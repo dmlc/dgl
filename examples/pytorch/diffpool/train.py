@@ -13,7 +13,7 @@ import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import tu
 
-from model.encoder import GraphEncoder, DiffPoolEncoder, DiffPool
+from model.encoder import DiffPool
 
 def arg_parse():
     '''
@@ -53,11 +53,11 @@ def arg_parse():
 
     parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
-                        pool_ratio=0.1,
+                        pool_ratio=0.5,
                         num_pool=2,
                         linkpred=True,
                         cuda=1,
-                        lr=0.001,
+                        lr=1e-3,
                         clip=2.0,
                         batch_size=10,
                         epoch=700,
@@ -68,8 +68,7 @@ def arg_parse():
                         gc_per_block=3,
                         dropout=0.0,
                         method='diffpool',
-                        bn=False,# \TODO batch normalization is not enabled
-                        # We batch graphs differently.
+                        bn=True,
                         bias=True)
     return parser.parse_args()
 
@@ -101,29 +100,6 @@ def graph_classify_task(prog_args):
     if prog_args.dataset == 'ENZYMES':
         use_node_attr = True
     dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
-    
-    """
-    dataset = tu.DiffpoolDataset(name=prog_args.dataset,
-                                 use_node_attr=use_node_attr,
-                                 use_node_label=True, mode='train',
-                                 train_ratio=prog_args.train_ratio,
-                                 test_ratio=prog_args.test_ratio,
-                                 **diffpool_kw_args)
-
-    val_dataset = tu.DiffpoolDataset(name=prog_args.dataset,
-                                     use_node_attr=use_node_attr,
-                                     use_node_label=True, mode='val',
-                                     train_ratio=prog_args.train_ratio,
-                                     test_ratio=prog_args.test_ratio,
-                                     **diffpool_kw_args)
-
-    test_dataset = tu.DiffpoolDataset(name=prog_args.dataset,
-                                      use_node_attr=use_node_attr,
-                                      use_node_label=True, mode='test',
-                                      train_ratio=prog_args.train_ratio,
-                                      test_ratio=prog_args.test_ratio,
-                                      **diffpool_kw_args)
-    """
 
     input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
@@ -132,11 +108,9 @@ def graph_classify_task(prog_args):
     print("the max num node is", max_num_node)
     print("number of graphs is", len(dataset))
 
-    # hidden dimension configs for diffpool model. \TODO allow user to change
-    # hidden dims?
-    hidden_dim = 64
+    hidden_dim = 64 # used to be 64
     embedding_dim = 64
-    pred_hidden_dims = [64, 64]
+
     # calculate assignment dimension: pool_ratio * largest graph's maximum
     # number of nodes  in the dataset
     assign_dim = int(max_num_node * prog_args.pool_ratio) * prog_args.batch_size
@@ -148,62 +122,30 @@ def graph_classify_task(prog_args):
     train_dataloader = prepare_data(dataset, prog_args, fold=0)
     val_dataloader = prepare_data(dataset, prog_args, fold=0)
     test_dataloader = prepare_data(dataset, prog_args, fold=0)
-    #val_dataloader = prepare_data(val_dataset, prog_args, mode='val')
-    #test_dataloader = prepare_data(test_dataset, prog_args, mode='test')
     activation = F.relu
     
 
     # initialize model
     # 'base' : graphsage
     # 'diffpool' : diffpool
-    if prog_args.method == 'base':
-        basekwargs = {'concat':False, 'bn':prog_args.bn, 'bias':True,
-                      'aggregator_type':'maxpool'}
-        model = GraphEncoder(input_dim, hidden_dim, embedding_dim,
-                             pred_hidden_dims, label_dim, activation,
-                             prog_args.gc_per_block, prog_args.dropout, **basekwargs)
-        if prog_args.cuda:
-            model = model.cuda()
-        print("model init finished")
-        print("MODEL:::::::::", prog_args.method)
-    elif prog_args.method == 'diffpool':
-        diffpoolkwargs = {'concat':True, 'bn':prog_args.bn, 'bias':True,
-                          'aggregator_type':'maxpool', 'pool_ratio':
-                          prog_args.pool_ratio, 'assign_dim': assign_dim,
-                          'batch_size': prog_args.batch_size}
-        # when assign_input_dim & assign_n_layers == -1, they are defaulted to
-        # be the same as input_dim and n_layers, respectively.
-        assign_input_dim = -1
-        assign_n_layers = -1
-        assign_hidden_dim = hidden_dim
-        """
-        model = DiffPoolEncoder(input_dim, assign_input_dim, hidden_dim, embedding_dim,
-                                pred_hidden_dims, assign_hidden_dim, label_dim, activation,
-                                prog_args.gc_per_block, assign_n_layers, prog_args.dropout,
-                                prog_args.num_pool, prog_args.linkpred,
-                                **diffpoolkwargs)
-        """
-        model = DiffPool(input_dim, 
-                         hidden_dim, 
-                         embedding_dim, 
-                         pred_hidden_dims, 
-                         assign_hidden_dim, 
-                         label_dim,
-                         activation, 
-                         prog_args.gc_per_block, 
-                         assign_n_layers, 
-                         prog_args.dropout, 
-                         prog_args.num_pool, 
-                         prog_args.linkpred,
-                         prog_args.batch_size, 
-                         'maxpool', 
-                         assign_dim,
-                         prog_args.pool_ratio)
+    model = DiffPool(input_dim, 
+                     hidden_dim, 
+                     embedding_dim,  
+                     label_dim,
+                     activation, 
+                     prog_args.gc_per_block,  
+                     prog_args.dropout, 
+                     prog_args.num_pool, 
+                     prog_args.linkpred,
+                     prog_args.batch_size, 
+                     'maxpool', 
+                     assign_dim,
+                     prog_args.pool_ratio)
 
-        print("model init finished")
-        print("MODEL:::::::", prog_args.method)
-        if prog_args.cuda:
-            model = model.cuda()
+    print("model init finished")
+    print("MODEL:::::::", prog_args.method)
+    if prog_args.cuda:
+        model = model.cuda()
     
     train(train_dataloader, model, prog_args, val_dataset=val_dataloader)
     result = evaluate(test_dataloader, model, prog_args)
@@ -216,11 +158,13 @@ def collate_fn(batch):
     '''
     graphs, labels = map(list, zip(*batch))
     cuda = torch.cuda.is_available()
+
     # batch graphs and cast to PyTorch tensor
     for graph in graphs:
         for (key, value) in graph.ndata.items():
             graph.ndata[key] = torch.FloatTensor(value)
     batched_graphs = dgl.batch(graphs)
+
     # move to cuda
     for (key, value) in batched_graphs.ndata.items():
         if cuda:
@@ -230,6 +174,7 @@ def collate_fn(batch):
 
     # cast to PyTorch tensor
     batched_labels = torch.LongTensor(np.array(labels))
+
     # move to cuda
     if cuda:
         batched_labels = batched_labels.cuda()
@@ -242,14 +187,11 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
     dataloader = dataset
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,
                                         model.parameters()), lr=0.001)
-    # iter
 
     if prog_args.cuda > 0:
         torch.cuda.set_device(0)
     else:
         cuda = False
-
-
 
     for epoch in range(prog_args.epoch):
         begin_time = time.time()
@@ -258,20 +200,13 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         print("EPOCH ###### {} ######".format(epoch))
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
             model.zero_grad()
-
-
             ypred = model(batch_graph)
-
             indi = torch.argmax(ypred, dim=1)
             correct = torch.sum(indi == graph_labels).item()
             train_accu += correct
-            if prog_args.method == 'base':
-                loss = model.loss(ypred, graph_labels)
-                loss.backward()
-            elif prog_args.method == 'diffpool':
-                loss = model.loss(ypred, graph_labels)
-                loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), prog_args.clip)
+            loss = model.loss(ypred, graph_labels)
+            loss.backward()
+            #nn.utils.clip_grad_norm_(model.parameters(), prog_args.clip)
             optimizer.step()
 
 
@@ -304,8 +239,6 @@ def main():
     '''
     main
     '''
-    #torch.multiprocessing.set_start_method('spawn')
-    # Not supported by DGL yet!
     prog_args = arg_parse()
     print(prog_args)
     graph_classify_task(prog_args)
