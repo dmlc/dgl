@@ -8,9 +8,299 @@ from scipy.linalg import block_diag
 
 import dgl
 
-from .graphSage import GraphSage, GraphSageLayer
-from tensorized_layers import *
+from .graphSage import GraphSage, GraphSageLayer, DiffPool4GraphLayer
+from .tensorized_layers import *
+from .model_utils import batch2tensor
 import time
+
+class DiffPool(nn.Module):
+    """
+    DiffPool Fuse
+    """
+    def __init__(self, input_dim, 
+                hidden_dim, 
+                embedding_dim, 
+                pred_hidden_dims, 
+                assign_hidden_dim, 
+                label_dim,
+                activation,
+                n_layers, 
+                assign_n_layers, 
+                dropout, 
+                n_pooling, 
+                linkpred, 
+                batch_size, 
+                aggregator_type, 
+                assign_dim, 
+                pool_ratio):
+        super(DiffPool, self).__init__()
+        self.link_pred = linkpred
+        self.concat = False #\TODO Fix
+        self.n_pooling = n_pooling
+        self.batch_size = batch_size
+        self.link_pred_loss = []
+        self.entropy_loss = []
+        self.hloss = HLoss()
+        # list of GNN modules before the first diffpool operation
+        self.gc_before_pool = nn.ModuleList()
+        self.diffpool_layers = nn.ModuleList()
+        # list of list of GNN modules, each list after one diffpool operation
+        self.gc_after_pool = nn.ModuleList()
+        self.assign_dim = assign_dim
+        self.bn = True
+        self.num_aggs = 1
+        self.cat = False
+
+        # constructing layers
+        # layers before diffpool
+        assert n_layers >= 3, "n_layers too few"
+        self.gc_before_pool.append(GraphSageLayer(input_dim, hidden_dim, activation, dropout, aggregator_type))
+        for _ in range(n_layers - 2):
+            self.gc_before_pool.append(GraphSageLayer(hidden_dim, hidden_dim, activation, dropout, aggregator_type))
+        self.gc_before_pool.append(GraphSageLayer(hidden_dim, embedding_dim, None, dropout, aggregator_type))
+
+        assign_dims = []
+        assign_dims.append(self.assign_dim)
+        self.first_diffpool_layer = DiffPool4GraphLayer(embedding_dim, self.assign_dim, hidden_dim,activation, dropout, aggregator_type, self.link_pred)
+        self.assign_dim = int(self.assign_dim * pool_ratio)
+        # each pooling module
+        for _ in range(n_pooling-1):
+            self.diffpool_layers.append(BatchedDiffPool(embedding_dim, self.assign_dim, hidden_dim, self.link_pred))
+            gc_after_per_pool = nn.ModuleList()
+            for _ in range(n_layers - 1):
+                gc_after_per_pool.append(BatchedGraphSAGE(hidden_dim, hidden_dim))
+            gc_after_per_pool.append(BatchedGraphSAGE(hidden_dim, embedding_dim))
+            self.gc_after_pool.append(gc_after_per_pool)
+            assign_dims.append(self.assign_dim)
+            self.assign_dim = int(self.assign_dim * pool_ratio)
+                
+        # predicting layer
+        self.pred_input_dim = embedding_dim # disable concat *(n_pooling + 1)
+        self.pred_layer = nn.Linear(self.pred_input_dim, label_dim)
+
+        # weight initialization
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                m.weight.data = init.xavier_uniform_(m.weight.data,
+                                                    gain=nn.init.calculate_gain('relu'))
+                if m.bias is not None:
+                    m.bias.data = init.constant_(m.bias.data, 0.0)
+    def gcn_forward(self, g, h, gc_layers, cat=False):
+        """
+        Return gc_layer embedding cat.
+        """
+        block_readout = []
+        for gc_layer in gc_layers[:-1]:
+            h = gc_layer(g, h)
+            if self.bn:
+                h = self.apply_bn(h)
+            block_readout.append(h)
+        h = gc_layers[-1](g, h)
+        block_readout.append(h)
+        if cat:
+            block = torch.cat(block_readout, dim=1) # N x F, F = F1 + F2 + ...
+        else:
+            block = h
+        return block
+    
+    def apply_bn(self, x):
+        """
+        Batch norm for 3D tensor X
+        """
+        bn_module = nn.BatchNorm1d(x.size()[1]).cuda()
+        return bn_module(x)
+    
+    def forward(self, g):
+        self.link_pred_loss = []
+        self.entropy_loss = []
+        h = g.ndata['feat']
+        # node feature for assignment matrix computation is the same as the
+        # original node feature
+        h_a = h
+
+        out_all = []
+
+        # we use GCN blocks to get an embedding first
+        total_time = []
+        comment = []
+        start = time.time()
+        g_embedding = self.gcn_forward(g, h, self.gc_before_pool, self.cat)
+        end = time.time() - start
+        total_time.append(end)
+        comment.append("pre_assignment graph convolution")
+
+        g.ndata['h'] = g_embedding
+
+        out = dgl.max_nodes(g, 'h')
+        out_all.append(out)
+        if self.num_aggs == 2:
+            out = dgl.sum_nodes(g, 'h')
+            out_all.append(out)
+        
+        adj, h = self.first_diffpool_layer(g, g_embedding)
+        node_per_pool_graph = int(adj.size()[0] / self.batch_size)
+        
+        h, adj = batch2tensor(adj, h, node_per_pool_graph) #\TODO batchG2tensorG
+
+        for i, diffpool_layer in enumerate(self.diffpool_layers):
+            h, adj = diffpool_layer(h, adj)
+            for layer in self.gc_after_pool[i]:
+                h = layer(h, adj)
+            out_all.append(h)
+        if self.concat:
+            output = torch.cat(out_all, dim=1)
+        else:
+            output = out
+        ypred = self.pred_layer(output)
+        return ypred
+    
+    def loss(self, pred, label):
+        '''
+        loss function
+        '''
+        #softmax + CE
+        criterion = nn.CrossEntropyLoss()
+        loss = criterion(pred, label)
+        for diffpool_layer in self.diffpool_layers:
+            for key, value in diffpool_layer.loss_log.items():
+                loss += value 
+        return loss
+        """
+            start = time.time()
+            self.assign_tensor = self.gcn_forward(g, h_a,
+                                                  self.gc_layers_assign[i],
+                                                  False)
+            # so that each node will not be assigned to clusters of other
+            # graphs
+            assign_tensor_masks = []
+            for g_n_nodes in g.batch_num_nodes:
+                mask =torch.ones((g_n_nodes,
+                                  int(self.assign_tensor.size()[1]/self.batch_size)))
+                assign_tensor_masks.append(mask)
+            mask = torch.FloatTensor(block_diag(*assign_tensor_masks)).cuda()
+
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("assignment matrix calculation")
+
+
+            start = time.time()
+            self.assign_tensor = masked_softmax(self.assign_tensor, mask,
+                                                memory_efficient=False)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("mask softmax calculation")
+
+            if not self.training:
+                _, idx = torch.max(self.assign_tensor, dim=1)
+                row_idx = list(range(self.assign_tensor.size()[0]))
+                sparse_assign = torch.zeros_like(self.assign_tensor)
+                sparse_assign[row_idx, list(idx)] = 1
+                self.assign_tensor = sparse_assign
+
+            # X_n = S^T X_{n-1}
+            start = time.time()
+            h = torch.matmul(torch.t(self.assign_tensor),g_embedding)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("lifting node feature matrix")
+
+            # we need to take out the adjacency matrix to compute S^TAS
+            # current device defaulted to cuda
+            device = torch.device('cuda:0')
+            adj = g.adjacency_matrix(ctx=device)
+            node_seg_list = g.batch_num_nodes
+            # S^TAS
+            start = time.time()
+            adj_new = torch.sparse.mm(adj, self.assign_tensor)
+            adj_new = torch.mm(torch.t(self.assign_tensor), adj_new)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("calculating next graph adj matrix")
+
+            h_a = h# updating assignment input and embedding input
+
+            pooled_g_n_nodes = self.assign_tensor.size()[1]
+
+            start = time.time()
+            pooled_g = dgl.DGLGraph()
+            # create the new pooled graph (batch version)
+            pooled_g.add_nodes(pooled_g_n_nodes)
+            adj_indices = adj_new.to_sparse()._indices()
+            # add edges
+            pooled_g.add_edges(adj_indices[1], adj_indices[0])
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("consrtructing new graph")
+
+            # edge weight is not set on pooled graph yet.\TODO
+
+            # at this point we have block diagonally dense graph (a batch
+            # graph)
+            start = time.time()
+            embedding_tensor = self.gcn_forward(pooled_g, h, self.gc_layers_after_pool[i])
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("after_assignment graph convolution")
+
+            pooled_g.ndata['h'] = embedding_tensor
+            out_temp = []
+            for index in node_seg_list:
+                sum_slice = torch.sum(pooled_g.ndata['h'][:index,:], dim=0,
+                                      keepdim=True)
+                out_temp.append(sum_slice)
+            out = torch.cat(out_temp, dim=0)
+
+            out_all.append(out)
+            if self.num_aggs == 2:
+                out_temp = []
+                for index in node_seg_list:
+                    sum_slice = torch.sum(pooled_g.ndata['h'][:index,:],dim=1)
+                    out_temp.append(sum_slice)
+                out_all.append(out)
+
+            # L_{lp} = A - S^TS
+            start = time.time()
+            current_lp_loss = torch.norm(adj.to_dense() - torch.mm(self.assign_tensor,
+                                                                   torch.t(self.assign_tensor))) / np.power(g.number_of_nodes(),2)
+            self.link_pred_loss.append(current_lp_loss)
+
+            # entropy loss
+            current_entropy_loss =\
+            self.hloss(self.assign_tensor, mask) / np.power(g.number_of_nodes(), 2)
+            self.entropy_loss.append(current_entropy_loss)
+            end = time.time() - start
+            comment.append("calculating loss")
+            total_time.append(end)
+
+            g = pooled_g
+
+        if self.concat:
+            output = torch.cat(out_all, dim=1)
+        else:
+            output = out
+        start = time.time()
+        ypred = self.pred_model(output)
+        end = time.time() - start
+        total_time.append(end)
+        total_time = np.array(total_time)
+        print((total_time/np.sum(total_time))*100)
+        print(comment)
+        return ypred
+
+    def loss(self, pred, label):
+        original_loss = super(DiffPoolEncoder, self).loss(pred, label)
+        # default entropy loss enabled
+        entropy_loss = sum(self.entropy_loss)
+        original_loss = original_loss + entropy_loss
+        if self.linkpred:
+            self.link_loss = sum(self.link_pred_loss)
+
+            return original_loss + self.link_loss
+        else:
+            return original_loss
+    """
+
 
 
 class GraphEncoder(nn.Module):

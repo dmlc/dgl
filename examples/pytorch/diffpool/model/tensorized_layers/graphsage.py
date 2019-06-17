@@ -13,7 +13,7 @@ class BatchedGraphSAGE(nn.Module):
 
         nn.init.xavier_uniform_(self.W.weight, gain=nn.init.calculate_gain('relu'))
 
-    def forward(self, x, adj, mask=None):
+    def forward(self, x, adj):
         if self.use_bn and not hasattr(self, 'bn'):
             self.bn = nn.BatchNorm1d(adj.size(1)).to(adj.device)
 
@@ -29,8 +29,6 @@ class BatchedGraphSAGE(nn.Module):
         h_k = F.relu(h_k)
         if self.use_bn:
             h_k = self.bn(h_k)
-        if mask is not None:
-            h_k = h_k * mask.unsqueeze(2).expand_as(h_k)
         return h_k
 
     def __repr__(self):

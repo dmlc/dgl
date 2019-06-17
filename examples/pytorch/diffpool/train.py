@@ -13,7 +13,7 @@ import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import tu
 
-from model.encoder import GraphEncoder, DiffPoolEncoder
+from model.encoder import GraphEncoder, DiffPoolEncoder, DiffPool
 
 def arg_parse():
     '''
@@ -51,10 +51,10 @@ def arg_parse():
     parser.add_argument('--bias', dest='bias', action='store_const',
                         const=True, default=True, help='switch for bias')
 
-    parser.set_defaults(dataset='ENZYMES',
+    parser.set_defaults(dataset='DD',
                         bmname='PH',
                         pool_ratio=0.25,
-                        num_pool=1,
+                        num_pool=2,
                         linkpred=True,
                         cuda=1,
                         lr=0.001,
@@ -82,7 +82,7 @@ def prepare_data(dataset, prog_args, mode):
     else:
         shuffle = False
 
-    dataset.set_mode(mode)
+    #dataset.set_mode(mode)
     return torch.utils.data.DataLoader(dataset,
                                        batch_size=prog_args.batch_size,
                                        shuffle=shuffle,
@@ -100,6 +100,9 @@ def graph_classify_task(prog_args):
     use_node_attr = False
     if prog_args.dataset == 'ENZYMES':
         use_node_attr = True
+    dataset = tu.TUDataset(name=prog_args.dataset)
+    
+    """
     dataset = tu.DiffpoolDataset(name=prog_args.dataset,
                                  use_node_attr=use_node_attr,
                                  use_node_label=True, mode='train',
@@ -120,14 +123,14 @@ def graph_classify_task(prog_args):
                                       train_ratio=prog_args.train_ratio,
                                       test_ratio=prog_args.test_ratio,
                                       **diffpool_kw_args)
+    """
 
-    input_dim, assign_input_dim, label_dim, max_num_node = dataset.statistics()
+    input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
     print("dataset feature dimension is", input_dim)
-    print("dataset assign_feature input dimension is (if used)",
-          assign_input_dim)
     print("dataset label dimension is", label_dim)
     print("the max num node is", max_num_node)
+    print("number of graphs is", len(dataset))
 
     # hidden dimension configs for diffpool model. \TODO allow user to change
     # hidden dims?
@@ -143,9 +146,12 @@ def graph_classify_task(prog_args):
     print("initial batched pool graph dim is", assign_dim)
 
     train_dataloader = prepare_data(dataset, prog_args, mode='train')
-    val_dataloader = prepare_data(val_dataset, prog_args, mode='val')
-    test_dataloader = prepare_data(test_dataset, prog_args, mode='test')
+    val_dataloader = train_dataloader
+    test_dataloader = train_dataloader
+    #val_dataloader = prepare_data(val_dataset, prog_args, mode='val')
+    #test_dataloader = prepare_data(test_dataset, prog_args, mode='test')
     activation = F.relu
+    
 
     # initialize model
     # 'base' : graphsage
@@ -170,16 +176,35 @@ def graph_classify_task(prog_args):
         assign_input_dim = -1
         assign_n_layers = -1
         assign_hidden_dim = hidden_dim
+        """
         model = DiffPoolEncoder(input_dim, assign_input_dim, hidden_dim, embedding_dim,
                                 pred_hidden_dims, assign_hidden_dim, label_dim, activation,
                                 prog_args.gc_per_block, assign_n_layers, prog_args.dropout,
                                 prog_args.num_pool, prog_args.linkpred,
                                 **diffpoolkwargs)
+        """
+        model = DiffPool(input_dim, 
+                         hidden_dim, 
+                         embedding_dim, 
+                         pred_hidden_dims, 
+                         assign_hidden_dim, 
+                         label_dim,
+                         activation, 
+                         prog_args.gc_per_block, 
+                         assign_n_layers, 
+                         prog_args.dropout, 
+                         prog_args.num_pool, 
+                         prog_args.linkpred,
+                         prog_args.batch_size, 
+                         'maxpool', 
+                         assign_dim,
+                         prog_args.pool_ratio)
+
         print("model init finished")
         print("MODEL:::::::", prog_args.method)
         if prog_args.cuda:
             model = model.cuda()
-
+    
     train(train_dataloader, model, prog_args, val_dataset=val_dataloader)
     result = evaluate(test_dataloader, model, prog_args)
     print("test  accuracy {}".format(result))
@@ -204,7 +229,7 @@ def collate_fn(batch):
             batched_graphs.ndata[key] = value
 
     # cast to PyTorch tensor
-    batched_labels = torch.LongTensor(np.concatenate(labels, axis=0))
+    batched_labels = torch.LongTensor(np.array(labels))
     # move to cuda
     if cuda:
         batched_labels = batched_labels.cuda()
