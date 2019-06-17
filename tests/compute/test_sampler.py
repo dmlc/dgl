@@ -174,6 +174,13 @@ def test_edge_sampler():
         assert_array_equal(src, src1)
         assert_array_equal(dst, dst1)
 
+        edges = []
+        for i in range(src_nf.num_blocks):
+            edges.append(F.asnumpy(src_nf.block_parent_eid(i)))
+        edges = np.concatenate(edges)
+        for eid in F.asnumpy(eids):
+            assert eid not in edges
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()

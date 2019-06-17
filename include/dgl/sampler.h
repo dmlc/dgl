@@ -56,13 +56,15 @@ class SamplerOp {
    * \param num_hops the number of hops to sample neighbors.
    * \param expand_factor the max number of neighbors to sample.
    * \param add_self_loop whether to add self loop to the sampled subgraph
+   * \param exclude_edges a set of edges we should exclude from the sampled NodeFlow.
    * \return a NodeFlow graph.
    */
   static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
                                         const std::vector<dgl_id_t>& seeds,
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor,
-                                        const bool add_self_loop);
+                                        const bool add_self_loop,
+                                        const std::unordered_set<dgl_id_t> &exclude_edges);
 
   /*!
    * \brief Sample a graph from the seed vertices with layer sampling.

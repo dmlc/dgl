@@ -499,7 +499,8 @@ class EdgeNeighborSampler(EdgeSampler):
             shuffle=False,
             num_workers=1,
             prefetch=False,
-            add_self_loop=False):
+            add_self_loop=False,
+            exclude_sampled_edges=True):
         super(EdgeNeighborSampler, self).__init__(
                 g, batch_size, seed_edges, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
@@ -512,6 +513,7 @@ class EdgeNeighborSampler(EdgeSampler):
         self._add_self_loop = add_self_loop
         self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
+        self._exclude_edges = exclude_sampled_edges
 
     def fetch(self, current_index):
         handles = unwrap_to_ptr_list(_CAPI_UniformEdgeSampling(
@@ -523,7 +525,8 @@ class EdgeNeighborSampler(EdgeSampler):
             self._expand_factor,
             self._num_hops,
             self._neighbor_type,
-            self._add_self_loop))
+            self._add_self_loop,
+            self._exclude_edges))
         nflows = []
         for hdl in handles:
             func = _CAPI_GetEdgeBatch(hdl)

@@ -146,13 +146,24 @@ void GetUniformSample(const dgl_id_t* edge_id_list,
                       const dgl_id_t* vid_list,
                       const size_t ver_len,
                       const size_t max_num_neighbor,
+                      const std::unordered_set<dgl_id_t> &exclude_edges,
                       std::vector<dgl_id_t>* out_ver,
                       std::vector<dgl_id_t>* out_edge,
                       unsigned int* seed) {
-  // Copy vid_list to output
-  if (ver_len <= max_num_neighbor) {
+  // Copy vid_list to output if we don't need to exclude edges.
+  if (ver_len <= max_num_neighbor && exclude_edges.empty()) {
     out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
     out_edge->insert(out_edge->end(), edge_id_list, edge_id_list + ver_len);
+    return;
+  } else if (ver_len <= max_num_neighbor) {
+    // We need to exclude some edges.
+    for (size_t i = 0; i < ver_len; i++) {
+      dgl_id_t eid = edge_id_list[i];
+      if (exclude_edges.find(eid) == exclude_edges.end()) {
+        out_ver->push_back(vid_list[i]);
+        out_edge->push_back(eid);
+      }
+    }
     return;
   }
   // If we just sample a small number of elements from a large neighbor list.
@@ -174,9 +185,21 @@ void GetUniformSample(const dgl_id_t* edge_id_list,
   for (size_t i = 1; i < sorted_idxs.size(); i++) {
     CHECK_GT(sorted_idxs[i], sorted_idxs[i - 1]);
   }
-  for (auto idx : sorted_idxs) {
-    out_ver->push_back(vid_list[idx]);
-    out_edge->push_back(edge_id_list[idx]);
+  // We don't need to exclude edges.
+  if (exclude_edges.empty()) {
+    for (auto idx : sorted_idxs) {
+      out_ver->push_back(vid_list[idx]);
+      out_edge->push_back(edge_id_list[idx]);
+    }
+  } else {
+    // TODO(zhengda) here we sample a smaller number of neighbors as required.
+    for (auto idx : sorted_idxs) {
+      dgl_id_t eid = edge_id_list[idx];
+      if (exclude_edges.find(eid) == exclude_edges.end()) {
+        out_ver->push_back(vid_list[idx]);
+        out_edge->push_back(eid);
+      }
+    }
   }
 }
 
@@ -188,10 +211,12 @@ void GetNonUniformSample(const float* probability,
                          const dgl_id_t* vid_list,
                          const size_t ver_len,
                          const size_t max_num_neighbor,
+                         const std::unordered_set<dgl_id_t> &exclude_edges,
                          std::vector<dgl_id_t>* out_ver,
                          std::vector<dgl_id_t>* out_edge,
                          unsigned int* seed) {
-  // Copy vid_list to output
+  CHECK(exclude_edges.empty()) << "Non-uniform sampling doesn't support excluding edges";
+  // Copy vid_list to output.
   if (ver_len <= max_num_neighbor) {
     out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
     out_edge->insert(out_edge->end(), edge_id_list, edge_id_list + ver_len);
@@ -378,7 +403,8 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         const std::string &edge_type,
                         int num_hops,
                         size_t num_neighbor,
-                        const bool add_self_loop) {
+                        const bool add_self_loop,
+                        const std::unordered_set<dgl_id_t> &exclude_edges) {
   unsigned int time_seed = randseed();
   const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
@@ -428,6 +454,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                          col_list + *(indptr + dst_id),
                          ver_len,
                          num_neighbor,
+                         exclude_edges,
                          &tmp_sampled_src_list,
                          &tmp_sampled_edge_list,
                          &time_seed);
@@ -437,6 +464,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             col_list + *(indptr + dst_id),
                             ver_len,
                             num_neighbor,
+                            exclude_edges,
                             &tmp_sampled_src_list,
                             &tmp_sampled_edge_list,
                             &time_seed);
@@ -535,14 +563,16 @@ NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
                                           const std::vector<dgl_id_t>& seeds,
                                           const std::string &edge_type,
                                           int num_hops, int expand_factor,
-                                          const bool add_self_loop) {
+                                          const bool add_self_loop,
+                                          const std::unordered_set<dgl_id_t> &exclude_edges) {
   return SampleSubgraph(graph,
                         seeds,                 // seed vector
                         nullptr,               // sample_id_probability
                         edge_type,
                         num_hops + 1,
                         expand_factor,
-                        add_self_loop);
+                        add_self_loop,
+                        exclude_edges);
 }
 
 namespace {
@@ -761,6 +791,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
+    std::unordered_set<dgl_id_t> exclude_edges;
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       // create per-worker seed nodes.
@@ -772,7 +803,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
                 worker_seeds.begin());
       nflows[i] = new NodeFlow();
       *nflows[i] = SamplerOp::NeighborUniformSample(
-          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
+          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop,
+          exclude_edges);
     }
     *rv = WrapVectorReturn(nflows);
   });
@@ -836,6 +868,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const int64_t num_hops = args[6];
     const std::string neigh_type = args[7];
     const bool add_self_loop = args[8];
+    const bool exclude_edges = args[9];
     // process args
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
@@ -857,22 +890,27 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       const int64_t num_edges = end - start;
       IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
                                                    sizeof(dgl_id_t) * start);
+      const dgl_id_t *edge_data = static_cast<const dgl_id_t *>(worker_seeds->data);
       GraphInterface::EdgeArray arr = gptr->FindEdges(worker_seeds);
       const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
       const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
-      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
       nflows[i] = new EdgeBatch();
       nflows[i]->src_nf = new NodeFlow();
       nflows[i]->dst_nf = new NodeFlow();
-      // TODO(zhengda) we need to remove the edges from NodeFlows.
+
+      // We need to exclude the edges.
+      std::unordered_set<dgl_id_t> exclude;
+      if (exclude_edges)
+        exclude.insert(edge_data, edge_data + num_edges);
+
       // TODO(zhengda) if this is an undirected graph, we need to remove the edges
       // and their reversed edges from NodeFlows.
       *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
-          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop, exclude);
       *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
-          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop, exclude);
       nflows[i]->eids = worker_seeds;
     }
     *rv = WrapVectorReturn(nflows);
