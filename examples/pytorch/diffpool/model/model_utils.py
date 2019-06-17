@@ -10,6 +10,7 @@ def construct_mask(mask_length: th.Tensor, max_length):
     # max_length = th.max(mask_length)
     mask = th.ones(*mask_length.shape, max_length)
     mask[th.arange(mask_length.shape[0]), mask_length - 1] = 1
+    print("hello world")
     return th.cumprod(mask, dim=1)
 
 
