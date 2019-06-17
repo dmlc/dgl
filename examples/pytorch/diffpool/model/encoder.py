@@ -40,9 +40,9 @@ class DiffPool(nn.Module):
         # constructing layers
         # layers before diffpool
         assert n_layers >= 3, "n_layers too few"
-        self.gc_before_pool.append(GraphSageLayer(input_dim, hidden_dim, activation, dropout, aggregator_type))
+        self.gc_before_pool.append(GraphSageLayer(input_dim, hidden_dim, activation, dropout, aggregator_type, self.bn))
         for _ in range(n_layers - 2):
-            self.gc_before_pool.append(GraphSageLayer(hidden_dim, hidden_dim, activation, dropout, aggregator_type))
+            self.gc_before_pool.append(GraphSageLayer(hidden_dim, hidden_dim, activation, dropout, aggregator_type, self.bn))
         self.gc_before_pool.append(GraphSageLayer(hidden_dim, embedding_dim, None, dropout, aggregator_type))
 
         assign_dims = []
@@ -92,8 +92,6 @@ class DiffPool(nn.Module):
         block_readout = []
         for gc_layer in gc_layers[:-1]:
             h = gc_layer(g, h)
-            if self.bn:
-                h = self.apply_bn(h)
             block_readout.append(h)
         h = gc_layers[-1](g, h)
         block_readout.append(h)
@@ -113,13 +111,6 @@ class DiffPool(nn.Module):
         else:
             block = h
         return block
-    
-    def apply_bn(self, x):
-        """
-        Batch norm for 3D tensor X
-        """
-        bn_module = nn.BatchNorm1d(x.size()[1]).cuda()
-        return bn_module(x)
     
     def forward(self, g):
         self.link_pred_loss = []
