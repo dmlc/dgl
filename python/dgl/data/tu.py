@@ -47,10 +47,15 @@ class TUDataset(object):
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
 
         node_idx_list = []
+        self.max_num_node = 0
         for idx in range(np.max(DS_indicator) + 1):
             node_idx = np.where(DS_indicator == idx)
             node_idx_list.append(node_idx[0])
+            if len(node_idx[0]) > self.max_num_node:
+                self.max_num_node = len(node_idx[0])
+
         self.graph_lists = g.subgraphs(node_idx_list)
+        self.num_labels = max(DS_graph_labels) + 1
         self.graph_labels = DS_graph_labels
 
         try:
@@ -117,5 +122,7 @@ class TUDataset(object):
         return one_hot_tensor
 
     def statistics(self):
-        return self.graph_lists[0].ndata['feat'].shape[1]
+        return self.graph_lists[0].ndata['feat'].shape[1],\
+                self.num_labels,\
+                self.max_num_node
 
