@@ -230,6 +230,8 @@ class NeighborSampler(NodeFlowSampler):
     ``len(seed_nodes) // batch_size`` (if ``seed_nodes`` is None, then it is equal
     to the set of all nodes in the graph).
 
+    Note: NeighborSampler currently only supprts immutable graphs.
+
     Parameters
     ----------
     g : DGLGraph
@@ -296,6 +298,8 @@ class NeighborSampler(NodeFlowSampler):
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
+        assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
@@ -329,6 +333,8 @@ class LayerSampler(NodeFlowSampler):
 
     The NodeFlow loader returns a list of NodeFlows.
     The size of the NodeFlow list is the number of workers.
+
+    Note: LayerSampler currently only supprts immutable graphs.
 
     Parameters
     ----------
@@ -380,6 +386,8 @@ class LayerSampler(NodeFlowSampler):
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
+        assert g.is_readonly, "LayerSampler doesn't support mutable graphs. " + \
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
 
         self._num_workers = int(num_workers)
