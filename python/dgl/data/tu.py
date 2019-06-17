@@ -21,7 +21,7 @@ class TUDataset(object):
 
     """
 
-    _url = r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
+    _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_pandas=False, hidden_size=10):
 
