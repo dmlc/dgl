@@ -83,8 +83,11 @@ class TUDataset(object):
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
         
         # randomly shuffle the data
-        random.shuffle(self.graph_lists)
-        random.shuffle(self.graph_labels)
+        ind = [i for i in range(len(self.graph_labels))]
+        random.seed(0)
+        random.shuffle(ind)
+        self.graph_lists = [self.graph_lists[i] for i in ind]
+        self.graph_labels = [self.graph_labels[i] for i in ind]
 
         #check dataset splitting:
         eps = 1e-5

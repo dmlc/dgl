@@ -53,15 +53,15 @@ def arg_parse():
 
     parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
-                        pool_ratio=0.5,
-                        num_pool=2,
+                        pool_ratio=0.25,
+                        num_pool=1,
                         linkpred=True,
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=10,
+                        batch_size=20,
                         epoch=700,
-                        train_ratio=0.8,
+                        train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=0,
                         feature_type='default',
@@ -99,8 +99,9 @@ def graph_classify_task(prog_args):
     use_node_attr = False
     if prog_args.dataset == 'ENZYMES':
         use_node_attr = True
-    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
-
+    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
+    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
+    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
     input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
     print("dataset feature dimension is", input_dim)
@@ -120,13 +121,12 @@ def graph_classify_task(prog_args):
     print("initial batched pool graph dim is", assign_dim)
 
     train_dataloader = prepare_data(dataset, prog_args, fold=0)
-    val_dataloader = prepare_data(dataset, prog_args, fold=0)
-    test_dataloader = prepare_data(dataset, prog_args, fold=0)
+    val_dataloader = prepare_data(dataset_val, prog_args, fold=1)
+    test_dataloader = prepare_data(dataset_test, prog_args, fold=2)
     activation = F.relu
     
 
     # initialize model
-    # 'base' : graphsage
     # 'diffpool' : diffpool
     model = DiffPool(input_dim, 
                      hidden_dim, 
@@ -206,7 +206,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
             train_accu += correct
             loss = model.loss(ypred, graph_labels)
             loss.backward()
-            #nn.utils.clip_grad_norm_(model.parameters(), prog_args.clip)
+            nn.utils.clip_grad_norm_(model.parameters(), prog_args.clip)
             optimizer.step()
 
 

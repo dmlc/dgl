@@ -136,7 +136,7 @@ class DiffPool(nn.Module):
 
         g.ndata['h'] = g_embedding
 
-        readout = dgl.max_nodes(g, 'h')
+        readout = dgl.sum_nodes(g, 'h')
         out_all.append(readout)
         if self.num_aggs == 2:
             readout = dgl.sum_nodes(g, 'h')
@@ -147,7 +147,7 @@ class DiffPool(nn.Module):
         
         h, adj = batch2tensor(adj, h, node_per_pool_graph)
         h = self.gcn_forward_tensorized(h, adj, self.gc_after_pool[0], self.concat)
-        readout, _ = torch.max(h, dim=1)
+        readout = torch.sum(h, dim=1)
         out_all.append(readout)
         if self.num_aggs == 2:
             readout, _ = torch.sum(h, dim=1)
@@ -157,7 +157,7 @@ class DiffPool(nn.Module):
         for i, diffpool_layer in enumerate(self.diffpool_layers):
             h, adj = diffpool_layer(h, adj)
             h = self.gcn_forward_tensorized(h, adj, self.gc_after_pool[i+1], self.concat)
-            readout, _ = torch.max(h, dim=1)
+            readout = torch.sum(h, dim=1)
             out_all.append(readout)
             if self.num_aggs == 2:
                 readout, _ = torch.sum(h, dim=1)
