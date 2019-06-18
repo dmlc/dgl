@@ -142,9 +142,6 @@ class SortPooling(nn.Module):
     def forward(self, feat, graph):
         pass
 
-class KNNPooling(nn.Module):
-    pass
-
 
 class SpectralClustering(nn.Module):
     pass
