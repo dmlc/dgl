@@ -28,7 +28,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     readonly : bool, optional
         Whether the graph structure is read-only (default: False)
     """
-    # pylint: disable=unused-argument
     def __init__(
             self,
             metagraph,
@@ -46,20 +45,26 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             raise Exception("Bipartite graph should have only two node types")
         assert metagraph.number_of_edges() == 1
         self._metagraph = metagraph
-        self._etype = list(edge_connections_by_type.keys())[0]
-        self._ntypes = [self._etype[0], self._etype[1]]
+        self._etypes = list(edge_connections_by_type.keys())
+        if len(self._etypes) > 2:
+            raise Exception("Bipartite graph has at most two types of relations")
+
+        self._ntypes = [self._etypes[0][0], self._etypes[0][1]]
         assert self._ntypes[0] in number_of_nodes_by_type.keys()
         assert self._ntypes[1] in number_of_nodes_by_type.keys()
         self._num_nodes = [number_of_nodes_by_type[self._ntypes[0]],
                            number_of_nodes_by_type[self._ntypes[1]]]
         self._num_nodes_by_type = number_of_nodes_by_type
 
-        # TODO(zhengda) this is a hack way of constructing a bipartite graph.
-        if len(edge_connections_by_type) > 1:
-            raise Exception("Bipartite graph only support one type of edges")
-        edges = edge_connections_by_type[self._etype]
-
-        self._graph = create_bigraph_index(edges, self._num_nodes, False, readonly)
+        if edge_connections_by_type is not None:
+            self._one_dir_graphs = {}
+            for etype in self._etypes:
+                edges = edge_connections_by_type[etype]
+                self._one_dir_graphs[etype] = create_bigraph_index(edges, self._num_nodes, False, readonly)
+            if len(self._etypes) == 1:
+                self._graph = self._one_dir_graphs[self._etypes[0]]
+        else:
+            self._graph = None
 
         if node_frame is not None:
             assert self._ntypes[0] in node_frame
@@ -69,14 +74,19 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         else:
             self._node_frames = {self._ntypes[0]: FrameRef(Frame(num_rows=self._num_nodes[0])),
                                  self._ntypes[1]: FrameRef(Frame(num_rows=self._num_nodes[1]))}
+        self._node_frame_vec = [self._node_frames[ntype] for ntype in self._ntypes]
 
         if edge_frame is not None:
-            assert self._etype in edge_frame
-            assert len(edge_frame) == 1
+            assert len(edge_frame) == len(self._etypes)
+            for etype in self._etypes:
+                assert etype in edge_frame
             self._edge_frames = edge_frame
         else:
-            num_edges = self._graph.number_of_edges()
-            self._edge_frames = {self._etype: FrameRef(Frame(num_rows=num_edges))}
+            self._edge_frames = {}
+            for etype in self._etypes:
+                num_edges = self._one_dir_graphs[etype].number_of_edges()
+                self._edge_frames[etype] = FrameRef(Frame(num_rows=num_edges))
+        self._edge_frame_vec = [self._edge_frames[etype] for etype in self._etypes]
 
         # registered functions
         self._message_funcs = {}
@@ -85,10 +95,10 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         self._apply_edge_funcs = {}
 
     def _get_node_frame(self, idx):
-        return self._node_frames[self._ntypes[idx]]
+        return self._node_frames[idx]
 
     def _get_edge_frame(self, idx):
-        return self._edge_frames[self._etype]
+        return self._edge_frames[idx]
 
     def _number_of_nodes(self, ntype):
         if isinstance(ntype, str):
@@ -99,6 +109,12 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             raise Exception("we can't get the number of nodes of different types")
         else:
             raise Exception('Wrong input type')
+
+    def _get_graph(self, etype):
+        return self._one_dir_graphs[etype]
+
+    def _number_of_edges(self, etype):
+        return self._get_graph(etype).number_of_edges()
 
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
@@ -118,10 +134,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         raise Exception("Bipartite graph doesn't support number_of_nodes."
                         "Please use g['ntype'].number_of_nodes() to get number of nodes.")
-
-    def _number_of_edges(self, etype):
-        assert etype == self._etype
-        return self._graph.number_of_edges()
 
     def number_of_edges(self):
         """Return the number of edges in the graph.
@@ -184,6 +196,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         bool
             True if the edge is in the graph, False otherwise.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].has_edge_between(u, v).")
         return self._graph.has_edge_between(u, v + self._number_of_nodes(0))
 
     def has_edges_between(self, u, v):
@@ -211,6 +226,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         a : tensor
             0-1 array indicating existence.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].has_edges_between(u, v).")
         u = utils.toindex(u)
         v = F.tensor(v, F.int64) + self._number_of_nodes(0)
         v = utils.toindex(v)
@@ -225,13 +243,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def is_multigraph(self):
         """True if the graph is a multigraph, False otherwise.
         """
-        return self._graph.is_multigraph()
+        return self._get_graph(self._etypes[0]).is_multigraph()
 
     @property
     def is_readonly(self):
         """True if the graph is readonly, False otherwise.
         """
-        return self._graph.is_readonly()
+        return self._get_graph(self._etypes[0]).is_readonly()
 
     def predecessors(self, v):
         """Return the predecessors of node `v` in the graph with the same
@@ -250,6 +268,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             Array of predecessor node IDs of source node type.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].predecessors(v).")
         return self._graph.predecessors(v + self._number_of_nodes(0)).tousertensor()
 
     def successors(self, v):
@@ -269,6 +290,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             Array of successor node IDs if destination node type.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].successors(v).")
         return self._graph.successors(v).tousertensor() - self._number_of_nodes(0)
 
     def edge_id(self, u, v, force_multi=False):
@@ -291,6 +315,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             The edge ID if force_multi == True and the graph is a simple graph.
             The edge ID array otherwise.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].edge_id(u, v).")
         idx = self._graph.edge_id(u, v + self._number_of_nodes(0))
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
@@ -328,6 +355,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
             and `v[i]` are returned.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v).")
         u = utils.toindex(u)
         v = self._to_dst_index(v)
         src, dst, eid = self._graph.edge_ids(u, v)
@@ -354,6 +384,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             The destination node ID array.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].find_edges(eid).")
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor() - self._number_of_nodes(0)
@@ -383,6 +416,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         One Tensor if form == 'eid'
             ``eid[i]`` is ID of an inbound edge to any of the nodes in ``v``.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].in_edges(v).")
         v = self._to_dst_index(v)
         src, dst, eid = self._graph.in_edges(v)
         if form == 'all':
@@ -420,6 +456,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         One Tensor if form == 'eid'
             ``eid[i]`` is ID of an outbound edge from any of the nodes in ``v``.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].out_edges(v).")
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(v)
         if form == 'all':
@@ -444,7 +483,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['srctype', 'dsttype', 'edgetype'].all_edges()
 
         Parameters
         ----------
@@ -473,6 +512,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         One Tensor if form == 'eid'
             ``eid[i]`` is the ID of an edge in the graph.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].all_edges().")
         src, dst, eid = self._graph.edges(order)
         if form == 'all':
             dst = dst.tousertensor() - self._number_of_nodes(0)
@@ -492,7 +534,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['srctype', 'dsttype', 'edgetype'].in_degree(v)
 
         Parameters
         ----------
@@ -504,6 +546,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         int
             The in-degree.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].in_degree(v).")
         v = v + self._number_of_nodes(0)
         return self._graph.in_degree(v)
 
@@ -517,7 +562,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['srctype', 'dsttype', 'edgetype'].in_degrees(v)
 
         Parameters
         ----------
@@ -530,6 +575,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         d : tensor
             The in-degree array.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].in_degrees(v).")
         if is_all(v):
             v = utils.toindex(slice(self._number_of_nodes(0),
                                     self._number_of_nodes(0) + self._number_of_nodes(1)))
@@ -545,7 +593,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['srctype', 'dsttype', 'edgetype'].out_degree(v)
 
         Parameters
         ----------
@@ -557,6 +605,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         int
             The out-degree.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].out_degree(v).")
         return self._graph.out_degree(v)
 
     def out_degrees(self, v=ALL):
@@ -569,7 +620,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['srctype', 'dsttype', 'edgetype'].out_degrees(v)
 
         Parameters
         ----------
@@ -582,6 +633,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         d : tensor
             The out-degree array.
         """
+        if len(self._etypes) > 1:
+            raise Exception("There are more than one relation in the bipartite graph. "
+                            "Please use g['srctype', 'dsttype', 'edgetype'].out_degrees(v).")
         if is_all(v):
             v = utils.toindex(slice(0, self._number_of_nodes(0)))
         else:
@@ -762,8 +816,26 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def edges(self):
         """Return an edges view that can used to set/get feature data of a
         single edge type.
+
+        Notes
+        -----
+        An error is raised if the graph contains multiple edge types.  Use
+
+            g[src_type, dst_type, edge_type]
+
+        to select edges with type ``(src_type, dst_type, edge_type)``.
+
+        Examples
+        --------
+        To set features of gameplays #1 (Bob -> Tetris) and #3 (Carol ->
+        Minecraft) in a heterogeneous graph:
+        >>> g['user', 'game', 'plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
         """
-        return HeteroEdgeView(self, self._etype)
+        if len(self._etypes[0]) == 1:
+            return HeteroEdgeView(self, self._etypes[0])
+        else:
+            raise Exception("Bipartite graph has two relations. "
+                            "Please use g[src_type, dst_type, edge_type].edges.")
 
     @property
     def edata(self):
@@ -887,7 +959,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             u = utils.toindex(u)
             v = utils.toindex(v)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            _, _, eid = self._graph.edge_ids(u, v)
+            _, _, eid = self._get_graph(etype).edge_ids(u, v)
         else:
             eid = utils.toindex(edges)
 
@@ -897,7 +969,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                            ' Got "%s" instead.' % type(data))
 
         if is_all(eid):
-            num_edges = self.number_of_edges()
+            num_edges = self._number_of_edges(etype)
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
@@ -915,7 +987,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             # update row
             self._edge_frames[etype].update_rows(eid, data, inplace=inplace)
 
-    def get_e_repr(self, etype=ALL, edges=ALL):
+    def get_e_repr(self, etype, edges=ALL):
         """Get edge(s) representation.
 
         Parameters
@@ -932,10 +1004,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         dict
             Representation dict
         """
-        if is_all(etype):
-            etype = self._etype
-
-        if len(self.edge_attr_schemes(self._etype)) == 0:
+        if len(self.edge_attr_schemes(etype)) == 0:
             return dict()
         # parse argument
         if is_all(edges):
@@ -946,7 +1015,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             u = utils.toindex(u)
             v = utils.toindex(v)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            _, _, eid = self._graph.edge_ids(u, v)
+            _, _, eid = self._get_graph(etype).edge_ids(u, v)
         else:
             eid = utils.toindex(edges)
 
@@ -995,13 +1064,10 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             If the graph has more than one edge type and ``func`` is not a
             dict, it will throw an error.
         """
-        if isinstance(func, dict):
-            assert len(func) == 1
-            key = list(func.keys())[0]
-            assert key == self._etype
+        assert isinstance(func, dict)
+        for key in func:
+            assert key in self._etypes
             self._message_funcs[key] = func[key]
-        else:
-            self._message_funcs[self._etype] = func
 
     def register_reduce_func(self, func):
         """Register global message reduce function for each edge type provided.
@@ -1072,13 +1138,10 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             If the graph has more than one edge type and ``func`` is not a
             dict, it will throw an error.
         """
-        if isinstance(func, dict):
-            assert len(func) == 1
-            key = list(func.keys())[0]
-            assert key == self._etype
+        assert isinstance(func, dict):
+        for key in func:
+            assert key in self._etypes
             self._apply_edge_funcs[key] = func[key]
-        else:
-            self._apply_edge_funcs[self._etype] = func
 
     def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the nodes with the same type to update their
@@ -1123,7 +1186,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         if func == "default":
             func = self._apply_node_funcs
-        if func is None:
+        if len(func) == 0:
             return
 
         assert isinstance(v, dict)
@@ -1177,33 +1240,34 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         if func == "default":
             func = self._apply_edge_funcs[self._etype]
-        assert func is not None
+        if len(func) == 0:
+            return
 
-        # Bipartite graphs have only one edge type.
-        if is_all(edges):
-            u, v, _ = self._graph.edges('eid')
-            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
-            eid = utils.toindex(slice(0, self.number_of_edges()))
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v + self._number_of_nodes(0))
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(u, v)
-            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
-        else:
-            eid = utils.toindex(edges)
-            u, v, _ = self._graph.find_edges(eid)
-            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+        for etype in self._etypes:
+            if is_all(edges):
+                u, v, _ = self._get_graph(etype).edges('eid')
+                v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+                eid = utils.toindex(slice(0, self.number_of_edges()))
+            elif isinstance(edges[etype], tuple):
+                u, v = edges
+                u = utils.toindex(u)
+                v = utils.toindex(v + self._number_of_nodes(0))
+                # Rewrite u, v to handle edge broadcasting and multigraph.
+                u, v, eid = self._get_graph(etype).edge_ids(u, v)
+                v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+            else:
+                eid = utils.toindex(edges[etype])
+                u, v, _ = self._get_graph(etype).find_edges(eid)
+                v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
 
-        with ir.prog() as prog:
-            scheduler.schedule_bipartite_apply_edges(graph=self,
-                                                     u=u,
-                                                     v=v,
-                                                     eid=eid,
-                                                     apply_func=func,
-                                                     inplace=inplace)
-            Runtime.run(prog)
+            with ir.prog() as prog:
+                scheduler.schedule_bipartite_apply_edges(graph=self,
+                                                         u=u,
+                                                         v=v,
+                                                         eid=eid,
+                                                         apply_func=func,
+                                                         inplace=inplace)
+                Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
         """Group the edges by nodes and apply the function of the grouped
@@ -1353,23 +1417,31 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         raise Exception("bipartite graph doesn't support recv for now")
 
-    def _get_func(self, message_func, reduce_func, apply_node_func):
+    def _get_func_iter(self, message_func, reduce_func, apply_node_func):
         if message_func == "default":
-            if self._etype in self._message_funcs:
-                message_func = self._message_funcs[self._etype]
-            else:
-                message_func = None
+            message_func = self._message_funcs
         if reduce_func == "default":
-            if self._ntypes[1] in self._reduce_funcs:
-                reduce_func = self._reduce_funcs[self._ntypes[1]]
-            else:
-                reduce_func = None
+            reduce_func = self._reduce_funcs
         if apply_node_func == "default":
-            if self._ntypes[1] in self._apply_node_funcs:
-                apply_node_func = self._apply_node_funcs[self._ntypes[1]]
-            else:
-                apply_node_func = None
-        return message_func, reduce_func, apply_node_func
+            apply_node_func = self._apply_node_funcs
+
+        class FuncIter(object):
+            def __init__(self):
+                self._idx = 0
+                self._relations = message_func.key()
+
+            def __next__(self):
+                if len(self._relations) == self._idx:
+                    raise StopIteration
+                relation = self._relations[self._idx]
+                self._idx += 1
+                mfunc = message_func[relation]
+                rfunc = reduce_func[relation[1]]
+                if apply_node_func is not None:
+                    nfunc = apply_node_func[relation[1]]
+                return mfunc, rfunc, nfunc
+
+        return FuncIter()
 
     def send_and_recv(self,
                       edges,
@@ -1440,34 +1512,34 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``edges``, ``message_func`` and ``reduce_func``
           must also be the same.
         """
-        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
-                                                                    apply_node_func)
-        assert message_func is not None
-        assert reduce_func is not None
+        for mfunc, rfunc, nfunc, etype, _ in self._get_func_iter(message_func, reduce_func,
+                                                                 apply_node_func):
+            assert mfunc is not None
+            assert rfunc is not None
 
-        if isinstance(edges, tuple):
-            u, v = edges
-            u = utils.toindex(u)
-            global_vid = self._to_dst_index(v)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, global_vid, eid = self._graph.edge_ids(u, global_vid)
-        else:
-            eid = utils.toindex(edges)
-            u, global_vid, _ = self._graph.find_edges(eid)
+            if isinstance(edges[etype], tuple):
+                u, v = edges[etype]
+                u = utils.toindex(u)
+                global_vid = self._to_dst_index(v)
+                # Rewrite u, v to handle edge broadcasting and multigraph.
+                u, global_vid, eid = self._get_graph(etype).edge_ids(u, global_vid)
+            else:
+                eid = utils.toindex(edges[etype])
+                u, global_vid, _ = self._get_graph(etype).find_edges(eid)
 
-        if len(u) == 0:
-            # no edges to be triggered
-            return
+            if len(u) == 0:
+                # no edges to be triggered
+                continue
 
-        v = utils.toindex(global_vid.tousertensor() - self._number_of_nodes(0))
-        with ir.prog() as prog:
-            scheduler.schedule_bipartite_snr(graph=self,
-                                             edge_tuples=(u, v, eid),
-                                             message_func=message_func,
-                                             reduce_func=reduce_func,
-                                             apply_func=apply_node_func,
-                                             inplace=inplace)
-            Runtime.run(prog)
+            v = utils.toindex(global_vid.tousertensor() - self._number_of_nodes(0))
+            with ir.prog() as prog:
+                scheduler.schedule_bipartite_snr(graph=self[etype],
+                                                 edge_tuples=(u, v, eid),
+                                                 message_func=mfunc,
+                                                 reduce_func=rfunc,
+                                                 apply_func=nfunc,
+                                                 inplace=inplace)
+                Runtime.run(prog)
 
     def pull(self,
              v,
@@ -1534,22 +1606,22 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
-                                                                    apply_node_func)
-        assert message_func is not None
-        assert reduce_func is not None
+        for mfunc, rfunc, nfunc, etype, _ in self._get_func_iter(message_func, reduce_func,
+                                                                 apply_node_func):
+            assert mfunc is not None
+            assert rfunc is not None
 
-        v = utils.toindex(v)
-        if len(v) == 0:
-            return
-        with ir.prog() as prog:
-            scheduler.schedule_bipartite_pull(graph=self,
-                                              pull_nodes=v,
-                                              message_func=message_func,
-                                              reduce_func=reduce_func,
-                                              apply_func=apply_node_func,
-                                              inplace=inplace)
-            Runtime.run(prog)
+            v = utils.toindex(v)
+            if len(v) == 0:
+                continue
+            with ir.prog() as prog:
+                scheduler.schedule_bipartite_pull(graph=self[etype],
+                                                  pull_nodes=v,
+                                                  message_func=mfunc,
+                                                  reduce_func=rfunc,
+                                                  apply_func=nfunc,
+                                                  inplace=inplace)
+                Runtime.run(prog)
 
     def push(self,
              u,
@@ -1614,22 +1686,22 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
-                                                                    apply_node_func)
-        assert message_func is not None
-        assert reduce_func is not None
+        for mfunc, rfunc, nfunc, etype, _ in self._get_func_iter(message_func, reduce_func,
+                                                                 apply_node_func):
+            assert mfunc is not None
+            assert rfunc is not None
 
-        u = utils.toindex(u)
-        if len(u) == 0:
-            return
-        with ir.prog() as prog:
-            scheduler.schedule_bipartite_push(graph=self,
-                                              u=u,
-                                              message_func=message_func,
-                                              reduce_func=reduce_func,
-                                              apply_func=apply_node_func,
-                                              inplace=inplace)
-            Runtime.run(prog)
+            u = utils.toindex(u)
+            if len(u) == 0:
+                continue
+            with ir.prog() as prog:
+                scheduler.schedule_bipartite_push(graph=self[etype],
+                                                  u=u,
+                                                  message_func=mfunc,
+                                                  reduce_func=rfunc,
+                                                  apply_func=nfunc,
+                                                  inplace=inplace)
+                Runtime.run(prog)
 
     def update_all(self,
                    message_func="default",
@@ -1683,17 +1755,17 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
-                                                                    apply_node_func)
-        assert message_func is not None
-        assert reduce_func is not None
+        for mfunc, rfunc, nfunc, etype, _ in self._get_func_iter(message_func, reduce_func,
+                                                                 apply_node_func):
+            assert mfunc is not None
+            assert rfunc is not None
 
-        with ir.prog() as prog:
-            scheduler.schedule_bipartite_update_all(graph=self,
-                                                    message_func=message_func,
-                                                    reduce_func=reduce_func,
-                                                    apply_func=apply_node_func)
-            Runtime.run(prog)
+            with ir.prog() as prog:
+                scheduler.schedule_bipartite_update_all(graph=self[etype],
+                                                        message_func=mfunc,
+                                                        reduce_func=rfunc,
+                                                        apply_func=nfunc)
+                Runtime.run(prog)
 
     # TODO should we support this?
     def prop_nodes(self,
@@ -1813,8 +1885,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         scipy.sparse.spmatrix
             The scipy representation of adjacency matrix.
         """
-        assert etype == self._etype
-        return self._graph.adjacency_matrix_scipy(transpose, fmt)
+        return self._get_graph(etype).adjacency_matrix_scipy(transpose, fmt)
 
     def adjacency_matrix(self, etype, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of edges with the
@@ -1841,8 +1912,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         SparseTensor
             The adjacency matrix.
         """
-        assert etype == self._etype
-        return self._graph.adjacency_matrix(transpose, ctx)[0]
+        return self._get_graph(etype).adjacency_matrix(transpose, ctx)[0]
 
     def incidence_matrix(self, etype, typestr, ctx=F.cpu()):
         """Return the incidence matrix representation of edges with the given
@@ -1888,8 +1958,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         SparseTensor
             The incidence matrix.
         """
-        assert etype == self._etype
-        return self._graph.incidence_matrix(typestr, ctx)[0]
+        return self._get_graph(etype).incidence_matrix(typestr, ctx)[0]
 
     def filter_nodes(self, ntype, predicate, nodes=ALL):
         """Return a tensor of node IDs with the given node type that satisfy
@@ -1952,9 +2021,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             The filtered edges represented by their ids.
         """
-        assert etype == self._etype
         if is_all(edges):
-            u, v, _ = self._graph.edges('eid')
+            u, v, _ = self._get_graph(etype).edges('eid')
             v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
             eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
@@ -1962,11 +2030,11 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             u = utils.toindex(u)
             v = utils.toindex(v + self._number_of_nodes(0))
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(u, v)
+            u, v, eid = self._get_graph(etype).edge_ids(u, v)
             v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
         else:
             eid = utils.toindex(edges)
-            u, v, _ = self._graph.find_edges(eid)
+            u, v, _ = self._get_graph(etype).find_edges(eid)
             v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
 
         src_data = self.get_n_repr(etype[0], u)
@@ -1993,18 +2061,37 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         assert readonly_state, "Bipartite graph doesn't support mutable graph for now."
 
     def __repr__(self):
-        ret = ('DGLBipartiteGraph(num_src_nodes={src_node},\n'
-               '                  num_dst_nodes={dst_node},\n'
-               '                  num_edges={edge},\n'
-               '                  src_ndata_schemes={src_ndata}\n'
-               '                  dst_ndata_schemes={dst_ndata}\n'
-               '                  edata_schemes={edata})')
-        return ret.format(src_node=self._number_of_nodes(0),
-                          dst_node=self._number_of_nodes(1),
-                          edge=self.number_of_edges(),
-                          src_ndata=str(self.node_attr_schemes(self._ntypes[0])),
-                          dst_ndata=str(self.node_attr_schemes(self._ntypes[1])),
-                          edata=str(self.edge_attr_schemes(self._etype)))
+        if len(self._etypes) == 1:
+            ret = ('DGLBipartiteGraph(num_src_nodes={src_node},\n'
+                   '                  num_dst_nodes={dst_node},\n'
+                   '                  num_edges={edge},\n'
+                   '                  src_ndata_schemes={src_ndata}\n'
+                   '                  dst_ndata_schemes={dst_ndata}\n'
+                   '                  edata_schemes={edata})')
+            return ret.format(src_node=self._number_of_nodes(0),
+                              dst_node=self._number_of_nodes(1),
+                              edge=self.number_of_edges(),
+                              src_ndata=str(self.node_attr_schemes(self._ntypes[0])),
+                              dst_ndata=str(self.node_attr_schemes(self._ntypes[1])),
+                              edata=str(self.edge_attr_schemes(self._etype)))
+        else:
+            ret = ('DGLBipartiteGraph(num_src_nodes={src_node},\n'
+                   '                  num_dst_nodes={dst_node},\n'
+                   '                  num_edges={edge},\n'
+                   '                  src_ndata_schemes={src_ndata}\n'
+                   '                  dst_ndata_schemes={dst_ndata}\n'
+                   '                  edata_schemes1={edata1})\n'
+                   '                  edata_schemes2={edata2})')
+            return ret.format(src_node=self._number_of_nodes(0),
+                              dst_node=self._number_of_nodes(1),
+                              edge=self.number_of_edges(),
+                              src_ndata=str(self.node_attr_schemes(self._ntypes[0])),
+                              dst_ndata=str(self.node_attr_schemes(self._ntypes[1])),
+                              edata1=str(self.edge_attr_schemes(self._etypes[0])),
+                              edata2=str(self.edge_attr_schemes(self._etypes[1])))
+
+    def _get_edge_view(self, key):
+        pass
 
     def __getitem__(self, key):
         """Returns a view on the bipartite graph with given node/edge type:
@@ -2032,7 +2119,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         if isinstance(key, str):
             assert key in self._num_nodes_by_type
-            return DGLBipartiteGraphView(self, key)
+            return DGLBipartiteGraphNodeView(self, key)
         else:
             key = tuple(key)
             if len(key) == 2:
@@ -2041,15 +2128,14 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                 else:
                     raise Exception("The subgraph view doesn't exist")
             elif len(key) == 3:
-                if key[0] == self._ntypes[0] and key[1] == self._ntypes[1] \
-                   and key[2] == self._etype:
+                if key == self._etypes[0] and len(self._etypes) == 1:
                     return self
                 else:
-                    raise Exception("The subgraph view doesn't exist")
+                    return self._get_edge_view(key)
             else:
                 raise Exception('invalid key')
 
-class DGLBipartiteGraphView(object):
+class DGLBipartiteGraphNodeView(object):
     """View on a bipartite graph, constructed from
     DGLBipartiteGraph.__getitem__().
 
