@@ -2258,3 +2258,18 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
             The node ID array in the subgraph of each node type.
         """
         pass
+
+def make_bipartite(g_u, g_v):
+    """Construct a bipartite graph between the nodes in g_u and nodes in g_v.
+
+    Parameters
+    ----------
+    g_u, g_v: DGLGraph
+
+    Returns
+    -------
+    g_bi: DGLBipartiteGraph
+
+    The node data frame of the returned graph would be FrameRef of the concatenation of the node data frame of g_u and node data frame of g_v.
+    """
+    pass
