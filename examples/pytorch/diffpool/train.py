@@ -50,6 +50,9 @@ def arg_parse():
                         help='dropout rate')
     parser.add_argument('--bias', dest='bias', action='store_const',
                         const=True, default=True, help='switch for bias')
+    parser.add_argument('--save_dir', dest='save_dir', help='model saving directory: SAVE_DICT/DATASET')
+    parser.add_argument('--load_epoch', dest='load_epoch', help='load trained model params from\
+                         SAVE_DICT/DATASET/model-LOAD_EPOCH')
 
     parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
@@ -69,7 +72,9 @@ def arg_parse():
                         dropout=0.0,
                         method='diffpool',
                         bn=True,
-                        bias=True)
+                        bias=True,
+                        save_dir="model_param",
+                        load_epoch=0)
     return parser.parse_args()
 
 def prepare_data(dataset, prog_args, fold=-1):
@@ -141,15 +146,19 @@ def graph_classify_task(prog_args):
                      'maxpool', 
                      assign_dim,
                      prog_args.pool_ratio)
+    
+    if prog_args.load_epoch >= 0 and prog_args.save_dir is not None:
+        model.load_state_dict(torch.load(prog_args.save_dir + "/" + prog_args.dataset\
+                                         + "/model.iter-" + str(prog_args.load_epoch)))
 
     print("model init finished")
     print("MODEL:::::::", prog_args.method)
     if prog_args.cuda:
         model = model.cuda()
     
-    train(train_dataloader, model, prog_args, val_dataset=val_dataloader)
-    result = evaluate(test_dataloader, model, prog_args)
-    print("test  accuracy {}".format(result))
+    logger = train(train_dataloader, model, prog_args, val_dataset=val_dataloader)
+    result = evaluate(test_dataloader, model, prog_args, logger)
+    print("test  accuracy {}%".format(result*100))
 
 def collate_fn(batch):
     '''
@@ -187,6 +196,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
     dataloader = dataset
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,
                                         model.parameters()), lr=0.001)
+    early_stopping_logger = {"best_epoch":-1, "val_acc": -1}
 
     if prog_args.cuda > 0:
         torch.cuda.set_device(0)
@@ -198,32 +208,47 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         model.train()
         train_accu = 0
         print("EPOCH ###### {} ######".format(epoch))
+        computation_time = 0.0
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
             model.zero_grad()
+            compute_start = time.time()
             ypred = model(batch_graph)
             indi = torch.argmax(ypred, dim=1)
             correct = torch.sum(indi == graph_labels).item()
             train_accu += correct
             loss = model.loss(ypred, graph_labels)
             loss.backward()
+            batch_compute_time = time.time() - compute_start
+            computation_time += batch_compute_time
             nn.utils.clip_grad_norm_(model.parameters(), prog_args.clip)
             optimizer.step()
 
 
         train_accu = train_accu / (len(dataloader)*prog_args.batch_size)
-        print("train accuracy for this epoch {} is {}".format(epoch,
-                                                              train_accu))
+        print("train accuracy for this epoch {} is {}%".format(epoch,
+                                                              train_accu*100))
         elapsed_time = time.time() - begin_time
-        print("loss {} with epoch time {} s ".format(loss.item(), elapsed_time))
+        print("loss {} with epoch time {} s & computation time {} s ".format(loss.item(), elapsed_time, computation_time))
         if val_dataset is not None:
             result = evaluate(val_dataset, model, prog_args)
-            print("validation  accuracy {}".format(result))
+            print("validation  accuracy {}%".format(result*100))
+            if result > early_stopping_logger['val_acc']:
+                early_stopping_logger.update(best_epoch=epoch, val_acc=result)
+                if prog_args.save_dir is not None:
+                    torch.save(model.state_dict(), prog_args.save_dir + "/" + prog_args.dataset\
+                                         + "/model.iter-" + str(early_stopping_logger['best_epoch']))
+            print("best epoch is EPOCH {}, val_acc is {}%".format(early_stopping_logger['best_epoch'], 
+                                                                early_stopping_logger['val_acc']))
         torch.cuda.empty_cache()
+    return early_stopping_logger
 
-def evaluate(dataloader, model, prog_args):
+def evaluate(dataloader, model, prog_args, logger=None):
     '''
     evaluate function
     '''
+    if logger is not None and prog_args.save_dir is not None:
+        model.load_state_dict(torch.load(prog_args.save_dir + "/" + prog_args.dataset\
+                                         + "/model.iter-" + str(logger['best_epoch'])))
     model.eval()
     correct_label = 0
     with torch.no_grad():
