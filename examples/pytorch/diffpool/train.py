@@ -56,14 +56,14 @@ def arg_parse():
 
     parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
-                        pool_ratio=0.25,
+                        pool_ratio=0.1,
                         num_pool=1,
                         linkpred=True,
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
                         batch_size=20,
-                        epoch=700,
+                        epoch=2000,
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=0,
@@ -73,8 +73,8 @@ def arg_parse():
                         method='diffpool',
                         bn=True,
                         bias=True,
-                        save_dir="model_param",
-                        load_epoch=0)
+                        save_dir="./model_param",
+                        load_epoch=-1)
     return parser.parse_args()
 
 def prepare_data(dataset, prog_args, fold=-1):
@@ -238,7 +238,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
                     torch.save(model.state_dict(), prog_args.save_dir + "/" + prog_args.dataset\
                                          + "/model.iter-" + str(early_stopping_logger['best_epoch']))
             print("best epoch is EPOCH {}, val_acc is {}%".format(early_stopping_logger['best_epoch'], 
-                                                                early_stopping_logger['val_acc']))
+                                                                early_stopping_logger['val_acc']*100))
         torch.cuda.empty_cache()
     return early_stopping_logger
 

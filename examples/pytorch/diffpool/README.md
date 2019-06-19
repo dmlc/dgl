@@ -21,8 +21,10 @@ python train.py
 
 arguments:
 ```bash
-blablabla
 ```
+
+accuracies:
+ENZYMES 63.38%
 
 ## Dependencies
 
