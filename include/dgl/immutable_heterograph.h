@@ -1,6 +1,13 @@
 
 namespace dgl {
 
+/*
+ * TODO: replace with ImmutableBiGraph after merging #573
+ */
+struct ImmutableBiGraph {
+  int dummy;
+};
+
 class ImmutableHeteroGraph : public HeteroGraphInterface {
  public:
   /*!
@@ -15,23 +22,23 @@ class ImmutableHeteroGraph : public HeteroGraphInterface {
       std::vector<ImmutableGraph> relations);
 
   /*! \brief default copy constructor */
-  ImmutableGraph(const ImmutableGraph& other) = default;
+  ImmutableHeteroGraph(const ImmutableHeteroGraph& other) = default;
 
 #ifndef _MSC_VER
   /*! \brief default move constructor */
-  ImmutableGraph(ImmutableGraph&& other) = default;
+  ImmutableHeteroGraph(ImmutableHeteroGraph&& other) = default;
 #else
-  ImmutableGraph(ImmutableGraph&& other) {
+  ImmutableHeteroGraph(ImmutableHeteroGraph&& other) {
     this->metagraph_ = other.metagraph_;
     this->relations_ = std::move(other.relations_);
   }
 #endif
 
   /*! \brief default assign constructor */
-  ImmutableGraph& operator=(const ImmutableGraph& other) = default;
+  ImmutableHeteroGraph& operator=(const ImmutableHeteroGraph& other) = default;
 
   /*! \brief default destructor */
-  ~ImmutableGraph() = default;
+  ~ImmutableHeteroGraph() = default;
 
  private:
   /*!
@@ -45,7 +52,7 @@ class ImmutableHeteroGraph : public HeteroGraphInterface {
   /*
    * A list of immutable graphs, either homogeneous or bipartite.
    */
-  std::vector<ImmutableGraph> relations_;
+  std::vector<ImmutableBiGraph> relations_;
 };
 
 };  // namespace dgl
