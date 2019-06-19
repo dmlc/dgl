@@ -1,163 +1,198 @@
 # This file contains DGL distributed kvstore APIs.
 from ..network import _create_sender, _create_receiver
 from ..network import _finalize_sender, _finalize_receiver
-from ..network import _add_receiver_addr, _receiver_wait
+from ..network import _network_wait, _add_receiver_addr
+from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
-from ..network import _sender_connect, SocketSync
-from ..network import _PUSH_MSG, _PULL_MSG, _PULL_BACK_MSG
-from ..network import KVStoreMsg
+from ..network import KVMsgType, KVStoreMsg
 
 import math
+import torch
 
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
-    In practice, developers use KVServer to hold large-scale graph features or 
-    graph embeddings across machines, or storing them in one standalone machine 
-    with big memory capability.
+    In practice, developers can use KVServer to hold large-scale graph features or 
+    graph embeddings across machines or storing them in one standalone machine with big memory 
+    capability. DGL KVServer uses a very simple range-partition scheme to partition data 
+    into different KVServer nodes. For example, if the total embedding size is 200 and we have 
+    two KVServer nodes, the data (0~99) will be stored in kvserver_0, and the data (100~199) will 
+    be stored in kvserver_1.
 
     Parameters
     ----------
     server_id : int
-        KVStore ID (start from 0). DGL KVServer uses a simple 
-        range-partition scheme to partition data on KVServer.
+        KVServer's ID (start from 0). 
     client_namebook : dict
-        IP address namebook of KVClient, where key is client's ID 
-        and value is client's IP address, e.g.,
+        IP address namebook of KVClient, where the key is client's ID 
+        (start from 0) and the value is client's IP address, e.g.,
 
             { 0:'168.12.23.45:50051', 
               1:'168.12.23.21:50051', 
               2:'168.12.46.12:50051' }
-        The client's ID also starts from 0.
     server_addr : str
-        IP address of current KVServer, e.g., '127.0.0.1:50051'
+        IP address of current KVServer node, e.g., '168.12.23.22:50051'
     """
     def __init__(self, server_id, client_namebook, server_addr):
-        assert server_id >= 0, 'server_id must be greater than or equal to 0.'
+        assert server_id >= 0, 'server_id cannot be a negative number.'
         assert len(client_namebook) > 0, 'client_namebook cannot be empty.'
+        assert len(server_addr.split(':')) == 2, 'Please use right IP format, e.g., 127.0.0.1:50051'
         # self._data_store is a key-value store 
-        # where the key is data name and value is tensor (mx.ndarray or torch.tensor)
+        # where the key is data name and value is a tensor 
+        # (mx.ndarray or torch.tensor) partitioned into current node.
         self._data_store = {}
         self._server_id = server_id
         self._client_namebook = client_namebook
+        self._client_count = len(client_namebook)
         self._addr = server_addr
         self._sender = _create_sender()
         self._receiver = _create_receiver()
 
     def __del__(self):
-        """Finalize the service of KVServer.
+        """Finalize KVServer
         """
         _finalize_sender(self._sender)
         _finalize_receiver(self._receiver)
-
-    def add_data(self, name, data):
-        """Add tensor data to KVServer
-
-        Parameters
-        ----------
-        name : str
-            data name
-        data : tensor (mx.ndarray or torch.tensor)
-            graph embedding (or graph feature) matrix
-        """
-        self._data_store[name] = data
 
     def start(self):
         """Start the service of KVServer
         """
         server_ip, server_port = self._addr.split(':')
-        _receiver_wait(self._receiver, server_ip, int(server_port), len(self._client_namebook))
-        SocketSync() # wait client setup
+        _receiver_wait(self._receiver, server_ip, int(server_port), self._client_count)
+        _network_wait() # wait client's setup
         for ID, addr in self._client_namebook.items():
             client_ip, client_port = addr.split(':')
             _add_receiver_addr(self._sender, client_ip, int(client_port), ID)
         _sender_connect(self._sender)
-        # Service loop (use Ctl+ C to exit)
+        # Service loop
         while True:
             msg = _recv_kv_msg(self._receiver)
-            if msg.type == _PUSH_MSG:
+            if msg.type == KVMsgType.INIT:
+                self._init_data(msg.name, msg.id.tolist())
+            elif msg.type == KVMsgType.PUSH:
+                self._remap_id(msg.name, msg.id)
                 self._push_handler(msg.name, msg.id, msg.data)
-            elif msg.type == _PULL_MSG:
+            elif msg.type == KVMsgType.PULL:
+                self._remap_id(msg.name, msg.id)
                 res_tensor = self._pull_handler(msg.name, msg.id)
                 back_msg = KVStoreMsg(
-                    type=_PULL_BACK_MSG,
+                    type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
                     name=msg.name,
                     id=msg.id,
                     data=res_tensor)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
+            elif msg.type == KVMsgType.FINAL:
+                print("Exit KVStore service...")
+                break
             else:
-                raise RuntimeError('Unknown message type: %d' % msg.type)
+                raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
+
+    def _init_data(self, name, shape):
+        """Initialized data on current KVServer nodes.
+
+        Parameters
+        ----------
+        name : str
+            data str
+        shape : list
+            local shape of target tensor
+        """
+        self._data_store[name] = torch.tensor(shape, dtype=torch.float32)
 
     def _push_handler(self, name, ID, data):
-        """User-defined msg handler for push operation
+        """User-defined handler for PUSH message. 
+
+        On default, _push_handler perform ADD() operation for the PUSH message.
 
         Parameters
         ----------
         name : str
             data name
         ID : tensor (mx.ndarray or torch.tensor)
-            a vector storing the IDs
+            a vector storing the IDs that has been re-mapped
         data : tensor (mx.ndarray or torch.tensor)
-            a data matrix with the same row size of id
+            a matrix with the same row size of id
         """
-        pass
+        size = ID.shape[0]
+        for idx in range(size):
+            self._data_store[name][ID[idx]] += data[idx]
 
     def _pull_handler(self, name, ID):
-        """User-defined msg handler for pull operation
+        """User-defined handler for PUSH operation.
+
+        On default, _pull_handler perform index_select() operation for the PULL message.
 
         Parameters
         ----------
         name : str
             data name
         ID : tensor (mx.ndarray or torch.tensor)
-            a vector storing the IDs
+            a vector storing the IDs that has been re-mapped
 
         Return
         ------
         tensor
-            a data matrix with the same row size of ID
-        """    
-        pass
+            a matrix with the same row size of ID
+        """
+        new_tensor = self._data_store[name].index_select(0, ID)
+        return new_tensor
+
+    def _remap_id(self, name, ID):
+        """Re-mapping global-ID to local-ID.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        ID : tensor (mx.ndarray or torch.tensor)
+            a vector storing the global data ID
+        """
+        size = self._data_store[name].shape[0]
+        ID = ID % size
 
 class KVClient(object):
-    """KVClient is used to send and recv message to/from KVServer on DGL trainer.
+    """KVClient is used to push/pull tensors to/from KVServer on DGL trainer.
 
-    There are two operations supported by KVClient:
+    There are three operations supported by KVClient:
 
-      * push(): push tensor data to KVServer
-      * pull(): pull tensor data from KVServer with target ID
+      * init_data(name, shape): initialize data for KVServer
+      * push(name, id, data): push data to KVServer
+      * pull(name, id): pull data from KVServer
+      * shut_down(): shut down all KVServer nodes
 
     Parameters
     ----------
     client_id : int
         KVClient's ID (start from 0)
     server_namebook: dict
-        IP address namebook of KVServer, where key is KVServer's ID 
-        and value is server's IP address, e.g.,
+        IP address namebook of KVServer, where key is the KVServer's ID 
+        (start from 0) and value is the server's IP address, e.g.,
 
         { 0:'168.12.23.45:50051', 
           1:'168.12.23.21:50051', 
           2:'168.12.46.12:50051' }
-        The KVServer's ID also starts from 0.
+    client_addr : str
+        IP address of current KVClient, e.g., '168.12.23.22:50051'
     """
     def __init__(self, client_id, server_namebook, client_addr):
-        assert client_id >= 0, 'client_id must be greater than or equal to 0.'
+        assert client_id >= 0, 'client_id cannot be a nagative number.'
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
-        # self._data_size is a key-value store 
-        # where the key is data name and value is the size of tensor
-        # self._data_size and self._group_size is used to partition message 
-        # into different KVServer nodes.
+        assert len(client_addr.split(':')) == 2, 'Please use right IP format, e.g., 127.0.0.1:50051'
+        # self._data_size is a key-value store where the key is data name 
+        # and value is the size of tensor. It is used to partition data into
+        # different KVServer nodes.
+        self._is_init = False
         self._data_size = {}
-        self._group_size = [0] * len(server_namebook)
         self._client_id = client_id
         self._server_namebook = server_namebook
+        self._server_count = len(server_namebook)
         self._addr = client_addr
         self._sender = _create_sender()
         self._receiver = _create_receiver()
 
     def __del__(self):
-        """Finalize KVClient (Disconnect to KVServer)
+        """Finalize KVClient
         """
         _finalize_sender(self._sender)
         _finalize_receiver(self._receiver)
@@ -170,24 +205,43 @@ class KVClient(object):
             _add_receiver_addr(self._sender, server_ip, int(server_port), ID)
         _sender_connect(self._sender)
         client_ip, client_port = self._addr.split(':')
-        _receiver_wait(self._receiver, client_ip, int(client_port), len(self._server_namebook))
+        _receiver_wait(self._receiver, client_ip, int(client_port), self._server_count)
 
-    def set_data_size(self, name, size):
-        """Let KVClient know the data size of kvstore
+    def init_data(self, name, shape):
+        """Initialize data tensor on KVServer. 
+        We usually invoke this API by just one client (e.g., client_0).
+
+        init_data() will automatically partition shape into different KVServer nodes.
 
         Parameters
         ----------
         name : str
             data name
-        size: int
-            data size
+        shape : list
+            global shape of tensor
         """
-        self._data_size[name] = size
+        self._data_size[name] = shape[0]
+        count = math.ceil(shape[0] / self._server_count)
+        for server_id in range(self._server_count):
+            par_shape = shape
+            if server_id != self._server_count - 1:
+                par_shape[0] = math.ceil(shape[0] / self._server_count)
+            else:
+                par_shape[0] = shape[0] % count
+            tensor_shape = torch.tensor(par_shape)
+            msg = KVStoreMsg(
+                type=KVMsgType.INIT,
+                rank=self._client_id,
+                name=name,
+                id=tensor_shape,
+                data=None)
+            _send_kv_msg(self._sender, msg, server_id)
+        self._is_init = True
         
     def push(self, name, ID, data):
         """Push message to KVServer
 
-        The push() function will partition message and push them into
+        The push() API will partition message and mapping them into
         different KVServer nodes automatically.
 
         Parameters
@@ -195,34 +249,35 @@ class KVClient(object):
         name : str
             data name
         ID : tensor (mx.ndarray or torch.tensor)
-            a tensor vector storing the IDs
+            a vector storing the global IDs
         data : tensor (mx.ndarray or torch.tensor)
-            a tensor matrix with the same row size of id
+            a matrix with the same row size of id
         """
         assert ID.dim() == 1, 'ID must be a vector.'
+        assert data.dim() == 2, 'data must be a matrix.'
         assert data.size(0) == ID.size(0), 'The data must has the same row size with ID vector.'
-        assert self._data_size[name] > 0, 'Please invoke set_data_size() before push().'
+        assert self._is_init == True, 'Please invoke init_data() before push().'
+        group_size = [0] * self._server_count
         for id in ID:
+            # mapping data to corresponded server nodes
             server_id = self._get_server_id(id.item(), name)
-            self._group_size[server_id] += 1
+            group_size[server_id] += 1
         min_idx = 0
         max_idx = 0
-        for idx in range(len(self._server_namebook)):
-            if self._group_size[idx] == 0:
+        for idx in range(self._server_count):
+            if group_size[idx] == 0:
                 continue
-            max_idx += self._group_size[idx]
+            max_idx += group_size[idx]
             range_id = ID[min_idx:max_idx]
             range_data = data[min_idx:max_idx]
             min_idx = max_idx
             msg = KVStoreMsg(
-                type=_PUSH_MSG,
+                type=KVMsgType.PUSH,
                 rank=self._client_id,
                 name=name,
                 id=range_id,
                 data=range_data)
             _send_kv_msg(self._sender, msg, idx)
-
-        self._group_size = [0] * len(self._server_namebook)
 
     def pull(self, name, ID):
         """Pull message from KVServer
@@ -237,39 +292,53 @@ class KVClient(object):
         Return
         ------
         tensor
-            a data matrix with the same row size of ID
+            a matrix with the same row size of ID
         """
         assert ID.dim() == 1, 'ID must be a vector.'
-        assert self._data_size[name] > 0, 'Please invoke set_data_size() before pull().'
+        assert self._is_init == True, 'Please invoke init_data() before pull().'
+        group_size = [0] * self._server_count
         for id in ID:
             server_id = self._get_server_id(id.item(), name)
-            group_count[server_id] += 1
+            group_size[server_id] += 1
         min_idx = 0
         max_idx = 0
         server_count = 0
-        for idx in range(len(self._server_namebook)):
-            if self._group_size[idx] == 0:
+        for idx in range(self._server_count):
+            if group_size[idx] == 0:
                 continue
             server_count += 1
-            max_idx += self._group_size[idx]
+            max_idx += group_size[idx]
             range_id = ID[min_idx:max_idx]
             min_idx = max_idx
             msg = KVStoreMsg(
-                type=_PULL_MSG,
+                type=KVMsgType.PULL,
                 rank=self._client_id,
                 name=name,
-                id=range_id)
+                id=range_id,
+                data=None)
             _send_kv_msg(self._sender, msg, idx)
         # Recv back message
         msg_list = []
-        for idx in range(server_count):
+        for idx in range(self._server_count):
             msg = _recv_kv_msg(self._receiver)
             msg_list.add(msg)
 
-        self._group_size = [0] * len(self._server_namebook)
-
-        return self._merge_msg_to_matrix(msg_list)
+        return self._merge_msg(msg_list)
     
+    def shut_down(self):
+        """Shutdown all KVServer nodes
+
+        We usually invoke this API by just one client (e.g., client_0).
+        """
+        for server_id in self._server_count:
+            msg = KVStoreMsg(
+                type=KVMsgType.FINAL,
+                rank=self._client_id,
+                name=None,
+                id=None,
+                data=None)
+            _send_kv_msg(self._sender, msg, server_id)
+
     def _get_server_id(self, id, name):
         """Get target server id by given a data id
 
@@ -285,10 +354,10 @@ class KVClient(object):
         int
            target server id
         """
-        count = math.ceil(self._data_size[name] / len(self._server_namebook))
+        count = math.ceil(self._data_size[name] / self._server_count)
         return int(id / count)
 
-    def _merge_msg_to_matrix(self, msg_list):
+    def _merge_msg(self, msg_list):
         """Merge separated message to a big matrix
 
         Parameters
@@ -301,4 +370,4 @@ class KVClient(object):
         tensor (mx.ndarray or torch.tensor)
             a merged data matrix
         """
-        pass
+        return msg_list[0].data

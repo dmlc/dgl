@@ -11,38 +11,16 @@ from . import ndarray
 
 import time
 import signal
+from enum import Enum
 from collections import namedtuple
 
 _init_api("dgl.network")
 
-_CONTROL_NODEFLOW = 0
-_CONTROL_END_SIGNAL = 1
 
-_PUSH_MSG = 2
-_PULL_MSG = 3
-_PULL_BACK_MSG = 4
+################################## Basic Networking Components ######################################
+
 
 _WAIT_TIME_SEC = 3  # 3 seconds for socket sync
-
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
-"""Message of DGL kvstore
-
-Data Field
-----------
-type : MessageType
-    Type of DGL kvstore message (PUSH, PULL, PULL_BACK)
-rank : int
-    sender's ID
-name : str
-    data name
-id : tensor (mx.ndarray or torch.tensor)
-    a vector storing the IDs
-data : tensor (mx.ndarray or torch.tensor)
-    a data matrix with the same row size of id
-"""
-
-def SocketSync():
-    time.sleep(_WAIT_TIME_SEC)
 
 def keyboardInterruptHandler(signal, frame):
     """Users can use [Ctl + C] to exit loop service
@@ -51,6 +29,11 @@ def keyboardInterruptHandler(signal, frame):
     exit(0)
 
 signal.signal(signal.SIGINT, keyboardInterruptHandler)
+
+def _network_wait():
+    """Sleep a few seconds
+    """
+    time.sleep(_WAIT_TIME_SEC)
 
 def _create_sender():
     """Create a Sender communicator via C api
@@ -119,6 +102,13 @@ def _receiver_wait(receiver, ip_addr, port, num_sender):
     """
     _CAPI_DGLReceiverWait(receiver, ip_addr, int(port), int(num_sender))
 
+
+################################## Distributed Sampler Components ######################################
+
+
+_CONTROL_NODEFLOW = 0
+_CONTROL_END_SIGNAL = 1
+
 def _send_nodeflow(sender, nodeflow, recv_id):
     """Send sampled subgraph (Nodeflow) to remote Receiver.
 
@@ -181,6 +171,34 @@ def _recv_nodeflow(receiver, graph):
         hdl = unwrap_to_ptr_list(res)
         return NodeFlow(graph, hdl[0])
 
+
+################################## Distributed KVStore Components ######################################
+
+
+class KVMsgType(Enum):
+    INIT = 1
+    PUSH = 2
+    PULL = 3
+    PULL_BACK = 4
+    FINAL = 5
+
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
+"""Message of DGL kvstore
+
+Data Field
+----------
+type : KVMsgType
+    Type of DGL kvstore message
+rank : int
+    sender's ID
+name : str
+    data name
+id : tensor (mx.ndarray or torch.tensor)
+    a vector storing the IDs
+data : tensor (mx.ndarray or torch.tensor)
+    a matrix with the same row size of id
+"""
+
 def _send_kv_msg(sender, msg, recv_id):
     """Send kvstore message.
 
@@ -195,12 +213,12 @@ def _send_kv_msg(sender, msg, recv_id):
     """
     ID = ndarray.from_dlpack(dlpack.to_dlpack(msg.id.contiguous()))
     data = ndarray.from_dlpack(dlpack.to_dlpack(msg.data.contiguous()))
-    if msg.type == _PUSH_MSG:
-        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type, msg.rank, msg.name, ID, data)
-    elif msg.type == _PULL_MSG:  # PULL
-        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type, msg.rank, msg.name, ID)
+    if msg.type == KVMsgType.PUSH:
+        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type.value, msg.rank, msg.name, ID, data)
+    elif msg.type == KVMsgType.PULL:  # PULL
+        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type.value, msg.rank, msg.name, ID)
     else:
-        raise RuntimeError('Unknown message type: %d' % msg.type)
+        raise RuntimeError('Unknown message type: %d' % msg.type.value)
 
 def _recv_kv_msg(receiver):
     """Receive kvstore message
@@ -221,21 +239,22 @@ def _recv_kv_msg(receiver):
     rank = _CAPI_ReceiverGetKVMsgRank(hdl[0])
     name = _CAPI_ReceiverGetKVMsgName(hdl[0])
     ID = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgID(hdl[0]).to_dlpack())
-    if msg_type == _PUSH_MSG:
+    if msg_type == KVMsgType.PUSH.value:
         data = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgData(hdl[0]).to_dlpack())
         msg = KVStoreMsg(
-            type=msg_type,
+            type=KVMsgType(msg_type),
             rank=rank,
             name=name,
             id=ID,
             data=data)
         return msg
-    elif msg_type == _PULL_MSG:
+    elif msg_type == KVMsgType.PULL.value:
         msg = KVStoreMsg(
-            type=msg_type,
+            type=KVMsgType(msg_type),
             rank=rank,
             name=name,
-            id=ID)
+            id=ID,
+            data=None)
         return msg
     else:
-        raise RuntimeError('Unknown message type: %d' % msg.type)
+        raise RuntimeError('Unknown message type: %d' % msg.type.value)
