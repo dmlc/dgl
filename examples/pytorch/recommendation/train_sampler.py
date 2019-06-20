@@ -14,6 +14,7 @@ from validation import *
 import argparse
 import pickle
 import os
+from util import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--layers', type=int, default=2)
