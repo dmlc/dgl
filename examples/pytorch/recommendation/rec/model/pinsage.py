@@ -107,8 +107,8 @@ class PinSage(nn.Module):
                     init_bias(w.bias)
                     self.proj[key] = proj.get(key, nn.Sequential(w, nn.LeakyReLU()))
 
-    msg = [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
-           FN.copy_edge('ppr_weight', 'w')]
+    msg = [FN.copy_src('h_q', 'h_w'),
+           FN.copy_src('deg', 'w')]
     red = [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
 
     
@@ -129,13 +129,16 @@ class PinSage(nn.Module):
         nids = [nf.layer_parent_nid(i) for i in range(nf.num_layers)]
         nids = torch.cat(nids)
         h = h_emb(cuda(nids + 1)) if h_emb is not None else None
+        idx = 0
         for i in range(nf.num_layers):
-            hi = h[nf.layer_offsets(i):nf.layer_offsets(i + 1)]
+            hi = h[idx:nf.layer_size(i) + idx]
+            idx += nf.layer_size(i)
             if self.use_feature:
                 nf.layers[i].data['h_x'] = mix_embeddings(
                         hi, nf.layers[i].data, self.emb, self.proj)
             else:
                 nf.layers[i].data['h_x'] = cuda(hi)
+            nf.layers[i].data['deg'] = cuda(torch.ones(nf.layer_size(i)))
         nf.layers[0].data['h'] = nf.layers[0].data['h_x']
 
         for i in range(nf.num_blocks):

@@ -44,7 +44,7 @@ n_items = len(ml.product_ids)
 # Find negative examples for each positive example
 # Note that this function only pick negative examples for products; it doesn't
 # allow picking for users.
-def find_negs(g_train, dst, ml, neighbors, n_negs):
+def find_negs(g_train, dst, ml, n_negs):
     dst_neg = []
     for i, d in enumerate(dst):
         assert len(ml.user_ids) <= d < len(ml.user_ids) + len(ml.product_ids)
@@ -59,10 +59,8 @@ g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
 g_train = g.edge_subgraph(g_train_edges, True)
 
 for epoch in range(500):
-    edge_shuffled = g_train_edges[torch.LongTensor(sender.recv())]
+    edge_shuffled = torch.LongTensor(sender.recv())
     src, dst = g_train.find_edges(edge_shuffled)
-    dst_neg = find_negs(g_train, dst, ml, neighbors, hard_neg_prob, n_negs)
-    dst_neg = dst_neg.flatten()
     # Chop the users, items and negative items into batches and reorganize
     # them into seed nodes.
     # Note that the batch size of DGL sampler here is (2 + n_negs) times our batch size,
@@ -70,13 +68,17 @@ for epoch in range(500):
     edge_batches = edge_shuffled.split(batch_size)
     src_batches = src.split(batch_size)
     dst_batches = dst.split(batch_size)
-    dst_neg_batches = dst_neg.split(batch_size * n_negs)
+    if n_negs > 0:
+        dst_neg = find_negs(g_train, dst, ml, n_negs)
+        dst_neg = dst_neg.flatten()
+        dst_neg_batches = dst_neg.split(batch_size * n_negs)
 
     seed_nodes = []
     for i in range(len(src_batches)):
         seed_nodes.append(src_batches[i])
         seed_nodes.append(dst_batches[i])
-        seed_nodes.append(dst_neg_batches[i])
+        if n_negs > 0:
+            seed_nodes.append(dst_neg_batches[i])
     seed_nodes = torch.cat(seed_nodes)
 
     sampler = NeighborSampler(
@@ -86,7 +88,7 @@ for epoch in range(500):
             n_layers,
             seed_nodes=seed_nodes,
             prefetch=True,
-            add_self_loop=True,
+            add_self_loop=False,
             num_workers=20)
     sampler_iter = iter(sampler)
 
@@ -95,12 +97,13 @@ for epoch in range(500):
             edges = edge_batches[batch_id]
             src = src_batches[batch_id]
             dst = dst_batches[batch_id]
-            dst_neg = dst_neg_batches[batch_id]
+            if n_negs > 0:
+                dst_neg = dst_neg_batches[batch_id]
 
             sender.send(
                     nodeflow,
                     (edges.numpy(),
                      src.numpy(),
                      dst.numpy(),
-                     dst_neg.numpy()))
+                     dst_neg.numpy() if n_negs > 0 else None))
     sender.complete()

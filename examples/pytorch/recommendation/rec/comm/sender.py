@@ -21,9 +21,7 @@ class NodeFlowSender(object):
         self.socket = s
 
     def send(self, nf, aux_data):
-        with io.BytesIO() as bio:
-            pickle.dump(nf, bio)
-            nf_buffer = bio.getvalue()
+        nf_buffer = dgl.network.serialize_nodeflow(nf)
         with io.BytesIO() as bio:
             pickle.dump(aux_data, bio)
             aux_buffer = bio.getvalue()

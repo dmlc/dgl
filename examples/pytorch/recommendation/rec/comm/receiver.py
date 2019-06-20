@@ -50,8 +50,8 @@ class NodeFlowReceiver(object):
 
         with recvall(s, aux_buffer_len, True) as bio:
             aux_data = pickle.load(bio)
-        with recvall(s, nf_buffer_len, False) as bio:
-            nf = pickle.load(bio)
+        nf = dgl.network.deserialize_nodeflow(
+                bytearray(recvall(s, nf_buffer_len, False)), self.parent_graph)
         return nf, aux_data
 
     def waitfor(self, n):

@@ -139,3 +139,45 @@ def _recv_nodeflow(receiver, graph):
     else:
         hdl = unwrap_to_ptr_list(res)
         return NodeFlow(graph, hdl[0])
+
+def serialize_nodeflow(nodeflow):
+    """Serializes a NodeFlow without parent graph information into a Python
+    bytearray object.
+
+    Parameters
+    ----------
+    nodeflow : NodeFlow
+        The NodeFlow
+
+    Returns
+    -------
+    bytearray
+        The bytearray
+    """
+    graph_handle = nodeflow._graph._handle
+    node_mapping = nodeflow._node_mapping.todgltensor()
+    edge_mapping = nodeflow._edge_mapping.todgltensor()
+    layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
+    flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
+    return _CAPI_SerializeSubgraph(
+            graph_handle, node_mapping, edge_mapping, layers_offsets, flows_offsets)
+
+
+def deserialize_nodeflow(buf, graph):
+    """Deserializes the NodeFlow given the bytearray object and the parent
+    graph.
+
+    Parameters
+    ----------
+    buf : bytearray
+        The bytearray
+    graph : DGLGraph
+        The parent graph
+
+    Returns
+    -------
+    NodeFlow
+        The deserialized NodeFlow object
+    """
+    hdl = _CAPI_DeserializeSubgraph(buf)
+    return NodeFlow(graph, hdl)

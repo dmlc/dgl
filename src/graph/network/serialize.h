@@ -38,7 +38,7 @@ int64_t SerializeSampledSubgraph(char* data,
  * \param layer_offsets layer offsets in NodeFlowIndex
  * \param flow_offsets flow offsets in NodeFlowIndex
  */
-void DeserializeSampledSubgraph(char* data,
+void DeserializeSampledSubgraph(const char* data,
                                 CSRPtr* csr,
                                 IdArray* node_mapping,
                                 IdArray* edge_mapping,

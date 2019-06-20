@@ -148,9 +148,10 @@ def runtrain():
     # Essentially, only the product embeddings are passed through GraphSage;
     # user embeddings would be left untouched.
     # We distribute the edges to train evenly to the remote samplers.
-    edge_shuffled = torch.randperm(
-            g_train.filter_edges(lambda edges: ~edges.data['inv']).shape[0]).long()
-    n_batches = len(edge_shuffled.split(batch_size))
+    edge_shuffled = torch.LongTensor(
+            np.random.permutation(
+                g_train.filter_edges(
+                    lambda edges: ~edges.data['inv']).numpy()))
     train_sampler.distribute(edge_shuffled.numpy())
 
     train_sampler_iter = iter(train_sampler)
@@ -164,13 +165,15 @@ def runtrain():
             edges = torch.LongTensor(edges)
             src = torch.LongTensor(src)
             dst = torch.LongTensor(dst)
-            dst_neg = torch.LongTensor(dst_neg)
-
             src_size = dst_size = src.shape[0]
-            dst_neg_size = dst_neg.shape[0]
             count += src_size
 
-            nodeset = torch.cat([dst, dst_neg])
+            if dst_neg is not None:
+                dst_neg = torch.LongTensor(dst_neg)
+                dst_neg_size = dst_neg.shape[0]
+                nodeset = torch.cat([dst, dst_neg])
+            else:
+                nodeset = dst
 
             nodeflow.copy_from_parent()
 
@@ -180,20 +183,26 @@ def runtrain():
 
             # Reindex the nodeflow output to figure out which outputs are from users (not used),
             # products, and "negative" products.
-            output_idx = nodeflow.map_from_parent_nid(-1, nodeset)
+            output_idx = nodeflow.map_from_parent_nid(-1, nodeset, True)
             h = node_output[output_idx]
-            h_dst, h_dst_neg = h.split([dst_size, dst_neg_size])
+            if dst_neg is not None:
+                h_dst, h_dst_neg = h.split([dst_size, dst_neg_size])
+            else:
+                h_dst = h
             h_src = nid_h(cuda(src + 1))
 
             b_src = nid_b(cuda(src + 1)).squeeze()
             b_dst = nid_b(cuda(dst + 1)).squeeze()
-            b_dst_neg = nid_b(cuda(dst_neg + 1)).view(src_size, n_negs).squeeze()
+            if dst_neg is not None:
+                b_dst_neg = nid_b(cuda(dst_neg + 1)).view(src_size, n_negs).squeeze()
 
             # Compute scores, losses, and classification accuracies
             pos_score = (h_src * h_dst).sum(1) + b_src + b_dst
-            neg_score = (h_src[:, None] * h_dst_neg.view(src_size, n_negs, -1)).sum(2) + b_src[:, None] + b_dst_neg
             pos_nlogp = -F.logsigmoid(pos_score)
-            neg_nlogp = -F.logsigmoid(-neg_score)
+            if dst_neg is not None:
+                neg_score = (h_src[:, None] * h_dst_neg.view(src_size, n_negs, -1)).sum(2)
+                neg_score = neg_score + b_src[:, None] + b_dst_neg
+                neg_nlogp = -F.logsigmoid(-neg_score)
             if args.dataset.startswith('movielens') and not args.dataset.endswith('imp'):
                 # rating prediction - L2 loss
                 loss = (pos_score - cuda(g_train.edges[edges].data['rating'])) ** 2
@@ -237,7 +246,6 @@ def runtest(validation=True):
         with tqdm.tqdm(valid_sampler_iter) as tq:
             for nodeflow, aux_data in tq:
                 nodeflow.copy_from_parent()
-                cast_ppr_weight(nodeflow)
                 h = forward(model, nodeflow, False)
                 hs.append(h)
                 auxs.append(torch.LongTensor(aux_data))
@@ -245,11 +253,7 @@ def runtest(validation=True):
     auxs = torch.cat(auxs, 0)
     assert (np.sort(auxs.numpy()) == np.arange(n_items)).all()
     h = h[auxs.sort()[1]]     # reorder h
-    # Residual & NoUserN
-    #h = h + nid_h(cuda(torch.arange(n_users, n_users + n_items) + 1))
-    # Residual
-    #h = h + nid_h(cuda(torch.arange(1, 1 + n_users + n_items)))
-    # NoUserN
+
     h = torch.cat([
         nid_h(cuda(torch.arange(0, n_users).long() + 1)),
         h], 0)

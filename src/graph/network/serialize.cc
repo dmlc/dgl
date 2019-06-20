@@ -93,7 +93,7 @@ int64_t SerializeSampledSubgraph(char* data,
   return total_size;
 }
 
-void DeserializeSampledSubgraph(char* data,
+void DeserializeSampledSubgraph(const char* data,
                                 CSRPtr* csr,
                                 IdArray* node_mapping,
                                 IdArray* edge_mapping,
@@ -101,9 +101,9 @@ void DeserializeSampledSubgraph(char* data,
                                 IdArray* flow_offsets) {
   // For each component, we first read its size at the
   // begining of the buffer and then read its binary data
-  char* data_ptr = data;
+  const char* data_ptr = data;
   // node_mapping
-  int64_t tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  int64_t tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   int64_t num_vertices = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
   *node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
@@ -112,7 +112,7 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(node_map_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // layer offsets
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   int64_t num_hops_add_one = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
   *layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops_add_one)},
@@ -121,7 +121,7 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(layer_off_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // flow offsets
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   int64_t num_hops = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
   *flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
@@ -130,7 +130,7 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(flow_off_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_mapping
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   int64_t num_edges = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
   *edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
@@ -142,19 +142,19 @@ void DeserializeSampledSubgraph(char* data,
   // TODO(minjie): multigraph flag
   *csr = CSRPtr(new CSR(num_vertices, num_edges, false));
   // indices (CSR)
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
   dgl_id_t* col_list_out = static_cast<dgl_id_t*>((*csr)->indices()->data);
   memcpy(col_list_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_ids (CSR)
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
   dgl_id_t* edge_ids = static_cast<dgl_id_t*>((*csr)->edge_ids()->data);
   memcpy(edge_ids, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // indptr (CSR)
-  tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  tensor_size = *(reinterpret_cast<const int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
   dgl_id_t* indptr_out = static_cast<dgl_id_t*>((*csr)->indptr()->data);
   memcpy(indptr_out, data_ptr, tensor_size);

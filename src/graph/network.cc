@@ -175,8 +175,44 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     } else if (control == CONTROL_END_SIGNAL) {
       *rv = CONTROL_END_SIGNAL;
     } else {
-      LOG(FATAL) << "Unknow control number: " << control;
+      LOG(FATAL) << "Unknown control number: " << control;
     }
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_SerializeSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const IdArray node_mapping = args[1];
+    const IdArray edge_mapping = args[2];
+    const IdArray layer_offsets = args[3];
+    const IdArray flow_offsets = args[4];
+
+    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
+    auto csr = ptr->GetInCSR();
+
+    char* buffer = new char[kMaxBufferSize];
+    int64_t data_size = network::SerializeSampledSubgraph(
+        buffer, csr, node_mapping, edge_mapping, layer_offsets, flow_offsets);
+
+    DGLByteArray bytes{buffer, data_size};
+    *rv = bytes;
+    delete buffer;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DeserializeSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string bytes = args[0];    // NOTE: this is actually a byte-array
+    NodeFlow* nf = new NodeFlow();
+    CSRPtr csr;
+    network::DeserializeSampledSubgraph(
+        bytes.data(),
+        &csr,
+        &(nf->node_mapping),
+        &(nf->edge_mapping),
+        &(nf->layer_offsets),
+        &(nf->flow_offsets));
+    nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
+    *rv = static_cast<NodeFlowHandle>(nf);
   });
 
 }  // namespace network
