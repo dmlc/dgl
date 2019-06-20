@@ -1166,6 +1166,18 @@ class BiGraphIndex(GraphIndex):
         self._num_nodes = num_nodes
 
     def number_of_nodes(self, idx):
+        """Return the number of nodes.
+
+        Parameters
+        ----------
+        idx : int
+            The index of node types.
+
+        Returns
+        -------
+        int
+            The number of nodes
+        """
         return self._num_nodes[idx]
 
     def _conv_right1(self, v):
@@ -1180,53 +1192,233 @@ class BiGraphIndex(GraphIndex):
         return utils.toindex(v)
 
     def has_edge_between(self, u, v):
+        """Return true if the edge exists.
+
+        Parameters
+        ----------
+        u : int
+            The src node.
+        v : int
+            The dst node.
+
+        Returns
+        -------
+        bool
+            True if the edge exists, False otherwise
+        """
         v = self._conv_right1(v)
         return super(BiGraphIndex, self).has_edge_between(u, v)
 
     def has_edges_between(self, u, v):
+        """Return true if the edge exists.
+
+        Parameters
+        ----------
+        u : utils.Index
+            The src nodes.
+        v : utils.Index
+            The dst nodes.
+
+        Returns
+        -------
+        utils.Index
+            0-1 array indicating existence
+        """
         v = self._conv_right(v)
         return super(BiGraphIndex, self).has_edges_between(u, v)
 
     def predecessors(self, v):
+        """Return the predecessors of the node.
+
+        Parameters
+        ----------
+        v : int
+            The node.
+        radius : int, optional
+            The radius of the neighborhood.
+
+        Returns
+        -------
+        utils.Index
+            Array of predecessors
+        """
         v = self._conv_right1(v)
         return super(BiGraphIndex, self).predecessors(v)
 
     def successors(self, v):
+        """Return the successors of the node.
+
+        Parameters
+        ----------
+        v : int
+            The node.
+        radius : int, optional
+            The radius of the neighborhood.
+
+        Returns
+        -------
+        utils.Index
+            Array of successors
+        """
         return self._conv_right_back(super(BiGraphIndex, self).successors(v))
 
     def edge_id(self, u, v):
+        """Return the id array of all edges between u and v.
+
+        Parameters
+        ----------
+        u : int
+            The src node.
+        v : int
+            The dst node.
+
+        Returns
+        -------
+        utils.Index
+            The edge id array.
+        """
         return super(BiGraphIndex, self).edge_id(u, self._conv_right1(v))
 
     def edge_ids(self, u, v):
+        """Return a triplet of arrays that contains the edge IDs.
+
+        Parameters
+        ----------
+        u : utils.Index
+            The src nodes.
+        v : utils.Index
+            The dst nodes.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         src, dst, eid = super(BiGraphIndex, self).edge_ids(u, self._conv_right(v))
         dst = self._conv_right_back(dst)
         return src, dst, eid
 
     def find_edges(self, eid):
+        """Return a triplet of arrays that contains the edge IDs.
+
+        Parameters
+        ----------
+        eid : utils.Index
+            The edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         src, dst, eid = super(BiGraphIndex, self).find_edges(eid)
         dst = self._conv_right_back(dst)
         return src, dst, eid
 
     def in_edges(self, v):
+        """Return the in edges of the node(s).
+
+        Parameters
+        ----------
+        v : utils.Index
+            The node(s).
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         src, dst, eid = super(BiGraphIndex, self).in_edges(self._conv_right(v))
         dst = self._conv_right_back(dst)
         return src, dst, eid
 
     def out_edges(self, v):
+        """Return the out edges of the node(s).
+
+        Parameters
+        ----------
+        v : utils.Index
+            The node(s).
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         src, dst, eid = super(BiGraphIndex, self).out_edges(v)
         dst = self._conv_right_back(dst)
         return src, dst, eid
 
     def edges(self, order=None):
+        """Return all the edges
+
+        Parameters
+        ----------
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         src, dst, eid = super(BiGraphIndex, self).edges(order)
         dst = self._conv_right_back(dst)
         return src, dst, eid
 
     def in_degree(self, v):
+        """Return the in degree of the node.
+
+        Parameters
+        ----------
+        v : int
+            The node.
+
+        Returns
+        -------
+        int
+            The in degree.
+        """
         v = self._conv_right1(v)
         return super(BiGraphIndex, self).in_degree(v)
 
     def in_degrees(self, v):
+        """Return the in degrees of the nodes.
+
+        Parameters
+        ----------
+        v : utils.Index
+            The nodes.
+
+        Returns
+        -------
+        int
+            The in degree array.
+        """
         v = self._conv_right(v)
         return super(BiGraphIndex, self).in_degrees(v)
 
