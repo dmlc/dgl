@@ -194,7 +194,7 @@ rank : int
 name : str
     data name
 id : tensor (mx.ndarray or torch.tensor)
-    a vector storing the IDs
+    a vector storing the global IDs
 data : tensor (mx.ndarray or torch.tensor)
     a matrix with the same row size of id
 """
@@ -211,17 +211,37 @@ def _send_kv_msg(sender, msg, recv_id):
     recv_id : int
         receiver's ID
     """
-    ID = ndarray.from_dlpack(dlpack.to_dlpack(msg.id.contiguous()))
-    data = ndarray.from_dlpack(dlpack.to_dlpack(msg.data.contiguous()))
-    if msg.type == KVMsgType.PUSH:
-        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type.value, msg.rank, msg.name, ID, data)
-    elif msg.type == KVMsgType.PULL:  # PULL
-        _CAPI_SenderSendKVMsg(sender, int(recv_id), msg.type.value, msg.rank, msg.name, ID)
+    if msg.type == KVMsgType.INIT or msg.type == KVMsgType.PULL:
+        ID = ndarray.from_dlpack(dlpack.to_dlpack(msg.id.contiguous()))
+        _CAPI_SenderSendKVMsg(
+            sender, 
+            int(recv_id), 
+            msg.type.value, 
+            msg.rank, 
+            msg.name, 
+            ID)
+    elif msg.type == KVMsgType.PUSH or msg.type == KVMsgType.PULL_BACK:
+        ID = ndarray.from_dlpack(dlpack.to_dlpack(msg.id.contiguous()))
+        data = ndarray.from_dlpack(dlpack.to_dlpack(msg.data.contiguous()))
+        _CAPI_SenderSendKVMsg(
+            sender, 
+            int(recv_id), 
+            msg.type.value, 
+            msg.rank, 
+            msg.name, 
+            ID, 
+            data)
+    elif msg.type == KVMsgType.FINAL:
+        _CAPI_SenderSendKVMsg(
+            sender, 
+            int(recv_id), 
+            msg.type.value, 
+            msg.rank)
     else:
         raise RuntimeError('Unknown message type: %d' % msg.type.value)
 
 def _recv_kv_msg(receiver):
-    """Receive kvstore message
+    """Receive kvstore message.
 
     Parameters
     ----------
@@ -233,28 +253,39 @@ def _recv_kv_msg(receiver):
     KVStoreMsg
         kvstore message
     """
-    res = _CAPI_ReceiverRecvKVMsg(receiver)
-    hdl = unwrap_to_ptr_list(res)
-    msg_type = _CAPI_ReceiverGetKVMsgType(hdl[0])
-    rank = _CAPI_ReceiverGetKVMsgRank(hdl[0])
-    name = _CAPI_ReceiverGetKVMsgName(hdl[0])
-    ID = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgID(hdl[0]).to_dlpack())
-    if msg_type == KVMsgType.PUSH.value:
-        data = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgData(hdl[0]).to_dlpack())
+    msg = None
+    msg_list = _CAPI_ReceiverRecvKVMsg(receiver)
+    msg_ptr = unwrap_to_ptr_list(msg_list)
+    msg_type = KVMsgType(_CAPI_ReceiverGetKVMsgType(msg_ptr[0]))
+    rank = _CAPI_ReceiverGetKVMsgRank(msg_ptr[0])
+    if msg_type == KVMsgType.INIT or msg_type == KVMsgType.PULL:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr[0])
+        ID = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgID(msg_ptr[0]).to_dlpack())
         msg = KVStoreMsg(
-            type=KVMsgType(msg_type),
-            rank=rank,
-            name=name,
-            id=ID,
-            data=data)
-        return msg
-    elif msg_type == KVMsgType.PULL.value:
-        msg = KVStoreMsg(
-            type=KVMsgType(msg_type),
+            type=msg_type,
             rank=rank,
             name=name,
             id=ID,
             data=None)
-        return msg
+    elif msg_type == KVMsgType.PUSH or msg_type == KVMsgType.PULL_BACK:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr[0])
+        ID = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgID(msg_ptr[0]).to_dlpack())
+        data = dlpack.from_dlpack(_CAPI_ReceiverGetKVMsgData(msg_ptr[0]).to_dlpack())
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=ID,
+            data=data)
+    elif msg_type == KVMsgType.FINAL:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr[0])
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=None,
+            id=None,
+            data=None)
     else:
-        raise RuntimeError('Unknown message type: %d' % msg.type.value)
+        raise RuntimeError('Unknown message type: %d' % msg_type.value)
+
+    return msg

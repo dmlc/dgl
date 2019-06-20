@@ -89,7 +89,9 @@ class KVServer(object):
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
     def _init_data(self, name, shape):
-        """Initialized data on current KVServer nodes.
+        """User-defined initialize method.
+
+        On default, we initialize all data to zero.
 
         Parameters
         ----------
@@ -98,7 +100,7 @@ class KVServer(object):
         shape : list
             local shape of target tensor
         """
-        self._data_store[name] = torch.tensor(shape, dtype=torch.float32)
+        self._data_store[name] = torch.zeros(shape, dtype=torch.float32)
 
     def _push_handler(self, name, ID, data):
         """User-defined handler for PUSH message. 
@@ -224,17 +226,17 @@ class KVClient(object):
         count = math.ceil(shape[0] / self._server_count)
         for server_id in range(self._server_count):
             par_shape = shape
-            if server_id != self._server_count - 1:
-                par_shape[0] = math.ceil(shape[0] / self._server_count)
+            if shape[0] - server_id*count >= count:
+                par_shape[0] = count
             else:
-                par_shape[0] = shape[0] % count
+                par_shape[0] = shape[0] - server_id*count
             tensor_shape = torch.tensor(par_shape)
             msg = KVStoreMsg(
                 type=KVMsgType.INIT,
                 rank=self._client_id,
                 name=name,
                 id=tensor_shape,
-                data=None)
+                data=None) 
             _send_kv_msg(self._sender, msg, server_id)
         self._is_init = True
         
@@ -321,7 +323,7 @@ class KVClient(object):
         msg_list = []
         for idx in range(self._server_count):
             msg = _recv_kv_msg(self._receiver)
-            msg_list.add(msg)
+            msg_list.append(msg)
 
         return self._merge_msg(msg_list)
     
@@ -330,7 +332,7 @@ class KVClient(object):
 
         We usually invoke this API by just one client (e.g., client_0).
         """
-        for server_id in self._server_count:
+        for server_id in range(self._server_count):
             msg = KVStoreMsg(
                 type=KVMsgType.FINAL,
                 rank=self._client_id,

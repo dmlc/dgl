@@ -57,7 +57,7 @@ void DeserializeSampledSubgraph(char* data,
 int64_t SerializeKVMsg(char* data,
                        const int msg_type,
                        const int rank,
-                       const std::string& name,
+                       const std::string* name,
                        const NDArray* ID,
                        const NDArray* tensor);
 /*!

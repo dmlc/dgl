@@ -31,9 +31,11 @@ const int CONTROL_NODEFLOW = 0;
 const int CONTROL_END_SIGNAL = 1;
 
 // KVStore message type
+const int INIT_MSG = 1;
 const int PUSH_MSG = 2;
 const int PULL_MSG = 3;
 const int PULL_BACK_MSG = 4;
+const int FINAL_MSG = 5;
 
 /*!
  * \brief C structure for holding DGL distributed kvstore message

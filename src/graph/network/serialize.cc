@@ -164,27 +164,32 @@ void DeserializeSampledSubgraph(char* data,
 int64_t SerializeKVMsg(char* data,
                        const int msg_type,
                        const int rank,
-                       const std::string& name,
+                       const std::string* name,
                        const NDArray* ID,
                        const NDArray* tensor) {
   int64_t total_size = 0;
-  int64_t id_size = ID->GetSize();
-  int64_t data_size = tensor->GetSize();
-  int64_t id_shape = (*ID)->shape[0];
+  int64_t id_size = 0;
+  int64_t data_size = 0;
+  int64_t id_shape = 0;
   int64_t data_shape_0 = 0;
   int64_t data_shape_1 = 0;
-  if (tensor != nullptr) {
-    data_shape_0 = (*tensor)->shape[0];
-    data_shape_1 = (*tensor)->shape[1];
-  }
   total_size += sizeof(msg_type);
   total_size += sizeof(rank);
-  total_size += sizeof(name.length());
-  total_size += name.length();
-  total_size += id_size;
-  total_size += sizeof(id_size);
-  total_size += sizeof(id_shape);
+  if (name != nullptr) {
+    total_size += sizeof(name->length());
+    total_size += name->length();
+  }
+  if (ID != nullptr) {
+    id_size = ID->GetSize();
+    id_shape = (*ID)->shape[0];
+    total_size += id_size;
+    total_size += sizeof(id_size);
+    total_size += sizeof(id_shape);
+  }
   if (tensor != nullptr) {
+    data_size = tensor->GetSize();
+    data_shape_0 = (*tensor)->shape[0];
+    data_shape_1 = (*tensor)->shape[1];
     total_size += data_size;
     total_size += sizeof(data_size);
     total_size += sizeof(data_shape_0);
@@ -193,7 +198,7 @@ int64_t SerializeKVMsg(char* data,
   if (total_size > kMaxBufferSize) {
     LOG(FATAL) << "Message size: (" << total_size
                << ") is larger than buffer size: ("
-               << kMaxBufferSize << ")";
+               << kMaxBufferSize << ")"; 
   }
   char* data_ptr = data;
   // Write message type
@@ -203,35 +208,41 @@ int64_t SerializeKVMsg(char* data,
   *(reinterpret_cast<int*>(data_ptr)) = rank;
   data_ptr += sizeof(rank);
   // write name
-  *(reinterpret_cast<size_t*>(data_ptr)) = name.length();
-  data_ptr += sizeof(name.length());
-  memcpy(data_ptr, name.data(), name.length());
-  data_ptr += name.length();
+  if (name != nullptr) {
+    *(reinterpret_cast<size_t*>(data_ptr)) = name->length();
+    data_ptr += sizeof(name->length());
+    memcpy(data_ptr, name->data(), name->length());
+    data_ptr += name->length();
+  }
   // Write id
-  *(reinterpret_cast<int64_t*>(data_ptr)) = id_shape;
-  data_ptr += sizeof(id_shape);
-  *(reinterpret_cast<int64_t*>(data_ptr)) = id_size;
-  data_ptr += sizeof(id_size);
-  char* id_ptr = static_cast<char*>((*ID)->data);
-  memcpy(data_ptr, id_ptr, id_size);
-  data_ptr += id_size;
+  if (ID != nullptr) {
+    *(reinterpret_cast<int64_t*>(data_ptr)) = id_shape;
+    data_ptr += sizeof(id_shape);
+    *(reinterpret_cast<int64_t*>(data_ptr)) = id_size;
+    data_ptr += sizeof(id_size);
+    char* id_ptr = static_cast<char*>((*ID)->data);
+    memcpy(data_ptr, id_ptr, id_size);
+    data_ptr += id_size;
+  }
   // Write tensor
-  *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_0;
-  data_ptr += sizeof(data_shape_0);
-  *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_1;
-  data_ptr += sizeof(data_shape_1);
-  *(reinterpret_cast<int64_t*>(data_ptr)) = data_size;
-  data_ptr += sizeof(data_size);
-  char* tensor_ptr = static_cast<char*>((*tensor)->data);
-  memcpy(data_ptr, tensor_ptr, data_size);
+  if (tensor != nullptr) {
+    *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_0;
+    data_ptr += sizeof(data_shape_0);
+    *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_1;
+    data_ptr += sizeof(data_shape_1);
+    *(reinterpret_cast<int64_t*>(data_ptr)) = data_size;
+    data_ptr += sizeof(data_size);
+    char* tensor_ptr = static_cast<char*>((*tensor)->data);
+    memcpy(data_ptr, tensor_ptr, data_size);
+  }
   return total_size;
 }
 
-void DeserializeKVMsg(char* data, 
-                      int* msg_type, 
-                      int* rank, 
-                      std::string* name, 
-                      NDArray* ID, 
+void DeserializeKVMsg(char* data,
+                      int* msg_type,
+                      int* rank,
+                      std::string* name,
+                      NDArray* ID,
                       NDArray* tensor) {
   char* data_ptr = data;
   // Read message type
@@ -241,29 +252,35 @@ void DeserializeKVMsg(char* data,
   *rank = *(reinterpret_cast<int*>(data_ptr));
   data_ptr += sizeof(int);
   // Read name
-  size_t name_size = *(reinterpret_cast<size_t*>(data_ptr));
-  data_ptr += sizeof(name_size);
-  name->assign(data_ptr, name_size);
-  data_ptr += name_size;
-  // Read id
-  int64_t id_shape = *(reinterpret_cast<int64_t*>(data_ptr));
-  data_ptr += sizeof(id_shape);
-  int64_t id_size = *(reinterpret_cast<int64_t*>(data_ptr));
-  data_ptr += sizeof(id_size);
-  *ID = NDArray::Empty({id_shape}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  char* id_ptr = static_cast<char*>((*ID)->data);
-  memcpy(id_ptr, data_ptr, id_size);
-  data_ptr += id_size;
+  if (name != nullptr) {
+    size_t name_size = *(reinterpret_cast<size_t*>(data_ptr));
+    data_ptr += sizeof(name_size);
+    name->assign(data_ptr, name_size);
+    data_ptr += name_size;
+  }
+  // Read ID
+  if (ID != nullptr) {
+    int64_t id_shape = *(reinterpret_cast<int64_t*>(data_ptr));
+    data_ptr += sizeof(id_shape);
+    int64_t id_size = *(reinterpret_cast<int64_t*>(data_ptr));
+    data_ptr += sizeof(id_size);
+    *ID = NDArray::Empty({id_shape}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    char* id_ptr = static_cast<char*>((*ID)->data);
+    memcpy(id_ptr, data_ptr, id_size);
+    data_ptr += id_size;
+  }
   // Read tensor
-  int64_t data_shape_0 = *(reinterpret_cast<int64_t*>(data_ptr));
-  data_ptr += sizeof(data_shape_0);
-  int64_t data_shape_1 = *(reinterpret_cast<int64_t*>(data_ptr));
-  data_ptr += sizeof(data_shape_1);
-  int64_t data_size = *(reinterpret_cast<int64_t*>(data_ptr));
-  data_ptr += sizeof(data_size);
-  *tensor = NDArray::Empty({data_shape_0, data_shape_1}, DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
-  char* tensor_ptr = static_cast<char*>((*tensor)->data);
-  memcpy(tensor_ptr, data_ptr, data_size);
+  if (tensor != nullptr) {
+    int64_t data_shape_0 = *(reinterpret_cast<int64_t*>(data_ptr));
+    data_ptr += sizeof(data_shape_0);
+    int64_t data_shape_1 = *(reinterpret_cast<int64_t*>(data_ptr));
+    data_ptr += sizeof(data_shape_1);
+    int64_t data_size = *(reinterpret_cast<int64_t*>(data_ptr));
+    data_ptr += sizeof(data_size);
+    *tensor = NDArray::Empty({data_shape_0, data_shape_1}, DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
+    char* tensor_ptr = static_cast<char*>((*tensor)->data);
+    memcpy(tensor_ptr, data_ptr, data_size);
+  }
 }
 
 }  // namespace network

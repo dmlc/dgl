@@ -20,6 +20,8 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
+///////////////////////////////////////// Basic Networking Components ///////////////////////////////////////////
+
 // Wrapper for Send api
 static void SendData(network::Sender* sender,
                      const char* data,
@@ -110,6 +112,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
     receiver->Wait(ip.c_str(), port, num_sender, kQueueSize);
   });
 
+
+
+////////////////////////////////////// Distributed Sampler Components /////////////////////////////////////////
+
+
+
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
@@ -179,33 +187,47 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     }
   });
 
+
+//////////////////////////////////////// Distributed KVStore Components ///////////////////////////////////////////
+
+
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    network::Sender* sender = static_cast<network::Sender*>(chandle);
     int recv_id = args[1];
     int msg_type = args[2];
     int rank = args[3];
-    std::string name = args[4];
-    const NDArray ID = args[5];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
     char* buffer = sender->GetBuffer();
     int64_t data_size = 0;
-    if (msg_type == PUSH_MSG) {
+    if (msg_type == INIT_MSG || msg_type == PULL_MSG) {
+      std::string name = args[4];
+      const NDArray ID = args[5];
+      data_size = network::SerializeKVMsg(
+        buffer, 
+        msg_type, 
+        rank, 
+        &name, 
+        &ID, 
+        nullptr);
+    } else if (msg_type == PUSH_MSG || msg_type == PULL_BACK_MSG) {
+      std::string name = args[4];
+      const NDArray ID = args[5];
       const NDArray data = args[6];
       data_size = network::SerializeKVMsg(
         buffer, 
         msg_type, 
         rank, 
-        name, 
+        &name, 
         &ID, 
         &data);
-    } else if (msg_type == PULL_MSG) {
+    } else if (msg_type == FINAL_MSG) {
       data_size = network::SerializeKVMsg(
         buffer, 
         msg_type, 
         rank, 
-        name, 
-        &ID, 
+        nullptr, 
+        nullptr, 
         nullptr);
     } else {
       LOG(ERROR) << "Unknown message type: " << msg_type;
@@ -223,14 +245,34 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvKVMsg")
     char* buffer = receiver->GetBuffer();
     RecvData(receiver, buffer, kMaxBufferSize);
     KVStoreMsg *msg = new KVStoreMsg();
-    // Deserialize KVStoreMsg from recv_data_buffer
-    network::DeserializeKVMsg(
-      buffer, 
-      &(msg->msg_type), 
-      &(msg->rank), 
-      &(msg->name), 
-      &(msg->ID), 
-      &(msg->data));
+    int msg_type = *buffer;
+    if (msg_type == INIT_MSG || msg_type == PULL_MSG) {
+      network::DeserializeKVMsg(
+        buffer, 
+        &(msg->msg_type), 
+        &(msg->rank), 
+        &(msg->name), 
+        &(msg->ID), 
+        nullptr);
+    } else if (msg_type == PUSH_MSG || msg_type == PULL_BACK_MSG) {
+      network::DeserializeKVMsg(
+        buffer, 
+        &(msg->msg_type), 
+        &(msg->rank), 
+        &(msg->name), 
+        &(msg->ID), 
+        &(msg->data));
+    } else if (msg_type == FINAL_MSG) {
+      network::DeserializeKVMsg(
+        buffer, 
+        &(msg->msg_type), 
+        &(msg->rank), 
+        nullptr,
+        nullptr,
+        nullptr);
+    } else {
+      LOG(ERROR) << "Unknown message type: " << msg_type;
+    }
     std::vector<KVStoreMsg*> res_msg(1);
     res_msg[0] = msg;
     *rv = WrapVectorReturn(res_msg);
