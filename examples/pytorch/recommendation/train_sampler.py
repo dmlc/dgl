@@ -4,10 +4,12 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import tqdm
+from rec.model.pinsage import PinSage
 from rec.utils import cuda
 from rec.comm.sender import NodeFlowSender
 from dgl import DGLGraph
 from dgl.contrib.sampling import NeighborSampler
+from validation import *
 
 import argparse
 import pickle
@@ -38,12 +40,10 @@ n_negs = args.n_negs
 n_users = len(ml.user_ids)
 n_items = len(ml.product_ids)
 
-
 # Find negative examples for each positive example
 # Note that this function only pick negative examples for products; it doesn't
 # allow picking for users.
-# The returned node ID tensor is (dst.shape[0], n_negs)
-def find_negs(dst, ml, neighbors, n_negs):
+def find_negs(g_train, dst, ml, neighbors, n_negs):
     dst_neg = []
     for i, d in enumerate(dst):
         assert len(ml.user_ids) <= d < len(ml.user_ids) + len(ml.product_ids)
@@ -53,14 +53,15 @@ def find_negs(dst, ml, neighbors, n_negs):
     return dst_neg
 
 sender = NodeFlowSender(args.host, args.port)
-# Make it readonly so we can construct neighbor-sampling NodeFlows
 g.readonly()
+g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
+g_train = g.edge_subgraph(g_train, True)
 
 for epoch in range(500):
-    # Receive the edge batches to construct NodeFlows from
-    edges = g_train_edges[torch.LongTensor(sender.recv())]
-
-    src, dst = g.find_edges(edges)
+    edge_shuffled = g_train_edges[torch.LongTensor(sender.recv())]
+    src, dst = g_train.find_edges(edge_shuffled)
+    dst_neg = find_negs(g_train, dst, ml, neighbors, hard_neg_prob, n_negs)
+    dst_neg = dst_neg.flatten()
     # Chop the users, items and negative items into batches and reorganize
     # them into seed nodes.
     # Note that the batch size of DGL sampler here is (2 + n_negs) times our batch size,
@@ -68,10 +69,7 @@ for epoch in range(500):
     edge_batches = edge_shuffled.split(batch_size)
     src_batches = src.split(batch_size)
     dst_batches = dst.split(batch_size)
-    if n_negs > 0:
-        dst_neg = find_negs(dst, ml, neighbors, n_negs)
-        dst_neg = dst_neg.flatten()
-        dst_neg_batches = dst_neg.split(batch_size * n_negs)
+    dst_neg_batches = dst_neg.split(batch_size * n_negs)
 
     seed_nodes = []
     for i in range(len(src_batches)):
@@ -81,7 +79,7 @@ for epoch in range(500):
     seed_nodes = torch.cat(seed_nodes)
 
     sampler = NeighborSampler(
-            g,
+            g_train,
             batch_size * (2 + n_negs),
             5,
             n_layers,

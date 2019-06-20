@@ -36,14 +36,15 @@ batch_size = args.batch_size
 n_users = len(ml.user_ids)
 n_items = len(ml.product_ids)
 
-g.readonly()
-
 sender = NodeFlowSender(args.host, args.port)
+g.readonly()
+g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
+g_train = g.edge_subgraph(g_train, True)
 
 for epoch in range(500):
     seeds = torch.LongTensor(sender.recv()) + n_users
     sampler = NeighborSampler(
-            g_prior,
+            g_train,
             batch_size,
             5,
             n_layers,

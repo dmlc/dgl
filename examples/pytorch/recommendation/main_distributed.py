@@ -61,6 +61,9 @@ _compute_validation = {
 compute_validation = _compute_validation[args.dataset]
 
 g = ml.g
+g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
+g_train = g.edge_subgraph(g_train_edges, True)
+g_train.copy_from_parent()
 
 n_hidden = 100
 n_layers = args.layers
@@ -90,7 +93,7 @@ emb = {}
 model = cuda(PinSage(
     [n_hidden] * (n_layers + 1),
     use_feature=args.use_feature,
-    G=g,
+    G=g_train,
     emb=emb,
     ))
 # The learnable embeddings for each user and product that don't take part in GraphSage
@@ -130,10 +133,10 @@ def forward(model, nodeflow, train=True):
 # I need to send additional data along with the NodeFlow.
 train_sampler = NodeFlowReceiver(args.train_port)
 train_sampler.waitfor(args.num_samplers)
-train_sampler.set_parent_graph(g)
+train_sampler.set_parent_graph(g_train)
 valid_sampler = NodeFlowReceiver(args.valid_port)
 valid_sampler.waitfor(args.num_samplers)
-valid_sampler.set_parent_graph(g)
+valid_sampler.set_parent_graph(g_train)
 
 def runtrain():
     global opt
@@ -143,10 +146,9 @@ def runtrain():
     # from user to product, without the inverse direction.
     # Essentially, only the product embeddings are passed through GraphSage;
     # user embeddings would be left untouched.
-    # We partition the edges to train, and distribute the batches of edges
-    # evenly to the remote samplers.
+    # We distribute the edges to train evenly to the remote samplers.
     edge_shuffled = torch.randperm(
-            g.filter_edges(lambda edges: ~edges.data['inv']).shape[0]).long()
+            g_train.filter_edges(lambda edges: ~edges.data['inv']).shape[0]).long()
     n_batches = len(edge_shuffled.split(batch_size))
     train_sampler.distribute(edge_shuffled.numpy())
 
@@ -193,7 +195,7 @@ def runtrain():
             neg_nlogp = -F.logsigmoid(-neg_score)
             if args.dataset.startswith('movielens') and not args.dataset.endswith('imp'):
                 # rating prediction - L2 loss
-                loss = (pos_score - cuda(g.edges[edges].data['rating'])) ** 2
+                loss = (pos_score - cuda(g_train.edges[edges].data['rating'])) ** 2
                 loss = loss.mean()
                 acc = loss
             else:

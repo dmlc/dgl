@@ -95,7 +95,8 @@ class MovieLens(UserProductDataset):
         self.users = self.users[self.users.index.isin(self.ratings['user_id'])]
         self.products = self.products[self.products.index.isin(self.ratings['product_id'])]
         self.build_graph()
-        #self.find_neighbors(0.2, 2000, 1000)
+        self.refresh_mask()
+        self.generate_candidates()
 
     def build_graph(self):
         user_ids = list(self.users.index)
@@ -168,7 +169,6 @@ class MovieLens(UserProductDataset):
                 data={'inv': torch.ones(self.ratings.shape[0], dtype=torch.uint8),
                     'rating': torch.FloatTensor(self.ratings['rating'])})
         self.g = g
-        self.generate_candidates()
 
 
     def find_neighbors(self, restart_prob, max_nodes, top_T):
@@ -186,28 +186,11 @@ class MovieLens(UserProductDataset):
             product_neighbor = neighbors[i]
             self.product_neighbors.append(product_neighbor.tolist())
 
-    def generate_mask(self):
-        while True:
-            ratings = self.ratings.groupby('user_id', group_keys=False).apply(self.split_user)
-            prior_prob = ratings['prob'].values
-            for i in range(5):
-                train_mask = (prior_prob >= 0.2 * i) & (prior_prob < 0.2 * (i + 1))
-                prior_mask = ~train_mask
-                train_mask &= ratings['train'].values
-                prior_mask &= ratings['train'].values
-                yield prior_mask, train_mask
-
     def refresh_mask(self):
-        if not hasattr(self, 'masks'):
-            self.masks = self.generate_mask()
-        prior_mask, train_mask = next(self.masks)
-
         valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
         test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
-        train_tensor = torch.from_numpy(train_mask.astype('uint8'))
-        prior_tensor = torch.from_numpy(prior_mask.astype('uint8'))
+        train_tensor = torch.from_numpy(self.ratings['train'].values.astype('uint8'))
         edge_data = {
-                'prior': prior_tensor,
                 'valid': valid_tensor,
                 'test': test_tensor,
                 'train': train_tensor,
@@ -243,4 +226,5 @@ class MovieLens20M(MovieLens):
         self.products = self.products[self.products.index.isin(self.ratings['product_id'])]
 
         self.build_graph()
-        #self.find_neighbors(0.2, 2000, 1000)
+        self.refresh_mask()
+        self.generate_candidates()
