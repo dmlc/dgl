@@ -24,7 +24,7 @@ endif()
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
+dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" ON)
 
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
@@ -110,6 +110,9 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+add_subdirectory("third_party/dmlc-core")
+list(APPEND DGL_LINKER_LIBS dmlc)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
