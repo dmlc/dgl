@@ -56,7 +56,7 @@ def find_negs(g_train, dst, ml, neighbors, n_negs):
 sender = NodeFlowSender(args.host, args.port)
 g.readonly()
 g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
-g_train = g.edge_subgraph(g, True)
+g_train = g.edge_subgraph(g_train_edges, True)
 
 for epoch in range(500):
     edge_shuffled = g_train_edges[torch.LongTensor(sender.recv())]

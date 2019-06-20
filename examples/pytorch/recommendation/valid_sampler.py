@@ -40,7 +40,7 @@ n_items = len(ml.product_ids)
 sender = NodeFlowSender(args.host, args.port)
 g.readonly()
 g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
-g_train = g.edge_subgraph(g, True)
+g_train = g.edge_subgraph(g_train_edges, True)
 
 for epoch in range(500):
     seeds = torch.LongTensor(sender.recv()) + n_users
