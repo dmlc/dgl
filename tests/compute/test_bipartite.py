@@ -23,14 +23,21 @@ def edge_pair_input(sort=False):
         dst = [9, 6, 3, 9, 4, 4, 9, 9, 1, 8, 3, 2, 8, 1, 5, 7, 3, 2, 6, 5, 10]
         return src, dst
 
-def gen_from_edgelist():
+def gen_from_edgelist(directed):
     src, dst = edge_pair_input()
     num_typed_nodes = {'src': max(src) + 1, 'dst': max(dst) + 1}
     src = np.array(src, np.int64)
     dst = np.array(dst, np.int64)
-    metagraph = nx.MultiGraph([('src', 'dst', 'e')])
-    g = dgl.DGLBipartiteGraph(metagraph, num_typed_nodes,
-                              {('src', 'dst', 'e'): (src, dst)}, readonly=True)
+    metagraph = nx.MultiGraph([('src', 'dst', 'e'), ('dst', 'src', 'e')])
+    if directed:
+        g = dgl.DGLBipartiteGraph(metagraph, num_typed_nodes,
+                                  {('src', 'dst', 'e'): (src, dst)},
+                                  readonly=True)
+    else:
+        g = dgl.DGLBipartiteGraph(metagraph, num_typed_nodes,
+                                  {('src', 'dst', 'e'): (src, dst),
+                                   ('dst', 'src', 'e'): (dst, src)},
+                                  readonly=True)
     return g
 
 def scipy_coo_input():
@@ -61,7 +68,7 @@ def gen_from_data(data, readonly):
     return g
 
 def test_query():
-    def _test_one(g):
+    def _test_one1(g):
         assert g['src'].number_of_nodes() == 10
         assert g['dst'].number_of_nodes() == 11
         assert g.number_of_edges() == 21
@@ -135,10 +142,89 @@ def test_query():
         assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('src', 'dst', 'e'), transpose=True)),
                               scipy_coo_input().toarray())
 
-    def _test(g):
+    def _test_one2(g):
+        assert g['src'].number_of_nodes() == 10
+        assert g['dst'].number_of_nodes() == 11
+        assert g.number_of_edges() == 21
+        assert not g.is_multigraph
+
+        for i in range(10):
+            assert g['src'].has_node(i)
+            assert i in g['src']
+        for i in range(11):
+            assert g['dst'].has_node(i)
+            assert i in g['dst']
+        assert not g['src'].has_node(11)
+        assert not g['dst'].has_nodes(12)
+        assert not g['src'].has_node(-1)
+        assert not g['dst'].has_node(-1)
+        assert not -1 in g['src']
+        assert F.allclose(g['src'].has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+
+        src, dst = edge_pair_input()
+        for u, v in zip(dst, src):
+            assert g.has_edge_between(u, v)
+        assert not g.has_edge_between(0, 0)
+        assert F.allclose(g.has_edges_between([0, 9, 8], [0, 0, 3]), F.tensor([0,1,1]))
+        assert set(F.asnumpy(g.successors(9))) == set([0,5,7,4])
+        assert set(F.asnumpy(g.predecessors(2))) == set([7,3])
+
+        assert g.edge_id(4,4) == 5
+        assert F.allclose(g.edge_ids([4,9], [4,0]), F.tensor([5,0]))
+
+        src, dst = g.find_edges([3, 6, 5])
+        assert F.allclose(dst, F.tensor([5, 7, 4]))
+        assert F.allclose(src, F.tensor([9, 9, 4]))
+
+        src, dst, eid = g.out_edges(9, form='all')
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7)])
+        src, dst, eid = g.out_edges([9,0,8], form='all')  # test node#0 has no in edges
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7),(3,8,9),(7,8,12)])
+
+        src, dst, eid = g.in_edges(0, form='all')
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(0,6,1),(0,4,4)])
+        src, dst, eid = g.in_edges([0,4,8], form='all')  # test node#8 has no out edges
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(0,6,1),(0,4,4),(4,3,2),(4,4,5),(4,9,7),(4,1,8)])
+
+        src, dst, eid = g.edges('all', 'eid')
+        t_src, t_dst = edge_pair_input()
+        t_tup = list(zip(t_src, t_dst, list(range(21))))
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(eid)) == list(range(21))
+
+        src, dst, eid = g.edges('all', 'srcdst')
+        t_src, t_dst = edge_pair_input()
+        t_tup = list(zip(t_src, t_dst, list(range(21))))
+        tup = list(zip(F.asnumpy(dst), F.asnumpy(src), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
+
+        assert g.out_degree(0) == 0
+        assert g.out_degree(9) == 4
+        assert F.allclose(g.out_degrees([0, 9]), F.tensor([0, 4]))
+        assert g.in_degree(8) == 0
+        assert g.in_degree(9) == 2
+        assert F.allclose(g.in_degrees([8, 9]), F.tensor([0, 2]))
+
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('dst', 'src', 'e'))),
+                              scipy_coo_input().toarray())
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('dst', 'src', 'e'), transpose=True)),
+                              scipy_coo_input().toarray().T)
+
+    def _test1(g):
         # test twice to see whether the cached format works or not
-        _test_one(g)
-        _test_one(g)
+        _test_one1(g)
+        _test_one1(g)
+
+    def _test2(g):
+        # test twice to see whether the cached format works or not
+        _test_one2(g)
+        _test_one2(g)
 
     def _test_csr_one(g):
         assert g['src'].number_of_nodes() == 10
@@ -223,9 +309,12 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
-    _test(gen_from_edgelist())
+    _test1(gen_from_edgelist(True))
+    g = gen_from_edgelist(False)
+    _test1(g['src', 'dst', 'e'])
+    _test2(g['dst', 'src', 'e'])
     #_test(gen_from_data(scipy_coo_input(), False))
-    _test(gen_from_data(scipy_coo_input(), True))
+    _test1(gen_from_data(scipy_coo_input(), True))
 
     #_test_csr(gen_from_data(scipy_csr_input(), False))
     _test_csr(gen_from_data(scipy_csr_input(), True))
@@ -255,7 +344,7 @@ def test_mutation():
     assert F.allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
 
 def test_scipy_adjmat():
-    g = gen_from_edgelist()
+    g = gen_from_edgelist(False)
     coo = scipy_coo_input()
     coo_t = coo.transpose()
 
@@ -265,10 +354,22 @@ def test_scipy_adjmat():
     assert np.array_equal(coo_t.col, adj_1.col)
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
+    adj_0 = g.adjacency_matrix_scipy(('dst', 'src', 'e'))
+    adj_1 = g.adjacency_matrix_scipy(('dst', 'src', 'e'), fmt='coo')
+    assert np.array_equal(coo.row, adj_1.row)
+    assert np.array_equal(coo.col, adj_1.col)
+    assert np.array_equal(adj_0.toarray(), adj_1.toarray())
+
     adj_t0 = g.adjacency_matrix_scipy(('src', 'dst', 'e'), transpose=True)
     adj_t_1 = g.adjacency_matrix_scipy(('src', 'dst', 'e'), transpose=True, fmt='coo')
     assert np.array_equal(coo.row, adj_t_1.row)
     assert np.array_equal(coo.col, adj_t_1.col)
+    assert np.array_equal(adj_t0.toarray(), adj_t_1.toarray())
+
+    adj_t0 = g.adjacency_matrix_scipy(('dst', 'src', 'e'), transpose=True)
+    adj_t_1 = g.adjacency_matrix_scipy(('dst', 'src', 'e'), transpose=True, fmt='coo')
+    assert np.array_equal(coo_t.row, adj_t_1.row)
+    assert np.array_equal(coo_t.col, adj_t_1.col)
     assert np.array_equal(adj_t0.toarray(), adj_t_1.toarray())
 
 def test_incmat():
@@ -282,8 +383,6 @@ def test_incmat():
                               {('src', 'dst', 'e'): (src, dst)}, readonly=True)
     inc_in = F.sparse_to_numpy(g.incidence_matrix(('src', 'dst', 'e'), 'in'))
     inc_out = F.sparse_to_numpy(g.incidence_matrix(('src', 'dst', 'e'), 'out'))
-    print(inc_in)
-    print(inc_out)
     assert np.allclose(
             inc_in,
             np.array([[0., 0., 0., 0., 0.],
@@ -395,24 +494,39 @@ def check_apply_nodes(g, ntype):
     assert F.allclose(F.gather_row(g[ntype].ndata['h'], u), F.zeros((4, D)))
 
 def test_apply_nodes():
-    g = gen_from_edgelist()
+    g = gen_from_edgelist(False)
     check_apply_nodes(g, 'src')
     check_apply_nodes(g, 'dst')
 
 def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
-    g = gen_from_edgelist()
-    g.edata['w'] = F.randn((g.number_of_edges(), D))
-    g.register_apply_edge_func(_upd)
-    old = g.edata['w']
+    g = gen_from_edgelist(False)
+    g['src', 'dst', 'e'].edata['w'] = F.randn((g['src', 'dst', 'e'].number_of_edges(), D))
+    g['dst', 'src', 'e'].edata['w'] = F.randn((g['dst', 'src', 'e'].number_of_edges(), D))
+    old1 = g['src', 'dst', 'e'].edata['w']
+    old2 = g['dst', 'src', 'e'].edata['w']
+    g.apply_edges({('src', 'dst', 'e'): _upd,
+                   ('dst', 'src', 'e'): _upd})
+    assert F.allclose(old1 * 2, g['src', 'dst', 'e'].edata['w'])
+    assert F.allclose(old2 * 2, g['dst', 'src', 'e'].edata['w'])
+
+    g.register_apply_edge_func({('src', 'dst', 'e'): _upd,
+                                ('dst', 'src', 'e'): _upd})
     g.apply_edges()
-    assert F.allclose(old * 2, g.edata['w'])
+    assert F.allclose(old1 * 4, g['src', 'dst', 'e'].edata['w'])
+    assert F.allclose(old2 * 4, g['dst', 'src', 'e'].edata['w'])
+
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([4, 6, 9, 3, 9, 6])
-    g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = g.edge_ids(u, v)
-    assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
+    udf = lambda edges : {'w' : edges.data['w'] * 0.}
+    g.apply_edges({('src', 'dst', 'e'): udf,
+                   ('dst', 'src', 'e'): udf},
+                  {('src', 'dst', 'e'): (u, v),
+                   ('dst', 'src', 'e'): (v, u)})
+    eid = g['src', 'dst', 'e'].edge_ids(u, v)
+    assert F.allclose(F.gather_row(g['src', 'dst', 'e'].edata['w'], eid),
+                      F.zeros((6, D)))
 
 reduce_msg_shapes = set()
 
@@ -432,10 +546,7 @@ def apply_node_func(nodes):
     return {'res' : nodes.data['h'] + nodes.data['accum']}
 
 def test_update_routines():
-    g = gen_from_edgelist()
-    g.register_message_func(message_func)
-    g['dst'].register_reduce_func(reduce_func)
-    g['dst'].register_apply_node_func(apply_node_func)
+    g = gen_from_edgelist(False)
     g['src'].ndata['h'] = F.randn((g['src'].number_of_nodes(), D))
     g['dst'].ndata['h'] = F.randn((g['dst'].number_of_nodes(), D))
     adj = g.adjacency_matrix(('src', 'dst', 'e'))
@@ -445,8 +556,21 @@ def test_update_routines():
     reduce_msg_shapes.clear()
     u = [0, 0, 0, 4, 5, 6]
     v = [4, 6, 9, 3, 9, 6]
-    g.send_and_recv((u, v))
+    g.send_and_recv((u, v),
+                    {('src', 'dst', 'e'): message_func},
+                    {'dst': reduce_func},
+                    {'dst': apply_node_func})
     assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
+
+    reduce_msg_shapes.clear()
+    u = [0, 0, 0, 4, 5, 6]
+    v = [4, 6, 9, 3, 9, 6]
+    g['src', 'dst', 'e'].send_and_recv((u, v),
+                                       message_func,
+                                       reduce_func,
+                                       apply_node_func)
+    assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
+
     reduce_msg_shapes.clear()
     try:
         g.send_and_recv([u, v])
@@ -457,7 +581,18 @@ def test_update_routines():
     # pull
     v = F.tensor([1, 2, 3, 9])
     reduce_msg_shapes.clear()
-    g.pull(v)
+    g.pull(v,
+           {('src', 'dst', 'e'): message_func},
+           {'dst': reduce_func},
+           {'dst': apply_node_func})
+    assert(reduce_msg_shapes == {(2, 2, D), (1, 3, D), (1, 4, D)})
+    reduce_msg_shapes.clear()
+    F.allclose(g['dst'].ndata['res'][v], comp_res[v])
+
+    g['src', 'dst', 'e'].pull(v,
+                              message_func,
+                              reduce_func,
+                              apply_node_func)
     assert(reduce_msg_shapes == {(2, 2, D), (1, 3, D), (1, 4, D)})
     reduce_msg_shapes.clear()
     F.allclose(g['dst'].ndata['res'][v], comp_res[v])
@@ -465,30 +600,49 @@ def test_update_routines():
     # push
     v = F.tensor([0, 1, 2, 3])
     reduce_msg_shapes.clear()
-    g.push(v)
+    g.push(v,
+           {('src', 'dst', 'e'): message_func},
+           {'dst': reduce_func},
+           {'dst': apply_node_func})
+    assert(reduce_msg_shapes == {(2, 2, D), (5, 1, D)})
+    reduce_msg_shapes.clear()
+
+    g['src', 'dst', 'e'].push(v,
+                              message_func,
+                              reduce_func,
+                              apply_node_func)
     assert(reduce_msg_shapes == {(2, 2, D), (5, 1, D)})
     reduce_msg_shapes.clear()
 
     # update_all
     reduce_msg_shapes.clear()
-    g.update_all()
+    g.update_all({('src', 'dst', 'e'): message_func},
+                 {'dst': reduce_func},
+                 {'dst': apply_node_func})
+    assert(reduce_msg_shapes == {(1, 3, D), (2, 1, D), (6, 2, D), (1, 4, D)})
+    reduce_msg_shapes.clear()
+    F.allclose(g['dst'].ndata['res'], comp_res)
+
+    g['src', 'dst', 'e'].update_all(message_func,
+                                    reduce_func,
+                                    apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (2, 1, D), (6, 2, D), (1, 4, D)})
     reduce_msg_shapes.clear()
     F.allclose(g['dst'].ndata['res'], comp_res)
 
 def test_filter():
-    g = gen_from_edgelist()
+    g = gen_from_edgelist(False)
 
     src_repr = F.zeros((g['src'].number_of_nodes(), 5))
     dst_repr = F.zeros((g['dst'].number_of_nodes(), 5))
-    e_repr = F.zeros((g.number_of_edges(), 5))
+    e_repr = F.zeros((g['src', 'dst', 'e'].number_of_edges(), 5))
     src_repr[[1, 3]] = 1
     dst_repr[[1, 5]] = 1
     e_repr[[1, 3]] = 1
 
     g['src'].ndata['a'] = src_repr
     g['dst'].ndata['a'] = dst_repr
-    g.edata['a'] = e_repr
+    g['src', 'dst', 'e'].edata['a'] = e_repr
 
     def predicate(r):
         return F.max(r.data['a'], 1) > 0

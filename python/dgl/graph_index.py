@@ -1165,6 +1165,71 @@ class BiGraphIndex(GraphIndex):
         super(BiGraphIndex, self).__init__(handle)
         self._num_nodes = num_nodes
 
+    def number_of_nodes(self, idx):
+        return self._num_nodes[idx]
+
+    def _conv_right1(self, v):
+        return v + self._num_nodes[0]
+
+    def _conv_right(self, v):
+        v = v.tousertensor() + self._num_nodes[0]
+        return utils.toindex(v)
+
+    def _conv_right_back(self, v):
+        v = v.tousertensor() - self._num_nodes[0]
+        return utils.toindex(v)
+
+    def has_edge_between(self, u, v):
+        v = self._conv_right1(v)
+        return super(BiGraphIndex, self).has_edge_between(u, v)
+
+    def has_edges_between(self, u, v):
+        v = self._conv_right(v)
+        return super(BiGraphIndex, self).has_edges_between(u, v)
+
+    def predecessors(self, v):
+        v = self._conv_right1(v)
+        return super(BiGraphIndex, self).predecessors(v)
+
+    def successors(self, v):
+        return self._conv_right_back(super(BiGraphIndex, self).successors(v))
+
+    def edge_id(self, u, v):
+        return super(BiGraphIndex, self).edge_id(u, self._conv_right1(v))
+
+    def edge_ids(self, u, v):
+        src, dst, eid = super(BiGraphIndex, self).edge_ids(u, self._conv_right(v))
+        dst = self._conv_right_back(dst)
+        return src, dst, eid
+
+    def find_edges(self, eid):
+        src, dst, eid = super(BiGraphIndex, self).find_edges(eid)
+        dst = self._conv_right_back(dst)
+        return src, dst, eid
+
+    def in_edges(self, v):
+        src, dst, eid = super(BiGraphIndex, self).in_edges(self._conv_right(v))
+        dst = self._conv_right_back(dst)
+        return src, dst, eid
+
+    def out_edges(self, v):
+        src, dst, eid = super(BiGraphIndex, self).out_edges(v)
+        dst = self._conv_right_back(dst)
+        return src, dst, eid
+
+    def edges(self, order=None):
+        src, dst, eid = super(BiGraphIndex, self).edges(order)
+        dst = self._conv_right_back(dst)
+        return src, dst, eid
+
+    def in_degree(self, v):
+        v = self._conv_right1(v)
+        return super(BiGraphIndex, self).in_degree(v)
+
+    def in_degrees(self, v):
+        v = self._conv_right(v)
+        return super(BiGraphIndex, self).in_degrees(v)
+
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt):
         """Return the scipy adjacency matrix representation of this graph.
@@ -1305,9 +1370,6 @@ class BiGraphIndex(GraphIndex):
         m = self.number_of_edges()
         if typestr == 'in':
             n = self._num_nodes[1]
-            dst = dst - self._num_nodes[0]
-            print(dst)
-            print(eid)
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
