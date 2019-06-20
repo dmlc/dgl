@@ -22,7 +22,7 @@ parser.add_argument('--cache', type=str, default='/tmp/dataset.pkl',
 parser.add_argument('--raw-dataset-path', type=str, default='/efs/quagan/movielens')
 parser.add_argument('--dataset', type=str, default='movielens')
 parser.add_argument('--host', type=str, default='localhost')
-parser.add_argument('--port', type=int, default=5902)
+parser.add_argument('--port', type=int, default=5901)
 parser.add_argument('--batch-size', type=int, default=32)
 args = parser.parse_args()
 
