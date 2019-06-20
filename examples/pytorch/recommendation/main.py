@@ -7,7 +7,6 @@ import tqdm
 from rec.model.pinsage import PinSage
 from rec.datasets.movielens import MovieLens
 from rec.utils import cuda
-from rec.adabound import AdaBound
 from dgl import DGLGraph
 
 import argparse

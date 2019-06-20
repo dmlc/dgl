@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import dgl.function as FN
 from .. import randomwalk
 from ..utils import cuda
+from .layers import ScaledEmbedding
 
 def create_embeddings(n_nodes, n_features):
     return nn.Parameter(torch.randn(n_nodes, n_features))
@@ -13,12 +15,16 @@ def mix_embeddings(h, ndata, emb, proj):
     (projected by ``emb``) and numeric inputs (projected by ``proj``).
     '''
     e = []
-    for key, value in ndata.items():
-        if value.dtype == torch.int64:
-            e.append(emb[key](value))
-        elif value.dtype == torch.float32:
-            e.append(proj[key](value))
-    return h + torch.stack(e, 0).sum(0)
+    for key in emb.keys():
+        value = ndata[key]
+        result = emb[key](cuda(value))
+        if result.dim() == 3:
+            result = result.mean(1)     # bag of words
+        e.append(result)
+    for key in proj.keys():
+        value = ndata[key]
+        e.append(proj[key](cuda(value)))
+    return (cuda(h) if h is not None else 0) + torch.stack(e, 0).sum(0)
 
 def get_embeddings(h, nodeset):
     return h[nodeset]
@@ -48,55 +54,32 @@ class PinSageConv(nn.Module):
 
         self.Q = nn.Linear(in_features, hidden_features)
         self.W = nn.Linear(in_features + hidden_features, out_features)
+        self.V = nn.Linear(in_features, hidden_features)
 
         init_weight(self.Q.weight, 'xavier_uniform_', 'leaky_relu')
         init_weight(self.W.weight, 'xavier_uniform_', 'leaky_relu')
+        init_weight(self.V.weight, 'xavier_uniform_', 'leaky_relu')
         init_bias(self.Q.bias)
         init_bias(self.W.bias)
+        init_bias(self.V.bias)
 
-
-    def forward(self, h, nodeset, nb_nodes, nb_weights):
-        '''
-        h: node embeddings (num_total_nodes, in_features), or a container
-           of the node embeddings (for distributed computing)
-        nodeset: node IDs in this minibatch (num_nodes,)
-        nb_nodes: neighbor node IDs of each node in nodeset (num_nodes, num_neighbors)
-        nb_weights: weight of each neighbor node (num_nodes, num_neighbors)
-        return: new node embeddings (num_nodes, out_features)
-        '''
-        n_nodes, T = nb_nodes.shape
-
-        h_nodeset = get_embeddings(h, nodeset)  # (n_nodes, in_features)
-        h_neighbors = get_embeddings(h, nb_nodes.view(-1)).view(n_nodes, T, self.in_features)
-
-        h_neighbors = F.leaky_relu(self.Q(h_neighbors))
-        h_agg = safediv(
-                (nb_weights[:, :, None] * h_neighbors).sum(1),
-                nb_weights.sum(1, keepdim=True))
-
-        h_concat = torch.cat([h_nodeset, h_agg], 1)
+    def forward(self, nodes):
+        h_agg = safediv(nodes.data['h_agg'], nodes.data['w'][:, None])
+        h = nodes.data['h']
+        h_concat = torch.cat([h, h_agg], 1)
+        # HSelf
+        #h_new = F.leaky_relu(self.W(h_concat) + self.V(nodes.data['h_x']))
         h_new = F.leaky_relu(self.W(h_concat))
         h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True))
+        return {'h': h_new}
 
-        return h_new
+    def project(self, h):
+        return F.leaky_relu(self.Q(h))
+
 
 class PinSage(nn.Module):
-    '''
-    Completes a multi-layer PinSage convolution
-    G: DGLGraph
-    feature_sizes: the dimensionality of input/hidden/output features
-    T: number of neighbors we pick for each node
-    restart_prob: restart probability
-    max_nodes: max number of nodes visited for each seed
-    '''
-    def __init__(self, num_nodes, feature_sizes, T, restart_prob, max_nodes,
-                 use_feature=False, G=None):
+    def __init__(self, feature_sizes, use_feature=False, G=None, emb={}, proj={}):
         super(PinSage, self).__init__()
-
-        self.T = T
-        self.restart_prob = restart_prob
-        self.max_nodes = max_nodes
-
         self.in_features = feature_sizes[0]
         self.out_features = feature_sizes[-1]
         self.n_layers = len(feature_sizes) - 1
@@ -106,7 +89,6 @@ class PinSage(nn.Module):
             self.convs.append(PinSageConv(
                 feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1]))
 
-        self.h = create_embeddings(num_nodes, self.in_features)
         self.use_feature = use_feature
 
         if use_feature:
@@ -115,35 +97,57 @@ class PinSage(nn.Module):
 
             for key, scheme in G.node_attr_schemes().items():
                 if scheme.dtype == torch.int64:
-                    self.emb[key] = nn.Embedding(
+                    self.emb[key] = emb.get(key, ScaledEmbedding(
                             G.ndata[key].max().item() + 1,
                             self.in_features,
-                            padding_idx=0)
+                            padding_idx=0))
                 elif scheme.dtype == torch.float32:
-                    self.proj[key] = nn.Sequential(
-                            nn.Linear(scheme.shape[0], self.in_features),
-                            nn.LeakyReLU(),
-                            )
+                    w = nn.Linear(scheme.shape[0], self.in_features)
+                    init_weight(w.weight, 'xavier_uniform_', 'leaky_relu')
+                    init_bias(w.bias)
+                    self.proj[key] = proj.get(key, nn.Sequential(w, nn.LeakyReLU()))
 
-    def forward(self, G, nodeset):
+    msg = [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
+           FN.copy_edge('ppr_weight', 'w')]
+    red = [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
+
+    
+    def forward(self, nf, h_emb):
         '''
-        Given a complete embedding matrix h and a list of node IDs, return
-        the output embeddings of these node IDs.
-
-        nodeset: node IDs in this minibatch (num_nodes,)
-        return: new node embeddings (num_nodes, out_features)
+        nf: NodeFlow.
         '''
-        if self.use_feature:
-            h = mix_embeddings(self.h, G.ndata, self.emb, self.proj)
-        else:
-            h = self.h
+        if self.n_layers == 0:
+            nid = nf.layer_parent_nid(-1)
+            h = h_emb(cuda(nid + 1)) if h_emb is not None else None
+            if self.use_feature:
+                nf.layers[-1].data['h'] = mix_embeddings(
+                        h, nf.layers[-1].data, self.emb, self.proj)
+            else:
+                nf.layers[-1].data['h'] = cuda(h)
+            return nf.layers[-1].data['h']
 
-        nodeflow = randomwalk.random_walk_nodeflow(
-                G, nodeset, self.n_layers, self.restart_prob, self.max_nodes, self.T)
+        nids = [nf.layer_parent_nid(i) for i in range(nf.num_layers)]
+        nids = torch.cat(nids)
+        h = h_emb(cuda(nids + 1)) if h_emb is not None else None
+        for i in range(nf.num_layers):
+            hi = h[nf.layer_offsets(i):nf.layer_offsets(i + 1)]
+            if self.use_feature:
+                nf.layers[i].data['h_x'] = mix_embeddings(
+                        hi, nf.layers[i].data, self.emb, self.proj)
+            else:
+                nf.layers[i].data['h_x'] = cuda(hi)
+        nf.layers[0].data['h'] = nf.layers[0].data['h_x']
 
-        for i, (nodeset, nb_weights, nb_nodes) in enumerate(nodeflow):
-            new_embeddings = self.convs[i](h, nodeset, nb_nodes, nb_weights)
-            h = put_embeddings(h, nodeset, new_embeddings)
+        for i in range(nf.num_blocks):
+            parent_nid_1 = nf.layer_parent_nid(i + 1)
+            parent_nid_0 = nf.layer_parent_nid(i)
+            result = nf.layers[i].data['h'][nf.map_from_parent_nid(i, parent_nid_1)]
+            nf.layers[i + 1].data['h'] = result
+            result = self.convs[i].project(nf.layers[i].data['h'])
+            nf.layers[i].data['h_q'] = result
+            nf.block_compute(i, self.msg, self.red, self.convs[i])
 
-        h_new = get_embeddings(h, nodeset)
-        return h_new
+        result = nf.layers[-1].data['h']
+        assert (result != result).sum() == 0
+        return result
+
