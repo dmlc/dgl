@@ -2,6 +2,7 @@ import torch
 import tqdm
 import numpy as np
 from rec.utils import cuda
+import scipy.stats as st
 
 def compute_validation_rating(ml, h, b, model, test):
     n_users = len(ml.users)

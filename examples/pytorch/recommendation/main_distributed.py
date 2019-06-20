@@ -54,8 +54,8 @@ ml = load_data(args)
 _compute_validation = {
         'movielens1m': compute_validation_rating,
         'movielens10m': compute_validation_rating,
-        'movielens10m-imp': compute_validation_ml,
-        'movielens-imp': compute_validation_ml,
+        'movielens10m-imp': compute_validation_imp,
+        'movielens-imp': compute_validation_imp,
         }
 # The evaluation function for the current dataset
 compute_validation = _compute_validation[args.dataset]
