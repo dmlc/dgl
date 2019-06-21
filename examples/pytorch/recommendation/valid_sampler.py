@@ -51,7 +51,7 @@ for epoch in range(500):
             n_layers,
             seed_nodes=seeds,
             prefetch=True,
-            add_self_loop=False,
+            add_self_loop=True,
             num_workers=20)
 
     with tqdm.tqdm(sampler) as tq:

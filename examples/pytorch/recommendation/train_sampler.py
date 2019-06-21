@@ -88,7 +88,7 @@ for epoch in range(500):
             n_layers,
             seed_nodes=seed_nodes,
             prefetch=True,
-            add_self_loop=False,
+            add_self_loop=True,
             num_workers=20)
     sampler_iter = iter(sampler)
 

@@ -174,7 +174,7 @@ def runtrain():
             else:
                 nodeset = dst
 
-            nodeflow.copy_from_parent()
+            nodeflow.copy_from_parent(edge_embed_names=None)
 
             # The features on nodeflow is stored on CPUs for now.  We copy them to GPUs
             # in model.forward().
@@ -244,7 +244,7 @@ def runtest(validation=True):
     with torch.no_grad():
         with tqdm.tqdm(valid_sampler_iter) as tq:
             for nodeflow, aux_data in tq:
-                nodeflow.copy_from_parent()
+                nodeflow.copy_from_parent(edge_embed_names=None)
                 h = forward(model, nodeflow, False)
                 hs.append(h)
                 auxs.append(torch.LongTensor(aux_data))

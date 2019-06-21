@@ -59,8 +59,10 @@ class GraphSageConv(nn.Module):
         init_bias(self.W.bias)
 
     def forward(self, nodes):
-        h_agg = safediv(nodes.data['h_agg'], nodes.data['w'][:, None])
-        h = nodes.data['h_x']
+        h_agg = nodes.data['h_agg']
+        h = nodes.data['h']
+        w = nodes.data['w'][:, None]
+        h_agg = safediv(h_agg - h, w - 1)
         h_concat = torch.cat([h, h_agg], 1)
         h_new = F.leaky_relu(self.W(h_concat))
         return {'h': safediv(h_new, h_new.norm(dim=1, keepdim=True))}
@@ -123,12 +125,11 @@ class GraphSage(nn.Module):
             hi = h[idx:nf.layer_size(i) + idx]
             idx += nf.layer_size(i)
             if self.use_feature:
-                nf.layers[i].data['h_x'] = mix_embeddings(
+                nf.layers[i].data['h'] = mix_embeddings(
                         hi, nf.layers[i].data, self.emb, self.proj)
             else:
-                nf.layers[i].data['h_x'] = cuda(hi)
+                nf.layers[i].data['h'] = cuda(hi)
             nf.layers[i].data['deg'] = cuda(torch.ones(nf.layer_size(i)))
-        nf.layers[0].data['h'] = nf.layers[0].data['h_x']
 
         for i in range(nf.num_blocks):
             nf.block_compute(i, self.msg, self.red, self.convs[i])
