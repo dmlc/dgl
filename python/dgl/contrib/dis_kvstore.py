@@ -322,7 +322,10 @@ class KVClient(object):
         # Recv back message
         msg_list = []
         for idx in range(self._server_count):
+            if group_size[idx] == 0:
+                continue
             msg = _recv_kv_msg(self._receiver)
+            assert msg.type == KVMsgType.PULL_BACK
             msg_list.append(msg)
 
         return self._merge_msg(msg_list)
@@ -359,6 +362,16 @@ class KVClient(object):
         count = math.ceil(self._data_size[name] / self._server_count)
         return int(id / count)
 
+    def _sort_func(self, msg):
+        """Sort function for KVStoreMsg: sort message by rank
+
+        Parameters
+        ----------
+        msg : KVStoreMsg
+            KVstore message
+        """
+        return msg.rank
+
     def _merge_msg(self, msg_list):
         """Merge separated message to a big matrix
 
@@ -372,4 +385,5 @@ class KVClient(object):
         tensor (mx.ndarray or torch.tensor)
             a merged data matrix
         """
-        return msg_list[0].data
+        msg_list.sort(key=self._sort_func)
+        return torch.cat([msg.data for msg in msg_list], 0)

@@ -42,7 +42,7 @@ const int FINAL_MSG = 5;
  */
 struct KVStoreMsg {
   /*!
-   * \brief Message type: PUSH_MSG, PULL_MSG, PULL_BACK_MSG
+   * \brief Message type
    */
   int msg_type;
   /*!
