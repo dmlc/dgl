@@ -52,15 +52,18 @@ class GraphSageConv(nn.Module):
         self.out_features = out_features
         self.hidden_features = hidden_features
 
-        self.Q = nn.Linear(in_features, hidden_features)
+        self.W = nn.Linear(in_features + in_features, hidden_features)
 
-        init_weight(self.Q.weight, 'xavier_uniform_', 'leaky_relu')
-        init_bias(self.Q.bias)
+        init_weight(self.W.weight, 'xavier_uniform_', 'leaky_relu')
+        #nn.init.constant_(self.Q.weight, 0)
+        init_bias(self.W.bias)
 
     def forward(self, nodes):
         h_agg = safediv(nodes.data['h_agg'], nodes.data['w'][:, None])
         h = nodes.data['h_x']
-        return {'h': h + F.leaky_relu(self.Q(h_agg))}
+        h_concat = torch.cat([h, h_agg], 1)
+        h_new = F.leaky_relu(self.W(h_concat))
+        return {'h': safediv(h_new, h_new.norm(dim=1, keepdim=True))}
 
 
 class GraphSage(nn.Module):
