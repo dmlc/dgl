@@ -40,6 +40,7 @@ class KVServer(object):
         # self._data_store is a key-value store 
         # where the key is data name and value is a tensor 
         # (mx.ndarray or torch.tensor) partitioned into current node.
+        self._is_init = False
         self._data_store = {}
         self._server_id = server_id
         self._client_namebook = client_namebook
@@ -68,13 +69,15 @@ class KVServer(object):
         while True:
             msg = _recv_kv_msg(self._receiver)
             if msg.type == KVMsgType.INIT:
-                self._init_data(msg.name, msg.id.tolist())
+                if self._is_init == False:
+                    self._init_data(msg.name, msg.id.tolist())
+                    self._is_init = True
             elif msg.type == KVMsgType.PUSH:
-                self._remap_id(msg.name, msg.id)
-                self._push_handler(msg.name, msg.id, msg.data)
+                ID = self._remap_id(msg.name, msg.id)
+                self._push_handler(msg.name, ID, msg.data)
             elif msg.type == KVMsgType.PULL:
-                self._remap_id(msg.name, msg.id)
-                res_tensor = self._pull_handler(msg.name, msg.id)
+                ID = self._remap_id(msg.name, msg.id)
+                res_tensor = self._pull_handler(msg.name, ID)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
@@ -83,10 +86,20 @@ class KVServer(object):
                     data=res_tensor)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
             elif msg.type == KVMsgType.FINAL:
-                print("Exit KVStore service...")
+                print("Exit KVStore service, server ID: %d" % self.get_id())
                 break
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
+
+    def get_id(self):
+        """Get server id
+
+        Return
+        ------
+        int
+            KVServer ID
+        """
+        return self._server_id
 
     def _init_data(self, name, shape):
         """User-defined initialize method.
@@ -149,9 +162,13 @@ class KVServer(object):
             data name
         ID : tensor (mx.ndarray or torch.tensor)
             a vector storing the global data ID
+
+        Return
+        ------
+        tensor
+            re-mapped ID
         """
-        size = self._data_store[name].shape[0]
-        ID = ID % size
+        return ID % self._data_store[name].shape[0]
 
 class KVClient(object):
     """KVClient is used to push/pull tensors to/from KVServer on DGL trainer.
@@ -184,7 +201,6 @@ class KVClient(object):
         # self._data_size is a key-value store where the key is data name 
         # and value is the size of tensor. It is used to partition data into
         # different KVServer nodes.
-        self._is_init = False
         self._data_size = {}
         self._client_id = client_id
         self._server_namebook = server_namebook
@@ -225,7 +241,7 @@ class KVClient(object):
         self._data_size[name] = shape[0]
         count = math.ceil(shape[0] / self._server_count)
         for server_id in range(self._server_count):
-            par_shape = shape
+            par_shape = shape.copy()
             if shape[0] - server_id*count >= count:
                 par_shape[0] = count
             else:
@@ -238,7 +254,6 @@ class KVClient(object):
                 id=tensor_shape,
                 data=None) 
             _send_kv_msg(self._sender, msg, server_id)
-        self._is_init = True
         
     def push(self, name, ID, data):
         """Push message to KVServer
@@ -258,7 +273,6 @@ class KVClient(object):
         assert ID.dim() == 1, 'ID must be a vector.'
         assert data.dim() == 2, 'data must be a matrix.'
         assert data.size(0) == ID.size(0), 'The data must has the same row size with ID vector.'
-        assert self._is_init == True, 'Please invoke init_data() before push().'
         group_size = [0] * self._server_count
         for id in ID:
             # mapping data to corresponded server nodes
@@ -297,7 +311,6 @@ class KVClient(object):
             a matrix with the same row size of ID
         """
         assert ID.dim() == 1, 'ID must be a vector.'
-        assert self._is_init == True, 'Please invoke init_data() before pull().'
         group_size = [0] * self._server_count
         for id in ID:
             server_id = self._get_server_id(id.item(), name)
@@ -343,6 +356,16 @@ class KVClient(object):
                 id=None,
                 data=None)
             _send_kv_msg(self._sender, msg, server_id)
+
+    def get_id(self):
+        """Get client id
+
+        Return
+        ------
+        int
+            KVClient ID
+        """
+        return self._client_id
 
     def _get_server_id(self, id, name):
         """Get target server id by given a data id
