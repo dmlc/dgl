@@ -4,6 +4,7 @@ from .. import randomwalk
 import tqdm
 
 class UserProductDataset(object):
+    split_by_time = None
     def split_user(self, df, filter_counts=0, timestamp=None):
         df_new = df.copy()
         df_new['prob'] = -1
@@ -21,7 +22,7 @@ class UserProductDataset(object):
 
     def data_split(self, ratings):
         ratings = ratings.groupby('user_id', group_keys=False).apply(
-                partial(self.split_user, filter_counts=10, timestamp='timestamp'))
+                partial(self.split_user, filter_counts=10, timestamp=self.split_by_time))
         ratings['train'] = ratings['prob'] <= 0.8
         ratings['valid'] = (ratings['prob'] > 0.8) & (ratings['prob'] <= 0.9)
         ratings['test'] = ratings['prob'] > 0.9
@@ -45,21 +46,6 @@ class UserProductDataset(object):
             neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
                     self.g, batch, restart_prob, max_nodes, top_T)
             self.product_neighbors.extend(list(neighbors))
-
-    def refresh_mask(self):
-        import torch
-
-        valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
-        test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
-        test_tensor = torch.from_numpy(self.ratings['train'].values.astype('uint8'))
-        edge_data = {
-                'valid': torch.cat([valid_tensor, valid_tensor], 0),
-                'test': torch.cat([test_tensor, test_tensor], 0),
-                'train': torch.cat([train_tensor, train_tensor], 0),
-                }
-
-        # not supporting slice
-        self.g.edges[torch.arange(0, len(self.ratings) * 2)].data.update(edge_data)
 
     # Generate the list of products for each user in training/validation/test set.
     def generate_candidates(self):
