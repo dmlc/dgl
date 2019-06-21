@@ -19,12 +19,19 @@ using dgl::runtime::DGLRetValue;
 using dgl::runtime::PackedFunc;
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
-typedef std::pair<std::string, NDArray> NamedTensor;
 
 namespace dgl {
 namespace serialize {
 
 static const ImmutableGraph* ToImmutableGraph(const GraphInterface *g);
+
+static bool SaveDGLGraphs(std::vector<const ImmutableGraph*> graph_list,
+                          std::vector<NDArray> node_feats,
+                          std::vector<NDArray> edge_feats,
+                          std::vector<std::string> node_names,
+                          std::vector<std::string> edge_names,
+//                          NDArray label_list,
+                          const std::string& filename);
 
 } // namespace serialize
 } //namespace dgl

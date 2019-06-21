@@ -3,11 +3,13 @@
 //
 
 #include "graph_serialize.h"
+#include <dmlc/io.h>
 
 using dgl::COO;
 using dgl::COOPtr;
 using dgl::ImmutableGraph;
 using dmlc::SeekStream;
+//using dmlc::io::LocalFileSystem;
 using dgl::runtime::NDArray;
 
 namespace dgl {
@@ -26,16 +28,17 @@ static void ToNameAndTensorList(void *pytensorlist, void *pynamelist, int list_s
                                 std::vector<std::string> &name_listptr,
                                 std::vector<NDArray> &tensor_listptr) {
   const NDArray *tensor_list_handle = static_cast<const NDArray *>(pytensorlist);
-  const std::string *name_list_handle = static_cast<const std::string *>(pynamelist);
+  const char **name_list_handle = static_cast<const char **>(pynamelist);
   for (int i = 0; i < list_size; i ++) {
     tensor_listptr.push_back(tensor_list_handle[i]);
-    name_listptr.push_back(name_list_handle[i]);
+    name_listptr.emplace_back(name_list_handle[i]);
   }
 }
 
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
+    LOG(INFO) << "SaveGraph blablabla";
     void *graph_list = args[0];
     int graph_list_size = args[1];
     void *node_feat_name_list = args[2];
@@ -45,13 +48,13 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
     void *edge_feat_list = args[6];
     int edge_feat_list_size = args[7];
     std::string filename = args[8];
-
+    LOG(INFO) << filename;
 
     GraphHandle *inhandles = static_cast<GraphHandle *>(graph_list);
     std::vector<const ImmutableGraph *> graphs;
     for (int i = 0; i < graph_list_size; ++ i) {
       const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
-      const ImmutableGraph* g = ToImmutableGraph(ptr);
+      const ImmutableGraph *g = ToImmutableGraph(ptr);
       graphs.push_back(g);
     }
 
@@ -64,14 +67,14 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
     ToNameAndTensorList(edge_feat_list, edge_feat_name_list, edge_feat_list_size, edge_names,
                         edge_feats);
 
-
+    SaveDGLGraphs(graphs, node_feats, edge_feats, node_names, edge_names, filename);
 
 
 });
 
-const ImmutableGraph* ToImmutableGraph(const GraphInterface *g) {
+const ImmutableGraph *ToImmutableGraph(const GraphInterface *g) {
   const ImmutableGraph *imgr = dynamic_cast<const ImmutableGraph *>(g);
-  if (g) {
+  if (imgr) {
     return imgr;
   } else {
     const Graph *mgr = dynamic_cast<const Graph *>(g);
@@ -79,21 +82,80 @@ const ImmutableGraph* ToImmutableGraph(const GraphInterface *g) {
     IdArray srcs_array = mgr->Edges("srcdst").src;
     IdArray dsts_array = mgr->Edges("srcdst").dst;
     COOPtr coo(new COO(mgr->NumVertices(), srcs_array, dsts_array, mgr->IsMultigraph()));
-    const ImmutableGraph* imgptr =new ImmutableGraph(coo);
+    const ImmutableGraph *imgptr = new ImmutableGraph(coo);
     return imgptr;
   }
 }
 
-bool SaveDGLGraphs(std::vector<ImmutableGraph*> graph_list,
+//class Writer{
+//public:
+//  Writer(std::string filename){
+//    this->current_pos=0;
+//    this->fs= Stream::Create(filename.c_str(), "w", true);
+//    CHECK(this->fs) << "Failed to initialize File Stream";
+//  }
+//
+//  template <typename T>
+//  void Write(T obj){
+//    fs->Write(obj);
+//    current_pos+= sizeof(obj);
+//  }
+//
+//  void Write(NDArray ndarray){
+////    ndarray->data
+//    fs->Write(ndarray->ndim);
+//    fs->Write(ndarray->dtype);
+//    int ndim = ndarray->ndim;
+//    fs->WriteArray(ndarray->shape, ndim);
+//
+//    int type_bytes = ndarray->dtype.bits / 8;
+//    int64_t num_elems = 1;
+//    for (int i = 0; i < ndim; ++i) {
+//      num_elems *= ndarray->shape[i];
+//    }
+//    int64_t data_byte_size = type_bytes * num_elems;
+//    fs->Write(data_byte_size);
+//
+//    if (DMLC_IO_NO_ENDIAN_SWAP &&
+//        ndarray->ctx.device_type == kDLCPU &&
+//        ndarray->strides == nullptr &&
+//        ndarray->byte_offset == 0) {
+//      // quick path
+//      fs->Write(ndarray->data, data_byte_size);
+//    }
+//
+//
+//
+//
+//    ndarray.GetSize();
+//    ndarray->data;
+//    ndarray->byte_offset;
+//    ndarray.Save(fs);
+//    current_pos+=ndarray.GetSize();
+//  }
+//
+//  uint64_t current_pos;
+//
+//  protected:
+//    Stream* fs;
+//};
+
+bool SaveDGLGraphs(std::vector<const ImmutableGraph *> graph_list,
                    std::vector<NDArray> node_feats,
                    std::vector<NDArray> edge_feats,
                    std::vector<std::string> node_names,
                    std::vector<std::string> edge_names,
-                   NDArray label_list,
-                   const std::string& filename) {
+//                   NDArray label_list,
+                   const std::string &filename) {
 
 
-  SeekStream *fs = SeekStream::CreateForRead(filename.c_str());
+//  Writer writer(filename);
+
+  SeekStream* fs= static_cast<SeekStream*>(SeekStream::Create(filename.c_str(), "w", true));
+  CHECK(fs) << "Null Stream";
+  LOG(INFO)  << "GOOD";
+//  uint64_t current_pos = 0;
+//  writer.Write(runtime::kDGLNDArrayMagic);
   fs->Write(runtime::kDGLNDArrayMagic);
   fs->Write(kVersion);
   fs->Write(kImmutableGraph);
@@ -117,7 +179,7 @@ bool SaveDGLGraphs(std::vector<ImmutableGraph*> graph_list,
 
   for (int i = 0; i < num_graph; ++ i) {
     graph_indices[i] = fs->Tell();
-    ImmutableGraph *g = graph_list[i];
+    const ImmutableGraph *g = graph_list[i];
     g->GetInCSR()->indptr().Save(fs);
     g->GetInCSR()->indices().Save(fs);
     g->GetInCSR()->edge_ids().Save(fs);
