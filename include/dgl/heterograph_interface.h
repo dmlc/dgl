@@ -12,8 +12,8 @@
 #include <utility>
 #include <algorithm>
 
-#include "array.h"
 #include "graph_interface.h"
+#include "array.h"
 
 namespace dgl {
 
@@ -22,132 +22,331 @@ struct HeteroSubgraph;
 class HeteroGraphInterface;
 typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
 
-class HeteroGraphETypeViewInterface : public GraphInterface {
+/*!
+ * \brief Heterogenous graph APIs
+ */
+class HeteroGraphInterface {
  public:
-  virtual ~HeteroGraphViewInterface() = default;
-  HeteroGraphViewInterface(
-      HeteroGraphInterface *parent,
-      dgl_type_t etype);
+  /* \brief structure used to represent a list of edges */
+  // TODO(minjie): move this data structure outside of class definition so
+  // it can be shared by Graph and HeteroGraph.
+  typedef struct {
+    /* \brief the two endpoints and the id of the edge */
+    IdArray src, dst, id;
+  } EdgeArray;
 
-  /*
-   * Interfaces to be implemented:
-   *
-   * AddEdge(src, dst)
-   * AddEdges(src_ids, dst_ids)
-   * NumEdges()
-   * HasEdgeBetween(src, dst)
-   * HasEdgesBetween(src, dst)
-   * Predecessors(vid)
-   * Successors(vid)
-   * EdgeId(src, dst)
-   * EdgeIds(src, dst)
-   * FindEdge(eid)
-   * FindEdges(eids)
-   * InEdges(vid)
-   * InEdges(vids)
-   * OutEdges(vid)
-   * OutEdges(vids)
-   * Edges(order = "")
-   * InDegree(vid)
-   * InDegrees(vids)
-   * OutDegree(vid)
-   * OutDegrees(vids)
-   */
-}
-
-class HeteroGraphInterface : public GraphInterface {
- public:
   virtual ~HeteroGraphInterface() = default;
 
-  virtual HeteroGraphETypeViewInterface GetRelationGraph(
-      dgl_type_t etype) const = 0;
+  ////////////////////////// query/operations on meta graph ////////////////////////
+  
+  /*! \return the number of vertex types */
+  virtual uint64_t NumVertexTypes() const = 0;
+
+  /*! \return the number of edge types */
+  virtual uint64_t NumEdgeTypes() const = 0;
+
+  /*! \return the meta graph */
+  virtual GraphPtr GetMetaGraph() const = 0;
+
+  ////////////////////////// query/operations on realized graph ////////////////////////
+
+  /*! \brief Add vertices to the given vertex type */
+  virtual void AddVertices(dgl_type_t vtype, uint64_t num_vertices) = 0;
+
+  /*! \brief Add one edge to the given edge type */
+  virtual void AddEdge(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) = 0;
+
+  /*! \brief Add edges to the given edge type */
+  virtual void AddEdges(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) = 0;
 
   /*!
-   * \brief Add vertices to the graph with the given node type.
-   *
-   * \param ntype the node type
-   * \param num_vertices the number of vertices to add
+   * \brief Clear the graph. Remove all vertices/edges.
    */
-  virtual void AddVertices(dgl_type_t vtype, uint64_t num_vertices);
+  virtual void Clear() = 0;
 
-  /*! \return the number of vertices of given type in the graph */
+  /*!
+   * \brief Get the device context of this graph.
+   */
+  virtual DLContext Context() const = 0;
+
+  /*!
+   * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
+   */
+  virtual uint8_t NumBits() const = 0;
+
+  /*!
+   * \return whether the graph is a multigraph
+   */
+  virtual bool IsMultigraph() const = 0;
+
+  /*! \return whether the graph is read-only */
+  virtual bool IsReadonly() const = 0;
+
+  /*! \return the number of vertices in the graph.*/
   virtual uint64_t NumVertices(dgl_type_t vtype) const = 0;
 
-  /*!
-   * \return true if the vertex exists
-   */
-  virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
-    return vid < NumVertices(vtype);
-  };
+  /*! \return the number of edges in the graph.*/
+  virtual uint64_t NumEdges(dgl_type_t etype) const = 0;
 
-  /*!
-   * \return a boolean array of the existence of the nodes
-   */
+  /*! \return true if the given vertex is in the graph.*/
+  virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
+
+  /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const {
-    // FIXME: duplicate code with GraphInterface::HasVertices due to
-    // additional argument vtype
     const auto len = vids->shape[0];
     BoolArray rst = NewBoolArray(len);
-    const dgl_id_t *vid_data = static_cast<dgl_id_t *>(vids->data);
-    dgl_id_t *rst_data = static_cast<dgl_id_t *>(rst->data);
-    const uint64_t nverts = NumVertices(vtype);
+    const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
+    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
     for (int64_t i = 0; i < len; ++i) {
-      rst_data[i] = (vid_data[i] < nverts) ? 1 : 0;
+      rst_data[i] = HasVertex(vtype, vid_data[i])? 1 : 0;
+    }
+    return rst;
+  }
+
+  /*! \return true if the given edge is in the graph.*/
+  virtual bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
+
+  /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
+  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const {
+    const auto srclen = src_ids->shape[0];
+    const auto dstlen = dst_ids->shape[0];
+    const auto rstlen = std::max(srclen, dstlen);
+    BoolArray rst = NewBoolArray(rstlen);
+    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
+    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+    if (srclen == 1) {
+      // one-many
+      for (int64_t i = 0; i < dstlen; ++i) {
+        rst_data[i] = HasEdgeBetween(etype, src_data[0], dst_data[i])? 1 : 0;
+      }
+    } else if (dstlen == 1) {
+      // many-one
+      for (int64_t i = 0; i < srclen; ++i) {
+        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[0])? 1 : 0;
+      }
+    } else {
+      // many-many
+      CHECK(srclen == dstlen) << "Invalid src and dst id array.";
+      for (int64_t i = 0; i < srclen; ++i) {
+        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[i])? 1 : 0;
+      }
     }
     return rst;
   }
 
   /*!
-   * \brief Construct the induced subgraph of the given vertices.
-   *
-   * The induced subgraph is a subgraph formed by specifying a set of vertices V' and then
-   * selecting all of the edges from the original graph that connect two vertices in V'.
-   *
-   * Vertices and edges in the original graph will be "reindexed" to local index. The local
-   * index of the vertices preserve the order of the given id array, while the local index
-   * of the edges preserve the index order in the original graph. Vertices not in the
-   * original graph are ignored.
-   *
-   * The result subgraph is read-only.
-   *
-   * \param n Number of nodes by node type in vids.
-   * \param vids The vertices in the subgraph.
-   * \return the induced subgraph
-   * \note For heterogeneous graphs, the vertices selected for inducing include:
-   *       Vertex ID vids[0:n[0]] with vertex type 0
-   *       Vertex ID vids[n[0]:n[0] + n[1]] with vertex type 1
-   *       Vertex ID vids[n[0] + n[1]:n[0] + n[1] + n[2]] with vertex type 2
-   *       etc.
+   * \brief Find the predecessors of a vertex.
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the predecessor id array.
    */
-  virtual HeteroSubgraph VertexSubgraph(IdArray n, IdArray vids) const = 0;
+  virtual IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const = 0;
 
   /*!
-   * \brief Construct the induced edge subgraph of the given edges.
-   *
-   * The induced edges subgraph is a subgraph formed by specifying a set of edges E' and then
-   * selecting all of the nodes from the original graph that are endpoints in E'.
-   *
-   * Vertices and edges in the original graph will be "reindexed" to local index. The local
-   * index of the edges preserve the order of the given id array, while the local index
-   * of the vertices preserve the index order in the original graph. Edges not in the
-   * original graph are ignored.
-   *
-   * The result subgraph is read-only.
-   *
-   * \param n Number of edges by edge type in eids.
-   * \param eids The edges in the subgraph.
-   * \return the induced edge subgraph
-   * \note For heterogeneous graphs, the edges selected for inducing include:
-   *       Edge ID eids[0:n[0]] with edge type 0
-   *       Edge ID eids[n[0]:n[0] + n[1]] with edge type 1
-   *       Edge ID eids[n[0] + n[1]:n[0] + n[1] + n[2]] with edge type 2
-   *       etc.
+   * \brief Find the successors of a vertex.
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the successor id array.
    */
-  virtual HeteroSubgraph EdgeSubgraph(IdArray n, IdArray eids, bool preserve_nodes = false) const = 0;
-};
+  virtual IdArray Successors(dgl_type_t etype, dgl_id_t src) const = 0;
 
-// TODO
-struct HeteroSubgraph : public Subgraph {
+  /*!
+   * \brief Get all edge ids between the two given endpoints
+   * \note The given src and dst vertices should belong to the source vertex type
+   *       and the dest vertex type of the given edge type, respectively.
+   * \param etype The edge type
+   * \param src The source vertex.
+   * \param dst The destination vertex.
+   * \return the edge id array.
+   */
+  virtual IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
+
+  /*!
+   * \brief Get all edge ids between the given endpoint pairs.
+   * \note Edges are associated with an integer id start from zero.
+   *       The id is assigned when the edge is being added to the graph.
+   *       If duplicate pairs exist, the returned edge IDs will also duplicate.
+   *       The order of returned edge IDs will follow the order of src-dst pairs
+   *       first, and ties are broken by the order of edge ID.
+   * \param etype The edge type
+   * \param src The src vertex ids.
+   * \param dst The dst vertex ids.
+   * \return EdgeArray containing all edges between all pairs.
+   */
+  virtual EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const = 0;
+
+  /*!
+   * \brief Find the edge ID and return the pair of endpoints
+   * \param etype The edge type
+   * \param eid The edge ID
+   * \return a pair whose first element is the source and the second the destination.
+   */
+  virtual std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const = 0;
+
+  /*!
+   * \brief Find the edge IDs and return their source and target node IDs.
+   * \param etype The edge type
+   * \param eids The edge ID array.
+   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   */
+  virtual EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const = 0;
+
+  /*!
+   * \brief Get the in edges of the vertex.
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the edges
+   */
+  virtual EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Get the in edges of the vertices.
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vids The vertex id array.
+   * \return the id arrays of the two endpoints of the edges.
+   */
+  virtual EdgeArray InEdges(dgl_type_t etype, IdArray vids) const = 0;
+
+  /*!
+   * \brief Get the out edges of the vertex.
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the id arrays of the two endpoints of the edges.
+   */
+  virtual EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Get the out edges of the vertices.
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vids The vertex id array.
+   * \return the id arrays of the two endpoints of the edges.
+   */
+  virtual EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const = 0;
+
+  /*!
+   * \brief Get all the edges in the graph.
+   * \note If order is "srcdst", the returned edges list is sorted by their src and
+   *       dst ids. If order is "eid", they are in their edge id order.
+   *       Otherwise, in the arbitrary order.
+   * \param etype The edge type
+   * \param order The order of the returned edge list.
+   * \return the id arrays of the two endpoints of the edges.
+   */
+  virtual EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const = 0;
+
+  /*!
+   * \brief Get the in degree of the given vertex.
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the in degree
+   */
+  virtual uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Get the in degrees of the given vertices.
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id array.
+   * \return the in degree array
+   */
+  virtual DegreeArray InDegrees(dgl_type_t etype, IdArray vids) const = 0;
+
+  /*!
+   * \brief Get the out degree of the given vertex.
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id.
+   * \return the out degree
+   */
+  virtual uint64_t OutDegree(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Get the out degrees of the given vertices.
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param etype The edge type
+   * \param vid The vertex id array.
+   * \return the out degree array
+   */
+  virtual DegreeArray OutDegrees(dgl_type_t etype, IdArray vids) const = 0;
+
+  /*!
+   * \brief Return the successor vector
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param vid The vertex id.
+   * \return the successor vector iterator pair.
+   */
+  virtual DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Return the out edge id vector
+   * \note The given vertex should belong to the source vertex type
+   *       of the given edge type.
+   * \param vid The vertex id.
+   * \return the out edge id vector iterator pair.
+   */
+  virtual DGLIdIters OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Return the predecessor vector
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param vid The vertex id.
+   * \return the predecessor vector iterator pair.
+   */
+  virtual DGLIdIters PredVec(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Return the in edge id vector
+   * \note The given vertex should belong to the dest vertex type
+   *       of the given edge type.
+   * \param vid The vertex id.
+   * \return the in edge id vector iterator pair.
+   */
+  virtual DGLIdIters InEdgeVec(dgl_type_t etype, dgl_id_t vid) const = 0;
+
+  /*!
+   * \brief Reset the data in the graph and move its data to the returned graph object.
+   * \return a raw pointer to the graph object.
+   */
+  virtual HeteroGraphInterface *Reset() = 0;
+
+  /*!
+   * \brief Get the adjacency matrix of the graph.
+   *
+   * By default, a row of returned adjacency matrix represents the destination
+   * of an edge and the column represents the source.
+   *
+   * If the fmt is 'csr', the function should return three arrays, representing
+   *  indptr, indices and edge ids
+   *
+   * If the fmt is 'coo', the function should return one array of shape (2, nnz),
+   * representing a horitonzal stack of row and col indices.
+   *
+   * \param transpose A flag to transpose the returned adjacency matrix.
+   * \param fmt the format of the returned adjacency matrix.
+   * \return a vector of IdArrays.
+   */
+  virtual std::vector<IdArray> GetAdj(
+      dgl_id_t etype, bool transpose, const std::string &fmt) const = 0;
 };
 
 };  // namespace dgl
