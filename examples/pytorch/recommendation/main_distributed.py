@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import tqdm
-from rec.model.pinsage import PinSage
+from rec.model.graphsage import GraphSage
 from rec.model.layers import ScaledEmbedding, ZeroEmbedding
 from rec.utils import cuda
 from rec.comm.receiver import NodeFlowReceiver
@@ -90,8 +90,7 @@ emb = {}
 # of a node.
 # PinSage constructs neighborhood from random walks, while GraphSage takes direct
 # neighbors of a node.
-# Here, I'm reusing the parameterization of PinSage convolutions for GraphSage.
-model = cuda(PinSage(
+model = cuda(GraphSage(
     [n_hidden] * (n_layers + 1),
     use_feature=args.use_feature,
     G=g_train,

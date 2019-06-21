@@ -16,6 +16,7 @@ from functools import reduce
 import operator
 
 class MovieLens(UserProductDataset):
+    split_by_time = None
     def __init__(self, directory):
         '''
         directory: path to movielens directory which should have the three
