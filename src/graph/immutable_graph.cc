@@ -533,17 +533,22 @@ Subgraph COO::EdgeSubgraph(IdArray eids) const {
   dgl_id_t newid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
+  // All source nodes have node Ids smaller than destination nodes.
   for (int64_t i = 0; i < eids->shape[0]; ++i) {
     const dgl_id_t eid = eids_data[i];
     const dgl_id_t src = src_data[eid];
-    const dgl_id_t dst = dst_data[eid];
     if (!oldv2newv.count(src)) {
       oldv2newv[src] = newid++;
     }
+    *(new_src_data++) = oldv2newv[src];
+  }
+
+  for (int64_t i = 0; i < eids->shape[0]; ++i) {
+    const dgl_id_t eid = eids_data[i];
+    const dgl_id_t dst = dst_data[eid];
     if (!oldv2newv.count(dst)) {
       oldv2newv[dst] = newid++;
     }
-    *(new_src_data++) = oldv2newv[src];
     *(new_dst_data++) = oldv2newv[dst];
   }
 

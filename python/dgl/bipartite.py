@@ -1865,7 +1865,19 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             node/edge ID via `parent_nid` and `parent_eid` properties of the
             subgraph.
         """
-        raise NotImplementedError('not supported')
+        from . import subgraph
+        gidx = {}
+        parent_nids = {}
+        parent_eids = {}
+        for key in edges:
+            gidx[key] = self._get_graph(key).edge_subgraph(edges[key])
+            src_type, dst_type, _ = key
+            # TODO(zhengda) we need to make sure sampled nodes of
+            # the same type are the same.
+            parent_nids[src_type] = gidx[key].induced_nodes[0]
+            parent_nids[dst_type] = gidx[key].induced_nodes[1]
+            parent_eids[key] = gidx[key].induced_edges
+        return subgraph.DGLBiSubGraph(self, parent_nids, parent_eids, gidx)
 
     def adjacency_matrix_scipy(self, etype, transpose=False, fmt='csr'):
         """Return the scipy adjacency matrix representation of edges with the

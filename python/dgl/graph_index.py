@@ -1017,13 +1017,13 @@ def from_edge_list(elist, is_multigraph, readonly):
         raise DGLError('Invalid edge list. Nodes must start from 0.')
     return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly)
 
-def map_to_subgraph_nid(subgraph, parent_nids):
+def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
     Parameters
     ----------
-    subgraph: SubgraphIndex
-        the graph index of a subgraph
+    induced_nodes : utils.Index
+        induced nodes in a subgraph
 
     parent_nids: utils.Index
         Node Ids in the parent graph.
@@ -1033,7 +1033,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     utils.Index
         Node Ids in the subgraph.
     """
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(induced_nodes.todgltensor(),
                                                  parent_nids.todgltensor()))
 
 def transform_ids(mapping, ids):
@@ -1153,6 +1153,8 @@ def create_graph_index(graph_data, multigraph, readonly):
 
 class BiGraphIndex(GraphIndex):
     """Bipartite graph index object.
+
+    This graph index only contains edges from one node type to the other type.
 
     Parameters
     ----------
@@ -1422,6 +1424,75 @@ class BiGraphIndex(GraphIndex):
         v = self._conv_right(v)
         return super(BiGraphIndex, self).in_degrees(v)
 
+    def node_subgraph(self, u, v):
+        """Return the induced node subgraph.
+
+        Parameters
+        ----------
+        u : utils.Index
+            The nodes on the left.
+        v : utils.Index
+            The nodes on the right.
+
+        Returns
+        -------
+        BiSubgraphIndex
+            The subgraph index.
+        """
+        u1 = u.tousertensor()
+        v1 = v.tousertensor() + self._num_nodes[0]
+        v1 = F.cat([u1, v1], 0)
+        v_array = utils.toindex(v1).todgltensor()
+        rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
+        induced_edges = utils.toindex(rst(2))
+        return BiSubgraphIndex(rst(0), [len(u), len(v)], self, [u, v], induced_edges)
+
+    def node_subgraphs(self, us_arr, vs_arr):
+        """Return the induced node subgraphs.
+
+        Parameters
+        ----------
+        us_arr : a list of utils.Index
+            The nodes on the left.
+        vs_arr : a list of utils.Index
+            The nodes on the right.
+
+        Returns
+        -------
+        a vector of BiSubgraphIndex
+            The subgraph index.
+        """
+        gis = []
+        for u, v in zip(us_arr, vs_arr):
+            gis.append(self.node_subgraph(u, v))
+        return gis
+
+    def edge_subgraph(self, e):
+        """Return the induced edge subgraph.
+
+        Parameters
+        ----------
+        e : utils.Index
+            The edges.
+
+        Returns
+        -------
+        BiSubgraphIndex
+            The subgraph index.
+        """
+        # TODO(zhengda) this implementation isn't efficient.
+        src, dst, eid = self.find_edges(e)
+        num_src = len(np.unique(src.tonumpy()))
+        num_dst = len(np.unique(dst.tonumpy()))
+        e_array = e.todgltensor()
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        induced_nodes = utils.toindex(rst(1)).tousertensor()
+        assert(len(induced_nodes) == num_src + num_dst)
+        induced_nodes = F.split(induced_nodes, [num_src, num_dst], 0)
+        induced_nodes = [utils.toindex(induced_nodes[0]),
+                         utils.toindex(induced_nodes[1] - self._num_nodes[0])]
+        return BiSubgraphIndex(rst(0), [num_src, num_dst], self, induced_nodes, e)
+
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt):
         """Return the scipy adjacency matrix representation of this graph.
@@ -1581,6 +1652,68 @@ class BiGraphIndex(GraphIndex):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
+class BiSubgraphIndex(BiGraphIndex):
+    """Graph index for subgraph of a bipartite graph.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : a list of utils.Index
+        The parent node ids in this subgraph.
+    induced_edges : utils.Index
+        The parent edge ids in this subgraph.
+    """
+    def __init__(self, handle, num_nodes, parent, induced_nodes, induced_edges):
+        super(BiSubgraphIndex, self).__init__(handle, num_nodes)
+        self._parent = parent
+        self._induced_nodes = induced_nodes
+        self._induced_edges = induced_edges
+
+    def add_nodes(self, num):
+        """Add nodes. Disabled because BiSubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edge(self, u, v):
+        """Add edges. Disabled because BiSubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edges(self, u, v):
+        """Add edges. Disabled because BiSubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    @property
+    def induced_nodes(self):
+        """Return parent node ids.
+
+        Returns
+        -------
+        a list of utils.Index
+            The parent node ids.
+        """
+        return self._induced_nodes
+
+    @property
+    def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent edge ids.
+        """
+        return self._induced_edges
+
+    def __getstate__(self):
+        raise NotImplementedError(
+            "SubgraphIndex pickling is not supported yet.")
+
+    def __setstate__(self, state):
+        raise NotImplementedError(
+            "SubgraphIndex unpickling is not supported yet.")
+
 def from_bigraph_coo(num_nodes, src, dst, is_multigraph, readonly):
     """Construct a bipartite graph from coo arrays.
 
@@ -1631,7 +1764,13 @@ def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, re
     multigraph : bool, optional
         Whether the graph is multigraph (default is False)
     """
-    if isinstance(graph_data, (list, tuple)):
+    if isinstance(graph_data, BiGraphIndex):
+        assert graph_data.number_of_nodes(0) == num_nodes[0]
+        assert graph_data.number_of_nodes(1) == num_nodes[1]
+        assert graph_data.is_multigraph() == multigraph
+        assert graph_data.is_readonly() == readonly
+        return graph_data
+    elif isinstance(graph_data, (list, tuple)):
         assert len(graph_data) == 2
         src_nodes, dst_nodes = graph_data
         return from_bigraph_coo(num_nodes, src_nodes, dst_nodes, multigraph, readonly)

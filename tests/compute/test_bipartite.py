@@ -1,6 +1,7 @@
 import time
 import math
 import numpy as np
+from numpy.testing import assert_array_equal
 import scipy.sparse as sp
 import networkx as nx
 import dgl
@@ -665,6 +666,26 @@ def test_filter():
     e_idx = g.filter_edges(('src', 'dst', 'e'), predicate, [0, 1])
     assert set(F.zerocopy_to_numpy(e_idx)) == {1}
 
+def test_edge_subgraph():
+    g = gen_from_edgelist(True)
+    src_g = g['src']
+    dst_g = g['dst']
+    srcdst_g = g['src', 'dst', 'e']
+    src_g.ndata['nid'] = F.arange(0, src_g.number_of_nodes())
+    dst_g.ndata['nid'] = F.arange(src_g.number_of_nodes(),
+                                  src_g.number_of_nodes() + dst_g.number_of_nodes())
+    srcdst_g.edata['eid'] = F.arange(0, srcdst_g.number_of_edges())
+    subg_eid = dgl.utils.toindex([0, 2, 7, 9])
+    subg_src, subg_dst = g.find_edges(subg_eid)
+    subg = g.edge_subgraph({('src', 'dst', 'e'): subg_eid})
+    subg.copy_from_parent()
+    assert_array_equal(np.unique(F.asnumpy(subg['src'].ndata['nid'])),
+                       np.unique(F.asnumpy(subg_src)))
+    assert_array_equal(np.unique(F.asnumpy(subg['dst'].ndata['nid'])),
+                       np.unique(F.asnumpy(subg_dst)) + src_g.number_of_nodes())
+    assert_array_equal(F.asnumpy(subg['src', 'dst', 'e'].edata['eid']),
+                       subg_eid.tonumpy())
+
 if __name__ == '__main__':
     test_query()
     #test_mutation()
@@ -676,4 +697,5 @@ if __name__ == '__main__':
     test_apply_edges()
     test_update_routines()
     test_filter()
+    test_edge_subgraph()
 
