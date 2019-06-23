@@ -111,9 +111,11 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
+# For serialization
 add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
 
+# For Debug
 SET(CMAKE_BUILD_TYPE "Debug")
 SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb ")
 
