@@ -68,7 +68,7 @@ def arg_parse():
                         epoch=300,
                         train_ratio=0.7,
                         test_ratio=0.1,
-                        n_worker=0,
+                        n_worker=1,
                         feature_type='default',
                         gc_per_block=3,
                         dropout=0.0,
@@ -345,6 +345,10 @@ def evaluate(dataloader, model, prog_args, logger=None):
     correct_label = 0
     with torch.no_grad():
         for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
+            if torch.cuda.is_available():
+                for (key, value) in batch_graph.ndata.items():
+                    batch_graph.ndata[key] = value.cuda()
+                graph_labels = graph_labels.cuda()
             ypred = model(batch_graph)
             indi = torch.argmax(ypred, dim=1)
             correct = torch.sum(indi==graph_labels)
