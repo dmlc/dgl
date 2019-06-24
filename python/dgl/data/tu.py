@@ -93,6 +93,13 @@ class TUDataset(object):
         self.graph_lists = [self.graph_lists[i] for i in ind]
         self.graph_labels = [self.graph_labels[i] for i in ind]
 
+        #make dataset divisible by 10
+        if len(self.graph_lists) % 10 != 0:
+            "TU dataset not divisible by 10"
+            new_len = len(self.graph_lists) // 10
+            self.graph_lists = self.graph_lists[:new_len*10]
+            self.graph_labels = self.graph_labels[:new_len*10]
+
         #check dataset splitting:
         eps = 1e-5
         if split_ratio:
