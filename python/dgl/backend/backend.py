@@ -327,6 +327,21 @@ def max(input, dim):
     """
     pass
 
+def exp(input):
+    """Returns a new tensor with the exponential of the elements of the input tensor `input`.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor
+    """
+    pass
+
 def cat(seq, dim):
     """Concat the sequence of tensors in the given dimension.
 

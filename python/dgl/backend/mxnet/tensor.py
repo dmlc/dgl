@@ -118,6 +118,9 @@ def mean(input, dim):
 def max(input, dim):
     return nd.max(input, axis=dim)
 
+def exp(input):
+    return nd.exp(input)
+
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
 

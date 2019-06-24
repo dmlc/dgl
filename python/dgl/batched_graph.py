@@ -13,7 +13,7 @@ from . import utils
 
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
            'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
-           'max_nodes', 'max_edges']
+           'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -765,6 +765,37 @@ def _max_on(graph, typestr, feat):
     else:
         return F.max(feat, 0)
 
+def _softmax_on(graph, typestr, feat):
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
+    data = getattr(graph, data_attr)
+    feat = data[feat]
+
+    if isinstance(graph, BatchedDGLGraph):
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        max_n_nodes = max(batch_num_objs)
+        index = []
+        for i, num_obj in enumerate(batch_num_objs):
+            index.extend(range(i * max_n_nodes, i * max_n_nodes + num_obj))
+        index = F.tensor(index)
+        dtype = F.dtype(feat)
+        ctx = F.context(feat)
+        feat_ = F.zeros((len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]), dtype=dtype, ctx=ctx) - float('inf')
+        feat_ = F.scatter_row(feat_, index, feat)
+        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_nodes, *F.shape(feat)[1:]))
+        max_val = F.max(feat_, 1)
+        minus_max = feat_ - F.unsqueeze(max_val, 1)
+        exp_val = F.exp(minus_max)
+        sum_val = F.sum(exp_val, 1)
+        feat_ = exp_val / F.unsqueeze(sum_val, 1)
+        feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]))
+        return F.gather_row(feat_, index)
+    else:
+        max_val = F.max(feat, 0)
+        minus_max = feat - F.unsqueeze(max_val, 0)
+        exp_val = F.exp(minus_max)
+        sum_val = F.sum(exp_val, 0)
+        return exp_val / F.unsqueeze(sum_val, 0)
+
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
     :attr:`feat` in :attr:`graph`
@@ -816,3 +847,46 @@ def max_edges(graph, feat):
     a zero tensor with the same shape is returned at the corresponding row.
     """
     return _max_on(graph, 'edges', feat)
+
+def softmax_nodes(graph, feat):
+    """Apply softmax over all the values of node field :attr:`feat` in :attr:`graph`.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field
+
+    Returns
+    -------
+    tensor
+        The tensor obtained
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each example in the batch.
+    """
+    return _softmax_on(graph, 'nodes', feat)
+
+
+def softmax_edges(graph, feat):
+    """Apply softmax over all the values of edge field :attr:`feat` in :attr:`graph`.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field
+
+    Returns
+    -------
+    tensor
+        The tensor obtained
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each example in the batch.
+    """
+    return _softmax_on(graph, 'edges', feat)

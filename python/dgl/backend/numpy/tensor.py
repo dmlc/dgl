@@ -78,6 +78,9 @@ def sum(input, dim):
 def max(input, dim):
     return np.max(input, axis=dim)
 
+def exp(input):
+    return np.exp(input)
+
 def cat(seq, dim):
     return np.concatenate(seq, axis=dim)
 

@@ -97,6 +97,9 @@ def max(input, dim):
     # NOTE: the second argmax array is not returned
     return th.max(input, dim=dim)[0]
 
+def exp(input):
+    return th.exp(input)
+
 def cat(seq, dim):
     return th.cat(seq, dim=dim)
 
