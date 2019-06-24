@@ -68,7 +68,7 @@ class TUDataset(object):
             one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = one_hot_node_labels[idxs, :]
-            self.data_mode = "node_label"
+            self.data_mode = "constant"
         except IOError:
             print("No Node Label Data")
 

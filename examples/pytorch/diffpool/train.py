@@ -55,7 +55,7 @@ def arg_parse():
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
     parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
-    parser.set_defaults(dataset='ENZYMES',
+    parser.set_defaults(dataset='DD',
                         bmname='PH',
                         pool_ratio=0.1,
                         num_pool=1,
@@ -63,7 +63,7 @@ def arg_parse():
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=20,
+                        batch_size=19,
                         epoch=2000,
                         train_ratio=0.7,
                         test_ratio=0.1,
