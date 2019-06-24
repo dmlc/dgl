@@ -60,12 +60,12 @@ def arg_parse():
                         bmname='PH',
                         pool_ratio=0.15,
                         num_pool=1,
-                        linkpred=False,
+                        linkpred=True,
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
                         batch_size=29,
-                        epoch=400,
+                        epoch=4000,
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=1,
@@ -324,7 +324,8 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         if val_dataset is not None:
             result = evaluate(val_dataset, model, prog_args)
             print("validation  accuracy {}%".format(result*100))
-            if result > early_stopping_logger['val_acc']:
+            if result >= early_stopping_logger['val_acc'] and result <=\
+            train_accu:
                 early_stopping_logger.update(best_epoch=epoch, val_acc=result)
                 if prog_args.save_dir is not None:
                     torch.save(model.state_dict(), prog_args.save_dir + "/" + prog_args.dataset\
