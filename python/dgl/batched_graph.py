@@ -746,24 +746,23 @@ def _max_on(graph, typestr, feat):
     Tensor
         The (weighted) summed node or edge features.
     """
-    # TODO(zihao): optimize this
     data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     feat = data[feat]
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        max_readout_list = []
-        first = 0
-        for num_obj in batch_num_objs:
-            if num_obj == 0:
-                max_readout_list.append(F.zeros(F.shape(feat)[1:],
-                                                F.dtype(feat),
-                                                F.context(feat)))
-                continue
-            max_readout_list.append(F.max(feat[first:first+num_obj], 0))
-            first += num_obj
-        return F.stack(max_readout_list, 0)
+        max_n_objs = max(batch_num_objs)
+        index = []
+        for i, num_obj in enumerate(batch_num_objs):
+            index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
+        index = F.tensor(index)
+        dtype = F.dtype(feat)
+        ctx = F.context(feat)
+        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]), dtype, ctx) - float('inf')
+        feat_ = F.scatter_row(feat_, index, feat)
+        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
+        return F.max(feat_, 1)
     else:
         return F.max(feat, 0)
 
@@ -784,11 +783,11 @@ def _softmax_on(graph, typestr, feat):
         feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]), dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
-        feat_ = F.softmax(feat_, axis=1)
+        feat_ = F.softmax(feat_, 1)
         feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]))
         return F.gather_row(feat_, index)
     else:
-        return F.softmax(feat, axis=0)
+        return F.softmax(feat, 0)
 
 def _broadcast_on(graph, typestr, feat):
     _, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
