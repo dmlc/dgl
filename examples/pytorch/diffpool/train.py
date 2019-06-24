@@ -53,6 +53,7 @@ def arg_parse():
     parser.add_argument('--save_dir', dest='save_dir', help='model saving directory: SAVE_DICT/DATASET')
     parser.add_argument('--load_epoch', dest='load_epoch', help='load trained model params from\
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
+    parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
     parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
@@ -74,17 +75,21 @@ def arg_parse():
                         bn=True,
                         bias=True,
                         save_dir="./model_param",
-                        load_epoch=-1)
+                        load_epoch=-1,
+                        data_mode = 'id')
     return parser.parse_args()
 
-def prepare_data(dataset, prog_args, fold=-1):
+def prepare_data(dataset, prog_args, fold=-1, pre_process=None):
     '''
-    load dataset into dataloader
+    preprocess TU dataset according to DiffPool's paper setting and load dataset into dataloader
     '''
     if fold == -1 or fold == 0:
         shuffle = True
     else:
         shuffle = False
+    
+    if pre_process:
+        pre_process(dataset, prog_args)
 
     dataset.set_fold(fold)
     return torch.utils.data.DataLoader(dataset,
@@ -92,6 +97,82 @@ def prepare_data(dataset, prog_args, fold=-1):
                                        shuffle=shuffle,
                                        collate_fn=collate_fn,
                                        num_workers=prog_args.n_worker)
+
+def one_hotify(labels, pad=-1):
+        '''
+        cast label to one hot vector
+        '''
+        num_instances = len(labels)
+        if pad <= 0:
+            dim_embedding = np.max(labels) + 1 #zero-indexed assumed
+        else:
+            assert pad > 0, "result_dim for padding one hot embedding not set!"
+            dim_embedding = pad + 1
+        embeddings = np.zeros((num_instances, dim_embedding))
+        embeddings[np.arange(num_instances), labels] = 1
+
+        return embeddings
+
+
+def pre_process(dataset, prog_args):
+        """
+        diffpool specific data partition, pre-process and shuffling
+        """
+        # adjacency degree normalization -- not done here
+        if dataset.data_mode == "constant":
+            print("node attribute not found, overwrite with DiffPool's preprocess setting")
+            if prog_args['data_mode'] == 'id':
+                for g in dataset.graph_lists:
+                    id_list = np.arange(g.number_of_nodes)
+                    g.ndata['feat'] = one_hotify(id_list, pad=dataset.max_num_node)
+            elif prog_args['data_mode'] == 'deg-num':
+                for g in dataset.graph_lists:
+                    g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
+
+            elif prog_args['data_mode'] == 'deg':
+                # max degree is disabled.
+                for g in dataset.graph_lists:
+                    degs = list(g.in_degrees())
+                    degs_one_hot = one_hotify(degs, pad=dataset.max_degrees)
+                    g.ndata['feat'] = degs_one_hot
+        """
+        elif self.kwargs['feature_mode'] == 'struct':
+            for g in self.graph_lists:
+                degs = list(g.in_degrees())
+                degs_one_hot = self.one_hotify(degs, pad=True, result_dim=self.max_degrees)
+                nxg = g.to_networkx().to_undirected()
+                clustering_coeffs = np.array(list(nx.clustering(nxg).values()))
+                clustering_embedding = np.expand_dims(clustering_coeffs,
+                                                      axis=1)
+                struct_feats = np.concatenate((degs_one_hot,
+                                               clustering_embedding),
+                                              axis=1)
+                if self.use_node_attr:
+                    g.ndata['feat'] = np.concatenate((struct_feats,
+                                                      g.ndata['feat']),
+                                                     axis=1)
+                else:
+                    g.ndata['feat'] = struct_feats
+
+        assert 'feat' in self.graph_lists[0].ndata, "node feature not initialized!"
+
+        if self.kwargs['assign_feat'] == 'id':
+            for g in self.graph_lists:
+                id_list = np.arange(g.number_of_nodes())
+                g.ndata['a_feat'] = self.one_hotify(id_list, pad=True,
+                                                    result_dim=self.max_num_node)
+        else:
+            for g in self.graph_lists:
+                id_list = np.arange(g.number_of_nodes())
+                id_embedding = self.one_hotify(id_list, pad=True,
+                                               result_dim=self.max_num_node)
+                g.ndata['a_feat'] = np.concatenate((id_embedding,
+                                                    g.ndata['feat']),
+                                                   axis=1)
+        # sanity check
+        """
+        assert dataset.graph_lists[0].ndata['feat'].shape[1] ==\
+                dataset.graph_lists[1].ndata['feat'].shape[1]
 
 
 def graph_classify_task(prog_args):
