@@ -1870,7 +1870,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         parent_nids = {}
         parent_eids = {}
         for key in edges:
-            gidx[key] = self._get_graph(key).edge_subgraph(edges[key])
+            e = utils.toindex(edges[key])
+            gidx[key] = self._get_graph(key).edge_subgraph(e)
             src_type, dst_type, _ = key
             # TODO(zhengda) we need to make sure sampled nodes of
             # the same type are the same.

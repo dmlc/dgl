@@ -686,6 +686,31 @@ def test_edge_subgraph():
     assert_array_equal(F.asnumpy(subg['src', 'dst', 'e'].edata['eid']),
                        subg_eid.tonumpy())
 
+    g = gen_from_edgelist(False)
+    src_g = g['src']
+    dst_g = g['dst']
+    src_g.ndata['nid'] = F.arange(0, src_g.number_of_nodes())
+    dst_g.ndata['nid'] = F.arange(src_g.number_of_nodes(),
+                                  src_g.number_of_nodes() + dst_g.number_of_nodes())
+    srcdst_g = g['src', 'dst', 'e']
+    dstsrc_g = g['dst', 'src', 'e']
+    srcdst_g.edata['eid'] = F.arange(0, srcdst_g.number_of_edges())
+    dstsrc_g.edata['eid'] = F.arange(srcdst_g.number_of_edges(),
+                                     srcdst_g.number_of_edges() * 2)
+    subg_eid = dgl.utils.toindex([0, 2, 7, 9])
+    subg_src, subg_dst = srcdst_g.find_edges(subg_eid)
+    subg = g.edge_subgraph({('src', 'dst', 'e'): subg_eid,
+                            ('dst', 'src', 'e'): dstsrc_g.edge_ids(subg_dst, subg_src)})
+    subg.copy_from_parent()
+    assert_array_equal(np.unique(F.asnumpy(subg['src'].ndata['nid'])),
+                       np.unique(F.asnumpy(subg_src)))
+    assert_array_equal(np.unique(F.asnumpy(subg['dst'].ndata['nid'])),
+                       np.unique(F.asnumpy(subg_dst)) + src_g.number_of_nodes())
+    assert_array_equal(F.asnumpy(subg['src', 'dst', 'e'].edata['eid']),
+                       subg_eid.tonumpy())
+    assert_array_equal(F.asnumpy(subg['dst', 'src', 'e'].edata['eid']),
+                       subg_eid.tonumpy() + srcdst_g.number_of_edges())
+
 if __name__ == '__main__':
     test_query()
     #test_mutation()
