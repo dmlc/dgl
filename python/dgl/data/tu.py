@@ -101,7 +101,7 @@ class TUDataset(object):
         
         # randomly shuffle the data
         ind = [i for i in range(len(self.graph_labels))]
-        random.seed(18)
+        random.seed(233)
         random.shuffle(ind)
         self.graph_lists = [self.graph_lists[i] for i in ind]
         self.graph_labels = [self.graph_labels[i] for i in ind]
