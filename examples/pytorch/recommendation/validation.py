@@ -40,6 +40,7 @@ def compute_validation_imp(ml, h, b, model, test):
                 score[ml.p_train[u_nid]] = -10000
                 score[ml.p_test[u_nid] if validation else ml.p_valid[u_nid]] = -10000
                 rank = st.rankdata(-score)[ml.p_valid[u_nid] if validation else ml.p_test[u_nid]]
+                rank = rank[rank <= 25]
                 rank = 1 / rank
                 rr.append(rank.mean() if len(rank) > 0 else 0.)
                 tq.set_postfix({'rank': rank.mean()})
