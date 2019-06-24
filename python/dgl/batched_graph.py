@@ -13,7 +13,8 @@ from . import utils
 
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
            'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
-           'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges']
+           'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges',
+           'broadcast_nodes', 'broadcast_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -745,6 +746,7 @@ def _max_on(graph, typestr, feat):
     Tensor
         The (weighted) summed node or edge features.
     """
+    # TODO(zihao): optimize this
     data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     feat = data[feat]
@@ -772,21 +774,35 @@ def _softmax_on(graph, typestr, feat):
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        max_n_nodes = max(batch_num_objs)
+        max_n_objs = max(batch_num_objs)
         index = []
         for i, num_obj in enumerate(batch_num_objs):
-            index.extend(range(i * max_n_nodes, i * max_n_nodes + num_obj))
+            index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
         index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
-        feat_ = F.zeros((len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]), dtype=dtype, ctx=ctx) - float('inf')
+        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]), dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
-        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_nodes, *F.shape(feat)[1:]))
+        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
         feat_ = F.softmax(feat_, axis=1)
-        feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]))
+        feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]))
         return F.gather_row(feat_, index)
     else:
         return F.softmax(feat, axis=0)
+
+def _broadcast_on(graph, typestr, feat):
+    _, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
+
+    if isinstance(graph, BatchedDGLGraph):
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        index = []
+        for i, num_obj in enumerate(batch_num_objs):
+            index.extend([i] * num_obj)
+        index = F.tensor(index)
+        return F.gather_row(feat, index)
+    else:
+        n_objs = getattr(graph, num_objs_attr)()
+        return F.stack([feat] * n_objs, 0)
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
@@ -848,12 +864,12 @@ def softmax_nodes(graph, feat):
     graph : DGLGraph or BatchedDGLGraph
         The graph.
     feat : str
-        The feature field
+        The feature field.
 
     Returns
     -------
     tensor
-        The tensor obtained
+        The tensor obtained.
 
     Notes
     -----
@@ -870,15 +886,59 @@ def softmax_edges(graph, feat):
     graph : DGLGraph or BatchedDGLGraph
         The graph.
     feat : str
-        The feature field
+        The feature field.
 
     Returns
     -------
     tensor
-        The tensor obtained
+        The tensor obtained.
 
     Notes
     -----
     If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each example in the batch.
     """
     return _softmax_on(graph, 'edges', feat)
+
+def broadcast_nodes(graph, feat):
+    """Broadcast feature to all node values of field :attr:`feat` in :attr:`graph`, and return
+    a tensor of node features.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatcheDGLGraph
+        The graph.
+    feat : tensor
+        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and :math:`(B, *)` for batched graph.
+
+    Returns
+    -------
+    tensor
+        The node features tensor with shape :math:`(N, *)`.
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to the nodes in i-th example in the batch.
+    """
+    return _broadcast_on(graph, 'nodes', feat)
+
+def broadcast_edges(graph, feat):
+    """Broadcast feature to all edge values of field :attr:`feat` in :attr:`graph`, and return
+    a tensor of edge features.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatcheDGLGraph
+        The graph.
+    feat : tensor
+        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and :math:`(B, *)` for batched graph.
+
+    Returns
+    -------
+    tensor
+        The edge features tensor with shape :math:`(E, *)`
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to the edges in i-th example in the batch.
+    """
+    return _broadcast_on(graph, 'edges', feat)

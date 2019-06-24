@@ -9,9 +9,10 @@ import torch as th
 import torch.nn as nn
 from torch.nn import init
 
-from python.dgl.heterograph import make_bipartite
 from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name
+from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes
+
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
@@ -23,7 +24,7 @@ class SumPooling(nn.Module):
     def forward(self, feat, graph):
         self._feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[self._feat_name] = feat
-        readout = dgl.sum_nodes(graph, self._feat_name)
+        readout = sum_nodes(graph, self._feat_name)
         return readout
 
 
@@ -37,7 +38,7 @@ class AvgPooling(nn.Module):
     def forward(self, feat, graph):
         self._feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[self._feat_name] = feat
-        readout = dgl.mean_nodes(graph, self._feat_name)
+        readout = mean_nodes(graph, self._feat_name)
         return readout
 
 
@@ -51,7 +52,7 @@ class MaxPooling(nn.Module):
     def forward(self, feat, graph):
         self._feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[self._feat_name] = feat
-        readout = dgl.max_nodes(graph, self._feat_name)
+        readout = max_nodes(graph, self._feat_name)
         return readout
 
 
@@ -63,6 +64,7 @@ class TopKPooling(nn.Module):
         super(TopKPooling, self).__init__()
 
     def forward(self, feat, graph):
+        # TODO(zihao): finish this
         pass
 
 
@@ -76,7 +78,7 @@ class GlobAttnPooling(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        # TODO: reset parameters of gate_nn and nn
+        # TODO(zihao): reset parameters of gate_nn and nn
         pass
 
     def forward(self, feat, graph):
@@ -84,8 +86,18 @@ class GlobAttnPooling(nn.Module):
         gate = self.gate_nn(feat)
         feat = self.nn(feat) if self.nn else feat
 
-        # TODO: softmax
-        pass
+        feat_name = get_ndata_name(graph, 'gate')
+        graph.ndata[feat_name] = gate
+        gate = softmax_nodes(graph, feat_name)
+        graph.ndata.pop(feat_name)
+
+        feat_name = get_ndata_name(graph, 'readout')
+        graph.ndata[feat_name] = feat * gate
+        readout = sum_nodes(graph, feat_name)
+        graph.ndata.pop(feat_name)
+
+        return readout
+
 
 class DiffPool(nn.Module):
     r"""Apply Differentiable Pooling
@@ -95,12 +107,8 @@ class DiffPool(nn.Module):
         pass
 
     def forward(self, feat, graph):
-        # TODO: compute the features and graph at next level: feat_next, graph_next
-        feat_next = None
-        graph_next = None
-
-        return feat_next, graph_next, make_bipartite(graph, graph_next)
-
+        # TODO(zihao): finish this
+        pass
 
 class Set2Set(nn.Module):
     r"""Apply Set2Set (from paper "Order Matters: Sequence to sequence for sets") over the graph.
@@ -113,10 +121,10 @@ class Set2Set(nn.Module):
         self.output_dim = 2 * input_dim
         self.n_iters = n_iters
         self.n_layers= n_layers
-        self.rnn = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
+        self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
 
     def reset_parameters(self):
-        # TODO
+        # TODO(zihao): finish this
         pass
 
     def forward(self, feat, graph):
@@ -130,7 +138,24 @@ class Set2Set(nn.Module):
              feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
         q_star = feat.new_zeros(batch_size, self.output_dim)
 
-        # TODO: we also need a graph level softmax here.
+        for i in range(self.n_iters):
+            q, h = self.lstm(q_star.unsqueeze(0), h)
+            q = q.view(batch_size, self.input_dim)
+
+            score = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
+            feat_name = get_ndata_name(graph, 'score')
+            graph.ndata[feat_name] = score
+            score = softmax_nodes(graph, feat_name)
+            graph.ndata.pop(feat_name)
+
+            feat_name = get_ndata_name(graph, 'readout')
+            graph.ndata[feat_name] = feat * score
+            readout = sum_nodes(graph, feat_name)
+            graph.ndata.pop(feat_name)
+
+            q_star = th.cat([q, readout], dim=-1)
+
+        return q_star
 
 class SortPooling(nn.Module):
     r"""Apply sort pooling (from paper "An End-to-End Deep Learning Architecture

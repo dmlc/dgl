@@ -46,6 +46,18 @@ def test_graph_conv():
     new_weight = conv.weight.data
     assert not th.allclose(old_weight, new_weight)
 
+def test_set2set():
+    # TODO(zihao): finish this
+    pass
+
+def test_glob_att_pool():
+    # TODO(zihao): finish this
+    pass
+
+def test_simple_pool():
+    # TODO(zihao): finish this (AvgPooling, MaxPooling, etc.)
+    pass
+
 def uniform_attention(g, shape):
     a = th.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
@@ -67,3 +79,6 @@ def test_edge_softmax():
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
+    test_set2set()
+    test_glob_att_pool()
+    test_simple_pool()
