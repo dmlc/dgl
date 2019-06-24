@@ -23,15 +23,28 @@ using dgl::ImmutableGraph;
 namespace dgl {
 namespace serialize {
 
-static const ImmutableGraph* ToImmutableGraph(const GraphInterface *g);
+typedef std::pair<std::string, NDArray> NamedTensor;
 
-static bool SaveDGLGraphs(std::vector<const ImmutableGraph*> graph_list,
+static const ImmutableGraph *ToImmutableGraph(const GraphInterface *g);
+
+//std::vector<NamedTensor> ToNamedTensorList(void *pytensorlist, void *pynamelist, int list_size);
+
+static bool SaveDGLGraphs(std::vector<const ImmutableGraph *> graph_list,
                           std::vector<NDArray> node_feats,
                           std::vector<NDArray> edge_feats,
                           std::vector<std::string> node_names,
                           std::vector<std::string> edge_names,
 //                          NDArray label_list,
-                          const std::string& filename);
+                          const std::string &filename);
+
+static void ToNameAndTensorList(void *pytensorlist, void *pynamelist, int list_size,
+                                std::vector<std::string> &name_listptr,
+                                std::vector<NDArray> &tensor_listptr);
+
+static bool LoadDGLGraphs(const std::string &filename,
+                          std::vector<uint32_t> idx_list);
+
+static std::vector<NamedTensor> ToNamedTensorList(void *pytensorlist, void *pynamelist, int list_size);
 
 } // namespace serialize
 } //namespace dgl

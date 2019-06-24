@@ -398,6 +398,10 @@ class DGLPODValue_ {
     DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
     return value_.v_int64 != 0;
   }
+  operator std::string() const {
+    DGL_CHECK_TYPE_CODE(type_code_, kStr);
+    return std::string(value_.v_str);
+  }
   operator void*() const {
     if (type_code_ == kNull) return nullptr;
     if (type_code_ == kArrayHandle) return value_.v_handle;
