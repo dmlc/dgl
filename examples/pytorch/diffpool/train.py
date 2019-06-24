@@ -55,7 +55,7 @@ def arg_parse():
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
     parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
-    parser.set_defaults(dataset='DD',
+    parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
                         pool_ratio=0.1,
                         num_pool=1,
@@ -63,7 +63,7 @@ def arg_parse():
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=19,
+                        batch_size=20,
                         epoch=2000,
                         train_ratio=0.7,
                         test_ratio=0.1,
@@ -118,18 +118,17 @@ def pre_process(dataset, prog_args):
         """
         diffpool specific data partition, pre-process and shuffling
         """
-        # adjacency degree normalization -- not done here
-        if dataset.data_mode == "constant":
-            print("node attribute not found, overwrite with DiffPool's preprocess setting")
-            if prog_args['data_mode'] == 'id':
+        if dataset.data_mode != "default":
+            print("overwrite node attributes with DiffPool's preprocess setting")
+            if prog_args.data_mode == 'id':
                 for g in dataset.graph_lists:
-                    id_list = np.arange(g.number_of_nodes)
+                    id_list = np.arange(g.number_of_nodes())
                     g.ndata['feat'] = one_hotify(id_list, pad=dataset.max_num_node)
-            elif prog_args['data_mode'] == 'deg-num':
+            elif prog_args.data_mode == 'deg-num':
                 for g in dataset.graph_lists:
                     g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
 
-            elif prog_args['data_mode'] == 'deg':
+            elif prog_args.data_mode == 'deg':
                 # max degree is disabled.
                 for g in dataset.graph_lists:
                     degs = list(g.in_degrees())
@@ -169,8 +168,8 @@ def pre_process(dataset, prog_args):
                 g.ndata['a_feat'] = np.concatenate((id_embedding,
                                                     g.ndata['feat']),
                                                    axis=1)
-        # sanity check
         """
+        # sanity check
         assert dataset.graph_lists[0].ndata['feat'].shape[1] ==\
                 dataset.graph_lists[1].ndata['feat'].shape[1]
 
@@ -188,12 +187,21 @@ def graph_classify_task(prog_args):
     dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
     dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
     dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
+    train_dataloader = prepare_data(dataset, prog_args, fold=0,
+                                    pre_process=pre_process)
+    val_dataloader = prepare_data(dataset_val, prog_args, fold=1,
+                                  pre_process=pre_process)
+    test_dataloader = prepare_data(dataset_test, prog_args,
+                                   fold=2,pre_process=pre_process)
     input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
     print("dataset feature dimension is", input_dim)
     print("dataset label dimension is", label_dim)
     print("the max num node is", max_num_node)
     print("number of graphs is", len(dataset))
+    assert len(dataset) % prog_args.batch_size == 0, "training set not divisible by batch size"
+    assert len(dataset_val) % prog_args.batch_size == 0, "val set not divisible by batch size"
+    assert len(dataset_test) % prog_args.batch_size == 0, "test set not divisible by batch size"
 
     hidden_dim = 64 # used to be 64
     embedding_dim = 64
@@ -205,10 +213,6 @@ def graph_classify_task(prog_args):
     print("model hidden dim is", hidden_dim)
     print("model embedding dim for graph instance embedding", embedding_dim)
     print("initial batched pool graph dim is", assign_dim)
-
-    train_dataloader = prepare_data(dataset, prog_args, fold=0)
-    val_dataloader = prepare_data(dataset_val, prog_args, fold=1)
-    test_dataloader = prepare_data(dataset_test, prog_args, fold=2)
     activation = F.relu
     
 
