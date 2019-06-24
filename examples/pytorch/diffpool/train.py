@@ -135,41 +135,6 @@ def pre_process(dataset, prog_args):
                     degs = list(g.in_degrees())
                     degs_one_hot = one_hotify(degs, pad=dataset.max_degrees)
                     g.ndata['feat'] = degs_one_hot
-        """
-        elif self.kwargs['feature_mode'] == 'struct':
-            for g in self.graph_lists:
-                degs = list(g.in_degrees())
-                degs_one_hot = self.one_hotify(degs, pad=True, result_dim=self.max_degrees)
-                nxg = g.to_networkx().to_undirected()
-                clustering_coeffs = np.array(list(nx.clustering(nxg).values()))
-                clustering_embedding = np.expand_dims(clustering_coeffs,
-                                                      axis=1)
-                struct_feats = np.concatenate((degs_one_hot,
-                                               clustering_embedding),
-                                              axis=1)
-                if self.use_node_attr:
-                    g.ndata['feat'] = np.concatenate((struct_feats,
-                                                      g.ndata['feat']),
-                                                     axis=1)
-                else:
-                    g.ndata['feat'] = struct_feats
-
-        assert 'feat' in self.graph_lists[0].ndata, "node feature not initialized!"
-
-        if self.kwargs['assign_feat'] == 'id':
-            for g in self.graph_lists:
-                id_list = np.arange(g.number_of_nodes())
-                g.ndata['a_feat'] = self.one_hotify(id_list, pad=True,
-                                                    result_dim=self.max_num_node)
-        else:
-            for g in self.graph_lists:
-                id_list = np.arange(g.number_of_nodes())
-                id_embedding = self.one_hotify(id_list, pad=True,
-                                               result_dim=self.max_num_node)
-                g.ndata['a_feat'] = np.concatenate((id_embedding,
-                                                    g.ndata['feat']),
-                                                   axis=1)
-        """
         # sanity check
         assert dataset.graph_lists[0].ndata['feat'].shape[1] ==\
                 dataset.graph_lists[1].ndata['feat'].shape[1]
@@ -201,8 +166,6 @@ def graph_classify_task(prog_args):
     print("the max num node is", max_num_node)
     print("number of graphs is", len(dataset))
     assert len(dataset) % prog_args.batch_size == 0, "training set not divisible by batch size"
-    # assert len(dataset_val) % prog_args.batch_size == 0, "val set not divisible by batch size"
-    # assert len(dataset_test) % prog_args.batch_size == 0, "test set not divisible by batch size"
 
     hidden_dim = 64 # used to be 64
     embedding_dim = 64
@@ -260,19 +223,9 @@ def collate_fn(batch):
             graph.ndata[key] = torch.FloatTensor(value)
     batched_graphs = dgl.batch(graphs)
 
-    # move to cuda
-    #for (key, value) in batched_graphs.ndata.items():
-    #    if cuda:
-    #        batched_graphs.ndata[key] = value.cuda()
-    #    else:
-    #        batched_graphs.ndata[key] = value
-
     # cast to PyTorch tensor
     batched_labels = torch.LongTensor(np.array(labels))
 
-    # move to cuda
-    #if cuda:
-    #    batched_labels = batched_labels.cuda()
     return batched_graphs, batched_labels
 
 def train(dataset, model, prog_args, same_feat=True, val_dataset=None):

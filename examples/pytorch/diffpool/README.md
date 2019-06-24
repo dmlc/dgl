@@ -16,15 +16,13 @@ How to run
 ----------
 
 ```bash
-python train.py
+python train.py --dataset ENZYMES --pool_ratio 0.10 --linkpred True --num_pool 1
 ```
+Performance
+-----------
+ENZYMES 63.33% (with early stopping)
+DD 79.31% (with early stopping)
 
-arguments:
-```bash
-```
-
-accuracies:
-ENZYMES 63.38%
 
 ## Dependencies
 
