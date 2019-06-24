@@ -30,6 +30,7 @@ class TUDataset(object):
         self.hidden_size = hidden_size
         self.extract_dir = self._download()
         self.fold = -1
+        self.data_mode = None
 
         if use_pandas:
             import pandas as pd
@@ -67,6 +68,7 @@ class TUDataset(object):
             one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = one_hot_node_labels[idxs, :]
+            self.data_mode = "node_label"
         except IOError:
             print("No Node Label Data")
 
@@ -74,12 +76,14 @@ class TUDataset(object):
             DS_node_attr = np.loadtxt(self._file_path("node_attributes"), delimiter=",")
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = DS_node_attr[idxs, :]
+            self.data_mode = "node_data"
         except IOError:
             print("No Node Attribute Data")
 
         if 'feat' not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
+            self.data_mode = "constant"
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
         
         # randomly shuffle the data
