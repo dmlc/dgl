@@ -32,26 +32,22 @@ struct Addr {
 };
 
 /*!
- * \brief Network Sender for DGL distributed training.
+ * \brief Socket Sender for DGL distributed training.
  *
- * Sender is an abstract class that defines a set of APIs for sending 
- * binary data over network. It can be implemented by different underlying 
- * networking libraries such TCP socket and ZMQ. One Sender can connect to 
- * multiple receivers, and it can send data to specified receiver via receiver's ID.
+ * SocketSender is the communicator implemented by tcp socket.
  */
 class SocketSender : public Sender {
  public:
   /*!
    * \brief Add receiver address and it's ID to the namebook
-   * \param ip receviver's IP address
-   * \param port receiver's port
+   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051'
    * \param id receiver's ID
    */
-  void AddReceiver(const char* ip, int port, int recv_id);
+  void AddReceiver(const char* addr, int recv_id);
 
   /*!
    * \brief Connect with all the Receivers
-   * \return True for sucess and False for fail
+   * \return True for success of all connections and False for fail
    */
   bool Connect();
 
@@ -63,6 +59,8 @@ class SocketSender : public Sender {
    * \return bytes we sent
    *   > 0 : bytes we sent
    *   - 1 : error
+   * Note that, the Send() API is a blocking API that 
+   * returns until the target receiver get its message.
    */
   int64_t Send(const char* data, int64_t size, int recv_id);
 
@@ -70,17 +68,6 @@ class SocketSender : public Sender {
    * \brief Finalize Sender
    */
   void Finalize();
-
-  /*!
-   * \brief Get data buffer
-   * \return buffer pointer
-   */
-  char* GetBuffer();
-
-  /*!
-   * \brief Set data buffer
-   */
-  void SetBuffer(char* buffer);
 
  private:
   /*!
@@ -92,58 +79,39 @@ class SocketSender : public Sender {
    * \brief receiver address map
    */ 
   std::unordered_map<int, Addr> receiver_addr_map_;
-
-  /*!
-   * \brief data buffer
-   */ 
-  char* buffer_ = nullptr;
 };
 
 /*!
- * \brief Network Receiver for DGL distributed training.
+ * \brief Socket Receiver for DGL distributed training.
  *
- * Receiver is an abstract class that defines a set of APIs for receiving binary 
- * data over network. It can be implemented by different underlying networking libraries 
- * such TCP socket and ZMQ. One Receiver can connect with multiple Senders, and it can receive 
- * data from these Senders concurrently via multi-threading and message queue.
+ * SocketReceiver is the communicator implemented by tcp socket.
  */
 class SocketReceiver : public Receiver {
  public:
   /*!
    * \brief Wait all of the Senders to connect
-   * \param ip Receiver's IP address
-   * \param port Receiver's port
+   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051'
    * \param num_sender total number of Senders
    * \param queue_size size of message queue
    * \return True for sucess and False for fail
    */
-  bool Wait(const char* ip, int port, int num_sender, int queue_size);
+  bool Wait(const char* ip, int num_sender, int queue_size);
 
   /*!
    * \brief Recv data from Sender (copy data from message queue)
-   * \param dest data buffer of destination
-   * \param max_size maximul size of data buffer
-   * \return bytes we received
-   *   > 0 : bytes we received
+   * \param buffer data buffer
+   * \param buff_size size of data buffer
+   * \return real bytes received
+   *   > 0 : size of message
    *   - 1 : error
+   * Note that, the Recv() API is blocking API that returns until getting data.
    */
-  int64_t Recv(char* dest, int64_t max_size);
+  int64_t Recv(char* buffer, int64_t buff_size);
 
   /*!
    * \brief Finalize Receiver
    */
   void Finalize();
-
-  /*!
-   * \brief Get data buffer
-   * \return buffer pointer
-   */
-  char* GetBuffer();
-
-  /*!
-   * \brief Set data buffer
-   */
-  void SetBuffer(char* buffer);
 
  private:
   /*!
@@ -170,11 +138,6 @@ class SocketReceiver : public Receiver {
    * \brief Message queue for communicator
    */ 
   MessageQueue* queue_;
-
-  /*!
-   * \brief data buffer
-   */ 
-  char* buffer_ = nullptr;
 
   /*!
    * \brief Process received message in independent threads

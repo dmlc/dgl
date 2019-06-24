@@ -5,6 +5,7 @@
  */
 #include <dmlc/logging.h>
 
+#include "common.h"
 #include "socket_communicator.h"
 #include "../../c_api_common.h"
 #include "../network.h"
@@ -18,14 +19,29 @@
 namespace dgl {
 namespace network {
 
+using dgl::network::SplitStringUsing;
+
 const int kTimeOut = 10;  // 10 minutes for socket timeout
 const int kMaxConnection = 1024;  // 1024 maximal socket connection
 
-void SocketSender::AddReceiver(const char* ip, int port, int recv_id) {
-  dgl::network::Addr addr;
-  addr.ip_.assign(const_cast<char*>(ip));
-  addr.port_ = port;
-  receiver_addr_map_[recv_id] = addr;
+/////////////////////////////////////// SocketSender ///////////////////////////////////////////
+
+void SocketSender::AddReceiver(const char* addr, int recv_id) {
+  std::vector<std::string> substring;
+  SplitStringUsing(addr, "//", &substring);
+  // Check address format
+  if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr 
+               << " Please provide right address format, "
+               << "e.g, 'ip://127.0.0.1:50051'.";
+  }
+  // Get IP and port
+  std::vector<std::string> ip_and_port;
+  SplitStringUsing(substring[1], ":", &ip_and_port);
+  dgl::network::Addr address;
+  address.ip_ = ip_and_port[0];
+  address.port_ = std::stoi(ip_and_port[1]);
+  receiver_addr_map_[recv_id] = address;
 }
 
 bool SocketSender::Connect() {
@@ -93,23 +109,28 @@ void SocketSender::Finalize() {
       client = nullptr;
     }
   }
-  delete buffer_;
 }
 
-char* SocketSender::GetBuffer() {
-  return buffer_;
-}
+/////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
 
-void SocketSender::SetBuffer(char* buffer) {
-  buffer_ = buffer;
-}
-
-bool SocketReceiver::Wait(const char* ip,
-                          int port,
+bool SocketReceiver::Wait(const char* addr,
                           int num_sender,
                           int queue_size) {
   CHECK_GE(num_sender, 1);
   CHECK_GT(queue_size, 0);
+  std::vector<std::string> substring;
+  SplitStringUsing(addr, "//", &substring);
+  // Check address format
+  if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
+    LOG(FATAL) << "Incorrect address format:" << addr 
+               << " Please provide right address format, "
+               << "e.g, 'ip://127.0.0.1:50051'.";
+  }
+  // Get IP and port
+  std::vector<std::string> ip_and_port;
+  SplitStringUsing(substring[1], ":", &ip_and_port);
+  std::string ip = ip_and_port[0];
+  int port = stoi(ip_and_port[1]);
   // Initialize message queue
   num_sender_ = num_sender;
   queue_size_ = queue_size;
@@ -121,7 +142,7 @@ bool SocketReceiver::Wait(const char* ip,
   TCPSocket* server = socket_[0];
   server->SetTimeout(kTimeOut * 60 * 1000);  // millsec
   // Bind socket
-  if (server->Bind(ip, port) == false) {
+  if (server->Bind(ip.c_str(), port) == false) {
     LOG(FATAL) << "Cannot bind to " << ip << ":" << port;
     return false;
   }
@@ -180,9 +201,9 @@ void SocketReceiver::MsgHandler(TCPSocket* socket, MessageQueue* queue, int id) 
   delete [] buffer;
 }
 
-int64_t SocketReceiver::Recv(char* dest, int64_t max_size) {
+int64_t SocketReceiver::Recv(char* buffer, int64_t buff_size) {
   // Get message from message queue
-  return queue_->Remove(dest, max_size);
+  return queue_->Remove(buffer, buff_size);
 }
 
 void SocketReceiver::Finalize() {
@@ -199,15 +220,6 @@ void SocketReceiver::Finalize() {
       socket_[i] = nullptr;
     }
   }
-  delete buffer_;
-}
-
-char* SocketReceiver::GetBuffer() {
-  return buffer_;
-}
-
-void SocketReceiver::SetBuffer(char* buffer) {
-  buffer_ = buffer;
 }
 
 }  // namespace network

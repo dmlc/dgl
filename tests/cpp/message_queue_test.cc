@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file msg_queue.cc
- * \brief Message queue for DGL distributed training.
+ * \file message_queue_test.cc
+ * \brief Test MessageQueue
  */
 #include <gtest/gtest.h>
 #include <string>

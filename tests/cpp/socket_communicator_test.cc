@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file msg_queue.cc
- * \brief Message queue for DGL distributed training.
+ * \file socket_communicator_test.cc
+ * \brief Test SocketCommunicator
  */
 #include <gtest/gtest.h>
 #include <string.h>
@@ -76,7 +76,7 @@ void start_client() {
   const char * msg = "123456789";
   sleep(1);
   SocketSender sender;
-  sender.AddReceiver("127.0.0.1", 2049, 0);
+  sender.AddReceiver("socket://127.0.0.1:2049", 0);
   sender.Connect();
   sender.Send(msg, 9, 0);
   sender.Finalize();
@@ -86,7 +86,7 @@ bool start_server() {
   char serbuff[10];
   memset(serbuff, '\0', 10);
   SocketReceiver receiver;
-  receiver.Wait("127.0.0.1", 2049, 1, 500 * 1024);
+  receiver.Wait("socket://127.0.0.1:2049", 1, 500 * 1024);
   receiver.Recv(serbuff, 9);
   receiver.Finalize();
   return string("123456789") == string(serbuff);
