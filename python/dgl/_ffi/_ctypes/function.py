@@ -9,12 +9,15 @@ from numbers import Number, Integral
 
 from ..base import _LIB, check_call
 from ..base import c_str, string_types
+from ..node_generic import convert_to_node, NodeGeneric
 from ..runtime_ctypes import DGLType, DGLByteArray, DGLContext
 from . import ndarray as _nd
 from .ndarray import NDArrayBase, _make_array
 from .types import DGLValue, TypeCode
 from .types import DGLPackedCFunc, DGLCFuncFinalizer
 from .types import RETURN_SWITCH, C_TO_PY_ARG_SWITCH, _wrap_arg_func
+from .node import NodeBase
+from . import node as _node
 
 FunctionHandle = ctypes.c_void_p
 ModuleHandle = ctypes.c_void_p
@@ -79,7 +82,11 @@ def convert_to_dgl_func(pyfunc):
 
 
 def _make_dgl_args(args, temp_args):
-    """Pack arguments into c args dgl call accept"""
+    """Pack arguments into c args dgl call accept.
+
+    temp_args is used to temporarily save the arguments so they will not be
+    freed during C API function call.
+    """
     num_args = len(args)
     values = (DGLValue * num_args)()
     type_codes = (ctypes.c_int * num_args)()
@@ -87,6 +94,14 @@ def _make_dgl_args(args, temp_args):
         if arg is None:
             values[i].v_handle = None
             type_codes[i] = TypeCode.NULL
+        elif isinstance(arg, NodeBase):
+            values[i].v_handle = arg.handle
+            type_codes[i] = TypeCode.NODE_HANDLE
+        elif isinstance(arg, (list, tuple, dict, NodeGeneric)):
+            arg = convert_to_node(arg)
+            values[i].v_handle = arg.handle
+            type_codes[i] = TypeCode.NODE_HANDLE
+            temp_args.append(arg)
         elif isinstance(arg, NDArrayBase):
             values[i].v_handle = ctypes.cast(arg.handle, ctypes.c_void_p)
             type_codes[i] = (TypeCode.NDARRAY_CONTAINER
@@ -210,6 +225,7 @@ def _handle_return_func(x):
 
 
 # setup return handle for function type
+_node.__init_by_constructor__ = __init_handle_by_constructor__
 RETURN_SWITCH[TypeCode.FUNC_HANDLE] = _handle_return_func
 RETURN_SWITCH[TypeCode.MODULE_HANDLE] = _return_module
 RETURN_SWITCH[TypeCode.NDARRAY_CONTAINER] = lambda x: _make_array(x.v_handle, False)
