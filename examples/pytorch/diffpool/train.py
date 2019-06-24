@@ -65,7 +65,7 @@ def arg_parse():
                         lr=1e-3,
                         clip=2.0,
                         batch_size=29,
-                        epoch=300,
+                        epoch=1300,
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=1,
