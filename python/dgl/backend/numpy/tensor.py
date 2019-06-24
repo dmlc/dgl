@@ -81,6 +81,13 @@ def max(input, dim):
 def exp(input):
     return np.exp(input)
 
+def softmax(input, axis=-1):
+    max_val = input.max(axis=axis)
+    minus_max = input - np.expand_dims(max_val, axis=axis)
+    exp_val = np.exp(minus_max)
+    sum_val = np.sum(exp_val, axis=axis)
+    return exp_val / np.expand_dims(sum_val, axis=axis)
+
 def cat(seq, dim):
     return np.concatenate(seq, axis=dim)
 

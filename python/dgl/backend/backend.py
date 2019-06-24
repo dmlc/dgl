@@ -338,9 +338,27 @@ def exp(input):
     Returns
     -------
     Tensor
-        The output tensor
+        The output tensor.
     """
     pass
+
+def softmax(input, axis=-1):
+    """Apply the softmax function on given axis.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    axis : int
+        The axis along which to compute softmax.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 
 def cat(seq, dim):
     """Concat the sequence of tensors in the given dimension.

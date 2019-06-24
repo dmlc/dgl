@@ -100,6 +100,9 @@ def max(input, dim):
 def exp(input):
     return th.exp(input)
 
+def softmax(input, axis=-1):
+    return th.softmax(input, dim=axis)
+
 def cat(seq, dim):
     return th.cat(seq, dim=dim)
 

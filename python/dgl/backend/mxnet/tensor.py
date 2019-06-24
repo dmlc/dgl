@@ -121,6 +121,9 @@ def max(input, dim):
 def exp(input):
     return nd.exp(input)
 
+def softmax(input, axis=-1):
+    return nd.softmax(input, axis=axis)
+
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
 
