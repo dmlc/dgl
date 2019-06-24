@@ -55,7 +55,7 @@ def arg_parse():
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
     parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
-    parser.set_defaults(dataset='ENZYMES',
+    parser.set_defaults(dataset='DD',
                         bmname='PH',
                         pool_ratio=0.1,
                         num_pool=1,
@@ -63,7 +63,7 @@ def arg_parse():
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=20,
+                        batch_size=8,
                         epoch=2000,
                         train_ratio=0.7,
                         test_ratio=0.1,
@@ -200,8 +200,8 @@ def graph_classify_task(prog_args):
     print("the max num node is", max_num_node)
     print("number of graphs is", len(dataset))
     assert len(dataset) % prog_args.batch_size == 0, "training set not divisible by batch size"
-    assert len(dataset_val) % prog_args.batch_size == 0, "val set not divisible by batch size"
-    assert len(dataset_test) % prog_args.batch_size == 0, "test set not divisible by batch size"
+    # assert len(dataset_val) % prog_args.batch_size == 0, "val set not divisible by batch size"
+    # assert len(dataset_test) % prog_args.batch_size == 0, "test set not divisible by batch size"
 
     hidden_dim = 64 # used to be 64
     embedding_dim = 64
