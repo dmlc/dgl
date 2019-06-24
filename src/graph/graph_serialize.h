@@ -23,28 +23,23 @@ using dgl::ImmutableGraph;
 namespace dgl {
 namespace serialize {
 
-typedef std::pair<std::string, NDArray> NamedTensor;
+
+struct DGLGraphSerialize {
+  GraphHandle g_handle;
+  uint32_t num_node_feats;
+  uint32_t num_edge_feats;
+  const char **node_names;
+  NDArray **node_feats;
+  const char **edge_names;
+  NDArray **edge_feats;
+};
 
 static const ImmutableGraph *ToImmutableGraph(const GraphInterface *g);
 
-//std::vector<NamedTensor> ToNamedTensorList(void *pytensorlist, void *pynamelist, int list_size);
+bool SaveDGLGraphs(std::string filename, uint32_t num_graph, const DGLGraphSerialize *gstructs);
 
-static bool SaveDGLGraphs(std::vector<const ImmutableGraph *> graph_list,
-                          std::vector<NDArray> node_feats,
-                          std::vector<NDArray> edge_feats,
-                          std::vector<std::string> node_names,
-                          std::vector<std::string> edge_names,
-//                          NDArray label_list,
-                          const std::string &filename);
-
-static void ToNameAndTensorList(void *pytensorlist, void *pynamelist, int list_size,
-                                std::vector<std::string> &name_listptr,
-                                std::vector<NDArray> &tensor_listptr);
-
-static bool LoadDGLGraphs(const std::string &filename,
-                          std::vector<uint32_t> idx_list);
-
-static std::vector<NamedTensor> ToNamedTensorList(void *pytensorlist, void *pynamelist, int list_size);
+std::vector<DGLGraphSerialize> LoadDGLGraphs(const std::string &filename,
+                                             std::vector<uint32_t> idx_list);
 
 } // namespace serialize
 } //namespace dgl
