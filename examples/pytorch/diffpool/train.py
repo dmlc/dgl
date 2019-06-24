@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 import dgl
@@ -64,7 +65,7 @@ def arg_parse():
                         lr=1e-3,
                         clip=2.0,
                         batch_size=29,
-                        epoch=200,
+                        epoch=300,
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=0,
@@ -184,9 +185,9 @@ def graph_classify_task(prog_args):
     use_node_attr = False
     if prog_args.dataset == 'ENZYMES':
         use_node_attr = True
-    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
-    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
-    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.7, 0.2, 0.1])
+    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
+    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
+    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
     train_dataloader = prepare_data(dataset, prog_args, fold=0,
                                     pre_process=pre_process)
     val_dataloader = prepare_data(dataset_val, prog_args, fold=1,
@@ -251,7 +252,7 @@ def collate_fn(batch):
     transform ndata to tensor (in gpu is available)
     '''
     graphs, labels = map(list, zip(*batch))
-    cuda = torch.cuda.is_available()
+    #cuda = torch.cuda.is_available()
 
     # batch graphs and cast to PyTorch tensor
     for graph in graphs:
@@ -260,24 +261,27 @@ def collate_fn(batch):
     batched_graphs = dgl.batch(graphs)
 
     # move to cuda
-    for (key, value) in batched_graphs.ndata.items():
-        if cuda:
-            batched_graphs.ndata[key] = value.cuda()
-        else:
-            batched_graphs.ndata[key] = value
+    #for (key, value) in batched_graphs.ndata.items():
+    #    if cuda:
+    #        batched_graphs.ndata[key] = value.cuda()
+    #    else:
+    #        batched_graphs.ndata[key] = value
 
     # cast to PyTorch tensor
     batched_labels = torch.LongTensor(np.array(labels))
 
     # move to cuda
-    if cuda:
-        batched_labels = batched_labels.cuda()
+    #if cuda:
+    #    batched_labels = batched_labels.cuda()
     return batched_graphs, batched_labels
 
 def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
     '''
     training function
     '''
+    dir = prog_args.save_dir + "/" + prog_args.dataset
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     dataloader = dataset
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,
                                         model.parameters()), lr=0.001)
@@ -285,9 +289,6 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
 
     if prog_args.cuda > 0:
         torch.cuda.set_device(0)
-    else:
-        cuda = False
-
     for epoch in range(prog_args.epoch):
         begin_time = time.time()
         model.train()
@@ -295,6 +296,12 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         print("EPOCH ###### {} ######".format(epoch))
         computation_time = 0.0
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
+            if torch.cuda.is_available():
+                for (key, value) in batch_graph.ndata.items():
+                    batch_graph.ndata[key] = value.cuda()
+                graph_labels = graph_labels.cuda()
+
+                
             model.zero_grad()
             compute_start = time.time()
             ypred = model(batch_graph)
@@ -317,7 +324,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         if val_dataset is not None:
             result = evaluate(val_dataset, model, prog_args)
             print("validation  accuracy {}%".format(result*100))
-            if result > early_stopping_logger['val_acc']:
+            if result > early_stopping_logger['val_acc'] and result < train_accu:
                 early_stopping_logger.update(best_epoch=epoch, val_acc=result)
                 if prog_args.save_dir is not None:
                     torch.save(model.state_dict(), prog_args.save_dir + "/" + prog_args.dataset\

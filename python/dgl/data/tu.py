@@ -24,7 +24,7 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=1000):
+    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=1000, cross_valid=False):
 
         self.name = name
         self.hidden_size = hidden_size
@@ -32,6 +32,7 @@ class TUDataset(object):
         self.fold = -1
         self.data_mode = None
         self.max_allow_node = max_allow_node
+        self.cross_valid = cross_valid
 
         if use_pandas:
             import pandas as pd
@@ -100,7 +101,7 @@ class TUDataset(object):
         
         # randomly shuffle the data
         ind = [i for i in range(len(self.graph_labels))]
-        #random.seed(0)
+        random.seed(17)
         random.shuffle(ind)
         self.graph_lists = [self.graph_lists[i] for i in ind]
         self.graph_labels = [self.graph_labels[i] for i in ind]
@@ -120,7 +121,7 @@ class TUDataset(object):
             split_ratio = [0] + split_ratio
             self.fold_start_idx = np.cumsum([np.floor(ratio*len(self.graph_lists)) for ratio in split_ratio])
             self.fold_start_idx = list(map(lambda x: int(x), self.fold_start_idx))
-
+        
     def set_fold(self, n):
         self.fold = n
 
@@ -143,7 +144,10 @@ class TUDataset(object):
 
     def __len__(self):
         if self.fold != -1:
-            return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
+            if self.cross_valid:
+                print("WIP")
+            else:
+                return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
         return len(self.graph_lists)
 
     def _download(self):

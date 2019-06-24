@@ -24,11 +24,10 @@ class LinkPredLoss(nn.Module):
         return link_pred_loss.mean()
 
 class BatchedDiffPool(nn.Module):
-    def __init__(self, nfeat, nnext, nhid, link_pred=True, entropy=False):
+    def __init__(self, nfeat, nnext, nhid, link_pred=False, entropy=True):
         super(BatchedDiffPool, self).__init__()
         self.link_pred = link_pred
         self.log = {}
-        self.min_cut = True
         self.link_pred_layer = LinkPredLoss()
         self.embed = BatchedGraphSAGE(nfeat, nhid, use_bn=True)
         self.assign = DiffPoolAssignment(nfeat, nnext)
