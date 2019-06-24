@@ -782,19 +782,11 @@ def _softmax_on(graph, typestr, feat):
         feat_ = F.zeros((len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]), dtype=dtype, ctx=ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_nodes, *F.shape(feat)[1:]))
-        max_val = F.max(feat_, 1)
-        minus_max = feat_ - F.unsqueeze(max_val, 1)
-        exp_val = F.exp(minus_max)
-        sum_val = F.sum(exp_val, 1)
-        feat_ = exp_val / F.unsqueeze(sum_val, 1)
+        feat_ = F.softmax(feat_, axis=1)
         feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_nodes, *F.shape(feat)[1:]))
         return F.gather_row(feat_, index)
     else:
-        max_val = F.max(feat, 0)
-        minus_max = feat - F.unsqueeze(max_val, 0)
-        exp_val = F.exp(minus_max)
-        sum_val = F.sum(exp_val, 0)
-        return exp_val / F.unsqueeze(sum_val, 0)
+        return F.softmax(feat, axis=0)
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
