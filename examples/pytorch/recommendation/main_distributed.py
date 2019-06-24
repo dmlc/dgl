@@ -10,6 +10,7 @@ from rec.utils import cuda
 from rec.comm.receiver import NodeFlowReceiver
 from dgl import DGLGraph
 from validation import *
+import operator
 
 import argparse
 import pickle
@@ -56,10 +57,27 @@ _compute_validation = {
         'movielens1m': compute_validation_rating,
         'movielens10m': compute_validation_rating,
         'movielens10m-imp': compute_validation_imp,
-        'movielens-imp': compute_validation_imp,
+        'movielens1m-imp': compute_validation_imp,
+        }
+# The function that aggregates per-example metric into one single number
+_metric_agg = {
+        'movielens1m': lambda x: np.sqrt(np.mean(x)),
+        'movielens10m': lambda x: np.sqrt(np.mean(x)),
+        'movielens10m-imp': np.mean,
+        'movielens1m-imp': np.mean,
+        }
+# The function that determines whether the first metric is better than the
+# second metric
+_better = {
+        'movielens1m': operator.lt,
+        'movielens10m': operator.lt,
+        'movielens10m-imp': operator.gt,
+        'movielens1m-imp': operator.gt,
         }
 # The evaluation function for the current dataset
 compute_validation = _compute_validation[args.dataset]
+metric_agg = _metric_agg[args.dataset]
+better = _better[args.dataset]
 
 g = ml.g
 g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
@@ -263,25 +281,24 @@ def runtest(validation=True):
 
 def train():
     global opt, sched
-    best_mrr = 10
+    best_metric = None
     best_test = 0
 
     for epoch in range(args.n):
         print('Epoch %d validation' % epoch)
 
-        if 1:
-            with torch.no_grad():
-                valid_mrr = runtest(True)
-            print(pd.Series(valid_mrr).describe())
-            print('Epoch %d test' % epoch)
-            with torch.no_grad():
-                test_mrr = runtest(False)
-            if best_mrr > valid_mrr.mean():
-                best_mrr = valid_mrr.mean()
-                best_test = test_mrr.mean()
-                torch.save(model.state_dict(), 'model.pt')
-            print(pd.Series(test_mrr).describe())
-            print('Best valid:', np.sqrt(best_mrr), np.sqrt(best_test))
+        with torch.no_grad():
+            valid_metric = runtest(True)
+        print(pd.Series(valid_metric).describe())
+        print('Epoch %d test' % epoch)
+        with torch.no_grad():
+            test_metric = runtest(False)
+        if best_metric is None or not better(best_metric, metric_agg(valid_metric)):
+            best_metric = metric_agg(valid_metric)
+            best_test = metric_agg(test_metric)
+            torch.save(model.state_dict(), 'model.pt')
+        print(pd.Series(test_metric).describe())
+        print('Best valid:', best_metric, best_test)
 
         print('Epoch %d train' % epoch)
         runtrain()
@@ -292,7 +309,7 @@ def train():
         elif epoch < args.sgd_switch:
             sched.step()
 
-    print('Best valid:', np.sqrt(best_mrr), np.sqrt(best_test))
+    print('Best valid:', best_metric, best_test)
 
 
 if __name__ == '__main__':

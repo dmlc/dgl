@@ -15,6 +15,7 @@ def load_data(args):
     else:
         if args.dataset in [
                 'movielens1m',
+                'movielens1m-imp',
                 'movielens10m',
                 'movielens10m-imp']:
             from rec.datasets.movielens import MovieLens
