@@ -63,7 +63,7 @@ def arg_parse():
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=8,
+                        batch_size=9,
                         epoch=2000,
                         train_ratio=0.7,
                         test_ratio=0.1,
