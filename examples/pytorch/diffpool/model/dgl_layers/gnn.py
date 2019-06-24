@@ -19,7 +19,7 @@ class GraphSageLayer(nn.Module):
         super(GraphSageLayer, self).__init__()
         self.use_bn = bn
         self.bundler = Bundler(in_feats, out_feats, activation, dropout,
-                               bias=True)
+                               bias=bias)
         self.dropout = nn.Dropout(p=dropout)
 
         if aggregator_type == "maxpool":

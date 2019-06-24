@@ -24,13 +24,14 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None):
+    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=1000):
 
         self.name = name
         self.hidden_size = hidden_size
         self.extract_dir = self._download()
         self.fold = -1
         self.data_mode = None
+        self.max_allow_node = max_allow_node
 
         if use_pandas:
             import pandas as pd
@@ -86,16 +87,27 @@ class TUDataset(object):
             self.data_mode = "constant"
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
         
+        # remove graphs that are too large by user given standard
+        preserve_idx = []
+        print("original dataset length : ", len(self.graph_lists))
+        for (i, g) in enumerate(self.graph_lists):
+            if g.number_of_nodes() <= self.max_allow_node:
+                preserve_idx.append(i)
+        self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
+        print("after pruning graphs that are too big : ", len(self.graph_lists))
+        self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
+        self.max_num_node = self.max_allow_node
+        
         # randomly shuffle the data
         ind = [i for i in range(len(self.graph_labels))]
-        random.seed(0)
+        #random.seed(0)
         random.shuffle(ind)
         self.graph_lists = [self.graph_lists[i] for i in ind]
         self.graph_labels = [self.graph_labels[i] for i in ind]
 
         #make dataset divisible by 10
         if len(self.graph_lists) % 10 != 0:
-            "TU dataset not divisible by 10"
+            print("TU dataset not divisible by 10")
             new_len = len(self.graph_lists) // 10
             self.graph_lists = self.graph_lists[:new_len*10]
             self.graph_labels = self.graph_labels[:new_len*10]

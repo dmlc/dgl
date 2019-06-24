@@ -59,12 +59,12 @@ def arg_parse():
                         bmname='PH',
                         pool_ratio=0.1,
                         num_pool=1,
-                        linkpred=True,
+                        linkpred=False,
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=9,
-                        epoch=2000,
+                        batch_size=29,
+                        epoch=200,
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=0,
@@ -76,7 +76,7 @@ def arg_parse():
                         bias=True,
                         save_dir="./model_param",
                         load_epoch=-1,
-                        data_mode = 'id')
+                        data_mode = 'default')
     return parser.parse_args()
 
 def prepare_data(dataset, prog_args, fold=-1, pre_process=None):
