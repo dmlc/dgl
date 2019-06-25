@@ -125,6 +125,5 @@ void StringAppendF(string* dst, const char* format, ...) {
   va_end(ap);
 }
 
-
 }  // namespace network
 }  // namespace dgl

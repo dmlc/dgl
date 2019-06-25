@@ -14,7 +14,6 @@
 #include "./network/common.h"
 #include "../c_api_common.h"
 
-
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
 using dgl::runtime::DGLRetValue;
@@ -25,7 +24,7 @@ using dgl::network::StringPrintf;
 namespace dgl {
 namespace network {
 
-static std::unordered_map<void*, char*> MemoryPool;
+static std::unordered_map<void*, char*> MemoryBuffer;
 
 
 ////////////////////////////////// Basic Networking Components ////////////////////////////////
@@ -58,7 +57,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(sender);
     try {
       char* buffer = new char[kMaxBufferSize];
-      MemoryPool[chandle] = buffer;
+      MemoryBuffer[chandle] = buffer;
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for sender buffer: " << kMaxBufferSize;
     }
@@ -71,7 +70,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(receiver);
     try {
       char* buffer = new char[kMaxBufferSize];
-      MemoryPool[chandle] = buffer;
+      MemoryBuffer[chandle] = buffer;
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
     }
@@ -83,7 +82,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeSender")
     CommunicatorHandle chandle = args[0];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     sender->Finalize();
-    delete [] MemoryPool[chandle];
+    delete [] MemoryBuffer[chandle];
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
@@ -91,7 +90,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
     CommunicatorHandle chandle = args[0];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     receiver->Finalize();
-    delete [] MemoryPool[chandle];
+    delete [] MemoryBuffer[chandle];
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
@@ -126,9 +125,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
   });
 
 
-
 ////////////////////////// Distributed Sampler Components ////////////////////////////////
-
 
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
@@ -144,7 +141,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
     // Write control message
-    char* buffer = MemoryPool[chandle];
+    char* buffer = MemoryBuffer[chandle];
     *buffer = CONTROL_NODEFLOW;
     // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
@@ -165,7 +162,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendEndSignal")
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    char* buffer = MemoryPool[chandle];
+    char* buffer = MemoryBuffer[chandle];
     *buffer = CONTROL_END_SIGNAL;
     // Send msg via network
     SendData(sender, buffer, sizeof(CONTROL_END_SIGNAL), recv_id);
@@ -176,7 +173,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     CommunicatorHandle chandle = args[0];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     // Recv data from network
-    char* buffer = MemoryPool[chandle];
+    char* buffer = MemoryBuffer[chandle];
     RecvData(receiver, buffer, kMaxBufferSize);
     int control = *buffer;
     if (control == CONTROL_NODEFLOW) {
