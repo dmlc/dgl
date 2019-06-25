@@ -43,7 +43,7 @@ g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
 g_train = g.edge_subgraph(g_train_edges, True)
 
 for epoch in range(500):
-    seeds = torch.LongTensor(sender.recv())
+    seeds = torch.LongTensor(sender.recv()) + n_users
     sampler = NeighborSampler(
             g_train,
             batch_size,
@@ -58,6 +58,6 @@ for epoch in range(500):
         for i, nodeflow in enumerate(tq):
             sender.send(
                     nodeflow,
-                    seeds[i * batch_size:(i + 1) * batch_size].numpy())
+                    seeds[i * batch_size:(i + 1) * batch_size].numpy() - n_users)
     print('Completing')
     sender.complete()

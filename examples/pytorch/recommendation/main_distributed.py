@@ -255,7 +255,7 @@ def runtest(validation=True):
     n_users = len(ml.user_ids)
     n_items = len(ml.product_ids)
 
-    valid_sampler.distribute(np.arange(n_users + n_items))
+    valid_sampler.distribute(np.arange(n_items))
     valid_sampler_iter = iter(valid_sampler)
 
     hs = []
@@ -272,9 +272,9 @@ def runtest(validation=True):
     assert (np.sort(auxs.numpy()) == np.arange(n_items)).all()
     h = h[auxs.sort()[1]]     # reorder h
 
-    #h = torch.cat([
-    #    nid_h(cuda(torch.arange(0, n_users).long() + 1)),
-    #    h], 0)
+    h = torch.cat([
+        nid_h(cuda(torch.arange(0, n_users).long() + 1)),
+        h], 0)
     b = nid_b(cuda(torch.arange(1, 1 + n_users + n_items)))
 
     return compute_validation(ml, h, b, model, not validation)
