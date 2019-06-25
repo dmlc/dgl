@@ -31,9 +31,9 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
   SplitStringUsing(addr, "//", &substring);
   // Check address format
   if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
-    LOG(FATAL) << "Incorrect address format:" << addr 
+    LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'ip://127.0.0.1:50051'.";
+               << "e.g, 'socket://127.0.0.1:50051'.";
   }
   // Get IP and port
   std::vector<std::string> ip_and_port;
@@ -122,9 +122,9 @@ bool SocketReceiver::Wait(const char* addr,
   SplitStringUsing(addr, "//", &substring);
   // Check address format
   if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
-    LOG(FATAL) << "Incorrect address format:" << addr 
+    LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'ip://127.0.0.1:50051'.";
+               << "e.g, 'socket://127.0.0.1:50051'.";
   }
   // Get IP and port
   std::vector<std::string> ip_and_port;

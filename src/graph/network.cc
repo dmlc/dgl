@@ -5,14 +5,15 @@
  */
 
 #include "./network.h"
+
+#include <unordered_map>
+
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/serialize.h"
 #include "./network/common.h"
-
 #include "../c_api_common.h"
 
-#include <unordered_map>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -27,7 +28,7 @@ namespace network {
 static std::unordered_map<void*, char*> MemoryPool;
 
 
-///////////////////////////////////////// Basic Networking Components ///////////////////////////////////////////
+////////////////////////////////// Basic Networking Components ////////////////////////////////
 
 
 // Wrapper for Communicator Send() API
@@ -126,7 +127,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
 
 
 
-////////////////////////////////////// Distributed Sampler Components /////////////////////////////////////////
+////////////////////////// Distributed Sampler Components ////////////////////////////////
 
 
 

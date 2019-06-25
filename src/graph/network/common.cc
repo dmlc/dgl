@@ -127,4 +127,4 @@ void StringAppendF(string* dst, const char* format, ...) {
 
 
 }  // namespace network
-}  // namesapce dgl
+}  // namespace dgl
