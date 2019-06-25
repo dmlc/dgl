@@ -38,6 +38,7 @@ parser.add_argument('--num-samplers', type=int, default=8)
 parser.add_argument('--batch-size', type=int, default=32)
 parser.add_argument('--l2', type=float, default=1e-9)
 parser.add_argument('--loss', type=str, default='bpr')
+parser.add_argument('--dropout', type=float, default=0.5)
 args = parser.parse_args()
 
 print(args)
@@ -113,6 +114,7 @@ model = cuda(GraphSage(
     use_feature=args.use_feature,
     G=g_train,
     emb=emb,
+    p=args.dropout,
     ))
 # The learnable embeddings for each user and product that don't take part in GraphSage
 # convolution.
@@ -188,9 +190,9 @@ def runtrain():
             if dst_neg is not None:
                 dst_neg = torch.LongTensor(dst_neg)
                 dst_neg_size = dst_neg.shape[0]
-                nodeset = torch.cat([dst, dst_neg])
+                nodeset = torch.cat([src, dst, dst_neg])
             else:
-                nodeset = dst
+                nodeset = torch.cat([src, dst])
 
             nodeflow.copy_from_parent(edge_embed_names=None)
 
@@ -203,10 +205,9 @@ def runtrain():
             output_idx = nodeflow.map_from_parent_nid(-1, nodeset, True)
             h = node_output[output_idx]
             if dst_neg is not None:
-                h_dst, h_dst_neg = h.split([dst_size, dst_neg_size])
+                h_src, h_dst, h_dst_neg = h.split([src_size, dst_size, dst_neg_size])
             else:
-                h_dst = h
-            h_src = nid_h(cuda(src + 1))
+                h_src, h_dst = h.split([src_size, dst_size])
 
             b_src = nid_b(cuda(src + 1)).squeeze()
             b_dst = nid_b(cuda(dst + 1)).squeeze()
@@ -254,7 +255,7 @@ def runtest(validation=True):
     n_users = len(ml.user_ids)
     n_items = len(ml.product_ids)
 
-    valid_sampler.distribute(np.arange(n_items))
+    valid_sampler.distribute(np.arange(n_users + n_items))
     valid_sampler_iter = iter(valid_sampler)
 
     hs = []
@@ -271,9 +272,9 @@ def runtest(validation=True):
     assert (np.sort(auxs.numpy()) == np.arange(n_items)).all()
     h = h[auxs.sort()[1]]     # reorder h
 
-    h = torch.cat([
-        nid_h(cuda(torch.arange(0, n_users).long() + 1)),
-        h], 0)
+    #h = torch.cat([
+    #    nid_h(cuda(torch.arange(0, n_users).long() + 1)),
+    #    h], 0)
     b = nid_b(cuda(torch.arange(1, 1 + n_users + n_items)))
 
     return compute_validation(ml, h, b, model, not validation)
@@ -296,7 +297,7 @@ def train():
         if best_metric is None or not better(best_metric, metric_agg(valid_metric)):
             best_metric = metric_agg(valid_metric)
             best_test = metric_agg(test_metric)
-            torch.save(model.state_dict(), 'model.pt')
+            torch.save(model.state_dict(), 'model-test.pt')
         print(pd.Series(test_metric).describe())
         print('Best valid:', best_metric, best_test)
 

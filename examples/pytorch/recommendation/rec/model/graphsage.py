@@ -45,7 +45,7 @@ def init_bias(w):
     nn.init.constant_(w, 0)
 
 class GraphSageConv(nn.Module):
-    def __init__(self, in_features, out_features, hidden_features):
+    def __init__(self, in_features, out_features, hidden_features, p):
         super(GraphSageConv, self).__init__()
 
         self.in_features = in_features
@@ -53,6 +53,7 @@ class GraphSageConv(nn.Module):
         self.hidden_features = hidden_features
 
         self.W = nn.Linear(in_features + in_features, hidden_features)
+        self.dropout = nn.Dropout(p)
 
         init_weight(self.W.weight, 'xavier_uniform_', 'leaky_relu')
         #nn.init.constant_(self.Q.weight, 0)
@@ -65,11 +66,11 @@ class GraphSageConv(nn.Module):
         h_agg = safediv(h_agg - h, w - 1)
         h_concat = torch.cat([h, h_agg], 1)
         h_new = F.leaky_relu(self.W(h_concat))
-        return {'h': safediv(h_new, h_new.norm(dim=1, keepdim=True))}
+        return {'h': self.dropout(safediv(h_new, h_new.norm(dim=1, keepdim=True)))}
 
 
 class GraphSage(nn.Module):
-    def __init__(self, feature_sizes, use_feature=False, G=None, emb={}, proj={}):
+    def __init__(self, feature_sizes, use_feature=False, G=None, emb={}, proj={}, p=0.5):
         super(GraphSage, self).__init__()
         self.in_features = feature_sizes[0]
         self.out_features = feature_sizes[-1]
@@ -78,7 +79,7 @@ class GraphSage(nn.Module):
         self.convs = nn.ModuleList()
         for i in range(self.n_layers):
             self.convs.append(GraphSageConv(
-                feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1]))
+                feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1], p))
 
         self.use_feature = use_feature
 

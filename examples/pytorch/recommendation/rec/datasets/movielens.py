@@ -17,6 +17,7 @@ import operator
 
 class MovieLens(UserProductDataset):
     split_by_time = None
+    inductive = False
     def __init__(self, directory):
         '''
         directory: path to movielens directory which should have the three
@@ -95,6 +96,19 @@ class MovieLens(UserProductDataset):
         self.ratings = self.data_split(self.ratings)
         self.users = self.users[self.users.index.isin(self.ratings['user_id'])]
         self.products = self.products[self.products.index.isin(self.ratings['product_id'])]
+
+        if self.inductive:
+            new_users = np.random.choice(self.users.index)
+            self.ratings['new_user'] = self.ratings['user_id'].isin(new_users)
+            tmp = self.ratings[self.ratings['new_user'], 'train']
+            self.ratings[self.ratings['new_user'], 'train'] = \
+                    self.ratings[self.ratings['new_user'], 'valid']
+            self.ratings[self.ratings['new_user'], 'valid'] = tmp
+            self.new_users = new_users
+        else:
+            self.ratings['new_user'] = False
+            self.new_users = []
+
         self.build_graph()
         self.refresh_mask()
         self.generate_candidates()
