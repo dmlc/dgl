@@ -572,6 +572,15 @@ def test_update_routines():
                                        apply_node_func)
     assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
 
+    g['dst', 'src', 'e'].send_and_recv((v, u),
+                                       message_func,
+                                       reduce_func,
+                                       apply_node_func)
+    print(reduce_msg_shapes)
+    print(g['src'].ndata['res'])
+    #assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
+    #assert F.allclose(g['src'].ndata['res'], comp_res)
+
     reduce_msg_shapes.clear()
     try:
         g.send_and_recv([u, v])
@@ -588,7 +597,7 @@ def test_update_routines():
            {'dst': apply_node_func})
     assert(reduce_msg_shapes == {(2, 2, D), (1, 3, D), (1, 4, D)})
     reduce_msg_shapes.clear()
-    F.allclose(g['dst'].ndata['res'][v], comp_res[v])
+    assert F.allclose(g['dst'].ndata['res'][v], comp_res[v])
 
     g['src', 'dst', 'e'].pull(v,
                               message_func,
@@ -596,7 +605,7 @@ def test_update_routines():
                               apply_node_func)
     assert(reduce_msg_shapes == {(2, 2, D), (1, 3, D), (1, 4, D)})
     reduce_msg_shapes.clear()
-    F.allclose(g['dst'].ndata['res'][v], comp_res[v])
+    assert F.allclose(g['dst'].ndata['res'][v], comp_res[v])
 
     # push
     v = F.tensor([0, 1, 2, 3])
@@ -622,14 +631,14 @@ def test_update_routines():
                  {'dst': apply_node_func})
     assert(reduce_msg_shapes == {(1, 3, D), (2, 1, D), (6, 2, D), (1, 4, D)})
     reduce_msg_shapes.clear()
-    F.allclose(g['dst'].ndata['res'], comp_res)
+    assert F.allclose(g['dst'].ndata['res'], comp_res)
 
     g['src', 'dst', 'e'].update_all(message_func,
                                     reduce_func,
                                     apply_node_func)
     assert(reduce_msg_shapes == {(1, 3, D), (2, 1, D), (6, 2, D), (1, 4, D)})
     reduce_msg_shapes.clear()
-    F.allclose(g['dst'].ndata['res'], comp_res)
+    assert F.allclose(g['dst'].ndata['res'], comp_res)
 
 def test_filter():
     g = gen_from_edgelist(False)

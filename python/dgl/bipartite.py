@@ -46,13 +46,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         assert metagraph.number_of_edges() == 1
         self._metagraph = metagraph
 
-        self._ntypes = list(number_of_nodes_by_type.keys())
-        assert self._ntypes[0] in number_of_nodes_by_type.keys()
-        assert self._ntypes[1] in number_of_nodes_by_type.keys()
-        self._num_nodes_by_type = number_of_nodes_by_type
-        self._num_nodes = [number_of_nodes_by_type[self._ntypes[0]],
-                           number_of_nodes_by_type[self._ntypes[1]]]
-
         self._one_dir_graphs = {}
         self._graph = None
         self._etypes = list(edge_connections_by_type.keys())
@@ -69,6 +62,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                 self._one_dir_graphs[etype] = None
         if len(self._etypes) == 1:
             self._graph = self._one_dir_graphs[self._etypes[0]]
+
+        self._ntypes = list(self._etypes[0])[0:2]
+        assert self._ntypes[0] in number_of_nodes_by_type.keys()
+        assert self._ntypes[1] in number_of_nodes_by_type.keys()
+        self._num_nodes_by_type = number_of_nodes_by_type
+        self._num_nodes = [number_of_nodes_by_type[self._ntypes[0]],
+                           number_of_nodes_by_type[self._ntypes[1]]]
 
         if node_frame is not None:
             assert self._ntypes[0] in node_frame
