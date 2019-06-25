@@ -79,7 +79,7 @@ template <typename StringType, typename ITR>
 static inline
 void SplitStringToIteratorUsing(const StringType& full,
                                 const char* delim,
-                                ITR& result) {
+                                ITR* result) {
   // Optimize the common case where delim is a single character.
   if (delim[0] != '\0' && delim[1] == '\0') {
     char c = delim[0];
@@ -93,7 +93,7 @@ void SplitStringToIteratorUsing(const StringType& full,
         while (++p != end && *p != c) {
           // Skip to the next occurence of the delimiter.
         }
-        *result++ = StringType(start, p - start);
+        *(*result)++ = StringType(start, p - start);
       }
     }
     return;
@@ -104,10 +104,10 @@ void SplitStringToIteratorUsing(const StringType& full,
   while (begin_index != std::string::npos) {
     end_index = full.find_first_of(delim, begin_index);
     if (end_index == std::string::npos) {
-      *result++ = full.substr(begin_index);
+      *(*result)++ = full.substr(begin_index);
       return;
     }
-    *result++ = full.substr(begin_index, (end_index - begin_index));
+    *(*result)++ = full.substr(begin_index, (end_index - begin_index));
     begin_index = full.find_first_not_of(delim, end_index);
   }
 }

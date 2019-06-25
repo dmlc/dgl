@@ -45,7 +45,7 @@ void SplitStringUsing(const std::string& full,
   CHECK(result != NULL);
   result->reserve(CalculateReserveForVector(full, delim));
   back_insert_iterator< std::vector<std::string> > it(*result);
-  SplitStringToIteratorUsing(full, delim, it);
+  SplitStringToIteratorUsing(full, delim, &it);
 }
 
 void SplitStringToSetUsing(const std::string& full,
@@ -54,7 +54,7 @@ void SplitStringToSetUsing(const std::string& full,
   CHECK(delim != NULL);
   CHECK(result != NULL);
   simple_insert_iterator<std::set<std::string> > it(result);
-  SplitStringToIteratorUsing(full, delim, it);
+  SplitStringToIteratorUsing(full, delim, &it);
 }
 
 static void StringAppendV(string* dst, const char* format, va_list ap) {
