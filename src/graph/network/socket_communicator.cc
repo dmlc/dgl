@@ -5,6 +5,8 @@
  */
 #include <dmlc/logging.h>
 
+#include <string.h>
+
 #include "common.h"
 #include "socket_communicator.h"
 #include "../../c_api_common.h"
