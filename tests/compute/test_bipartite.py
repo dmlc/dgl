@@ -571,15 +571,29 @@ def test_update_routines():
                                        reduce_func,
                                        apply_node_func)
     assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
+    tmp_res = np.zeros((np.max(v) + 1, D))
+    tmp_input = F.asnumpy(g['src'].ndata['h'])
+    dst_idx = np.unique(v)
+    for u1, v1 in zip(u, v):
+        tmp_res[v1] += tmp_input[u1]
+    tmp_res = F.tensor(tmp_res)[dst_idx]
+    tmp_res += g['dst'].ndata['h'][dst_idx]
+    assert F.allclose(g['dst'].ndata['res'][dst_idx], tmp_res)
 
+    reduce_msg_shapes.clear()
     g['dst', 'src', 'e'].send_and_recv((v, u),
                                        message_func,
                                        reduce_func,
                                        apply_node_func)
-    print(reduce_msg_shapes)
-    print(g['src'].ndata['res'])
-    #assert(reduce_msg_shapes == {(2, 2, D), (2, 1, D)})
-    #assert F.allclose(g['src'].ndata['res'], comp_res)
+    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
+    tmp_res = np.zeros((np.max(u) + 1, D))
+    tmp_input = F.asnumpy(g['dst'].ndata['h'])
+    dst_idx = np.unique(u)
+    for u1, v1 in zip(u, v):
+        tmp_res[u1] += tmp_input[v1]
+    tmp_res = F.tensor(tmp_res)[dst_idx]
+    tmp_res += g['src'].ndata['h'][dst_idx]
+    assert F.allclose(g['src'].ndata['res'][dst_idx], tmp_res)
 
     reduce_msg_shapes.clear()
     try:
