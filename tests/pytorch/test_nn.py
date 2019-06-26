@@ -85,6 +85,24 @@ def test_edge_softmax():
     # checkout gradient
     assert th.allclose(score.grad, grad_score)
     print(score.grad[:10], grad_score[:10])
+    
+    # Test 2
+    def generate_rand_graph(n):
+      arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
+      return dgl.DGLGraph(arr, readonly=True)
+    
+    g = generate_rand_graph(50)
+    a1 = th.randn(g.number_of_edges(), 1).requires_grad_()
+    a2 = a1.clone().detach().requires_grad_()
+    g.edata['s'] = a1
+    g.group_apply_edges('dst', lambda edges: {'ss':th.softmax(edges.data['s'], 1)})
+    g.edata['ss'].sum().backward()
+    
+    builtin_sm = nn.edge_softmax(g, a2)
+    builtin_sm.sum().backward()
+    print(a1.grad - a2.grad)
+    assert th.allclose(a1.grad, a2.grad)
+    
 
 if __name__ == '__main__':
     test_graph_conv()
