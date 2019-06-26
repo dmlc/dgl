@@ -49,7 +49,7 @@ class HeteroGraphInterface {
   virtual ~HeteroGraphInterface() = default;
 
   ////////////////////////// query/operations on meta graph ////////////////////////
-  
+
   /*! \return the number of vertex types */
   virtual uint64_t NumVertexTypes() const = 0;
 
