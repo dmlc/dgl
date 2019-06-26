@@ -17,13 +17,24 @@
 
 namespace dgl {
 
+// Forward declaration
 struct HeteroSubgraph;
-
 class HeteroGraphInterface;
+
 typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
 
 /*!
  * \brief Heterogenous graph APIs
+ *
+ * In heterograph, nodes represent entities and edges represent relations.
+ * Nodes and edges are associated with types. The same pair of entity types
+ * can have multiple relation types between them, but relation type **uniquely**
+ * identifies the source and destination entity types.
+ *
+ * In a high-level, a heterograph is a data structure composed of:
+ *  - A meta-graph that stores the entity-entity relation graph.
+ *  - A dictionary of relation type to the bipartite graph representing the
+ *    actual connections among entity nodes.
  */
 class HeteroGraphInterface {
  public:
@@ -46,7 +57,14 @@ class HeteroGraphInterface {
   virtual uint64_t NumEdgeTypes() const = 0;
 
   /*! \return the meta graph */
-  virtual GraphPtr GetMetaGraph() const = 0;
+  virtual const GraphInterface& GetMetaGraph() const = 0;
+
+  /*!
+   * \brief Return the bipartite graph of the given edge type.
+   * \param etype The edge type.
+   * \return The bipartite graph.
+   */
+  virtual const HeteroGraphInterface& GetRelationGraph(dgl_type_t etype) const = 0;
 
   ////////////////////////// query/operations on realized graph ////////////////////////
 
@@ -347,6 +365,51 @@ class HeteroGraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(
       dgl_id_t etype, bool transpose, const std::string &fmt) const = 0;
+
+  /*!
+   * \brief Extract the induced subgraph by the given vertices.
+   * 
+   * The length of the given vector should be equal to the number of vertex types.
+   * Empty arrays can be provided if no vertex is needed for the type. The result
+   * subgraph has the same meta graph with the parent, but some types can have no
+   * node/edge.
+   *
+   * \param vids the induced vertices per type.
+   * \return the subgraph.
+   */
+  virtual HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const = 0;
+
+  /*!
+   * \brief Extract the induced subgraph by the given edges.
+   * 
+   * The length of the given vector should be equal to the number of edge types.
+   * Empty arrays can be provided if no edge is needed for the type. The result
+   * subgraph has the same meta graph with the parent, but some types can have no
+   * node/edge.
+   *
+   * \param eids The edges in the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
+   *                       may have no incident edges.
+   * \return the subgraph.
+   */
+  virtual HeteroSubgraph EdgeSubgraph(
+      const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
+};
+
+/*! \brief Heter-subgraph data structure */
+struct HeteroSubgraph {
+  /*! \brief The heterograph. */
+  HeteroGraphPtr graph;
+  /*!
+   * \brief The induced vertex ids of each entity type.
+   * The vector length is equal to the number of vertex types in the parent graph.
+   */
+  std::vector<IdArray> induced_vertices;
+  /*!
+   * \brief The induced vertex ids of each entity type.
+   * The vector length is equal to the number of vertex types in the parent graph.
+   */
+  std::vector<IdArray> induced_edges;
 };
 
 };  // namespace dgl

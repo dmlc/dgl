@@ -323,6 +323,8 @@ class GraphInterface {
    * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
+   *                       may have no incident edges.
    * \return the induced edge subgraph
    */
   virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
