@@ -63,6 +63,28 @@ def test_edge_softmax():
     a = nn.edge_softmax(g, edata)
     assert th.allclose(a, uniform_attention(g, a.shape))
 
+    # Test both forward and backward with PyTorch built-in softmax.
+    g = dgl.DGLGraph()
+    g.add_nodes(30)
+    # build a complete graph
+    for i in range(30):
+        for j in range(30):
+            g.add_edge(i, j)
+
+    score = th.rand(900, 1)
+    score.requires_grad_()
+    grad = th.rand(900, 1)
+    y = th.softmax(score.view(30, 30), dim=0).view(-1, 1)
+    y.backward(grad)
+    grad_score = score.grad
+    score.grad.zero_()
+    y_dgl = nn.edge_softmax(g, score)
+    # check forward
+    assert th.allclose(y_dgl, y)
+    y_dgl.backward(grad)
+    # checkout gradient
+    assert th.allclose(score.grad, grad_score)
+    print(score.grad[:10], grad_score[:10])
 
 if __name__ == '__main__':
     test_graph_conv()
