@@ -104,7 +104,7 @@ def test_edge_softmax():
     builtin_sm = nn.edge_softmax(g, a2)
     builtin_sm.sum().backward()
     print(a1.grad - a2.grad)
-    assert th.allclose(a1.grad, a2.grad)
+    assert th.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     
 
 if __name__ == '__main__':
