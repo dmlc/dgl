@@ -8,7 +8,7 @@ from scipy.linalg import block_diag
 
 import dgl
 
-from .dgl_layers import GraphSage, GraphSageLayer, DiffPool4GraphLayer
+from .dgl_layers import GraphSage, GraphSageLayer, DiffPoolBatchedGraphLayer
 from .tensorized_layers import *
 from .model_utils import batch2tensor
 import time
@@ -23,7 +23,7 @@ class DiffPool(nn.Module):
                 assign_dim, pool_ratio, cat=False):
         super(DiffPool, self).__init__()
         self.link_pred = linkpred
-        self.concat = cat #\TODO Fix
+        self.concat = cat
         self.n_pooling = n_pooling
         self.batch_size = batch_size
         self.link_pred_loss = []
@@ -53,7 +53,7 @@ class DiffPool(nn.Module):
             pool_embedding_dim = hidden_dim * (n_layers -1) + embedding_dim
         else:
             pool_embedding_dim = embedding_dim
-        self.first_diffpool_layer = DiffPool4GraphLayer(pool_embedding_dim, self.assign_dim, hidden_dim,activation, dropout, aggregator_type, self.link_pred)
+        self.first_diffpool_layer = DiffPoolBatchedGraphLayer(pool_embedding_dim, self.assign_dim, hidden_dim,activation, dropout, aggregator_type, self.link_pred)
         gc_after_per_pool = nn.ModuleList()
         for _ in range(n_layers - 1):
             gc_after_per_pool.append(BatchedGraphSAGE(hidden_dim, hidden_dim))

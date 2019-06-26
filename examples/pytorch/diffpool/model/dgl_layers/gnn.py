@@ -7,6 +7,7 @@ import dgl.function as fn
 
 from .aggregator import MaxPoolAggregator, MeanAggregator, LSTMAggregator
 from .bundler import Bundler
+from ..model_utils import masked_softmax
 
 
 class GraphSageLayer(nn.Module):
@@ -70,10 +71,10 @@ class GraphSage(nn.Module):
             h = layer(g, h)
         return h
 
-class DiffPool4GraphLayer(nn.Module):
+class DiffPoolBatchedGraphLayer(nn.Module):
 
     def __init__(self, input_dim, assign_dim, output_feat_dim, activation, dropout, aggregator_type, link_pred):
-        super(DiffPool4GraphLayer, self).__init__()
+        super(DiffPoolBatchedGraphLayer, self).__init__()
         self.embedding_dim = input_dim
         self.assign_dim = assign_dim
         self.hidden_dim = output_feat_dim
@@ -94,6 +95,11 @@ class DiffPool4GraphLayer(nn.Module):
             mask =torch.ones((g_n_nodes,
                               int(assign_tensor.size()[1]/batch_size)))
             assign_tensor_masks.append(mask)
+        """
+        The first pooling layer is computed on batched graph. 
+        We first take the adjacency matrix of the batched graph, which is block-wise diagonal.
+        We then compute the assignment matrix for the whole batch graph, which will also be block diagonal
+        """
         mask = torch.FloatTensor(block_diag(*assign_tensor_masks)).to(device=device)
         assign_tensor = masked_softmax(assign_tensor, mask,
                                         memory_efficient=False)
@@ -114,38 +120,7 @@ class DiffPool4GraphLayer(nn.Module):
         return adj_new, h
     
 
-def masked_softmax(matrix, mask, dim=-1, memory_efficient=True,
-                   mask_fill_value=-1e32):
-    '''
-    masked_softmax for dgl batch graph
-    code snippet contributed by AllenNLP (https://github.com/allenai/allennlp)
-    '''
-    if mask is None:
-        result = torch.nn.functional.softmax(matrix, dim=dim)
-    else:
-        mask = mask.float()
-        while mask.dim() < matrix.dim():
-            mask = mask.unsqueeze(1)
-        if not memory_efficient:
-            result = torch.nn.functional.softmax(matrix * mask, dim=dim)
-            result = result * mask
-            result = result / (result.sum(dim=dim, keepdim=True) + 1e-13)
-        else:
-            masked_matrix = matrix.masked_fill((1-mask).byte(),
-                                               mask_fill_value)
-            result = torch.nn.functional.softmax(masked_matrix, dim=dim)
-    return result
 
-def masked_log_softmax(matrix, mask, dim=-1):
-    '''
-    masked log softmax for dgl batch graph
-    '''
-    if mask is not None:
-        mask = mask.float()
-        while mask.dim() < matrix.dim():
-            mask = mask.unsqueeze(1)
-        matrix = matrix + (mask + 1e-32).log()
-    return torch.nn.functional.log_softmax(matrix, dim=dim)
 
 
 class EntropyLoss(nn.Module):

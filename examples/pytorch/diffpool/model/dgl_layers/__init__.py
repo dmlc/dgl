@@ -1,1 +1,1 @@
-from .gnn import GraphSage, GraphSageLayer, DiffPool4GraphLayer
+from .gnn import GraphSage, GraphSageLayer, DiffPoolBatchedGraphLayer

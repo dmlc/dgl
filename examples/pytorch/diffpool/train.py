@@ -22,12 +22,9 @@ def arg_parse():
     '''
     parser = argparse.ArgumentParser(description='DiffPool arguments')
     parser.add_argument('--dataset', dest='dataset', help='Input Dataset')
-    parser.add_argument('--bmname', dest='benchmark name', help='Name of the\
-                        benchmark dataset')
     parser.add_argument('--pool_ratio', dest='pool_ratio', type=float, help='pooling ratio')
     parser.add_argument('--num_pool', dest='num_pool', type=int, help='num_pooling layer')
-    parser.add_argument('--link_pred', dest='linkpred', action='store_const',
-                        const=True, default=True,
+    parser.add_argument('--no_link_pred', dest='linkpred', action='store_false',
                         help='switch of link prediction object')
     parser.add_argument('--cuda', dest='cuda', type=int, help='switch cuda')
     parser.add_argument('--lr', dest='lr', type=float, help='learning rate')
@@ -56,15 +53,14 @@ def arg_parse():
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
     parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
-    parser.set_defaults(dataset='DD',
+    parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
                         pool_ratio=0.15,
                         num_pool=1,
-                        linkpred=True,
                         cuda=1,
                         lr=1e-3,
                         clip=2.0,
-                        batch_size=29,
+                        batch_size=20,
                         epoch=4000,
                         train_ratio=0.7,
                         test_ratio=0.1,
