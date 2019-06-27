@@ -155,7 +155,7 @@ class ObjectRef {
    * This returns nullptr if the object is not of the requested type.
    * Example usage:
    *
-   * if (const Banana *banana = obj->as<MyObject>()) {
+   * if (const Banana *banana = obj->as<Banana>()) {
    *   // This is a Banana!
    * }
    * \tparam T the target type, must be subtype of Object

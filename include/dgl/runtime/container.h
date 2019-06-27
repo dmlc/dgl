@@ -9,10 +9,34 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
-#include "./object.h"
+#include "object.h"
+#include "packed_func.h"
 
 namespace dgl {
 namespace runtime {
+
+/*!
+ * \brief value object.
+ *
+ * It is typically used to wrap a non-Object type to Object type.
+ * Any type that is supported by DGLRetValue is supported by this.
+ */
+class ValueObject : public Object {
+ public:
+  /*! \brief the value data */
+  DGLRetValue data;
+
+  static constexpr const char* _type_key = "Value";
+  DGL_DECLARE_OBJECT_TYPE_INFO(ValueObject, Object);
+};
+
+/*! \brief Construct a value object. */
+template <typename T>
+inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
+  auto obj = std::make_shared<ValueObject>();
+  obj->data = val;
+  return obj;
+}
 
 /*! \brief list obj content in list */
 class ListObject : public Object {
