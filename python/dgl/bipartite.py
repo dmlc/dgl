@@ -1417,9 +1417,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             reduce_func = self._reduce_funcs
         if apply_node_func == "default":
             apply_node_func = self._apply_node_funcs
+            if len(apply_node_func) == 0:
+                apply_node_func = None
+
         if not isinstance(message_func, dict):
             assert not isinstance(reduce_func, dict)
-            assert not isinstance(apply_node_func, dict)
+            if apply_node_func is not None:
+                assert not isinstance(apply_node_func, dict)
             etype = self._etypes[0]
             message_func = {etype: message_func}
             reduce_func = {etype[1]: reduce_func}
