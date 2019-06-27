@@ -72,4 +72,38 @@ DGL_REGISTER_GLOBAL("_Test2")
     }
   });
 
+class StuffObject : public Object {
+ public:
+  std::string color;
+  int num;
+
+  void VisitAttrs(AttrVisitor* v) final {
+    v->Visit("color", &color);
+    v->Visit("num", &num);
+  }
+
+  static constexpr const char* _type_key = "Stuff";
+  DGL_DECLARE_OBJECT_TYPE_INFO(StuffObject, Object);
+};
+
+class Stuff : public ObjectRef {
+ public:
+  Stuff() {}
+  explicit Stuff(std::shared_ptr<Object> o): ObjectRef(o) {}
+
+  const StuffObject* operator->() const {
+    return static_cast<const StuffObject*>(obj_.get());
+  }
+
+  using ContainerType = StuffObject;
+};
+
+DGL_REGISTER_GLOBAL("_CreateStuff")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    auto o = std::make_shared<StuffObject>();
+    o->color = "red";
+    o->num = 2;
+    *rv = o;
+  });
+
 }  // namespace dgl

@@ -5,7 +5,7 @@ from __future__ import absolute_import
 import ctypes
 import sys
 from .. import _api_internal
-from .object_generic import ObjectGeneric, convert_to_object, const
+from .object_generic import ObjectGeneric, convert_to_object
 from .base import _LIB, check_call, c_str, py_str, _FFI_MODE
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
