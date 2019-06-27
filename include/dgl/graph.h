@@ -134,11 +134,6 @@ class Graph: public GraphInterface {
     return num_edges_;
   }
 
-  /*! \return true if the given vertex is in the graph.*/
-  bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices();
-  }
-
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   BoolArray HasVertices(IdArray vids) const override;
 
