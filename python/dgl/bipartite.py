@@ -980,7 +980,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             # update row
             self._edge_frames[etype].update_rows(eid, data, inplace=inplace)
 
-    def get_e_repr(self, etype, edges=ALL):
+    def get_e_repr(self, etype=None, edges=ALL):
         """Get edge(s) representation.
 
         Parameters
@@ -997,6 +997,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         dict
             Representation dict
         """
+        if etype is None:
+            etype = self._etypes[0]
         if len(self.edge_attr_schemes(etype)) == 0:
             return dict()
         # parse argument
