@@ -58,7 +58,7 @@ class EdgeSoftmax(th.autograd.Function):
         out = dgl.EData(g, out)
         sds = out * grad_out  # type dgl.EData
         sds_sum = sds.dst_sum()  # type dgl.NData
-        grad_score = sds - sds * sds_sum  # multiple expressions
+        grad_score = sds - out * sds_sum  # multiple expressions
         return grad_score.data
         """
         g, out = ctx.backward_cache
