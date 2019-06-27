@@ -1,11 +1,11 @@
-"""Node namespace"""
+"""Object namespace"""
 # pylint: disable=unused-import
 from __future__ import absolute_import
 
 import ctypes
 import sys
 from .. import _api_internal
-from .node_generic import NodeGeneric, convert_to_node, const
+from .object_generic import ObjectGeneric, convert_to_object, const
 from .base import _LIB, check_call, c_str, py_str, _FFI_MODE
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
@@ -14,12 +14,12 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import _register_node, NodeBase as _NodeBase
+        from ._cy3.core import _register_object, ObjectBase as _ObjectBase
     else:
-        from ._cy2.core import _register_node, NodeBase as _NodeBase
+        from ._cy2.core import _register_object, ObjectBase as _ObjectBase
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.node import _register_node, NodeBase as _NodeBase
+    from ._ctypes.object import _register_object, ObjectBase as _ObjectBase
 
 
 def _new_object(cls):
@@ -27,15 +27,15 @@ def _new_object(cls):
     return cls.__new__(cls)
 
 
-class NodeBase(_NodeBase):
-    """NodeBase is the base class of all TVM language AST object."""
+class ObjectBase(_ObjectBase):
+    """ObjectBase is the base class of all DGL CAPI object."""
     def __repr__(self):
         return _api_internal._format_str(self)
 
     def __dir__(self):
         plist = ctypes.POINTER(ctypes.c_char_p)()
         size = ctypes.c_uint()
-        check_call(_LIB.TVMNodeListAttrNames(
+        check_call(_LIB.DGLObjectListAttrNames(
             self.handle, ctypes.byref(size), ctypes.byref(plist)))
         names = []
         for i in range(size.value):
@@ -56,6 +56,7 @@ class NodeBase(_NodeBase):
         return (_new_object, (cls, ), self.__getstate__())
 
     def __getstate__(self):
+        assert False, "get state is not supported for object type"
         handle = self.handle
         if handle is not None:
             return {'handle': _api_internal._save_json(self)}
@@ -63,6 +64,7 @@ class NodeBase(_NodeBase):
 
     def __setstate__(self, state):
         # pylint: disable=assigning-non-slot
+        assert False, "set state is not supported for object type"
         handle = state['handle']
         if handle is not None:
             json_str = handle
@@ -74,27 +76,33 @@ class NodeBase(_NodeBase):
 
     def same_as(self, other):
         """check object identity equality"""
-        if not isinstance(other, NodeBase):
+        if not isinstance(other, ObjectBase):
             return False
         return self.__hash__() == other.__hash__()
 
 
-def register_node(type_key=None):
-    """register node type
+def register_object(type_key=None):
+    """Decorator used to register object type
+
+    Examples
+    --------
+    >>> @register_object
+    >>> class MyObject:
+    >>> ... pass
 
     Parameters
     ----------
     type_key : str or cls
-        The type key of the node
+        The type key of the object
     """
-    node_name = type_key if isinstance(type_key, str) else type_key.__name__
+    object_name = type_key if isinstance(type_key, str) else type_key.__name__
 
     def register(cls):
         """internal register function"""
         tindex = ctypes.c_int()
-        ret = _LIB.TVMNodeTypeKey2Index(c_str(node_name), ctypes.byref(tindex))
+        ret = _LIB.DGLObjectTypeKey2Index(c_str(object_name), ctypes.byref(tindex))
         if ret == 0:
-            _register_node(tindex.value, cls)
+            _register_object(tindex.value, cls)
         return cls
 
     if isinstance(type_key, str):

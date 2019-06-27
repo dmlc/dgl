@@ -2,52 +2,52 @@ from __future__ import absolute_import
 
 import ctypes
 from ..base import _LIB, check_call, c_str
-from ..node_generic import _set_class_node_base
-from .types import TVMValue, TypeCode
+from ..object_generic import _set_class_object_base
+from .types import DGLValue, TypeCode
 from .types import RETURN_SWITCH, C_TO_PY_ARG_SWITCH, _wrap_arg_func
 
-NodeHandle = ctypes.c_void_p
+ObjectHandle = ctypes.c_void_p
 __init_by_constructor__ = None
 
-"""Maps node type to its constructor"""
-NODE_TYPE = {}
+"""Maps object type to its constructor"""
+OBJECT_TYPE = {}
 
-def _register_node(index, cls):
-    """register node class in python"""
-    NODE_TYPE[index] = cls
+def _register_object(index, cls):
+    """register object class in python"""
+    OBJECT_TYPE[index] = cls
 
-def _return_node(x):
-    """Construct a node object from the given TVMValue object"""
+def _return_object(x):
+    """Construct a object object from the given DGLValue object"""
     handle = x.v_handle
-    if not isinstance(handle, NodeHandle):
-        handle = NodeHandle(handle)
+    if not isinstance(handle, ObjectHandle):
+        handle = ObjectHandle(handle)
     tindex = ctypes.c_int()
-    check_call(_LIB.TVMNodeGetTypeIndex(handle, ctypes.byref(tindex)))
-    cls = NODE_TYPE.get(tindex.value, NodeBase)
+    check_call(_LIB.DGLObjectGetTypeIndex(handle, ctypes.byref(tindex)))
+    cls = OBJECT_TYPE.get(tindex.value, ObjectBase)
     # Avoid calling __init__ of cls, instead directly call __new__
     # This allows child class to implement their own __init__
-    node = cls.__new__(cls)
-    node.handle = handle
-    return node
+    obj = cls.__new__(cls)
+    obj.handle = handle
+    return obj
 
 
-RETURN_SWITCH[TypeCode.NODE_HANDLE] = _return_node
-C_TO_PY_ARG_SWITCH[TypeCode.NODE_HANDLE] = _wrap_arg_func(
-    _return_node, TypeCode.NODE_HANDLE)
+RETURN_SWITCH[TypeCode.OBJECT_HANDLE] = _return_object
+C_TO_PY_ARG_SWITCH[TypeCode.OBJECT_HANDLE] = _wrap_arg_func(
+    _return_object, TypeCode.OBJECT_HANDLE)
 
 
-class NodeBase(object):
+class ObjectBase(object):
     __slots__ = ["handle"]
     # pylint: disable=no-member
     def __del__(self):
         if _LIB is not None:
-            check_call(_LIB.TVMNodeFree(self.handle))
+            check_call(_LIB.DGLObjectFree(self.handle))
 
     def __getattr__(self, name):
-        ret_val = TVMValue()
+        ret_val = DGLValue()
         ret_type_code = ctypes.c_int()
         ret_success = ctypes.c_int()
-        check_call(_LIB.TVMNodeGetAttr(
+        check_call(_LIB.DGLObjectGetAttr(
             self.handle, c_str(name),
             ctypes.byref(ret_val),
             ctypes.byref(ret_type_code),
@@ -71,14 +71,14 @@ class NodeBase(object):
         Note
         ----
         We have a special calling convention to call constructor functions.
-        So the return handle is directly set into the Node object
-        instead of creating a new Node.
+        So the return handle is directly set into the Object object
+        instead of creating a new Object.
         """
         # assign handle first to avoid error raising
         self.handle = None
         handle = __init_by_constructor__(fconstructor, args)
-        if not isinstance(handle, NodeHandle):
-            handle = NodeHandle(handle)
+        if not isinstance(handle, ObjectHandle):
+            handle = ObjectHandle(handle)
         self.handle = handle
 
-_set_class_node_base(NodeBase)
+_set_class_object_base(ObjectBase)

@@ -9,15 +9,15 @@ from numbers import Number, Integral
 
 from ..base import _LIB, check_call
 from ..base import c_str, string_types
-from ..node_generic import convert_to_node, NodeGeneric
+from ..object_generic import convert_to_object, ObjectGeneric
 from ..runtime_ctypes import DGLType, DGLByteArray, DGLContext
 from . import ndarray as _nd
 from .ndarray import NDArrayBase, _make_array
 from .types import DGLValue, TypeCode
 from .types import DGLPackedCFunc, DGLCFuncFinalizer
 from .types import RETURN_SWITCH, C_TO_PY_ARG_SWITCH, _wrap_arg_func
-from .node import NodeBase
-from . import node as _node
+from .object import ObjectBase
+from . import object as _object
 
 FunctionHandle = ctypes.c_void_p
 ModuleHandle = ctypes.c_void_p
@@ -94,13 +94,13 @@ def _make_dgl_args(args, temp_args):
         if arg is None:
             values[i].v_handle = None
             type_codes[i] = TypeCode.NULL
-        elif isinstance(arg, NodeBase):
+        elif isinstance(arg, ObjectBase):
             values[i].v_handle = arg.handle
-            type_codes[i] = TypeCode.NODE_HANDLE
-        elif isinstance(arg, (list, tuple, dict, NodeGeneric)):
-            arg = convert_to_node(arg)
+            type_codes[i] = TypeCode.OBJECT_HANDLE
+        elif isinstance(arg, (list, tuple, dict, ObjectGeneric)):
+            arg = convert_to_object(arg)
             values[i].v_handle = arg.handle
-            type_codes[i] = TypeCode.NODE_HANDLE
+            type_codes[i] = TypeCode.OBJECT_HANDLE
             temp_args.append(arg)
         elif isinstance(arg, NDArrayBase):
             values[i].v_handle = ctypes.cast(arg.handle, ctypes.c_void_p)
@@ -204,7 +204,7 @@ def __init_handle_by_constructor__(fconstructor, args):
         ctypes.byref(ret_val), ctypes.byref(ret_tcode)))
     _ = temp_args
     _ = args
-    assert ret_tcode.value == TypeCode.NODE_HANDLE
+    assert ret_tcode.value == TypeCode.OBJECT_HANDLE
     handle = ret_val.v_handle
     return handle
 
@@ -225,7 +225,7 @@ def _handle_return_func(x):
 
 
 # setup return handle for function type
-_node.__init_by_constructor__ = __init_handle_by_constructor__
+_object.__init_by_constructor__ = __init_handle_by_constructor__
 RETURN_SWITCH[TypeCode.FUNC_HANDLE] = _handle_return_func
 RETURN_SWITCH[TypeCode.MODULE_HANDLE] = _return_module
 RETURN_SWITCH[TypeCode.NDARRAY_CONTAINER] = lambda x: _make_array(x.v_handle, False)

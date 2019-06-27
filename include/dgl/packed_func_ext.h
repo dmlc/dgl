@@ -55,6 +55,27 @@ struct ObjectTypeChecker<List<T> > {
   }
 };
 
+template<typename V>
+struct ObjectTypeChecker<Map<std::string, V> > {
+  static inline bool Check(Object* sptr) {
+    if (sptr == nullptr) return false;
+    if (!sptr->is_type<StrMapObject>()) return false;
+    StrMapObject* n = static_cast<StrMapObject*>(sptr);
+    for (const auto& kv : n->data) {
+      if (!ObjectTypeChecker<V>::Check(kv.second.get())) return false;
+    }
+    return true;
+  }
+  static inline void PrintName(std::ostringstream& os) { // NOLINT(*)
+    os << "map<string";
+    os << ',';
+    ObjectTypeChecker<V>::PrintName(os);
+    os << '>';
+  }
+};
+
+
+
 template<typename K, typename V>
 struct ObjectTypeChecker<Map<K, V> > {
   static inline bool Check(Object* sptr) {

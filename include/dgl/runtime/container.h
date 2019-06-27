@@ -38,6 +38,19 @@ inline std::shared_ptr<ValueObject> MakeValue(T&& val) {
   return obj;
 }
 
+/*! \brief Vallue reference type */
+class Value : public ObjectRef {
+ public:
+  Value() {}
+  explicit Value(std::shared_ptr<Object> o): ObjectRef(o) {}
+
+  const ValueObject* operator->() const {
+    return static_cast<const ValueObject*>(obj_.get());
+  }
+
+  using ContainerType = ValueObject;
+};
+
 /*! \brief list obj content in list */
 class ListObject : public Object {
  public:

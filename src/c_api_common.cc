@@ -4,6 +4,8 @@
  * \brief DGL C API common implementations
  */
 #include "c_api_common.h"
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/container.h>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -44,6 +46,30 @@ DGL_REGISTER_GLOBAL("_FreeVectorWrapper")
     void* ptr = args[0];
     CAPIVectorWrapper* wrapper = static_cast<CAPIVectorWrapper*>(ptr);
     delete wrapper;
+  });
+
+using namespace runtime;
+
+DGL_REGISTER_GLOBAL("_Test")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CHECK(args[0].IsObjectType<List<Value>>());
+    auto l = args[0].AsObjectRef<List<Value>>();
+    for (int i = 0; i < l.size(); ++i) {
+      LOG(INFO) << "Item#" << i << ": " << l[i]->data.operator int64_t();
+    }
+  });
+
+DGL_REGISTER_GLOBAL("_Test2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    using ArgType = Map<std::string, List<Value>>;
+    CHECK(args[0].IsObjectType<ArgType>());
+    auto m = args[0].AsObjectRef<ArgType>();
+    for (const auto& kv : m) {
+      LOG(INFO) << "Key: " << kv.first;
+      for (const auto& ele : kv.second) {
+        LOG(INFO) << "\t" << ele->data.operator int64_t();
+      }
+    }
   });
 
 }  // namespace dgl
