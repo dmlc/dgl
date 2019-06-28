@@ -117,4 +117,16 @@ DGL_REGISTER_GLOBAL("_Test3")
     }
   });
 
+DGL_REGISTER_GLOBAL("_CreateBlueStuffs")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    List<Stuff> list;
+    for (int i = 0; i < 10; ++i) {
+      auto o = std::make_shared<StuffObject>();
+      o->color = "blue";
+      o->num = i + 10;
+      list.push_back(Stuff(o));
+    }
+    *rv = list;
+  });
+
 }  // namespace dgl

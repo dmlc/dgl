@@ -1,16 +1,18 @@
-"""Container data structures used in TVM DSL."""
+"""Container data structures used in DGL runtime.
+reference: tvm/python/tvm/collections.py
+"""
 from __future__ import absolute_import as _abs
-from ._ffi.node import NodeBase, register_node
+from ._ffi.object import ObjectBase, register_object
 from . import _api_internal
 
-@register_node
-class Array(NodeBase):
-    """Array container of TVM.
+@register_object
+class List(ObjectBase):
+    """List container of DGL.
 
-    You do not need to create Array explicitly.
+    You do not need to create List explicitly.
     Normally python list and tuple will be converted automatically
-    to Array during tvm function call.
-    You may get Array in return values of TVM function call.
+    to List during dgl function call.
+    You may get List in return values of DGL function call.
     """
     def __getitem__(self, i):
         if isinstance(i, slice):
@@ -24,23 +26,23 @@ class Array(NodeBase):
             return [self[idx] for idx in range(start, stop, step)]
 
         if i < -len(self) or i >= len(self):
-            raise IndexError("Array index out of range. Array size: {}, got index {}"
+            raise IndexError("List index out of range. List size: {}, got index {}"
                              .format(len(self), i))
         if i < 0:
             i += len(self)
-        return _api_internal._ArrayGetItem(self, i)
+        return _api_internal._ListGetItem(self, i)
 
     def __len__(self):
-        return _api_internal._ArraySize(self)
+        return _api_internal._ListSize(self)
 
 
-@register_node
-class Map(NodeBase):
-    """Map container of TVM.
+@register_object
+class Map(ObjectBase):
+    """Map container of DGL.
 
     You do not need to create Map explicitly.
-    Normally python dict will be converted automaticall to Map during tvm function call.
-    You can use convert to create a dict[NodeBase-> NodeBase] into a Map
+    Normally python dict will be converted automaticall to Map during dgl function call.
+    You can use convert to create a dict[ObjectBase-> ObjectBase] into a Map
     """
     def __getitem__(self, k):
         return _api_internal._MapGetItem(self, k)
@@ -57,23 +59,13 @@ class Map(NodeBase):
         return _api_internal._MapSize(self)
 
 
-@register_node
+@register_object
 class StrMap(Map):
     """A special map container that has str as key.
 
-    You can use convert to create a dict[str->NodeBase] into a Map.
+    You can use convert to create a dict[str->ObjectBase] into a Map.
     """
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
         return [(akvs[i].value, akvs[i+1]) for i in range(0, len(akvs), 2)]
-
-
-@register_node
-class Range(NodeBase):
-    """Represent a range in TVM.
-
-    You do not need to create a Range explicitly.
-    Python lists and tuples will be converted automatically to a Range in API functions.
-    """
-    pass
