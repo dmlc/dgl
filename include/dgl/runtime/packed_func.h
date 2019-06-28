@@ -525,7 +525,7 @@ class DGLArgValue : public DGLPODValue_ {
   // Deferred extension handler.
   template<typename TObjectRef>
   inline TObjectRef AsObjectRef() const;
-  
+
   // Convert this value to arbitrary class type
   template<typename T,
            typename = typename std::enable_if<

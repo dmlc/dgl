@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <utility>
+#include <string>
 #include "object.h"
 #include "packed_func.h"
 

@@ -52,7 +52,7 @@ uint32_t Object::TypeKey2Index(const char* key) {
 const char* Object::TypeIndex2Key(uint32_t index) {
   TypeManager *t = TypeManager::Global();
   std::lock_guard<std::mutex>(t->mutex);
-  CHECK(index != 0);
+  CHECK_NE(index, 0);
   return t->index2key.at(index - 1).c_str();
 }
 

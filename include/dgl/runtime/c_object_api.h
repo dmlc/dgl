@@ -7,8 +7,8 @@
  * \note Most API functions are registerd as PackedFunc and
  *  can be grabbed via DGLFuncGetGlobal
  */
-#ifndef DGL_C_OBJECT_API_H_
-#define DGL_C_OBJECT_API_H_
+#ifndef DGL_RUNTIME_C_OBJECT_API_H_
+#define DGL_RUNTIME_C_OBJECT_API_H_
 
 #include "./c_runtime_api.h"
 
@@ -73,4 +73,4 @@ DGL_DLL int DGLObjectListAttrNames(ObjectHandle handle,
 #ifdef __cplusplus
 }  // DGL_EXTERN_C
 #endif
-#endif  // DGL_C_OBJECT_API_H_
+#endif  // DGL_RUNTIME_C_OBJECT_API_H_

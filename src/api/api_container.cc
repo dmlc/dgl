@@ -40,7 +40,7 @@ DGL_REGISTER_GLOBAL("_ListSize")
 
 DGL_REGISTER_GLOBAL("_Map")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    CHECK(args.size() % 2 == 0);
+    CHECK_EQ(args.size() % 2, 0);
     if (args.size() != 0 && args[0].type_code() == kStr) {
       // StrMap
       StrMapObject::ContainerType data;
