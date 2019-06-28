@@ -168,7 +168,7 @@ cdef inline object make_ret(DGLValue value, int tcode):
     """convert result to return value."""
     if tcode == kObjectHandle:
         return make_ret_object(value.v_handle)
-    if tcode == kNull:
+    elif tcode == kNull:
         return None
     elif tcode == kInt:
         return value.v_int64
