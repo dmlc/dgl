@@ -224,7 +224,6 @@ def test_edge_sampler():
     g = generate_rand_graph(100)
     EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
     for src_nf, dst_nf, edge_subg in EdgeNeighborSampler(g, 50, g.number_of_nodes(), num_hops=2):
-        assert edge_subg.number_of_nodes() == g.number_of_nodes()
         eids = edge_subg.parent_eid
         src, dst = g.find_edges(eids)
         src1 = src_nf.layer_parent_nid(-1)
@@ -253,15 +252,35 @@ def test_negative_sampler():
                                                           num_hops=2,
                                                           negative_mode="head",
                                                           neg_sample_size=10):
-        assert pos_edges.number_of_nodes() == g.number_of_nodes()
-        assert neg_edges.number_of_nodes() == g.number_of_nodes()
+        assert 10 * pos_edges.number_of_edges() == neg_edges.number_of_edges()
+        pos_nid = pos_edges.parent_nid
         pos_eid = pos_edges.parent_eid
-        neg_src, neg_dst = neg_edges.all_edges(order='eid')
-        exist_edges = g.has_edges_between(neg_src, neg_dst)
-        for i, eid in enumerate(neg_edges.parent_eid):
-            assert eid in pos_eid
-            assert not exist_edges[i]
-            # TODO check if only the head is changed.
+        pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        pos_src = pos_nid[pos_lsrc]
+        pos_dst = pos_nid[pos_ldst]
+        pos_eid = pos_eid[pos_leid]
+        assert_array_equal(F.asnumpy(pos_eid), F.asnumpy(g.edge_ids(pos_src, pos_dst)))
+
+        pos_map = {}
+        for i in range(len(pos_eid)):
+            pos_d = int(F.asnumpy(pos_dst[i]))
+            pos_e = int(F.asnumpy(pos_eid[i]))
+            pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_src[i]))
+            print(pos_d, pos_e, F.asnumpy(pos_src[i]))
+
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_nid = neg_edges.parent_nid
+        neg_eid = neg_edges.parent_eid
+        neg_src = neg_nid[neg_lsrc]
+        neg_dst = neg_nid[neg_ldst]
+        neg_eid = neg_eid[neg_leid]
+
+        for i in range(len(neg_eid)):
+            neg_d = int(F.asnumpy(neg_dst[i]))
+            neg_e = int(F.asnumpy(neg_eid[i]))
+            print("neg: ", neg_d, neg_e, F.asnumpy(neg_src[i]))
+            assert (neg_d, neg_e) in pos_map
+            assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
 
 if __name__ == '__main__':
