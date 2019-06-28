@@ -943,7 +943,7 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
-  for (size_t i = 0; i < num_pos_edges; i++) {
+  for (int64_t i = 0; i < num_pos_edges; i++) {
     size_t neg_idx = i * neg_sample_size;
     neg_vids.clear();
     RandomSample(num_tot_nodes, neg_sample_size, pos_nodes, &neg_vids, &seed);
@@ -964,7 +964,7 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
     dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
 
-    for (size_t j = 0; j < neg_sample_size; j++) {
+    for (int64_t j = 0; j < neg_sample_size; j++) {
       neg_unchanged[neg_idx + j] = local_unchanged;
       neg_eid_data[neg_idx + j] = curr_eid++;
       dgl_id_t local_changed = global2local_map(neg_vids[j], &neg_map);
@@ -1042,10 +1042,12 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       else
         nflows[i]->neg_subg = nullptr;
 
-      *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
-        gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
-      *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
-        gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+      if (expand_factor > 0 && num_hops > 0) {
+        *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
+          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+        *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
+          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+      }
       *nflows[i]->pos_subg = gptr->EdgeSubgraph(worker_seeds, false);
       if (neg_mode.size() > 0)
         *nflows[i]->neg_subg = NegEdgeSubgraph(gptr->NumVertices(), *nflows[i]->pos_subg,

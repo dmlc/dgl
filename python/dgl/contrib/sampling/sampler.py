@@ -571,16 +571,22 @@ class EdgeNeighborSampler(EdgeSampler):
                                          utils.toindex(pos_subg_func(2)))
             pos_subg = subgraph.DGLSubGraph(self.g, pos_subg_idx)
 
+            if self._num_hops > 0 and self._expand_factor > 0:
+                nf1 = NodeFlow(self.g, func(0))
+                nf2 = NodeFlow(self.g, func(1))
+            else:
+                nf1 = None
+                nf2 = None
+
             if self._negative_mode == "":
-                nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)), pos_subg))
+                nflows.append((nf1, nf2, pos_subg))
             else:
                 neg_subg_func = _CAPI_GetSubgraph(func(3))
                 neg_subg_idx = SubgraphIndex(GraphIndex(neg_subg_func(0)), self.g._graph,
                                              utils.toindex(neg_subg_func(1)),
                                              utils.toindex(neg_subg_func(2)))
                 neg_subg = subgraph.DGLSubGraph(self.g, neg_subg_idx)
-                nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)),
-                               pos_subg, neg_subg))
+                nflows.append((nf1, nf2, pos_subg, neg_subg))
 
         return nflows
 
