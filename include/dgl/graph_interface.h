@@ -107,7 +107,6 @@ class GraphInterface {
   virtual uint8_t NumBits() const = 0;
 
   /*!
-   * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
   virtual bool IsMultigraph() const = 0;
@@ -124,12 +123,14 @@ class GraphInterface {
   virtual uint64_t NumEdges() const = 0;
 
   /*! \return true if the given vertex is in the graph.*/
-  virtual bool HasVertex(dgl_id_t vid) const = 0;
+  virtual bool HasVertex(dgl_id_t vid) const {
+    return vid < NumVertices();
+  }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   virtual BoolArray HasVertices(IdArray vids) const {
     const auto len = vids->shape[0];
-    BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
+    BoolArray rst = NewBoolArray(len);
     const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
     dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
     const uint64_t nverts = NumVertices();
@@ -322,6 +323,8 @@ class GraphInterface {
    * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
+   *                       may have no incident edges.
    * \return the induced edge subgraph
    */
   virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
