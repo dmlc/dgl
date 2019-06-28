@@ -63,7 +63,7 @@ class EdgeSoftmax(th.autograd.Function):
         return grad_score.data
         """
         g = ctx.backward_cache
-        out = ctx.saved_tensors
+        out, = ctx.saved_tensors
         # clear backward cache explicitly
         ctx.backward_cache = None
         out_name = utils.get_edata_name(g, 'out')
