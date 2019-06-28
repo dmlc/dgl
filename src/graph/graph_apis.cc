@@ -18,7 +18,6 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-namespace {
 // Convert EdgeArray structure to PackedFunc.
 template<class EdgeArray>
 PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
@@ -68,8 +67,6 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
     };
   return PackedFunc(body);
 }
-
-}  // namespace
 
 namespace {
 // This namespace contains template functions for batching
@@ -596,5 +593,6 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
     GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
     *rv = bghandle;
   });
+
 
 }  // namespace dgl
