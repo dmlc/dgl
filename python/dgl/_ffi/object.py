@@ -58,10 +58,6 @@ class ObjectBase(_ObjectBase):
         #   for runtime API, so it could contain binary data such as NDArray.
         #   If this feature is required, please raise a RFC to DGL issue.
         raise RuntimeError("__getstate__ is not supported for object type")
-        handle = self.handle
-        if handle is not None:
-            return {'handle': _api_internal._save_json(self)}
-        return {'handle': None}
 
     def __setstate__(self, state):
         # pylint: disable=assigning-non-slot
@@ -70,14 +66,6 @@ class ObjectBase(_ObjectBase):
         #   for runtime API, so it could contain binary data such as NDArray.
         #   If this feature is required, please raise a RFC to DGL issue.
         raise RuntimeError("__setstate__ is not supported for object type")
-        handle = state['handle']
-        if handle is not None:
-            json_str = handle
-            other = _api_internal._load_json(json_str)
-            self.handle = other.handle
-            other.handle = None
-        else:
-            self.handle = None
 
     def same_as(self, other):
         """check object identity equality"""
