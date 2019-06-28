@@ -115,6 +115,23 @@ void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
   out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
 }
 
+void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
+                  std::vector<size_t>* out, unsigned int* seed) {
+  std::unordered_map<size_t, int> sampled_idxs;
+  for (auto v : exclude) {
+    sampled_idxs.insert(std::pair<size_t, int>(v, 0));
+  }
+  while (sampled_idxs.size() < num + exclude.size()) {
+    sampled_idxs.insert(std::pair<size_t, int>(rand_r(seed) % set_size, 1));
+  }
+  out->clear();
+  for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
+    if (it->second) {
+      out->push_back(it->first);
+    }
+  }
+}
+
 /*
  * For a sparse array whose non-zeros are represented by nz_idxs,
  * negate the sparse array and outputs the non-zeros in the negated array.
@@ -913,6 +930,8 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
   const dgl_id_t *induced_vid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
   const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+  size_t num_pos_nodes = pos_subg.graph->NumVertices();
+  std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
@@ -927,7 +946,7 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   for (size_t i = 0; i < num_pos_edges; i++) {
     size_t neg_idx = i * neg_sample_size;
     neg_vids.clear();
-    RandomSample(num_tot_nodes, neg_sample_size, &neg_vids, &seed);
+    RandomSample(num_tot_nodes, neg_sample_size, pos_nodes, &neg_vids, &seed);
 
     const dgl_id_t *unchanged;
     dgl_id_t *neg_unchanged;
