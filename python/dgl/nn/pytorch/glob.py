@@ -1,76 +1,77 @@
-""" Global pooling layers for DGL.
-Three types:
-1. One vector/K vectors per graph as readout.
-2. Graph Coarsening, in this case we need to construct a new graph and a bipartite graph to bridge the current graph
-   and the pooling graph.
-"""
-
+"""Torch modules for graph global pooling."""
+# pylint: disable= no-member, arguments-differ
 import torch as th
 import torch.nn as nn
 from torch.nn import init
 
 from ... import function as fn, BatchedDGLGraph
-from ...utils import get_ndata_name
+from ...utils import get_ndata_name, get_edata_name
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes
 
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
     """
+    _feat_name = '_gpool_feat'
     def __init__(self):
         super(SumPooling, self).__init__()
-        self._feat_name = '_gpool_feat'
 
     def forward(self, feat, graph):
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[self._feat_name] = feat
-        readout = sum_nodes(graph, self._feat_name)
+        _feat_name = get_ndata_name(graph, self._feat_name)
+        graph.ndata[_feat_name] = feat
+        readout = sum_nodes(graph, _feat_name)
         return readout
 
 
 class AvgPooling(nn.Module):
     r"""Apply average pooling over the graph.
     """
+    _feat_name = '_gpool_avg'
     def __init__(self):
         super(AvgPooling, self).__init__()
-        self._feat_name = '_gpool_avg'
 
     def forward(self, feat, graph):
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[self._feat_name] = feat
-        readout = mean_nodes(graph, self._feat_name)
+        _feat_name = get_ndata_name(graph, self._feat_name)
+        graph.ndata[_feat_name] = feat
+        readout = mean_nodes(graph, _feat_name)
         return readout
 
 
 class MaxPooling(nn.Module):
     r"""Apply max pooling over the graph.
     """
+    _feat_name = '_gpool_max'
     def __init__(self):
         super(MaxPooling, self).__init__()
-        self._feat_name = '_gpool_max'
 
     def forward(self, feat, graph):
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[self._feat_name] = feat
-        readout = max_nodes(graph, self._feat_name)
+        _feat_name = get_ndata_name(graph, self._feat_name)
+        graph.ndata[_feat_name] = feat
+        readout = max_nodes(graph, _feat_name)
         return readout
 
 
-class TopKPooling(nn.Module):
-    r"""Apply top-k pooling (from paper "Graph U-Net" and "Towards Sparse Hierarchical Graph
-    Classifiers") over the graph.
+class SortPooling(nn.Module):
+    r"""Apply sort pooling (from paper "An End-to-End Deep Learning Architecture
+    for Graph Classification") over the graph.
     """
-    def __init__(self):
-        super(TopKPooling, self).__init__()
+    _feat_name = '_gpool_sort'
+    def __init__(self, k):
+        super(SortPooling, self).__init__()
+        self.k = k
 
     def forward(self, feat, graph):
-        # TODO(zihao): finish this
+        # Sort the feature of each node in ascending order.
+        feat, _ = feat.sort(dim=-1)
+        # Sort nodes according to the their last features.
         pass
 
 
 class GlobAttnPooling(nn.Module):
     r"""Apply global attention pooling over the graph.
     """
+    _gate_name = '_gpool_attn_gate'
+    _readout_name = '_gpool_attn_readout'
     def __init__(self, gate_nn, nn=None):
         super(GlobAttnPooling, self).__init__()
         self.gate_nn = gate_nn
@@ -86,12 +87,12 @@ class GlobAttnPooling(nn.Module):
         gate = self.gate_nn(feat)
         feat = self.nn(feat) if self.nn else feat
 
-        feat_name = get_ndata_name(graph, 'gate')
+        feat_name = get_ndata_name(graph, self.gate_name)
         graph.ndata[feat_name] = gate
         gate = softmax_nodes(graph, feat_name)
         graph.ndata.pop(feat_name)
 
-        feat_name = get_ndata_name(graph, 'readout')
+        feat_name = get_ndata_name(graph, self.readout_name)
         graph.ndata[feat_name] = feat * gate
         readout = sum_nodes(graph, feat_name)
         graph.ndata.pop(feat_name)
@@ -99,37 +100,25 @@ class GlobAttnPooling(nn.Module):
         return readout
 
 
-class DiffPool(nn.Module):
-    r"""Apply Differentiable Pooling
-    """
-    def __init__(self):
-        super(DiffPool, self).__init__()
-        pass
-
-    def forward(self, feat, graph):
-        # TODO(zihao): finish this
-        pass
-
 class Set2Set(nn.Module):
     r"""Apply Set2Set (from paper "Order Matters: Sequence to sequence for sets") over the graph.
     """
+    _score_name = '_gpool_s2s_score'
+    _readout_name = '_gpool_s2s_readout'
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
-        self._feat_name = '_gpool_set2set'
-
         self.input_dim = input_dim
         self.output_dim = 2 * input_dim
         self.n_iters = n_iters
         self.n_layers= n_layers
         self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
+        self.reset_parameters()
 
     def reset_parameters(self):
         # TODO(zihao): finish this
         pass
 
     def forward(self, feat, graph):
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
@@ -143,12 +132,12 @@ class Set2Set(nn.Module):
             q = q.view(batch_size, self.input_dim)
 
             score = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
-            feat_name = get_ndata_name(graph, 'score')
+            feat_name = get_ndata_name(graph, self._score_name)
             graph.ndata[feat_name] = score
             score = softmax_nodes(graph, feat_name)
             graph.ndata.pop(feat_name)
 
-            feat_name = get_ndata_name(graph, 'readout')
+            feat_name = get_ndata_name(graph, self._readout_name)
             graph.ndata[feat_name] = feat * score
             readout = sum_nodes(graph, feat_name)
             graph.ndata.pop(feat_name)
@@ -157,16 +146,10 @@ class Set2Set(nn.Module):
 
         return q_star
 
-class SortPooling(nn.Module):
-    r"""Apply sort pooling (from paper "An End-to-End Deep Learning Architecture
-    for Graph Classification") over the graph.
-    """
-    def __init__(self):
-        pass
-
-    def forward(self, feat, graph):
-        pass
-
-
-class SpectralClustering(nn.Module):
-    pass
+    def extra_repr(self):
+        """Set the extra representation of the module.
+        which will come into effect when printing the model.
+        """
+        summary = 'input_dim={input_dim}, out_dim={out_dim}' +\
+            'n_iters={n_iters}, n_layers={n_layers}'
+        return summary.format(**self.__dict__)
