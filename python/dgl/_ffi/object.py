@@ -29,9 +29,6 @@ def _new_object(cls):
 
 class ObjectBase(_ObjectBase):
     """ObjectBase is the base class of all DGL CAPI object."""
-    def __repr__(self):
-        return _api_internal._format_str(self)
-
     def __dir__(self):
         plist = ctypes.POINTER(ctypes.c_char_p)()
         size = ctypes.c_uint()
@@ -56,7 +53,11 @@ class ObjectBase(_ObjectBase):
         return (_new_object, (cls, ), self.__getstate__())
 
     def __getstate__(self):
-        assert False, "get state is not supported for object type"
+        # TODO(minjie): TVM assumes that a Node (Object in DGL) can be serialized
+        #   to json. However, this is not true in DGL because DGL Object is meant
+        #   for runtime API, so it could contain binary data such as NDArray.
+        #   If this feature is required, please raise a RFC to DGL issue.
+        raise RuntimeError("__getstate__ is not supported for object type")
         handle = self.handle
         if handle is not None:
             return {'handle': _api_internal._save_json(self)}
@@ -64,7 +65,11 @@ class ObjectBase(_ObjectBase):
 
     def __setstate__(self, state):
         # pylint: disable=assigning-non-slot
-        assert False, "set state is not supported for object type"
+        # TODO(minjie): TVM assumes that a Node (Object in DGL) can be serialized
+        #   to json. However, this is not true in DGL because DGL Object is meant
+        #   for runtime API, so it could contain binary data such as NDArray.
+        #   If this feature is required, please raise a RFC to DGL issue.
+        raise RuntimeError("__setstate__ is not supported for object type")
         handle = state['handle']
         if handle is not None:
             json_str = handle
