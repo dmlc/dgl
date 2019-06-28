@@ -266,7 +266,6 @@ def test_negative_sampler():
             pos_d = int(F.asnumpy(pos_dst[i]))
             pos_e = int(F.asnumpy(pos_eid[i]))
             pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_src[i]))
-            print(pos_d, pos_e, F.asnumpy(pos_src[i]))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
         neg_nid = neg_edges.parent_nid
@@ -278,7 +277,6 @@ def test_negative_sampler():
         for i in range(len(neg_eid)):
             neg_d = int(F.asnumpy(neg_dst[i]))
             neg_e = int(F.asnumpy(neg_eid[i]))
-            print("neg: ", neg_d, neg_e, F.asnumpy(neg_src[i]))
             assert (neg_d, neg_e) in pos_map
             assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
