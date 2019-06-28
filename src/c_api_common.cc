@@ -100,10 +100,21 @@ class Stuff : public ObjectRef {
 
 DGL_REGISTER_GLOBAL("_CreateStuff")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string color = args[0];
+    int64_t num = args[1];
     auto o = std::make_shared<StuffObject>();
-    o->color = "red";
-    o->num = 2;
+    o->color = color;
+    o->num = num;
     *rv = o;
+  });
+
+DGL_REGISTER_GLOBAL("_Test3")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CHECK(args[0].IsObjectType<List<Stuff>>());
+    auto l = args[0].AsObjectRef<List<Stuff>>();
+    for (int i = 0; i < l.size(); ++i) {
+      LOG(INFO) << "Stuff#" << i << ": color=" << l[i]->color << " num=" << l[i]->num;
+    }
   });
 
 }  // namespace dgl

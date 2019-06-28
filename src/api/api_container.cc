@@ -13,12 +13,10 @@ namespace runtime {
 
 DGL_REGISTER_GLOBAL("_List")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::vector<std::shared_ptr<Object>> data;
-    for (int i = 0; i < args.size(); ++i) {
-      data.push_back(args[i].obj_sptr());
-    }
     auto ret_obj = std::make_shared<runtime::ListObject>();
-    ret_obj->data = std::move(data);
+    for (int i = 0; i < args.size(); ++i) {
+      ret_obj->data.push_back(args[i].obj_sptr());
+    }
     *rv = ret_obj;
   });
 
