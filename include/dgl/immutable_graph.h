@@ -90,10 +90,6 @@ class CSR : public GraphInterface {
     return indices_->shape[0];
   }
 
-  bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices();
-  }
-
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
 
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
