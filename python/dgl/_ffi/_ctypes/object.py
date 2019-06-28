@@ -38,6 +38,7 @@ C_TO_PY_ARG_SWITCH[TypeCode.OBJECT_HANDLE] = _wrap_arg_func(
 
 
 class ObjectBase(object):
+    """Object base class"""
     __slots__ = ["handle"]
     # pylint: disable=no-member
     def __del__(self):
