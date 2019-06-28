@@ -29,9 +29,9 @@ struct DGLGraphSerialize {
   uint32_t num_node_feats;
   uint32_t num_edge_feats;
   const char **node_names;
-  NDArray **node_feats;
+  DLTensor **node_feats;
   const char **edge_names;
-  NDArray **edge_feats;
+  DLTensor **edge_feats;
 };
 
 static const ImmutableGraph *ToImmutableGraph(const GraphInterface *g);
@@ -40,6 +40,8 @@ bool SaveDGLGraphs(std::string filename, uint32_t num_graph, const DGLGraphSeria
 
 std::vector<DGLGraphSerialize> LoadDGLGraphs(const std::string &filename,
                                              std::vector<uint32_t> idx_list);
+
+static bool SaveDGLGraphs(std::string filename, uint32_t num_graph, void *gstructs);
 
 } // namespace serialize
 } //namespace dgl

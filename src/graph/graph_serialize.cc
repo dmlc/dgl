@@ -36,8 +36,12 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
     int num_graph = args[1];
     std::string filename = args[2];
     const DGLGraphSerialize *g_list = static_cast<const DGLGraphSerialize *>(g_list_handle);
-    SaveDGLGraphs(filename, num_graph, g_list);
+    SaveDGLGraphs(filename, num_graph, g_list_handle);
 });
+
+bool SaveDGLGraphs(std::string filename, uint32_t num_graph, void *gstructs){
+  std::vector<int> aaa;
+}
 
 bool SaveDGLGraphs(std::string filename, uint32_t num_graph, const DGLGraphSerialize *gstructs) {
   auto *fs = dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w",
@@ -167,9 +171,16 @@ std::vector<DGLGraphSerialize> LoadDGLGraphs(const std::string &filename,
             .num_node_feats = num_node_feats,
             .num_edge_feats = num_node_feats,
             .node_names = node_names,
-            .node_feats = &node_feats,
+            .node_feats = nullptr,
             .edge_names = edge_names,
-            .edge_feats = &edge_feats};
+            .edge_feats = nullptr};
+//    DGLGraphSerialize g_struct = {.g_handle= g.Reset(),
+//            .num_node_feats = num_node_feats,
+//            .num_edge_feats = num_node_feats,
+//            .node_names = node_names,
+//            .node_feats = &node_feats,
+//            .edge_names = edge_names,
+//            .edge_feats = &edge_feats};
     graph_list.push_back(g_struct);
   }
   return graph_list;
