@@ -223,7 +223,9 @@ def test_setseed():
 def test_edge_sampler():
     g = generate_rand_graph(100)
     EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
-    for src_nf, dst_nf, eids in EdgeNeighborSampler(g, 50, g.number_of_nodes(), num_hops=2):
+    for src_nf, dst_nf, edge_subg in EdgeNeighborSampler(g, 50, g.number_of_nodes(), num_hops=2):
+        assert edge_subg.number_of_nodes() == g.number_of_nodes()
+        eids = edge_subg.parent_eid
         src, dst = g.find_edges(eids)
         src1 = src_nf.layer_parent_nid(-1)
         dst1 = dst_nf.layer_parent_nid(-1)
@@ -237,6 +239,31 @@ def test_edge_sampler():
         assert_array_equal(src, src1)
         assert_array_equal(dst, dst1)
 
+        edges = []
+        for i in range(src_nf.num_blocks):
+            edges.append(F.asnumpy(src_nf.block_parent_eid(i)))
+        edges = np.concatenate(edges)
+        for eid in F.asnumpy(eids):
+            assert eid not in edges
+
+def test_negative_sampler():
+    g = generate_rand_graph(100)
+    EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
+    for _, _, pos_edges, neg_edges in EdgeNeighborSampler(g, 50,
+                                                          num_hops=2,
+                                                          negative_mode="head",
+                                                          neg_sample_size=10):
+        assert pos_edges.number_of_nodes() == g.number_of_nodes()
+        assert neg_edges.number_of_nodes() == g.number_of_nodes()
+        pos_eid = pos_edges.parent_eid
+        neg_src, neg_dst = neg_edges.all_edges(order='eid')
+        exist_edges = g.has_edges_between(neg_src, neg_dst)
+        for i, eid in enumerate(neg_edges.parent_eid):
+            assert eid in pos_eid
+            assert not exist_edges[i]
+            # TODO check if only the head is changed.
+
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -246,4 +273,5 @@ if __name__ == '__main__':
     test_layer_sampler()
     test_nonuniform_neighbor_sampler()
     test_setseed()
+    test_negative_sampler()
     test_edge_sampler()

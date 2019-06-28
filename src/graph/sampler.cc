@@ -874,9 +874,67 @@ void BuildCoo(const ImmutableGraph &g) {
 struct EdgeBatch {
   NodeFlow *src_nf;
   NodeFlow *dst_nf;
-  IdArray eids;
+  Subgraph *pos_subg;
+  Subgraph *neg_subg;
 };
 
+Subgraph NegEdgeSubgraph(const Subgraph &pos_subg, const std::string &neg_mode,
+                         int neg_sample_size) {
+  unsigned int seed = randseed();
+  std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
+  IdArray coo = adj[0];
+  int64_t num_nodes = pos_subg.graph->NumVertices();
+  int64_t num_pos_edges = coo->shape[0] / 2;
+  int64_t num_neg_edges = num_pos_edges * neg_sample_size;
+  IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  // The negative subgraph should have the same set of vertices.
+  IdArray induced_neg_vid = pos_subg.induced_vertices;
+
+  const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
+  const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
+  const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+  dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
+  dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
+  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
+  dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
+
+  bool neg_head = (neg_mode == "head");
+  dgl_id_t curr_eid = 0;
+  std::vector<size_t> neg_vids;
+  neg_vids.reserve(neg_sample_size);
+  for (size_t i = 0; i < num_pos_edges; i++) {
+    size_t neg_idx = i * neg_sample_size;
+    neg_vids.clear();
+    RandomSample(num_nodes, neg_sample_size, &neg_vids, &seed);
+    if (neg_head) {
+      for (size_t j = 0; j < neg_sample_size; j++) {
+        neg_dst_data[neg_idx + j] = dst_data[i];
+        neg_eid_data[neg_idx + j] = curr_eid++;
+        neg_src_data[neg_idx + j] = neg_vids[j];
+        // induced negative eid references to the positive one.
+        induced_neg_eid_data[neg_idx + j] = induced_eid_data[i];
+      }
+    } else {
+      for (size_t j = 0; j < neg_sample_size; j++) {
+        neg_src_data[neg_idx + j] = src_data[i];
+        neg_eid_data[neg_idx + j] = curr_eid++;
+        neg_dst_data[neg_idx + j] = neg_vids[j];
+        induced_neg_eid_data[neg_idx + j] = induced_eid_data[i];
+      }
+    }
+  }
+  Subgraph neg_subg;
+  // We sample negative vertices without replacement.
+  // There shouldn't be duplicated edges.
+  COOPtr neg_coo(new COO(num_nodes, neg_src, neg_dst, false));
+  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
+  neg_subg.induced_vertices = induced_neg_vid;
+  neg_subg.induced_edges = induced_neg_eid;
+  return neg_subg;
+}
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -890,6 +948,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const int64_t num_hops = args[6];
     const std::string neigh_type = args[7];
     const bool add_self_loop = args[8];
+    const std::string neg_mode = args[9];
+    const int neg_sample_size = args[10];
     // process args
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
@@ -920,14 +980,20 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       nflows[i] = new EdgeBatch();
       nflows[i]->src_nf = new NodeFlow();
       nflows[i]->dst_nf = new NodeFlow();
-      // TODO(zhengda) we need to remove the edges from NodeFlows.
-      // TODO(zhengda) if this is an undirected graph, we need to remove the edges
-      // and their reversed edges from NodeFlows.
+      nflows[i]->pos_subg = new Subgraph();
+      if (neg_mode.size() > 0)
+        nflows[i]->neg_subg = new Subgraph();
+      else
+        nflows[i]->neg_subg = nullptr;
+
       *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
-          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+        gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
       *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
-          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
-      nflows[i]->eids = worker_seeds;
+        gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+      *nflows[i]->pos_subg = gptr->EdgeSubgraph(worker_seeds, true);
+      CHECK_EQ(nflows[i]->pos_subg->graph->NumVertices(), gptr->NumVertices());
+      if (neg_mode.size() > 0)
+        *nflows[i]->neg_subg = NegEdgeSubgraph(*nflows[i]->pos_subg, neg_mode, neg_sample_size);
     }
     *rv = WrapVectorReturn(nflows);
   });
@@ -941,7 +1007,10 @@ PackedFunc ConvertEdgeBatchToPackedFunc(const EdgeBatch& eb) {
       } else if (which == 1) {
         *rv = eb.dst_nf;
       } else if (which == 2) {
-        *rv = std::move(eb.eids);
+        *rv = eb.pos_subg;
+      } else if (which == 3) {
+        CHECK(eb.neg_subg);
+        *rv = eb.neg_subg;
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -954,6 +1023,15 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeBatch")
     void *ptr = args[0];
     const EdgeBatch *eb = static_cast<const EdgeBatch *>(ptr);
     *rv = ConvertEdgeBatchToPackedFunc(*eb);
+});
+
+PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg);
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_GetSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void *ptr = args[0];
+    const Subgraph *eb = static_cast<const Subgraph *>(ptr);
+    *rv = ConvertSubgraphToPackedFunc(*eb);
 });
 
 }  // namespace dgl

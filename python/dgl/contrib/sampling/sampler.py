@@ -10,6 +10,9 @@ from ..._ffi.function import _init_api
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
+from ...utils import unwrap_to_ptr_list
+from ...graph_index import SubgraphIndex, GraphIndex
+from ... import subgraph
 
 try:
     import Queue as queue
@@ -519,7 +522,7 @@ class EdgeNeighborSampler(EdgeSampler):
             self,
             g,
             batch_size,
-            expand_factor=None,
+            expand_factor=0,
             num_hops=1,
             neighbor_type='in',
             node_prob=None,
@@ -527,7 +530,9 @@ class EdgeNeighborSampler(EdgeSampler):
             shuffle=False,
             num_workers=1,
             prefetch=False,
-            add_self_loop=False):
+            add_self_loop=False,
+            negative_mode="",
+            neg_sample_size=0):
         super(EdgeNeighborSampler, self).__init__(
                 g, batch_size, seed_edges, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
@@ -540,6 +545,8 @@ class EdgeNeighborSampler(EdgeSampler):
         self._add_self_loop = add_self_loop
         self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
+        self._negative_mode = negative_mode
+        self._neg_sample_size = neg_sample_size
 
     def fetch(self, current_index):
         handles = unwrap_to_ptr_list(_CAPI_UniformEdgeSampling(
@@ -551,11 +558,30 @@ class EdgeNeighborSampler(EdgeSampler):
             self._expand_factor,
             self._num_hops,
             self._neighbor_type,
-            self._add_self_loop))
+            self._add_self_loop,
+            self._negative_mode,
+            self._neg_sample_size))
         nflows = []
         for hdl in handles:
             func = _CAPI_GetEdgeBatch(hdl)
-            nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)), func(2)))
+
+            pos_subg_func = _CAPI_GetSubgraph(func(2))
+            pos_subg_idx = SubgraphIndex(GraphIndex(pos_subg_func(0)), self.g._graph,
+                                         utils.toindex(pos_subg_func(1)),
+                                         utils.toindex(pos_subg_func(2)))
+            pos_subg = subgraph.DGLSubGraph(self.g, pos_subg_idx)
+
+            if self._negative_mode == "":
+                nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)), pos_subg))
+            else:
+                neg_subg_func = _CAPI_GetSubgraph(func(3))
+                neg_subg_idx = SubgraphIndex(GraphIndex(neg_subg_func(0)), self.g._graph,
+                                             utils.toindex(neg_subg_func(1)),
+                                             utils.toindex(neg_subg_func(2)))
+                neg_subg = subgraph.DGLSubGraph(self.g, neg_subg_idx)
+                nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)),
+                               pos_subg, neg_subg))
+
         return nflows
 
 
