@@ -946,8 +946,9 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   for (int64_t i = 0; i < num_pos_edges; i++) {
     size_t neg_idx = i * neg_sample_size;
     neg_vids.clear();
-    RandomSample(num_tot_nodes, neg_sample_size, pos_nodes, &neg_vids, &seed);
 
+    std::vector<size_t> neighbors;
+    DGLIdIters neigh_it;
     const dgl_id_t *unchanged;
     dgl_id_t *neg_unchanged;
     dgl_id_t *neg_changed;
@@ -955,11 +956,20 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       unchanged = dst_data;
       neg_unchanged = neg_dst_data;
       neg_changed = neg_src_data;
+      neigh_it = pos_subg.graph->PredVec(unchanged[i]);
     } else {
       unchanged = src_data;
       neg_unchanged = neg_src_data;
       neg_changed = neg_dst_data;
+      neigh_it = pos_subg.graph->SuccVec(unchanged[i]);
     }
+
+    std::vector<size_t> exclude;
+    for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
+      dgl_id_t local_vid = *it;
+      exclude.push_back(induced_vid_data[local_vid]);
+    }
+    RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids, &seed);
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
     dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
