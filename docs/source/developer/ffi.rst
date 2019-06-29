@@ -19,6 +19,7 @@ We decided to borrow the idea (shamelessly). For example, to define a C
 API that is exposed to python is only a few lines of codes:
 
 .. code:: c++
+
    // file: calculator.cc (put it in dgl/src folder)
    #include <dgl/runtime/packed_func.h>
    #include <dgl/runtime/registry.h>
@@ -34,6 +35,7 @@ Compile and build the library. On the python side, create a
 ``calculator.py`` file under ``dgl/python/dgl/``
 
 .. code:: python
+
    # file: calculator.py
    from ._ffi.function import _init_api
 
@@ -77,6 +79,7 @@ To achieve this, we introduce the Object type system. For example, to define a
 new type ``Calculator``:
 
 .. code:: c++
+
    // file: calculator.cc
    #include <dgl/packed_func_ext.h>
    using namespace runtime;
@@ -117,6 +120,7 @@ new type ``Calculator``:
 On the python side:
 
 .. code:: python
+
    # file: calculator.py
    from dgl._ffi.object import register_object, ObjectBase
    from ._ffi.function import _init_api
@@ -133,6 +137,7 @@ On the python side:
 We can then simply create ``Calculator`` object by:
 
 .. code:: python
+
    calc = Calculator.create("casio", 100)
 
 What is nice about this object is that, it defines a visitor pattern that is
@@ -140,6 +145,7 @@ essentially a reflection mechanism to get its internal attributes. For example,
 you can print the calculator's brand and by simply accessing its attributes.
 
 .. code:: python
+
    print(calc.brand)
    print(calc.price)
 
@@ -147,6 +153,7 @@ The reflection is indeed a little bit slow due to the string key lookup. To
 speed it up, you could define an attribute access API:
 
 .. code:: c++
+
    // file: calculator.cc
    DGL_REGISTER_GLOBAL("calculator.CaculatorGetBrand")
    .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -161,6 +168,7 @@ Containers are also objects. For example, the C API below accepts a list of
 integers and return their sum:
 
 .. code:: c++
+
    // in file: calculator.cc
    #include <dgl/runtime/container.h>
    using namespace runtime;
@@ -180,6 +188,7 @@ automatically convert python list/tuple/dictionary to the corresponding object
 type.
 
 .. code:: python
+
    # in file: calculator.py
    from ._ffi.function import _init_api
 
@@ -192,6 +201,7 @@ to be composed. Below is an API that accepts a list of calculators and print
 out their price:
 
 .. code:: c++
+
    // in file: calculator.cc
    #include <iostream>
    #include <dgl/runtime/container.h>
