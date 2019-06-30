@@ -93,6 +93,7 @@ file(GLOB DGL_SRC
 )
 
 file(GLOB_RECURSE DGL_SRC_1
+  src/api/*.cc
   src/graph/*.cc
   src/scheduler/*.cc
 )

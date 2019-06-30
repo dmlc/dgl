@@ -3,8 +3,7 @@ import traceback
 from cpython cimport Py_INCREF, Py_DECREF
 from numbers import Number, Integral
 from ..base import string_types
-# (minjie): Node and class module are not used in DGL.
-# from ..node_generic import convert_to_node, NodeGeneric
+from ..object_generic import convert_to_object, ObjectGeneric
 from ..runtime_ctypes import DGLType, DGLContext, DGLByteArray
 
 
@@ -25,9 +24,8 @@ cdef int dgl_callback(DGLValue* args,
     for i in range(num_args):
         value = args[i]
         tcode = type_codes[i]
-        # (minjie): Node and class module are not used in DGL.
-        #if (tcode == kNodeHandle or
-        if (tcode == kFuncHandle or
+        if (tcode == kObjectHandle or
+            tcode == kFuncHandle or
             tcode == kModuleHandle or
             tcode > kExtBegin):
             CALL(DGLCbArgToReturn(&value, tcode))
@@ -81,11 +79,10 @@ cdef inline int make_arg(object arg,
                          list temp_args) except -1:
     """Pack arguments into c args dgl call accept"""
     cdef unsigned long long ptr
-    # (minjie): Node and class module are not used in DGL.
-    #if isinstance(arg, NodeBase):
-    #    value[0].v_handle = (<NodeBase>arg).chandle
-    #    tcode[0] = kNodeHandle
-    if isinstance(arg, NDArrayBase):
+    if isinstance(arg, ObjectBase):
+        value[0].v_handle = (<ObjectBase>arg).chandle
+        tcode[0] = kObjectHandle
+    elif isinstance(arg, NDArrayBase):
         value[0].v_handle = (<NDArrayBase>arg).chandle
         tcode[0] = (kNDArrayContainer if
                     not (<NDArrayBase>arg).c_is_view else kArrayHandle)
@@ -134,12 +131,11 @@ cdef inline int make_arg(object arg,
         value[0].v_str = tstr
         tcode[0] = kStr
         temp_args.append(tstr)
-    # (minjie): Node and class module are not used in DGL.
-    #elif isinstance(arg, (list, tuple, dict, NodeGeneric)):
-    #    arg = convert_to_node(arg)
-    #    value[0].v_handle = (<NodeBase>arg).chandle
-    #    tcode[0] = kNodeHandle
-    #    temp_args.append(arg)
+    elif isinstance(arg, (list, tuple, dict, ObjectGeneric)):
+        arg = convert_to_object(arg)
+        value[0].v_handle = (<ObjectBase>arg).chandle
+        tcode[0] = kObjectHandle
+        temp_args.append(arg)
     #elif isinstance(arg, _CLASS_MODULE):
     #    value[0].v_handle = c_handle(arg.handle)
     #    tcode[0] = kModuleHandle
@@ -170,10 +166,9 @@ cdef inline bytearray make_ret_bytes(void* chandle):
 
 cdef inline object make_ret(DGLValue value, int tcode):
     """convert result to return value."""
-    # (minjie): Node and class module are not used in DGL.
-    #if tcode == kNodeHandle:
-    #    return make_ret_node(value.v_handle)
-    if tcode == kNull:
+    if tcode == kObjectHandle:
+        return make_ret_object(value.v_handle)
+    elif tcode == kNull:
         return None
     elif tcode == kInt:
         return value.v_int64
@@ -189,7 +184,7 @@ cdef inline object make_ret(DGLValue value, int tcode):
         return ctypes_handle(value.v_handle)
     elif tcode == kDGLContext:
         return DGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
-    # (minjie): Node and class module are not used in DGL.
+    # (minjie): class module are not used in DGL.
     #elif tcode == kModuleHandle:
     #    return _CLASS_MODULE(ctypes_handle(value.v_handle))
     elif tcode == kFuncHandle:

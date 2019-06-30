@@ -15,14 +15,22 @@
 namespace dgl {
 
 typedef uint64_t dgl_id_t;
+typedef uint64_t dgl_type_t;
 typedef dgl::runtime::NDArray IdArray;
 typedef dgl::runtime::NDArray DegreeArray;
 typedef dgl::runtime::NDArray BoolArray;
 typedef dgl::runtime::NDArray IntArray;
 typedef dgl::runtime::NDArray FloatArray;
+typedef dgl::runtime::NDArray TypeArray;
 
 /*! \brief Create a new id array with given length (on CPU) */
 IdArray NewIdArray(int64_t length);
+
+/*!
+ * \brief Create a new boolean array with given length (on CPU)
+ * \note the elements are 64-bit.
+ */
+BoolArray NewBoolArray(int64_t length);
 
 /*! \brief Create a new id array with the given vector data (on CPU) */
 IdArray VecToIdArray(const std::vector<dgl_id_t>& vec);
