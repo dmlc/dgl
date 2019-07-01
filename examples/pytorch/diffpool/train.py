@@ -73,11 +73,11 @@ def arg_parse():
                         data_mode = 'default')
     return parser.parse_args()
 
-def prepare_data(dataset, prog_args, fold=-1, pre_process=None):
+def prepare_data(dataset, prog_args, train=False, pre_process=None):
     '''
     preprocess TU dataset according to DiffPool's paper setting and load dataset into dataloader
     '''
-    if fold == -1 or fold == 0:
+    if train:
         shuffle = True
     else:
         shuffle = False
@@ -85,11 +85,12 @@ def prepare_data(dataset, prog_args, fold=-1, pre_process=None):
     if pre_process:
         pre_process(dataset, prog_args)
 
-    dataset.set_fold(fold)
+    #dataset.set_fold(fold)
     return torch.utils.data.DataLoader(dataset,
                                        batch_size=prog_args.batch_size,
                                        shuffle=shuffle,
                                        collate_fn=collate_fn,
+                                       drop_last=True,
                                        num_workers=prog_args.n_worker)
 
 
@@ -98,22 +99,25 @@ def graph_classify_task(prog_args):
     perform graph classification task
     '''
     
-    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
-    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
-    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
-    train_dataloader = prepare_data(dataset, prog_args, fold=0,
+    dataset = tu.TUDataset(name=prog_args.dataset)
+    train_size = int(prog_args.train_ratio * len(dataset))
+    test_size = int(prog_args.test_ratio * len(dataset))
+    val_size = int(len(dataset) - train_size - test_size) 
+
+    dataset_train, dataset_val, dataset_test = torch.utils.data.random_split(dataset, (train_size, val_size, test_size))
+    train_dataloader = prepare_data(dataset_train, prog_args, train=True,
                                     pre_process=pre_process)
-    val_dataloader = prepare_data(dataset_val, prog_args, fold=1,
+    val_dataloader = prepare_data(dataset_val, prog_args, train=False,
                                   pre_process=pre_process)
-    test_dataloader = prepare_data(dataset_test, prog_args,
-                                   fold=2,pre_process=pre_process)
+    test_dataloader = prepare_data(dataset_test, prog_args, train=False,
+                                   pre_process=pre_process)
     input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
     print("dataset feature dimension is", input_dim)
     print("dataset label dimension is", label_dim)
     print("the max num node is", max_num_node)
     print("number of graphs is", len(dataset))
-    assert len(dataset) % prog_args.batch_size == 0, "training set not divisible by batch size"
+    # assert len(dataset) % prog_args.batch_size == 0, "training set not divisible by batch size"
 
     hidden_dim = 64 # used to be 64
     embedding_dim = 64
@@ -193,7 +197,8 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
     for epoch in range(prog_args.epoch):
         begin_time = time.time()
         model.train()
-        train_accu = 0
+        accum_correct = 0
+        total = 0
         print("EPOCH ###### {} ######".format(epoch))
         computation_time = 0.0
         for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
@@ -208,7 +213,8 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
             ypred = model(batch_graph)
             indi = torch.argmax(ypred, dim=1)
             correct = torch.sum(indi == graph_labels).item()
-            train_accu += correct
+            accum_correct += correct
+            total += graph_labels.size()[0]
             loss = model.loss(ypred, graph_labels)
             loss.backward()
             batch_compute_time = time.time() - compute_start
@@ -217,7 +223,7 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
             optimizer.step()
 
 
-        train_accu = train_accu / (len(dataloader)*prog_args.batch_size)
+        train_accu = accum_correct / total
         print("train accuracy for this epoch {} is {}%".format(epoch,
                                                               train_accu*100))
         elapsed_time = time.time() - begin_time

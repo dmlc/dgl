@@ -28,9 +28,11 @@ class DiffPool(nn.Module):
         self.batch_size = batch_size
         self.link_pred_loss = []
         self.entropy_loss = []
+
         # list of GNN modules before the first diffpool operation
         self.gc_before_pool = nn.ModuleList()
         self.diffpool_layers = nn.ModuleList()
+
         # list of list of GNN modules, each list after one diffpool operation
         self.gc_after_pool = nn.ModuleList()
         self.assign_dim = assign_dim
@@ -52,13 +54,17 @@ class DiffPool(nn.Module):
             # and return pool_embedding_dim node embedding
             pool_embedding_dim = hidden_dim * (n_layers -1) + embedding_dim
         else:
+
             pool_embedding_dim = embedding_dim
+        
         self.first_diffpool_layer = DiffPoolBatchedGraphLayer(pool_embedding_dim, self.assign_dim, hidden_dim,activation, dropout, aggregator_type, self.link_pred)
         gc_after_per_pool = nn.ModuleList()
+        
         for _ in range(n_layers - 1):
             gc_after_per_pool.append(BatchedGraphSAGE(hidden_dim, hidden_dim))
         gc_after_per_pool.append(BatchedGraphSAGE(hidden_dim, embedding_dim))
         self.gc_after_pool.append(gc_after_per_pool)
+        
         self.assign_dim = int(self.assign_dim * pool_ratio)
         # each pooling module
         for _ in range(n_pooling-1):
@@ -130,7 +136,7 @@ class DiffPool(nn.Module):
         readout = dgl.sum_nodes(g, 'h')
         out_all.append(readout)
         if self.num_aggs == 2:
-            readout = dgl.sum_nodes(g, 'h')
+            readout = dgl.max_nodes(g, 'h')
             out_all.append(readout)
         
         adj, h = self.first_diffpool_layer(g, g_embedding)
@@ -141,7 +147,7 @@ class DiffPool(nn.Module):
         readout = torch.sum(h, dim=1)
         out_all.append(readout)
         if self.num_aggs == 2:
-            readout, _ = torch.sum(h, dim=1)
+            readout, _ = torch.max(h, dim=1)
             out_all.append(readout)
         
 
@@ -151,7 +157,7 @@ class DiffPool(nn.Module):
             readout = torch.sum(h, dim=1)
             out_all.append(readout)
             if self.num_aggs == 2:
-                readout, _ = torch.sum(h, dim=1)
+                readout, _ = torch.max(h, dim=1)
                 out_all.append(readout)
         if self.concat or self.num_aggs > 1:
             final_readout = torch.cat(out_all, dim=1)

@@ -24,12 +24,11 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=None):
+    def __init__(self, name, use_pandas=False, hidden_size=10, max_allow_node=None):
 
         self.name = name
         self.hidden_size = hidden_size
         self.extract_dir = self._download()
-        self.fold = -1
         self.data_mode = None
         self.max_allow_node = max_allow_node
 
@@ -98,32 +97,7 @@ class TUDataset(object):
             print("after pruning graphs that are too big : ", len(self.graph_lists))
             self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
             self.max_num_node = self.max_allow_node
-        
-        # randomly shuffle the data
-        ind = [i for i in range(len(self.graph_labels))]
-        random.seed(321)
-        random.shuffle(ind)
-        self.graph_lists = [self.graph_lists[i] for i in ind]
-        self.graph_labels = [self.graph_labels[i] for i in ind]
 
-        #make dataset divisible by 10
-        if len(self.graph_lists) % 10 != 0:
-            print("TU dataset not divisible by 10")
-            new_len = len(self.graph_lists) // 10
-            self.graph_lists = self.graph_lists[:new_len*10]
-            self.graph_labels = self.graph_labels[:new_len*10]
-
-        #check dataset splitting:
-        eps = 1e-5
-        if split_ratio:
-            assert abs(sum(split_ratio) - 1) < eps, "sum of split ratio is not 1"
-            assert len(split_ratio) == n_split, "n_split and length of ratio provided disagree"
-            split_ratio = [0] + split_ratio
-            self.fold_start_idx = np.cumsum([np.floor(ratio*len(self.graph_lists)) for ratio in split_ratio])
-            self.fold_start_idx = list(map(lambda x: int(x), self.fold_start_idx))
-        
-    def set_fold(self, n):
-        self.fold = n
 
     def __getitem__(self, idx):
         """Get the i^th sample.
@@ -137,14 +111,10 @@ class TUDataset(object):
             DGLGraph with node feature stored in `feat` field and node label in `node_label` if available.
             And its label.
         """
-        if self.fold != -1:
-            idx += self.fold_start_idx[self.fold]
         g = self.graph_lists[idx]
         return g, self.graph_labels[idx]
 
     def __len__(self):
-        if self.fold != -1:
-            return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
         return len(self.graph_lists)
 
     def _download(self):
