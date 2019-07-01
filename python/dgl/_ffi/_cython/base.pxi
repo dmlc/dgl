@@ -15,7 +15,7 @@ cdef enum DGLTypeCode:
     kDGLType = 5
     kDGLContext = 6
     kArrayHandle = 7
-    kNodeHandle = 8
+    kObjectHandle = 8
     kModuleHandle = 9
     kFuncHandle = 10
     kStr = 11
@@ -62,7 +62,7 @@ ctypedef DGLArray* CDGLArrayHandle
 ctypedef void* DGLStreamHandle
 ctypedef void* DGLRetValueHandle
 ctypedef void* DGLFunctionHandle
-ctypedef void* NodeHandle
+ctypedef void* ObjectHandle
 
 ctypedef int (*DGLPackedCFunc)(
     DGLValue* args,
@@ -115,18 +115,17 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                          DLManagedTensor** out)
     void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
-# (minjie): Node and class module are not used in DGL.
-#cdef extern from "dgl/c_dsl_api.h":
-#    int DGLNodeFree(NodeHandle handle)
-#    int DGLNodeTypeKey2Index(const char* type_key,
-#                             int* out_index)
-#    int DGLNodeGetTypeIndex(NodeHandle handle,
-#                            int* out_index)
-#    int DGLNodeGetAttr(NodeHandle handle,
-#                       const char* key,
-#                       DGLValue* out_value,
-#                       int* out_type_code,
-#                       int* out_success)
+cdef extern from "dgl/runtime/c_object_api.h":
+    int DGLObjectFree(ObjectHandle handle)
+    int DGLObjectTypeKey2Index(const char* type_key,
+                               int* out_index)
+    int DGLObjectGetTypeIndex(ObjectHandle handle,
+                              int* out_index)
+    int DGLObjectGetAttr(ObjectHandle handle,
+                         const char* key,
+                         DGLValue* out_value,
+                         int* out_type_code,
+                         int* out_success)
 
 cdef inline py_str(const char* x):
     if PY_MAJOR_VERSION < 3:

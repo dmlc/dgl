@@ -188,11 +188,19 @@ Or go through all of them :doc:`here <tutorials/models/index>`.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Notes
+   :caption: Developer Notes
    :hidden:
    :glob:
 
    contribute
+   developer/ffi
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Misc
+   :hidden:
+   :glob:
+
    faq
    env_var
    resources
