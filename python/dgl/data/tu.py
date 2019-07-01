@@ -87,6 +87,8 @@ class TUDataset(object):
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
         
         # remove graphs that are too large by user given standard
+        # optional pre-processing steop in conformity with Rex Ying's original
+        # DiffPool implementation
         if self.max_allow_node:
             preserve_idx = []
             print("original dataset length : ", len(self.graph_lists))
