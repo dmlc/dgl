@@ -50,7 +50,10 @@ def arg_parse():
     parser.add_argument('--save_dir', dest='save_dir', help='model saving directory: SAVE_DICT/DATASET')
     parser.add_argument('--load_epoch', dest='load_epoch', help='load trained model params from\
                          SAVE_DICT/DATASET/model-LOAD_EPOCH')
-    parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
+    parser.add_argument('--data_mode', dest='data_mode', help='data\
+                        preprocessing mode: default, id, degree, or one-hot\
+                        vector of degree number', choices=['default', 'id', 'deg',
+                                                      'deg_num'])
 
     parser.set_defaults(dataset='ENZYMES',
                         pool_ratio=0.15,
