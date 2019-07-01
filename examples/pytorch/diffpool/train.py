@@ -15,6 +15,7 @@ from dgl import DGLGraph
 from dgl.data import tu
 
 from model.encoder import DiffPool
+from data_utils import pre_process
 
 def arg_parse():
     '''
@@ -38,8 +39,6 @@ def arg_parse():
                         help='ratio of testing dataset split')
     parser.add_argument('--num_workers', dest='n_worker', type=int,
                         help='number of workers when dataloading')
-    parser.add_argument('--feature', dest='feature_type',
-                        help='feature type, could be id or deg')
     parser.add_argument('--gc-per-block', dest='gc_per_block', type=int,
                         help='number of graph conv layer per block')
     parser.add_argument('--bn', dest='bn', action='store_const', const=True,
@@ -54,7 +53,6 @@ def arg_parse():
     parser.add_argument('--data_mode', dest='data_mode', help='data preprocessing mode')
 
     parser.set_defaults(dataset='ENZYMES',
-                        bmname='PH',
                         pool_ratio=0.15,
                         num_pool=1,
                         cuda=1,
@@ -65,7 +63,6 @@ def arg_parse():
                         train_ratio=0.7,
                         test_ratio=0.1,
                         n_worker=1,
-                        feature_type='default',
                         gc_per_block=3,
                         dropout=0.0,
                         method='diffpool',
@@ -95,60 +92,15 @@ def prepare_data(dataset, prog_args, fold=-1, pre_process=None):
                                        collate_fn=collate_fn,
                                        num_workers=prog_args.n_worker)
 
-def one_hotify(labels, pad=-1):
-        '''
-        cast label to one hot vector
-        '''
-        num_instances = len(labels)
-        if pad <= 0:
-            dim_embedding = np.max(labels) + 1 #zero-indexed assumed
-        else:
-            assert pad > 0, "result_dim for padding one hot embedding not set!"
-            dim_embedding = pad + 1
-        embeddings = np.zeros((num_instances, dim_embedding))
-        embeddings[np.arange(num_instances), labels] = 1
-
-        return embeddings
-
-
-def pre_process(dataset, prog_args):
-        """
-        diffpool specific data partition, pre-process and shuffling
-        """
-        if dataset.data_mode != "default":
-            print("overwrite node attributes with DiffPool's preprocess setting")
-            if prog_args.data_mode == 'id':
-                for g in dataset.graph_lists:
-                    id_list = np.arange(g.number_of_nodes())
-                    g.ndata['feat'] = one_hotify(id_list, pad=dataset.max_num_node)
-            elif prog_args.data_mode == 'deg-num':
-                for g in dataset.graph_lists:
-                    g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
-
-            elif prog_args.data_mode == 'deg':
-                # max degree is disabled.
-                for g in dataset.graph_lists:
-                    degs = list(g.in_degrees())
-                    degs_one_hot = one_hotify(degs, pad=dataset.max_degrees)
-                    g.ndata['feat'] = degs_one_hot
-        # sanity check
-        assert dataset.graph_lists[0].ndata['feat'].shape[1] ==\
-                dataset.graph_lists[1].ndata['feat'].shape[1]
-
 
 def graph_classify_task(prog_args):
     '''
     perform graph classification task
     '''
-    diffpool_kw_args = {}
-    diffpool_kw_args['feature_mode'] = prog_args.feature_type
-    diffpool_kw_args['assign_feat'] = 'id'
-    use_node_attr = False
-    if prog_args.dataset == 'ENZYMES':
-        use_node_attr = True
-    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
-    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
-    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
+    
+    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
+    dataset_val = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
+    dataset_test = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1], max_allow_node=1000)
     train_dataloader = prepare_data(dataset, prog_args, fold=0,
                                     pre_process=pre_process)
     val_dataloader = prepare_data(dataset_val, prog_args, fold=1,
@@ -188,7 +140,7 @@ def graph_classify_task(prog_args):
                      prog_args.num_pool, 
                      prog_args.linkpred,
                      prog_args.batch_size, 
-                     'maxpool', 
+                     'meanpool', 
                      assign_dim,
                      prog_args.pool_ratio)
     

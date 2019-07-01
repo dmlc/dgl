@@ -7,12 +7,7 @@ from torch.autograd import Variable
 from model.tensorized_layers.graphsage import BatchedGraphSAGE
 
 
-class Assignment(nn.Module):
-    def forward(self, x, adj, log=False):
-        raise NotImplementedError
-
-
-class DiffPoolAssignment(Assignment):
+class DiffPoolAssignment(nn.Module):
     def __init__(self, nfeat, nnext):
         super().__init__()
         self.assign_mat = BatchedGraphSAGE(nfeat, nnext, use_bn=True)

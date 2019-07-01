@@ -24,7 +24,7 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=1000, cross_valid=False):
+    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None, max_allow_node=None):
 
         self.name = name
         self.hidden_size = hidden_size
@@ -32,7 +32,6 @@ class TUDataset(object):
         self.fold = -1
         self.data_mode = None
         self.max_allow_node = max_allow_node
-        self.cross_valid = cross_valid
 
         if use_pandas:
             import pandas as pd
@@ -89,15 +88,16 @@ class TUDataset(object):
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
         
         # remove graphs that are too large by user given standard
-        preserve_idx = []
-        print("original dataset length : ", len(self.graph_lists))
-        for (i, g) in enumerate(self.graph_lists):
-            if g.number_of_nodes() <= self.max_allow_node:
-                preserve_idx.append(i)
-        self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
-        print("after pruning graphs that are too big : ", len(self.graph_lists))
-        self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
-        self.max_num_node = self.max_allow_node
+        if self.max_allow_node:
+            preserve_idx = []
+            print("original dataset length : ", len(self.graph_lists))
+            for (i, g) in enumerate(self.graph_lists):
+                if g.number_of_nodes() <= self.max_allow_node:
+                    preserve_idx.append(i)
+            self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
+            print("after pruning graphs that are too big : ", len(self.graph_lists))
+            self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
+            self.max_num_node = self.max_allow_node
         
         # randomly shuffle the data
         ind = [i for i in range(len(self.graph_labels))]
@@ -144,10 +144,7 @@ class TUDataset(object):
 
     def __len__(self):
         if self.fold != -1:
-            if self.cross_valid:
-                print("WIP")
-            else:
-                return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
+            return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
         return len(self.graph_lists)
 
     def _download(self):

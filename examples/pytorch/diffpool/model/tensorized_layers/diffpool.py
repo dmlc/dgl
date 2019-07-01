@@ -3,25 +3,7 @@ from torch import nn as nn
 
 from model.tensorized_layers.assignment import DiffPoolAssignment
 from model.tensorized_layers.graphsage import BatchedGraphSAGE
-
-
-# from model.layers.loss.link_pred import LinkPredLoss
-
-
-class EntropyLoss(nn.Module):
-    # Return Scalar
-    def forward(self, adj, anext, s_l):
-        entropy = (torch.distributions.Categorical(probs=s_l).entropy()).sum(-1).mean(-1)
-        assert not torch.isnan(entropy)
-        return entropy
-
-
-class LinkPredLoss(nn.Module):
-
-    def forward(self, adj, anext, s_l):
-        link_pred_loss = (adj - s_l.matmul(s_l.transpose(-1, -2))).norm(dim=(1, 2))
-        link_pred_loss = link_pred_loss / (adj.size(1) * adj.size(2))
-        return link_pred_loss.mean()
+from model.loss import EntropyLoss, LinkPredLoss
 
 class BatchedDiffPool(nn.Module):
     def __init__(self, nfeat, nnext, nhid, link_pred=False, entropy=True):
