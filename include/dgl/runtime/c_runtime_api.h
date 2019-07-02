@@ -3,7 +3,7 @@
  * \file dgl/runtime/c_runtime_api.h
  * \brief DGL runtime library.
  *
- * This runtime is adapted from TVM project
+ * This runtime is adapted from TVM project (commit: 2ce5277)
  */
 #ifndef DGL_RUNTIME_C_RUNTIME_API_H_
 #define DGL_RUNTIME_C_RUNTIME_API_H_
@@ -72,7 +72,7 @@ typedef enum {
   kDGLType = 5U,
   kDGLContext = 6U,
   kArrayHandle = 7U,
-  kNodeHandle = 8U,
+  kObjectHandle = 8U,
   kModuleHandle = 9U,
   kFuncHandle = 10U,
   kStr = 11U,
