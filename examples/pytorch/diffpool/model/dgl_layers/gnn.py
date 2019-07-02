@@ -16,6 +16,7 @@ class GraphSageLayer(nn.Module):
     GraphSage layer in Inductive learning paper by hamilton
     Here, graphsage layer is a reduced function in DGL framework
     """
+
     def __init__(self, in_feats, out_feats, activation, dropout,
                  aggregator_type, bn=False, bias=True):
         super(GraphSageLayer, self).__init__()
@@ -50,19 +51,20 @@ class GraphSage(nn.Module):
     """
     Grahpsage network that concatenate several graphsage layer
     """
+
     def __init__(self, in_feats, n_hidden, n_classes, n_layers, activation,
                  dropout, aggregator_type):
         super(GraphSage, self).__init__()
         self.layers = nn.ModuleList()
 
-        #input layer
+        # input layer
         self.layers.append(GraphSageLayer(in_feats, n_hidden, activation, dropout,
                                           aggregator_type))
         # hidden layers
-        for _ in range(n_layers -1):
+        for _ in range(n_layers - 1):
             self.layers.append(GraphSageLayer(n_hidden, n_hidden, activation,
                                               dropout, aggregator_type))
-        #output layer
+        # output layer
         self.layers.append(GraphSageLayer(n_hidden, n_classes, None,
                                           dropout, aggregator_type))
 
@@ -72,46 +74,62 @@ class GraphSage(nn.Module):
             h = layer(g, h)
         return h
 
+
 class DiffPoolBatchedGraphLayer(nn.Module):
 
-    def __init__(self, input_dim, assign_dim, output_feat_dim, activation, dropout, aggregator_type, link_pred):
+    def __init__(self, input_dim, assign_dim, output_feat_dim,
+                 activation, dropout, aggregator_type, link_pred):
         super(DiffPoolBatchedGraphLayer, self).__init__()
         self.embedding_dim = input_dim
         self.assign_dim = assign_dim
         self.hidden_dim = output_feat_dim
         self.link_pred = link_pred
-        self.feat_gc = GraphSageLayer(input_dim, output_feat_dim, activation, dropout, aggregator_type)
-        self.pool_gc = GraphSageLayer(input_dim, assign_dim, activation, dropout, aggregator_type)
+        self.feat_gc = GraphSageLayer(
+            input_dim,
+            output_feat_dim,
+            activation,
+            dropout,
+            aggregator_type)
+        self.pool_gc = GraphSageLayer(
+            input_dim,
+            assign_dim,
+            activation,
+            dropout,
+            aggregator_type)
         self.reg_loss = nn.ModuleList([])
         self.loss_log = {}
         self.reg_loss.append(EntropyLoss())
 
     def forward(self, g, h):
         feat = self.feat_gc(g, h)
-        assign_tensor = self.pool_gc(g,h)
+        assign_tensor = self.pool_gc(g, h)
         device = feat.device
         assign_tensor_masks = []
         batch_size = len(g.batch_num_nodes)
         for g_n_nodes in g.batch_num_nodes:
-            mask =torch.ones((g_n_nodes,
-                              int(assign_tensor.size()[1]/batch_size)))
+            mask = torch.ones((g_n_nodes,
+                               int(assign_tensor.size()[1] / batch_size)))
             assign_tensor_masks.append(mask)
         """
-        The first pooling layer is computed on batched graph. 
+        The first pooling layer is computed on batched graph.
         We first take the adjacency matrix of the batched graph, which is block-wise diagonal.
         We then compute the assignment matrix for the whole batch graph, which will also be block diagonal
         """
-        mask = torch.FloatTensor(block_diag(*assign_tensor_masks)).to(device=device)
+        mask = torch.FloatTensor(
+            block_diag(
+                *
+                assign_tensor_masks)).to(
+            device=device)
         assign_tensor = masked_softmax(assign_tensor, mask,
-                                        memory_efficient=False)
-        h = torch.matmul(torch.t(assign_tensor),feat)
+                                       memory_efficient=False)
+        h = torch.matmul(torch.t(assign_tensor), feat)
         adj = g.adjacency_matrix(ctx=device)
         adj_new = torch.sparse.mm(adj, assign_tensor)
         adj_new = torch.mm(torch.t(assign_tensor), adj_new)
 
         if self.link_pred:
-            current_lp_loss = torch.norm(adj.to_dense() -\
-            torch.mm(assign_tensor, torch.t(assign_tensor))) / np.power(g.number_of_nodes(),2)
+            current_lp_loss = torch.norm(adj.to_dense() -
+                                         torch.mm(assign_tensor, torch.t(assign_tensor))) / np.power(g.number_of_nodes(), 2)
             self.loss_log['LinkPredLoss'] = current_lp_loss
 
         for loss_layer in self.reg_loss:

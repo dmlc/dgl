@@ -24,7 +24,8 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10, max_allow_node=None):
+    def __init__(self, name, use_pandas=False,
+                 hidden_size=10, max_allow_node=None):
 
         self.name = name
         self.hidden_size = hidden_size
@@ -73,7 +74,8 @@ class TUDataset(object):
             print("No Node Label Data")
 
         try:
-            DS_node_attr = np.loadtxt(self._file_path("node_attributes"), delimiter=",")
+            DS_node_attr = np.loadtxt(
+                self._file_path("node_attributes"), delimiter=",")
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = DS_node_attr[idxs, :]
             self.data_mode = "node_attr"
@@ -84,8 +86,9 @@ class TUDataset(object):
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
             self.data_mode = "constant"
-            print("Use Constant one as Feature with hidden size {}".format(hidden_size))
-        
+            print(
+                "Use Constant one as Feature with hidden size {}".format(hidden_size))
+
         # remove graphs that are too large by user given standard
         # optional pre-processing steop in conformity with Rex Ying's original
         # DiffPool implementation
@@ -96,10 +99,11 @@ class TUDataset(object):
                 if g.number_of_nodes() <= self.max_allow_node:
                     preserve_idx.append(i)
             self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
-            print("after pruning graphs that are too big : ", len(self.graph_lists))
+            print(
+                "after pruning graphs that are too big : ", len(
+                    self.graph_lists))
             self.graph_labels = [self.graph_labels[i] for i in preserve_idx]
             self.max_num_node = self.max_allow_node
-
 
     def __getitem__(self, idx):
         """Get the i^th sample.
@@ -121,14 +125,18 @@ class TUDataset(object):
 
     def _download(self):
         download_dir = get_download_dir()
-        zip_file_path = os.path.join(download_dir, "tu_{}.zip".format(self.name))
+        zip_file_path = os.path.join(
+            download_dir,
+            "tu_{}.zip".format(
+                self.name))
         download(self._url.format(self.name), path=zip_file_path)
         extract_dir = os.path.join(download_dir, "tu_{}".format(self.name))
         extract_archive(zip_file_path, extract_dir)
         return extract_dir
 
     def _file_path(self, category):
-        return os.path.join(self.extract_dir, self.name, "{}_{}.txt".format(self.name, category))
+        return os.path.join(self.extract_dir, self.name,
+                            "{}_{}.txt".format(self.name, category))
 
     @staticmethod
     def _idx_from_zero(idx_tensor):
@@ -144,6 +152,5 @@ class TUDataset(object):
 
     def statistics(self):
         return self.graph_lists[0].ndata['feat'].shape[1],\
-                self.num_labels,\
-                self.max_num_node
-
+            self.num_labels,\
+            self.max_num_node

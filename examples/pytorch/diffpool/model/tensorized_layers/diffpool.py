@@ -5,6 +5,7 @@ from model.tensorized_layers.assignment import DiffPoolAssignment
 from model.tensorized_layers.graphsage import BatchedGraphSAGE
 from model.loss import EntropyLoss, LinkPredLoss
 
+
 class BatchedDiffPool(nn.Module):
     def __init__(self, nfeat, nnext, nhid, link_pred=False, entropy=True):
         super(BatchedDiffPool, self).__init__()
@@ -20,7 +21,6 @@ class BatchedDiffPool(nn.Module):
         if entropy:
             self.reg_loss.append(EntropyLoss())
 
-
     def forward(self, x, adj, log=False):
         z_l = self.embed(x, adj)
         s_l = self.assign(x, adj)
@@ -35,5 +35,3 @@ class BatchedDiffPool(nn.Module):
         if log:
             self.log['a'] = anext.cpu().numpy()
         return xnext, anext
-
-
