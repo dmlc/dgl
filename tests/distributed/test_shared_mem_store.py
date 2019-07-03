@@ -220,7 +220,49 @@ def test_sync_barrier():
     for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
+def create_mem(gidx):
+    gidx1 = gidx.copyto_shared_mem("in", "test_graph5")
+    gidx2 = gidx.copyto_shared_mem("out", "test_graph6")
+    time.sleep(30)
+
+def check_mem(gidx):
+    time.sleep(10)
+    gidx1 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph5", gidx.number_of_nodes(),
+                                                       gidx.number_of_edges(), "in", False)
+    gidx2 = dgl.graph_index.from_shared_mem_csr_matrix("test_graph6", gidx.number_of_nodes(),
+                                                       gidx.number_of_edges(), "out", False)
+    in_csr = gidx.adjacency_matrix_scipy(False, "csr")
+    out_csr = gidx.adjacency_matrix_scipy(True, "csr")
+
+    in_csr1 = gidx1.adjacency_matrix_scipy(False, "csr")
+    assert_array_equal(in_csr.indptr, in_csr1.indptr)
+    assert_array_equal(in_csr.indices, in_csr1.indices)
+    out_csr1 = gidx1.adjacency_matrix_scipy(True, "csr")
+    assert_array_equal(out_csr.indptr, out_csr1.indptr)
+    assert_array_equal(out_csr.indices, out_csr1.indices)
+
+    in_csr2 = gidx2.adjacency_matrix_scipy(False, "csr")
+    assert_array_equal(in_csr.indptr, in_csr2.indptr)
+    assert_array_equal(in_csr.indices, in_csr2.indices)
+    out_csr2 = gidx2.adjacency_matrix_scipy(True, "csr")
+    assert_array_equal(out_csr.indptr, out_csr2.indptr)
+    assert_array_equal(out_csr.indices, out_csr2.indices)
+
+    gidx1 = gidx1.copyto_shared_mem("in", "test_graph5")
+    gidx2 = gidx2.copyto_shared_mem("out", "test_graph6")
+
+def test_copy_shared_mem():
+    csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
+    gidx = dgl.graph_index.create_graph_index(csr, False, True)
+    p1 = Process(target=create_mem, args=(gidx,))
+    p2 = Process(target=check_mem, args=(gidx,))
+    p1.start()
+    p2.start()
+    p1.join()
+    p2.join()
+
 if __name__ == '__main__':
+    test_copy_shared_mem()
     test_init()
     test_sync_barrier()
     test_compute()

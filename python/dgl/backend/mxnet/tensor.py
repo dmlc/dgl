@@ -125,8 +125,17 @@ def stack(seq, dim):
     return nd.stack(*seq, axis=dim)
 
 def split(x, sizes_or_sections, dim):
+    if isinstance(sizes_or_sections, list) and len(sizes_or_sections) == 1:
+        assert len(x) == sizes_or_sections[0]
+        return [x]
+
+    if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
+        if isinstance(sizes_or_sections, (np.ndarray, list)):
+            sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
+        return nd.split_v2(x, sizes_or_sections1, axis=dim)
+
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
-        # TODO: fallback to numpy is unfortunate
+        # Old MXNet doesn't support split with different section sizes.
         np_arr = x.asnumpy()
         indices = np.cumsum(sizes_or_sections)[:-1]
         res = np.split(np_arr, indices, axis=dim)
@@ -249,8 +258,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
-    # NOTE: not zerocopy
-    return nd.array(np_data, dtype=np_data.dtype)
+    return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
@@ -310,6 +318,8 @@ class BinaryReduce(mx.autograd.Function):
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
         grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         return grad_lhs, grad_rhs
 
 
@@ -351,6 +361,8 @@ class CopyReduce(mx.autograd.Function):
             self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
             grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
             self.in_map[1], self.out_map[1])
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         return grad_in
 
 
@@ -389,3 +401,12 @@ def _reduce_grad(grad, shape):
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
+
+def sync():
+    """Synchronize computation.
+
+    In DL frameworks such as MXNet and TensorFlow, the computation in operators
+    are done asynchronously. This is to synchronize computation and makes sure
+    that all computation is complete after this function call.
+    """
+    mx.nd.waitall()

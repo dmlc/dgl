@@ -1114,12 +1114,53 @@ class DGLGraph(DGLBaseGraph):
         self._msg_frame.add_rows(num)
 
     def remove_nodes(self, vids):
-        """Remove multiple nodes.
+        """Remove multiple nodes, edges that have connection with these nodes would also be removed.
 
         Parameters
         ----------
         vids: list, tensor
             The id of nodes to remove.
+
+        Notes
+        -----
+        The nodes and edges in the graph would be re-indexed after the removal.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5, {'x': th.arange(5) * 2})
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0], {'x': th.arange(15).view(5, 3)})
+        >>> G.nodes()
+        tensor([0, 1, 2, 3, 4])
+        >>> G.edges()
+        (tensor([0, 1, 2, 3, 4]), tensor([1, 2, 3, 4, 0]))
+        >>> G.ndata['x']
+        tensor([0, 2, 4, 6, 8])
+        >>> G.edata['x']
+        tensor([[ 0,  1,  2],
+                [ 3,  4,  5],
+                [ 6,  7,  8],
+                [ 9, 10, 11],
+                [12, 13, 14]])
+        >>> G.remove_nodes([2, 3])
+        >>> G.nodes()
+        tensor([0, 1, 2]
+        >>> G.edges()
+        (tensor([0, 2]), tensor([1, 0]))
+        >>> G.ndata['x']
+        tensor([0, 2, 8])
+        >>> G.edata['x']
+        tensor([[ 0,  1,  2],
+                [12, 13, 14]])
+
+        See Also
+        --------
+        add_nodes
+        add_edges
+        remove_edges
         """
         if self.is_readonly:
             raise DGLError("remove_nodes is not supported by read-only graph.")
@@ -1145,6 +1186,44 @@ class DGLGraph(DGLBaseGraph):
         ----------
         eids: list, tensor
             The id of edges to remove.
+
+        Notes
+        -----
+        The nodes and edges in the graph would be re-indexed after the removal.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5)
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0], {'x': th.arange(15).view(5, 3)})
+        >>> G.nodes()
+        tensor([0, 1, 2, 3, 4])
+        >>> G.edges()
+        (tensor([0, 1, 2, 3, 4]), tensor([1, 2, 3, 4, 0]))
+        >>> G.edata['x']
+        tensor([[ 0,  1,  2],
+                [ 3,  4,  5],
+                [ 6,  7,  8],
+                [ 9, 10, 11],
+                [12, 13, 14]])
+        >>> G.remove_edges([1, 2])
+        >>> G.nodes()
+        tensor([0, 1, 2, 3, 4])
+        >>> G.edges()
+        (tensor([0, 3, 4]), tensor([1, 4, 0]))
+        >>> G.edata['x']
+        tensor([[ 0,  1,  2],
+                [ 9, 10, 11],
+                [12, 13, 14]])
+
+        See Also
+        --------
+        add_nodes
+        add_edges
+        remove_nodes
         """
         if self.is_readonly:
             raise DGLError("remove_edges is not supported by read-only graph.")
@@ -3244,25 +3323,27 @@ class DGLGraph(DGLBaseGraph):
 
     # pylint: disable=invalid-name
     def to(self, ctx):
-        """
-        Move both ndata and edata to the targeted mode (cpu/gpu)
+        """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
         Parameters
         ----------
-        ctx : framework specific context object
+        ctx : framework-specific context object
+            The context to move data to.
 
-        Examples (Pytorch & MXNet)
+        Examples
         --------
-        >>> import backend as F
+        The following example uses PyTorch backend.
+
+        >>> import torch
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
-        >>> G.to(F.cuda())
-
+        >>> G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
+    # pylint: enable=invalid-name
