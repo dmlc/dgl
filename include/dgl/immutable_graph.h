@@ -148,8 +148,6 @@ class CSR : public GraphInterface {
 
   uint64_t OutDegree(dgl_id_t vid) const override {
     return aten::CSRGetRowNNZ(adj_, vid);
-    //const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
-    //return indptr_data[vid + 1] - indptr_data[vid];
   }
 
   DegreeArray OutDegrees(IdArray vids) const override;

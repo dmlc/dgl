@@ -27,47 +27,47 @@ template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length);
+IdArray Full(IdType val, int64_t length, DLContext ctx);
 
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-bool CSRIsNonZero(const CSRMatrix& , int64_t row, int64_t col);
+bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-int64_t CSRGetRowNNZ(const CSRMatrix& , int64_t row);
+int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetRowColumnIndices(const CSRMatrix& , int64_t row);
+runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetRowData(const CSRMatrix& , int64_t row);
+runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(const CSRMatrix& , int64_t row, int64_t col);
+runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(const CSRMatrix&, runtime::NDArray rows, runtime::NDArray cols);
+runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
-    const CSRMatrix& , runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-CSRMatrix CSRTranspose(const CSRMatrix& );
+CSRMatrix CSRTranspose(CSRMatrix );
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRToCOODataAsOrder(CSRMatrix );
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix CSRToCOO(const CSRMatrix& );
+CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-CSRMatrix CSRSliceRows(const CSRMatrix& csr, int64_t start, int64_t end);
+CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-CSRMatrix CSRSliceMatrix(const CSRMatrix& csr, runtime::NDArray rows, runtime::NDArray cols);
-
-template <DLDeviceType XPU, typename IdType, typename DType>
-CSRMatrix COOToCSR(const COOMatrix& );
+CSRMatrix COOToCSR(COOMatrix );
 
 }  // namespace impl
 }  // namespace aten

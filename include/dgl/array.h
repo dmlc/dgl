@@ -125,41 +125,49 @@ struct COOMatrix {
 ///////////////////////// CSR routines //////////////////////////
 
 /*! \brief Return true if the value (row, col) is non-zero */
-bool CSRIsNonZero(const CSRMatrix& , int64_t row, int64_t col);
+bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 
 /*! \brief Return the nnz of the given row */
-int64_t CSRGetRowNNZ(const CSRMatrix& , int64_t row);
+int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
 
 /*! \brief Return the column index array of the given row */
-runtime::NDArray CSRGetRowColumnIndices(const CSRMatrix& , int64_t row);
+runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
 /*! \brief Return the data array of the given row */
-runtime::NDArray CSRGetRowData(const CSRMatrix& , int64_t row);
+runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray CSRGetData(const CSRMatrix& , int64_t row, int64_t col);
-runtime::NDArray CSRGetData(const CSRMatrix&, runtime::NDArray rows, runtime::NDArray cols);
+runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
+runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 /* \brief Get the data and the row,col indices for each returned entries. */
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
-    const CSRMatrix& , runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
 
 /*! \brief Return a transposed CSR matrix */
-CSRMatrix CSRTranspose(const CSRMatrix& );
+CSRMatrix CSRTranspose(CSRMatrix );
 
-/*! \brief Convert COO matrix to CSR matrix. */
-COOMatrix CSRToCOO(const CSRMatrix& );
+/*!
+ * \brief Convert COO matrix to CSR matrix.
+ * \param csr Input csr matrix
+ * \param data_as_order If true, the data array in the input csr matrix contains the order
+ *                      by which the resulting COO tuples are stored. In this case, the
+ *                      data array of the resulting COO matrix will be empty because it
+ *                      is essentially a consecutive range.
+ * \return a coo matrix
+ */
+COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order = true);
 
 /*! \brief Slice rows of the given matrix and return. */
-CSRMatrix CSRSliceRows(const CSRMatrix& csr, int64_t start, int64_t end);
+CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 
 /*! \brief Get the submatrix specified by the row and col ids. */
-CSRMatrix CSRSliceMatrix(const CSRMatrix& csr, runtime::NDArray rows, runtime::NDArray cols);
+CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 ///////////////////////// COO routines //////////////////////////
 
 /*! \brief Convert COO matrix to CSR matrix. */
-CSRMatrix COOToCSR(const COOMatrix& );
+CSRMatrix COOToCSR(COOMatrix );
 
 }  // namespace aten
 }  // namespace dgl

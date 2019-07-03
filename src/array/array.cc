@@ -6,6 +6,9 @@
 #include <dgl/array.h>
 
 namespace dgl {
+
+using runtime::NDArray;
+
 namespace aten {
 
 // TODO(minjie): currently these operators are only on CPU.
@@ -37,113 +40,39 @@ IdArray Clone(IdArray arr) {
 }
 
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
-  if (arr->dtype.bits == bits) {
-    return arr;
-  } else {
-    const int64_t len = arr->shape[0];
-    IdArray ret = IdArray::Empty({len},
-        DLDataType{kDLInt, bits, 1}, DLContext{kDLCPU, 0});
-    if (arr->dtype.bits == 32 && bits == 64) {
-      const int32_t* arr_data = static_cast<int32_t*>(arr->data);
-      int64_t* ret_data = static_cast<int64_t*>(ret->data);
-      for (int64_t i = 0; i < len; ++i) {
-        ret_data[i] = arr_data[i];
-      }
-    } else if (arr->dtype.bits == 64 && bits == 32) {
-      const int64_t* arr_data = static_cast<int64_t*>(arr->data);
-      int32_t* ret_data = static_cast<int32_t*>(ret->data);
-      for (int64_t i = 0; i < len; ++i) {
-        ret_data[i] = arr_data[i];
-      }
-    } else {
-      LOG(FATAL) << "Invalid type conversion.";
-    }
-    return ret;
-  }
+  // TODO
 }
 
 IdArray Add(IdArray lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] + rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Sub(IdArray lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] - rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Mul(IdArray lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] * rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Div(IdArray lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] / rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Add(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] + rhs;
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Sub(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] - rhs;
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Mul(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] * rhs;
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Div(IdArray lhs, dgl_id_t rhs) {
-  IdArray ret = NewIdArray(lhs->shape[0]);
-  const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < lhs->shape[0]; ++i) {
-    ret_data[i] = lhs_data[i] / rhs;
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Add(dgl_id_t lhs, IdArray rhs) {
@@ -151,13 +80,7 @@ IdArray Add(dgl_id_t lhs, IdArray rhs) {
 }
 
 IdArray Sub(dgl_id_t lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(rhs->shape[0]);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < rhs->shape[0]; ++i) {
-    ret_data[i] = lhs - rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray Mul(dgl_id_t lhs, IdArray rhs) {
@@ -165,27 +88,11 @@ IdArray Mul(dgl_id_t lhs, IdArray rhs) {
 }
 
 IdArray Div(dgl_id_t lhs, IdArray rhs) {
-  IdArray ret = NewIdArray(rhs->shape[0]);
-  const dgl_id_t* rhs_data = static_cast<dgl_id_t*>(rhs->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < rhs->shape[0]; ++i) {
-    ret_data[i] = lhs / rhs_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 IdArray HStack(IdArray arr1, IdArray arr2) {
-  CHECK_EQ(arr1->shape[0], arr2->shape[0]);
-  const int64_t L = arr1->shape[0];
-  IdArray ret = NewIdArray(2 * L);
-  const dgl_id_t* arr1_data = static_cast<dgl_id_t*>(arr1->data);
-  const dgl_id_t* arr2_data = static_cast<dgl_id_t*>(arr2->data);
-  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
-  for (int64_t i = 0; i < L; ++i) {
-    ret_data[i] = arr1_data[i];
-    ret_data[i + L] = arr2_data[i];
-  }
-  return ret;
+  // TODO
 }
 
 CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
