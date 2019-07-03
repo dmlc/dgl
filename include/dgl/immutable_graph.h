@@ -147,8 +147,9 @@ class CSR : public GraphInterface {
   }
 
   uint64_t OutDegree(dgl_id_t vid) const override {
-    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
-    return indptr_data[vid + 1] - indptr_data[vid];
+    return aten::CSRGetRowNNZ(adj_, vid);
+    //const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    //return indptr_data[vid + 1] - indptr_data[vid];
   }
 
   DegreeArray OutDegrees(IdArray vids) const override;
@@ -165,21 +166,9 @@ class CSR : public GraphInterface {
     return Transpose();
   }
 
-  DGLIdIters SuccVec(dgl_id_t vid) const override {
-    const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-    const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-    const dgl_id_t start = indptr_data[vid];
-    const dgl_id_t end = indptr_data[vid + 1];
-    return DGLIdIters(indices_data + start, indices_data + end);
-  }
+  DGLIdIters SuccVec(dgl_id_t vid) const override;
 
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
-    const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-    const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-    const dgl_id_t start = indptr_data[vid];
-    const dgl_id_t end = indptr_data[vid + 1];
-    return DGLIdIters(eid_data + start, eid_data + end);
-  }
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override;
 
   DGLIdIters PredVec(dgl_id_t vid) const override {
     LOG(FATAL) << "CSR graph does not support efficient PredVec."
@@ -201,7 +190,7 @@ class CSR : public GraphInterface {
 
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
     CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
-    return {indptr_, indices_, edge_ids_};
+    return {adj_.indptr, adj_.indices, adj_.data};
   }
 
   /*! \brief Indicate whether this uses shared memory. */
@@ -221,7 +210,7 @@ class CSR : public GraphInterface {
    *       The data field of the CSR matrix stores the edge ids.
    */
   CSRMatrix ToCSRMatrix() const {
-    return CSRMatrix{indptr_, indices_, edge_ids_};
+    return adj_;
   }
 
   /*!
@@ -247,26 +236,19 @@ class CSR : public GraphInterface {
 
   // member getters
 
-  IdArray indptr() const { return indptr_; }
+  IdArray indptr() const { return adj_.indptr; }
 
-  IdArray indices() const { return indices_; }
+  IdArray indices() const { return adj_.indices; }
 
-  IdArray edge_ids() const { return edge_ids_; }
+  IdArray edge_ids() const { return adj_.data; }
 
  private:
   /*! \brief prive default constructor */
   CSR() {}
 
-  // The CSR arrays.
-  //  - The index is 0-based.
-  //  - The out edges of vertex v is stored from `indices_[indptr_[v]]` to
-  //    `indices_[indptr_[v+1]]` (exclusive).
-  //  - The indices are *not* necessarily sorted.
-  // TODO(minjie): in the future, we should separate CSR and graph. A general CSR
-  //   is not necessarily a graph, but graph operations could be implemented by
-  //   CSR matrix operations. CSR matrix operations would be backed by different
-  //   devices (CPU, CUDA, ...), while graph interface will not be aware of that.
-  IdArray indptr_, indices_, edge_ids_;
+  // The internal CSR adjacency matrix.
+  // The data field stores edge ids.
+  CSRMatrix adj_;
 
   // whether the graph is a multi-graph
   LazyObject<bool> is_multigraph_;
@@ -480,7 +462,8 @@ class COO : public GraphInterface {
    *       The data field of the coo matrix is none.
    */
   COOMatrix ToCOOMatrix() const {
-    return COOMatrix{src_, dst_, {}};
+    const int64_t n = NumVertices();
+    return COOMatrix{n, n, src_, dst_, {}};
   }
 
   /*!

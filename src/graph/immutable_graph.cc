@@ -494,6 +494,22 @@ CSR CSR::AsNumBits(uint8_t bits) const {
   }
 }
 
+DGLIdIters CSR::SuccVec(dgl_id_t vid) const {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t start = indptr_data[vid];
+  const dgl_id_t end = indptr_data[vid + 1];
+  return DGLIdIters(indices_data + start, indices_data + end);
+}
+
+DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  const dgl_id_t start = indptr_data[vid];
+  const dgl_id_t end = indptr_data[vid + 1];
+  return DGLIdIters(eid_data + start, eid_data + end);
+}
+
 //////////////////////////////////////////////////////////
 //
 // COO graph implementation

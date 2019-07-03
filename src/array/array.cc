@@ -1,26 +1,33 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file array.cc
+ * \file array/array.cc
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
 
 namespace dgl {
+namespace aten {
 
 // TODO(minjie): currently these operators are only on CPU.
 
-IdArray NewIdArray(int64_t length) {
-  return IdArray::Empty({length}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
+  return IdArray::Empty({length}, DLDataType{kDLInt, nbits, 1}, ctx);
 }
 
-BoolArray NewBoolArray(int64_t length) {
-  return BoolArray::Empty({length}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+BoolArray NewBoolArray(int64_t length, DLContext ctx) {
+  return BoolArray::Empty({length}, DLDataType{kDLInt, 64, 1}, ctx);
 }
 
-IdArray VecToIdArray(const std::vector<dgl_id_t>& vec) {
-  IdArray ret = NewIdArray(vec.size());
-  std::copy(vec.begin(), vec.end(), static_cast<dgl_id_t*>(ret->data));
-  return ret;
+IdArray VecToIdArray(const std::vector<int32_t>& vec, DLContext ctx) {
+  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, 32);
+  std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
+  return ret.CopyTo(ctx);
+}
+
+IdArray VecToIdArray(const std::vector<int64_t>& vec, DLContext ctx) {
+  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, 64);
+  std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(ret->data));
+  return ret.CopyTo(ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -188,6 +195,8 @@ CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
   const int64_t num_rows = end - start;
   const int64_t nnz = indptr[end] - indptr[start];
   CSRMatrix ret;
+  ret.num_rows = num_rows;
+  ret.num_cols = csr.num_cols;
   ret.indptr = NewIdArray(num_rows + 1);
   ret.indices = NewIdArray(nnz);
   ret.data = NewIdArray(nnz);
@@ -202,4 +211,5 @@ CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
   return ret;
 }
 
+}  // namespace aten
 }  // namespace dgl
