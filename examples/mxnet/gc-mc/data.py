@@ -21,7 +21,7 @@ _word_embedding = nlp.embedding.GloVe('glove.840B.300d')
 _tokenizer = nlp.data.transforms.SpacyTokenizer()
 
 class MovieLens(object):
-    def __init__(self, name, ctx, symm=True,
+    def __init__(self, name, ctx, use_one_hot_fea=False, symm=True,
                  test_ratio=0.1, valid_ratio = 0.1):
         self._name = name
         self._ctx = ctx
@@ -32,39 +32,38 @@ class MovieLens(object):
         self._load_raw_user_info()
         self._load_raw_movie_info()
         if self._name == 'ml-100k':
-            train_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'u1.base'), '\t')
+            self.all_train_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'u1.base'), '\t')
             self.test_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'u1.test'), '\t')
-            self.all_rating_info = pd.concat([train_rating_info, self.test_rating_info])
+            self.all_rating_info = pd.concat([self.all_train_rating_info, self.test_rating_info])
         elif self._name == 'ml-1m' or self._name == 'ml-10m':
             self.all_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'ratings.dat'), '::')
             num_test = int(np.ceil(self.all_rating_info.shape[0] * self._test_ratio))
             shuffled_idx = np.random.permutation(self.all_rating_info.shape[0])
             self.test_rating_info = self.all_rating_info.iloc[shuffled_idx[: num_test]]
-            train_rating_info = self.all_rating_info.iloc[shuffled_idx[num_test: ]]
+            self.all_train_rating_info = self.all_rating_info.iloc[shuffled_idx[num_test: ]]
         else:
             raise NotImplementedError
-        num_valid = int(np.ceil(train_rating_info.shape[0] * self._valid_ratio))
-        shuffled_idx = np.random.permutation(train_rating_info.shape[0])
-        self.valid_rating_info = train_rating_info.iloc[shuffled_idx[: num_valid]]
-        self.train_rating_info = train_rating_info.iloc[shuffled_idx[num_valid: ]]
+        num_valid = int(np.ceil(self.all_train_rating_info.shape[0] * self._valid_ratio))
+        shuffled_idx = np.random.permutation(self.all_train_rating_info.shape[0])
+        self.valid_rating_info = self.all_train_rating_info.iloc[shuffled_idx[: num_valid]]
+        self.train_rating_info = self.all_train_rating_info.iloc[shuffled_idx[num_valid: ]]
 
         print("All rating pairs : {}".format(self.all_rating_info.shape[0]))
-        print("\tTrain rating pairs : {}".format(self.train_rating_info.shape[0]))
-        print("\tValid rating pairs : {}".format(self.valid_rating_info.shape[0]))
+        print("\tAll train rating pairs : {}".format(self.all_train_rating_info.shape[0]))
+        print("\t\tTrain rating pairs : {}".format(self.train_rating_info.shape[0]))
+        print("\t\tValid rating pairs : {}".format(self.valid_rating_info.shape[0]))
         print("\tTest rating pairs  : {}".format(self.test_rating_info.shape[0]))
 
         self.user_info = self._drop_unseen_nodes(orign_info=self.user_info,
-                                            cmp_col_name="id",
-                                            reserved_ids_set=set(self.all_rating_info["user_id"].values),
-                                            label="user")
+                                                 cmp_col_name="id",
+                                                 reserved_ids_set=set(self.all_rating_info["user_id"].values),
+                                                 label="user")
         self.movie_info = self._drop_unseen_nodes(orign_info=self.movie_info,
-                                             cmp_col_name="id",
-                                             reserved_ids_set=set(self.all_rating_info["movie_id"].values),
-                                             label="movie")
+                                                  cmp_col_name="id",
+                                                  reserved_ids_set=set(self.all_rating_info["movie_id"].values),
+                                                  label="movie")
 
         # Map user/movie to the global id
-        print("  -----------------")
-        print("Generating user id map and movie id map ...")
         self.global_user_id_map = {ele: i for i, ele in enumerate(self.user_info['id'])}
         self.global_movie_id_map = {ele: i for i, ele in enumerate(self.movie_info['id'])}
         print('Total user number = {}, movie number = {}'.format(len(self.global_user_id_map),
@@ -73,28 +72,95 @@ class MovieLens(object):
         self._num_movie = len(self.global_movie_id_map)
 
         ### Generate features
-        self._process_user_fea()
-        self._process_movie_fea()
-        #print("user_features: shape ({},{})".format(self.user_features.shape[0], self.user_features.shape[1]))
-        #print("movie_features: shape ({},{})".format(self.movie_features.shape[0], self.movie_features.shape[1]))
+        if use_one_hot_fea:
+            self.user_feature = np.eye(self.num_user)
+            self.movie_feature = np.eye(self.num_movie)
+        else:
+            self.user_feature = self._process_user_fea()
+            self.movie_feature = self._process_movie_fea()
+        info_line = "Feature dim: "
+        info_line += "\n{}: {}".format(self.name_user, self.user_feature.shape)
+        info_line += "\n{}: {}".format(self.name_movie, self.movie_feature.shape)
+        print(info_line)
 
-        self.train_rating_pairs, self.train_rating_values = self._generata_pair_value(self.train_rating_info)
-        self.valid_rating_pairs, self.valid_rating_values = self._generata_pair_value(self.valid_rating_info)
-        self.test_rating_pairs, self.test_rating_values = self._generata_pair_value(self.test_rating_info)
+        """
+        self.train_rating_pairs, self.train_rating_values = self._generate_pair_value(self.train_rating_info)
+        self.valid_rating_pairs, self.valid_rating_values = self._generate_pair_value(self.valid_rating_info)
+        self.test_rating_pairs, self.test_rating_values = self._generate_pair_value(self.test_rating_info)
+        self.train_graph = self._generate_graphs(self.train_rating_pairs, self.train_rating_values, add_support=True)
+        self.train_graph[self.name_user].ndata['fea'] = mx.nd.array(self.user_feature, ctx=ctx, dtype=np.float32)
+        self.train_graph[self.name_movie].ndata['fea'] = mx.nd.array(self.movie_feature, ctx=ctx, dtype=np.float32)
+        """
+        all_train_rating_pairs, all_train_rating_values = self._generate_pair_value(self.all_train_rating_info)
+        train_rating_pairs, train_rating_values = self._generate_pair_value(self.train_rating_info)
+        valid_rating_pairs, valid_rating_values = self._generate_pair_value(self.valid_rating_info)
+        self.test_rating_pairs, self.test_rating_values = self._generate_pair_value(self.test_rating_info)
 
-        self.uv_train_graph, self.vu_train_graph = self._generate_graphs(self.train_rating_pairs,
-                                                                         self.train_rating_values)
+        self.test_graph = self._generate_graphs(all_train_rating_pairs, all_train_rating_values, add_support=True)
+        self.test_graph[self.name_user].ndata['fea'] = mx.nd.array(self.user_feature, ctx=ctx, dtype=np.float32)
+        self.test_graph[self.name_movie].ndata['fea'] = mx.nd.array(self.movie_feature, ctx=ctx, dtype=np.float32)
 
-    def _generata_pair_value(self, rating_info):
-        rating_pairs = (np.array([self.global_user_id_map[ele]
-                                  for ele in rating_info["user_id"]], dtype=np.int64),
-                        np.array([self.global_movie_id_map[ele]
-                                  for ele in rating_info["movie_id"]], dtype=np.int64))
+        uv_test_graph = self.test_graph[self.name_user, self.name_movie, self.name_edge]
+        vu_test_graph = self.test_graph[self.name_movie, self.name_user, self.name_edge]
+        self.train_graph = self.test_graph.edge_subgraph(
+            {(self.name_user, self.name_movie, self.name_edge):
+                 uv_test_graph.edge_ids(train_rating_pairs[0], train_rating_pairs[1]),
+             (self.name_movie, self.name_user, self.name_edge):
+                 vu_test_graph.edge_ids(train_rating_pairs[1], train_rating_pairs[0]) })
+        self.train_graph.copy_from_parent()
+
+        test2train_g_node_id_map = {}
+        for node_type in [self.name_user, self.name_movie]:
+            test2train_g_node_id_map[node_type] = {}
+            p_nids = self.train_graph.parent_nid(node_type).asnumpy()
+            #print("\t{}: {} nodes".format(node_type, p_nids.size))
+            for idx, p_nid in enumerate(p_nids):
+                test2train_g_node_id_map[node_type][p_nid] = idx
+
+        self.train_rating_pairs = (np.array(list(map(test2train_g_node_id_map[self.name_user].get,
+                                                     list(train_rating_pairs[0]))),
+                                            dtype=np.int64),
+                                   np.array(list(map(test2train_g_node_id_map[self.name_movie].get,
+                                                     list(train_rating_pairs[1]))),
+                                            dtype=np.int64))
+        self.train_rating_values = train_rating_values
+
+
+        filtered_valid_user = []
+        filtered_valid_movie = []
+        filtered_valid_values = []
+        for i in range(valid_rating_pairs[0].size):
+            if valid_rating_pairs[0][i] in train_rating_pairs[0] and \
+                valid_rating_pairs[1][i] in train_rating_pairs[1]:
+                filtered_valid_user.append(test2train_g_node_id_map[self.name_user][valid_rating_pairs[0][i]])
+                filtered_valid_movie.append(test2train_g_node_id_map[self.name_movie][valid_rating_pairs[1][i]])
+                filtered_valid_values.append(valid_rating_values[i])
+        print("Filtered {} validation node pairs".format(valid_rating_pairs[0].size - len(filtered_valid_user)))
+
+        self.valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),
+                                   np.array(filtered_valid_movie, dtype=np.int64))
+        self.valid_rating_values = np.array(filtered_valid_values, dtype=np.float32)
+
+
+        #self.uv_train_graph = self.uv_test_graph.edge_subgraph(self.train_rating_pairs)
+        print("Train graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.train_graph[self.name_user].number_of_nodes(), self.train_graph[self.name_movie].number_of_nodes(),
+            self.train_graph[self.name_user, self.name_movie, self.name_edge].number_of_edges()))
+        print("Test graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.test_graph[self.name_user].number_of_nodes(), self.test_graph[self.name_movie].number_of_nodes(),
+            self.test_graph[self.name_user, self.name_movie, self.name_edge].number_of_edges()))
+
+
+
+    def _generate_pair_value(self, rating_info):
+        rating_pairs = (np.array([self.global_user_id_map[ele] for ele in rating_info["user_id"]],
+                                 dtype=np.int64),
+                        np.array([self.global_movie_id_map[ele] for ele in rating_info["movie_id"]],
+                                 dtype=np.int64))
         rating_values = rating_info["rating"].values.astype(np.float32)
-
         return rating_pairs, rating_values
 
-    def _generate_graphs(self, rating_pairs, rating_values):
+    def _generate_graphs(self, rating_pairs, rating_values, add_support=False):
         user_movie_ratings_coo = sp.coo_matrix(
             (rating_values, rating_pairs),
             shape=(self._num_user, self._num_movie),dtype=np.float32)
@@ -104,65 +170,69 @@ class MovieLens(object):
         user_movie_R[rating_pairs] = rating_values
         movie_user_R = user_movie_R.transpose()
 
-        uv_graph = dgl.DGLBipartiteGraph(
-            metagraph=nx.MultiGraph([('user', 'movie', 'rating')]),
-            number_of_nodes_by_type={'user': self._num_user,
-                                     'movie': self._num_movie},
-            edge_connections_by_type={('user', 'movie', 'rating'): user_movie_ratings_coo},
-            # node_frame={"user": self.user_features, "movie": self.movie_features},
+        graph = dgl.DGLBipartiteGraph(
+            metagraph=nx.MultiGraph([(self.name_user, self.name_movie, self.name_edge),
+                                     (self.name_movie, self.name_user, self.name_edge)]),
+            number_of_nodes_by_type={self.name_user: self._num_user,
+                                     self.name_movie: self._num_movie},
+            edge_connections_by_type={(self.name_user, self.name_movie, self.name_edge): user_movie_ratings_coo,
+                                      (self.name_movie, self.name_user, self.name_edge): movie_user_ratings_coo},
             readonly=True)
 
-        vu_graph = dgl.DGLBipartiteGraph(
-            metagraph=nx.MultiGraph([('movie', 'user', 'rating')]),
-            number_of_nodes_by_type={'user': self._num_user,
-                                     'movie': self._num_movie},
-            edge_connections_by_type={('movie', 'user', 'rating'): movie_user_ratings_coo},
-            # node_frame={"user": self.user_features, "movie": self.movie_features},
-            readonly=True)
+        graph[self.name_user, self.name_movie, self.name_edge].edata['R'] \
+            = mx.nd.array(rating_values, ctx=self._ctx, dtype=np.float32)
 
-        uv_train_support_l = self.compute_support(user_movie_R, self.num_links, self._symm)
-        for idx, support in enumerate(uv_train_support_l):
-            sup_coo = support.tocoo()
-            uv_graph.edges[np.array(sup_coo.row, dtype=np.int64),
-                           np.array(sup_coo.col, dtype=np.int64)].data['support{}'.format(idx)] = \
-                mx.nd.array(sup_coo.data, ctx=self._ctx, dtype=np.float32)
+        if add_support:
+            uv_train_support_l = self.compute_support(user_movie_R, self.num_links, self._symm)
+            for idx, sup in enumerate(uv_train_support_l):
+                graph[self.name_user, self.name_movie, self.name_edge].edges[
+                    np.array(sup.row, dtype=np.int64),
+                    np.array(sup.col, dtype=np.int64)].data['support{}'.format(idx)] = \
+                    mx.nd.array(sup.data, ctx=self._ctx, dtype=np.float32)
 
-        vu_train_support_l = self.compute_support(movie_user_R, self.num_links, self._symm)
-        for idx, support in enumerate(vu_train_support_l):
-            sup_coo = support.tocoo()
-            vu_graph.edges[np.array(sup_coo.row, dtype=np.int64),
-                           np.array(sup_coo.col, dtype=np.int64)].data['support{}'.format(idx)] = \
-                mx.nd.array(sup_coo.data, ctx=self._ctx, dtype=np.float32)
+            vu_train_support_l = self.compute_support(movie_user_R, self.num_links, self._symm)
+            for idx, sup in enumerate(vu_train_support_l):
+                graph[self.name_movie, self.name_user, self.name_edge].edges[
+                    np.array(sup.row, dtype=np.int64),
+                    np.array(sup.col, dtype=np.int64)].data['support{}'.format(idx)] = \
+                    mx.nd.array(sup.data, ctx=self._ctx, dtype=np.float32)
 
-        return uv_graph, vu_graph
+        return graph
 
     @property
     def possible_rating_values(self):
         return np.unique(self.train_rating_info["rating"].values)
-
     @property
     def num_links(self):
         return self.possible_rating_values.size
     @property
     def name_user(self):
         return "user"
-
     @property
     def name_movie(self):
         return "movie"
+    @property
+    def name_edge(self):
+        return "rating"
+    @property
+    def num_user(self):
+        return self._num_user
+    @property
+    def num_movie(self):
+        return self._num_movie
 
     def _drop_unseen_nodes(self, orign_info, cmp_col_name, reserved_ids_set, label):
-        print("  -----------------")
-        print("{}: {}(reserved) v.s. {}(from info)".format(label, len(reserved_ids_set),
-                                                             len(set(orign_info[cmp_col_name].values))))
+        # print("  -----------------")
+        # print("{}: {}(reserved) v.s. {}(from info)".format(label, len(reserved_ids_set),
+        #                                                      len(set(orign_info[cmp_col_name].values))))
         if reserved_ids_set != set(orign_info[cmp_col_name].values):
             pd_rating_ids = pd.DataFrame(list(reserved_ids_set), columns=["id_graph"])
-            print("\torign_info: ({}, {})".format(orign_info.shape[0], orign_info.shape[1]))
+            # print("\torign_info: ({}, {})".format(orign_info.shape[0], orign_info.shape[1]))
             data_info = orign_info.merge(pd_rating_ids, left_on=cmp_col_name, right_on='id_graph', how='outer')
             data_info = data_info.dropna(subset=[cmp_col_name, 'id_graph'])
             data_info = data_info.drop(columns=["id_graph"])
             data_info = data_info.reset_index(drop=True)
-            print("\tAfter dropping, data shape: ({}, {})".format(data_info.shape[0], data_info.shape[1]))
+            # print("\tAfter dropping, data shape: ({}, {})".format(data_info.shape[0], data_info.shape[1]))
             return data_info
         else:
             orign_info = orign_info.reset_index(drop=True)
@@ -255,13 +325,14 @@ class MovieLens(object):
                                           dtype=np.float32)
             occupation_one_hot[np.arange(self.user_info.shape[0]),
                                np.array([occupation_map[ele] for ele in self.user_info['occupation']])] = 1
-            self.user_features = np.concatenate([ages.reshape((self.user_info.shape[0], 1)) / 50.0,
+            user_features = np.concatenate([ages.reshape((self.user_info.shape[0], 1)) / 50.0,
                                             gender.reshape((self.user_info.shape[0], 1)),
                                             occupation_one_hot], axis=1)
         elif self._name == 'ml-10m':
-            self.user_features = np.zeros(shape=(self.user_info.shape[0], 1), dtype=np.float32)
+            user_features = np.zeros(shape=(self.user_info.shape[0], 1), dtype=np.float32)
         else:
             raise NotImplementedError
+        return user_features
 
     def _load_raw_movie_info(self):
         """In MovieLens, the movie attributes may have the following formats:
@@ -336,6 +407,15 @@ class MovieLens(object):
             Generate movie features by concatenating embedding and the year
 
         """
+        if self._name == 'ml-100k':
+            GENRES = GENRES_ML_100K
+        elif self._name == 'ml-1m':
+            GENRES = GENRES_ML_1M
+        elif self._name == 'ml-10m':
+            GENRES = GENRES_ML_10M
+        else:
+            raise NotImplementedError
+
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
         release_years = np.zeros(shape=(self.movie_info.shape[0], 1), dtype=np.float32)
         p = re.compile(r'(.+)\s*\((\d+)\)')
@@ -349,7 +429,11 @@ class MovieLens(object):
             # We use average of glove
             title_embedding[i, :] =_word_embedding[_tokenizer(title_context)].asnumpy().mean(axis=0)
             release_years[i] = float(year)
-            self.movie_features = np.concatenate((title_embedding, (release_years - 1950.0) / 100.0), axis=1)
+        movie_features = np.concatenate((title_embedding,
+                                         (release_years - 1950.0) / 100.0,
+                                         self.movie_info[GENRES]),
+                                        axis=1)
+        return movie_features
 
 
     def compute_support(self, adj, num_links, symmetric):
@@ -374,20 +458,18 @@ class MovieLens(object):
         degree_v_inv_sqrt_mat = sp.diags([degree_v_inv_sqrt], [0])
 
         degree_u_inv = degree_u_inv_sqrt_mat.dot(degree_u_inv_sqrt_mat)
-
-        if symmetric:
-            support_l = [degree_u_inv_sqrt_mat.dot(adj).dot(degree_v_inv_sqrt_mat) for adj in adj_unnormalized_l]
-
-        else:
-            support_l = [degree_u_inv.dot(adj) for adj in adj_unnormalized_l]
-
-        return support_l
-
-
-
-
+        support_sp_l = []
+        for adj in adj_unnormalized_l:
+            if symmetric:
+                sup = sp.coo_matrix(degree_u_inv_sqrt_mat.dot(adj).dot(degree_v_inv_sqrt_mat))
+            else:
+                sup = sp.csr_matrix(degree_u_inv.dot(adj))
+            print("sup.data", sup.nnz)
+            support_sp_l.append(sup)
+        return support_sp_l
 
 if __name__ == '__main__':
-    MovieLens("ml-100k")
-    # MovieLens("ml-1m")
-    # MovieLens("ml-10m")
+    MovieLens("ml-100k", ctx=mx.gpu(0), symm=True)
+    MovieLens("ml-100k", ctx=mx.gpu(0), symm=False)
+    MovieLens("ml-1m", ctx=mx.gpu(0), symm=True)
+    MovieLens("ml-1m", ctx=mx.gpu(0), symm=False)
