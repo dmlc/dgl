@@ -439,11 +439,11 @@ class LayerSampler(NodeFlowSampler):
 
 
 class EdgeSampler(object):
-    '''Base class that generates NodeFlows for link prediction.
+    '''Edge sampler for link prediction.
 
     For a mini-batch, it samples a set of edges. From the source and
-    destination vertices, it creates NodeFlows with node-level sampler
-    (e.g., NeighborSampler, Layer-wise sampler).
+    destination vertices, it can potentially creates NodeFlows with
+    node-level sampler (e.g., NeighborSampler, Layer-wise sampler).
 
     Class properties
     ----------------
@@ -518,6 +518,18 @@ class EdgeSampler(object):
 
 
 class EdgeNeighborSampler(EdgeSampler):
+    '''Edge sampler that generates NodeFlows for link prediction.
+
+    For a mini-batch, it samples a set of edges. From the source and
+    destination vertices, it creates NodeFlows with node-level sampler
+    (e.g., NeighborSampler, Layer-wise sampler).
+
+    Class properties
+    ----------------
+    immutable_only : bool
+        Whether the sampler only works on immutable graphs.
+        Subclasses can override this property.
+    '''
     def __init__(
             self,
             g,
@@ -532,7 +544,8 @@ class EdgeNeighborSampler(EdgeSampler):
             prefetch=False,
             add_self_loop=False,
             negative_mode="",
-            neg_sample_size=0):
+            neg_sample_size=0,
+            exclude_positive=False):
         super(EdgeNeighborSampler, self).__init__(
                 g, batch_size, seed_edges, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
@@ -547,6 +560,7 @@ class EdgeNeighborSampler(EdgeSampler):
         self._neighbor_type = neighbor_type
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
+        self._exclude_positive = exclude_positive
 
     def fetch(self, current_index):
         handles = unwrap_to_ptr_list(_CAPI_UniformEdgeSampling(
@@ -560,7 +574,8 @@ class EdgeNeighborSampler(EdgeSampler):
             self._neighbor_type,
             self._add_self_loop,
             self._negative_mode,
-            self._neg_sample_size))
+            self._neg_sample_size,
+            self._exclude_positive))
         nflows = []
         for hdl in handles:
             func = _CAPI_GetEdgeBatch(hdl)

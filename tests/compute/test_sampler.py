@@ -251,7 +251,8 @@ def test_negative_sampler():
     for _, _, pos_edges, neg_edges in EdgeNeighborSampler(g, 50,
                                                           num_hops=2,
                                                           negative_mode="head",
-                                                          neg_sample_size=10):
+                                                          neg_sample_size=10,
+                                                          exclude_positive=True):
         assert 10 * pos_edges.number_of_edges() == neg_edges.number_of_edges()
         pos_nid = pos_edges.parent_nid
         pos_eid = pos_edges.parent_eid
