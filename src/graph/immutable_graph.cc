@@ -324,12 +324,12 @@ Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     IdArray new_dst = aten::IndexSelect(adj_.col, eids);
     induced_nodes = aten::Relabel_({new_src, new_dst});
     const auto new_nnodes = induced_nodes->shape[0];
-    subcoo = COOPtr(new COO(new_nnodes, new_src, new_dst));
+    subcoo = COOPtr(new COO(new_nnodes, new_src, new_dst, this->IsMultigraph()));
   } else {
     IdArray new_src = aten::IndexSelect(adj_.row, eids);
     IdArray new_dst = aten::IndexSelect(adj_.col, eids);
     induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
-    subcoo = COOPtr(new COO(NumVertices(), new_src, new_dst));
+    subcoo = COOPtr(new COO(NumVertices(), new_src, new_dst, this->IsMultigraph()));
   }
   Subgraph subg;
   subg.graph = subcoo;

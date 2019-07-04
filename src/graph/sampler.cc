@@ -914,7 +914,7 @@ dgl_id_t global2local_map(dgl_id_t global_id,
 
 Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
                          const std::string &neg_mode,
-                         int neg_sample_size) {
+                         int neg_sample_size, bool is_multigraph) {
   unsigned int seed = randseed();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
@@ -995,7 +995,7 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   Subgraph neg_subg;
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
-  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, false));
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
@@ -1021,7 +1021,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_edges));
-    CHECK(!gptr->IsMultigraph()) << "Edge sampling doesn't support multi-graph";
     BuildCsr(*gptr, neigh_type);
     BuildCoo(*gptr);
 
@@ -1061,7 +1060,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       *nflows[i]->pos_subg = gptr->EdgeSubgraph(worker_seeds, false);
       if (neg_mode.size() > 0)
         *nflows[i]->neg_subg = NegEdgeSubgraph(gptr->NumVertices(), *nflows[i]->pos_subg,
-                                               neg_mode, neg_sample_size);
+                                               neg_mode, neg_sample_size,
+                                               gptr->IsMultigraph());
     }
     *rv = WrapVectorReturn(nflows);
   });
