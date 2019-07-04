@@ -594,7 +594,7 @@ Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
       induced_nodes_data[kv.second] = kv.first;
     }
 
-    COOPtr subcoo(new COO(newid, new_src, new_dst));
+    COOPtr subcoo(new COO(newid, new_src, new_dst, this->IsMultigraph()));
     return Subgraph{subcoo, induced_nodes, eids};
   } else {
     for (int64_t i = 0; i < eids->shape[0]; ++i) {
@@ -610,7 +610,7 @@ Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     for (int64_t i = 0; i < NumVertices(); ++i)
       *(induced_nodes_data++) = i;
 
-    COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
+    COOPtr subcoo(new COO(NumVertices(), new_src, new_dst, this->IsMultigraph()));
     return Subgraph{subcoo, induced_nodes, eids};
   }
 }
