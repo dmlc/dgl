@@ -891,7 +891,8 @@ dgl_id_t global2local_map(dgl_id_t global_id,
 
 Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
                          const std::string &neg_mode,
-                         int neg_sample_size, bool is_multigraph) {
+                         int neg_sample_size, bool is_multigraph,
+                         bool exclude_positive) {
   unsigned int seed = randseed();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
@@ -941,12 +942,16 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       neigh_it = pos_subg.graph->SuccVec(unchanged[i]);
     }
 
-    std::vector<size_t> exclude;
-    for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
-      dgl_id_t local_vid = *it;
-      exclude.push_back(induced_vid_data[local_vid]);
+    if (exclude_positive) {
+      std::vector<size_t> exclude;
+      for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
+        dgl_id_t local_vid = *it;
+        exclude.push_back(induced_vid_data[local_vid]);
+      }
+      RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids, &seed);
+    } else {
+      RandomSample(num_tot_nodes, neg_sample_size, &neg_vids, &seed);
     }
-    RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids, &seed);
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
     dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
@@ -995,6 +1000,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const bool undirected = args[10];
     const std::string neg_mode = args[11];
     const int neg_sample_size = args[12];
+    const bool exclude_positive = args[13];
     // process args
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
@@ -1052,7 +1058,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       if (neg_mode.size() > 0)
         *nflows[i]->neg_subg = NegEdgeSubgraph(gptr->NumVertices(), *nflows[i]->pos_subg,
                                                neg_mode, neg_sample_size,
-                                               gptr->IsMultigraph());
+                                               gptr->IsMultigraph(), exclude_positive);
     }
     *rv = WrapVectorReturn(nflows);
   });
