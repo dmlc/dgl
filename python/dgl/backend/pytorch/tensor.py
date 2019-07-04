@@ -26,6 +26,9 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
+def as_scalar(data):
+    return data.item()
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -90,12 +93,31 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return th.sum(input, dim=dim)
 
+def all_sum(input):
+    return input.sum()
+
 def mean(input, dim):
     return th.mean(input, dim=dim)
+
+def all_mean(input):
+    return input.mean()
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
     return th.max(input, dim=dim)[0]
+
+def all_max(input):
+    return input.max()
+
+def min(input, dim):
+    # NOTE: the second argmin array is not returned
+    return th.min(input, dim=dim)[0]
+
+def all_min(input):
+    return input.min()
+
+def argsort(input, dim, descending):
+    return th.argsort(input, dim=dim, descending=descending)
 
 def exp(input):
     return th.exp(input)
@@ -112,8 +134,19 @@ def stack(seq, dim):
 def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
+def repeat(input, repeats, dim):
+    return th.repeat_interleave(input, repeats, dim)
+
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
+
+def slice_axis(data, axis, begin, end):
+    if begin >= end:
+        raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
+    return th.index_select(data, axis, th.arange(begin, end))
+
+def take(data, indices, dim):
+    return th.gather(data, dim, indices)
 
 def narrow_row(x, start, stop):
     return x[start:stop]

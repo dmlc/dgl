@@ -14,7 +14,7 @@ from . import utils
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
            'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
            'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges',
-           'broadcast_nodes', 'broadcast_edges']
+           'broadcast_nodes', 'broadcast_edges', 'topk_nodes', 'topk_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -815,7 +815,8 @@ def _softmax_on(graph, typestr, feat):
         return F.softmax(feat, 0)
 
 def _broadcast_on(graph, typestr, feat_data):
-    """Internal function of broadcasting features to node or edge features of a given field.
+    """Internal function of broadcasting features to node or edge features
+    of a given field.
 
     Parameters
     ----------
@@ -824,12 +825,13 @@ def _broadcast_on(graph, typestr, feat_data):
     typestr : str
         'nodes' or 'edges'
     feat_data : tensor
-        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and :math:`(B, *)` for batched graph.
+        The feature to broadcast. Tensor shape is :math:`(*)` for single graph,
+        and :math:`(B, *)` for batched graph.
 
     Returns
     -------
     tensor
-        The node features tensor with shape :math:`(N, *)`.
+        The node/edge features tensor with shape :math:`(N, *)`.
     """
     _, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
 
@@ -844,7 +846,70 @@ def _broadcast_on(graph, typestr, feat_data):
         n_objs = getattr(graph, num_objs_attr)()
         return F.stack([feat_data] * n_objs, 0)
 
-def _topk_on(graph, typestr, )
+def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
+    """Internal function to take graph-wise top-k features along the
+    given dimension of a given field.
+    If :attr:`reverse` is set to True, return the k smallest elements
+    instead.
+
+    Parameters
+    ---------
+    graph : DGLGraph
+        The graph
+    typestr : str
+        'nodes' or 'edges'
+    feat : str
+        The feature field name.
+    k : int
+        The k in "top-k".
+    descending : bool
+        Controls whether to return the largest or smallest elements.
+    idx : int
+        The key index we sort features along.
+
+    Returns
+    -------
+    Tensor:
+        Top-k features of the given graph with shape :math:`(K, D)`,
+        if the input graph is a BatchedDGLGraph a tensor with shape
+        :math:`(B, K, D)` we be returned, where math`B` is the batch
+        size.
+    """
+    data_attr, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
+    data = getattr(graph, data_attr)
+    if F.ndim(data[feat]) > 2:
+        raise DGLError('The {} feature `{}` should have dimension less than or equal to 2'.format(typestr, feat))
+    feat = data[feat]
+    hid_dim = F.shape(feat)[-1]
+    if idx < 0: idx += hid_dim
+
+    if isinstance(graph, BatchedDGLGraph):
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        batch_size = len(batch_num_objs)
+        max_n_objs = max(batch_num_objs)
+        index = []
+        for i, num_obj in enumerate(batch_num_objs):
+            if num_obj < k:
+                dgl_warning("Graph {}'s number of nodes is less than k".format(i))
+            index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
+        index = F.tensor(index)
+        dtype = F.dtype(feat)
+        ctx = F.context(feat)
+        feat_ = F.zeros((batch_size * max_n_objs, hid_dim), dtype, ctx) - float('inf')
+        feat_ = F.scatter_row(feat_, index, feat)
+        feat_ = F.reshape(feat_, (batch_size, max_n_objs, hid_dim))
+
+    keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
+    order = F.argsort(keys, -1, descending=descending)
+    topk_indices = F.slice_axis(order, -1, 0, k)
+
+    if isinstance(graph, BatchedDGLGraph):
+        feat_ = F.zeros((batch_size * max_n_objs, hid_dim), dtype, ctx)
+        feat_ = F.scatter_row(feat_, index, feat)
+        topk_indices = F.reshape(topk_indices, (-1,)) +\
+                       F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1)
+
+    return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hid_dim))
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
@@ -901,7 +966,8 @@ def max_edges(graph, feat):
     return _max_on(graph, 'edges', feat)
 
 def softmax_nodes(graph, feat):
-    """Apply batch-wise graph-level softmax over all the values of node field :attr:`feat` in :attr:`graph`.
+    """Apply batch-wise graph-level softmax over all the values of node field
+     :attr:`feat` in :attr:`graph`.
 
     Parameters
     ----------
@@ -917,13 +983,15 @@ def softmax_nodes(graph, feat):
 
     Notes
     -----
-    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each example in the batch.
+    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at
+    each example in the batch.
     """
     return _softmax_on(graph, 'nodes', feat)
 
 
 def softmax_edges(graph, feat):
-    """Apply batch-wise graph-level softmax over all the values of edge field :attr:`feat` in :attr:`graph`.
+    """Apply batch-wise graph-level softmax over all the values of edge field
+    :attr:`feat` in :attr:`graph`.
 
     Parameters
     ----------
@@ -939,20 +1007,22 @@ def softmax_edges(graph, feat):
 
     Notes
     -----
-    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each example in the batch.
+    If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each
+    example in the batch.
     """
     return _softmax_on(graph, 'edges', feat)
 
 def broadcast_nodes(graph, feat_data):
-    """Broadcast feature to all node values of field :attr:`feat` in :attr:`graph`, and return
-    a tensor of node features.
+    """Broadcast feature to all node values of field :attr:`feat` in :attr:`graph`,
+    and return a tensor of node features.
 
     Parameters
     ----------
     graph : DGLGraph or BatcheDGLGraph
         The graph.
     feat_data : tensor
-        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and :math:`(B, *)` for batched graph.
+        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and
+        :math:`(B, *)` for batched graph.
 
     Returns
     -------
@@ -961,20 +1031,22 @@ def broadcast_nodes(graph, feat_data):
 
     Notes
     -----
-    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to the nodes in i-th example in the batch.
+    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to the nodes
+     in i-th example in the batch.
     """
     return _broadcast_on(graph, 'nodes', feat_data)
 
 def broadcast_edges(graph, feat_data):
-    """Broadcast feature to all edge values of field :attr:`feat` in :attr:`graph`, and return
-    a tensor of edge features.
+    """Broadcast feature to all edge values of field :attr:`feat` in
+    :attr:`graph`, and return a tensor of edge features.
 
     Parameters
     ----------
     graph : DGLGraph or BatchedDGLGraph
         The graph.
     feat_data : tensor
-        The feature to broadcast. Tensor shape is :math:`(*)` for single graph, and :math:`(B, *)` for batched graph.
+        The feature to broadcast. Tensor shape is :math:`(*)` for single
+        graph, and :math:`(B, *)` for batched graph.
 
     Returns
     -------
@@ -983,12 +1055,15 @@ def broadcast_edges(graph, feat_data):
 
     Notes
     -----
-    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to the edges in i-th example in the batch.
+    If graph is a :class:`BatchedDGLGraph` object, feat[i] is broadcast to
+    the edges in i-th example in the batch.
     """
     return _broadcast_on(graph, 'edges', feat_data)
 
-def topk_nodes(graph, feat, k, dim=-1):
-    """Return the node feature of k nodes of field :attr:`feat` in :attr:`graph`, # TODO
+def topk_nodes(graph, feat, k, descending=True, idx=-1):
+    """Return graph-wise top-k node features of field :attr:`feat` in
+    :attr:`graph` along given dimension :attr:`dim`. If :attr:`reverse` is
+    set to True, return the k smallest elements instead.
 
     Parameters
     ----------
@@ -997,20 +1072,44 @@ def topk_nodes(graph, feat, k, dim=-1):
     feat : str
         The feature field.
     k : int
-        The number of nodes to hold for each graph.
-    dim : int
-        # TODO
+        The k in "top-k"
+    descending : bool
+        Controls whether to return the largest or smallest elements.
+    idx : int
+        The key index we sort node features on.
 
     Returns
     -------
-    # TODO
-
-    Notes
-    -----
-    If graph is a :class:`BatchedDGLGraph` object, # TODO
+    tensor
+        The obtained tensor with shape :math:`(K, D)`, if the input graph a
+        BatchedDGLGraph, the shape of returned tensor would be :math:`(B, K, D)`,
+        where :math:`B` is the batch size of the graph.
     """
-    return _topk_on(graph, 'nodes', feat, k, dim=dim)
+    return _topk_on(graph, 'nodes', feat, k, descending=descending, idx=idx)
 
-def topk_edges(graph, feat, k, dim=-1):
-    # TODO(zihao): finish this
-    pass
+def topk_edges(graph, feat, k, descending=True, idx=-1):
+    """Return graph-wise top-k edge features of field :attr:`feat` in
+    :attr:`graph` along given dimension :attr:`dim`. If :attr:`reverse` is
+    set to True, return the k smallest elements instead.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field.
+    k : int
+        The k in "top-k".
+    descending : bool
+        Controls whether to return the largest or smallest elements.
+    idx : int
+        The key index we sort edge features on.
+
+    Returns
+    -------
+    tensor
+        The obtained tensor with shape (K, D), if the input graph a
+        BatchedDGLGraph, the shape of returned tensor would be (B, K, D),
+        where B is the number of examples in the batched graph.
+    """
+    return _topk_on(graph, 'edges', feat, k, descending=descending, idx=idx)

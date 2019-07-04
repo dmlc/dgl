@@ -74,6 +74,21 @@ def tensor(data, dtype=None):
     """
     pass
 
+def as_scalar(data):
+    """Returns a scalar whose value is copied from this array.
+
+    Parameters
+    ----------
+    data : Tensor
+        The input data
+
+    Returns
+    -------
+    scalar
+        The scalar value in the tensor.
+    """
+    pass
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -293,6 +308,21 @@ def sum(input, dim):
     """
     pass
 
+def all_sum(input):
+    """Returns the sum of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
 def mean(input, dim):
     """Reduce average the input tensor along the given dim.
 
@@ -307,6 +337,21 @@ def mean(input, dim):
     -------
     Tensor
         A framework-specific tensor.
+    """
+    pass
+
+def all_mean(input):
+    """Returns the average of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
     """
     pass
 
@@ -326,6 +371,72 @@ def max(input, dim):
         A framework-specific tensor.
     """
     pass
+
+def all_max(input):
+    """Returns the max of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
+def min(input, dim):
+    """Reduce min the input tensor along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The reduce dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
+def all_min(input):
+    """Returns the min of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
+
+def argsort(input, dim, descending):
+    """Return the indices that would sort the input along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The dim to sort along.
+    descending : bool
+        Controls the sorting order (False: ascending, True: descending)
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
 
 def exp(input):
     """Returns a new tensor with the exponential of the elements of the input tensor `input`.
@@ -414,6 +525,25 @@ def split(input, sizes_or_sections, dim):
     """
     pass
 
+def repeat(input, repeats, dim):
+    """Repeats elements of an array.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input data array
+    repeats : int
+        The number of repetitions for each element
+    dim : int
+        The dim along which to repeat values.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor.
+    """
+    pass
+
 def gather_row(data, row_index):
     """Slice out the data given the row index.
 
@@ -428,6 +558,41 @@ def gather_row(data, row_index):
     -------
     Tensor
         The sliced data. The first dimension should equal to ``len(row_index)``.
+    """
+    pass
+
+def slice_axis(data, axis, begin, end):
+    """Slice along a given axis.
+    Returns an array slice along a given axis starting from :attr:`begin` index to :attr:`end` index.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor.
+    axis : int
+        The axis along to slice the tensor.
+    begin : int
+        Indicates the begin index.
+    end : int
+        Indicates the end index.
+    Returns:
+    --------
+    Tensor
+        The sliced tensor.
+    """
+    pass
+
+def take(data, indices, dim):
+    """Takes elements from an input array along the given dim.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor.
+    indices : Tensor
+        The indices tensor.
+    dim : Tensor
+        The dimension to gather along.
     """
     pass
 

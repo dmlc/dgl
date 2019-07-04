@@ -38,6 +38,9 @@ def tensor(data, dtype=None):
             dtype = np.float32
     return nd.array(data, dtype=dtype)
 
+def as_scalar(data):
+    return data.asscalar()
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -112,11 +115,29 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return nd.sum(input, axis=dim)
 
+def all_sum(input):
+    return input.max()
+
 def mean(input, dim):
     return nd.mean(input, axis=dim)
 
+def all_mean(input):
+    return input.mean()
+
 def max(input, dim):
     return nd.max(input, axis=dim)
+
+def all_max(input):
+    return input.max()
+
+def min(input, dim):
+    return nd.min(input, axis=dim)
+
+def all_min(input):
+    return input.min()
+
+def argsort(input, dim, descending):
+    return nd.argsort(input, dim, is_ascend=not descending)
 
 def exp(input):
     return nd.exp(input)
@@ -149,6 +170,9 @@ def split(x, sizes_or_sections, dim):
     else:
         return nd.split(x, sizes_or_sections, axis=dim)
 
+def repeat(input, repeats, dim):
+    return nd.repeat(input, repeats, axis=dim)
+
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
     if len(row_index) == 0:
@@ -158,6 +182,12 @@ def gather_row(data, row_index):
         return nd.take(data, row_index)
     else:
         return data[row_index,]
+
+def slice_axis(data, axis, begin, end):
+    return nd.slice_axis(data, axis, begin, end)
+
+def take(data, indices, dim):
+    return nd.take(data, indices, dim)
 
 def narrow_row(data, start, stop):
     return data[start:stop]

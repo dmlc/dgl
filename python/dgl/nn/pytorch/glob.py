@@ -6,7 +6,7 @@ from torch.nn import init
 
 from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name, get_edata_name
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes
+from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes, topk_nodes
 
 
 class SumPooling(nn.Module):
@@ -20,6 +20,7 @@ class SumPooling(nn.Module):
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = sum_nodes(graph, _feat_name)
+        graph.ndata.pop(_feat_name)
         return readout
 
 
@@ -34,6 +35,7 @@ class AvgPooling(nn.Module):
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = mean_nodes(graph, _feat_name)
+        graph.ndata.pop(_feat_name)
         return readout
 
 
@@ -48,6 +50,7 @@ class MaxPooling(nn.Module):
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = max_nodes(graph, _feat_name)
+        graph.ndata.pop(_feat_name)
         return readout
 
 
@@ -63,8 +66,11 @@ class SortPooling(nn.Module):
     def forward(self, feat, graph):
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
+        graph.ndata[self._feat_name] = feat
         # Sort nodes according to the their last features.
-        pass
+        ret = topk_nodes(graph, self._feat_name, self.k).view(-1, self.k * feat.shape[-1])
+        g.ndata.pop(self._feat_name)
+        return ret
 
 
 class GlobAttnPooling(nn.Module):
