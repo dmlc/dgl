@@ -870,6 +870,13 @@ struct EdgeBatch {
   NodeFlow *dst_nf;
   Subgraph *pos_subg;
   Subgraph *neg_subg;
+
+  EdgeBatch() {
+    src_nf = nullptr;
+    dst_nf = nullptr;
+    pos_subg = nullptr;
+    neg_subg = nullptr;
+  }
 };
 
 class Global2LocalMap {
@@ -1028,13 +1035,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
       nflows[i] = new EdgeBatch();
-      nflows[i]->src_nf = new NodeFlow();
-      nflows[i]->dst_nf = new NodeFlow();
-      nflows[i]->pos_subg = new Subgraph();
-      if (neg_mode.size() > 0)
-        nflows[i]->neg_subg = new Subgraph();
-      else
-        nflows[i]->neg_subg = nullptr;
 
       // We need to exclude the edges.
       std::unordered_set<dgl_id_t> exclude;
@@ -1049,19 +1049,26 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       }
 
       if (expand_factor > 0 && num_hops > 0) {
+        nflows[i]->src_nf = new NodeFlow();
+        nflows[i]->dst_nf = new NodeFlow();
         *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
           gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop, exclude);
         *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
           gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop, exclude);
       }
+      nflows[i]->pos_subg = new Subgraph();
       *nflows[i]->pos_subg = gptr->EdgeSubgraph(worker_seeds, false);
-      if (neg_mode.size() > 0)
+      if (neg_mode.size() > 0) {
+        nflows[i]->neg_subg = new Subgraph();
         *nflows[i]->neg_subg = NegEdgeSubgraph(gptr->NumVertices(), *nflows[i]->pos_subg,
                                                neg_mode, neg_sample_size,
                                                gptr->IsMultigraph(), exclude_positive);
+      }
     }
     *rv = WrapVectorReturn(nflows);
   });
+
+PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg);
 
 // Convert EdgeBatch structure to PackedFunc.
 PackedFunc ConvertEdgeBatchToPackedFunc(const EdgeBatch& eb) {
@@ -1074,7 +1081,6 @@ PackedFunc ConvertEdgeBatchToPackedFunc(const EdgeBatch& eb) {
       } else if (which == 2) {
         *rv = eb.pos_subg;
       } else if (which == 3) {
-        CHECK(eb.neg_subg);
         *rv = eb.neg_subg;
       } else {
         LOG(FATAL) << "invalid choice";
@@ -1090,13 +1096,25 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeBatch")
     *rv = ConvertEdgeBatchToPackedFunc(*eb);
 });
 
-PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg);
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_GetSubgraph")
+DGL_REGISTER_GLOBAL("sampling._CAPI_FreeEdgeBatch")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void *ptr = args[0];
+    const EdgeBatch *eb = static_cast<const EdgeBatch *>(ptr);
+    delete eb;
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_GetSubgraph")
+ .set_body([] (DGLArgs args, DGLRetValue* rv) {
+     void *ptr = args[0];
     const Subgraph *eb = static_cast<const Subgraph *>(ptr);
     *rv = ConvertSubgraphToPackedFunc(*eb);
-});
+ });
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_FreeSubgraph")
+ .set_body([] (DGLArgs args, DGLRetValue* rv) {
+     void *ptr = args[0];
+    const Subgraph *eb = static_cast<const Subgraph *>(ptr);
+    delete eb;
+ });
 
 }  // namespace dgl
