@@ -3,6 +3,7 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
+from ..utils import _create_fully_connected_graph, _create_bipartite_graph, _create_batched_graph_from_num_nodes
 
 from torch.nn import init
 from .softmax import edge_softmax
@@ -10,6 +11,10 @@ from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name, get_edata_name
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes, topk_nodes
 
+
+__all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
+           'GlobAttnPooling', 'Set2Set', 'MultiHeadAttention',
+           'SetAttentionBlock', 'InducedSetAttentionBlock', 'SetTransformer']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
@@ -88,9 +93,11 @@ class GlobAttnPooling(nn.Module):
 
     def reset_parameters(self):
         for p in self.gate_nn:
-            init.xavier_uniform_(p)
+            if p.dim() > 1:
+                init.xavier_uniform_(p)
         for p in self.nn:
-            init.xavier_uniform_(p)
+            if p.dim() > 1:
+                init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         feat = feat.unsqueeze(-1) if feat.dim() == 1 else feat
@@ -126,7 +133,8 @@ class Set2Set(nn.Module):
 
     def reset_parameters(self):
         for p in self.lstm.parameters():
-            init.xavier_uniform_(p)
+            if p.dim() > 1:
+                init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         batch_size = 1
@@ -193,6 +201,12 @@ class MultiHeadAttention(nn.Module):
         self.dropa = nn.Dropout(dropouta)
         self.norm_in = nn.LayerNorm(d_model)
         self.norm_inter = nn.LayerNorm(d_model)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                init.xavier_uniform_(p)
 
     def forward(self, graph, q_feat, kv_feat, q_nids, kv_nids):
         feat_name = get_ndata_name(graph, self._feat_name)
@@ -204,16 +218,16 @@ class MultiHeadAttention(nn.Module):
         out_name = get_ndata_name(graph, self._out_name)
 
         # Copy q_feat and kv_feat to graph data frame
-        graph.ndata[q_nids][feat_name] = q_feat
-        graph.ndata[kv_nids][feat_name] = kv_feat
+        graph.nodes[q_nids].data[feat_name] = q_feat
+        graph.nodes[kv_nids].data[feat_name] = kv_feat
 
         # Compute queries, keys and values.
-        graph.nodes[q_nids][query_name] =\
-            self.W_q(graph.nodes[q_nids][feat_name]).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids][key_name] =\
-            self.W_k(graph.nodes[kv_nids][feat_name]).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids][value_name] =\
-            self.W_v(graph.nodes[kv_nids][feat_name]).view(-1, self.num_heads, self.d_head)
+        graph.nodes[q_nids].data[query_name] =\
+            self.W_q(graph.nodes[q_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
+        graph.nodes[kv_nids].data[key_name] =\
+            self.W_k(graph.nodes[kv_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
+        graph.nodes[kv_nids].data[value_name] =\
+            self.W_v(graph.nodes[kv_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
 
         # Free node features.
         graph.ndata.pop(feat_name)
@@ -222,10 +236,11 @@ class MultiHeadAttention(nn.Module):
         graph.apply_edges(fn.u_mul_v(key_name, query_name, score_name))
         e = graph.edata.pop(score_name).sum(dim=-1, keepdim=True) / np.sqrt(self.d_head) # Attention & Free score field.
         graph.edata[att_name] = self.dropa(edge_softmax(graph, e))
-        graph.pull(q_nids,
+        #graph.pull(q_nids, #TODO(zihao): pull does not work, would check later.
+        graph.update_all(
                    fn.u_mul_e(value_name, att_name, 'm'),
                    fn.sum('m', out_name))
-        sa = self.W_o(graph.nodes[q_nids][out_name].view(-1, self.num_heads * self.d_head))
+        sa = self.W_o(graph.nodes[q_nids].data[out_name].view(-1, self.num_heads * self.d_head))
         feat = self.norm_in(q_feat + sa)
 
         # Free queries, keys, values, outputs and attention weights.
@@ -242,28 +257,73 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttentionBlock, self).__init__()
-        pass
+        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
+
+    def forward(self, graph, feat, sab_graph=None):
+        if sab_graph is None:
+            sab_graph = _create_fully_connected_graph(graph)
+
+        q_nids = sab_graph.nodes()
+        kv_nids = sab_graph.nodes()
+        if not isinstance(q_nids, th.Tensor):
+            q_nids = th.tensor(q_nids)
+        if not isinstance(kv_nids, th.Tensor):
+            kv_nids = th.tensor(kv_nids)
+
+        return self.mha(sab_graph, feat, feat, q_nids, kv_nids)
 
 class InducedSetAttentionBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
-        pass
+        self.m = m
+        self.I = nn.Parameter(
+            th.FloatTensor(m, d_model)
+        )
+        self.mha = nn.ModuleList([
+            MultiHeadAttention(d_model, num_heads, d_head, d_ff,
+                               dropouth=dropouth, dropouta=dropouta) for _ in range(2)])
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.xavier_uniform_(self.I) # TODO(zihao): not sure if it is the right way, would check later.
+
+    def forward(self, graph, feat, isab_graph=None):
+        query = self.I
+        if isab_graph is None:
+            if isinstance(graph, BatchedDGLGraph):
+                induced_graph = _create_batched_graph_from_num_nodes([self.m] * graph.batch_size)
+            else:
+                induced_graph = _create_batched_graph_from_num_nodes([self.m])
+
+            isab_graph = [
+                _create_bipartite_graph(graph, induced_graph),
+                _create_bipartite_graph(induced_graph, graph)
+            ]
+
+            query = query.repeat(graph.batch_size, 1)
+
+        for mha, (g, kv_nids, q_nids) in zip(self.mha, isab_graph):
+            rst = mha(g, query, feat, q_nids, kv_nids)
+            query, feat = feat, rst
+
+        return rst
+
 
 class MHAPooling(nn.Module):
     def __init__(self):
         super(MHAPooling, self).__init__()
         pass
 
-class STEncoder(nn.Module):
+class SetTransformerEncoder(nn.Module):
     def __init__(self):
-        super(STEncoder, self).__init__()
+        super(SetTransformerEncoder, self).__init__()
         pass
 
-class STDecoder(nn.Module):
+class SetTransformerDecoder(nn.Module):
     def __init__(self):
-        super(STDecoder, self).__init__()
+        super(SetTransformerDecoder, self).__init__()
         pass
 
 class SetTransformer(nn.Module):
