@@ -580,11 +580,13 @@ class EdgeNeighborSampler(EdgeSampler):
         for hdl in handles:
             func = _CAPI_GetEdgeBatch(hdl)
 
-            pos_subg_func = _CAPI_GetSubgraph(func(2))
+            pos_subg_hdl = func(2)
+            pos_subg_func = _CAPI_GetSubgraph(pos_subg_hdl)
             pos_subg_idx = SubgraphIndex(GraphIndex(pos_subg_func(0)), self.g._graph,
                                          utils.toindex(pos_subg_func(1)),
                                          utils.toindex(pos_subg_func(2)))
             pos_subg = subgraph.DGLSubGraph(self.g, pos_subg_idx)
+            _CAPI_FreeSubgraph(pos_subg_hdl)
 
             if self._num_hops > 0 and self._expand_factor > 0:
                 nf1 = NodeFlow(self.g, func(0))
@@ -596,12 +598,15 @@ class EdgeNeighborSampler(EdgeSampler):
             if self._negative_mode == "":
                 nflows.append((nf1, nf2, pos_subg))
             else:
-                neg_subg_func = _CAPI_GetSubgraph(func(3))
+                neg_subg_hdl = func(3)
+                neg_subg_func = _CAPI_GetSubgraph(neg_subg_hdl)
                 neg_subg_idx = SubgraphIndex(GraphIndex(neg_subg_func(0)), self.g._graph,
                                              utils.toindex(neg_subg_func(1)),
                                              utils.toindex(neg_subg_func(2)))
                 neg_subg = subgraph.DGLSubGraph(self.g, neg_subg_idx)
                 nflows.append((nf1, nf2, pos_subg, neg_subg))
+                _CAPI_FreeSubgraph(neg_subg_hdl)
+            _CAPI_FreeEdgeBatch(hdl)
 
         return nflows
 
