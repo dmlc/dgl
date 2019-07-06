@@ -236,8 +236,7 @@ class MultiHeadAttention(nn.Module):
         graph.apply_edges(fn.u_mul_v(key_name, query_name, score_name))
         e = graph.edata.pop(score_name).sum(dim=-1, keepdim=True) / np.sqrt(self.d_head) # Attention & Free score field.
         graph.edata[att_name] = self.dropa(edge_softmax(graph, e))
-        #graph.pull(q_nids, #TODO(zihao): pull does not work, would check later.
-        graph.update_all(
+        graph.pull(q_nids,
                    fn.u_mul_e(value_name, att_name, 'm'),
                    fn.sum('m', out_name))
         sa = self.W_o(graph.nodes[q_nids].data[out_name].view(-1, self.num_heads * self.d_head))

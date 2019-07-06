@@ -38,7 +38,7 @@ def _create_bipartite_graph(graph_u, graph_v):
                 np.arange(0, n_nodes_u * n_nodes_v + 1, n_nodes_v),
                 np.full(n_nodes_v, n_nodes_u * n_nodes_v, dtype=np.int64)
             ])
-            indices = np.tile(np.arange(n_nodes_v), n_nodes_u)
+            indices = np.tile(np.arange(n_nodes_u, n_nodes_u + n_nodes_v), n_nodes_u)
             gs.append(
                 DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True)
             )
@@ -54,7 +54,7 @@ def _create_bipartite_graph(graph_u, graph_v):
             np.arange(0, n_nodes_u * n_nodes_v + 1, n_nodes_v),
             np.full(n_nodes_v, n_nodes_u * n_nodes_v, )
         ])
-        indices = np.tile(np.arange(n_nodes_v), n_nodes_u)
+        indices = np.tile(np.arange(n_nodes_u, n_nodes_u + n_nodes_v), n_nodes_u)
         return DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True), \
             F.zerocopy_from_numpy(us), F.zerocopy_from_numpy(vs)
 
