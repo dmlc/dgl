@@ -43,7 +43,6 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
-
 template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 
@@ -57,6 +56,11 @@ std::vector<runtime::NDArray> CSRGetDataAndIndices(
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRTranspose(CSRMatrix );
 
+// Convert CSR to COO
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRToCOO(CSRMatrix );
+
+// Convert CSR to COO using data array as order
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix );
 

@@ -12,6 +12,61 @@ using runtime::NDArray;
 
 namespace aten {
 namespace impl {
+namespace {
+/*!
+ * \brief A hashmap that maps each ids in the given array to new ids starting from zero.
+ */
+template <typename IdType>
+class IdHashMap {
+ public:
+  // Construct the hashmap using the given id arrays.
+  // The id array could contain duplicates.
+  explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+    const IdType* ids_data = static_cast<IdType*>(ids->data);
+    const int64_t len = ids->shape[0];
+    IdType newid = 0;
+    for (int64_t i = 0; i < len; ++i) {
+      const IdType id = ids_data[i];
+      if (!Contains(id)) {
+        oldv2newv_[id] = newid++;
+        filter_[id & kFilterMask] = true;
+      }
+    }
+  }
+
+  // Return true if the given id is contained in this hashmap.
+  bool Contains(IdType id) const {
+    return filter_[id & kFilterMask] && oldv2newv_.count(id);
+  }
+
+  // Return the new id of the given id. If the given id is not contained
+  // in the hash map, returns the default_val instead.
+  IdType Map(IdType id, IdType default_val) const {
+    if (filter_[id & kFilterMask]) {
+      auto it = oldv2newv_.find(id);
+      return (it == oldv2newv_.end()) ? default_val : it->second;
+    } else {
+      return default_val;
+    }
+  }
+
+ private:
+  static constexpr int32_t kFilterMask = 0xFFFFFF;
+  static constexpr int32_t kFilterSize = kFilterMask + 1;
+  // This bitmap is used as a bloom filter to remove some lookups.
+  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
+  std::vector<bool> filter_;
+  // The hashmap from old vid to new vid
+  std::unordered_map<IdType, IdType> oldv2newv_;
+};
+
+struct PairHash {
+  template <class T1, class T2>
+  std::size_t operator() (const std::pair<T1, T2>& pair) const {
+    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+  }
+};
+}  // namespace
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
@@ -76,6 +131,7 @@ template NDArray CSRGetRowData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
+  // TODO(minjie): use more efficient binary search when the column indices
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   std::vector<DType> ret_vec;
@@ -87,8 +143,11 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
       ret_vec.push_back(data[i]);
     }
   }
-  // TODO(minjie): only id data is supported
-  return VecToIdArray(ret_vec);
+  const int64_t len = ret_vec.size();
+  NDArray ret_arr = NDArray::Empty({len}, csr.data->dtype, csr.data->ctx);
+  DType* ptr = static_cast<DType*>(ret_arr->data);
+  std::copy(ret_vec.begin(), ret_vec.end(), ptr);
+  return ret_arr;
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
@@ -112,7 +171,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
 
-  std::vector<DType> ret_data;
+  std::vector<DType> ret_vec;
 
   for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
     const IdType row_id = row_data[i], col_id = col_data[j];
@@ -120,14 +179,16 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
     for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
       if (indices_data[i] == col_id) {
-          //row.push_back(row_id);
-          //col.push_back(col_id);
-          ret_data.push_back(data[i]);
+          ret_vec.push_back(data[i]);
       }
     }
   }
 
-  return VecToIdArray(ret_data);
+  const int64_t len = ret_vec.size();
+  NDArray ret_arr = NDArray::Empty({len}, csr.data->dtype, csr.data->ctx);
+  DType* ptr = static_cast<DType*>(ret_arr->data);
+  std::copy(ret_vec.begin(), ret_vec.end(), ptr);
+  return ret_arr;
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -231,7 +292,23 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 template CSRMatrix CSRTranspose<kDLCPU, int32_t, int32_t>(CSRMatrix csr);
 template CSRMatrix CSRTranspose<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
 
-///////////////////////////// CSRToCOODataAsOrder /////////////////////////////
+///////////////////////////// CSRToCOO /////////////////////////////
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRToCOO(CSRMatrix csr) {
+  const int64_t nnz = csr.indices->shape[0];
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
+  for (IdType i = 0; i < csr.indptr->shape[0] - 1; ++i) {
+    std::fill(ret_row_data + indptr_data[i],
+              ret_row_data + indptr_data[i + 1],
+              i);
+  }
+  return COOMatrix{csr.num_rows, csr.num_cols, ret_row, csr.indices, csr.data};
+}
+
+template COOMatrix CSRToCOO<kDLCPU, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDLCPU, int64_t>(CSRMatrix csr);
 
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType>
@@ -241,6 +318,7 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   const int64_t nnz = csr.indices->shape[0];
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  // data array should have the same type as the indices arrays
   const IdType* data = static_cast<IdType*>(csr.data->data);
   NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   NDArray ret_col = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
@@ -262,6 +340,87 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   // no data array
   return coo;
 }
+
+template COOMatrix CSRToCOODataAsOrder<kDLCPU, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDLCPU, int64_t>(CSRMatrix csr);
+
+///////////////////////////// CSRSliceRows /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
+  const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
+  const int64_t num_rows = end - start;
+  const int64_t nnz = indptr[end] - indptr[start];
+  CSRMatrix ret;
+  ret.num_rows = num_rows;
+  ret.num_cols = csr.num_cols;
+  ret.indptr = NDArray::Empty({num_rows + 1}, csr.indptr->dtype, csr.indices->ctx);
+  ret.indices = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  ret.data = NDArray::Empty({nnz}, csr.data->dtype, csr.data->ctx);
+  IdType* r_indptr = static_cast<IdType*>(ret.indptr->data);
+  for (int64_t i = start; i < end + 1; ++i) {
+    r_indptr[i - start] = indptr[i] - indptr[start];
+  }
+  // indices and data can be view arrays
+  ret.indices = csr.indices.CreateView({nnz}, csr.indices->dtype, indptr[start] * sizeof(IdType));
+  ret.data = csr.data.CreateView({nnz}, csr.data->dtype, indptr[start] * sizeof(DType));
+  return ret;
+}
+
+template CSRMatrix CSRSliceRows<kDLCPU, int32_t, int32_t>(CSRMatrix , int64_t , int64_t );
+template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix , int64_t , int64_t );
+
+///////////////////////////// CSRSliceMatrix /////////////////////////////
+template <DLDeviceType XPU, typename IdType, typename DType>
+CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+  IdHashMap<IdType> hashmap(cols);
+  const int64_t new_nrows = rows->shape[0];
+  const int64_t new_ncols = cols->shape[0];
+  const IdType* rows_data = static_cast<IdType*>(rows->data);
+
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  const DType* data = static_cast<DType*>(csr.data->data);
+
+  std::vector<IdType> sub_indptr, sub_indices;
+  std::vector<DType> sub_data;
+  sub_indptr.resize(new_nrows + 1, 0);
+  const IdType kInvalidId = new_ncols + 1;
+  for (int64_t i = 0; i < new_nrows; ++i) {
+    // NOTE: newi == i
+    const IdType oldi = rows_data[i];
+    CHECK(oldi >= 0 && oldi < csr.num_rows) << "Invalid row index: " << oldi;
+    for (IdType p = indptr_data[oldi]; p < indptr_data[oldi + 1]; ++p) {
+      const IdType oldj = indices_data[p];
+      const IdType newj = hashmap.Map(oldj, kInvalidId);
+      if (newj != kInvalidId) {
+        ++sub_indptr[i];
+        sub_indices.push_back(newj);
+        sub_data.push_back(data[p]);
+      }
+    }
+  }
+
+  // cumsum sub_indptr
+  for (int64_t i = 0, cumsum = 0; i < new_nrows; ++i) {
+    const IdType temp = sub_indptr[i];
+    sub_indptr[i] = cumsum;
+    cumsum += temp;
+  }
+  sub_indptr[new_nrows] = sub_indices.size();
+
+  const int64_t nnz = sub_data.size();
+  NDArray sub_data_arr = NDArray::Empty({nnz}, csr.data->dtype, csr.data->ctx);
+  DType* ptr = static_cast<DType*>(sub_data_arr->data);
+  std::copy(sub_data.begin(), sub_data.end(), ptr);
+  return CSRMatrix{new_nrows, new_ncols,
+    VecToIdArray(sub_indptr), VecToIdArray(sub_indices), sub_data_arr};
+}
+
+template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t, int32_t>(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t, int64_t>(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 }  // namespace impl
 }  // namespace aten

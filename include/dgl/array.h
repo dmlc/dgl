@@ -11,6 +11,7 @@
 
 #include <dgl/runtime/ndarray.h>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 
@@ -80,8 +81,8 @@ IdArray Div(dgl_id_t lhs, IdArray rhs);
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 /*! \brief Return an array full of the given value */
-IdArray Full(int32_t val, int64_t length);
-IdArray Full(int64_t val, int64_t length);
+IdArray Full(int32_t val, int64_t length, DLContext ctx);
+IdArray Full(int64_t val, int64_t length, DLContext ctx);
 
 /*! \brief Concat the given 1D arrays */
 IdArray Concat(const std::vector<IdArray>& arrays);
@@ -126,9 +127,11 @@ struct COOMatrix {
 
 /*! \brief Return true if the value (row, col) is non-zero */
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
+runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
+runtime::NDArray CSRGetRowNNZ(CSRMatrix , runtime::NDArray row);
 
 /*! \brief Return the column index array of the given row */
 runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
@@ -160,9 +163,23 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order = true);
 
 /*! \brief Slice rows of the given matrix and return. */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
+CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
-/*! \brief Get the submatrix specified by the row and col ids. */
+/*!
+ * \brief Get the submatrix specified by the row and col ids.
+ *
+ * In numpy notation, given matrix M, row index array I, col index array J
+ * This function returns the submatrix M[I, J].
+ *
+ * \param csr The input csr matrix
+ * \param rows The row index to select
+ * \param cols The col index to select
+ * \return submatrix
+ */
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \return True if the matrix has duplicate entries */
+bool CSRHasDuplicate(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
 

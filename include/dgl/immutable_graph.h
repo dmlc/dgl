@@ -69,11 +69,11 @@ class CSR : public GraphInterface {
   }
 
   DLContext Context() const override {
-    return indptr_->ctx;
+    return adj_.indptr->ctx;
   }
 
   uint8_t NumBits() const override {
-    return indices_->dtype.bits;
+    return adj_.indices->dtype.bits;
   }
 
   bool IsMultigraph() const override;
@@ -83,11 +83,11 @@ class CSR : public GraphInterface {
   }
 
   uint64_t NumVertices() const override {
-    return indptr_->shape[0] - 1;
+    return adj_.indptr->shape[0] - 1;
   }
 
   uint64_t NumEdges() const override {
-    return indices_->shape[0];
+    return adj_.indices->shape[0];
   }
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
@@ -207,7 +207,7 @@ class CSR : public GraphInterface {
    * \note The csr matrix shares the storage with this graph.
    *       The data field of the CSR matrix stores the edge ids.
    */
-  CSRMatrix ToCSRMatrix() const {
+  aten::CSRMatrix ToCSRMatrix() const {
     return adj_;
   }
 
@@ -246,7 +246,7 @@ class CSR : public GraphInterface {
 
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
-  CSRMatrix adj_;
+  aten::CSRMatrix adj_;
 
   // whether the graph is a multi-graph
   LazyObject<bool> is_multigraph_;
@@ -281,11 +281,11 @@ class COO : public GraphInterface {
   }
 
   DLContext Context() const override {
-    return src_->ctx;
+    return adj_.row->ctx;
   }
 
   uint8_t NumBits() const override {
-    return src_->dtype.bits;
+    return adj_.row->dtype.bits;
   }
 
   bool IsMultigraph() const override;
@@ -295,11 +295,11 @@ class COO : public GraphInterface {
   }
 
   uint64_t NumVertices() const override {
-    return num_vertices_;
+    return adj_.num_rows;
   }
 
   uint64_t NumEdges() const override {
-    return src_->shape[0];
+    return adj_.row->shape[0];
   }
 
   bool HasVertex(dgl_id_t vid) const override {
@@ -338,8 +338,8 @@ class COO : public GraphInterface {
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
     CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
-    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
-    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+    const dgl_id_t* src_data = static_cast<dgl_id_t*>(adj_.row->data);
+    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(adj_.col->data);
     return std::make_pair(src_data[eid], dst_data[eid]);
   }
 
@@ -440,15 +440,15 @@ class COO : public GraphInterface {
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
     CHECK(fmt == "coo") << "Not valid adj format request.";
     if (transpose) {
-      return {HStack(dst_, src_)};
+      return {aten::HStack(adj_.col, adj_.row)};
     } else {
-      return {HStack(src_, dst_)};
+      return {aten::HStack(adj_.row, adj_.col)};
     }
   }
 
   /*! \brief Return the transpose of this COO */
   COOPtr Transpose() const {
-    return COOPtr(new COO(num_vertices_, dst_, src_));
+    return COOPtr(new COO(adj_.num_rows, adj_.col, adj_.row));
   }
 
   /*! \brief Convert this COO to CSR */
@@ -459,9 +459,8 @@ class COO : public GraphInterface {
    * \note The coo matrix shares the storage with this graph.
    *       The data field of the coo matrix is none.
    */
-  COOMatrix ToCOOMatrix() const {
-    const int64_t n = NumVertices();
-    return COOMatrix{n, n, src_, dst_, {}};
+  aten::COOMatrix ToCOOMatrix() const {
+    return adj_;
   }
 
   /*!
@@ -492,18 +491,18 @@ class COO : public GraphInterface {
 
   // member getters
 
-  IdArray src() const { return src_; }
+  IdArray src() const { return adj_.row; }
 
-  IdArray dst() const { return dst_; }
+  IdArray dst() const { return adj_.col; }
 
  private:
   /* !\brief private default constructor */
   COO() {}
 
-  /*! \brief number of vertices */
-  int64_t num_vertices_;
-  /*! \brief coordinate arrays */
-  IdArray src_, dst_;
+  // The internal COO adjacency matrix.
+  // The data field is empty
+  aten::COOMatrix adj_;
+
   /*! \brief whether the graph is a multi-graph */
   LazyObject<bool> is_multigraph_;
 };
@@ -1088,12 +1087,14 @@ template <typename IndptrIter, typename IndicesIter, typename EdgeIdIter>
 CSR::CSR(int64_t num_vertices, int64_t num_edges,
     IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin,
     bool is_multigraph): is_multigraph_(is_multigraph) {
-  indptr_ = NewIdArray(num_vertices + 1);
-  indices_ = NewIdArray(num_edges);
-  edge_ids_ = NewIdArray(num_edges);
-  dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  // TODO(minjie): this should be changed to a device-agnostic implementation
+  //   in the future
+  adj_.indptr = aten::NewIdArray(num_vertices + 1);
+  adj_.indices = aten::NewIdArray(num_edges);
+  adj_.data = aten::NewIdArray(num_edges);
+  dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
+  dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(adj_.data->data);
   for (int64_t i = 0; i < num_vertices + 1; ++i)
     *(indptr_data++) = *(indptr_begin++);
   for (int64_t i = 0; i < num_edges; ++i) {

@@ -14,59 +14,6 @@
 
 namespace dgl {
 namespace {
-/*!
- * \brief A hashmap that maps each ids in the given array to new ids starting from zero.
- */
-class IdHashMap {
- public:
-  // Construct the hashmap using the given id arrays.
-  // The id array could contain duplicates.
-  explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
-    const dgl_id_t* ids_data = static_cast<dgl_id_t*>(ids->data);
-    const int64_t len = ids->shape[0];
-    dgl_id_t newid = 0;
-    for (int64_t i = 0; i < len; ++i) {
-      const dgl_id_t id = ids_data[i];
-      if (!Contains(id)) {
-        oldv2newv_[id] = newid++;
-        filter_[id & kFilterMask] = true;
-      }
-    }
-  }
-
-  // Return true if the given id is contained in this hashmap.
-  bool Contains(dgl_id_t id) const {
-    return filter_[id & kFilterMask] && oldv2newv_.count(id);
-  }
-
-  // Return the new id of the given id. If the given id is not contained
-  // in the hash map, returns the default_val instead.
-  dgl_id_t Map(dgl_id_t id, dgl_id_t default_val) const {
-    if (filter_[id & kFilterMask]) {
-      auto it = oldv2newv_.find(id);
-      return (it == oldv2newv_.end()) ? default_val : it->second;
-    } else {
-      return default_val;
-    }
-  }
-
- private:
-  static constexpr int32_t kFilterMask = 0xFFFFFF;
-  static constexpr int32_t kFilterSize = kFilterMask + 1;
-  // This bitmap is used as a bloom filter to remove some lookups.
-  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
-  std::vector<bool> filter_;
-  // The hashmap from old vid to new vid
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv_;
-};
-
-struct PairHash {
-  template <class T1, class T2>
-  std::size_t operator() (const std::pair<T1, T2>& pair) const {
-    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
-  }
-};
-
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
 #ifndef _WIN32
@@ -97,26 +44,28 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
 
 CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
   : is_multigraph_(is_multigraph) {
-  indptr_ = NewIdArray(num_vertices + 1);
-  indices_ = NewIdArray(num_edges);
-  edge_ids_ = NewIdArray(num_edges);
+  adj_.indptr = aten::NewIdArray(num_vertices + 1);
+  adj_.indices = aten::NewIdArray(num_edges);
+  adj_.data = aten::NewIdArray(num_edges);
 }
 
-CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids) {
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t N = indptr->shape[0];
+  adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids),
-    is_multigraph_(is_multigraph) {
+  : is_multigraph_(is_multigraph) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t N = indptr->shape[0];
+  adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -127,12 +76,14 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
-  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
-  indptr_.CopyFrom(indptr);
-  indices_.CopyFrom(indices);
-  edge_ids_.CopyFrom(edge_ids);
+  adj_.indptr.CopyFrom(indptr);
+  adj_.indices.CopyFrom(indices);
+  adj_.data.CopyFrom(edge_ids);
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
@@ -144,18 +95,22 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
-  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
-  indptr_.CopyFrom(indptr);
-  indices_.CopyFrom(indices);
-  edge_ids_.CopyFrom(edge_ids);
+  adj_.indptr.CopyFrom(indptr);
+  adj_.indices.CopyFrom(indices);
+  adj_.data.CopyFrom(edge_ids);
 }
 
 CSR::CSR(const std::string &shared_mem_name,
          int64_t num_verts, int64_t num_edges, bool is_multigraph)
   : is_multigraph_(is_multigraph), shared_mem_name_(shared_mem_name) {
-  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, false);
 }
 
@@ -181,21 +136,11 @@ bool CSR::IsMultigraph() const {
 
 CSR::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
-  const dgl_id_t off = indptr_data[vid];
-  const int64_t len = OutDegree(vid);
-  IdArray src = NewIdArray(len);
-  IdArray dst = NewIdArray(len);
-  IdArray eid = NewIdArray(len);
-  dgl_id_t* src_data = static_cast<dgl_id_t*>(src->data);
-  dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eid->data);
-  std::fill(src_data, src_data + len, vid);
-  std::copy(indices_data + off, indices_data + off + len, dst_data);
-  std::copy(edge_ids_data + off, edge_ids_data + off + len, eid_data);
-  return CSR::EdgeArray{src, dst, eid};
+  IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
+  IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
+  // TODO(minjie): fill value type
+  IdArray ret_src = aten::Full(static_cast<int64_t>(vid), ret_dst->shape[0], ret_dst->ctx);
+  return CSR::EdgeArray{ret_src, ret_dst, ret_eid};
 }
 
 CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
@@ -236,6 +181,8 @@ CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  return aten::CSRGetRowNNZ(adj_, vids);
+  /*
   const auto len = vids->shape[0];
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   DegreeArray rst = DegreeArray::Empty({len}, vids->dtype, vids->ctx);
@@ -246,53 +193,29 @@ DegreeArray CSR::OutDegrees(IdArray vids) const {
     rst_data[i] = OutDegree(vid);
   }
   return rst;
+  */
 }
 
 bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
   CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  for (dgl_id_t i = indptr_data[src]; i < indptr_data[src+1]; ++i) {
-    if (indices_data[i] == dst) {
-      return true;
-    }
-  }
-  return false;
+  return aten::CSRIsNonZero(adj_, src, dst);
 }
 
 IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   CHECK(radius == 1) << "invalid radius: " << radius;
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const int64_t len = indptr_data[vid + 1] - indptr_data[vid];
-  IdArray rst = NewIdArray(len);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  std::copy(indices_data + indptr_data[vid],
-            indices_data + indptr_data[vid + 1],
-            rst_data);
-  return rst;
+  return aten::CSRGetRowColumnIndices(adj_, vid);
 }
 
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
-  // TODO(minjie): use more efficient binary search when the column indices
-  //   are also sorted.
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
-  std::vector<dgl_id_t> ids;
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-  for (dgl_id_t i = indptr_data[src]; i < indptr_data[src+1]; ++i) {
-    if (indices_data[i] == dst) {
-      ids.push_back(eid_data[i]);
-    }
-  }
-  return VecToIdArray(ids);
+  return aten::CSRGetData(adj_, src, dst);
 }
 
 CSR::EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+  // TODO: TBD
   // TODO(minjie): more efficient implementation for simple graph
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
@@ -330,7 +253,7 @@ CSR::EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
 
 CSR::EdgeArray CSR::Edges(const std::string &order) const {
   CHECK(order.empty() || order == std::string("srcdst"))
-    << "COO only support Edges of order \"srcdst\","
+    << "CSR only support Edges of order \"srcdst\","
     << " but got \"" << order << "\".";
   const int64_t rstlen = NumEdges();
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
