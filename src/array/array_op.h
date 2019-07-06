@@ -12,6 +12,12 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
+IdArray Full(IdType val, int64_t length, DLContext ctx);
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Range(IdType low, IdType high, DLContext ctx);
+
+template <DLDeviceType XPU, typename IdType>
 IdArray AsNumBits(IdArray arr, uint8_t bits);
 
 template <DLDeviceType XPU, typename IdType, typename Op>
@@ -25,9 +31,6 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
-
-template <DLDeviceType XPU, typename IdType>
-IdArray Full(IdType val, int64_t length, DLContext ctx);
 
 // sparse arrays
 

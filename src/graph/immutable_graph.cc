@@ -117,6 +117,8 @@ CSR::CSR(const std::string &shared_mem_name,
 bool CSR::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
+      return aten::CSRHasDuplicate(adj_);
+      /*
       const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
       const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
       for (dgl_id_t src = 0; src < NumVertices(); ++src) {
@@ -131,6 +133,7 @@ bool CSR::IsMultigraph() const {
         }
       }
       return false;
+      */
     });
 }
 
@@ -138,13 +141,17 @@ CSR::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
   IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
-  // TODO(minjie): fill value type
-  IdArray ret_src = aten::Full(static_cast<int64_t>(vid), ret_dst->shape[0], ret_dst->ctx);
+  IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
   return CSR::EdgeArray{ret_src, ret_dst, ret_eid};
 }
 
 CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  auto csrsubmat = aten::CSRSliceRows(adj_, vids);
+  auto coosubmat = aten::CSRToCOO(csrsubmat, false);
+  return CSR::EdgeArray{coosubmat.row, coosubmat.col, coosubmat.data};
+
+  /*
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
   const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
   const dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
@@ -177,6 +184,7 @@ CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
     }
   }
   return CSR::EdgeArray{src, dst, eid};
+  */
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
@@ -215,180 +223,43 @@ IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
 }
 
 CSR::EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
-  // TODO: TBD
-  // TODO(minjie): more efficient implementation for simple graph
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-
-  CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
-    << "Invalid src and dst id array.";
-
-  const int src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
-  const int dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-
-  std::vector<dgl_id_t> src, dst, eid;
-
-  for (int64_t i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
-    const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
-    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
-        "invalid edge: " << src_id << " -> " << dst_id;
-    for (dgl_id_t i = indptr_data[src_id]; i < indptr_data[src_id+1]; ++i) {
-      if (indices_data[i] == dst_id) {
-          src.push_back(src_id);
-          dst.push_back(dst_id);
-          eid.push_back(eid_data[i]);
-      }
-    }
-  }
-  return CSR::EdgeArray{VecToIdArray(src), VecToIdArray(dst), VecToIdArray(eid)};
+  const auto& arrs = aten::CSRGetDataAndIndices(adj_, src_ids, dst_ids);
+  return CSR::EdgeArray{arrs[0], arrs[1], arrs[2]};
 }
 
 CSR::EdgeArray CSR::Edges(const std::string &order) const {
   CHECK(order.empty() || order == std::string("srcdst"))
     << "CSR only support Edges of order \"srcdst\","
     << " but got \"" << order << "\".";
-  const int64_t rstlen = NumEdges();
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  IdArray rst_src = NewIdArray(rstlen);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-
-  // If sorted, the returned edges are sorted by the source Id and dest Id.
-  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
-    std::fill(rst_src_data + indptr_data[src],
-              rst_src_data + indptr_data[src + 1],
-              src);
-  }
-
-  return CSR::EdgeArray{rst_src, indices_, edge_ids_};
+  const auto& coo = aten::CSRToCOO(adj_, false);
+  return CSR::EdgeArray{coo.row, coo.col, coo.data};
 }
 
 Subgraph CSR::VertexSubgraph(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  IdHashMap hashmap(vids);
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  const int64_t len = vids->shape[0];
-
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-
-  std::vector<dgl_id_t> sub_indptr, sub_indices, sub_eids, induced_edges;
-  sub_indptr.resize(len + 1, 0);
-  const dgl_id_t kInvalidId = len + 1;
-  for (int64_t i = 0; i < len; ++i) {
-    // NOTE: newv == i
-    const dgl_id_t oldv = vid_data[i];
-    CHECK(HasVertex(oldv)) << "Invalid vertex: " << oldv;
-    for (dgl_id_t olde = indptr_data[oldv]; olde < indptr_data[oldv+1]; ++olde) {
-      const dgl_id_t oldu = indices_data[olde];
-      const dgl_id_t newu = hashmap.Map(oldu, kInvalidId);
-      if (newu != kInvalidId) {
-        ++sub_indptr[i];
-        sub_indices.push_back(newu);
-        induced_edges.push_back(eid_data[olde]);
-      }
-    }
-  }
-  sub_eids.resize(sub_indices.size());
-  std::iota(sub_eids.begin(), sub_eids.end(), 0);
-
-  // cumsum sub_indptr
-  for (int64_t i = 0, cumsum = 0; i < len; ++i) {
-    const dgl_id_t temp = sub_indptr[i];
-    sub_indptr[i] = cumsum;
-    cumsum += temp;
-  }
-  sub_indptr[len] = sub_indices.size();
-
-  CSRPtr subcsr(new CSR(
-        VecToIdArray(sub_indptr), VecToIdArray(sub_indices), VecToIdArray(sub_eids)));
-  return Subgraph{subcsr, vids, VecToIdArray(induced_edges)};
+  const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
+  IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+  CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
+  return Subgraph{subcsr, vids, submat.data};
 }
 
-// complexity: time O(E + V), space O(1)
 CSRPtr CSR::Transpose() const {
-  const int64_t N = NumVertices();
-  const int64_t M = NumEdges();
-  const dgl_id_t* Ap = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* Aj = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* Ax = static_cast<dgl_id_t*>(edge_ids_->data);
-  IdArray ret_indptr = NewIdArray(N + 1);
-  IdArray ret_indices = NewIdArray(M);
-  IdArray ret_edge_ids = NewIdArray(M);
-  dgl_id_t* Bp = static_cast<dgl_id_t*>(ret_indptr->data);
-  dgl_id_t* Bi = static_cast<dgl_id_t*>(ret_indices->data);
-  dgl_id_t* Bx = static_cast<dgl_id_t*>(ret_edge_ids->data);
-
-  std::fill(Bp, Bp + N, 0);
-
-  for (int64_t j = 0; j < M; ++j) {
-    Bp[Aj[j]]++;
-  }
-
-  // cumsum
-  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const dgl_id_t temp = Bp[i];
-    Bp[i] = cumsum;
-    cumsum += temp;
-  }
-  Bp[N] = M;
-
-  for (int64_t i = 0; i < N; ++i) {
-    for (dgl_id_t j = Ap[i]; j < Ap[i+1]; ++j) {
-      const dgl_id_t dst = Aj[j];
-      Bi[Bp[dst]] = i;
-      Bx[Bp[dst]] = Ax[j];
-      Bp[dst]++;
-    }
-  }
-
-  // correct the indptr
-  for (int64_t i = 0, last = 0; i <= N; ++i) {
-    dgl_id_t temp = Bp[i];
-    Bp[i] = last;
-    last = temp;
-  }
-
-  return CSRPtr(new CSR(ret_indptr, ret_indices, ret_edge_ids));
+  const auto& trans = aten::CSRTranspose(adj_);
+  return CSRPtr(new CSR(trans.indptr, trans.indices, trans.data));
 }
 
-// complexity: time O(E + V), space O(1)
 COOPtr CSR::ToCOO() const {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-  IdArray ret_src = NewIdArray(NumEdges());
-  IdArray ret_dst = NewIdArray(NumEdges());
-  dgl_id_t* ret_src_data = static_cast<dgl_id_t*>(ret_src->data);
-  dgl_id_t* ret_dst_data = static_cast<dgl_id_t*>(ret_dst->data);
-  // scatter by edge id
-  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
-    for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src + 1]; ++eid) {
-      const dgl_id_t dst = indices_data[eid];
-      ret_src_data[eid_data[eid]] = src;
-      ret_dst_data[eid_data[eid]] = dst;
-    }
-  }
-  return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
+  const auto& coo = aten::CSRToCOO(adj_, true);
+  return COOPtr(new COO(NumVertices(), coo.row, coo.col));
 }
 
 CSR CSR::CopyTo(const DLContext& ctx) const {
   if (Context() == ctx) {
     return *this;
   } else {
-    // TODO(minjie): change to use constructor later
-    CSR ret;
-    ret.indptr_ = indptr_.CopyTo(ctx);
-    ret.indices_ = indices_.CopyTo(ctx);
-    ret.edge_ids_ = edge_ids_.CopyTo(ctx);
+    CSR ret(adj_.indptr.CopyTo(ctx),
+            adj_.indices.CopyTo(ctx),
+            adj_.data.CopyTo(ctx));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
@@ -399,7 +270,7 @@ CSR CSR::CopyToSharedMem(const std::string &name) const {
     CHECK(name == shared_mem_name_);
     return *this;
   } else {
-    return CSR(indptr_, indices_, edge_ids_, name);
+    return CSR(adj_.indptr, adj_.indices, adj_.data, name);
   }
 }
 
@@ -407,27 +278,29 @@ CSR CSR::AsNumBits(uint8_t bits) const {
   if (NumBits() == bits) {
     return *this;
   } else {
-    // TODO(minjie): change to use constructor later
-    CSR ret;
-    ret.indptr_ = dgl::AsNumBits(indptr_, bits);
-    ret.indices_ = dgl::AsNumBits(indices_, bits);
-    ret.edge_ids_ = dgl::AsNumBits(edge_ids_, bits);
+    CSR ret(aten::AsNumBits(adj_.indptr, bits),
+            aten::AsNumBits(adj_.indices, bits),
+            aten::AsNumBits(adj_.data, bits));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
 }
 
 DGLIdIters CSR::SuccVec(dgl_id_t vid) const {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  // TODO(minjie): This still assumes the data type and device context
+  //   of this graph. Should fix later.
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
   const dgl_id_t start = indptr_data[vid];
   const dgl_id_t end = indptr_data[vid + 1];
   return DGLIdIters(indices_data + start, indices_data + end);
 }
 
 DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  // TODO(minjie): This still assumes the data type and device context
+  //   of this graph. Should fix later.
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(adj_.data->data);
   const dgl_id_t start = indptr_data[vid];
   const dgl_id_t end = indptr_data[vid + 1];
   return DGLIdIters(eid_data + start, eid_data + end);
@@ -722,9 +595,9 @@ ImmutableGraph ImmutableGraph::CopyToSharedMem(const std::string &edge_dir,
                                                const std::string &name) const {
   CSRPtr new_incsr, new_outcsr;
   std::string shared_mem_name = GetSharedMemName(name, edge_dir);
-  if (edge_dir == "in")
+  if (edge_dir == std::string("in"))
     new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(shared_mem_name)));
-  else if (edge_dir == "out")
+  else if (edge_dir == std::string("out"))
     new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(shared_mem_name)));
   return ImmutableGraph(new_incsr, new_outcsr, name);
 }

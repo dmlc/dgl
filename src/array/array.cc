@@ -40,6 +40,34 @@ IdArray Clone(IdArray arr) {
   return ret;
 }
 
+IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx) {
+  IdArray ret;
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
+    if (nbits == 32) {
+      ret = impl::Range<XPU, int32_t>(low, high, ctx);
+    } else if (nbits == 64) {
+      ret = impl::Range<XPU, int64_t>(low, high, ctx);
+    } else {
+      LOG(FATAL) << "Only int32 or int64 is supported.";
+    }
+  });
+  return ret;
+}
+
+IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx) {
+  IdArray ret;
+  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
+    if (nbits == 32) {
+      ret = impl::Full<XPU, int32_t>(val, length, ctx);
+    } else if (nbits == 64) {
+      ret = impl::Full<XPU, int64_t>(val, length, ctx);
+    } else {
+      LOG(FATAL) << "Only int32 or int64 is supported.";
+    }
+  });
+  return ret;
+}
+
 IdArray AsNumBits(IdArray arr, uint8_t bits) {
   IdArray ret;
   ATEN_XPU_SWITCH(arr->ctx.device_type, XPU, {
@@ -174,22 +202,6 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
     ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
       ret = impl::HStack<XPU, IdType>(lhs, rhs);
     });
-  });
-  return ret;
-}
-
-IdArray Full(int32_t val, int64_t length, DLContext ctx) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
-    ret = impl::Full<XPU, int32_t>(val, length, ctx);
-  });
-  return ret;
-}
-
-IdArray Full(int64_t val, int64_t length, DLContext ctx) {
-  IdArray ret;
-  ATEN_XPU_SWITCH(ctx.device_type, XPU, {
-    ret = impl::Full<XPU, int64_t>(val, length, ctx);
   });
   return ret;
 }

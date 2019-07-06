@@ -55,6 +55,26 @@ BoolArray NewBoolArray(int64_t length, DLContext ctx = DLContext{kDLCPU, 0});
 IdArray VecToIdArray(const std::vector<int32_t>& vec, DLContext ctx = DLContext{kDLCPU, 0});
 IdArray VecToIdArray(const std::vector<int64_t>& vec, DLContext ctx = DLContext{kDLCPU, 0});
 
+/*!
+ * \brief Return an array representing a 1D range.
+ * \param low Lower bound (inclusive).
+ * \param high Higher bound (exclusive).
+ * \param nbits result array's bits (32 or 64)
+ * \param ctx Device context
+ * \return range array
+ */
+IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
+
+/*!
+ * \brief Return an array full of the given value
+ * \param val The value to fill.
+ * \param length Number of elements.
+ * \param nbits result array's bits (32 or 64)
+ * \param ctx Device context
+ * \return the result array
+ */
+IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
+
 /*! \brief Create a copy of the given array */
 IdArray Clone(IdArray arr);
 
@@ -79,10 +99,6 @@ IdArray Div(dgl_id_t lhs, IdArray rhs);
 
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
-
-/*! \brief Return an array full of the given value */
-IdArray Full(int32_t val, int64_t length, DLContext ctx);
-IdArray Full(int64_t val, int64_t length, DLContext ctx);
 
 /*! \brief Concat the given 1D arrays */
 IdArray Concat(const std::vector<IdArray>& arrays);
@@ -159,7 +175,7 @@ CSRMatrix CSRTranspose(CSRMatrix );
  *                      is essentially a consecutive range.
  * \return a coo matrix
  */
-COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order = true);
+COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*! \brief Slice rows of the given matrix and return. */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);

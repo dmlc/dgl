@@ -66,6 +66,17 @@ struct PairHash {
     return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
   }
 };
+
+template <typename DType>
+inline runtime::NDArray VecToNDArray(const std::vector<DType>& vec,
+    DLDataType dtype, DLContext ctx) {
+  const int64_t len = vec.size();
+  NDArray ret_arr = NDArray::Empty({len}, dtype, ctx);
+  DType* ptr = static_cast<DType*>(ret_arr->data);
+  std::copy(vec.begin(), vec.end(), ptr);
+  return ret_arr;
+}
+
 }  // namespace
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
@@ -155,7 +166,7 @@ template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
-  // TODO(minjie): more efficient implementation for matrix without duplicate entries
+  // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
 
@@ -184,11 +195,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     }
   }
 
-  const int64_t len = ret_vec.size();
-  NDArray ret_arr = NDArray::Empty({len}, csr.data->dtype, csr.data->ctx);
-  DType* ptr = static_cast<DType*>(ret_arr->data);
-  std::copy(ret_vec.begin(), ret_vec.end(), ptr);
-  return ret_arr;
+  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -199,6 +206,7 @@ template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray row
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray cols) {
   // TODO(minjie): more efficient implementation for matrix without duplicate entries
+  // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
 
@@ -214,7 +222,8 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
 
-  std::vector<DType> ret_rows, ret_cols, ret_data;
+  std::vector<IdType> ret_rows, ret_cols;
+  std::vector<DType> ret_data;
 
   for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
     const IdType row_id = row_data[i], col_id = col_data[j];
@@ -229,7 +238,8 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     }
   }
 
-  return {VecToIdArray(ret_rows), VecToIdArray(ret_cols), VecToIdArray(ret_data)};
+  return {VecToIdArray(ret_rows), VecToIdArray(ret_cols),
+          VecToNDArray(ret_data, csr.data->dtype, csr.data->ctx)};
 }
 
 template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int32_t, int32_t>(
