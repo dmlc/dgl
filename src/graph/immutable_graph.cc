@@ -315,50 +315,9 @@ Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   }
 }
 
-// complexity: time O(E + V), space O(1)
 CSRPtr COO::ToCSR() const {
-  const int64_t N = num_vertices_;
-  const int64_t M = src_->shape[0];
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
-  IdArray indptr = NewIdArray(N + 1);
-  IdArray indices = NewIdArray(M);
-  IdArray edge_ids = NewIdArray(M);
-
-  dgl_id_t* Bp = static_cast<dgl_id_t*>(indptr->data);
-  dgl_id_t* Bi = static_cast<dgl_id_t*>(indices->data);
-  dgl_id_t* Bx = static_cast<dgl_id_t*>(edge_ids->data);
-
-  std::fill(Bp, Bp + N, 0);
-
-  for (int64_t i = 0; i < M; ++i) {
-    Bp[src_data[i]]++;
-  }
-
-  // cumsum
-  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const dgl_id_t temp = Bp[i];
-    Bp[i] = cumsum;
-    cumsum += temp;
-  }
-  Bp[N] = M;
-
-  for (int64_t i = 0; i < M; ++i) {
-    const dgl_id_t src = src_data[i];
-    const dgl_id_t dst = dst_data[i];
-    Bi[Bp[src]] = dst;
-    Bx[Bp[src]] = i;
-    Bp[src]++;
-  }
-
-  // correct the indptr
-  for (int64_t i = 0, last = 0; i <= N; ++i) {
-    dgl_id_t temp = Bp[i];
-    Bp[i] = last;
-    last = temp;
-  }
-
-  return CSRPtr(new CSR(indptr, indices, edge_ids));
+  const auto& csr = aten::COOToCSR(adj_);
+  return CSRPtr(new CSR(csr.indptr, csr.indices, csr.data));
 }
 
 COO COO::CopyTo(const DLContext& ctx) const {

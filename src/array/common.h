@@ -37,6 +37,16 @@ namespace aten {
     LOG(FATAL) << "CSR matrix data can only be int32 or int64";  \
   }
 
+// Macro to dispatch according to device context, index type and data type
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+      ATEN_CSR_DTYPE_SWITCH(csr.data->dtype, DType, {       \
+        {__VA_ARGS__}                                       \
+      });                                                   \
+    });                                                     \
+  });
+
 // Macro to dispatch according to device context and index type
 #define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
   ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
@@ -46,12 +56,20 @@ namespace aten {
   });
 
 // Macro to dispatch according to device context, index type and data type
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      ATEN_CSR_DTYPE_SWITCH(csr.data->dtype, DType, {       \
+#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      ATEN_CSR_DTYPE_SWITCH(coo.data->dtype, DType, {       \
         {__VA_ARGS__}                                       \
       });                                                   \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context and index type
+#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      {__VA_ARGS__}                                         \
     });                                                     \
   });
 

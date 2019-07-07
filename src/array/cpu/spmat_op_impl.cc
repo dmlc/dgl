@@ -78,6 +78,13 @@ inline runtime::NDArray VecToNDArray(const std::vector<DType>& vec,
   return ret_arr;
 }
 
+inline bool CSRHasData(CSRMatrix csr) {
+  return csr.data->ndim != 0;
+}
+
+inline bool COOHasData(COOMatrix csr) {
+  return csr.data->ndim != 0;
+}
 }  // namespace
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
@@ -169,6 +176,7 @@ template NDArray CSRGetRowColumnIndices<kDLCPU, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
+  CHECK(CSRHasData(csr)) << "missing data array";
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
@@ -183,6 +191,7 @@ template NDArray CSRGetRowData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
+  CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): use more efficient binary search when the column indices
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
@@ -207,6 +216,7 @@ template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+  CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
@@ -246,6 +256,7 @@ template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray row
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray cols) {
+  CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): more efficient implementation for matrix without duplicate entries
   // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
@@ -294,6 +305,7 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int64_t, int64_t>(
 // complexity: time O(NNZ + max(N, M)), space O(1)
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
+  CHECK(CSRHasData(csr)) << "missing data array is currently not allowed in CSRTranspose.";
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
@@ -364,6 +376,7 @@ template COOMatrix CSRToCOO<kDLCPU, int64_t>(CSRMatrix csr);
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
+  CHECK(CSRHasData(csr)) << "missing data array.";
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
@@ -399,6 +412,7 @@ template COOMatrix CSRToCOODataAsOrder<kDLCPU, int64_t>(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
+  CHECK(CSRHasData(csr)) << "missing data array.";
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const int64_t num_rows = end - start;
   const int64_t nnz = indptr[end] - indptr[start];
@@ -423,6 +437,7 @@ template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix , int64_t , 
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
+  CHECK(CSRHasData(csr)) << "missing data array.";
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
@@ -464,6 +479,7 @@ template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix , NDArray);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+  CHECK(CSRHasData(csr)) << "missing data array.";
   IdHashMap<IdType> hashmap(cols);
   const int64_t new_nrows = rows->shape[0];
   const int64_t new_ncols = cols->shape[0];
@@ -540,35 +556,36 @@ template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix coo) {
-  const int64_t N = num_vertices_;
-  const int64_t M = src_->shape[0];
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
-  IdArray indptr = NewIdArray(N + 1);
-  IdArray indices = NewIdArray(M);
-  IdArray edge_ids = NewIdArray(M);
+  CHECK(COOHasData(coo)) << "missing data array is currently not allowed in COOToCSR.";
+  const int64_t N = coo.num_rows;
+  const int64_t NNZ = coo.row->shape[0];
+  const IdType* row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* col_data = static_cast<IdType*>(coo.col->data);
+  IdArray ret_indptr = NewIdArray(N + 1);
+  IdArray ret_indices = NewIdArray(NNZ);
+  IdArray ret_data = NewIdArray(NNZ);
 
-  dgl_id_t* Bp = static_cast<dgl_id_t*>(indptr->data);
-  dgl_id_t* Bi = static_cast<dgl_id_t*>(indices->data);
-  dgl_id_t* Bx = static_cast<dgl_id_t*>(edge_ids->data);
+  IdType* Bp = static_cast<IdType*>(ret_indptr->data);
+  IdType* Bi = static_cast<IdType*>(ret_indices->data);
+  DType* Bx = static_cast<DType*>(ret_data->data);
 
   std::fill(Bp, Bp + N, 0);
 
-  for (int64_t i = 0; i < M; ++i) {
-    Bp[src_data[i]]++;
+  for (int64_t i = 0; i < NNZ; ++i) {
+    Bp[row_data[i]]++;
   }
 
   // cumsum
   for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const dgl_id_t temp = Bp[i];
+    const IdType temp = Bp[i];
     Bp[i] = cumsum;
     cumsum += temp;
   }
-  Bp[N] = M;
+  Bp[N] = NNZ;
 
-  for (int64_t i = 0; i < M; ++i) {
-    const dgl_id_t src = src_data[i];
-    const dgl_id_t dst = dst_data[i];
+  for (int64_t i = 0; i < NNZ; ++i) {
+    const IdType src = row_data[i];
+    const IdType dst = col_data[i];
     Bi[Bp[src]] = dst;
     Bx[Bp[src]] = i;
     Bp[src]++;
@@ -576,13 +593,16 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 
   // correct the indptr
   for (int64_t i = 0, last = 0; i <= N; ++i) {
-    dgl_id_t temp = Bp[i];
+    IdType temp = Bp[i];
     Bp[i] = last;
     last = temp;
   }
 
-  return CSRPtr(new CSR(indptr, indices, edge_ids));
+  return CSRMatrix{coo.num_rows, coo.num_cols, ret_indptr, ret_indices, ret_data};
 }
+
+template CSRMatrix COOToCSR<kDLCPU, int32_t, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDLCPU, int64_t, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

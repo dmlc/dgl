@@ -345,5 +345,23 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   return ret;
 }
 
+///////////////////////// COO routines //////////////////////////
+
+bool COOHasDuplicate(COOMatrix coo) {
+  bool ret = false;
+  ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOHasDuplicate<XPU, IdType>(coo);
+  });
+  return ret;
+}
+
+CSRMatrix COOToCSR(COOMatrix coo) {
+  CSRMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOToCSR<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
 }  // namespace aten
 }  // namespace dgl
