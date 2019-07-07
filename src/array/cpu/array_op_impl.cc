@@ -4,9 +4,11 @@
  * \brief Array operator CPU implementation
  */
 #include <dgl/array.h>
+#include <numeric>
 #include "../arith.h"
 
 namespace dgl {
+using runtime::NDArray;
 namespace aten {
 namespace impl {
 
@@ -121,7 +123,7 @@ IdArray HStack(IdArray arr1, IdArray arr2) {
 template IdArray HStack<kDLCPU, int32_t>(IdArray arr1, IdArray arr2);
 template IdArray HStack<kDLCPU, int64_t>(IdArray arr1, IdArray arr2);
 
-///////////////////////////// HStack /////////////////////////////
+///////////////////////////// Full /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Full(IdType val, int64_t length, DLContext ctx) {
@@ -133,6 +135,48 @@ IdArray Full(IdType val, int64_t length, DLContext ctx) {
 
 template IdArray Full<kDLCPU, int32_t>(int32_t val, int64_t length, DLContext ctx);
 template IdArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ctx);
+
+///////////////////////////// Range /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Range(IdType low, IdType high, DLContext ctx) {
+  IdArray ret = NewIdArray(high - low, ctx, sizeof(IdType) * 8);
+  IdType* ret_data = static_cast<IdType*>(ret->data);
+  std::iota(ret_data, ret_data + high - low, low);
+  return ret;
+}
+
+template IdArray Range<kDLCPU, int32_t>(int32_t, int32_t, DLContext);
+template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DLContext);
+
+///////////////////////////// Slice /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Slice(IdArray array, IdArray index) {
+  const IdType* array_data = static_cast<IdType*>(array->data);
+  const IdType* idx_data = static_cast<IdType*>(index->data);
+  const int64_t arr_len = array->shape[0];
+  const int64_t len = index->shape[0];
+  IdArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
+  IdType* ret_data = static_cast<IdType*>(ret->data);
+  for (int64_t i = 0; i < len; ++i) {
+    CHECK_LT(idx_data[i], arr_len) << "Index out of range.";
+    ret_data[i] = array_data[idx_data[i]];
+  }
+  return ret;
+}
+
+template IdArray Slice<kDLCPU, int32_t>(IdArray, IdArray);
+template IdArray Slice<kDLCPU, int64_t>(IdArray, IdArray);
+
+template <DLDeviceType XPU, typename IdType>
+int64_t Slice(IdArray array, int64_t index) {
+  const IdType* data = static_cast<IdType*>(array->data);
+  return data[index];
+}
+
+template int64_t Slice<kDLCPU, int32_t>(IdArray array, int64_t index);
+template int64_t Slice<kDLCPU, int64_t>(IdArray array, int64_t index);
 
 }  // namespace impl
 }  // namespace aten

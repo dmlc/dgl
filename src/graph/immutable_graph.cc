@@ -118,22 +118,6 @@ bool CSR::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
       return aten::CSRHasDuplicate(adj_);
-      /*
-      const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-      const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-      for (dgl_id_t src = 0; src < NumVertices(); ++src) {
-        std::unordered_set<dgl_id_t> hashmap;
-        for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src+1]; ++eid) {
-          const dgl_id_t dst = indices_data[eid];
-          if (hashmap.count(dst)) {
-            return true;
-          } else {
-            hashmap.insert(dst);
-          }
-        }
-      }
-      return false;
-      */
     });
 }
 
@@ -150,58 +134,11 @@ CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
   auto csrsubmat = aten::CSRSliceRows(adj_, vids);
   auto coosubmat = aten::CSRToCOO(csrsubmat, false);
   return CSR::EdgeArray{coosubmat.row, coosubmat.col, coosubmat.data};
-
-  /*
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
-  const auto len = vids->shape[0];
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  int64_t rstlen = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t vid = vid_data[i];
-    CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rstlen += OutDegree(vid);
-  }
-  IdArray src = NewIdArray(rstlen);
-  IdArray dst = NewIdArray(rstlen);
-  IdArray eid = NewIdArray(rstlen);
-  dgl_id_t* src_ptr = static_cast<dgl_id_t*>(src->data);
-  dgl_id_t* dst_ptr = static_cast<dgl_id_t*>(dst->data);
-  dgl_id_t* eid_ptr = static_cast<dgl_id_t*>(eid->data);
-  for (int64_t i = 0; i < len; ++i) {
-    const dgl_id_t vid = vid_data[i];
-    const dgl_id_t off = indptr_data[vid];
-    const int64_t deg = OutDegree(vid);
-    if (deg == 0)
-      continue;
-    const auto *succ = indices_data + off;
-    const auto *eids = edge_ids_data + off;
-    for (int64_t j = 0; j < deg; ++j) {
-      *(src_ptr++) = vid;
-      *(dst_ptr++) = succ[j];
-      *(eid_ptr++) = eids[j];
-    }
-  }
-  return CSR::EdgeArray{src, dst, eid};
-  */
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   return aten::CSRGetRowNNZ(adj_, vids);
-  /*
-  const auto len = vids->shape[0];
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  DegreeArray rst = DegreeArray::Empty({len}, vids->dtype, vids->ctx);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  for (int64_t i = 0; i < len; ++i) {
-    const auto vid = vid_data[i];
-    CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rst_data[i] = OutDegree(vid);
-  }
-  return rst;
-  */
 }
 
 bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
@@ -311,23 +248,31 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
 // COO graph implementation
 //
 //////////////////////////////////////////////////////////
-COO::COO(int64_t num_vertices, IdArray src, IdArray dst)
-  : num_vertices_(num_vertices), src_(src), dst_(dst) {
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
   CHECK(IsValidIdArray(src));
   CHECK(IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
+  adj_.num_rows = num_vertices;
+  adj_.num_cols = num_vertices;
+  adj_.row = src;
+  adj_.col = dst;
 }
 
-COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
-  : num_vertices_(num_vertices), src_(src), dst_(dst), is_multigraph_(is_multigraph) {
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph) : is_multigraph_(is_multigraph) {
   CHECK(IsValidIdArray(src));
   CHECK(IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
+  adj_.num_rows = num_vertices;
+  adj_.num_cols = num_vertices;
+  adj_.row = src;
+  adj_.col = dst;
 }
 
 bool COO::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
+      return aten::COOHasDuplicate(adj_);
+      /*
       std::unordered_set<std::pair<dgl_id_t, dgl_id_t>, PairHash> hashmap;
       const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
       const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
@@ -340,36 +285,30 @@ bool COO::IsMultigraph() const {
         }
       }
       return false;
+      */
     });
+}
+
+std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
+  CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
+  const auto src = aten::Slice(adj_.row, eid);
+  const auto dst = aten::Slice(adj_.col, eid);
+  return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 
 COO::EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  int64_t len = eids->shape[0];
-  IdArray rst_src = NewIdArray(len);
-  IdArray rst_dst = NewIdArray(len);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-
-  for (int64_t i = 0; i < len; i++) {
-    auto edge = COO::FindEdge(eid_data[i]);
-    rst_src_data[i] = edge.first;
-    rst_dst_data[i] = edge.second;
-  }
-
-  return COO::EdgeArray{rst_src, rst_dst, eids};
+  return EdgeArray{aten::Slice(adj_.row, eids),
+                   aten::Slice(adj_.col, eids),
+                   eids};
 }
 
 COO::EdgeArray COO::Edges(const std::string &order) const {
-  const int64_t rstlen = NumEdges();
   CHECK(order.empty() || order == std::string("eid"))
     << "COO only support Edges of order \"eid\", but got \""
     << order << "\".";
-  IdArray rst_eid = NewIdArray(rstlen);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-  std::iota(rst_eid_data, rst_eid_data + rstlen, 0);
-  return EdgeArray{src_, dst_, rst_eid};
+  IdArray rst_eid = aten::Range(0, NumEdges(), NumBits(), Context());
+  return EdgeArray{adj_.row, adj_.col, rst_eid};
 }
 
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {

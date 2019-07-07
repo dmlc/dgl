@@ -26,6 +26,10 @@ typedef dgl::runtime::NDArray TypeArray;
 
 namespace aten {
 
+//////////////////////////////////////////////////////////////////////
+// ID array
+//////////////////////////////////////////////////////////////////////
+
 /*!
  * \brief Create a new id array with given length
  * \param length The array length
@@ -100,8 +104,13 @@ IdArray Div(dgl_id_t lhs, IdArray rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! \brief Concat the given 1D arrays */
-IdArray Concat(const std::vector<IdArray>& arrays);
+/*! \brief Return the data under the index. In numpy notation, A[I] */
+int64_t Slice(IdArray array, int64_t index);
+IdArray Slice(IdArray array, IdArray index);
+
+//////////////////////////////////////////////////////////////////////
+// Sparse matrix
+//////////////////////////////////////////////////////////////////////
 
 /*!
  * \brief Plain CSR matrix
@@ -198,6 +207,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 bool CSRHasDuplicate(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
+
+/*! \return True if the matrix has duplicate entries */
+bool COOHasDuplicate(COOMatrix );
 
 /*! \brief Convert COO matrix to CSR matrix. */
 CSRMatrix COOToCSR(COOMatrix );

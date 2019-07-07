@@ -206,33 +206,36 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
-IdArray Concat(const std::vector<IdArray>& arrays) {
-  // TODO
-}
-
-
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   bool ret = false;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRIsNonZero<XPU, IdType, DType>(csr, row, col);
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
+  });
+  return ret;
+}
+
+bool CSRHasDuplicate(CSRMatrix csr) {
+  bool ret = false;
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRHasDuplicate<XPU, IdType>(csr);
   });
   return ret;
 }
 
 int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   int64_t ret = 0;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetRowNNZ<XPU, IdType, DType>(csr, row);
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   });
   return ret;
 }
 
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   NDArray ret;
-  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetRowColumnIndices<XPU, IdType, DType>(csr, row);
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRGetRowColumnIndices<XPU, IdType>(csr, row);
   });
   return ret;
 }

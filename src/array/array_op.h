@@ -32,15 +32,27 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs);
 template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 
+template <DLDeviceType XPU, typename IdType>
+IdArray Slice(IdArray array, IdArray index);
+
+template <DLDeviceType XPU, typename IdType>
+int64_t Slice(IdArray array, int64_t index);
+
 // sparse arrays
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
+bool CSRHasDuplicate(CSRMatrix );
+
+template <DLDeviceType XPU, typename IdType>
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray CSRGetRowNNZ(CSRMatrix , runtime::NDArray row);
+
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
@@ -69,6 +81,9 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix );
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
