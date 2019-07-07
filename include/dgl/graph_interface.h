@@ -130,7 +130,7 @@ class GraphInterface {
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   virtual BoolArray HasVertices(IdArray vids) const {
     const auto len = vids->shape[0];
-    BoolArray rst = NewBoolArray(len);
+    BoolArray rst = aten::NewBoolArray(len);
     const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
     dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
     const uint64_t nverts = NumVertices();

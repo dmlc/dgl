@@ -38,12 +38,13 @@ namespace aten {
   }
 
 // Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
 #define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
   ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
     ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      ATEN_CSR_DTYPE_SWITCH(csr.data->dtype, DType, {       \
-        {__VA_ARGS__}                                       \
-      });                                                   \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
     });                                                     \
   });
 
@@ -56,12 +57,13 @@ namespace aten {
   });
 
 // Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
 #define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
   ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
-      ATEN_CSR_DTYPE_SWITCH(coo.data->dtype, DType, {       \
-        {__VA_ARGS__}                                       \
-      });                                                   \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
     });                                                     \
   });
 

@@ -4,6 +4,7 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
 #include "./common.h"
@@ -20,18 +21,6 @@ IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
 
 BoolArray NewBoolArray(int64_t length, DLContext ctx) {
   return BoolArray::Empty({length}, DLDataType{kDLInt, 64, 1}, ctx);
-}
-
-IdArray VecToIdArray(const std::vector<int32_t>& vec, DLContext ctx) {
-  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, 32);
-  std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
-  return ret.CopyTo(ctx);
-}
-
-IdArray VecToIdArray(const std::vector<int64_t>& vec, DLContext ctx) {
-  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, 64);
-  std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(ret->data));
-  return ret.CopyTo(ctx);
 }
 
 IdArray Clone(IdArray arr) {
@@ -262,6 +251,14 @@ int64_t CSRGetRowNNZ(CSRMatrix csr, int64_t row) {
   return ret;
 }
 
+NDArray CSRGetRowNNZ(CSRMatrix csr, NDArray row) {
+  NDArray ret;
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
+  });
+  return ret;
+}
+
 NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row) {
   NDArray ret;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
@@ -333,6 +330,14 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
     ret = impl::CSRSliceRows<XPU, IdType, DType>(csr, start, end);
+  });
+  return ret;
+}
+
+CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
+  CSRMatrix ret;
+  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
+    ret = impl::CSRSliceRows<XPU, IdType, DType>(csr, rows);
   });
   return ret;
 }

@@ -53,11 +53,14 @@ BoolArray NewBoolArray(int64_t length, DLContext ctx = DLContext{kDLCPU, 0});
 /*!
  * \brief Create a new id array using the given vector data
  * \param vec The vector data
+ * \param nbits The integer bits of the returned array
  * \param ctx The array context
  * \return the id array
  */
-IdArray VecToIdArray(const std::vector<int32_t>& vec, DLContext ctx = DLContext{kDLCPU, 0});
-IdArray VecToIdArray(const std::vector<int64_t>& vec, DLContext ctx = DLContext{kDLCPU, 0});
+template <typename T>
+IdArray VecToIdArray(const std::vector<T>& vec,
+                     uint8_t nbits = 64,
+                     DLContext ctx = DLContext{kDLCPU, 0});
 
 /*!
  * \brief Return an array representing a 1D range.
@@ -224,6 +227,22 @@ bool COOHasDuplicate(COOMatrix );
 
 /*! \brief Convert COO matrix to CSR matrix. */
 CSRMatrix COOToCSR(COOMatrix );
+
+// inline implementations
+template <typename T>
+IdArray VecToIdArray(const std::vector<T>& vec,
+                     uint8_t nbits,
+                     DLContext ctx) {
+  IdArray ret = NewIdArray(vec.size(), DLContext{kDLCPU, 0}, nbits);
+  if (nbits == 32) {
+    std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
+  } else if (nbits == 64) {
+    std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
+  } else {
+    LOG(FATAL) << "Only int32 or int64 is supported.";
+  }
+  return ret.CopyTo(ctx);
+}
 
 }  // namespace aten
 }  // namespace dgl
