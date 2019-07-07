@@ -5,7 +5,7 @@
  */
 #include <dgl/array.h>
 #include <vector>
-#include <unorderd_set>
+#include <unordered_set>
 
 namespace dgl {
 
@@ -461,6 +461,7 @@ template CSRMatrix CSRSliceRows<kDLCPU, int32_t, int32_t>(CSRMatrix , NDArray);
 template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix , NDArray);
 
 ///////////////////////////// CSRSliceMatrix /////////////////////////////
+
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
   IdHashMap<IdType> hashmap(cols);
@@ -511,6 +512,77 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t, int32_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+
+///////////////////////////// COOHasDuplicate /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+bool COOHasDuplicate(COOMatrix coo) {
+  std::unordered_set<std::pair<IdType, IdType>, PairHash> hashmap;
+  const IdType* src_data = static_cast<IdType*>(coo.row->data);
+  const IdType* dst_data = static_cast<IdType*>(coo.col->data);
+  const auto nnz = coo.row->shape[0];
+  for (IdType eid = 0; eid < nnz; ++eid) {
+    const auto& p = std::make_pair(src_data[eid], dst_data[eid]);
+    if (hashmap.count(p)) {
+      return true;
+    } else {
+      hashmap.insert(p);
+    }
+  }
+  return false;
+}
+
+template bool COOHasDuplicate<kDLCPU, int32_t>(COOMatrix coo);
+template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
+
+///////////////////////////// COOToCSR /////////////////////////////
+
+// complexity: time O(NNZ), space O(1)
+template <DLDeviceType XPU, typename IdType, typename DType>
+CSRMatrix COOToCSR(COOMatrix coo) {
+  const int64_t N = num_vertices_;
+  const int64_t M = src_->shape[0];
+  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
+  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+  IdArray indptr = NewIdArray(N + 1);
+  IdArray indices = NewIdArray(M);
+  IdArray edge_ids = NewIdArray(M);
+
+  dgl_id_t* Bp = static_cast<dgl_id_t*>(indptr->data);
+  dgl_id_t* Bi = static_cast<dgl_id_t*>(indices->data);
+  dgl_id_t* Bx = static_cast<dgl_id_t*>(edge_ids->data);
+
+  std::fill(Bp, Bp + N, 0);
+
+  for (int64_t i = 0; i < M; ++i) {
+    Bp[src_data[i]]++;
+  }
+
+  // cumsum
+  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
+    const dgl_id_t temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
+  }
+  Bp[N] = M;
+
+  for (int64_t i = 0; i < M; ++i) {
+    const dgl_id_t src = src_data[i];
+    const dgl_id_t dst = dst_data[i];
+    Bi[Bp[src]] = dst;
+    Bx[Bp[src]] = i;
+    Bp[src]++;
+  }
+
+  // correct the indptr
+  for (int64_t i = 0, last = 0; i <= N; ++i) {
+    dgl_id_t temp = Bp[i];
+    Bp[i] = last;
+    last = temp;
+  }
+
+  return CSRPtr(new CSR(indptr, indices, edge_ids));
+}
 
 }  // namespace impl
 }  // namespace aten

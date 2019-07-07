@@ -272,20 +272,6 @@ bool COO::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
       return aten::COOHasDuplicate(adj_);
-      /*
-      std::unordered_set<std::pair<dgl_id_t, dgl_id_t>, PairHash> hashmap;
-      const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
-      const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
-      for (dgl_id_t eid = 0; eid < NumEdges(); ++eid) {
-        const auto& p = std::make_pair(src_data[eid], dst_data[eid]);
-        if (hashmap.count(p)) {
-          return true;
-        } else {
-          hashmap.insert(p);
-        }
-      }
-      return false;
-      */
     });
 }
 
@@ -313,54 +299,17 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
 
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
-  const dgl_id_t* eids_data = static_cast<dgl_id_t*>(eids->data);
-  IdArray new_src = NewIdArray(eids->shape[0]);
-  IdArray new_dst = NewIdArray(eids->shape[0]);
-  dgl_id_t* new_src_data = static_cast<dgl_id_t*>(new_src->data);
-  dgl_id_t* new_dst_data = static_cast<dgl_id_t*>(new_dst->data);
   if (!preserve_nodes) {
-    dgl_id_t newid = 0;
-    std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
-
-    for (int64_t i = 0; i < eids->shape[0]; ++i) {
-      const dgl_id_t eid = eids_data[i];
-      const dgl_id_t src = src_data[eid];
-      const dgl_id_t dst = dst_data[eid];
-      if (!oldv2newv.count(src)) {
-        oldv2newv[src] = newid++;
-      }
-      if (!oldv2newv.count(dst)) {
-        oldv2newv[dst] = newid++;
-      }
-      *(new_src_data++) = oldv2newv[src];
-      *(new_dst_data++) = oldv2newv[dst];
-    }
-
-    // induced nodes
-    IdArray induced_nodes = NewIdArray(newid);
-    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
-    for (const auto& kv : oldv2newv) {
-      induced_nodes_data[kv.second] = kv.first;
-    }
-
-    COOPtr subcoo(new COO(newid, new_src, new_dst));
+    IdArray new_src = aten::Slice(adj_.row, eids);
+    IdArray new_dst = aten::Slice(adj_.col, eids);
+    IdArray induced_nodes = aten::Relabel_({new_src, new_dst});
+    const auto new_nnodes = induced_nodes->shape[0];
+    COOPtr subcoo(new COO(new_nnodes, new_src, new_dst));
     return Subgraph{subcoo, induced_nodes, eids};
   } else {
-    for (int64_t i = 0; i < eids->shape[0]; ++i) {
-      const dgl_id_t eid = eids_data[i];
-      const dgl_id_t src = src_data[eid];
-      const dgl_id_t dst = dst_data[eid];
-      *(new_src_data++) = src;
-      *(new_dst_data++) = dst;
-    }
-
-    IdArray induced_nodes = NewIdArray(NumVertices());
-    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
-    for (int64_t i = 0; i < NumVertices(); ++i)
-      *(induced_nodes_data++) = i;
-
+    IdArray new_src = aten::Slice(adj_.row, eids);
+    IdArray new_dst = aten::Slice(adj_.col, eids);
+    IdArray induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
     COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
     return Subgraph{subcoo, induced_nodes, eids};
   }
@@ -416,11 +365,9 @@ COO COO::CopyTo(const DLContext& ctx) const {
   if (Context() == ctx) {
     return *this;
   } else {
-    // TODO(minjie): change to use constructor later
-    COO ret;
-    ret.num_vertices_ = num_vertices_;
-    ret.src_ = src_.CopyTo(ctx);
-    ret.dst_ = dst_.CopyTo(ctx);
+    COO ret(NumVertices(),
+            adj_.row.CopyTo(ctx),
+            adj_.col.CopyTo(ctx));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
@@ -434,11 +381,9 @@ COO COO::AsNumBits(uint8_t bits) const {
   if (NumBits() == bits) {
     return *this;
   } else {
-    // TODO(minjie): change to use constructor later
-    COO ret;
-    ret.num_vertices_ = num_vertices_;
-    ret.src_ = dgl::AsNumBits(src_, bits);
-    ret.dst_ = dgl::AsNumBits(dst_, bits);
+    COO ret(NumVertices(),
+            aten::AsNumBits(adj_.row, bits),
+            aten::AsNumBits(adj_.col, bits));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }

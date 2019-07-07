@@ -108,6 +108,17 @@ IdArray HStack(IdArray arr1, IdArray arr2);
 int64_t Slice(IdArray array, int64_t index);
 IdArray Slice(IdArray array, IdArray index);
 
+/*!
+ * \brief Relabel the given ids to consecutive ids.
+ *
+ * Relabeling is done inplace. The mapping is created from the union
+ * of the give arrays.
+ *
+ * \param arrays The id arrays to relabel.
+ * \return mapping array M from new id to old id.
+ */
+IdArray Relabel_(const std::vector<IdArray>& arrays);
+
 //////////////////////////////////////////////////////////////////////
 // Sparse matrix
 //////////////////////////////////////////////////////////////////////

@@ -206,6 +206,36 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
+IdArray Slice(IdArray array, IdArray index) {
+  IdArray ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::Slice<XPU, IdType>(array, index);
+    });
+  });
+  return ret;
+}
+
+int64_t Slice(IdArray array, int64_t index) {
+  int64_t ret = 0;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+      ret = impl::Slice<XPU, IdType>(array, index);
+    });
+  });
+  return ret;
+}
+
+IdArray Relabel_(const std::vector<IdArray>& arrays) {
+  IdArray ret;
+  ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
+      ret = impl::Relabel_<XPU, IdType>(arrays);
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {

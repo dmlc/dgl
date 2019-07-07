@@ -38,6 +38,9 @@ IdArray Slice(IdArray array, IdArray index);
 template <DLDeviceType XPU, typename IdType>
 int64_t Slice(IdArray array, int64_t index);
 
+template <DLDeviceType XPU, typename IdType>
+IdArray Relabel_(const std::vector<IdArray>& arrays);
+
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType>
@@ -87,6 +90,9 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType>
+bool COOHasDuplicate(COOMatrix );
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix );

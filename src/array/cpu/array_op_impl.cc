@@ -178,6 +178,34 @@ int64_t Slice(IdArray array, int64_t index) {
 template int64_t Slice<kDLCPU, int32_t>(IdArray array, int64_t index);
 template int64_t Slice<kDLCPU, int64_t>(IdArray array, int64_t index);
 
+///////////////////////////// Relabel_ /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+IdArray Relabel_(const std::vector<IdArray>& arrays) {
+  // build map & relabel
+  IdType newid = 0;
+  std::unordered_map<IdType, IdType> oldv2newv;
+  for (IdArray arr : arrays) {
+    for (int64_t i = 0; i < arr->shape[0]; ++i) {
+      const IdType id = static_cast<IdType*>(arr->data)[i];
+      if (!oldv2newv.count(id)) {
+        oldv2newv[id] = newid++;
+      }
+      static_cast<IdType*>(arr->data)[i] = oldv2newv[id];
+    }
+  }
+  // map array
+  IdArray maparr = NewIdArray(newid);
+  IdType* maparr_data = static_cast<IdType*>(maparr->data);
+  for (const auto& kv : oldv2newv) {
+    maparr_data[kv.second] = kv.first;
+  }
+  return maparr;
+}
+
+template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& );
+template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& );
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl
