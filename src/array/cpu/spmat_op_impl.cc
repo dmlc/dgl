@@ -181,7 +181,7 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   const int64_t len = impl::CSRGetRowNNZ<XPU, IdType>(csr, row);
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const int64_t offset = indptr_data[row] * sizeof(DType);
-  return csr.indices.CreateView({len}, csr.data->dtype, offset);
+  return csr.data.CreateView({len}, csr.data->dtype, offset);
 }
 
 template NDArray CSRGetRowData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t);
@@ -305,7 +305,6 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int64_t, int64_t>(
 // complexity: time O(NNZ + max(N, M)), space O(1)
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
-  LOG(INFO) << "@@@@@@@@@@@@";
   CHECK(CSRHasData(csr)) << "missing data array is currently not allowed in CSRTranspose.";
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
@@ -349,7 +348,6 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
     Bp[i] = last;
     last = temp;
   }
-  LOG(INFO) << "@@@@@@@@@@@@";
 
   return CSRMatrix{csr.num_cols, csr.num_rows, ret_indptr, ret_indices, ret_data};
 }

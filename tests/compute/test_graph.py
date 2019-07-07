@@ -75,8 +75,6 @@ def test_query():
         assert not g.has_edge_between(0, 0)
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
-        print('11111')
-        assert False
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
 
         assert g.edge_id(4,4) == 5
@@ -90,6 +88,7 @@ def test_query():
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7)])
         src, dst, eid = g.in_edges([9,0,8], form='all')  # test node#0 has no in edges
+        print(src, dst, eid)
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7),(3,8,9),(7,8,12)])
 
@@ -113,6 +112,8 @@ def test_query():
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set(t_tup)
         assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
+        print('11111')
+        assert False
 
         assert g.in_degree(0) == 0
         assert g.in_degree(9) == 4
