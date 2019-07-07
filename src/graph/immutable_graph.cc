@@ -54,7 +54,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
-  const int64_t N = indptr->shape[0];
+  const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
 }
 
@@ -64,7 +64,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
-  const int64_t N = indptr->shape[0];
+  const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
 }
 
@@ -380,11 +380,9 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
                      << "It may dramatically increase memory consumption.";
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      LOG(INFO) << "#####";
       const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
     }
   }
-  LOG(INFO) << "#####";
   return out_csr_;
 }
 

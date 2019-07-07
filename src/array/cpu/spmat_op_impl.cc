@@ -95,7 +95,7 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  for (IdType i = indptr_data[row]; i < indptr_data[col+1]; ++i) {
+  for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
     if (indices_data[i] == col) {
       return true;
     }
@@ -305,6 +305,7 @@ template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int64_t, int64_t>(
 // complexity: time O(NNZ + max(N, M)), space O(1)
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRTranspose(CSRMatrix csr) {
+  LOG(INFO) << "@@@@@@@@@@@@";
   CHECK(CSRHasData(csr)) << "missing data array is currently not allowed in CSRTranspose.";
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
@@ -348,6 +349,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
     Bp[i] = last;
     last = temp;
   }
+  LOG(INFO) << "@@@@@@@@@@@@";
 
   return CSRMatrix{csr.num_cols, csr.num_rows, ret_indptr, ret_indices, ret_data};
 }
