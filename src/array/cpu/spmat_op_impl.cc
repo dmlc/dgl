@@ -79,11 +79,11 @@ inline runtime::NDArray VecToNDArray(const std::vector<DType>& vec,
 }
 
 inline bool CSRHasData(CSRMatrix csr) {
-  return csr.data->ndim != 0;
+  return csr.data.defined();
 }
 
 inline bool COOHasData(COOMatrix csr) {
-  return csr.data->ndim != 0;
+  return csr.data.defined();
 }
 }  // namespace
 
@@ -556,18 +556,20 @@ template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix coo) {
-  CHECK(COOHasData(coo)) << "missing data array is currently not allowed in COOToCSR.";
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
   const IdType* row_data = static_cast<IdType*>(coo.row->data);
   const IdType* col_data = static_cast<IdType*>(coo.col->data);
   IdArray ret_indptr = NewIdArray(N + 1);
   IdArray ret_indices = NewIdArray(NNZ);
-  IdArray ret_data = NewIdArray(NNZ);
+  IdArray ret_data;
+
+  if (COOHasData(coo)) {
+    ret_data = NewIdArray(NNZ);
+  }
 
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
   IdType* Bi = static_cast<IdType*>(ret_indices->data);
-  DType* Bx = static_cast<DType*>(ret_data->data);
 
   std::fill(Bp, Bp + N, 0);
 
@@ -587,7 +589,10 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     const IdType src = row_data[i];
     const IdType dst = col_data[i];
     Bi[Bp[src]] = dst;
-    Bx[Bp[src]] = i;
+    if (COOHasData(coo)) {
+      DType* Bx = static_cast<DType*>(ret_data->data);
+      Bx[Bp[src]] = i;
+    }
     Bp[src]++;
   }
 

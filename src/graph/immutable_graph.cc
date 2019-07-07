@@ -271,6 +271,13 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph) : i
 bool COO::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
+      LOG(INFO) << "################";
+      LOG(INFO) << adj_.num_rows << " " << adj_.num_cols;
+      LOG(INFO) << adj_.data.defined();
+      auto x = adj_.data;
+      LOG(INFO) << "XXXX";
+      aten::COOMatrix xx = adj_;
+      LOG(INFO) << "XXXX";
       return aten::COOHasDuplicate(adj_);
     });
 }
@@ -334,6 +341,7 @@ COO COO::CopyTo(const DLContext& ctx) const {
 
 COO COO::CopyToSharedMem(const std::string &name) const {
   LOG(FATAL) << "COO doesn't supprt shared memory yet";
+  return COO();
 }
 
 COO COO::AsNumBits(uint8_t bits) const {

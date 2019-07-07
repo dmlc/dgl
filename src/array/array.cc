@@ -354,6 +354,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
 
 bool COOHasDuplicate(COOMatrix coo) {
   bool ret = false;
+  LOG(INFO) << "@@@@";
   ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
     ret = impl::COOHasDuplicate<XPU, IdType>(coo);
   });

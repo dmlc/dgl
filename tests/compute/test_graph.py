@@ -60,6 +60,7 @@ def test_query():
         assert g.number_of_edges() == 20
         assert len(g) == 10
         assert not g.is_multigraph
+        print('11111')
 
         for i in range(10):
             assert g.has_node(i)
@@ -202,9 +203,11 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
-    _test(gen_by_mutation())
-    _test(gen_from_data(elist_input(), False))
+    #_test(gen_by_mutation())
+    #_test(gen_from_data(elist_input(), False))
     _test(gen_from_data(elist_input(), True))
+    print('ccccc')
+    assert False
     _test(gen_from_data(nx_input(), False))
     _test(gen_from_data(nx_input(), True))
     _test(gen_from_data(scipy_coo_input(), False))
@@ -382,8 +385,8 @@ def test_find_edges():
 
 if __name__ == '__main__':
     test_query()
-    test_mutation()
-    test_scipy_adjmat()
-    test_incmat()
-    test_readonly()
-    test_find_edges()
+    #test_mutation()
+    #test_scipy_adjmat()
+    #test_incmat()
+    #test_readonly()
+    #test_find_edges()
