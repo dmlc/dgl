@@ -60,7 +60,6 @@ def test_query():
         assert g.number_of_edges() == 20
         assert len(g) == 10
         assert not g.is_multigraph
-        print('11111')
 
         for i in range(10):
             assert g.has_node(i)
@@ -72,7 +71,10 @@ def test_query():
 
         src, dst = edge_pair_input()
         for u, v in zip(src, dst):
+            print(u, v)
             assert g.has_edge_between(u, v)
+        print('11111')
+        assert False
         assert not g.has_edge_between(0, 0)
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])

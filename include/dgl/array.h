@@ -225,7 +225,14 @@ bool CSRHasDuplicate(CSRMatrix csr);
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix );
 
-/*! \brief Convert COO matrix to CSR matrix. */
+/*!
+ * \brief Convert COO matrix to CSR matrix.
+ *
+ * If the input COO matrix does not have data array, the data array of
+ * the result CSR matrix stores a shuffle index for how the entries
+ * will be reordered in CSR. The i^th entry in the result CSR corresponds
+ * to the CSR.data[i] th entry in the input COO.
+ */
 CSRMatrix COOToCSR(COOMatrix );
 
 // inline implementations

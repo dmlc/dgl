@@ -271,13 +271,6 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph) : i
 bool COO::IsMultigraph() const {
   // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
-      LOG(INFO) << "################";
-      LOG(INFO) << adj_.num_rows << " " << adj_.num_cols;
-      LOG(INFO) << adj_.data.defined();
-      auto x = adj_.data;
-      LOG(INFO) << "XXXX";
-      aten::COOMatrix xx = adj_;
-      LOG(INFO) << "XXXX";
       return aten::COOHasDuplicate(adj_);
     });
 }
@@ -361,6 +354,52 @@ COO COO::AsNumBits(uint8_t bits) const {
 // immutable graph implementation
 //
 //////////////////////////////////////////////////////////
+
+CSRPtr ImmutableGraph::GetInCSR() const {
+  if (!in_csr_) {
+    if (out_csr_) {
+      const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
+      if (out_csr_->IsSharedMem())
+        LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
+                     << "It may dramatically increase memory consumption.";
+    } else {
+      CHECK(coo_) << "None of CSR, COO exist";
+      const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
+    }
+  }
+  return in_csr_;
+}
+
+/* !\brief Return out csr. If not exist, transpose the other one.*/
+CSRPtr ImmutableGraph::GetOutCSR() const {
+  if (!out_csr_) {
+    if (in_csr_) {
+      const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
+      if (in_csr_->IsSharedMem())
+        LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
+                     << "It may dramatically increase memory consumption.";
+    } else {
+      CHECK(coo_) << "None of CSR, COO exist";
+      LOG(INFO) << "#####";
+      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
+    }
+  }
+  LOG(INFO) << "#####";
+  return out_csr_;
+}
+
+/* !\brief Return coo. If not exist, create from csr.*/
+COOPtr ImmutableGraph::GetCOO() const {
+  if (!coo_) {
+    if (in_csr_) {
+      const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
+    } else {
+      CHECK(out_csr_) << "Both CSR are missing.";
+      const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
+    }
+  }
+  return coo_;
+}
 
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   if (order.empty()) {

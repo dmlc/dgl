@@ -885,49 +885,13 @@ class ImmutableGraph: public GraphInterface {
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
   /* !\brief Return in csr. If not exist, transpose the other one.*/
-  CSRPtr GetInCSR() const {
-    if (!in_csr_) {
-      if (out_csr_) {
-        const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
-        if (out_csr_->IsSharedMem())
-          LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
-                       << "It may dramatically increase memory consumption.";
-      } else {
-        CHECK(coo_) << "None of CSR, COO exist";
-        const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
-      }
-    }
-    return in_csr_;
-  }
+  CSRPtr GetInCSR() const;
 
   /* !\brief Return out csr. If not exist, transpose the other one.*/
-  CSRPtr GetOutCSR() const {
-    if (!out_csr_) {
-      if (in_csr_) {
-        const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
-        if (in_csr_->IsSharedMem())
-          LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
-                       << "It may dramatically increase memory consumption.";
-      } else {
-        CHECK(coo_) << "None of CSR, COO exist";
-        const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
-      }
-    }
-    return out_csr_;
-  }
+  CSRPtr GetOutCSR() const;
 
   /* !\brief Return coo. If not exist, create from csr.*/
-  COOPtr GetCOO() const {
-    if (!coo_) {
-      if (in_csr_) {
-        const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
-      } else {
-        CHECK(out_csr_) << "Both CSR are missing.";
-        const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
-      }
-    }
-    return coo_;
-  }
+  COOPtr GetCOO() const;
 
   /*!
    * \brief Convert the given graph to an immutable graph.

@@ -560,12 +560,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t NNZ = coo.row->shape[0];
   const IdType* row_data = static_cast<IdType*>(coo.row->data);
   const IdType* col_data = static_cast<IdType*>(coo.col->data);
-  IdArray ret_indptr = NewIdArray(N + 1);
-  IdArray ret_indices = NewIdArray(NNZ);
-  IdArray ret_data;
-
+  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
+  NDArray ret_data;
   if (COOHasData(coo)) {
-    ret_data = NewIdArray(NNZ);
+    ret_data = NDArray::Empty({NNZ}, coo.data->dtype, coo.data->ctx);
+  } else {
+    // if no data array in the input coo, the return data array is a shuffle index.
+    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
   }
 
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
@@ -586,14 +588,17 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   Bp[N] = NNZ;
 
   for (int64_t i = 0; i < NNZ; ++i) {
-    const IdType src = row_data[i];
-    const IdType dst = col_data[i];
-    Bi[Bp[src]] = dst;
+    const IdType r = row_data[i];
+    Bi[Bp[r]] = col_data[i];
     if (COOHasData(coo)) {
+      const DType* data = static_cast<DType*>(coo.data->data);
       DType* Bx = static_cast<DType*>(ret_data->data);
-      Bx[Bp[src]] = i;
+      Bx[Bp[r]] = data[i];
+    } else {
+      IdType* Bx = static_cast<IdType*>(ret_data->data);
+      Bx[Bp[r]] = i;
     }
-    Bp[src]++;
+    Bp[r]++;
   }
 
   // correct the indptr
