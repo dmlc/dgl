@@ -259,7 +259,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   if (nbits == 32) {
     std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
   } else if (nbits == 64) {
-    std::copy(vec.begin(), vec.end(), static_cast<int32_t*>(ret->data));
+    std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(ret->data));
   } else {
     LOG(FATAL) << "Only int32 or int64 is supported.";
   }
