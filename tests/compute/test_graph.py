@@ -90,8 +90,6 @@ def test_query():
         src, dst, eid = g.in_edges([9,0,8], form='all')  # test node#0 has no in edges
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7),(3,8,9),(7,8,12)])
-        print('!!!!')
-        assert False
 
         src, dst, eid = g.out_edges(0, form='all')
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
@@ -113,8 +111,6 @@ def test_query():
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set(t_tup)
         assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
-        print('11111')
-        assert False
 
         assert g.in_degree(0) == 0
         assert g.in_degree(9) == 4
@@ -206,11 +202,9 @@ def test_query():
         _test_csr_one(g)
         _test_csr_one(g)
 
-    #_test(gen_by_mutation())
-    #_test(gen_from_data(elist_input(), False))
+    _test(gen_by_mutation())
+    _test(gen_from_data(elist_input(), False))
     _test(gen_from_data(elist_input(), True))
-    print('ccccc')
-    assert False
     _test(gen_from_data(nx_input(), False))
     _test(gen_from_data(nx_input(), True))
     _test(gen_from_data(scipy_coo_input(), False))
@@ -388,8 +382,8 @@ def test_find_edges():
 
 if __name__ == '__main__':
     test_query()
-    #test_mutation()
-    #test_scipy_adjmat()
-    #test_incmat()
-    #test_readonly()
-    #test_find_edges()
+    test_mutation()
+    test_scipy_adjmat()
+    test_incmat()
+    test_readonly()
+    test_find_edges()
