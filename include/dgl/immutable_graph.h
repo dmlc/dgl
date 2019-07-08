@@ -1048,6 +1048,8 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges,
     bool is_multigraph): is_multigraph_(is_multigraph) {
   // TODO(minjie): this should be changed to a device-agnostic implementation
   //   in the future
+  adj_.num_rows = num_vertices;
+  adj_.num_cols = num_vertices;
   adj_.indptr = aten::NewIdArray(num_vertices + 1);
   adj_.indices = aten::NewIdArray(num_edges);
   adj_.data = aten::NewIdArray(num_edges);
