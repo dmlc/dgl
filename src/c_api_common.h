@@ -55,8 +55,7 @@ dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
 
 /*!\brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
-    && arr->dtype.code == kDLInt;
+  return arr->ndim == 1 && arr->dtype.code == kDLInt;
 }
 
 /*!
