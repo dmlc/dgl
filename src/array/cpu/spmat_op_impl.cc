@@ -309,7 +309,6 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
-  LOG(INFO) << "N=" << N << " M=" << M << " nnz=" << nnz;
   const IdType* Ap = static_cast<IdType*>(csr.indptr->data);
   const IdType* Aj = static_cast<IdType*>(csr.indices->data);
   const DType* Ax = static_cast<DType*>(csr.data->data);

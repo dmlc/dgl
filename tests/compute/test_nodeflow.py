@@ -41,7 +41,6 @@ def test_self_loop():
     g = generate_rand_graph(n, complete=True)
     nf = create_mini_batch(g, num_hops, add_self_loop=True)
     for i in range(1, nf.num_layers):
-        print(i)
         in_deg = nf.layer_in_degree(i)
         deg = F.copy_to(F.ones(in_deg.shape, dtype=F.int64), F.cpu()) * n
         assert_array_equal(F.asnumpy(in_deg), F.asnumpy(deg))
@@ -50,7 +49,6 @@ def test_self_loop():
     g = dgl.to_simple_graph(g)
     nf = create_mini_batch(g, num_hops, add_self_loop=True)
     for i in range(nf.num_blocks):
-        print(i)
         parent_eid = F.asnumpy(nf.block_parent_eid(i))
         parent_nid = F.asnumpy(nf.layer_parent_nid(i + 1))
         # The loop eid in the parent graph must exist in the block parent eid.

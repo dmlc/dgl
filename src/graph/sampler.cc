@@ -381,8 +381,6 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         const bool add_self_loop) {
   CHECK_EQ(graph->NumBits(), 64) << "32 bit graph is not supported yet";
   unsigned int time_seed = randseed();
-  time_seed = 1562550379;
-  LOG(INFO) << "seed: " << time_seed;
   const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = static_cast<dgl_id_t*>(orig_csr->edge_ids()->data);
@@ -724,7 +722,6 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
 }
 
 void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
-  LOG(INFO) << "neigh_type: " << neigh_type;
   if (neigh_type == "in") {
     auto csr = g.GetInCSR();
     assert(csr);
@@ -734,12 +731,10 @@ void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
   } else {
     LOG(FATAL) << "We don't support sample from neighbor type " << neigh_type;
   }
-  LOG(INFO) << "exit";
 }
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    LOG(INFO) << "@@@@";
     // arguments
     const GraphHandle ghdl = args[0];
     const IdArray seed_nodes = args[1];
@@ -763,7 +758,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
-    LOG(INFO) << "<<<<<<<<<<<<<<<";
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       // create per-worker seed nodes.

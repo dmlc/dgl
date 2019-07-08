@@ -57,7 +57,6 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
-  LOG(INFO) << "CSR construct: " << N;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
 }
 
@@ -188,7 +187,6 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
 }
 
 CSRPtr CSR::Transpose() const {
-  LOG(INFO) << "Trans: " << adj_.num_rows << " " << adj_.num_cols;
   const auto& trans = aten::CSRTranspose(adj_);
   return CSRPtr(new CSR(trans.indptr, trans.indices, trans.data));
 }
@@ -268,7 +266,6 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph) : i
   CHECK(IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
   adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
-  LOG(INFO) << adj_.num_rows << " " << adj_.num_cols;
 }
 
 bool COO::IsMultigraph() const {
@@ -320,7 +317,6 @@ Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
 
 CSRPtr COO::ToCSR() const {
   const auto& csr = aten::COOToCSR(adj_);
-  LOG(INFO) << "ToCSR: " << csr.num_rows << " " << csr.num_cols;
   return CSRPtr(new CSR(csr.indptr, csr.indices, csr.data));
 }
 
@@ -368,7 +364,6 @@ CSRPtr ImmutableGraph::GetInCSR() const {
                      << "It may dramatically increase memory consumption.";
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      LOG(INFO) << "COO -> InCSR";
       const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
     }
   }
@@ -385,7 +380,6 @@ CSRPtr ImmutableGraph::GetOutCSR() const {
                      << "It may dramatically increase memory consumption.";
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      LOG(INFO) << "COO -> OutCSR";
       const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
     }
   }
