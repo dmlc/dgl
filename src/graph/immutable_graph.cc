@@ -44,9 +44,10 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
 
 CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
   : is_multigraph_(is_multigraph) {
-  adj_.indptr = aten::NewIdArray(num_vertices + 1);
-  adj_.indices = aten::NewIdArray(num_edges);
-  adj_.data = aten::NewIdArray(num_edges);
+  adj_ = aten::CSRMatrix{num_vertices, num_vertices,
+                         aten::NewIdArray(num_vertices + 1),
+                         aten::NewIdArray(num_edges),
+                         aten::NewIdArray(num_edges)};
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
