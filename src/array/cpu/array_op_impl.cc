@@ -149,10 +149,10 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
 template IdArray Range<kDLCPU, int32_t>(int32_t, int32_t, DLContext);
 template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DLContext);
 
-///////////////////////////// Slice /////////////////////////////
+///////////////////////////// IndexSelect /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Slice(IdArray array, IdArray index) {
+IdArray IndexSelect(IdArray array, IdArray index) {
   const IdType* array_data = static_cast<IdType*>(array->data);
   const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
@@ -166,17 +166,17 @@ IdArray Slice(IdArray array, IdArray index) {
   return ret;
 }
 
-template IdArray Slice<kDLCPU, int32_t>(IdArray, IdArray);
-template IdArray Slice<kDLCPU, int64_t>(IdArray, IdArray);
+template IdArray IndexSelect<kDLCPU, int32_t>(IdArray, IdArray);
+template IdArray IndexSelect<kDLCPU, int64_t>(IdArray, IdArray);
 
 template <DLDeviceType XPU, typename IdType>
-int64_t Slice(IdArray array, int64_t index) {
+int64_t IndexSelect(IdArray array, int64_t index) {
   const IdType* data = static_cast<IdType*>(array->data);
   return data[index];
 }
 
-template int64_t Slice<kDLCPU, int32_t>(IdArray array, int64_t index);
-template int64_t Slice<kDLCPU, int64_t>(IdArray array, int64_t index);
+template int64_t IndexSelect<kDLCPU, int32_t>(IdArray array, int64_t index);
+template int64_t IndexSelect<kDLCPU, int64_t>(IdArray array, int64_t index);
 
 ///////////////////////////// Relabel_ /////////////////////////////
 

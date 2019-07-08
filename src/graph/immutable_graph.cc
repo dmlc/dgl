@@ -133,7 +133,10 @@ CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   auto csrsubmat = aten::CSRSliceRows(adj_, vids);
   auto coosubmat = aten::CSRToCOO(csrsubmat, false);
-  return CSR::EdgeArray{coosubmat.row, coosubmat.col, coosubmat.data};
+  // Note that the row id in the csr submat is relabled, so
+  // we need to recover it using an index select.
+  auto row = aten::IndexSelect(vids, coosubmat.row);
+  return CSR::EdgeArray{row, coosubmat.col, coosubmat.data};
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
@@ -277,15 +280,15 @@ bool COO::IsMultigraph() const {
 
 std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
   CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
-  const auto src = aten::Slice(adj_.row, eid);
-  const auto dst = aten::Slice(adj_.col, eid);
+  const auto src = aten::IndexSelect(adj_.row, eid);
+  const auto dst = aten::IndexSelect(adj_.col, eid);
   return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 
 COO::EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
-  return EdgeArray{aten::Slice(adj_.row, eids),
-                   aten::Slice(adj_.col, eids),
+  return EdgeArray{aten::IndexSelect(adj_.row, eids),
+                   aten::IndexSelect(adj_.col, eids),
                    eids};
 }
 
@@ -300,15 +303,15 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
   if (!preserve_nodes) {
-    IdArray new_src = aten::Slice(adj_.row, eids);
-    IdArray new_dst = aten::Slice(adj_.col, eids);
+    IdArray new_src = aten::IndexSelect(adj_.row, eids);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids);
     IdArray induced_nodes = aten::Relabel_({new_src, new_dst});
     const auto new_nnodes = induced_nodes->shape[0];
     COOPtr subcoo(new COO(new_nnodes, new_src, new_dst));
     return Subgraph{subcoo, induced_nodes, eids};
   } else {
-    IdArray new_src = aten::Slice(adj_.row, eids);
-    IdArray new_dst = aten::Slice(adj_.col, eids);
+    IdArray new_src = aten::IndexSelect(adj_.row, eids);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids);
     IdArray induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
     COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
     return Subgraph{subcoo, induced_nodes, eids};

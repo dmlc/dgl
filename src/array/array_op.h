@@ -33,10 +33,10 @@ template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 template <DLDeviceType XPU, typename IdType>
-IdArray Slice(IdArray array, IdArray index);
+IdArray IndexSelect(IdArray array, IdArray index);
 
 template <DLDeviceType XPU, typename IdType>
-int64_t Slice(IdArray array, int64_t index);
+int64_t IndexSelect(IdArray array, int64_t index);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);

@@ -195,21 +195,21 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
-IdArray Slice(IdArray array, IdArray index) {
+IdArray IndexSelect(IdArray array, IdArray index) {
   IdArray ret;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Slice<XPU, IdType>(array, index);
+      ret = impl::IndexSelect<XPU, IdType>(array, index);
     });
   });
   return ret;
 }
 
-int64_t Slice(IdArray array, int64_t index) {
+int64_t IndexSelect(IdArray array, int64_t index) {
   int64_t ret = 0;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::Slice<XPU, IdType>(array, index);
+      ret = impl::IndexSelect<XPU, IdType>(array, index);
     });
   });
   return ret;

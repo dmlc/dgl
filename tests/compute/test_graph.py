@@ -88,9 +88,10 @@ def test_query():
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7)])
         src, dst, eid = g.in_edges([9,0,8], form='all')  # test node#0 has no in edges
-        print(src, dst, eid)
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
         assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7),(3,8,9),(7,8,12)])
+        print('!!!!')
+        assert False
 
         src, dst, eid = g.out_edges(0, form='all')
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))

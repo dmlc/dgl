@@ -108,8 +108,8 @@ IdArray Div(dgl_id_t lhs, IdArray rhs);
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 /*! \brief Return the data under the index. In numpy notation, A[I] */
-int64_t Slice(IdArray array, int64_t index);
-IdArray Slice(IdArray array, IdArray index);
+int64_t IndexSelect(IdArray array, int64_t index);
+IdArray IndexSelect(IdArray array, IdArray index);
 
 /*!
  * \brief Relabel the given ids to consecutive ids.
@@ -200,7 +200,22 @@ CSRMatrix CSRTranspose(CSRMatrix );
  */
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
-/*! \brief Slice rows of the given matrix and return. */
+/*!
+ * \brief Slice rows of the given matrix and return.
+ *
+ * Examples:
+ * num_rows = 4
+ * num_cols = 4
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [1, 0, 2, 3, 1]
+ *
+ *  After CSRSliceRows(csr, 1, 3)
+ *
+ * num_rows = 2
+ * num_cols = 4
+ * indptr = [0, 1, 1]
+ * indices = [2]
+ */
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
