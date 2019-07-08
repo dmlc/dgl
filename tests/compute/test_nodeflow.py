@@ -87,7 +87,6 @@ def check_basic(g, nf):
 
     for block_id in range(nf.num_blocks):
         u, v, eid = nf.block_edges(block_id)
-        print(u, v, eid)
         assert np.all(F.asnumpy(nf.has_edges_between(u, v)))
 
     deg = nf.layer_in_degree(0)
