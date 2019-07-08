@@ -10,6 +10,7 @@ class Aggregator(nn.Module):
 
     This class is not supposed to be called
     """
+
     def __init__(self):
         super(Aggregator, self).__init__()
 
@@ -22,10 +23,12 @@ class Aggregator(nn.Module):
         # N x F
         raise NotImplementedError
 
+
 class MeanAggregator(Aggregator):
     '''
     Mean Aggregator for graphsage
     '''
+
     def __init__(self):
         super(MeanAggregator, self).__init__()
 
@@ -33,15 +36,17 @@ class MeanAggregator(Aggregator):
         mean_neighbour = torch.mean(neighbour, dim=1)
         return mean_neighbour
 
+
 class MaxPoolAggregator(Aggregator):
     '''
     Maxpooling aggregator for graphsage
     '''
+
     def __init__(self, in_feats, out_feats, activation, bias):
         super(MaxPoolAggregator, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats, bias=bias)
         self.activation = activation
-        #Xavier initialization of weight
+        # Xavier initialization of weight
         nn.init.xavier_uniform_(self.linear.weight,
                                 gain=nn.init.calculate_gain('relu'))
 
@@ -52,10 +57,12 @@ class MaxPoolAggregator(Aggregator):
         maxpool_neighbour = torch.max(neighbour, dim=1)[0]
         return maxpool_neighbour
 
+
 class LSTMAggregator(Aggregator):
     '''
     LSTM aggregator for graphsage
     '''
+
     def __init__(self, in_feats, hidden_feats):
         super(LSTMAggregator, self).__init__()
         self.lstm = nn.LSTM(in_feats, hidden_feats, batch_first=True)
@@ -64,7 +71,6 @@ class LSTMAggregator(Aggregator):
 
         nn.init.xavier_uniform_(self.lstm.weight,
                                 gain=nn.init.calculate_gain('relu'))
-
 
     def init_hidden(self):
         """
@@ -82,11 +88,12 @@ class LSTMAggregator(Aggregator):
         neighbours = neighbours[:, rand_order, :]
 
         (lstm_out, self.hidden) = self.lstm(neighbours.view(neighbours.size()[0],
-                                                            neighbours.size()[1],
-                                                            -1))
+                                                            neighbours.size()[
+            1],
+            -1))
         return lstm_out[:, -1, :]
 
     def forward(self, node):
         neighbour = node.mailbox['m']
         c = self.aggre(neighbour)
-        return {"c":c}
+        return {"c": c}
