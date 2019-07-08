@@ -3,18 +3,21 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
+
 from ..utils import _create_fully_connected_graph, _create_bipartite_graph, _create_batched_graph_from_num_nodes
 
 from torch.nn import init
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name, get_edata_name
+from ...base import dgl_warning
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes, topk_nodes
 
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobAttnPooling', 'Set2Set', 'MultiHeadAttention',
-           'SetAttentionBlock', 'InducedSetAttentionBlock', 'SetTransformer']
+           'SetAttentionBlock', 'InducedSetAttentionBlock', 'SetTransEncoder', 'SetTransDecoder',
+           'SetTransformer']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
@@ -174,6 +177,7 @@ class Set2Set(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
+    r""" Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
     _query_name = '_gpool_mha_query'
     _key_name = '_gpool_mha_key'
     _value_name = '_gpool_mha_value'
@@ -256,6 +260,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
+    r""" SAB block mentioned in Set-Transformer paper."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttentionBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
@@ -266,7 +271,8 @@ class SetAttentionBlock(nn.Module):
 
         q_nids = sab_graph.nodes()
         kv_nids = sab_graph.nodes()
-        if not isinstance(q_nids, th.Tensor):
+
+        if not isinstance(q_nids, th.Tensor): # TODO(zihao): this should not happen it set PyTorch as the backend.
             q_nids = th.tensor(q_nids)
         if not isinstance(kv_nids, th.Tensor):
             kv_nids = th.tensor(kv_nids)
@@ -274,6 +280,7 @@ class SetAttentionBlock(nn.Module):
         return self.mha(sab_graph, feat, feat, q_nids, kv_nids)
 
 class InducedSetAttentionBlock(nn.Module):
+    r""" ISAB block mentioned in Set-Transformer paper."""
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
@@ -310,20 +317,115 @@ class InducedSetAttentionBlock(nn.Module):
         return rst
 
 
-class MHAPooling(nn.Module):
-    def __init__(self):
-        super(MHAPooling, self).__init__()
-        pass
+class _PMALayer(nn.Module):
+    r"""Pooling by Multihead Attention, used in the Decoder Module of Set Transformer."""
+    def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
+        self.k = k
+        super(_PMALayer, self).__init__()
+        self.S = nn.Parameter(
+            nn.FloatTensor(k, d_model)
+        )
+        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
+        self.reset_parameters()
 
-class SetTransformerEncoder(nn.Module):
-    def __init__(self):
-        super(SetTransformerEncoder, self).__init__()
-        pass
+    def reset_parameters(self):
+        init.xavier_uniform_(self.S)
 
-class SetTransformerDecoder(nn.Module):
-    def __init__(self):
-        super(SetTransformerDecoder, self).__init__()
-        pass
+    def forward(self, graph, feat, pma_graph=None):
+        query = self.S
+        if pma_graph is None:
+            if isinstance(graph, BatchedDGLGraph):
+                induced_graph = _create_batched_graph_from_num_nodes([self.k] * graph.batch_size)
+            else:
+                induced_graph = _create_batched_graph_from_num_nodes([self.k])
+            pma_graph = _create_bipartite_graph(graph, induced_graph)
+
+        g, kv_nids, q_nids = pma_graph
+
+        return self.mha(g, query, feat, q_nids, kv_nids)
+
+
+class SetTransEncoder(nn.Module):
+    r""" The Encoder module in Set Transformer paper. """
+    def __init__(self, d_model, num_heads, d_head, d_ff,
+                 n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
+        super(SetTransEncoder, self).__init__()
+        self.n_layers = n_layers
+        self.block_type = block_type
+        self.m = m
+        layers = []
+        if block_type == 'isab' and m is None:
+            raise KeyError('The number of inducing points is not specified in ISAB block.')
+
+        for _ in range(n_layers):
+            if block_type == 'sab':
+                layers.append(
+                    SetAttentionBlock(d_model, num_heads, d_head, d_ff,
+                                      dropouth=dropouth, dropouta=dropouta))
+            elif block_type == 'isab':
+                layers.append(
+                    InducedSetAttentionBlock(m, d_model, num_heads, d_head, d_ff,
+                                             dropouth=dropouth, dropouta=dropouta))
+            else:
+                raise KeyError("Unrecognized block type {}: we only support sab/isab")
+
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, graph, feat):
+        if self.block_type == 'sab':
+            att_graph = _create_fully_connected_graph(graph)
+        else:
+            if isinstance(graph, BatchedDGLGraph):
+                induced_graph = _create_batched_graph_from_num_nodes([self.m] * graph.batch_size)
+            else:
+                induced_graph = _create_batched_graph_from_num_nodes([self.m])
+
+            att_graph = [
+                _create_bipartite_graph(graph, induced_graph),
+                _create_bipartite_graph(induced_graph, graph)
+            ]
+
+        for layer in self.layers:
+            feat = layer(graph, feat, att_graph)
+
+        return feat
+
+
+class SetTransDecoder(nn.Module):
+    r""" The Decoder module in Set Transformer paper. """
+    def __init__(self, k, d_model, num_heads, d_head, d_ff, n_layers, dropouth=0., dropouta=0.):
+        super(SetTransDecoder, self).__init__()
+        self.n_layers = n_layers
+        self.k = k
+        self.d_model = d_model
+        self.pma = _PMALayer(k, d_model, num_heads, d_head, d_ff,
+                             dropouth=dropouth, dropouta=dropouta)
+        layers = []
+        for _ in range(n_layers):
+            layers.append(
+                SetAttentionBlock(d_model, num_heads, d_head, d_ff,
+                                  dropouth=dropouth, dropouta=dropouta))
+
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, graph, feat):
+        if isinstance(graph, BatchedDGLGraph):
+            induced_graph = _create_batched_graph_from_num_nodes([self.k] * graph.batch_size)
+        else:
+            induced_graph = _create_batched_graph_from_num_nodes([self.k])
+
+        pma_graph = _create_bipartite_graph(graph, induced_graph)
+        feat = self.pma(graph, feat, pma_graph=pma_graph)
+
+        sab_graph = _create_fully_connected_graph(induced_graph)
+        for layer in self.layers:
+            feat = layer(graph, feat, sab_graph=sab_graph)
+
+        if isinstance(graph, BatchedDGLGraph):
+            return feat.view(graph.batch_size, self.k, self.d_model)
+        else:
+            return feat.view(self.k, self.d_model)
+
 
 class SetTransformer(nn.Module):
     r"""Apply Set Transformer(f""Set Transformer: A Framework for Attention-based
