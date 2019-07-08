@@ -261,7 +261,8 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
   adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
 }
 
-COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph) : is_multigraph_(is_multigraph) {
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
   CHECK(IsValidIdArray(src));
   CHECK(IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);

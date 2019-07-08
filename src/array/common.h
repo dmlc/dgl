@@ -3,6 +3,9 @@
  * \file array/common.h
  * \brief Array operator common utilities
  */
+#ifndef DGL_ARRAY_COMMON_H_
+#define DGL_ARRAY_COMMON_H_
+
 namespace dgl {
 namespace aten {
 
@@ -77,3 +80,5 @@ namespace aten {
 
 }  // namespace aten
 }  // namespace dgl
+
+#endif  // DGL_ARRAY_COMMON_H_

@@ -203,8 +203,8 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return maparr;
 }
 
-template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& );
-template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& );
+template IdArray Relabel_<kDLCPU, int32_t>(const std::vector<IdArray>& arrays);
+template IdArray Relabel_<kDLCPU, int64_t>(const std::vector<IdArray>& arrays);
 
 }  // namespace impl
 }  // namespace aten

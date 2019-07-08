@@ -126,8 +126,8 @@ bool CSRHasDuplicate(CSRMatrix csr) {
   return false;
 }
 
-template bool CSRHasDuplicate<kDLCPU, int32_t>(CSRMatrix );
-template bool CSRHasDuplicate<kDLCPU, int64_t>(CSRMatrix );
+template bool CSRHasDuplicate<kDLCPU, int32_t>(CSRMatrix csr);
+template bool CSRHasDuplicate<kDLCPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRGetRowNNZ /////////////////////////////
 
@@ -432,8 +432,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   return ret;
 }
 
-template CSRMatrix CSRSliceRows<kDLCPU, int32_t, int32_t>(CSRMatrix , int64_t , int64_t );
-template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix , int64_t , int64_t );
+template CSRMatrix CSRSliceRows<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
+template CSRMatrix CSRSliceRows<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {

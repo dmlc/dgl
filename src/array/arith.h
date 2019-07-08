@@ -3,6 +3,8 @@
  * \file array/arith.h
  * \brief Arithmetic functors
  */
+#ifndef DGL_ARRAY_ARITH_H_
+#define DGL_ARRAY_ARITH_H_
 
 namespace dgl {
 namespace aten {
@@ -39,3 +41,5 @@ struct Div {
 }  // namespace arith
 }  // namespace aten
 }  // namespace dgl
+
+#endif  // DGL_ARRAY_ARITH_H_

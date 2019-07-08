@@ -10,6 +10,7 @@
 #define DGL_ARRAY_H_
 
 #include <dgl/runtime/ndarray.h>
+#include <algorithm>
 #include <vector>
 #include <utility>
 
@@ -187,7 +188,7 @@ std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
 
 /*! \brief Return a transposed CSR matrix */
-CSRMatrix CSRTranspose(CSRMatrix );
+CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
  * \brief Convert COO matrix to CSR matrix.
@@ -238,7 +239,7 @@ bool CSRHasDuplicate(CSRMatrix csr);
 ///////////////////////// COO routines //////////////////////////
 
 /*! \return True if the matrix has duplicate entries */
-bool COOHasDuplicate(COOMatrix );
+bool COOHasDuplicate(COOMatrix coo);
 
 /*!
  * \brief Convert COO matrix to CSR matrix.
@@ -248,7 +249,7 @@ bool COOHasDuplicate(COOMatrix );
  * will be reordered in CSR. The i^th entry in the result CSR corresponds
  * to the CSR.data[i] th entry in the input COO.
  */
-CSRMatrix COOToCSR(COOMatrix );
+CSRMatrix COOToCSR(COOMatrix coo);
 
 // inline implementations
 template <typename T>
