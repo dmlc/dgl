@@ -11,12 +11,10 @@
 #include <utility>
 #include <algorithm>
 
+#include "./runtime/object.h"
 #include "array.h"
 
 namespace dgl {
-
-struct Subgraph;
-struct NodeFlow;
 
 const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
 
@@ -51,6 +49,15 @@ class DGLIdIters {
   const dgl_id_t *begin_{nullptr}, *end_{nullptr};
 };
 
+/* \brief structure used to represent a list of edges */
+typedef struct {
+  /* \brief the two endpoints and the id of the edge */
+  IdArray src, dst, id;
+} EdgeArray;
+
+// forward declaration
+struct Subgraph;
+class BaseGraphRef;
 class GraphInterface;
 typedef std::shared_ptr<GraphInterface> GraphPtr;
 
@@ -58,15 +65,15 @@ typedef std::shared_ptr<GraphInterface> GraphPtr;
  * \brief dgl graph index interface.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero.
+ *
+ * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
+ * the input edges are represented by two id arrays for source and destination
+ * vertex ids. In the general case, the two arrays should have the same length.
+ * If the length of src id array is one, it represents one-many connections.
+ * If the length of dst id array is one, it represents many-one connections.
  */
-class GraphInterface {
+class GraphInterface : public runtime::Object {
  public:
-  /* \brief structure used to represent a list of edges */
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   virtual ~GraphInterface() = default;
 
   /*!
@@ -331,12 +338,6 @@ class GraphInterface {
   virtual DGLIdIters InEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  virtual GraphInterface *Reset() = 0;
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -353,6 +354,24 @@ class GraphInterface {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
+
+  static constexpr const char* _type_key = "graph.BaseGraph";
+  DGL_DECLARE_BASE_OBJECT_INFO(GraphInterface, runtime::Object);
+};
+
+/*! \brief Base graph reference */
+class BaseGraphRef : public runtime::ObjectRef {
+ public:
+  /*! \brief empty reference */
+  BaseGraphRef() {}
+  explicit BaseGraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+  const GraphInterface* operator->() const {
+    return static_cast<const GraphInterface*>(obj_.get());
+  }
+  GraphInterface* operator->() {
+    return static_cast<GraphInterface*>(obj_.get());
+  }
+  using ContainerType = GraphInterface;
 };
 
 /*! \brief Subgraph data structure */

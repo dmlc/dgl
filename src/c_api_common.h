@@ -34,9 +34,6 @@ inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
 
 namespace dgl {
 
-// Graph handler type
-typedef void* GraphHandle;
-
 // Communicator handler type
 typedef void* CommunicatorHandle;
 

@@ -192,10 +192,10 @@ class ObjectRef {
  * For example:
  *
  * // This class is an abstract class and cannot create instances
- * class SomeBaseClass : public Node {
+ * class SomeBaseClass : public Object {
  *  public:
  *   static constexpr const char* _type_key = "some_base";
- *   DGL_DECLARE_BASE_OBJECT_INFO(SomeBaseClass, Node);
+ *   DGL_DECLARE_BASE_OBJECT_INFO(SomeBaseClass, Object);
  * };
  *
  * // Child class that allows instantiation

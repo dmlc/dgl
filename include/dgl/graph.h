@@ -20,20 +20,7 @@ namespace dgl {
 class Graph;
 class GraphOp;
 
-/*!
- * \brief Base dgl graph index class.
- *
- * DGL's graph is directed. Vertices are integers enumerated from zero.
- *
- * Removal of vertices/edges is not allowed. Instead, the graph can only be "cleared"
- * by removing all the vertices and edges.
- *
- * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
- * the input edges are represented by two id arrays for source and destination
- * vertex ids. In the general case, the two arrays should have the same length.
- * If the length of src id array is one, it represents one-many connections.
- * If the length of dst id array is one, it represents many-one connections.
- */
+/*! \brief Mutable graph based on adjacency list. */
 class Graph: public GraphInterface {
  public:
   /*! \brief default constructor */
@@ -359,16 +346,6 @@ class Graph: public GraphInterface {
   }
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  GraphInterface *Reset() override {
-    Graph* gptr = new Graph();
-    *gptr = std::move(*this);
-    return gptr;
-  }
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -378,6 +355,9 @@ class Graph: public GraphInterface {
    * \return a vector of three IdArray.
    */
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+
+  static constexpr const char* _type_key = "graph.Graph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(Graph, GraphInterface);
 
  protected:
   friend class GraphOp;
@@ -410,6 +390,32 @@ class Graph: public GraphInterface {
   bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
+};
+
+/*! \brief Graph reference class */
+class GraphRef : public runtime::ObjectRef {
+ public:
+  /*! \brief empty reference */
+  GraphRef() {}
+  explicit GraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+  const Graph* operator->() const {
+    return static_cast<const Graph*>(obj_.get());
+  }
+  Graph* operator->() {
+    return static_cast<Graph*>(obj_.get());
+  }
+  using ContainerType = Graph;
+
+  /*! \brief Create an empty graph */
+  static GraphRef Create(bool multigraph = false) {
+    return GraphRef(std::make_shared<Graph>(multigraph));
+  }
+
+  /*! \brief Create from coo */
+  static GraphRef CreateFromCOO(
+      int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
+    return GraphRef(std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph));
+  }
 };
 
 }  // namespace dgl

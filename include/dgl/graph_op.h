@@ -25,7 +25,7 @@ class GraphOp {
    * \param backtracking Whether the backtracking edges are included or not
    * \return the line graph
    */
-  static Graph LineGraph(const Graph* graph, bool backtracking);
+  static GraphRef LineGraph(GraphRef graph, bool backtracking);
 
   /*!
    * \brief Return a disjoint union of the input graphs.
@@ -39,7 +39,7 @@ class GraphOp {
    * \param graphs A list of input graphs to be unioned.
    * \return the disjoint union of the graphs
    */
-  static Graph DisjointUnion(std::vector<const Graph*> graphs);
+  static GraphRef DisjointUnion(std::vector<GraphRef> graphs);
 
   /*!
    * \brief Partition the graph into several subgraphs.
@@ -52,7 +52,7 @@ class GraphOp {
    * \param num The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<Graph> DisjointPartitionByNum(const Graph* graph, int64_t num);
+  static std::vector<GraphRef> DisjointPartitionByNum(GraphRef graph, int64_t num);
 
   /*!
    * \brief Partition the graph into several subgraphs.
@@ -65,7 +65,7 @@ class GraphOp {
    * \param sizes The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<Graph> DisjointPartitionBySizes(const Graph* graph, IdArray sizes);
+  static std::vector<GraphRef> DisjointPartitionBySizes(GraphRef graph, IdArray sizes);
 
   /*!
   * \brief Return a readonly disjoint union of the input graphs.
@@ -79,7 +79,7 @@ class GraphOp {
   * \param ImmutableGraph A list of input graphs to be unioned.
   * \return the disjoint union of the ImmutableGraph
   */
-  static ImmutableGraph DisjointUnion(std::vector<const ImmutableGraph*> graphs);
+  static ImmutableGraphRef DisjointUnion(std::vector<ImmutableGraphRef> graphs);
 
    /*!
    * \brief Partition the ImmutableGraph into several immutable subgraphs.
@@ -92,8 +92,8 @@ class GraphOp {
    * \param num The number of partitions.
    * \return a list of partitioned ImmutableGraph
    */
-  static std::vector<ImmutableGraph> DisjointPartitionByNum(const ImmutableGraph *graph,
-          int64_t num);
+  static std::vector<ImmutableGraphRef> DisjointPartitionByNum(
+      ImmutableGraphRef graph, int64_t num);
 
   /*!
   * \brief Partition the ImmutableGraph into several immutable subgraphs.
@@ -106,8 +106,8 @@ class GraphOp {
   * \param sizes The number of partitions.
   * \return a list of partitioned ImmutableGraph
   */
-  static std::vector<ImmutableGraph> DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
-          IdArray sizes);
+  static std::vector<ImmutableGraphRef> DisjointPartitionBySizes(
+      ImmutableGraphRef batched_graph, IdArray sizes);
 
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.
@@ -143,7 +143,7 @@ class GraphOp {
    * \param graph The input graph.
    * \return a new immutable simple graph with no multi-edge.
    */
-  static ImmutableGraph ToSimpleGraph(const GraphInterface* graph);
+  static ImmutableGraphRef ToSimpleGraph(BaseGraphRef graph);
 
   /*!
    * \brief Convert the graph to a mutable bidirected graph.
@@ -155,14 +155,14 @@ class GraphOp {
    * \param graph The input graph.
    * \return a new mutable bidirected graph.
    */
-  static Graph ToBidirectedMutableGraph(const GraphInterface* graph);
+  static GraphRef ToBidirectedMutableGraph(BaseGraphRef graph);
 
   /*!
    * \brief Same as BidirectedMutableGraph except that the returned graph is immutable.
    * \param graph The input graph.
    * \return a new immutable bidirected graph.
    */
-  static ImmutableGraph ToBidirectedImmutableGraph(const GraphInterface* graph);
+  static ImmutableGraphRef ToBidirectedImmutableGraph(BaseGraphRef graph);
 };
 
 }  // namespace dgl

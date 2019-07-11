@@ -12,8 +12,16 @@
 
 #include "../c_api_common.h"
 
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+
 namespace dgl {
 namespace {
+inline std::string GetSharedMemName(const std::string &name, const std::string &edge_dir) {
+  return name + "_" + edge_dir;
+}
+
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
 #ifndef _WIN32
@@ -124,22 +132,22 @@ bool CSR::IsMultigraph() const {
     });
 }
 
-CSR::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
+EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
   IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
   IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
-  return CSR::EdgeArray{ret_src, ret_dst, ret_eid};
+  return EdgeArray{ret_src, ret_dst, ret_eid};
 }
 
-CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
+EdgeArray CSR::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   auto csrsubmat = aten::CSRSliceRows(adj_, vids);
   auto coosubmat = aten::CSRToCOO(csrsubmat, false);
   // Note that the row id in the csr submat is relabled, so
   // we need to recover it using an index select.
   auto row = aten::IndexSelect(vids, coosubmat.row);
-  return CSR::EdgeArray{row, coosubmat.col, coosubmat.data};
+  return EdgeArray{row, coosubmat.col, coosubmat.data};
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
@@ -171,17 +179,17 @@ IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   return aten::CSRGetData(adj_, src, dst);
 }
 
-CSR::EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   const auto& arrs = aten::CSRGetDataAndIndices(adj_, src_ids, dst_ids);
-  return CSR::EdgeArray{arrs[0], arrs[1], arrs[2]};
+  return EdgeArray{arrs[0], arrs[1], arrs[2]};
 }
 
-CSR::EdgeArray CSR::Edges(const std::string &order) const {
+EdgeArray CSR::Edges(const std::string &order) const {
   CHECK(order.empty() || order == std::string("srcdst"))
     << "CSR only support Edges of order \"srcdst\","
     << " but got \"" << order << "\".";
   const auto& coo = aten::CSRToCOO(adj_, false);
-  return CSR::EdgeArray{coo.row, coo.col, coo.data};
+  return EdgeArray{coo.row, coo.col, coo.data};
 }
 
 Subgraph CSR::VertexSubgraph(IdArray vids) const {
@@ -289,14 +297,14 @@ std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
   return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 
-COO::EdgeArray COO::FindEdges(IdArray eids) const {
+EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
   return EdgeArray{aten::IndexSelect(adj_.row, eids),
                    aten::IndexSelect(adj_.col, eids),
                    eids};
 }
 
-COO::EdgeArray COO::Edges(const std::string &order) const {
+EdgeArray COO::Edges(const std::string &order) const {
   CHECK(order.empty() || order == std::string("eid"))
     << "COO only support Edges of order \"eid\", but got \""
     << order << "\".";
@@ -411,7 +419,7 @@ COOPtr ImmutableGraph::GetCOO() const {
   return coo_;
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
+EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   if (order.empty()) {
     // arbitrary order
     if (in_csr_) {
@@ -515,5 +523,126 @@ ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
     return ImmutableGraph(new_incsr, new_outcsr);
   }
 }
+
+GraphPtr ImmutableGraph::Reverse() const {
+  if (coo_) {
+    return std::make_shared<ImmutableGraph>(
+          out_csr_, in_csr_, coo_->Transpose());
+  } else {
+    return std::make_shared<ImmutableGraph>(out_csr_, in_csr_);
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids));
+  if (edge_dir == "in") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphRef();
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    bool multigraph, const std::string &edge_dir) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
+  if (edge_dir == "in") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphRef();
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    const std::string &edge_dir,
+    const std::string &shared_mem_name) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
+  if (edge_dir == "in") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphRef();
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    bool multigraph, const std::string &edge_dir,
+    const std::string &shared_mem_name) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
+                     GetSharedMemName(shared_mem_name, edge_dir)));
+  if (edge_dir == "in") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphRef();
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+    const std::string &shared_mem_name, size_t num_vertices,
+    size_t num_edges, bool multigraph,
+    const std::string &edge_dir) {
+  CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
+                     multigraph));
+  if (edge_dir == "in") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphRef();
+  }
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCOO(
+    int64_t num_vertices, IdArray src, IdArray dst) {
+  COOPtr coo(new COO(num_vertices, src, dst));
+  return ImmutableGraphRef(std::make_shared<ImmutableGraph>(coo));
+}
+
+ImmutableGraphRef ImmutableGraphRef::CreateFromCOO(
+    int64_t num_vertices, IdArray src, IdArray dst, bool multigraph) {
+  COOPtr coo(new COO(num_vertices, src, dst, multigraph));
+  return ImmutableGraphRef(std::make_shared<ImmutableGraph>(coo));
+}
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    ImmutableGraphRef ig = args[0];
+    const int device_type = args[1];
+    const int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    *rv = ig->CopyTo(ctx);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    ImmutableGraphRef ig = args[0];
+    std::string edge_dir = args[1];
+    std::string name = args[2];
+    *rv = ig->CopyToSharedMem(edge_dir, name);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    ImmutableGraphRef ig = args[0];
+    int bits = args[1];
+    *rv = ig->AsNumBits(bits);
+  });
 
 }  // namespace dgl
