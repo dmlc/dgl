@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
+#include <memory>
 
 #include "graph_interface.h"
 
@@ -19,6 +20,7 @@ namespace dgl {
 
 class Graph;
 class GraphOp;
+typedef std::shared_ptr<Graph> MGraphPtr;
 
 /*! \brief Mutable graph based on adjacency list. */
 class Graph: public GraphInterface {
@@ -293,15 +295,6 @@ class Graph: public GraphInterface {
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  GraphPtr Reverse() const override;
-
-  /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
@@ -356,8 +349,16 @@ class Graph: public GraphInterface {
    */
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
-  static constexpr const char* _type_key = "graph.Graph";
-  DGL_DECLARE_OBJECT_TYPE_INFO(Graph, GraphInterface);
+  /*! \brief Create an empty graph */
+  static MGraphPtr Create(bool multigraph = false) {
+    return std::make_shared<Graph>(multigraph);
+  }
+
+  /*! \brief Create from coo */
+  static MGraphPtr CreateFromCOO(
+      int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
+    return std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph);
+  }
 
  protected:
   friend class GraphOp;
@@ -390,32 +391,6 @@ class Graph: public GraphInterface {
   bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
-};
-
-/*! \brief Graph reference class */
-class GraphRef : public runtime::ObjectRef {
- public:
-  /*! \brief empty reference */
-  GraphRef() {}
-  explicit GraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-  const Graph* operator->() const {
-    return static_cast<const Graph*>(obj_.get());
-  }
-  Graph* operator->() {
-    return static_cast<Graph*>(obj_.get());
-  }
-  using ContainerType = Graph;
-
-  /*! \brief Create an empty graph */
-  static GraphRef Create(bool multigraph = false) {
-    return GraphRef(std::make_shared<Graph>(multigraph));
-  }
-
-  /*! \brief Create from coo */
-  static GraphRef CreateFromCOO(
-      int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
-    return GraphRef(std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph));
-  }
 };
 
 }  // namespace dgl

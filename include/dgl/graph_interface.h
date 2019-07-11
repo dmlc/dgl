@@ -57,7 +57,7 @@ typedef struct {
 
 // forward declaration
 struct Subgraph;
-class BaseGraphRef;
+class GraphRef;
 class GraphInterface;
 typedef std::shared_ptr<GraphInterface> GraphPtr;
 
@@ -301,15 +301,6 @@ class GraphInterface : public runtime::Object {
   virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  virtual GraphPtr Reverse() const = 0;
-
-  /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector iterator pair.
@@ -355,22 +346,30 @@ class GraphInterface : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
-  static constexpr const char* _type_key = "graph.BaseGraph";
-  DGL_DECLARE_BASE_OBJECT_INFO(GraphInterface, runtime::Object);
+  static constexpr const char* _type_key = "graph.Graph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
 
 /*! \brief Base graph reference */
-class BaseGraphRef : public runtime::ObjectRef {
+class GraphRef : public runtime::ObjectRef {
  public:
   /*! \brief empty reference */
-  BaseGraphRef() {}
-  explicit BaseGraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+  GraphRef() {}
+  explicit GraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+
   const GraphInterface* operator->() const {
     return static_cast<const GraphInterface*>(obj_.get());
   }
+
   GraphInterface* operator->() {
     return static_cast<GraphInterface*>(obj_.get());
   }
+
+  /*! \brief get shared pointer */
+  std::shared_ptr<GraphInterface> sptr() const {
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<GraphInterface>(obj_));
+  }
+
   using ContainerType = GraphInterface;
 };
 

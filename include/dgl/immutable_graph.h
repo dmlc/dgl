@@ -22,7 +22,9 @@ class CSR;
 class COO;
 typedef std::shared_ptr<CSR> CSRPtr;
 typedef std::shared_ptr<COO> COOPtr;
-class ImmutableGraphRef;
+
+class ImmutableGraph;
+typedef std::shared_ptr<ImmutableGraph> ImGraphPtr;
 
 /*!
  * \brief Graph class stored using CSR structure.
@@ -168,10 +170,6 @@ class CSR : public GraphInterface {
     return {};
   }
 
-  GraphPtr Reverse() const override {
-    return Transpose();
-  }
-
   DGLIdIters SuccVec(dgl_id_t vid) const override;
 
   DGLIdIters OutEdgeVec(dgl_id_t vid) const override;
@@ -241,9 +239,6 @@ class CSR : public GraphInterface {
   IdArray indices() const { return adj_.indices; }
 
   IdArray edge_ids() const { return adj_.data; }
-
-  static constexpr const char* _type_key = "graph.CSRGraph";
-  DGL_DECLARE_OBJECT_TYPE_INFO(CSR, GraphInterface);
 
  private:
   /*! \brief prive default constructor */
@@ -414,10 +409,6 @@ class COO : public GraphInterface {
 
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
-  GraphPtr Reverse() const override {
-    return Transpose();
-  }
-
   DGLIdIters SuccVec(dgl_id_t vid) const override {
     LOG(FATAL) << "COO graph does not support efficient SuccVec."
       << " Please use CSR graph or AdjList graph instead.";
@@ -499,9 +490,6 @@ class COO : public GraphInterface {
   IdArray src() const { return adj_.row; }
 
   IdArray dst() const { return adj_.col; }
-
-  static constexpr const char* _type_key = "graph.COOGraph";
-  DGL_DECLARE_OBJECT_TYPE_INFO(COO, GraphInterface);
 
  private:
   /* !\brief private default constructor */
@@ -836,15 +824,6 @@ class ImmutableGraph: public GraphInterface {
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  GraphPtr Reverse() const override;
-
-  /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
@@ -900,6 +879,35 @@ class ImmutableGraph: public GraphInterface {
   /* !\brief Return coo. If not exist, create from csr.*/
   COOPtr GetCOO() const;
 
+  /*! \brief Create an immutable graph from CSR. */
+  static ImGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
+
+  static ImGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      bool multigraph, const std::string &edge_dir);
+
+  static ImGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      const std::string &edge_dir, const std::string &shared_mem_name);
+
+  static ImGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      bool multigraph, const std::string &edge_dir,
+      const std::string &shared_mem_name);
+
+  static ImGraphPtr CreateFromCSR(
+      const std::string &shared_mem_name, size_t num_vertices,
+      size_t num_edges, bool multigraph,
+      const std::string &edge_dir);
+
+  /*! \brief Create an immutable graph from COO. */
+  static ImGraphPtr CreateFromCOO(
+      int64_t num_vertices, IdArray src, IdArray dst);
+
+  static ImGraphPtr CreateFromCOO(
+      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
+
   /*!
    * \brief Convert the given graph to an immutable graph.
    *
@@ -909,14 +917,14 @@ class ImmutableGraph: public GraphInterface {
    * \param graph The input graph.
    * \return an immutable graph object.
    */
-  static ImmutableGraphRef ToImmutable(BaseGraphRef graph);
+  static ImGraphPtr ToImmutable(GraphPtr graph);
 
   /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  ImmutableGraphRef CopyTo(const DLContext& ctx) const;
+  static ImGraphPtr CopyTo(ImGraphPtr g, const DLContext& ctx);
 
   /*!
    * \brief Copy data to shared memory.
@@ -924,17 +932,24 @@ class ImmutableGraph: public GraphInterface {
    * \param name The name of the shared memory.
    * \return The graph in the shared memory
    */
-  ImmutableGraphRef CopyToSharedMem(const std::string &edge_dir, const std::string &name) const;
+  static ImGraphPtr CopyToSharedMem(
+      ImGraphPtr g, const std::string &edge_dir, const std::string &name);
 
   /*!
    * \brief Convert the graph to use the given number of bits for storage.
    * \param bits The new number of integer bits (32 or 64).
    * \return The graph with new bit size storage.
    */
-  ImmutableGraphRef AsNumBits(uint8_t bits) const;
+  static ImGraphPtr AsNumBits(ImGraphPtr g, uint8_t bits);
 
-  static constexpr const char* _type_key = "graph.ImmutableGraph";
-  DGL_DECLARE_OBJECT_TYPE_INFO(ImmutableGraph, GraphInterface);
+  /*!
+   * \brief Return a new graph with all the edges reversed.
+   *
+   * The returned graph preserves the vertex and edge index in the original graph.
+   *
+   * \return the reversed graph
+   */
+  ImGraphPtr Reverse() const;
 
  protected:
   /* !\brief internal default constructor */
@@ -973,50 +988,6 @@ class ImmutableGraph: public GraphInterface {
   // The name of shared memory for this graph.
   // If it's empty, the graph isn't stored in shared memory.
   std::string shared_mem_name_;
-};
-
-/*! \brief ImmutableGraph reference class */
-class ImmutableGraphRef : public runtime::ObjectRef {
- public:
-  /*! \brief empty reference */
-  ImmutableGraphRef() {}
-  explicit ImmutableGraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-  const ImmutableGraph* operator->() const {
-    return static_cast<const ImmutableGraph*>(obj_.get());
-  }
-  ImmutableGraph* operator->() {
-    return static_cast<ImmutableGraph*>(obj_.get());
-  }
-  using ContainerType = ImmutableGraph;
-
-  /*! \brief Create an immutable graph from CSR. */
-  static ImmutableGraphRef CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
-
-  static ImmutableGraphRef CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir);
-
-  static ImmutableGraphRef CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      const std::string &edge_dir, const std::string &shared_mem_name);
-
-  static ImmutableGraphRef CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir,
-      const std::string &shared_mem_name);
-
-  static ImmutableGraphRef CreateFromCSR(
-      const std::string &shared_mem_name, size_t num_vertices,
-      size_t num_edges, bool multigraph,
-      const std::string &edge_dir);
-
-  /*! \brief Create an immutable graph from COO. */
-  static ImmutableGraphRef CreateFromCOO(
-      int64_t num_vertices, IdArray src, IdArray dst);
-
-  static ImmutableGraphRef CreateFromCOO(
-      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
 };
 
 // inline implementations

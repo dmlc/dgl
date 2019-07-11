@@ -4,6 +4,7 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <string.h>
 #include <bitset>
@@ -12,9 +13,7 @@
 
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace {
@@ -475,174 +474,177 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
   }
 }
 
-ImmutableGraph ImmutableGraph::ToImmutable(const GraphInterface* graph) {
-  const ImmutableGraph* ig = dynamic_cast<const ImmutableGraph*>(graph);
-  if (ig) {
-    return *ig;
-  } else {
-    const auto& adj = graph->GetAdj(true, "csr");
-    CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
-    return ImmutableGraph(nullptr, csr);
-  }
-}
-
-ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
-  if (ctx == Context()) {
-    return *this;
-  }
-  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
-  //   we make sure that this graph (on CPU) has materialized CSR,
-  //   and then copy them to other context (usually GPU). This should
-  //   be fixed later.
-  CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
-  CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
-  return ImmutableGraph(new_incsr, new_outcsr);
-}
-
-ImmutableGraph ImmutableGraph::CopyToSharedMem(const std::string &edge_dir,
-                                               const std::string &name) const {
-  CSRPtr new_incsr, new_outcsr;
-  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
-  if (edge_dir == std::string("in"))
-    new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(shared_mem_name)));
-  else if (edge_dir == std::string("out"))
-    new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(shared_mem_name)));
-  return ImmutableGraph(new_incsr, new_outcsr, name);
-}
-
-ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
-  if (NumBits() == bits) {
-    return *this;
-  } else {
-    // TODO(minjie): since we don't have int32 operations,
-    //   we make sure that this graph (on CPU) has materialized CSR,
-    //   and then copy them to other context (usually GPU). This should
-    //   be fixed later.
-    CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->AsNumBits(bits)));
-    CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->AsNumBits(bits)));
-    return ImmutableGraph(new_incsr, new_outcsr);
-  }
-}
-
-GraphPtr ImmutableGraph::Reverse() const {
-  if (coo_) {
-    return std::make_shared<ImmutableGraph>(
-          out_csr_, in_csr_, coo_->Transpose());
-  } else {
-    return std::make_shared<ImmutableGraph>(out_csr_, in_csr_);
-  }
-}
-
-ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+ImGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir) {
     CSRPtr csr(new CSR(indptr, indices, edge_ids));
   if (edge_dir == "in") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr));
+    return ImGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr));
+    return ImGraphPtr(new ImmutableGraph(nullptr, csr));
   } else {
     LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphRef();
+    return ImGraphPtr();
   }
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+ImGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
     bool multigraph, const std::string &edge_dir) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
   if (edge_dir == "in") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr));
+    return ImGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr));
+    return ImGraphPtr(new ImmutableGraph(nullptr, csr));
   } else {
     LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphRef();
+    return ImGraphPtr();
   }
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+ImGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
     const std::string &edge_dir,
     const std::string &shared_mem_name) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
   if (edge_dir == "in") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
   } else {
     LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphRef();
+    return ImGraphPtr();
   }
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+ImGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
     bool multigraph, const std::string &edge_dir,
     const std::string &shared_mem_name) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
                      GetSharedMemName(shared_mem_name, edge_dir)));
   if (edge_dir == "in") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
   } else {
     LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphRef();
+    return ImGraphPtr();
   }
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCSR(
+ImGraphPtr ImmutableGraph::CreateFromCSR(
     const std::string &shared_mem_name, size_t num_vertices,
     size_t num_edges, bool multigraph,
     const std::string &edge_dir) {
   CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
                      multigraph));
   if (edge_dir == "in") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(csr, nullptr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
-    return ImmutableGraphRef(std::make_shared<ImmutableGraph>(nullptr, csr, shared_mem_name));
+    return ImGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
   } else {
     LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-    return ImmutableGraphRef();
+    return ImGraphPtr();
   }
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCOO(
+ImGraphPtr ImmutableGraph::CreateFromCOO(
     int64_t num_vertices, IdArray src, IdArray dst) {
   COOPtr coo(new COO(num_vertices, src, dst));
-  return ImmutableGraphRef(std::make_shared<ImmutableGraph>(coo));
+  return std::make_shared<ImmutableGraph>(coo);
 }
 
-ImmutableGraphRef ImmutableGraphRef::CreateFromCOO(
+ImGraphPtr ImmutableGraph::CreateFromCOO(
     int64_t num_vertices, IdArray src, IdArray dst, bool multigraph) {
   COOPtr coo(new COO(num_vertices, src, dst, multigraph));
-  return ImmutableGraphRef(std::make_shared<ImmutableGraph>(coo));
+  return std::make_shared<ImmutableGraph>(coo);
+}
+
+ImGraphPtr ImmutableGraph::ToImmutable(GraphPtr graph) {
+  ImGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(graph);
+  if (ig) {
+    return ig;
+  } else {
+    const auto& adj = graph->GetAdj(true, "csr");
+    CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
+    return ImmutableGraph::CreateFromCSR(adj[0], adj[1], adj[2], "out");
+  }
+}
+
+ImGraphPtr ImmutableGraph::CopyTo(ImGraphPtr g, const DLContext& ctx) {
+  if (ctx == g->Context()) {
+    return g;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  CSRPtr new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyTo(ctx)));
+  return ImGraphPtr(new ImmutableGraph(new_incsr, new_outcsr));
+}
+
+ImGraphPtr ImmutableGraph::CopyToSharedMem(ImGraphPtr g,
+    const std::string &edge_dir, const std::string &name) {
+  CSRPtr new_incsr, new_outcsr;
+  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
+  if (edge_dir == std::string("in"))
+    new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyToSharedMem(shared_mem_name)));
+  else if (edge_dir == std::string("out"))
+    new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+  return ImGraphPtr(new ImmutableGraph(new_incsr, new_outcsr, name));
+}
+
+ImGraphPtr ImmutableGraph::AsNumBits(ImGraphPtr g, uint8_t bits) {
+  if (g->NumBits() == bits) {
+    return g;
+  } else {
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    CSRPtr new_incsr = CSRPtr(new CSR(g->GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->AsNumBits(bits)));
+    return ImGraphPtr(new ImmutableGraph(new_incsr, new_outcsr));
+  }
+}
+
+ImGraphPtr ImmutableGraph::Reverse() const {
+  if (coo_) {
+    return ImGraphPtr(new ImmutableGraph(
+          out_csr_, in_csr_, coo_->Transpose()));
+  } else {
+    return ImGraphPtr(new ImmutableGraph(out_csr_, in_csr_));
+  }
 }
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    ImmutableGraphRef ig = args[0];
+    GraphRef g = args[0];
     const int device_type = args[1];
     const int device_id = args[2];
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    *rv = ig->CopyTo(ctx);
+    ImGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::CopyTo(ig, ctx);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    ImmutableGraphRef ig = args[0];
+    GraphRef g = args[0];
     std::string edge_dir = args[1];
     std::string name = args[2];
-    *rv = ig->CopyToSharedMem(edge_dir, name);
+    ImGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::CopyToSharedMem(ig, edge_dir, name);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    ImmutableGraphRef ig = args[0];
+    GraphRef g = args[0];
     int bits = args[1];
-    *rv = ig->AsNumBits(bits);
+    ImGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::AsNumBits(ig, bits);
   });
 
 }  // namespace dgl
