@@ -6,6 +6,7 @@
 #include <dgl/sampler.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
+#include <dgl/packed_func_ext.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>

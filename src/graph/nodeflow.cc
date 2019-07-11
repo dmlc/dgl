@@ -8,7 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/nodeflow.h>
 
-#include <string.h>
+#include <string>
 
 #include "../c_api_common.h"
 
