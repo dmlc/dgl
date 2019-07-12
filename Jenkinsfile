@@ -20,7 +20,7 @@ def rmvenv_win64() {
 
 def init_git_win64() {
   checkout scm
-  bat "workon ${BUILD_TAG}"
+  mkvenv_win64()
   bat "git submodule update --recursive --init"
 }
 
