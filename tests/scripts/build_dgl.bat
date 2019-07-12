@@ -1,7 +1,7 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
 
-CALL mkvirtualenv -i nose %BUILD_TAG%
+CALL mkvirtualenv --system-site-packages %BUILD_TAG%
 DEL /S /Q build
 DEL /S /Q _download
 MD build
