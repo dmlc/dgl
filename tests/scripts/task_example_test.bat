@@ -15,6 +15,7 @@ IF x%1x==xx (
 	ECHO Must supply CPU or GPU
 	GOTO :FAIL
 )
+CALL workon %BUILD_TAG%
 
 SET DGLBACKEND=pytorch
 SET DGL_LIBRARY_PATH=!CD!\build
