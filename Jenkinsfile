@@ -11,7 +11,7 @@ def init_git() {
 }
 
 def mkvenv_win64() {
-  bat "mkvirtualenv ${BUILD_TAG}"
+  bat "mkvirtualenv ${BUILD_TAG} & IF ERRORLEVEL 1 workon ${BUILD_TAG}"
 }
 
 def rmvenv_win64() {
