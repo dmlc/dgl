@@ -115,7 +115,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
       if (multigraph == kBoolUnknown) {
         *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
       } else {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, multigraph, edge_dir));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(
+            indptr, indices, edge_ids, multigraph, edge_dir));
       }
     } else {
       if (multigraph == kBoolUnknown) {

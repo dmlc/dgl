@@ -1,7 +1,6 @@
 """Module for graph transformation methods."""
 from ._ffi.function import _init_api
 from .graph import DGLGraph
-from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
 __all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']

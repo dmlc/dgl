@@ -1,12 +1,10 @@
 """Utility module."""
 from __future__ import absolute_import, division
 
-import ctypes
 from collections.abc import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
-from . import _api_internal
 from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
