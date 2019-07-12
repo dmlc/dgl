@@ -310,7 +310,7 @@ class NeighborSampler(NodeFlowSampler):
 
     def fetch(self, current_nodeflow_index):
         nfobjs = _CAPI_UniformSampling(
-            self.g.c_handle,
+            self.g._graph,
             self.seed_nodes.todgltensor(),
             current_nodeflow_index, # start batch id
             self.batch_size,        # batch size
@@ -395,7 +395,7 @@ class LayerSampler(NodeFlowSampler):
 
     def fetch(self, current_nodeflow_index):
         nfobjs = _CAPI_LayerSampling(
-            self.g.c_handle,
+            self.g._graph,
             self.seed_nodes.todgltensor(),
             current_nodeflow_index,  # start batch id
             self.batch_size,         # batch size

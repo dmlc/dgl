@@ -28,7 +28,7 @@ class NodeFlowObject(ObjectBase):
         -------
         GraphIndex
         """
-        return _CAPI_NodeFlowGetGraph(self.handle)
+        return _CAPI_NodeFlowGetGraph(self)
 
     @property
     def layer_offsets(self):
@@ -38,7 +38,7 @@ class NodeFlowObject(ObjectBase):
         -------
         NDArray
         """
-        return _CAPI_NodeFlowGetLayerOffsets(self.handle)
+        return _CAPI_NodeFlowGetLayerOffsets(self)
 
     @property
     def block_offsets(self):
@@ -48,7 +48,7 @@ class NodeFlowObject(ObjectBase):
         -------
         NDArray
         """
-        return _CAPI_NodeFlowGetBlockOffsets(self.handle)
+        return _CAPI_NodeFlowGetBlockOffsets(self)
 
     @property
     def node_mapping(self):
@@ -58,7 +58,7 @@ class NodeFlowObject(ObjectBase):
         -------
         NDArray
         """
-        return _CAPI_NodeFlowGetNodeMapping(self.handle)
+        return _CAPI_NodeFlowGetNodeMapping(self)
 
     @property
     def edge_mapping(self):
@@ -68,7 +68,7 @@ class NodeFlowObject(ObjectBase):
         -------
         NDArray
         """
-        return _CAPI_NodeFlowGetEdgeMapping(self.handle)
+        return _CAPI_NodeFlowGetEdgeMapping(self)
 
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
@@ -337,6 +337,7 @@ class NodeFlow(DGLBaseGraph):
             The parent node id array.
         """
         nid = utils.toindex(nid)
+        # TODO(minjie): should not directly use []
         return self._node_mapping.tousertensor()[nid.tousertensor()]
 
     def map_to_parent_eid(self, eid):
@@ -353,6 +354,7 @@ class NodeFlow(DGLBaseGraph):
             The parent edge id array.
         """
         eid = utils.toindex(eid)
+        # TODO(minjie): should not directly use []
         return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
     def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
@@ -462,6 +464,7 @@ class NodeFlow(DGLBaseGraph):
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
+        # TODO(minjie): should not directly use []
         return self._node_mapping.tousertensor()[start:end]
 
     def block_eid(self, block_id):
@@ -500,6 +503,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
+        # TODO(minjie): should not directly use []
         ret = self._edge_mapping.tousertensor()[start:end]
         # If `add_self_loop` is enabled, the returned parent eid can be -1.
         # We have to make sure this case doesn't happen.
@@ -531,7 +535,7 @@ class NodeFlow(DGLBaseGraph):
         """
         block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph, "coo",
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
                                         int(self._layer_offsets[block_id + 2]),
@@ -567,7 +571,7 @@ class NodeFlow(DGLBaseGraph):
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph, fmt,
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
                                         int(self._layer_offsets[block_id + 2]),
