@@ -449,7 +449,6 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
-  // We prefer to generate a subgraph from out-csr.
   auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   return Subgraph{GraphPtr(new ImmutableGraph(subcoo)),

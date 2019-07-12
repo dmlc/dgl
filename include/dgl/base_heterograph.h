@@ -11,20 +11,21 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
+#include "./runtime/object.h"
 #include "graph_interface.h"
 #include "array.h"
 
 namespace dgl {
 
 // Forward declaration
+class BaseHeteroGraph;
+typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
 struct HeteroSubgraph;
-class HeteroGraphInterface;
-
-typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
 
 /*!
- * \brief Heterogenous graph APIs
+ * \brief Base heterogenous graph.
  *
  * In heterograph, nodes represent entities and edges represent relations.
  * Nodes and edges are associated with types. The same pair of entity types
@@ -36,9 +37,9 @@ typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
  *  - A dictionary of relation type to the bipartite graph representing the
  *    actual connections among entity nodes.
  */
-class HeteroGraphInterface {
+class BaseHeteroGraph : public runtime::Object {
  public:
-  virtual ~HeteroGraphInterface() = default;
+  virtual ~BaseHeteroGraph() = default;
 
   ////////////////////////// query/operations on meta graph ////////////////////////
 
@@ -49,14 +50,16 @@ class HeteroGraphInterface {
   virtual uint64_t NumEdgeTypes() const = 0;
 
   /*! \return the meta graph */
-  virtual const GraphInterface& GetMetaGraph() const = 0;
+  virtual GraphPtr meta_graph() const {
+    return meta_graph_;
+  }
 
   /*!
    * \brief Return the bipartite graph of the given edge type.
    * \param etype The edge type.
    * \return The bipartite graph.
    */
-  virtual const HeteroGraphInterface& GetRelationGraph(dgl_type_t etype) const = 0;
+  virtual HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const = 0;
 
   ////////////////////////// query/operations on realized graph ////////////////////////
 
@@ -380,10 +383,40 @@ class HeteroGraphInterface {
    */
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
+
+  static constexpr const char* _type_key = "graph.HeteroGraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
+
+ protected:
+  /*! \brief meta graph */
+  GraphPtr meta_graph_;
+};
+
+/*! \brief Base heterograph reference */
+class HeteroGraphRef : public runtime::ObjectRef {
+ public:
+  /*! \brief empty reference */
+  HeteroGraphRef() {}
+  explicit HeteroGraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+
+  const BaseHeteroGraph* operator->() const {
+    return static_cast<const BaseHeteroGraph*>(obj_.get());
+  }
+
+  BaseHeteroGraph* operator->() {
+    return static_cast<BaseHeteroGraph*>(obj_.get());
+  }
+
+  /*! \brief get shared pointer */
+  std::shared_ptr<BaseHeteroGraph> sptr() const {
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<BaseHeteroGraph>(obj_));
+  }
+
+  using ContainerType = BaseHeteroGraph;
 };
 
 /*! \brief Heter-subgraph data structure */
-struct HeteroSubgraph {
+struct HeteroSubgraph : public runtime::Object {
   /*! \brief The heterograph. */
   HeteroGraphPtr graph;
   /*!
@@ -396,6 +429,9 @@ struct HeteroSubgraph {
    * The vector length is equal to the number of vertex types in the parent graph.
    */
   std::vector<IdArray> induced_edges;
+
+  static constexpr const char* _type_key = "graph.HeteroSubgraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
 
 };  // namespace dgl
