@@ -1,7 +1,7 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
 
-CALL mkvirtualenv %BUILD_TAG% & IF ERRORLEVEL 1 CALL workon %BUILD_TAG%
+CALL mkvirtualenv -i nose %BUILD_TAG%
 
 DEL /S /Q build
 DEL /S /Q _download
