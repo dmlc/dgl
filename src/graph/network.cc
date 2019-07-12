@@ -82,6 +82,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
+    // TODO(minjie): could simply use NodeFlow nf = args[2];
     GraphRef g = args[2];
     const IdArray node_mapping = args[3];
     const IdArray edge_mapping = args[4];

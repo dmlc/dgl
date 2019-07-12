@@ -94,7 +94,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
       }
     } else {
       CHECK_NE(multigraph, kBoolUnknown);
-      *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
+      *rv = GraphRef(Graph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
     }
   });
 

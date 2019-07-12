@@ -3,7 +3,6 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
-from .utils import unwrap_to_ptr_list
 from . import utils
 
 _init_api("dgl.network")
@@ -137,5 +136,5 @@ def _recv_nodeflow(receiver, graph):
         else:
             raise RuntimeError('Got unexpected control code {}'.format(res))
     else:
-        hdl = unwrap_to_ptr_list(res)
-        return NodeFlow(graph, hdl[0])
+        # res is of type NodeFlowObject
+        return NodeFlow(graph, res)

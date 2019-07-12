@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import ctypes
 
+from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from .base import ALL, is_all, DGLError
 from . import backend as F
@@ -15,7 +16,59 @@ from .view import LayerView, BlockView
 
 __all__ = ['NodeFlow']
 
-NodeFlowHandle = ctypes.c_void_p
+@register_object('graph.NodeFlow')
+class NodeFlowObject(ObjectBase):
+    """NodeFlow object"""
+
+    @property
+    def graph(self):
+        """The graph structure of this nodeflow.
+
+        Returns
+        -------
+        GraphIndex
+        """
+        return _CAPI_NodeFlowGetGraph(self.handle)
+
+    @property
+    def layer_offsets(self):
+        """The offsets of each layer.
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetLayerOffsets(self.handle)
+
+    @property
+    def block_offsets(self):
+        """The offsets of each block.
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetBlockOffsets(self.handle)
+
+    @property
+    def node_mapping(self):
+        """Mapping array from nodeflow node id to parent graph
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetNodeMapping(self.handle)
+
+    @property
+    def edge_mapping(self):
+        """Mapping array from nodeflow edge id to parent graph
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetEdgeMapping(self.handle)
 
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
@@ -36,25 +89,16 @@ class NodeFlow(DGLBaseGraph):
     ----------
     parent : DGLGraph
         The parent graph.
-    handle : NodeFlowHandle
-        The handle to the underlying C structure.
+    nfobj : NodeFlowObject
+        The nodeflow object
     """
-    def __init__(self, parent, handle):
-        # NOTE(minjie): handle is a pointer to the underlying C++ structure
-        #  defined in include/dgl/sampler.h. The constructor will save
-        #  all its members in the python side and destroy the handler
-        #  afterwards. One can view the given handle object as a transient
-        #  argument pack to construct this python class.
-        # TODO(minjie): We should use TVM's Node system as a cleaner solution later.
-        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
+    def __init__(self, parent, nfobj):
+        super(NodeFlow, self).__init__(nfobj.graph)
         self._parent = parent
-        self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
-        self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
-        self._layer_offsets = utils.toindex(
-            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
-        self._block_offsets = utils.toindex(
-            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
-        _CAPI_NodeFlowFree(handle)
+        self._node_mapping = utils.toindex(nfobj.node_mapping)
+        self._edge_mapping = utils.toindex(nfobj.edge_mapping)
+        self._layer_offsets = utils.toindex(nfobj.layer_offsets).tonumpy()
+        self._block_offsets = utils.toindex(nfobj.block_offsets).tonumpy()
         # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
                              for i in range(self.num_layers)]
