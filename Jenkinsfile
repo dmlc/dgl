@@ -293,4 +293,11 @@ pipeline {
       }
     }
   }
+  post {
+    always {
+      node('windows') {
+        bat "rmvirtualenv ${BUILD_TAG}"
+      }
+    }
+  }
 }
