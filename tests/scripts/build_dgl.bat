@@ -2,7 +2,6 @@
 SETLOCAL EnableDelayedExpansion
 
 CALL mkvirtualenv -i nose %BUILD_TAG%
-
 DEL /S /Q build
 DEL /S /Q _download
 MD build
