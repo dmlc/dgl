@@ -7,6 +7,7 @@ IF x%1x==xx (
 ) ELSE (
 	SET BACKEND=%1
 )
+mkvirtualenv %BUILD_TAG% & IF ERRORLEVEL 1 workon %BUILD_TAG%
 
 SET PYTHONPATH=tests;!CD!\python;!PYTHONPATH!
 SET DGLBACKEND=!BACKEND!
