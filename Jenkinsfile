@@ -10,8 +10,17 @@ def init_git() {
   sh "git submodule update --recursive --init"
 }
 
+def mkvenv_win64() {
+  bat "mkvirtualenv ${BUILD_TAG}"
+}
+
+def rmvenv_win64() {
+  bat "rmvirtualenv ${BUILD_TAG}"
+}
+
 def init_git_win64() {
   checkout scm
+  bat "workon ${BUILD_TAG}"
   bat "git submodule update --recursive --init"
 }
 
@@ -290,6 +299,13 @@ pipeline {
             }
           }
         }
+      }
+    }
+  }
+  post {
+    always {
+      node('windows') {
+        rmvenv_win64()
       }
     }
   }
