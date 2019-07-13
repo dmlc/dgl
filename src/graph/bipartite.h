@@ -1,15 +1,15 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/bipartite.h
+ * \file graph/bipartite.h
  * \brief Bipartite graph
  */
 
-#ifndef DGL_BIPARTITE_H_
-#define DGL_BIPARTITE_H_
+#ifndef DGL_GRAPH_BIPARTITE_H_
+#define DGL_GRAPH_BIPARTITE_H_
 
+#include <dgl/graph_interface.h>
+#include <dgl/base_heterograph.h>
 #include <memory>
-#include "graph_interface.h"
-#include "base_heterograph.h"
 
 namespace dgl {
 
@@ -156,4 +156,4 @@ class Bipartite : public BaseHeteroGraph {
 
 };  // namespace dgl
 
-#endif  // DGL_BIPARTITE_H_
+#endif  // DGL_GRAPH_BIPARTITE_H_

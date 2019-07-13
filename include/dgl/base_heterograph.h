@@ -39,6 +39,8 @@ struct HeteroSubgraph;
  */
 class BaseHeteroGraph : public runtime::Object {
  public:
+  BaseHeteroGraph(GraphPtr meta_graph): meta_graph_(meta_graph) {}
+
   virtual ~BaseHeteroGraph() = default;
 
   ////////////////////////// query/operations on meta graph ////////////////////////
