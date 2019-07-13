@@ -1,5 +1,9 @@
 #include "./heterograph.h"
+#include <dgl/packed_func_ext.h>
+#include "../c_api_common.h"
 #include "./bipartite.h"
+
+using namespace dgl::runtime;
 
 namespace dgl {
 
@@ -79,5 +83,257 @@ HeteroSubgraph HeteroGraph::EdgeSubgraph(
   ret.graph = HeteroGraphPtr(new HeteroGraph(meta_graph_, subrels));
   return ret;
 }
+
+// creator implementation
+HeteroGraphPtr CreateBipartiteFromCOO(
+    int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
+  return Bipartite::CreateFromCOO(num_src, num_dst, row, col);
+}
+
+HeteroGraphPtr CreateBipartiteFromCSR(
+    int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids) {
+  return Bipartite::CreateFromCSR(num_src, num_dst, indptr, indices, edge_ids);
+}
+
+HeteroGraphPtr CreateHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs) {
+  return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
+}
+
+///////////////////////// C APIs /////////////////////////
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCOO")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int64_t num_src = args[0];
+    int64_t num_dst = args[1];
+    IdArray row = args[2];
+    IdArray col = args[3];
+    auto hgptr = CreateBipartiteFromCOO(num_src, num_dst, row, col);
+    *rv = HeteroGraphRef(hgptr);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCSR")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    int64_t num_src = args[0];
+    int64_t num_dst = args[1];
+    IdArray indptr = args[2];
+    IdArray indices = args[3];
+    IdArray edge_ids = args[4];
+    auto hgptr = CreateBipartiteFromCSR(num_src, num_dst, indptr, indices, edge_ids);
+    *rv = HeteroGraphRef(hgptr);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateHeteroGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    List<HeteroGraphRef> rel_graphs = args[1];
+    std::vector<HeteroGraphPtr> rel_ptrs;
+    rel_ptrs.reserve(rel_graphs.size());
+    for (const auto& ref : rel_graphs) {
+      rel_ptrs.push_back(ref.sptr());
+    }
+    auto hgptr = CreateHeteroGraph(meta_graph.sptr(), rel_ptrs);
+    *rv = HeteroGraphRef(hgptr);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetMetaGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = GraphRef(hg->meta_graph());
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetRelationGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    dgl_type_t etype = args[1];
+    *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdge")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroClear")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroContext")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroIsMultigraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroIsReadonly")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertex")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgeBetween")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgesBetween")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSuccessors")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeId")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroFindEdge")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroFindEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegrees")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegrees")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetAdj")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroVertexSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+
+  });
 
 }  // namespace dgl

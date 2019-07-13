@@ -436,6 +436,21 @@ struct HeteroSubgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
 
+// creators
+
+/*! \brief Create a bipartite graph from COO arrays */
+HeteroGraphPtr CreateBipartiteFromCOO(
+    int64_t num_src, int64_t num_dst, IdArray row, IdArray col);
+
+/*! \brief Create a bipartite graph from (out) CSR arrays */
+HeteroGraphPtr CreateBipartiteFromCSR(
+    int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids);
+
+/*! \brief Create a heterograph from meta graph and a list of bipartite graph */
+HeteroGraphPtr CreateHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
+
 };  // namespace dgl
 
 #endif  // DGL_HETEROGRAPH_INTERFACE_H_

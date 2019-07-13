@@ -123,6 +123,16 @@ class Bipartite : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
+  // creators
+  /*! \brief Create a bipartite graph from COO arrays */
+  static HeteroGraphPtr CreateFromCOO(int64_t num_src, int64_t num_dst,
+      IdArray row, IdArray col);
+
+  /*! \brief Create a bipartite graph from (out) CSR arrays */
+  static HeteroGraphPtr CreateFromCSR(
+      int64_t num_src, int64_t num_dst,
+      IdArray indptr, IdArray indices, IdArray edge_ids);
+
  private:
   // internal data structure
   class COO;

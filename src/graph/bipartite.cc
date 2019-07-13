@@ -709,6 +709,20 @@ HeteroSubgraph Bipartite::EdgeSubgraph(
   return ret;
 }
 
+HeteroGraphPtr Bipartite::CreateFromCOO(
+    int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col) {
+  COOPtr coo(new COO(num_src, num_dst, row, col));
+  return HeteroGraphPtr(new Bipartite(nullptr, nullptr, coo));
+}
+
+HeteroGraphPtr Bipartite::CreateFromCSR(
+    int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids) {
+  CSRPtr csr(new CSR(num_src, num_dst, indptr, indices, edge_ids));
+  return HeteroGraphPtr(new Bipartite(nullptr, csr, nullptr));
+}
+
 Bipartite::Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
   : BaseHeteroGraph(CreateBipartiteMetaGraph()), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
