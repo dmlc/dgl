@@ -9,6 +9,7 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/packed_func.h>
 #include <dgl/runtime/registry.h>
+#include <dgl/array.h>
 #include <algorithm>
 #include <vector>
 
@@ -33,6 +34,9 @@ inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
 }
 
 namespace dgl {
+
+// forward declaration
+struct EdgeArray;
 
 // Communicator handler type
 typedef void* CommunicatorHandle;
@@ -69,6 +73,8 @@ dgl::runtime::NDArray CopyVectorToNDArray(
   std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(a->data));
   return a;
 }
+
+runtime::PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea);
 
 }  // namespace dgl
 

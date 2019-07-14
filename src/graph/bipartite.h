@@ -116,7 +116,7 @@ class Bipartite : public BaseHeteroGraph {
   DGLIdIters InEdgeVec(dgl_type_t etype, dgl_id_t vid) const override;
 
   std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const override;
+      dgl_type_t etype, bool transpose, const std::string &fmt) const override;
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 

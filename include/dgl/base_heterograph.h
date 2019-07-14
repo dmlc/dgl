@@ -355,7 +355,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const = 0;
+      dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.

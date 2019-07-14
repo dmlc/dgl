@@ -20,36 +20,6 @@ using dgl::runtime::NDArray;
 namespace dgl {
 
 namespace {
-// Convert EdgeArray structure to PackedFunc.
-template<class EdgeArray>
-PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        *rv = std::move(ea.src);
-      } else if (which == 1) {
-        *rv = std::move(ea.dst);
-      } else if (which == 2) {
-        *rv = std::move(ea.id);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-// Convert CSRArray structure to PackedFunc.
-PackedFunc ConvertAdjToPackedFunc(const std::vector<IdArray>& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if ((size_t) which < ea.size()) {
-        *rv = std::move(ea[which]);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
 
 // Convert Subgraph structure to PackedFunc.
 PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
@@ -347,7 +317,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     bool transpose = args[1];
     std::string format = args[2];
     auto res = g->GetAdj(transpose, format);
-    *rv = ConvertAdjToPackedFunc(res);
+    *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")

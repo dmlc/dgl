@@ -154,7 +154,7 @@ class HeteroGraph : public BaseHeteroGraph {
   }
 
   std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const override {
+      dgl_type_t etype, bool transpose, const std::string &fmt) const override {
     return GetRelationGraph(etype)->GetAdj(0, transpose, fmt);
   }
 

@@ -217,7 +217,7 @@ class Bipartite::COO : public BaseHeteroGraph {
   }
 
   std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const override {
+      dgl_type_t etype, bool transpose, const std::string &fmt) const override {
     CHECK(fmt == "coo") << "Not valid adj format request.";
     if (transpose) {
       return {aten::HStack(adj_.col, adj_.row)};
@@ -487,7 +487,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const override {
+      dgl_type_t etype, bool transpose, const std::string &fmt) const override {
     CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
     return {adj_.indptr, adj_.indices, adj_.data};
   }
@@ -668,7 +668,7 @@ DGLIdIters Bipartite::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
 }
 
 std::vector<IdArray> Bipartite::GetAdj(
-    dgl_id_t etype, bool transpose, const std::string &fmt) const {
+    dgl_type_t etype, bool transpose, const std::string &fmt) const {
   // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
   //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
   //   is equal to in edge CSR.
