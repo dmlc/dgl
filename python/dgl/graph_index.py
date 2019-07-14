@@ -89,7 +89,7 @@ class GraphIndex(ObjectBase):
         v : int
             The dst node.
         """
-        _CAPI_DGLGraphAddEdge(self, u, v)
+        _CAPI_DGLGraphAddEdge(self, int(u), int(v))
         self.clear_cache()
 
     def add_edges(self, u, v):
@@ -1234,5 +1234,130 @@ def create_graph_index(graph_data, multigraph, readonly):
             raise DGLError('Error while creating graph from input of type "%s".'
                            % type(graph_data))
         return gidx
+
+#############################################################
+# Hetero graph
+#############################################################
+
+@register_object('graph.HeteroGraph')
+class HeteroGraphIndex(ObjectBase):
+    """HeteroGraph index object.
+
+    Note
+    ----
+    Do not create GraphIndex directly.
+    """
+    def __new__(cls):
+        obj = ObjectBase.__new__(cls)
+        return obj
+
+    def __getstate__(self):
+        # TODO
+        return
+
+    def __setstate__(self, state):
+        # TODO
+        pass
+
+    @property
+    def meta_graph(self):
+        """Meta graph
+
+        Returns
+        -------
+        GraphIndex
+            The meta graph.
+        """
+        return _CAPI_DGLHeteroGetMetaGraph(self)
+
+    def get_relation_graph(self, etype):
+        """Get the bipartite graph of the given edge/relation type.
+
+        Parameters
+        ----------
+        etype : int
+            The edge/relation type.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The bipartite graph.
+        """
+        return _CAPI_DGLHeteroGetRelationGraph(self, int(etype))
+
+    def add_nodes(self, ntype, num):
+        """Add nodes.
+
+        Parameters
+        ----------
+        ntype : int
+            Node type
+        num : int
+            Number of nodes to be added.
+        """
+        _CAPI_DGLHetero(self, int(ntype), int(num))
+    
+    def add_edge(self, etype, u, v):
+        """Add one edge.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        u : int
+            The src node.
+        v : int
+            The dst node.
+        """
+        _CAPI_DGLHeteroAddEdge(self, int(etype), int(u), int(v))
+
+    def add_edges(self, etype, u, v):
+        """Add many edges.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        u : utils.Index
+            The src nodes.
+        v : utils.Index
+            The dst nodes.
+        """
+        _CAPI_DGLHeteroAddEdges(self, int(etype),
+            u.todgltensor(), v.todgltensor())
+
+    def clear(self):
+        """Clear the graph."""
+        _CAPI_DGLHeteroClear(self)
+
+    def ctx(self):
+        """Return the context of this graph index.
+
+        Returns
+        -------
+        DGLContext
+            The context of the graph.
+        """
+        return _CAPI_DGLHeteroContext(self)
+
+    def nbits(self):
+        """Return the number of integer bits used in the storage (32 or 64).
+
+        Returns
+        -------
+        int
+            The number of bits.
+        """
+        return _CAPI_DGLHeteroNumBits(self)
+
+    def is_multigraph(self):
+        """Return whether the graph is a multigraph
+
+        Returns
+        -------
+        bool
+            True if it is a multigraph, False otherwise.
+        """
+        return bool(_CAPI_DGLHeteroIsMultigraph(self))
 
 _init_api("dgl.graph_index")
