@@ -436,6 +436,29 @@ struct HeteroSubgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
 
+/*! \brief Heter-subgraph reference class */
+class HeteroSubgraphRef : public runtime::ObjectRef {
+ public:
+  /*! \brief empty reference */
+  HeteroSubgraphRef() {}
+  explicit HeteroSubgraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
+
+  const HeteroSubgraph* operator->() const {
+    return static_cast<const HeteroSubgraph*>(obj_.get());
+  }
+
+  HeteroSubgraph* operator->() {
+    return static_cast<HeteroSubgraph*>(obj_.get());
+  }
+
+  /*! \brief get shared pointer */
+  std::shared_ptr<HeteroSubgraph> sptr() const {
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<HeteroSubgraph>(obj_));
+  }
+
+  using ContainerType = HeteroSubgraph;
+};
+
 // creators
 
 /*! \brief Create a bipartite graph from COO arrays */

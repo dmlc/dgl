@@ -10,6 +10,7 @@
 #include <dgl/runtime/packed_func.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/array.h>
+#include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
 
@@ -34,9 +35,6 @@ inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
 }
 
 namespace dgl {
-
-// forward declaration
-struct EdgeArray;
 
 // Communicator handler type
 typedef void* CommunicatorHandle;

@@ -397,7 +397,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroVertexSubgraph")
     }
     std::shared_ptr<HeteroSubgraph> subg(
         new HeteroSubgraph(hg->VertexSubgraph(vid_vec)));
-    *rv = subg;
+    *rv = HeteroSubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeSubgraph")
@@ -412,20 +412,20 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeSubgraph")
     }
     std::shared_ptr<HeteroSubgraph> subg(
         new HeteroSubgraph(hg->EdgeSubgraph(eid_vec, preserve_nodes)));
-    *rv = subg;
+    *rv = HeteroSubgraphRef(subg);
   });
 
 // HeteroSubgraph C APIs
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::shared_ptr<HeteroSubgraph> subg = args[0];
+    HeteroSubgraphRef subg = args[0];
     *rv = HeteroGraphRef(subg->graph);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::shared_ptr<HeteroSubgraph> subg = args[0];
+    HeteroSubgraphRef subg = args[0];
     List<Value> induced_verts;
     for (IdArray arr : subg->induced_vertices) {
       induced_verts.push_back(Value(MakeValue(arr)));
@@ -435,7 +435,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedVertices")
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::shared_ptr<HeteroSubgraph> subg = args[0];
+    HeteroSubgraphRef subg = args[0];
     List<Value> induced_edges;
     for (IdArray arr : subg->induced_edges) {
       induced_edges.push_back(Value(MakeValue(arr)));
