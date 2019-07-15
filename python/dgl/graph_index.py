@@ -1896,4 +1896,65 @@ class HeteroSubgraphIndex(ObjectBase):
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data) for v in ret]
 
+def create_bipartite_from_coo(num_src, num_dst, row, col):
+    """Create a bipartite graph index from COO format
+
+    Parameters
+    ----------
+    num_src : int
+        Number of nodes in the src type.
+    num_dst : int
+        Number of nodes in the dst type.
+    row : utils.Index
+        Row index.
+    col : utils.Index
+        Col index.
+
+    Returns
+    -------
+    HeteroGraphIndex
+    """
+    return _CAPI_DGLHeteroCreateBipartiteFromCOO(
+            int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+
+def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
+    """Create a bipartite graph index from CSR format
+
+    Parameters
+    ----------
+    num_src : int
+        Number of nodes in the src type.
+    num_dst : int
+        Number of nodes in the dst type.
+    indptr : utils.Index
+        CSR indptr.
+    indices : utils.Index
+        CSR indices.
+    edge_ids : utils.Index
+        Edge shuffle id.
+
+    Returns
+    -------
+    HeteroGraphIndex
+    """
+    return _CAPI_DGLHeteroCreateBipartiteFromCSR(
+            int(num_src), int(num_dst),
+            indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
+
+def create_heterograph(meta_graph, rel_graphs):
+    """Create a heterograph from metagraph and graphs of every relation.
+
+    Parameters
+    ----------
+    meta_graph : GraphIndex
+        Meta-graph.
+    rel_graphs : list of HeteroGraphIndex
+        Bipartite graph of each relation.
+
+    Returns
+    -------
+    HeteroGraphIndex
+    """
+    return _CAPI_DGLHeteroCreateHeteroGraph(meta_graph, rel_graphs)
+
 _init_api("dgl.graph_index")
