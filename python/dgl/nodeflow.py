@@ -938,7 +938,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(flow_range):
             flow_range = range(0, self.num_blocks)
         elif isinstance(flow_range, slice):
-            if slice.step != 1:
+            if flow_range.step != 1:
                 raise DGLError("We can't propogate flows and skip some of them")
             flow_range = range(flow_range.start, flow_range.stop)
         else:
