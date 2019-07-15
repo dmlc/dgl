@@ -26,9 +26,10 @@ namespace {
 /*
  * ArrayHeap is used to sample elements from vector
  */
+template<typename ValueType>
 class ArrayHeap {
  public:
-  explicit ArrayHeap(const std::vector<float>& prob) {
+  explicit ArrayHeap(const std::vector<ValueType>& prob) {
     vec_size_ = prob.size();
     bit_len_ = ceil(log2(vec_size_));
     limit_ = 1 << bit_len_;
@@ -52,7 +53,7 @@ class ArrayHeap {
    */
   void Delete(size_t index) {
     size_t i = index + limit_;
-    float w = heap_[i];
+    ValueType w = heap_[i];
     for (int j = bit_len_; j >= 0; --j) {
       heap_[i] -= w;
       i = i >> 1;
@@ -62,7 +63,7 @@ class ArrayHeap {
   /*
    * Add value w to index (this costs O(log m) steps)
    */
-  void Add(size_t index, float w) {
+  void Add(size_t index, ValueType w) {
     size_t i = index + limit_;
     for (int j = bit_len_; j >= 0; --j) {
       heap_[i] += w;
@@ -74,7 +75,7 @@ class ArrayHeap {
    * Sample from arrayHeap
    */
   size_t Sample(unsigned int* seed) {
-    float xi = heap_[1] * (rand_r(seed)%100/101.0);
+    ValueType xi = heap_[1] * (rand_r(seed)%100/101.0);
     int i = 1;
     while (i < limit_) {
       i = i << 1;
@@ -101,7 +102,7 @@ class ArrayHeap {
   int vec_size_;  // sample size
   int bit_len_;   // bit size
   int limit_;
-  std::vector<float> heap_;
+  std::vector<ValueType> heap_;
 };
 
 /*
@@ -182,8 +183,11 @@ void GetUniformSample(const dgl_id_t* edge_id_list,
 
 /*
  * Non-uniform sample via ArrayHeap
+ *
+ * \param probability Transition probability on the entire graph, indexed by edge ID
  */
-void GetNonUniformSample(const float* probability,
+template<typename ValueType>
+void GetNonUniformSample(const ValueType* probability,
                          const dgl_id_t* edge_id_list,
                          const dgl_id_t* vid_list,
                          const size_t ver_len,
@@ -199,11 +203,11 @@ void GetNonUniformSample(const float* probability,
   }
   // Make sample
   std::vector<size_t> sp_index(max_num_neighbor);
-  std::vector<float> sp_prob(ver_len);
+  std::vector<ValueType> sp_prob(ver_len);
   for (size_t i = 0; i < ver_len; ++i) {
-    sp_prob[i] = probability[vid_list[i]];
+    sp_prob[i] = probability[edge_id_list[i]];
   }
-  ArrayHeap arrayHeap(sp_prob);
+  ArrayHeap<ValueType> arrayHeap(sp_prob);
   arrayHeap.SampleWithoutReplacement(max_num_neighbor, &sp_index, seed);
   out_ver->resize(max_num_neighbor);
   out_edge->resize(max_num_neighbor);
@@ -372,9 +376,10 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   return nf;
 }
 
+template<typename ValueType>
 NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         const std::vector<dgl_id_t>& seeds,
-                        const float* probability,
+                        const ValueType* probability,
                         const std::string &edge_type,
                         int num_hops,
                         size_t num_neighbor,
@@ -531,14 +536,16 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
     delete nflow;
   });
 
-NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
-                                          const std::vector<dgl_id_t>& seeds,
-                                          const std::string &edge_type,
-                                          int num_hops, int expand_factor,
-                                          const bool add_self_loop) {
+template<typename ValueType>
+NodeFlow SamplerOp::NeighborSample(const ImmutableGraph *graph,
+                                   const std::vector<dgl_id_t>& seeds,
+                                   const std::string &edge_type,
+                                   int num_hops, int expand_factor,
+                                   const bool add_self_loop,
+                                   const ValueType *probability = nullptr) {
   return SampleSubgraph(graph,
-                        seeds,                 // seed vector
-                        nullptr,               // sample_id_probability
+                        seeds,
+                        probability,
                         edge_type,
                         num_hops + 1,
                         expand_factor,
@@ -731,19 +738,18 @@ void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
   }
 }
 
-DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // arguments
-    const GraphHandle ghdl = args[0];
-    const IdArray seed_nodes = args[1];
-    const int64_t batch_start_id = args[2];
-    const int64_t batch_size = args[3];
-    const int64_t max_num_workers = args[4];
-    const int64_t expand_factor = args[5];
-    const int64_t num_hops = args[6];
-    const std::string neigh_type = args[7];
-    const bool add_self_loop = args[8];
-    // process args
+template<typename ValueType>
+std::vector<NodeFlow*> _CAPI_NeighborSampling(
+    const GraphHandle ghdl,
+    const IdArray seed_nodes,
+    const int64_t batch_start_id,
+    const int64_t batch_size,
+    const int64_t max_num_workers,
+    const int64_t expand_factor,
+    const int64_t num_hops,
+    const std::string neigh_type,
+    const bool add_self_loop,
+    const ValueType *probability) {
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
@@ -766,9 +772,66 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
       std::copy(seed_nodes_data + start, seed_nodes_data + end,
                 worker_seeds.begin());
       nflows[i] = new NodeFlow();
-      *nflows[i] = SamplerOp::NeighborUniformSample(
-          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
+      *nflows[i] = SamplerOp::NeighborSample(
+          gptr, worker_seeds, neigh_type, num_hops, expand_factor,
+          add_self_loop, probability);
     }
+    return nflows;
+}
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    const GraphHandle ghdl = args[0];
+    const IdArray seed_nodes = args[1];
+    const int64_t batch_start_id = args[2];
+    const int64_t batch_size = args[3];
+    const int64_t max_num_workers = args[4];
+    const int64_t expand_factor = args[5];
+    const int64_t num_hops = args[6];
+    const std::string neigh_type = args[7];
+    const bool add_self_loop = args[8];
+
+    std::vector<NodeFlow*> nflows = _CAPI_NeighborSampling<float>(
+        ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+        expand_factor, num_hops, neigh_type, add_self_loop, nullptr);
+
+    *rv = WrapVectorReturn(nflows);
+  });
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    const GraphHandle ghdl = args[0];
+    const IdArray seed_nodes = args[1];
+    const int64_t batch_start_id = args[2];
+    const int64_t batch_size = args[3];
+    const int64_t max_num_workers = args[4];
+    const int64_t expand_factor = args[5];
+    const int64_t num_hops = args[6];
+    const std::string neigh_type = args[7];
+    const bool add_self_loop = args[8];
+    const NDArray probability = args[9];
+
+    // TODO: template-based selector?
+    std::vector<NodeFlow*> nflows;
+    CHECK(probability->dtype.code == kDLFloat)
+      << "transition probability must be float";
+    if (probability->dtype.bits == 32) {
+      const float *prob32 = static_cast<const float *>(probability->data);
+      nflows = _CAPI_NeighborSampling(
+          ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+          expand_factor, num_hops, neigh_type, add_self_loop, prob32);
+    } else if (probability->dtype.bits == 64) {
+      const double *prob64 = static_cast<const double *>(probability->data);
+      nflows = _CAPI_NeighborSampling(
+          ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+          expand_factor, num_hops, neigh_type, add_self_loop, prob64);
+    } else {
+      LOG(FATAL) << "transition probability must be either float32 or float64";
+      return;
+    }
+
     *rv = WrapVectorReturn(nflows);
   });
 

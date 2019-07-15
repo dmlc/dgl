@@ -206,7 +206,7 @@ class NodeFlowSampler(object):
         return self._batch_size
 
 class NeighborSampler(NodeFlowSampler):
-    '''Create a sampler that samples neighborhood.
+    r'''Create a sampler that samples neighborhood.
 
     It returns a generator of :class:`~dgl.NodeFlow`. This can be viewed as
     an analogy of *mini-batch training* on graph data -- the given graph represents
@@ -259,10 +259,30 @@ class NeighborSampler(NodeFlowSampler):
         * "out": the neighbors on the out-edges.
 
         Default: "in"
-    node_prob : Tensor, optional
-        A 1D tensor for the probability that a neighbor node is sampled.
-        None means uniform sampling. Otherwise, the number of elements
-        should be equal to the number of vertices in the graph.
+    transition_prob : str, optional
+        A 1D tensor containing the (unnormalized) transition probability.
+
+        The probability of a node v being sampled from a neighbor u is proportional to
+        the edge weight, normalized by the sum over edge weights grouping by the
+        destination node.
+
+        In other words, given a node v, the probability of node u and edge (u, v)
+        included in the NodeFlow layer preceding that of v is given by:
+
+        .. math::
+
+           p(u, v) = \frac{w_{u, v}}{\sum_{u', (u', v) \in E} w_{u', v}}
+
+        If neighbor type is "out", then the probability is instead normalized by the sum
+        grouping by source node:
+
+        .. math::
+
+           p(v, u) = \frac{w_{v, u}}{\sum_{u', (v, u') \in E} w_{v, u'}}
+
+        If a str is given, the edge weight will be loaded from the feature column with
+        the same name.  The feature column must be a scalar column in this case.
+
         Default: None
     seed_nodes : Tensor, optional
         A 1D tensor  list of nodes where we sample NodeFlows from.
@@ -288,7 +308,7 @@ class NeighborSampler(NodeFlowSampler):
             expand_factor=None,
             num_hops=1,
             neighbor_type='in',
-            node_prob=None,
+            transition_prob=None,
             seed_nodes=None,
             shuffle=False,
             num_workers=1,
@@ -300,7 +320,6 @@ class NeighborSampler(NodeFlowSampler):
 
         assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
                 "Please turn it into an immutable graph with DGLGraph.readonly"
-        assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
         self._expand_factor = int(expand_factor)
@@ -308,18 +327,41 @@ class NeighborSampler(NodeFlowSampler):
         self._add_self_loop = add_self_loop
         self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
+        self._transition_prob = transition_prob
 
     def fetch(self, current_nodeflow_index):
-        handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
-            self.g.c_handle,
-            self.seed_nodes.todgltensor(),
-            current_nodeflow_index, # start batch id
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
-            self._expand_factor,
-            self._num_hops,
-            self._neighbor_type,
-            self._add_self_loop))
+        if self._transition_prob is None:
+            prob = None
+        elif isinstance(self._transition_prob, str):
+            prob = self.g.edata[self._transition_prob]
+        else:
+            prob = self._transition_prob
+
+        if prob is None:
+            handles = _CAPI_UniformSampling(
+                self.g.c_handle,
+                self.seed_nodes.todgltensor(),
+                current_nodeflow_index, # start batch id
+                self.batch_size,        # batch size
+                self._num_workers,      # num batches
+                self._expand_factor,
+                self._num_hops,
+                self._neighbor_type,
+                self._add_self_loop)
+        else:
+            handles = _CAPI_NonUniformSampling(
+                self.g.c_handle,
+                self.seed_nodes.todgltensor(),
+                current_nodeflow_index, # start batch id
+                self.batch_size,        # batch size
+                self._num_workers,      # num batches
+                self._expand_factor,
+                self._num_hops,
+                self._neighbor_type,
+                self._add_self_loop,
+                F.zerocopy_to_dgl_ndarray(prob))
+        handles = unwrap_to_ptr_list(handles)
+
         nflows = [NodeFlow(self.g, hdl) for hdl in handles]
         return nflows
 
