@@ -1,3 +1,4 @@
+import numpy as np
 import dgl
 import dgl.ndarray as nd
 import dgl.graph_index as dgl_gidx
@@ -20,6 +21,9 @@ rel graph:
 1->2 : [0 -> 0, 1 -> 1, 1 -> 2]
 2->1 : [0 -> 1, 1 -> 1, 2 -> 1]
 """
+
+def _array_equal(dglidx, l):
+    return dglidx.tonumpy().tolist() == l
 
 def rel1_from_coo():
     row = toindex([0, 1, 2, 3])
@@ -69,6 +73,20 @@ def test_query():
         assert g.meta_graph.number_of_nodes() == 3
         assert g.meta_graph.number_of_edges() == 3
         assert g.ctx() == nd.cpu(0)
+        assert g.nbits() == 64
+        assert not g.is_multigraph()
+        assert g.is_readonly()
+        # relation graph 1
+        assert g.number_of_nodes(0) == 5
+        assert g.number_of_edges(0) == 4
+        assert g.has_node(0, 0)
+        assert not g.has_node(0, 10)
+        assert _array_equal(g.has_nodes(0, toindex([0, 10])), [1, 0])
+        assert g.has_edge_between(0, 3, 0)
+        assert not g.has_edge_between(0, 4, 0)
+        assert _array_equal(g.has_edges_between(0, toindex([3, 4]), toindex([0, 0])), [1, 0])
+
+        assert g.number_of_nodes(1) == 2
 
     g = gen_from_coo()
     _test_g(g)

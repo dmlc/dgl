@@ -242,7 +242,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgeBetween")
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     dgl_id_t src = args[2];
-    dgl_id_t dst = args[2];
+    dgl_id_t dst = args[3];
     *rv = hg->HasEdgeBetween(etype, src, dst);
   });
 
