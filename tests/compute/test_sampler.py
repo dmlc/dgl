@@ -155,6 +155,38 @@ def test_layer_sampler():
     _test_layer_sampler()
     _test_layer_sampler(prefetch=True)
 
+def test_nonuniform_neighbor_sampler():
+    # Construct a graph with
+    # (1) A path (0, 1, ..., 99) with weight 1
+    # (2) A bunch of random edges with weight 0.
+    edges = []
+    for i in range(99):
+        edges.append((i, i + 1))
+    for i in range(1000):
+        edge = (np.random.randint(100), np.random.randint(100))
+        if edge not in edges:
+            edges.append(edge)
+    src, dst = zip(*edges)
+    g = dgl.DGLGraph()
+    g.add_nodes(100)
+    g.add_edges(src, dst)
+    g.readonly()
+
+    g.edata['w'] = F.cat([
+        F.ones((99,), F.float32, F.cpu()),
+        F.zeros((len(edges) - 99,), F.float32, F.cpu())], 0)
+
+    # Test 1-neighbor NodeFlow with 99 as target node.
+    # The generated NodeFlow should only contain node i on layer i.
+    sampler = dgl.contrib.sampling.NeighborSampler(
+        g, 1, 1, 99, transition_prob='w', seed_nodes=[99])
+    nf = next(iter(sampler))
+
+    assert nf.num_layers == 100
+    for i in range(nf.num_layers):
+        assert nf.layer_size(i) == 1
+        assert nf.layer_parent_nid(i)[0] == i
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -162,3 +194,4 @@ if __name__ == '__main__':
     test_1neighbor_sampler()
     test_10neighbor_sampler()
     test_layer_sampler()
+    test_nonuniform_neighbor_sampler()
