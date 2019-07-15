@@ -110,7 +110,7 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
-|         |         |    pip install mxnet==1.5.0b20190605             |
+|         |         |    pip install mxnet==1.5.0b20190705             |
 |         |         |                                                  |
 |         |         | or cuda version (e.g. for cuda 9.0)              |
 |         |         |                                                  |
