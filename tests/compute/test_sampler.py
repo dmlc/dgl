@@ -173,19 +173,29 @@ def test_nonuniform_neighbor_sampler():
     g.readonly()
 
     g.edata['w'] = F.cat([
-        F.ones((99,), F.float32, F.cpu()),
-        F.zeros((len(edges) - 99,), F.float32, F.cpu())], 0)
+        F.ones((99,), F.float64, F.cpu()),
+        F.zeros((len(edges) - 99,), F.float64, F.cpu())], 0)
 
     # Test 1-neighbor NodeFlow with 99 as target node.
     # The generated NodeFlow should only contain node i on layer i.
     sampler = dgl.contrib.sampling.NeighborSampler(
-        g, 1, 1, 99, transition_prob='w', seed_nodes=[99])
+        g, 1, 1, 99, 'in', transition_prob='w', seed_nodes=[99])
     nf = next(iter(sampler))
 
     assert nf.num_layers == 100
     for i in range(nf.num_layers):
         assert nf.layer_size(i) == 1
         assert nf.layer_parent_nid(i)[0] == i
+
+    # Test the reverse direction
+    sampler = dgl.contrib.sampling.NeighborSampler(
+        g, 1, 1, 99, 'out', transition_prob='w', seed_nodes=[0])
+    nf = next(iter(sampler))
+
+    assert nf.num_layers == 100
+    for i in range(nf.num_layers):
+        assert nf.layer_size(i) == 1
+        assert nf.layer_parent_nid(i)[0] == 99 - i
 
 if __name__ == '__main__':
     test_create_full()
