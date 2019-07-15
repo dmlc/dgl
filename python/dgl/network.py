@@ -160,7 +160,7 @@ def serialize_nodeflow(nodeflow):
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     return _CAPI_SerializeSubgraph(
-            graph_handle, node_mapping, edge_mapping, layers_offsets, flows_offsets)
+        graph_handle, node_mapping, edge_mapping, layers_offsets, flows_offsets)
 
 
 def deserialize_nodeflow(buf, graph):
