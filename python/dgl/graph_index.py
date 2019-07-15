@@ -1272,11 +1272,11 @@ class HeteroGraphIndex(ObjectBase):
 
     def number_of_ntypes(self):
         """Return number of node types."""
-        return meta_graph.number_of_nodes()
+        return self.meta_graph.number_of_nodes()
 
     def number_of_etypes(self):
         """Return number of edge types."""
-        return meta_graph.number_of_edges()
+        return self.meta_graph.number_of_edges()
 
     def get_relation_graph(self, etype):
         """Get the bipartite graph of the given edge/relation type.

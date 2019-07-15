@@ -63,7 +63,8 @@ RETURN_SWITCH = {
     TypeCode.HANDLE: _return_handle,
     TypeCode.NULL: lambda x: None,
     TypeCode.STR: lambda x: py_str(x.v_str),
-    TypeCode.BYTES: _return_bytes
+    TypeCode.BYTES: _return_bytes,
+    TypeCode.DGL_CONTEXT: lambda x: DGLContext(x.v_ctx.device_type, x.v_ctx.device_id),
 }
 
 C_TO_PY_ARG_SWITCH = {
@@ -72,5 +73,6 @@ C_TO_PY_ARG_SWITCH = {
     TypeCode.HANDLE: _return_handle,
     TypeCode.NULL: lambda x: None,
     TypeCode.STR: lambda x: py_str(x.v_str),
-    TypeCode.BYTES: _return_bytes
+    TypeCode.BYTES: _return_bytes,
+    TypeCode.DGL_CONTEXT: lambda x: DGLContext(x.v_ctx.device_type, x.v_ctx.device_id),
 }
