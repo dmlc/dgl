@@ -1,6 +1,7 @@
 @ECHO OFF
 SETLOCAL EnableDelayedExpansion
 
+CALL mkvirtualenv --system-site-packages %BUILD_TAG%
 DEL /S /Q build
 DEL /S /Q _download
 MD build
@@ -15,7 +16,7 @@ POPD
 
 PUSHD python
 DEL /S /Q build *.egg-info dist
-pip install -e . --force-reinstall --user || EXIT /B 1
+pip install -e . || EXIT /B 1
 POPD
 
 ENDLOCAL
