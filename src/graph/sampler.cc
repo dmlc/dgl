@@ -815,7 +815,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
 
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
 
-    // TODO: template-based selector?
+    // TODO(BarclayII): template-based selector?
     std::vector<NodeFlow*> nflows;
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
