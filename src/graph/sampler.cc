@@ -740,7 +740,7 @@ void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
 
 template<typename ValueType>
 std::vector<NodeFlow*> _CAPI_NeighborSampling(
-    const GraphHandle ghdl,
+    const GraphInterface *ptr,
     const IdArray seed_nodes,
     const int64_t batch_start_id,
     const int64_t batch_size,
@@ -750,7 +750,6 @@ std::vector<NodeFlow*> _CAPI_NeighborSampling(
     const std::string neigh_type,
     const bool add_self_loop,
     const ValueType *probability) {
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_nodes));
@@ -792,8 +791,9 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     const std::string neigh_type = args[7];
     const bool add_self_loop = args[8];
 
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     std::vector<NodeFlow*> nflows = _CAPI_NeighborSampling<float>(
-        ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+        ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
         expand_factor, num_hops, neigh_type, add_self_loop, nullptr);
 
     *rv = WrapVectorReturn(nflows);
@@ -813,19 +813,27 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
     const bool add_self_loop = args[8];
     const NDArray probability = args[9];
 
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
+
     // TODO: template-based selector?
     std::vector<NodeFlow*> nflows;
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
+    CHECK(probability->ndim == 1)
+      << "transition probability must be a 1-dimensional vector";
+    CHECK(probability->shape[0] == ptr->NumEdges())
+      << "transition probability must have same number of elements as edges";
+    CHECK(probability->strides == nullptr || probability->strides[0] == 1)
+      << "transition probability must be contiguous tensor";
     if (probability->dtype.bits == 32) {
       const float *prob32 = static_cast<const float *>(probability->data);
       nflows = _CAPI_NeighborSampling(
-          ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+          ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
           expand_factor, num_hops, neigh_type, add_self_loop, prob32);
     } else if (probability->dtype.bits == 64) {
       const double *prob64 = static_cast<const double *>(probability->data);
       nflows = _CAPI_NeighborSampling(
-          ghdl, seed_nodes, batch_start_id, batch_size, max_num_workers,
+          ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
           expand_factor, num_hops, neigh_type, add_self_loop, prob64);
     } else {
       LOG(FATAL) << "transition probability must be either float32 or float64";
