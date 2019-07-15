@@ -542,7 +542,7 @@ NodeFlow SamplerOp::NeighborSample(const ImmutableGraph *graph,
                                    const std::string &edge_type,
                                    int num_hops, int expand_factor,
                                    const bool add_self_loop,
-                                   const ValueType *probability = nullptr) {
+                                   const ValueType *probability) {
   return SampleSubgraph(graph,
                         seeds,
                         probability,
