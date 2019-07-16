@@ -5,7 +5,6 @@ import dgl.function as fn
 
 class NNConvLayer(nn.Module):
     def __init__(self,
-                 g,
                  in_channels,
                  out_channels,
                  edge_net,
@@ -14,7 +13,6 @@ class NNConvLayer(nn.Module):
                  bias=True):
         super(NNConvLayer, self).__init__()
         
-        self.g = g
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.edge_net = edge_net
@@ -46,12 +44,8 @@ class NNConvLayer(nn.Module):
         return {'m' : torch.matmul(edges.src['h'].unsqueeze(1),edges.data['w']).squeeze(1)}
     
     def reduce(self, nodes):
-        if self.aggr == 'add':
-            return {'aggr_out' : torch.sum(nodes.mailbox['m'], 1)}
-        elif self.aggr == 'mean':
-            return {'aggr_out' : torch.mean(nodes.mailbox['m'], 1)}
-        else:
-            raise AssertionError()
+        return {'aggr_out' : eval(f"torch.{self.aggr}(nodes.mailbox['m'], 1)")}
+        
             
     def apply_node_func(self, nodes):
         aggr_out = nodes.data['aggr_out']        
@@ -63,12 +57,12 @@ class NNConvLayer(nn.Module):
         
         return {'h': aggr_out}
 
-    def forward(self, h, e):
+    def forward(self, g, h, e):
         h = h.unsqueeze(-1) if h.dim() == 1 else h
         e = e.unsqueeze(-1) if e.dim() == 1 else e
         
-        self.g.ndata['h'] = h
-        self.g.edata['w'] = self.edge_net(e).view(-1, self.in_channels, self.out_channels)
+        g.ndata['h'] = h
+        g.edata['w'] = self.edge_net(e).view(-1, self.in_channels, self.out_channels)
         
         if self.aggr == 'add':
             g.update_all(self.message, self.reduce,self.apply_node_func)
@@ -76,4 +70,4 @@ class NNConvLayer(nn.Module):
             
             g.update_all(self.message, self.reduce, self.apply_node_func)
 
-        return self.g.ndata.pop('h')
+        return g.ndata.pop('h')
