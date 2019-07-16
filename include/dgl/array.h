@@ -74,7 +74,7 @@ IdArray Range(int64_t low, int64_t high, uint8_t nbits, DLContext ctx);
  */
 IdArray Full(int64_t val, int64_t length, uint8_t nbits, DLContext ctx);
 
-/*! \brief Create a copy of the given array */
+/*! \brief Create a deep copy of the given array */
 IdArray Clone(IdArray arr);
 
 /*! \brief Convert the idarray to the given bit width */

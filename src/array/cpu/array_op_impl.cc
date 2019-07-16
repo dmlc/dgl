@@ -146,6 +146,7 @@ template IdArray Full<kDLCPU, int64_t>(int64_t val, int64_t length, DLContext ct
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Range(IdType low, IdType high, DLContext ctx) {
+  CHECK(high >= low) << "high must be bigger than low";
   IdArray ret = NewIdArray(high - low, ctx, sizeof(IdType) * 8);
   IdType* ret_data = static_cast<IdType*>(ret->data);
   std::iota(ret_data, ret_data + high - low, low);

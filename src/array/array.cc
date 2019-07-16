@@ -20,7 +20,7 @@ IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
 }
 
 IdArray Clone(IdArray arr) {
-  IdArray ret = NewIdArray(arr->shape[0]);
+  IdArray ret = NewIdArray(arr->shape[0], arr->ctx, arr->dtype.bits);
   ret.CopyFrom(arr);
   return ret;
 }
