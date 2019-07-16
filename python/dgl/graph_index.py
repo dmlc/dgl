@@ -323,6 +323,24 @@ class GraphIndex(ObjectBase):
 
         return src, dst, eid
 
+    def find_edge(self, eid):
+        """Return the edge tuple of the given id.
+
+        Parameters
+        ----------
+        eid : int
+            The edge id.
+
+        Returns
+        -------
+        int
+            src node id
+        int
+            dst node id
+        """
+        ret = _CAPI_DGLGraphFindEdge(self, int(eid))
+        return ret(0), ret(1)
+
     def find_edges(self, eid):
         """Return a triplet of arrays that contains the edge IDs.
 
@@ -1487,6 +1505,8 @@ class HeteroGraphIndex(ObjectBase):
     def predecessors(self, etype, v):
         """Return the predecessors of the node.
 
+        Assume that node_type(v) == dst_type(etype). Thus, the ntype argument is omitted.
+
         Parameters
         ----------
         etype : int
@@ -1504,6 +1524,8 @@ class HeteroGraphIndex(ObjectBase):
 
     def successors(self, etype, v):
         """Return the successors of the node.
+
+        Assume that node_type(v) == src_type(etype). Thus, the ntype argument is omitted.
 
         Parameters
         ----------
@@ -1602,6 +1624,8 @@ class HeteroGraphIndex(ObjectBase):
     def in_edges(self, etype, v):
         """Return the in edges of the node(s).
 
+        Assume that node_type(v) == dst_type(etype). Thus, the ntype argument is omitted.
+
         Parameters
         ----------
         etype : int
@@ -1630,6 +1654,8 @@ class HeteroGraphIndex(ObjectBase):
 
     def out_edges(self, etype, v):
         """Return the out edges of the node(s).
+
+        Assume that node_type(v) == src_type(etype). Thus, the ntype argument is omitted.
 
         Parameters
         ----------
@@ -1694,6 +1720,8 @@ class HeteroGraphIndex(ObjectBase):
     def in_degree(self, etype, v):
         """Return the in degree of the node.
 
+        Assume that node_type(v) == dst_type(etype). Thus, the ntype argument is omitted.
+
         Parameters
         ----------
         etype : int
@@ -1710,6 +1738,8 @@ class HeteroGraphIndex(ObjectBase):
 
     def in_degrees(self, etype, v):
         """Return the in degrees of the nodes.
+
+        Assume that node_type(v) == dst_type(etype). Thus, the ntype argument is omitted.
 
         Parameters
         ----------
@@ -1729,6 +1759,8 @@ class HeteroGraphIndex(ObjectBase):
     def out_degree(self, etype, v):
         """Return the out degree of the node.
 
+        Assume that node_type(v) == src_type(etype). Thus, the ntype argument is omitted.
+
         Parameters
         ----------
         etype : int
@@ -1745,6 +1777,8 @@ class HeteroGraphIndex(ObjectBase):
 
     def out_degrees(self, etype, v):
         """Return the out degrees of the nodes.
+
+        Assume that node_type(v) == src_type(etype). Thus, the ntype argument is omitted.
 
         Parameters
         ----------
@@ -1792,22 +1826,23 @@ class HeteroGraphIndex(ObjectBase):
                            ' but got %s.' % (type(transpose)))
         fmt = F.get_preferred_sparse_format()
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
+        # convert to framework-specific sparse matrix
+        srctype, dsttype = self.meta_graph.find_edge(etype)
+        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
+        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
             shuffle = utils.toindex(rst(2))
-            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
-            spmat = F.sparse_matrix(dat, ('csr', indices, indptr),
-                                    (self.number_of_nodes(), self.number_of_nodes()))[0]
+            dat = F.ones(nnz, dtype=F.float32, ctx=ctx)  # FIXME(minjie): data type
+            spmat = F.sparse_matrix(dat, ('csr', indices, indptr), (nrows, ncols))[0]
             return spmat, shuffle
         elif fmt == "coo":
-            ## FIXME(minjie): data type
             idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            m = self.number_of_edges()
-            idx = F.reshape(idx, (2, m))
-            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            n = self.number_of_nodes()
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+            idx = F.reshape(idx, (2, nnz))
+            dat = F.ones((nnz,), dtype=F.float32, ctx=ctx)
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (nrows, ncols))
             shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
@@ -1828,18 +1863,16 @@ class HeteroGraphIndex(ObjectBase):
             The subgraph index.
         """
         vids = [nodes.todgltensor() for nodes in induced_nodes]
-        rst = _CAPI_DGLHeteroVertexSubgraph(self, vids)
-        induced_edges = utils.toindex(rst(2))
-        gidx = rst(0)
-        return SubgraphIndex(gidx, self, v, induced_edges)
+        return _CAPI_DGLHeteroVertexSubgraph(self, vids)
 
-    def edge_subgraph(self, e, preserve_nodes):
+    def edge_subgraph(self, induced_edges, preserve_nodes):
         """Return the induced edge subgraph.
 
         Parameters
         ----------
-        e : utils.Index
-            The edges.
+        induced_edges : list of utils.Index
+            Induced edges. The length should be equal to the number of
+            edge types in this heterograph.
         preserve_nodes : bool
             Indicates whether to preserve all nodes or not.
             If true, keep the nodes which have no edge connected in the subgraph;
@@ -1850,11 +1883,8 @@ class HeteroGraphIndex(ObjectBase):
         SubgraphIndex
             The subgraph index.
         """
-        e_array = e.todgltensor()
-        rst = _CAPI_DGLHeteroEdgeSubgraph(self, e_array, preserve_nodes)
-        induced_nodes = utils.toindex(rst(1))
-        gidx = rst(0)
-        return SubgraphIndex(gidx, self, induced_nodes, e)
+        eids = [edges.todgltensor() for edges in induced_edges]
+        return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):

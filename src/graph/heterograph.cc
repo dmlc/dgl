@@ -65,6 +65,7 @@ HeteroSubgraph HeteroGraph::VertexSubgraph(const std::vector<IdArray>& vids) con
 
 HeteroSubgraph HeteroGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
+  // TODO(minjie): this is not correct
   CHECK_EQ(eids.size(), NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;

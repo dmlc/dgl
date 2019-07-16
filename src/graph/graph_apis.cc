@@ -226,6 +226,18 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
     *rv = ConvertEdgeArrayToPackedFunc(g->EdgeIds(src, dst));
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdge")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    const dgl_id_t eid = args[1];
+    const auto& pair = g->FindEdge(eid);
+    *rv = PackedFunc([pair] (DGLArgs args, DGLRetValue* rv) {
+        const int choice = args[0];
+        const int64_t ret = (choice == 0? pair.first : pair.second);
+        *rv = ret;
+      });
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];

@@ -69,3 +69,11 @@ class StrMap(Map):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
         return [(akvs[i].value, akvs[i+1]) for i in range(0, len(akvs), 2)]
+
+@register_object
+class Value(ObjectBase):
+    """Object wrapper for various values."""
+    @property
+    def data(self):
+        """Return the value data."""
+        return _api_internal._ValueGet(self)
