@@ -49,6 +49,9 @@ template <DLDeviceType XPU, typename IdType>
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType>
+runtime::NDArray CSRIsNonZero(CSRMatrix csr, runtime::NDArray row, runtime::NDArray col);
+
+template <DLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>

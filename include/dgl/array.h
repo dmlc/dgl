@@ -43,15 +43,6 @@ IdArray NewIdArray(int64_t length,
                    uint8_t nbits = 64);
 
 /*!
- * \brief Create a new boolean array with given length
- * \note FIXME: the elements are 64-bit.
- * \param length The array length
- * \param ctx The array context
- * \return the bool array
- */
-BoolArray NewBoolArray(int64_t length, DLContext ctx = DLContext{kDLCPU, 0});
-
-/*!
  * \brief Create a new id array using the given vector data
  * \param vec The vector data
  * \param nbits The integer bits of the returned array
@@ -104,6 +95,8 @@ IdArray Add(dgl_id_t lhs, IdArray rhs);
 IdArray Sub(dgl_id_t lhs, IdArray rhs);
 IdArray Mul(dgl_id_t lhs, IdArray rhs);
 IdArray Div(dgl_id_t lhs, IdArray rhs);
+
+BoolArray LT(IdArray lhs, dgl_id_t rhs);
 
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
@@ -167,6 +160,10 @@ struct COOMatrix {
 
 /*! \brief Return true if the value (row, col) is non-zero */
 bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of CSRIsNonZero.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
 runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
@@ -181,6 +178,11 @@ runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of CSRGetData.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 /* \brief Get the data and the row,col indices for each returned entries. */
@@ -191,7 +193,7 @@ std::vector<runtime::NDArray> CSRGetDataAndIndices(
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
 /*!
- * \brief Convert COO matrix to CSR matrix.
+ * \brief Convert CSR matrix to COO matrix.
  * \param csr Input csr matrix
  * \param data_as_order If true, the data array in the input csr matrix contains the order
  *                      by which the resulting COO tuples are stored. In this case, the

@@ -106,6 +106,26 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
 template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
 template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
+template <DLDeviceType XPU, typename IdType>
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
+  const auto rowlen = row->shape[0];
+  const auto collen = col->shape[0];
+  const auto rstlen = std::max(rowlen, collen);
+  NDArray rst = NDArray::Empty({rstlen}, row->dtype, row->ctx);
+  IdType* rst_data = static_cast<IdType*>(rst->data);
+  const IdType* row_data = static_cast<IdType*>(row->data);
+  const IdType* col_data = static_cast<IdType*>(col->data);
+  const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
+  const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
+  for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
+    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
+  }
+  return rst;
+}
+
+template NDArray CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray);
+
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
@@ -192,7 +212,7 @@ template NDArray CSRGetRowData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t);
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(CSRHasData(csr)) << "missing data array";
-  // TODO(minjie): use more efficient binary search when the column indices
+  // TODO(minjie): use more efficient binary search when the column indices is sorted
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   std::vector<DType> ret_vec;
@@ -204,11 +224,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
       ret_vec.push_back(data[i]);
     }
   }
-  const int64_t len = ret_vec.size();
-  NDArray ret_arr = NDArray::Empty({len}, csr.data->dtype, csr.data->ctx);
-  DType* ptr = static_cast<DType*>(ret_arr->data);
-  std::copy(ret_vec.begin(), ret_vec.end(), ptr);
-  return ret_arr;
+  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);

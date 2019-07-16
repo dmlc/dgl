@@ -90,7 +90,14 @@ class CSR : public GraphInterface {
     return adj_.indices->shape[0];
   }
 
+  BoolArray HasVertices(IdArray vids) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return {};
+  }
+
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
+
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
 
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
     LOG(FATAL) << "CSR graph does not support efficient predecessor query."
@@ -306,10 +313,21 @@ class COO : public GraphInterface {
     return vid < NumVertices();
   }
 
+  BoolArray HasVertices(IdArray vids) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return {};
+  }
+
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
     LOG(FATAL) << "COO graph does not support efficient HasEdgeBetween."
       << " Please use CSR graph or AdjList graph instead.";
     return false;
+  }
+
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override {
+    LOG(FATAL) << "COO graph does not support efficient HasEdgeBetween."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
   }
 
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
@@ -610,12 +628,22 @@ class ImmutableGraph: public GraphInterface {
     return vid < NumVertices();
   }
 
+  BoolArray HasVertices(IdArray vids) const override;
+
   /*! \return true if the given edge is in the graph.*/
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
     if (in_csr_) {
       return in_csr_->HasEdgeBetween(dst, src);
     } else {
       return GetOutCSR()->HasEdgeBetween(src, dst);
+    }
+  }
+
+  BoolArray HasEdgesBetween(IdArray src, IdArray dst) const override {
+    if (in_csr_) {
+      return in_csr_->HasEdgesBetween(dst, src);
+    } else {
+      return GetOutCSR()->HasEdgesBetween(src, dst);
     }
   }
 

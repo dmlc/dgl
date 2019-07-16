@@ -153,6 +153,12 @@ bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   return aten::CSRIsNonZero(adj_, src, dst);
 }
 
+BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
+  CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+  CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+  return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
+}
+
 IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   CHECK(radius == 1) << "invalid radius: " << radius;
@@ -355,6 +361,11 @@ COO COO::AsNumBits(uint8_t bits) const {
 // immutable graph implementation
 //
 //////////////////////////////////////////////////////////
+
+BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  return aten::LT(vids, NumVertices());
+}
 
 CSRPtr ImmutableGraph::GetInCSR() const {
   if (!in_csr_) {

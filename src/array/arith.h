@@ -38,6 +38,13 @@ struct Div {
   }
 };
 
+struct LT {
+  template <typename T>
+  inline static bool Call(const T& t1, const T& t2) {
+    return t1 < t2;
+  }
+};
+
 }  // namespace arith
 }  // namespace aten
 }  // namespace dgl

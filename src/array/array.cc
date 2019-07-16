@@ -19,10 +19,6 @@ IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
   return IdArray::Empty({length}, DLDataType{kDLInt, nbits, 1}, ctx);
 }
 
-BoolArray NewBoolArray(int64_t length, DLContext ctx) {
-  return BoolArray::Empty({length}, DLDataType{kDLInt, 64, 1}, ctx);
-}
-
 IdArray Clone(IdArray arr) {
   IdArray ret = NewIdArray(arr->shape[0]);
   ret.CopyFrom(arr);
@@ -183,6 +179,16 @@ IdArray Div(dgl_id_t lhs, IdArray rhs) {
   return ret;
 }
 
+BoolArray LT(IdArray lhs, dgl_id_t rhs) {
+  BoolArray ret;
+  ATEN_XPU_SWITCH(lhs->ctx.device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(lhs->dtype, IdType, {
+      ret = impl::BinaryElewise<XPU, IdType, arith::LT>(lhs, rhs);
+    });
+  });
+  return ret;
+}
+
 IdArray HStack(IdArray lhs, IdArray rhs) {
   IdArray ret;
   CHECK_EQ(lhs->ctx, rhs->ctx) << "Both operands should have the same device context";
@@ -229,6 +235,14 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   bool ret = false;
+  ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
+  });
+  return ret;
+}
+
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
+  NDArray ret;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
     ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
