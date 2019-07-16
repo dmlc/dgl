@@ -6,6 +6,8 @@
 #ifndef DGL_GRAPH_NETWORK_COMMUNICATOR_H_
 #define DGL_GRAPH_NETWORK_COMMUNICATOR_H_
 
+#include <dmlc/logging.h>
+
 #include <string>
 
 namespace dgl {
@@ -14,38 +16,48 @@ namespace network {
 /*!
  * \brief Network Sender for DGL distributed training.
  *
- * Sender is an abstract class that defines a set of APIs for sending 
- * binary data over network. It can be implemented by different underlying 
+ * Sender is an abstract class that defines a set of APIs for sending binary 
+ * data message over network. It can be implemented by different underlying 
  * networking libraries such TCP socket and MPI. One Sender can connect to 
- * multiple receivers, and it can send data to specified receiver via receiver's ID.
+ * multiple receivers and it can send data to specified receiver via receiver's ID.
  */
 class Sender {
  public:
+  /*!
+   * \brief Sender constructor
+   * \param queue_size size of message queue. 
+   * Note that, the queue_size parameter is optional.
+   */
+  explicit Sender(int64_t queue_size = 0) {
+    if (queue_size < 0) {
+      LOG(FATAL) << "queue_size cannot be a negative number.";
+    }
+    queue_size_ = queue_size;
+  }
+
   virtual ~Sender() {}
 
   /*!
-   * \brief Add receiver address and it's ID to the namebook
-   * \param addr Networking address, e.g., 'socket://127.0.0.1:500591', 'mpi://0'
+   * \brief Add receiver's address and ID to the sender's namebook
+   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
    * \param id receiver's ID
    */
   virtual void AddReceiver(const char* addr, int id) = 0;
 
   /*!
    * \brief Connect with all the Receivers
-   * \return True for success of all connections and False for fail
+   * \return True for success and False for fail
    */
   virtual bool Connect() = 0;
 
   /*!
-   * \brief Send data to specified Receiver
+   * \brief Send binary data to specified Receiver
    * \param data data buffer for sending
-   * \param size data size for sending
+   * \param size size of data for sending
    * \param recv_id receiver's ID
-   * \return bytes we sent
+   * \return bytes of data
    *   > 0 : bytes we sent
    *   - 1 : error
-   * Note that, the Send() API is a blocking API that 
-   * returns until the target receiver get its message.
    */
   virtual int64_t Send(const char* data, int64_t size, int recv_id) = 0;
 
@@ -53,44 +65,82 @@ class Sender {
    * \brief Finalize Sender
    */
   virtual void Finalize() = 0;
+
+  /*!
+   * \brief Communicator type: 'socket', 'mpi', etc.
+   */
+  virtual std::string Type() const = 0;
+
+ protected:
+  /*!
+   * \brief Size of message queue
+   */
+  int64_t queue_size_;
 };
 
 /*!
  * \brief Network Receiver for DGL distributed training.
  *
- * Receiver is an abstract class that defines a set of APIs for receiving binary 
- * data over network. It can be implemented by different underlying networking libraries 
- * such TCP socket and MPI. One Receiver can connect with multiple Senders, and it can receive 
- * data from multiple Senders concurrently via multi-threading and message queue.
+ * Receiver is an abstract class that defines a set of APIs for receiving binary data 
+ * message over network. It can be implemented by different underlying networking 
+ * libraries such as TCP socket and MPI. One Receiver can connect with multiple Senders 
+ * and it can receive data from multiple Senders concurrently.
  */
 class Receiver {
  public:
+  /*!
+   * \brief Receiver constructor
+   * \param queue_size size of message queue.
+   * Note that, the queue_size parameter is optional.
+   */
+  explicit Receiver(int64_t queue_size = 0) {
+    if (queue_size < 0) {
+      LOG(FATAL) << "queue_size cannot be a negative number.";
+    }
+    queue_size_ = queue_size;
+  }  
+
   virtual ~Receiver() {}
 
   /*!
-   * \brief Wait all of the Senders to connect
+   * \brief Wait for all the Senders to connect
    * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
-   * \param queue_size size of message queue
-   * \return True for sucess and False for fail
+   * \return True for success and False for fail
    */
-  virtual bool Wait(const char* addr, int num_sender, int queue_size) = 0;
+  virtual bool Wait(const char* addr, int num_sender) = 0;
 
   /*!
-   * \brief Recv data from Sender (copy data from message queue)
-   * \param buffer data buffer
-   * \param buff_size size of data buffer
-   * \return real bytes received
-   *   > 0 : size of message
-   *   - 1 : error
-   * Note that, the Recv() API is blocking API that returns until getting data.
+   * \brief Recv data from Sender
+   * \param size data size we received
+   * \param send_id which sender current msg comes from
+   * \return data buffer we received
    */
-  virtual int64_t Recv(char* buffer, int64_t buff_size) = 0;
+  virtual char* Recv(int64_t* size, int* send_id) = 0;
+
+  /*!
+   * \brief Recv data from specified Sender
+   * \param size data size we received
+   * \param send_id sender's ID
+   * \return data buffer we received
+   */
+  virtual char* RecvFrom(int64_t* size, int send_id) = 0;
 
   /*!
    * \brief Finalize Receiver
    */
   virtual void Finalize() = 0;
+
+  /*!
+   * \brief Communicator type: 'socket', 'mpi', etc
+   */
+  virtual std::string Type() const = 0;
+ 
+ protected:
+  /*!
+   * \brief Size of message queue
+   */
+  int64_t queue_size_;
 };
 
 }  // namespace network

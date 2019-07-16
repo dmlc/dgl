@@ -73,21 +73,23 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 #endif  // WIN32
 
 void start_client() {
-  const char * msg = "123456789";
-  sleep(1);
-  SocketSender sender;
+  char* msg = new char[9];
+  memcpy(msg, "123456789", 9);
+  SocketSender sender(500 * 1024);
   sender.AddReceiver("socket://127.0.0.1:2049", 0);
   sender.Connect();
   sender.Send(msg, 9, 0);
+  sleep(1);
   sender.Finalize();
 }
 
 bool start_server() {
-  char serbuff[10];
-  memset(serbuff, '\0', 10);
-  SocketReceiver receiver;
-  receiver.Wait("socket://127.0.0.1:2049", 1, 500 * 1024);
-  receiver.Recv(serbuff, 9);
+  SocketReceiver receiver(500 * 1024);
+  receiver.Wait("socket://127.0.0.1:2049", 1);
+  int id = 0;
+  int64_t size = 0;
+  char* data = receiver.Recv(&size, &id);
+  sleep(1);
   receiver.Finalize();
-  return string("123456789") == string(serbuff);
+  return string("123456789") == string(data, size);
 }
