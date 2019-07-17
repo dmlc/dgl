@@ -14,7 +14,7 @@
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/common.h"
-#include "../c_api_common.h"
+
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -129,39 +129,59 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     auto csr = ptr->GetInCSR();
     // Create a message for the meta data of ndarray
-    Message msg(NF_MSG);
-    msg.AddShape({node_mapping->shape[0]});
-    msg.AddShape({edge_mapping->shape[0]});
-    msg.AddShape({layer_offsets->shape[0]});
-    msg.AddShape({flow_offsets->shape[0]});
-    msg.AddShape({csr->indptr()->shape[0]});
-    msg.AddShape({csr->indices()->shape[0]});
-    msg.AddShape({csr->edge_ids()->shape[0]});
+    MsgMeta msg(NF_MSG);
+    msg.AddArray(node_mapping);
+    msg.AddArray(edge_mapping);
+    msg.AddArray(layer_offsets);
+    msg.AddArray(flow_offsets);
+    msg.AddArray(csr->indptr());
+    msg.AddArray(csr->indices());
+    msg.AddArray(csr->edge_ids());
     // First we send meta message
     int64_t size = 0;
-    char* data = msg.Serialize(&size);
+    std::unique_ptr<char> data(msg.Serialize(&size));
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    sender->Send(data, size, recv_id);
+    sender->Send(data.get(), size, recv_id);
     // Then we send a set of ndarray
-    /*
-    sender->Send(static_cast<char*>(node_mapping->data), node_mapping.GetSize(), recv_id);
-    sender->Send(static_cast<char*>(edge_mapping->data), edge_mapping.GetSize(), recv_id);
-    sender->Send(static_cast<char*>(layer_offsets->data), layer_offsets.GetSize(), recv_id);
-    sender->Send(static_cast<char*>(flow_offsets->data), flow_offsets.GetSize(), recv_id);
-    sender->Send(static_cast<char*>(csr->indptr()->data), csr->indptr().GetSize(), recv_id);
-    sender->Send(static_cast<char*>(csr->indices()->data), csr->indices().GetSize(), recv_id);
-    sender->Send(static_cast<char*>(csr->edge_ids()->data), csr->edge_ids().GetSize(), recv_id);*/
+    sender->Send(
+      static_cast<char*>(node_mapping->data), 
+      node_mapping.GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(edge_mapping->data), 
+      edge_mapping.GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(layer_offsets->data), 
+      layer_offsets.GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(flow_offsets->data), 
+      flow_offsets.GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(csr->indptr()->data), 
+      csr->indptr().GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(csr->indices()->data), 
+      csr->indices().GetSize(), 
+      recv_id);
+    sender->Send(
+      static_cast<char*>(csr->edge_ids()->data), 
+      csr->edge_ids().GetSize(), 
+      recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
-    Message msg(END_MSG);
+    MsgMeta msg(END_MSG);
     int64_t size = 0;
-    char* data = msg.Serialize(&size);
+    std::unique_ptr<char> data(msg.Serialize(&size));
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    sender->Send(data, size, recv_id);
+    sender->Send(data.get(), size, recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
@@ -170,47 +190,46 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     int64_t data_size = 0;
     int send_id = 0;
-    char* data = receiver->Recv(&data_size, &send_id);
-    Message msg(data, data_size);
+    std::unique_ptr<char> data_meta(receiver->Recv(&data_size, &send_id));
+    MsgMeta msg(data_meta.get(), data_size);
     if (msg.Type() == NF_MSG) {
+      CHECK_EQ(msg.NDArrayCount() * 2, msg.data_shape_.size());
       NodeFlow* nf = new NodeFlow();
       // node_mapping
-      data = receiver->RecvFrom(&data_size, send_id);
+      std::unique_ptr<char> array_0(receiver->RecvFrom(&data_size, send_id));
+      CHECK_EQ(msg.data_shape_[0], 1);
       nf->node_mapping = NDArray::Empty(
-        {msg.data_shape_[0]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->node_mapping->data), data, data_size);
-      delete [] data;
-      // edge_mapping
-      data = receiver->RecvFrom(&data_size, send_id);
-      nf->edge_mapping = NDArray::Empty(
         {msg.data_shape_[1]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->edge_mapping->data), data, data_size);
-      delete [] data;
-      // layer_offset
-      data = receiver->RecvFrom(&data_size, send_id);
-      nf->layer_offsets = NDArray::Empty(
-        {msg.data_shape_[2]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->layer_offsets->data), data, data_size);
-      delete [] data;
-      // flow_offset
-      data = receiver->RecvFrom(&data_size, send_id);
-      nf->flow_offsets = NDArray::Empty(
+      // TODO(chao): Can we avoid memory copy here? ndarray->data is const pointer.
+      memcpy(static_cast<char*>(nf->node_mapping->data), array_0.get(), data_size);
+      // edge_mapping
+      std::unique_ptr<char> array_1(receiver->RecvFrom(&data_size, send_id));
+      CHECK_EQ(msg.data_shape_[2], 1);
+      nf->edge_mapping = NDArray::Empty(
         {msg.data_shape_[3]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->flow_offsets->data), data, data_size);
-      delete [] data;
+      memcpy(static_cast<char*>(nf->edge_mapping->data), array_1.get(), data_size);
+      // layer_offset
+      std::unique_ptr<char> array_2(receiver->RecvFrom(&data_size, send_id));
+      CHECK_EQ(msg.data_shape_[4], 1);
+      nf->layer_offsets = NDArray::Empty(
+        {msg.data_shape_[5]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+      memcpy(static_cast<char*>(nf->layer_offsets->data), array_2.get(), data_size);
+      // flow_offset
+      std::unique_ptr<char> array_3(receiver->RecvFrom(&data_size, send_id));
+      CHECK_EQ(msg.data_shape_[6], 1);
+      nf->flow_offsets = NDArray::Empty(
+        {msg.data_shape_[7]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+      memcpy(static_cast<char*>(nf->flow_offsets->data), array_3.get(), data_size);
       // CSR indptr
-      CSRPtr csr(new CSR(msg.data_shape_[0], msg.data_shape_[1], false));
-      data = receiver->RecvFrom(&data_size, send_id);
-      memcpy(static_cast<char*>(csr->indptr()->data), data, data_size);
-      delete [] data;
+      CSRPtr csr(new CSR(msg.data_shape_[1], msg.data_shape_[3], false));
+      std::unique_ptr<char> array_4(receiver->RecvFrom(&data_size, send_id));
+      memcpy(static_cast<char*>(csr->indptr()->data), array_4.get(), data_size);
       // CSR indice
-      data = receiver->RecvFrom(&data_size, send_id);
-      memcpy(static_cast<char*>(csr->indices()->data), data, data_size);
-      delete [] data;
+      std::unique_ptr<char> array_5(receiver->RecvFrom(&data_size, send_id));
+      memcpy(static_cast<char*>(csr->indices()->data), array_5.get(), data_size);
       // CSR edge_ids
-      data = receiver->RecvFrom(&data_size, send_id);
-      memcpy(static_cast<char*>(csr->edge_ids()->data), data, data_size);
-      delete [] data;
+      std::unique_ptr<char> array_6(receiver->RecvFrom(&data_size, send_id));
+      memcpy(static_cast<char*>(csr->edge_ids()->data), array_6.get(), data_size);
       nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
       *rv = nf;
     } else if (msg.Type() == END_MSG) {

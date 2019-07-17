@@ -18,19 +18,18 @@ namespace dgl {
 namespace network {
 
 /*!
- * \brief Message Queue for network communication.
+ * \brief Message Queue for DGL distributed training.
  *
- * MessageQueue is FIFO queue that adopts producer/consumer model for data pointer. 
- * It supports one or more producer threads and one or more consumer threads. 
- * Producers invokes Add() to push data pointers into the queue, and consumers 
- * invokes Remove() to pop data pointers. Add() and Remove() use two condition
- * variables to synchronize producer threads and consumer threads. Each producer 
- * invokes Signal(producer_id) to claim that it is about to finish, where producer_id 
- * is an integer uniquely identify a producer thread. This signaling mechanism 
- * prevents consumers from waiting after all producers have finished their jobs. 
- * Note that MessageQueue uses zero-copy technology to avoid large memory copy.
- *
- * MessageQueue is thread-safe.
+ * MessageQueue is a circle queue for using the ring-buffer in a 
+ * producer/consumer model. It supports one or more producer 
+ * threads and one or more consumer threads. Producers invokes Add()
+ * to push data elements into the queue, and consumers invokes
+ * Remove() to pop data elements. Add() and Remove() use two condition
+ * variables to synchronize producers and consumers. Each producer invokes
+ * Signal(producer_id) to claim that it is about to finish, where 
+ * producer_id is an integer uniquely identify a producer thread. This
+ * signaling mechanism prevents consumers from waiting after all producers
+ * have finished their jobs.
  * 
  */
 class MessageQueue {
@@ -46,28 +45,30 @@ class MessageQueue {
   /*!
    * \brief MessageQueue deconstructor
    */
-  ~MessageQueue() {}
+  ~MessageQueue();
 
   /*!
-   * \brief Add data pointer to the message queue
-   * \param src data pointer
-   * \param size data size
-   * \param is_blocking Blocking if cannot add, else return
+   * \brief Add data to the message queue
+   * \param src The data pointer
+   * \param size The size of data
+   * \param is_blocking Block function if cannot add, else return
    * \return bytes added to the queue
    *   > 0 : size of message
-   *   = 0 : no enough space for this message (when is_blocking == false)
+   *   = 0 : no enough space for this message (when is_blocking = false)
    *   - 1 : error 
    */
   int64_t Add(const char* src, int64_t size, bool is_blocking = true);
 
   /*!
-   * \brief Remove data pointer from the queue
-   * \param size data size of current buffer
-   * \param is_blocking Blocking if cannot remove, else return
-   * \return data pointer
-   *   if data pointer == nullptr, queue is empty (when blocking == false)
+   * \brief Remove message from the queue
+   * \param size size of data
+   *   > 0 : size of data
+   *   = 0 : queue is empty (is_blocking = false)
+   * \param is_blocking Block function if cannot remove, else return
+   * \return pointer of data buffer, 
+   *   pointer == nullptr is queue is empty
    */
-  char* Remove(int64_t *size, bool is_blocking = true);
+  char* Remove(int64_t* size, bool is_blocking = true);
 
   /*!
    * \brief Signal that producer producer_id will no longer produce anything
@@ -86,13 +87,13 @@ class MessageQueue {
   bool EmptyAndNoMoreAdd() const;
 
  protected:
-  typedef std::pair<char*   /* data pointer */,
-                    int64_t /* data size */> Message;
+  typedef std::pair<int64_t /* message_start_position in queue_ */,
+                    int64_t /* message_length */> MessagePosition;
 
   /*! 
    * \brief Pointer to the queue 
    */
-  std::queue<Message> queue_;
+  char* queue_;
 
   /*! 
    * \brief Size of the queue in bytes 
@@ -105,9 +106,22 @@ class MessageQueue {
   int64_t free_size_;
 
   /*! 
+   * \brief Location in queue_ for where to write the next element 
+   * Note that we do not need read_pointer since all messages were indexed
+   * by message_postions_, and the first element in message_position_ 
+   * denotes where we should read
+   */
+  int64_t write_pointer_;
+
+  /*! 
    * \brief Used to check all producers will no longer produce anything 
    */
   size_t num_producers_;
+
+  /*! 
+   * \brief Messages in the queue 
+   */
+  std::queue<MessagePosition> message_positions_;
 
   /*! 
    * \brief Store finished producer id 

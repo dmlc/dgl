@@ -73,23 +73,24 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 #endif  // WIN32
 
 void start_client() {
-  char* msg = new char[9];
-  memcpy(msg, "123456789", 9);
-  SocketSender sender(500 * 1024);
-  sender.AddReceiver("socket://127.0.0.1:2049", 0);
+  sleep(1); // wait server start
+  SocketSender sender(500*1024);
+  sender.AddReceiver("socket://127.0.0.1:50091", 0);
   sender.Connect();
-  sender.Send(msg, 9, 0);
-  sleep(1);
+  for (int i = 0; i < 100; ++i) {
+    sender.Send("123456789", 9, 0);
+  }
   sender.Finalize();
 }
 
 bool start_server() {
-  SocketReceiver receiver(500 * 1024);
-  receiver.Wait("socket://127.0.0.1:2049", 1);
-  int id = 0;
+  SocketReceiver receiver(500*1024);
+  receiver.Wait("socket://127.0.0.1:50091", 1);
   int64_t size = 0;
-  char* data = receiver.Recv(&size, &id);
-  sleep(1);
+  char* data = nullptr;
+  for (int i = 0; i < 100; ++i) {
+    data = receiver.RecvFrom(&size, 0);
+  }
   receiver.Finalize();
   return string("123456789") == string(data, size);
 }

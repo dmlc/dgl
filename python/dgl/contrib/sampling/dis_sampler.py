@@ -170,7 +170,7 @@ class SamplerReceiver(object):
         self._tmp_count = 0
         self._receiver = _create_receiver(net_type)
         ip_port = addr.split(':')
-        ssert len(ip_port) == 2, 'Uncorrect ip address.'
+        assert len(ip_port) == 2, 'Uncorrect ip address.'
         _receiver_wait(self._receiver, ip_port[0], int(ip_port[1]), num_sender);
 
     def __del__(self):

@@ -182,11 +182,6 @@ class SocketReceiver : public Receiver {
   int num_sender_;
 
   /*!
-   * \brief maximal size of message queue
-   */ 
-  int64_t queue_size_;
-
-  /*!
    * \brief server socket for listening connections
    */ 
   TCPSocket* server_socket_;

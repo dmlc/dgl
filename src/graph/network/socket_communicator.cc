@@ -30,12 +30,14 @@ using dgl::network::Addr;
 
 void SocketSender::AddReceiver(const char* addr, int recv_id) {
   CHECK_NOTNULL(addr);
-  CHECK_LE(0, recv_id);
+  if (recv_id < 0) {
+    LOG(FATAL) << "recv_id cannot be a negative number.";
+  }
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
+  if (substring[0] != "socket:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
                << "e.g, 'socket://127.0.0.1:50051'. ";
@@ -55,7 +57,7 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
 }
 
 bool SocketSender::Connect() {
-  static int kMaxTryCount = 1024;
+  static int kMaxTryCount = 1024;  // maximal connection: 1024
   // Create N sockets for Receiver
   for (const auto& r : receiver_addrs_) {
     int ID = r.first;
@@ -90,14 +92,20 @@ bool SocketSender::Connect() {
   return true;
 }
 
+int send_count = 0;
+int loop_count = 0;
+
 int64_t SocketSender::Send(const char* data, int64_t size, int recv_id) {
   CHECK_NOTNULL(data);
-  CHECK_LE(0, recv_id);
+  if (recv_id < 0) {
+    LOG(FATAL) << "recv_id cannot be a negative number.";
+  }
   // Add data to message queue
   int64_t send_size = msg_queue_[recv_id]->Add(data, size);
   if (send_size < 0) {
     LOG(FATAL) << "Error on pushing data to message queue.";
   }
+  send_count++;
   return send_size;
 }
 
@@ -158,22 +166,24 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
       }
       sent_bytes += tmp;
     }
+    loop_count++;
   }
 }
 
 /////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
 
 bool SocketReceiver::Wait(const char* addr, int num_sender) {
-  // 10 minutes for socket timeout
-  static int kTimeOut = 10;
-  static int kMaxConnection = 1024;
+  static int kTimeOut = 10;          // 10 minutes for socket timeout
+  static int kMaxConnection = 1024;  // maximal connection: 1024
   CHECK_NOTNULL(addr);
-  CHECK_LT(0, num_sender);
+  if (num_sender < 0) {
+    LOG(FATAL) << "num_sender cannot be a negative number.";
+  }
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (strcmp(substring[0].c_str(), "socket:") != 0 || substring.size() != 2) {
+  if (substring[0] != "socket:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
                << "e.g, 'socket://127.0.0.1:50051'. ";
@@ -285,24 +295,23 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
     }
     if (data_size < 0) {
       LOG(FATAL) << "Recv data error (data_size: " << data_size << ")";
-    }
-    // This is a end-signal sent by client
-    if (data_size == 0) {
+    } else if (data_size == 0) { // This is a end-signal sent by client
       return;
-    }
-    // Then recv the data
-    char* buffer = new char[data_size];
-    received_bytes = 0;
-    while (received_bytes < data_size) {
-      int64_t max_len = data_size - received_bytes;
-      int64_t tmp = socket->Receive(buffer+received_bytes, max_len);
-      if (tmp == -1) {
-        LOG(FATAL) << "Socket recv error.";
+    } else {
+      char* buffer = new char[data_size];
+      received_bytes = 0;
+      while (received_bytes < data_size) {
+        int64_t max_len = data_size - received_bytes;
+        int64_t tmp = socket->Receive(buffer+received_bytes, max_len);
+        if (tmp == -1) {
+          LOG(FATAL) << "Socket recv error.";
+        }
+        received_bytes += tmp;
       }
-      received_bytes += tmp;
-    }
-    if (queue->Add(buffer, data_size) < 0) {
-      LOG(FATAL) << "Push data into msg_queue error.";
+      if (queue->Add(buffer, data_size) < 0) {
+        LOG(FATAL) << "Push data into msg_queue error.";
+      }
+      delete [] buffer;
     }
   }
 }
