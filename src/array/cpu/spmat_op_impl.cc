@@ -306,7 +306,8 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     }
   }
 
-  return {VecToIdArray(ret_rows), VecToIdArray(ret_cols),
+  return {VecToIdArray(ret_rows, csr.indptr->dtype.bits, csr.indptr->ctx),
+          VecToIdArray(ret_cols, csr.indptr->dtype.bits, csr.indptr->ctx),
           VecToNDArray(ret_data, csr.data->dtype, csr.data->ctx)};
 }
 
@@ -537,7 +538,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   DType* ptr = static_cast<DType*>(sub_data_arr->data);
   std::copy(sub_data.begin(), sub_data.end(), ptr);
   return CSRMatrix{new_nrows, new_ncols,
-    VecToIdArray(sub_indptr), VecToIdArray(sub_indices), sub_data_arr};
+    VecToIdArray(sub_indptr, csr.indptr->dtype.bits, csr.indptr->ctx),
+    VecToIdArray(sub_indices, csr.indptr->dtype.bits, csr.indptr->ctx),
+    sub_data_arr};
 }
 
 template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t, int32_t>(

@@ -185,7 +185,10 @@ runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 
 runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
-/* \brief Get the data and the row,col indices for each returned entries. */
+/*!
+ * \brief Get the data and the row,col indices for each returned entries.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix , runtime::NDArray rows, runtime::NDArray cols);
 
@@ -205,6 +208,9 @@ COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order);
 
 /*!
  * \brief Slice rows of the given matrix and return.
+ * \param csr CSR matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
  *
  * Examples:
  * num_rows = 4
