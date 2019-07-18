@@ -866,8 +866,8 @@ def zerocopy_from_dgl_ndarray(input):
 # kernels (see kernel.py), and plug into tensor framework using custom op
 # extensions.
 
-def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+def binary_reduce(reducer, op, G, A_target, B_target, A, B,
+                  out_size, A_rows, B_rows, out_rows):
     """Perform binary operation between given data and reduce based on graph
     structure.
 
@@ -876,25 +876,25 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     reducer : str
         Type of reduction: 'sum', 'max', 'min', 'mean', 'prod', 'none' (no
         reduction)
-    binary_op : str
+    op : str
         Binary operation to perform, can be 'add', 'mul', 'sub', 'div'
-    graph : GraphIndex
+    G : GraphIndex
         The graph
-    lhs : int
+    A_target : int
         The lhs target (src, dst, edge)
-    rhs : int
+    B_target : int
         The rhs target (src, dst, edge)
-    lhs_data : Tensor
+    A : Tensor
         The lhs data
-    rhs_data : Tensor
+    B : Tensor
         The rhs data
     out_size : int
         Size of first dimension of output data
-    lhs_map : tuple
+    A_rows : tuple
         Two lhs id mapping arrays, one for forward pass, the other for backward
-    rhs_map : tuple
+    B_rows : tuple
         Two rhs id mapping arrays, one for forward pass, the other for backward
-    out_map : tuple
+    out_rows : tuple
         Two out id mapping arrays, one for forward pass, the other for backward
 
     Returns
@@ -904,7 +904,7 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     """
     pass
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+def copy_reduce(reducer, G, target, X, out_size, X_rows, out_rows):
     """Copy target data and perform reduce based on graph structure.
 
     Parameters
@@ -912,17 +912,17 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     reducer : str
         Type of reduction: be 'sum', 'max', 'min', 'mean', 'prod', 'none' (no
         reduction)
-    graph : GraphIndex
+    G : GraphIndex
         The graph
     target : int
         The input target (src, dst, edge)
-    in_data : Tensor
+    X : Tensor
         The input data
     out_size : int
         Size of first dimension of output data
-    in_map : tuple
+    X_rows : tuple
         Two input id mapping arrays, one for forward, the other for backward
-    out_map : tuple
+    out_rows : tuple
         Two output id mapping arrays, one for forward, the other for backward
 
     Returns

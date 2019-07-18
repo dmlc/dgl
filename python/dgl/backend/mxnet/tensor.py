@@ -271,104 +271,110 @@ def zerocopy_from_dgl_ndarray(arr):
 
 
 class BinaryReduce(mx.autograd.Function):
-    def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
-                 rhs_map, out_map):
+    # pylint: disable=invalid-name
+    def __init__(self, reducer, op, G, A_target, B_target, out_size, A_rows,
+                 B_rows, out_rows):
         super(BinaryReduce, self).__init__()
         self.reducer = reducer
-        self.binary_op = binary_op
-        self.graph = graph
-        self.lhs = lhs
-        self.rhs = rhs
+        self.op = op
+        self.G = G
+        self.A_target = A_target
+        self.B_target = B_target
         self.out_size = out_size
-        self.lhs_map = lhs_map
-        self.rhs_map = rhs_map
-        self.out_map = out_map
+        self.A_rows = A_rows
+        self.B_rows = B_rows
+        self.out_rows = out_rows
 
-    def forward(self, lhs_data, rhs_data):
-        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
-        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = nd.empty((self.out_size,) + feat_shape,
-                            ctx=lhs_data.context, dtype=lhs_data.dtype)
-        out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
+    # pylint: disable=invalid-name
+    def forward(self, A, B):
+        A_nd = zerocopy_to_dgl_ndarray(A)
+        B_nd = zerocopy_to_dgl_ndarray(B)
+        feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
+        out = nd.empty((self.out_size,) + feat_shape,
+                       ctx=A.context, dtype=A.dtype)
+        out_nd = zerocopy_to_dgl_ndarray_for_write(out)
         K.binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
-            lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
-            self.rhs_map[0], self.out_map[0])
-        self.save_for_backward(lhs_data_nd, rhs_data_nd, out_data_nd,
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, self.A_rows[0],
+            self.B_rows[0], self.out_rows[0])
+        self.save_for_backward(A_nd, B_nd, out_nd,
                                feat_shape)
-        return out_data
+        return out
 
     def backward(self, grad_out):
-        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape = self.saved_tensors
+        A_nd, B_nd, out_nd, feat_shape = self.saved_tensors
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        grad_lhs = nd.empty((lhs_data_nd.shape[0],) + feat_shape,
-                            ctx=grad_out.context, dtype=grad_out.dtype)
+        grad_A = nd.empty((A_nd.shape[0],) + feat_shape,
+                          ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_lhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
-            lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
-            zerocopy_to_dgl_ndarray_for_write(grad_lhs), self.lhs_map[1],
-            self.rhs_map[1], self.out_map[1])
-        grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
-        grad_rhs = nd.empty((rhs_data_nd.shape[0],) + feat_shape,
-                             ctx=grad_out.context, dtype=grad_out.dtype)
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, grad_out_nd,
+            zerocopy_to_dgl_ndarray_for_write(grad_A), self.A_rows[1],
+            self.B_rows[1], self.out_rows[1])
+        grad_A = _reduce_grad(grad_A, A_nd.shape)
+        grad_B = nd.empty((B_nd.shape[0],) + feat_shape,
+                          ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_rhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
-            lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
-            zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
-            self.rhs_map[1], self.out_map[1])
-        grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, grad_out_nd,
+            zerocopy_to_dgl_ndarray_for_write(grad_B), self.A_rows[1],
+            self.B_rows[1], self.out_rows[1])
+        grad_B = _reduce_grad(grad_B, B_nd.shape)
         # clear saved tensors explicitly
         self.saved_tensors = None
-        return grad_lhs, grad_rhs
+        return grad_A, grad_B
 
 
-def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
-    func = BinaryReduce(reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
-                        rhs_map, out_map)
-    return func(lhs_data, rhs_data)
+# pylint: disable=invalid-name
+def binary_reduce(reducer, op, G, A_target, B_target, A, B,
+                  out_size, A_rows, B_rows, out_rows):
+    func = BinaryReduce(reducer, op, G, A_target, B_target, out_size, A_rows,
+                        B_rows, out_rows)
+    return func(A, B)
 
 
 class CopyReduce(mx.autograd.Function):
-    def __init__(self, reducer, graph, target, out_size, in_map, out_map):
+    # pylint: disable=invalid-name
+    def __init__(self, reducer, G, target, out_size, X_rows, out_rows):
         super(CopyReduce, self).__init__()
         self.reducer = reducer
-        self.graph = graph
+        self.G = G
         self.target = target
         self.out_size = out_size
-        self.in_map = in_map
-        self.out_map = out_map
+        self.X_rows = X_rows
+        self.out_rows = out_rows
 
-    def forward(self, in_data):
-        feat_shape = in_data.shape[1:]
-        out_data = nd.empty((self.out_size,) + feat_shape,
-                            ctx=in_data.context, dtype=in_data.dtype)
-        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
-        out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
+    # pylint: disable=invalid-name
+    def forward(self, X):
+        feat_shape = X.shape[1:]
+        out = nd.empty((self.out_size,) + feat_shape,
+                       ctx=X.context, dtype=X.dtype)
+        X_nd = zerocopy_to_dgl_ndarray(X)
+        out_nd = zerocopy_to_dgl_ndarray_for_write(out)
         K.copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
-            self.in_map[0], self.out_map[0])
-        self.save_for_backward(in_data_nd, out_data_nd)
-        return out_data
+            self.reducer, self.G, self.target, X_nd, out_nd,
+            self.X_rows[0], self.out_rows[0])
+        self.save_for_backward(X_nd, out_nd)
+        return out
 
     def backward(self, grad_out):
-        in_data_nd, out_data_nd = self.saved_tensors
+        X_nd, out_nd = self.saved_tensors
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-        grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
-                            dtype=grad_out.dtype)
+        grad_X = nd.empty(X_nd.shape, ctx=grad_out.context,
+                          dtype=grad_out.dtype)
         K.backward_copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
-            grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
-            self.in_map[1], self.out_map[1])
+            self.reducer, self.G, self.target, X_nd, out_nd,
+            grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_X),
+            self.X_rows[1], self.out_rows[1])
         # clear saved tensors explicitly
         self.saved_tensors = None
-        return grad_in
+        return grad_X
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
-    func = CopyReduce(reducer, graph, target, out_size, in_map, out_map)
-    return func(in_data)
+# pylint: disable=invalid-name
+def copy_reduce(reducer, G, target, X, out_size, X_rows, out_rows):
+    func = CopyReduce(reducer, G, target, out_size, X_rows, out_rows)
+    return func(X)
 
 
 def _reduce_grad(grad, shape):

@@ -35,12 +35,10 @@ dtype_dict = F.data_type_dict
 dtype_dict = {dtype_dict[key]:key for key in dtype_dict}
 
 def _move_data_to_shared_mem_array(arr, name):
-    dlpack = F.zerocopy_to_dlpack(arr)
-    dgl_tensor = nd.from_dlpack(dlpack)
+    dgl_tensor = F.zerocopy_to_dgl_ndarray(arr)
     new_arr = empty_shared_mem(name, True, F.shape(arr), dtype_dict[F.dtype(arr)])
     dgl_tensor.copyto(new_arr)
-    dlpack = new_arr.to_dlpack()
-    return F.zerocopy_from_dlpack(dlpack)
+    return F.zerocopy_from_dgl_ndarray(dgl_tensor)
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
@@ -223,8 +221,7 @@ def shared_mem_zero_initializer(shape, dtype, name):  # pylint: disable=unused-a
     """Zero feature initializer in shared memory
     """
     data = empty_shared_mem(name, True, shape, dtype)
-    dlpack = data.to_dlpack()
-    arr = F.zerocopy_from_dlpack(dlpack)
+    arr = F.zerocopy_from_dgl_ndarray(data)
     arr[:] = 0
     return arr
 
@@ -582,16 +579,14 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             self.proxy.init_ndata(init, name, tuple(shape), dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
+            return F.zerocopy_from_dgl_ndarray(data)
         def edge_initializer(init, name, shape, dtype, ctx):
             init = self._init_manager.serialize(init)
             dtype = dtype_dict[dtype]
             self.proxy.init_edata(init, name, tuple(shape), dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
+            return F.zerocopy_from_dgl_ndarray(data)
 
         self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
         self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
@@ -604,14 +599,12 @@ class SharedMemoryDGLGraph(BaseGraphStore):
     def _init_ndata(self, ndata_name, shape, dtype):
         assert self.number_of_nodes() == shape[0]
         data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.set_n_repr({ndata_name: F.zerocopy_from_dlpack(dlpack)})
+        self.set_n_repr({ndata_name: F.zerocopy_from_dgl_ndarray(data)})
 
     def _init_edata(self, edata_name, shape, dtype):
         assert self.number_of_edges() == shape[0]
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.set_e_repr({edata_name: F.zerocopy_from_dlpack(dlpack)})
+        self.set_e_repr({edata_name: F.zerocopy_from_dgl_ndarray(data)})
 
     @property
     def num_workers(self):

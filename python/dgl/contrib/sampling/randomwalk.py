@@ -37,7 +37,7 @@ def random_walk(g, seeds, num_traces, num_hops):
     seeds = utils.toindex(seeds).todgltensor()
     traces = _CAPI_DGLRandomWalk(g._graph._handle,
             seeds, int(num_traces), int(num_hops))
-    return F.zerocopy_from_dlpack(traces.to_dlpack())
+    return F.zerocopy_from_dgl_ndarray(traces)
 
 
 def _split_traces(traces):
@@ -54,9 +54,9 @@ def _split_traces(traces):
         traces[i][j] is the j-th trace generated for i-th seed.
     """
     trace_counts = F.zerocopy_to_numpy(
-            F.zerocopy_from_dlpack(traces(0).to_dlpack())).tolist()
-    trace_lengths = F.zerocopy_from_dlpack(traces(1).to_dlpack())
-    trace_vertices = F.zerocopy_from_dlpack(traces(2).to_dlpack())
+            F.zerocopy_from_dgl_ndarray(traces(0))).tolist()
+    trace_lengths = F.zerocopy_from_dgl_ndarray(traces(1))
+    trace_vertices = F.zerocopy_from_dgl_ndarray(traces(2))
 
     trace_vertices = F.split(
             trace_vertices, F.zerocopy_to_numpy(trace_lengths).tolist(), 0)

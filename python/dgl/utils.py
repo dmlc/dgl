@@ -96,8 +96,8 @@ class Index(object):
         if len(self._user_tensor_data) == 0:
             if self._dgl_tensor_data is not None:
                 # zero copy from dgl tensor
-                dlpack = self._dgl_tensor_data.to_dlpack()
-                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dlpack)
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dgl_ndarray(
+                    self._dgl_tensor_data)
             else:
                 # zero copy from numpy array
                 self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tonumpy())
@@ -112,8 +112,7 @@ class Index(object):
         if self._dgl_tensor_data is None:
             # zero copy from user tensor
             tsor = self.tousertensor()
-            dlpack = F.zerocopy_to_dlpack(tsor)
-            self._dgl_tensor_data = nd.from_dlpack(dlpack)
+            self._dgl_tensor_data = F.zerocopy_to_dgl_ndarray(tsor)
         return self._dgl_tensor_data
 
     def slice_data(self):

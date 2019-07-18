@@ -11,8 +11,7 @@ def test_dlpack():
                         [0., 0., 0., 0.],
                         [0., 0., 0., 0.]])
         x = nd.array(np.zeros((3, 4), dtype=np.float32))
-        dl = x.to_dlpack()
-        y = F.zerocopy_from_dlpack(dl)
+        y = F.zerocopy_from_dgl_ndarray(x)
         y[0] = 1
         print(x)
         print(y)
@@ -23,8 +22,7 @@ def test_dlpack():
                         [0., 0., 0., 0.],
                         [0., 0., 0., 0.]])
         x = F.zeros((3, 4))
-        dl = F.zerocopy_to_dlpack(x)
-        y = nd.from_dlpack(dl)
+        y = F.zerocopy_to_dgl_ndarray(x)
         x[0] = 1
         print(x)
         print(y)
@@ -35,9 +33,8 @@ def test_dlpack():
         ans = np.array([0, 2])
         y = x[:2, 0]
         # Uncomment this line and comment the one below to observe error
-        #dl = dlpack.to_dlpack(y)
-        dl = F.zerocopy_to_dlpack(y)
-        z = nd.from_dlpack(dl)
+        #z = F.zerocopy_to_dgl_ndarray(y)
+        z = F.zerocopy_to_dgl_ndarray(y)
         print(x)
         print(z)
         assert np.allclose(z.asnumpy(), ans)

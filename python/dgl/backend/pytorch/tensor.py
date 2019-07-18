@@ -81,9 +81,7 @@ def copy_to(input, ctx):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
-        if ctx.index is not None:
-            th.cuda.set_device(ctx.index)
-        return input.cuda()
+        return input.cuda(ctx.index)
     else:
         raise RuntimeError('Invalid context', ctx)
 
@@ -199,79 +197,81 @@ def zerocopy_from_dgl_ndarray(input):
 
 
 class BinaryReduce(th.autograd.Function):
+    # pylint: disable=invalid-name
     @staticmethod
-    def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                out_size, lhs_map, rhs_map, out_map):
-        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
-        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = lhs_data.new_empty((out_size,) + feat_shape)
-        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+    def forward(ctx, reducer, op, G, A_target, B_target, A, B,
+                out_size, A_rows, B_rows, out_rows):
+        A_nd = zerocopy_to_dgl_ndarray(A)
+        B_nd = zerocopy_to_dgl_ndarray(B)
+        feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
+        out = A.new_empty((out_size,) + feat_shape)
+        out_nd = zerocopy_to_dgl_ndarray(out)
         K.binary_op_reduce(
-            reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-            out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+            reducer, op, G, A_target, B_target, A_nd, B_nd,
+            out_nd, A_rows[0], B_rows[0], out_rows[0])
         # save_for_backward can only save variables
-        ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
-                              rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-                              out_data_nd, feat_shape)
-        return out_data
+        ctx.backward_cache = (reducer, op, G, A_target, B_target, A_rows,
+                              B_rows, out_rows, A_nd, B_nd,
+                              out_nd, feat_shape)
+        return out
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-            lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape \
+        reducer, op, G, A_target, B_target, A_rows, B_rows, out_rows, \
+            A_nd, B_nd, out_nd, feat_shape \
             = ctx.backward_cache
         ctx.backward_cache = None
-        grad_lhs = None
-        grad_rhs = None
+        grad_A = None
+        grad_B = None
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[5]:
-            grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
+            grad_A = grad_out.new_empty((A_nd.shape[0],) + feat_shape)
             K.backward_lhs_binary_op_reduce(
-                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
-                lhs_map[1], rhs_map[1], out_map[1])
-            grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
+                reducer, op, G, A_target, B_target, A_nd, B_nd,
+                out_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_A),
+                A_rows[1], B_rows[1], out_rows[1])
+            grad_A = _reduce_grad(grad_A, A_nd.shape)
         if ctx.needs_input_grad[6]:
-            grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
+            grad_B = grad_out.new_empty((B_nd.shape[0],) + feat_shape)
             K.backward_rhs_binary_op_reduce(
-                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_rhs),
-                lhs_map[1], rhs_map[1], out_map[1])
-            grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+                reducer, op, G, A_target, B_target, A_nd, B_nd,
+                out_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_B),
+                A_rows[1], B_rows[1], out_rows[1])
+            grad_B = _reduce_grad(grad_B, B_nd.shape)
 
-        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
+        return None, None, None, None, None, grad_A, grad_B, None, None, \
             None, None
 
 
 class CopyReduce(th.autograd.Function):
+    # pylint: disable=invalid-name
     @staticmethod
-    def forward(ctx, reducer, graph, target, in_data, out_size, in_map,
-                out_map):
-        out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
-        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
-        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+    def forward(ctx, reducer, G, target, X, out_size, X_rows,
+                out_rows):
+        out = X.new_empty((out_size,) + X.shape[1:])
+        X_nd = zerocopy_to_dgl_ndarray(X)
+        out_nd = zerocopy_to_dgl_ndarray(out)
         K.copy_reduce(
-            reducer, graph, target, in_data_nd, out_data_nd, in_map[0],
-            out_map[0])
+            reducer, G, target, X_nd, out_nd, X_rows[0],
+            out_rows[0])
         # save_for_backward can only save variables
-        ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, out_data_nd)
-        return out_data
+        ctx.backward_cache = (reducer, G, target, X_rows, out_rows,
+                              X_nd, out_nd)
+        return out
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd \
+        reducer, G, target, X_rows, out_rows, X_nd, out_nd \
             = ctx.backward_cache
         ctx.backward_cache = None
-        grad_in = None
+        grad_X = None
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_in = grad_out.new_empty(in_data_nd.shape)
+            grad_X = grad_out.new_empty(X_nd.shape)
             K.backward_copy_reduce(
-                reducer, graph, target, in_data_nd, out_data_nd, grad_out_nd,
-                zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return None, None, None, grad_in, None, None, None
+                reducer, G, target, X_nd, out_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_X), X_rows[1], out_rows[1])
+        return None, None, None, grad_X, None, None, None
 
 
 binary_reduce = BinaryReduce.apply
