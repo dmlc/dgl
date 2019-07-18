@@ -1,5 +1,5 @@
 import chainer
-import chainer.function as F
+import chainer.functions as F
 import operator
 try:
     import cupy
@@ -20,7 +20,7 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
     return get_array_module(a).allclose(a.data, b.data, rtol, atol)
 
 def randn(shape):
-    return chainer.as_variable(np.random.randn(*shape))
+    return chainer.as_variable(np.random.randn(*shape).astype('float32'))
 
 def attach_grad(x):
     if x.grad is not None:
@@ -40,7 +40,8 @@ def is_no_grad(x):
     return x.grad is None or (x.grad == 0).all().item()
 
 def full(shape, fill_value, dtype, ctx):
-    return get_context_module(ctx).full(shape, fill_value, dtype=dtype)
+    return chainer.as_variable(
+        get_context_module(ctx).full(shape, fill_value, dtype=dtype))
 
 def narrow_row_set(x, start, stop, new):
     x.data[start:stop] = new

@@ -31,7 +31,16 @@ def cpu():
     return '@numpy'
 
 def tensor(data, dtype=None):
-    return chainer.as_variable(np.asarray(data))
+    if dtype is not None or isinstance(data, np.ndarray):
+        return chainer.as_variable(np.asarray(data, dtype=dtype))
+    else:
+        # Chainer defaults to int32 and float64 which is troubling
+        data = np.asarray(data)
+        if np.issubdtype(data.dtype, np.integer):
+            data = data.astype('int64')
+        else:
+            data = data.astype('float32')
+        return chainer.as_variable(data)
 
 def get_preferred_sparse_format():
     """
@@ -77,7 +86,7 @@ def context(input):
 def device_type(ctx):
     if is_cpu(ctx):
         return 'cpu'
-    elif is_gpu(ctx):
+    elif is_cuda(ctx):
         return 'cuda'
     else:
         raise TypeError('Unknown device: %s.' % ctx)
@@ -85,7 +94,7 @@ def device_type(ctx):
 def device_id(ctx):
     if is_cpu(ctx):
         return 0
-    elif is_gpu(ctx):
+    elif is_cuda(ctx):
         return chainer.get_device(ctx).device.id
     else:
         raise TypeError('Unknown device: %s.' % ctx)
@@ -98,7 +107,10 @@ def asnumpy(input):
     return input.data
 
 def copy_to(input, ctx):
-    return input.to_device(chainer.get_device(ctx))
+    if is_cpu(ctx):
+        return F.copy(input, -1)
+    else:
+        return F.copy(input, device_id(ctx))
 
 def sum(input, dim):
     return F.sum(input, axis=dim)
@@ -223,7 +235,7 @@ def sort_1d(input):
     return val, idx
 
 def arange(start, stop):
-    return chainer.as_variable(np.arange(start, stop))
+    return chainer.as_variable(np.arange(start, stop).astype('int64'))
 
 def rand_shuffle(arr):
     idx = np.random.permutation(arr.shape[0])
@@ -238,22 +250,27 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(input):
     return chainer.as_variable(input)
 
-def zerocopy_to_dgl_ndarray(input):
-    if isinstance(input.device, CpuDevice):
-        return nd.zerocopy_from_numpy(input.data)
-    elif isinstance(input.device, GpuDevice):
-        # TODO: contiguous
+def _zerocopy_to_dgl_ndarray(input_array):
+    if isinstance(input_array, np.ndarray):
+        return nd.array(input_array)
+    elif isinstance(input_array, cupy.ndarray):
         return nd.from_dlpack(input.data.toDlpack())
     else:
-        raise ValueError('Unknown device %s.' % input.device)
+        raise TypeError('Unknown type %s.' % type(input_array))
+
+def _zerocopy_from_dgl_ndarray(input):
+    if input.ctx.device_type == 1:      # cpu
+        return input.asnumpy()
+    elif input.ctx.device_type == 2:    # gpu
+        return cupy.fromDlpack(input.to_dlpack())
+    else:
+        raise TypeError('Unsupported device %d' % input.ctx.device_type)
+
+def zerocopy_to_dgl_ndarray(input):
+    return _zerocopy_to_dgl_ndarray(input.data)
 
 def zerocopy_from_dgl_ndarray(input):
-    if input.ctx.device_type == 1:      # cpu
-        return chainer.as_variable(input.asnumpy())
-    elif input.ctx.device_type == 2:    # gpu
-        return chainer.as_variable(cupy.fromDlpack(input.to_dlpack()))
-    else:
-        raise ValueError('Unknown device %s.' % input.ctx)
+    return chainer.as_variable(_zerocopy_from_dgl_ndarray(input))
 
 
 class BinaryReduce(chainer.FunctionNode):
@@ -274,13 +291,12 @@ class BinaryReduce(chainer.FunctionNode):
     def forward(self, inputs):
         A, B = inputs
 
-        A_nd = zerocopy_to_dgl_ndarray(A)
-        B_nd = zerocopy_to_dgl_ndarray(B)
+        A_nd = _zerocopy_to_dgl_ndarray(A)
+        B_nd = _zerocopy_to_dgl_ndarray(B)
         feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
-        out = chainer.as_variable(
-            get_array_module(A).empty(
-                (self.out_size,) + feat_shape, dtype=A.dtype))
-        out_nd = zerocopy_to_dgl_ndarray(out)
+        out = get_array_module(A).empty(
+            (self.out_size,) + feat_shape, dtype=A.dtype)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
 
         K.binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
@@ -331,7 +347,7 @@ def binary_reduce(reducer, op, G, A_target, B_target, A, B,
                   out_size, A_rows, B_rows, out_rows):
     func = BinaryReduce(reducer, op, G, A_target, B_target, out_size, A_rows,
                         B_rows, out_rows)
-    return func.apply((A, B))
+    return func.apply((A, B))[0]
 
 
 class CopyReduce(chainer.FunctionNode):
@@ -349,12 +365,11 @@ class CopyReduce(chainer.FunctionNode):
         X, = inputs
         feat_shape = X.shape[1:]
 
-        X_nd = zerocopy_to_dgl_ndarray(X)
-        out = chainer.as_variable(
-            get_array_module(X).empty(
-                (self.out_size,) + feat_shape,
-                dtype=X.dtype))
-        out_nd = zerocopy_to_dgl_ndarray(out)
+        X_nd = _zerocopy_to_dgl_ndarray(X)
+        out = get_array_module(X).empty(
+            (self.out_size,) + feat_shape,
+            dtype=X.dtype)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
 
         K.copy_reduce(
             self.reducer, self.G, self.target, X_nd, out_nd,
@@ -363,7 +378,7 @@ class CopyReduce(chainer.FunctionNode):
         self.retain_inputs((0,))
         self.retain_outputs((0,))
 
-        return out
+        return out,
 
     def backward(self, target_input_indexes, grad_outputs):
         X, = self.get_retained_inputs()
@@ -387,7 +402,7 @@ class CopyReduce(chainer.FunctionNode):
 # pylint: disable=invalid-name
 def copy_reduce(reducer, G, target, X, out_size, X_rows, out_rows):
     func = CopyReduce(reducer, G, target, out_size, X_rows, out_rows)
-    return func.apply((X,))
+    return func.apply((X,))[0]
 
 
 def _reduce_grad(grad, shape):

@@ -1,5 +1,5 @@
 import numpy as np
-from chainer.backend import get_array_module
+from chainer.backend import get_array_module as _get_array_module
 try:
     import cupy
 except ImportError:
@@ -21,4 +21,4 @@ def get_context_module(ctx):
 
 def get_array_module(var):
     # get_array_module(var) doesn't work
-    return get_array_module(var.data)
+    return _get_array_module(var.data)

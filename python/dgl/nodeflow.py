@@ -293,7 +293,7 @@ class NodeFlow(DGLBaseGraph):
             The parent node id array.
         """
         nid = utils.toindex(nid)
-        return self._node_mapping.tousertensor()[nid.tousertensor()]
+        return F.gather_row(self._node_mapping.tousertensor(), nid.tousertensor())
 
     def map_to_parent_eid(self, eid):
         """This maps the child edge Ids to the parent Ids.
@@ -309,7 +309,7 @@ class NodeFlow(DGLBaseGraph):
             The parent edge id array.
         """
         eid = utils.toindex(eid)
-        return self._edge_mapping.tousertensor()[eid.tousertensor()]
+        return F.gather_row(self._edge_mapping.tousertensor(), eid.tousertensor())
 
     def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
@@ -336,9 +336,8 @@ class NodeFlow(DGLBaseGraph):
         layers = self._layer_offsets
         start = int(layers[layer_id])
         end = int(layers[layer_id + 1])
-        # TODO(minjie): should not directly use []
         mapping = self._node_mapping.tousertensor()
-        mapping = mapping[start:end]
+        mapping = F.narrow_row(mapping, start, end)
         mapping = utils.toindex(mapping)
         nflow_ids = transform_ids(mapping, parent_nids)
         if remap_local:
@@ -418,7 +417,7 @@ class NodeFlow(DGLBaseGraph):
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
-        return self._node_mapping.tousertensor()[start:end]
+        return F.narrow_row(self._node_mapping.tousertensor(), start, end)
 
     def block_eid(self, block_id):
         """Get the edge Ids in the specified block.
@@ -456,10 +455,10 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
-        ret = self._edge_mapping.tousertensor()[start:end]
+        ret = F.narrow_row(self._edge_mapping.tousertensor(), start, end)
         # If `add_self_loop` is enabled, the returned parent eid can be -1.
         # We have to make sure this case doesn't happen.
-        assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
+        assert (F.asnumpy(ret) == -1).sum() == 0, "The eid in the parent graph is invalid."
         return ret
 
     def block_edges(self, block_id, remap_local=False):
@@ -496,7 +495,9 @@ class NodeFlow(DGLBaseGraph):
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
         assert len(eid) == num_edges
-        return idx[num_edges:len(idx)], idx[0:num_edges], eid.tousertensor()
+        return F.narrow_row(idx, num_edges, len(idx)), \
+               F.narrow_row(idx, 0, num_edges), \
+               eid.tousertensor()
 
     def block_adjacency_matrix(self, block_id, ctx):
         """Return the adjacency matrix representation for a specific block in a NodeFlow.

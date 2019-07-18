@@ -214,14 +214,14 @@ class Index(object):
 
     def nonzero(self):
         """Return the nonzero positions"""
-        tensor = self.tousertensor()
-        mask = F.nonzero_1d(tensor != 0)
+        tensor = self.tonumpy()
+        mask = np.nonzero(tensor)[0]
         return Index(mask)
 
     def has_nonzero(self):
         """Check if there is any nonzero value in this Index"""
-        tensor = self.tousertensor()
-        return F.sum(tensor, 0) > 0
+        tensor = self.tonumpy()
+        return (tensor != 0).any()
 
 def toindex(data):
     """Convert the given data to Index object.
