@@ -6,15 +6,14 @@
 
 #include "./network.h"
 
+#include <dgl/immutable_graph.h>
+#include <dgl/nodeflow.h>
+
 #include <unordered_map>
 
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/common.h"
-
-#include <dgl/immutable_graph.h>
-#include <dgl/nodeflow.h>
-
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

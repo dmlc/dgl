@@ -8,6 +8,8 @@
 
 #include <dmlc/logging.h>
 
+#include <vector>
+
 #include "../c_api_common.h"
 
 using dgl::runtime::NDArray;
@@ -79,7 +81,7 @@ class MsgMeta {
    * \return pointer of data buffer
    */
   char* Serialize(int64_t* size) {
-  	char* buffer = nullptr;
+    char* buffer = nullptr;
     int64_t buffer_size = 0;
     buffer_size += sizeof(msg_type_);
     if (ndarray_count_ != 0) {
@@ -100,7 +102,7 @@ class MsgMeta {
       *(reinterpret_cast<size_t*>(pointer)) = data_shape_.size();
       pointer += sizeof(data_shape_.size());
       // Write data of data_shape_
-      memcpy(pointer, 
+      memcpy(pointer,
         reinterpret_cast<char*>(data_shape_.data()),
         sizeof(int64_t) * data_shape_.size());
     }
@@ -130,7 +132,7 @@ class MsgMeta {
       data_size += sizeof(size_t);
       data_shape_.resize(count);
       // Read data of data_shape_
-      memcpy(data_shape_.data(), buffer, 
+      memcpy(data_shape_.data(), buffer,
         count * sizeof(int64_t));
       data_size += count * sizeof(int64_t);
     }
