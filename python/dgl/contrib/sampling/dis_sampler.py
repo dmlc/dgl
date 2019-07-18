@@ -84,7 +84,7 @@ class SamplerSender(object):
     """
     def __init__(self, namebook, net_type='socket'):
         assert len(namebook) > 0, 'namebook cannot be empty.'
-        assert net_type == 'socket' or net_type == 'mpi', 'Unknown network type.'
+        assert net_type in ('socket', 'mpi'), 'Unknown network type.'
         self._namebook = namebook
         self._sender = _create_sender(net_type)
         for ID, addr in self._namebook.items():
@@ -163,7 +163,7 @@ class SamplerReceiver(object):
     """
     def __init__(self, graph, addr, num_sender, net_type='socket'):
         assert num_sender > 0, 'num_sender must be large than zero.'
-        assert net_type == 'socket' or net_type == 'mpi', 'Unknown network type.'
+        assert net_type in ('socket', 'mpi'), 'Unknown network type.'
         self._graph = graph
         self._addr = addr
         self._num_sender = num_sender
