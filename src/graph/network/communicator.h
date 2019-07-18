@@ -98,7 +98,7 @@ class Receiver {
       LOG(FATAL) << "queue_size cannot be a negative number.";
     }
     queue_size_ = queue_size;
-  }  
+  }
 
   virtual ~Receiver() {}
 
@@ -135,7 +135,7 @@ class Receiver {
    * \brief Communicator type: 'socket', 'mpi', etc
    */
   virtual std::string Type() const = 0;
- 
+
  protected:
   /*!
    * \brief Size of message queue

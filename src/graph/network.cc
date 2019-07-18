@@ -8,12 +8,12 @@
 
 #include <unordered_map>
 
-#include <dgl/immutable_graph.h>
-#include <dgl/nodeflow.h>
-
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/common.h"
+
+#include <dgl/immutable_graph.h>
+#include <dgl/nodeflow.h>
 
 
 using dgl::runtime::DGLArgs;
@@ -144,32 +144,32 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
     sender->Send(data, size, recv_id);
     // Then we send a set of ndarray
     sender->Send(
-      static_cast<char*>(node_mapping->data), 
-      node_mapping.GetSize(), 
+      static_cast<char*>(node_mapping->data),
+      node_mapping.GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(edge_mapping->data), 
-      edge_mapping.GetSize(), 
+      static_cast<char*>(edge_mapping->data),
+      edge_mapping.GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(layer_offsets->data), 
-      layer_offsets.GetSize(), 
+      static_cast<char*>(layer_offsets->data),
+      layer_offsets.GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(flow_offsets->data), 
-      flow_offsets.GetSize(), 
+      static_cast<char*>(flow_offsets->data),
+      flow_offsets.GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(csr->indptr()->data), 
-      csr->indptr().GetSize(), 
+      static_cast<char*>(csr->indptr()->data),
+      csr->indptr().GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(csr->indices()->data), 
-      csr->indices().GetSize(), 
+      static_cast<char*>(csr->indices()->data),
+      csr->indices().GetSize(),
       recv_id);
     sender->Send(
-      static_cast<char*>(csr->edge_ids()->data), 
-      csr->edge_ids().GetSize(), 
+      static_cast<char*>(csr->edge_ids()->data),
+      csr->edge_ids().GetSize(),
       recv_id);
   });
 

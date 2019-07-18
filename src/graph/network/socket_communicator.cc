@@ -158,7 +158,7 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
       int64_t max_len = data_size - sent_bytes;
       int64_t tmp = socket->Send(data+sent_bytes, max_len);
       if (tmp == -1) {
-        LOG(FATAL) << "Socket send error."; 
+        LOG(FATAL) << "Socket send error.";
       }
       sent_bytes += tmp;
     }
@@ -231,7 +231,7 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
 
 char* SocketReceiver::Recv(int64_t* size, int* send_id) {
   // Get the top message
-  for (;;) { // loop until get a message
+  for (;;) {  // loop until get a message
     for (auto& mq : msg_queue_) {
       if (mq.second->Empty() == false) {
         *send_id = mq.first;
@@ -273,7 +273,7 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
   for (;;) {
     // If main thread had finished its job
     if (queue->EmptyAndNoMoreAdd()) {
-      return; // exit loop thread
+      return;  // exit loop thread
     }
     // First recv the size
     int64_t received_bytes = 0;
@@ -290,7 +290,7 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
     }
     if (data_size < 0) {
       LOG(FATAL) << "Recv data error (data_size: " << data_size << ")";
-    } else if (data_size == 0) { // This is a end-signal sent by client
+    } else if (data_size == 0) {  // This is a end-signal sent by client
       return;
     } else {
       char* buffer = new char[data_size];

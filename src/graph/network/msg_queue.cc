@@ -73,7 +73,7 @@ char* MessageQueue::Remove(int64_t* size, bool is_blocking) {
   cond_not_empty_.wait(lock, [this] {
     return !queue_.empty() || exit_flag_.load();
   });
-  if (finished_producers_.size() >= num_producers_ && 
+  if (finished_producers_.size() >= num_producers_ &&
       queue_.empty()) {
     *size = 0;
     return nullptr;

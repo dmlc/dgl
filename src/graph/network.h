@@ -10,8 +10,6 @@
 
 #include "../c_api_common.h"
 
-#include <vector>
-
 using dgl::runtime::NDArray;
 
 namespace dgl {
@@ -34,7 +32,7 @@ class MsgMeta {
    * \brief MsgMeta constructor.
    * \param msg_type type of message
    */
-  explicit MsgMeta(int msg_type) 
+  explicit MsgMeta(int msg_type)
   : msg_type_(msg_type), ndarray_count_(0) {}
 
   /*!
@@ -43,7 +41,7 @@ class MsgMeta {
    * \param size data size
    */
   MsgMeta(char* buffer, int64_t size) {
-  	CHECK_NOTNULL(buffer);
+    CHECK_NOTNULL(buffer);
     this->Deserialize(buffer, size);
   }
 
@@ -58,7 +56,7 @@ class MsgMeta {
    * \return count of ndarray
    */
   int NDArrayCount() const {
-  	return ndarray_count_;
+    return ndarray_count_;
   }
 
   /*!
@@ -66,12 +64,12 @@ class MsgMeta {
    * \param array NDArray
    */
   void AddArray(const NDArray& array) {
-  	// We first write the ndim to the data_shape_
+    // We first write the ndim to the data_shape_
     data_shape_.push_back(static_cast<int64_t>(array->ndim));
     // Then we write the data shape
-  	for (int i = 0; i < array->ndim; ++i) {
-  	  data_shape_.push_back(array->shape[i]);
-  	}
+    for (int i = 0; i < array->ndim; ++i) {
+      data_shape_.push_back(array->shape[i]);
+    }
     ndarray_count_++;
   }
 
@@ -103,8 +101,8 @@ class MsgMeta {
       pointer += sizeof(data_shape_.size());
       // Write data of data_shape_
       memcpy(pointer, 
-    	reinterpret_cast<char*>(data_shape_.data()),
-    	sizeof(int64_t) * data_shape_.size());
+        reinterpret_cast<char*>(data_shape_.data()),
+        sizeof(int64_t) * data_shape_.size());
     }
     *size = buffer_size;
     return buffer;
@@ -116,8 +114,8 @@ class MsgMeta {
    * \param size size of data buffer
    */
   void Deserialize(char* buffer, int64_t size) {
-  	int64_t data_size = 0;
-  	// Read mesg_type_
+    int64_t data_size = 0;
+    // Read mesg_type_
     msg_type_ = *(reinterpret_cast<int*>(buffer));
     buffer += sizeof(int);
     data_size += sizeof(int);
@@ -133,7 +131,7 @@ class MsgMeta {
       data_shape_.resize(count);
       // Read data of data_shape_
       memcpy(data_shape_.data(), buffer, 
-    	count * sizeof(int64_t));
+        count * sizeof(int64_t));
       data_size += count * sizeof(int64_t);
     }
     CHECK_EQ(data_size, size);
