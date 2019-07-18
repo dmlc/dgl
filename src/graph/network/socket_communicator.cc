@@ -110,7 +110,11 @@ void SocketSender::Finalize() {
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
-      usleep(1000);
+#ifdef _WIN32
+        // wait
+#else   // !_WIN32
+        usleep(1000);
+#endif  // _WIN32
     }
     int ID = mq.first;
     mq.second->Signal(ID);
@@ -121,7 +125,6 @@ void SocketSender::Finalize() {
   }
   // Clear all sockets
   for (auto& socket : sockets_) {
-    socket.second->ShutDown(SHUT_RDWR);
     socket.second->Close();
   }
 }
@@ -262,7 +265,6 @@ void SocketReceiver::Finalize() {
   }
   // Clear all sockets
   for (auto& socket : sockets_) {
-    socket.second->ShutDown(SHUT_RDWR);
     socket.second->Close();
   }
 }
