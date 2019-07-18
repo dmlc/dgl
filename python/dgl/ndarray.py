@@ -86,6 +86,6 @@ def zerocopy_from_numpy(np_data):
     """
     arr, _ = numpyasarray(np_data)
     handle = ctypes.pointer(arr)
-    return NDArray(handle, is_view=True)
+    return NDArray(handle, is_view=False)
 
 _set_class_ndarray(NDArray)
