@@ -8,6 +8,7 @@
 
 #include <dmlc/logging.h>
 
+#include <string.h>
 #include <vector>
 
 #include "../c_api_common.h"
