@@ -3,13 +3,12 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
-from .utils import unwrap_to_ptr_list
 from . import utils
 
 _init_api("dgl.network")
 
 
-########################################## Common Network Components ############################################
+################################ Common Network Components ##################################
 
 def _create_sender(net_type):
     """Create a Sender communicator via C api
@@ -19,7 +18,7 @@ def _create_sender(net_type):
     net_type : str
         'socket' or 'mpi'
     """
-    assert net_type == 'socket' or net_type == 'mpi', 'Unknown network type.'
+    assert net_type in ('socket', 'mpi'), 'Unknown network type.'
     return _CAPI_DGLSenderCreate(net_type)
 
 def _create_receiver(net_type):
@@ -30,7 +29,7 @@ def _create_receiver(net_type):
     net_type : str
         'socket' or 'mpi'
     """
-    assert net_type == 'socket' or net_type == 'mpi', 'Unknown network type.'
+    assert net_type in ('socket', 'mpi'), 'Unknown network type.'
     return _CAPI_DGLReceiverCreate(net_type)
 
 def _finalize_sender(sender):
@@ -93,7 +92,7 @@ def _receiver_wait(receiver, ip_addr, port, num_sender):
     _CAPI_DGLReceiverWait(receiver, ip_addr, int(port), int(num_sender))
 
 
-########################################## Distributed Sampler Components ############################################
+################################ Distributed Sampler Components ################################
 
 
 def _send_nodeflow(sender, nodeflow, recv_id):
