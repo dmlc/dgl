@@ -111,7 +111,7 @@ void SocketSender::Finalize() {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
 #ifdef _WIN32
-        // wait
+        // just loop
 #else   // !_WIN32
         usleep(1000);
 #endif  // _WIN32
@@ -245,7 +245,7 @@ char* SocketReceiver::Recv(int64_t* size, int* send_id) {
 }
 
 char* SocketReceiver::RecvFrom(int64_t* size, int send_id) {
-  // Get message from specified message queueC++
+  // Get message from specified message queue
   return msg_queue_[send_id]->Remove(size);
 }
 
@@ -254,7 +254,11 @@ void SocketReceiver::Finalize() {
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
-      usleep(1000);
+#ifdef _WIN32
+        // just loop
+#else   // !_WIN32
+        usleep(1000);
+#endif  // _WIN32
     }
     int ID = mq.first;
     mq.second->Signal(ID);
