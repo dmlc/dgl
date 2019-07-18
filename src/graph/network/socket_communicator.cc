@@ -92,9 +92,6 @@ bool SocketSender::Connect() {
   return true;
 }
 
-int send_count = 0;
-int loop_count = 0;
-
 int64_t SocketSender::Send(const char* data, int64_t size, int recv_id) {
   CHECK_NOTNULL(data);
   if (recv_id < 0) {
@@ -105,7 +102,6 @@ int64_t SocketSender::Send(const char* data, int64_t size, int recv_id) {
   if (send_size < 0) {
     LOG(FATAL) << "Error on pushing data to message queue.";
   }
-  send_count++;
   return send_size;
 }
 
@@ -166,7 +162,6 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
       }
       sent_bytes += tmp;
     }
-    loop_count++;
   }
 }
 
@@ -311,7 +306,6 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
       if (queue->Add(buffer, data_size) < 0) {
         LOG(FATAL) << "Push data into msg_queue error.";
       }
-      delete [] buffer;
     }
   }
 }

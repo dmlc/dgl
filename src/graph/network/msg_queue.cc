@@ -15,27 +15,15 @@ using std::string;
 
 MessageQueue::MessageQueue(int64_t queue_size, int num_producers) {
   if (queue_size < 0) {
-    LOG(FATAL) << "queue_size cannot be a negative value.";
+    LOG(FATAL) << "queue_size cannot be a negative number.";
   }
-  try {
-    queue_ = new char[queue_size];
-  } catch(const std::bad_alloc&) {
-    LOG(FATAL) << "Not enough memory for message queue.";
+  if (num_producers < 0) {
+    LOG(FATAL) << "num_producers cannot be a negative number.";
   }
-  memset(queue_, '\0', queue_size);
 
   queue_size_ = queue_size;
   free_size_ = queue_size;
-  write_pointer_ = 0;
   num_producers_ = num_producers;
-}
-
-MessageQueue::~MessageQueue() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (nullptr != queue_) {
-    delete [] queue_;
-    queue_ = nullptr;
-  }
 }
 
 int64_t MessageQueue::Add(const char* src, int64_t size, bool is_blocking) {
@@ -60,24 +48,9 @@ int64_t MessageQueue::Add(const char* src, int64_t size, bool is_blocking) {
   cond_not_full_.wait(lock, [&]() {
     return size <= free_size_;
   });
-  // Write data into buffer:
-  // If there has enough space on tail of buffer, just append data
-  // else, write till in the end of buffer and return to head of buffer
-  message_positions_.push(std::make_pair(write_pointer_, size));
+  // Add data pointer to queue
+  queue_.push(std::make_pair(const_cast<char*>(src), size));
   free_size_ -= size;
-  if (write_pointer_ + size <= queue_size_) {
-    memcpy(&queue_[write_pointer_], src, size);
-    write_pointer_ += size;
-    if (write_pointer_ == queue_size_) {
-      write_pointer_ = 0;
-    }
-  } else {
-    int64_t size_partial = queue_size_ - write_pointer_;
-    memcpy(&queue_[write_pointer_], src, size_partial);
-    memcpy(queue_, &src[size_partial], size - size_partial);
-    write_pointer_ = size - size_partial;
-  }
-
   // not empty signal
   cond_not_empty_.notify_one();
 
@@ -86,7 +59,7 @@ int64_t MessageQueue::Add(const char* src, int64_t size, bool is_blocking) {
 
 char* MessageQueue::Remove(int64_t* size, bool is_blocking) {
   std::unique_lock<std::mutex> lock(mutex_);
-  if (message_positions_.empty()) {
+  if (queue_.empty()) {
     if (!is_blocking) {
       *size = 0;
       return nullptr;
@@ -98,35 +71,21 @@ char* MessageQueue::Remove(int64_t* size, bool is_blocking) {
   }
 
   cond_not_empty_.wait(lock, [this] {
-    return !message_positions_.empty() || exit_flag_.load();
+    return !queue_.empty() || exit_flag_.load();
   });
   if (finished_producers_.size() >= num_producers_ && 
-      message_positions_.empty()) {
+      queue_.empty()) {
     *size = 0;
     return nullptr;
   }
 
-  MessagePosition & pos = message_positions_.front();
-  char* dest = new char[pos.second];
-
-  // read from buffer:
-  // if this message stores in consecutive memory, just read
-  // else, read from buffer tail then return to the head
-  if (pos.first + pos.second <= queue_size_) {
-    memcpy(dest, &queue_[pos.first], pos.second);
-  } else {
-    int64_t size_partial = queue_size_ - pos.first;
-    memcpy(dest, &queue_[pos.first], size_partial);
-    memcpy(&dest[size_partial], queue_, pos.second - size_partial);
-  }
-  *size = pos.second;
-  
-  free_size_ += pos.second;
-  message_positions_.pop();
-
+  Message & msg = queue_.front();
+  queue_.pop();
+  *size = msg.second;
+  free_size_ += msg.second;
   cond_not_full_.notify_one();
 
-  return dest;
+  return msg.first;
 }
 
 void MessageQueue::Signal(int producer_id) {
@@ -142,12 +101,12 @@ void MessageQueue::Signal(int producer_id) {
 
 bool MessageQueue::Empty() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return message_positions_.size() == 0;
+  return queue_.size() == 0;
 }
 
 bool MessageQueue::EmptyAndNoMoreAdd() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return message_positions_.size() == 0 &&
+  return queue_.size() == 0 &&
          finished_producers_.size() >= num_producers_;
 }
 

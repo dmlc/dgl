@@ -139,9 +139,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
     msg.AddArray(csr->edge_ids());
     // First we send meta message
     int64_t size = 0;
-    std::unique_ptr<char> data(msg.Serialize(&size));
+    char* data = msg.Serialize(&size);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    sender->Send(data.get(), size, recv_id);
+    sender->Send(data, size, recv_id);
     // Then we send a set of ndarray
     sender->Send(
       static_cast<char*>(node_mapping->data), 
@@ -179,9 +179,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
     int recv_id = args[1];
     MsgMeta msg(END_MSG);
     int64_t size = 0;
-    std::unique_ptr<char> data(msg.Serialize(&size));
+    char* data = msg.Serialize(&size);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    sender->Send(data.get(), size, recv_id);
+    sender->Send(data, size, recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
