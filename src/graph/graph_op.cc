@@ -138,9 +138,9 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
     num_nodes += gr->NumVertices();
     num_edges += gr->NumEdges();
   }
-  IdArray indptr_arr = NewIdArray(num_nodes + 1);
-  IdArray indices_arr = NewIdArray(num_edges);
-  IdArray edge_ids_arr = NewIdArray(num_edges);
+  IdArray indptr_arr = aten::NewIdArray(num_nodes + 1);
+  IdArray indices_arr = aten::NewIdArray(num_edges);
+  IdArray edge_ids_arr = aten::NewIdArray(num_edges);
   dgl_id_t* indptr = static_cast<dgl_id_t*>(indptr_arr->data);
   dgl_id_t* indices = static_cast<dgl_id_t*>(indices_arr->data);
   dgl_id_t* edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
@@ -207,9 +207,9 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
     const int64_t end_pos = cumsum[i + 1];
     const int64_t g_num_nodes = sizes_data[i];
     const int64_t g_num_edges = indptr[end_pos] - indptr[start_pos];
-    IdArray indptr_arr = NewIdArray(g_num_nodes + 1);
-    IdArray indices_arr = NewIdArray(g_num_edges);
-    IdArray edge_ids_arr = NewIdArray(g_num_edges);
+    IdArray indptr_arr = aten::NewIdArray(g_num_nodes + 1);
+    IdArray indices_arr = aten::NewIdArray(g_num_edges);
+    IdArray edge_ids_arr = aten::NewIdArray(g_num_edges);
     dgl_id_t* g_indptr = static_cast<dgl_id_t*>(indptr_arr->data);
     dgl_id_t* g_indices = static_cast<dgl_id_t*>(indices_arr->data);
     dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
@@ -329,13 +329,13 @@ Graph GraphOp::ToBidirectedMutableGraph(const GraphInterface* g) {
     for (dgl_id_t v = u; v < g->NumVertices(); ++v) {
       const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
       if (new_n_e > 0) {
-        IdArray us = NewIdArray(new_n_e);
+        IdArray us = aten::NewIdArray(new_n_e);
         dgl_id_t* us_data = static_cast<dgl_id_t*>(us->data);
         std::fill(us_data, us_data + new_n_e, u);
         if (u == v) {
           bg.AddEdges(us, us);
         } else {
-          IdArray vs = NewIdArray(new_n_e);
+          IdArray vs = aten::NewIdArray(new_n_e);
           dgl_id_t* vs_data = static_cast<dgl_id_t*>(vs->data);
           std::fill(vs_data, vs_data + new_n_e, v);
           bg.AddEdges(us, vs);
@@ -380,8 +380,8 @@ ImmutableGraph GraphOp::ToBidirectedImmutableGraph(const GraphInterface* g) {
     }
   }
 
-  IdArray srcs_array = VecToIdArray(srcs);
-  IdArray dsts_array = VecToIdArray(dsts);
+  IdArray srcs_array = aten::VecToIdArray(srcs);
+  IdArray dsts_array = aten::VecToIdArray(dsts);
   COOPtr coo(new COO(g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph()));
   return ImmutableGraph(coo);
 }

@@ -151,6 +151,7 @@ class GraphIndex(object):
         readonly_state : bool
             New readonly state of current graph index.
         """
+        # TODO(minjie): very ugly code, should fix this
         n_nodes, multigraph, _, src, dst = self.__getstate__()
         self.clear_cache()
         state = (n_nodes, multigraph, readonly_state, src, dst)
