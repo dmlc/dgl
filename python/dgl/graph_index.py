@@ -562,7 +562,7 @@ class GraphIndex(object):
         return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
-    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids):
+    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=True):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
