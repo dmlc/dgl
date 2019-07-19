@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import torch as th
+import operator
 
 def cuda():
     return th.device('cuda:0')
@@ -37,6 +38,9 @@ def is_no_grad(x):
 def full(shape, fill_value, dtype, ctx):
     return th.full(shape, fill_value, dtype=dtype, device=ctx)
 
+def index_set(x, i, new):
+    x[i] = new
+
 def narrow_row_set(x, start, stop, new):
     x[start:stop] = new
 
@@ -55,17 +59,13 @@ def softmax(x, dim):
 def spmm(x, y):
     return th.spmm(x, y)
 
-def add(a, b):
-    return a + b
+add = operator.add
+sub = operator.sub
+mul = operator.mul
+div = operator.truediv
 
-def sub(a, b):
-    return a - b
-
-def mul(a, b):
-    return a * b
-
-def div(a, b):
-    return a / b
+def gt0(x):
+    return x > 0
 
 def sum(x, dim):
     return x.sum(dim)

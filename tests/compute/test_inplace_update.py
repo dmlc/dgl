@@ -264,7 +264,7 @@ def test_inplace_apply():
     # test apply all nodes, should not be done in place
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, inplace=True)
-    assert F.allclose(nf, g.ndata['f']) == False
+    assert not F.allclose(nf, g.ndata['f'])
 
     edges = [3, 5, 7, 10]
     ef = g.edata['e']
@@ -277,9 +277,9 @@ def test_inplace_apply():
     g.edata['e'] = ef
     assert F.allclose(ef, new_ef)
     # test apply all edges, should not be done in place
-    g.edata['e'] == ef
+    g.edata['e'] = ef
     g.apply_edges(apply_edge_func, inplace=True)
-    assert F.allclose(ef, g.edata['e']) == False
+    assert not F.allclose(ef, g.edata['e'])
 
 if __name__ == '__main__':
     test_inplace_recv()

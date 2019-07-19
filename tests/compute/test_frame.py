@@ -2,6 +2,8 @@ import numpy as np
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
 import backend as F
+import unittest
+import os
 
 N = 10
 D = 5
@@ -169,6 +171,8 @@ def test_row1():
         f[rowid] = vals
     assert check_fail(failed_update_rows)
 
+@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer',
+                 'Chainer does not support head gradients')
 def test_row2():
     # test row getter/setter autograd compatibility
     data = create_test_data(grad=True)
@@ -237,7 +241,7 @@ def test_row4():
     rowid = Index(F.tensor([0, 2, 4]))
     f[rowid] = {'h' : F.ones((3, 2))}
     ans = F.zeros((5, 2))
-    ans[F.tensor([0, 2, 4])] = F.ones((3, 2))
+    F.scatter_row_inplace(ans, F.tensor([0, 2, 4]), F.ones((3, 2)))
     assert F.allclose(f['h'], ans)
 
 def test_sharing():

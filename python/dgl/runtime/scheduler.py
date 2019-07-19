@@ -983,7 +983,7 @@ def _build_idx_map(idx, nbits):
         new id tensor: new_id = old_to_new[old_id]
     """
     x = idx.tousertensor()
-    map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
+    map_len = int(F.asnumpy(x).max(0)) + 1
     old_to_new = F.full_1d(map_len, -1, dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
     old_to_new = utils.to_nbits_int(old_to_new, nbits)

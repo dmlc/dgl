@@ -56,6 +56,10 @@ def is_no_grad(x):
 def full(shape, fill_value, dtype, ctx):
     pass
 
+def index_set(x, i, new):
+    """Set an element of the given tensor to a new value in-place."""
+    pass
+
 def narrow_row_set(x, start, stop, new):
     """Set a slice of the given tensor to a new value."""
     pass
@@ -93,6 +97,10 @@ def mul(a, b):
 
 def div(a, b):
     """Compute a / b"""
+    pass
+
+def gt0(x):
+    """Compute a > 0"""
     pass
 
 def sum(x, dim):

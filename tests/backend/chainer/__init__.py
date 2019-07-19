@@ -43,8 +43,14 @@ def full(shape, fill_value, dtype, ctx):
     return chainer.as_variable(
         get_context_module(ctx).full(shape, fill_value, dtype=dtype))
 
+def index_set(x, i, new):
+    x.data[i] = new
+
 def narrow_row_set(x, start, stop, new):
-    x.data[start:stop] = new
+    if isinstance(new, chainer.Variable):
+        x.data[start:stop] = new.data
+    else:
+        x.data[start:stop] = new
 
 def sparse_to_numpy(x):
     return x.to_dense()
@@ -66,6 +72,9 @@ add = operator.add
 sub = operator.sub
 mul = operator.mul
 div = operator.truediv
+
+def gt0(x):
+    return chainer.as_variable(x.data > 0)
 
 def sum(x, dim):
     return F.sum(x, dim)

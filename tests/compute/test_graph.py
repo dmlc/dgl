@@ -355,9 +355,11 @@ def test_find_edges():
     g = dgl.DGLGraph()
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
-    e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+    src, dst = g.find_edges([1, 3, 2, 4])
+    src = list(F.asnumpy(src))
+    dst = list(F.asnumpy(dst))
+    assert src == [1, 3, 2, 4]
+    assert dst == [2, 4, 3, 5]
 
     try:
         g.find_edges([10])
@@ -368,9 +370,11 @@ def test_find_edges():
         assert fail
 
     g.readonly()
-    e = g.find_edges([1, 3, 2, 4])
-    assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
-    assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+    src, dst = g.find_edges([1, 3, 2, 4])
+    src = list(F.asnumpy(src))
+    dst = list(F.asnumpy(dst))
+    assert src == [1, 3, 2, 4]
+    assert dst == [2, 4, 3, 5]
 
     try:
         g.find_edges([10])

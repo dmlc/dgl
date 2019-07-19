@@ -4,6 +4,12 @@ from dgl.utils import toindex
 import numpy as np
 import backend as F
 
+import unittest
+import os
+
+@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer' and
+                 os.getenv('DGLTESTDEV', 'cpu') == 'cpu',
+                 'Chainer/CPU arrays currently does not support zerocopy with DLPack')
 def test_dlpack():
     # test dlpack conversion.
     def nd2th():
@@ -12,7 +18,7 @@ def test_dlpack():
                         [0., 0., 0., 0.]])
         x = nd.array(np.zeros((3, 4), dtype=np.float32))
         y = F.zerocopy_from_dgl_ndarray(x)
-        y[0] = 1
+        F.index_set(y, 0, 1)
         print(x)
         print(y)
         assert np.allclose(x.asnumpy(), ans)
@@ -23,7 +29,7 @@ def test_dlpack():
                         [0., 0., 0., 0.]])
         x = F.zeros((3, 4))
         y = F.zerocopy_to_dgl_ndarray(x)
-        x[0] = 1
+        F.index_set(x, 0, 1)
         print(x)
         print(y)
         assert np.allclose(y.asnumpy(), ans)

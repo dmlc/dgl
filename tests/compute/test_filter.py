@@ -8,14 +8,14 @@ def test_filter():
 
     n_repr = F.zeros((4, 5))
     e_repr = F.zeros((4, 5))
-    n_repr[[1, 3]] = 1
-    e_repr[[1, 3]] = 1
+    F.scatter_row_inplace(n_repr, F.tensor([1, 3]), 1)
+    F.scatter_row_inplace(e_repr, F.tensor([1, 3]), 1)
 
     g.ndata['a'] = n_repr
     g.edata['a'] = e_repr
 
     def predicate(r):
-        return F.max(r.data['a'], 1) > 0
+        return F.gt0(F.max(r.data['a'], 1))
 
     # full node filter
     n_idx = g.filter_nodes(predicate)

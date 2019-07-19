@@ -18,14 +18,14 @@ except ImportError:
     cussp = None
 
 def data_type_dict():
-    return {'float16' : np.float16,
-            'float32' : np.float32,
-            'float64' : np.float64,
-            'uint8'   : np.uint8,
-            'int8'    : np.int8,
-            'int16'   : np.int16,
-            'int32'   : np.int32,
-            'int64'   : np.int64}
+    return {'float16' : np.dtype('float16'),
+            'float32' : np.dtype('float32'),
+            'float64' : np.dtype('float64'),
+            'uint8'   : np.dtype('uint8'),
+            'int8'    : np.dtype('int8'),
+            'int16'   : np.dtype('int16'),
+            'int32'   : np.dtype('int32'),
+            'int64'   : np.dtype('int64')}
 
 def cpu():
     return '@numpy'
@@ -43,30 +43,19 @@ def tensor(data, dtype=None):
         return chainer.as_variable(data)
 
 def get_preferred_sparse_format():
-    """
-    Chainer supports both COO and CSR
-    """
     return "coo"
 
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
-    if fmt == 'coo':
-        coords = index[1]
-        return ssp.coo_matrix((data, (coords[0], coords[1])), shape=shape)
-    elif fmt == 'csr':
-        indices = index[1]
-        indptr = index[2]
-        return ssp.csr_matrix((data, indices, indptr), shape=shape)
-    else:
+    data = data.data
+    coord = index[1].data
+    if fmt != 'coo':
         raise TypeError('Invalid format: %s.' % fmt)
+    spmat = chainer.utils.CooMatrix(data, coord[0], coord[1], shape)
+    return spmat, None
 
 def sparse_matrix_indices(spmat):
-    if spmat.format == 'coo':
-        return ('coo', np.stack([spmat.row, spmat.col], axis=0))
-    elif spmat.format == 'csr':
-        return ('csr', spmat.indices, spmat.indptr)
-    else:
-        raise ValueError('Invalid format: %s.' % spmat.format)
+    return ('csr', spmat.indices, spmat.indptr)
 
 def is_tensor(obj):
     return isinstance(obj, chainer.Variable)
@@ -83,6 +72,9 @@ def ndim(input):
 def context(input):
     return str(input.device)
 
+def _context_of_array(input_array):
+    return str(chainer.backend.get_device_from_array(input_array))
+
 def device_type(ctx):
     if is_cpu(ctx):
         return 'cpu'
@@ -96,6 +88,14 @@ def device_id(ctx):
         return 0
     elif is_cuda(ctx):
         return chainer.get_device(ctx).device.id
+    else:
+        raise TypeError('Unknown device: %s.' % ctx)
+
+def _get_dgl_context(ctx):
+    if is_cpu(ctx):
+        return nd.cpu()
+    elif is_gpu(ctx):
+        return nd.gpu(device_id(ctx))
     else:
         raise TypeError('Unknown device: %s.' % ctx)
 
@@ -147,7 +147,11 @@ def scatter_row(data, row_index, value):
     return F.scatter_add(data, row_index, value - data[row_index])
 
 def scatter_row_inplace(data, row_index, value):
-    data.data[row_index] = value.data
+    if isinstance(value, chainer.Variable):
+        data.data[row_index.data] = value.data
+    else:
+        data.data[row_index.data] = value
+
 
 def squeeze(input, dim):
     return F.squeeze(input, axis=dim)
@@ -174,7 +178,7 @@ def ones(shape, dtype, ctx):
     return v
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    y = zeros((n_segs,) + input.shape[1:], input.dtype, input.device)
+    y = zeros((n_segs,) + input.shape[1:], input.dtype, context(input))
     if dim != 0:
         # Transpose the input so that @dim goes to the first dimension
         axes = list(range(input.ndim))
@@ -194,8 +198,8 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     n_ones = chainer.as_variable(
         get_array_module(seg_id).ones_like(seg_id.data))
 
-    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
-    w = F.clip(w, 1, np.inf)
+    w = F.cast(unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0), np.float32)
+    w = F.clip(w, 1., np.inf)
     y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
 
     expand_dims = [1] * y.ndim
@@ -208,11 +212,11 @@ def boolean_mask(input, mask):
     return input[mask.data]
 
 def equal(x, y):
-    return x == y
+    return chainer.as_variable(x.data == y.data)
 
 def logical_not(input):
     v = chainer.as_variable(
-        get_context_module(v).logical_not(input.data))
+        get_array_module(input).logical_not(input.data))
     return v
 
 def unique(input):
@@ -294,14 +298,20 @@ class BinaryReduce(chainer.FunctionNode):
         A_nd = _zerocopy_to_dgl_ndarray(A)
         B_nd = _zerocopy_to_dgl_ndarray(B)
         feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
-        out = get_array_module(A).empty(
-            (self.out_size,) + feat_shape, dtype=A.dtype)
-        out_nd = _zerocopy_to_dgl_ndarray(out)
+        out_nd = nd.empty(
+            (self.out_size,) + feat_shape,
+            A.dtype,
+            _get_dgl_context(_context_of_array(A)))
 
         K.binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
             A_nd, B_nd, out_nd, self.A_rows[0], self.B_rows[0],
             self.out_rows[0])
+        # TODO(minjie): (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
+        # For cpu tensors, the DGL NDArrays are **NOT** zero-copied to
+        # numpy arrays.  I (Quan) couldn't get zero-copying from numpy
+        # to DGL tensors to work.
+        out = _zerocopy_from_dgl_ndarray(out_nd)
 
         self.retain_inputs((0, 1))
         self.retain_outputs((0,))
@@ -319,24 +329,28 @@ class BinaryReduce(chainer.FunctionNode):
         feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
 
-        grad_A = chainer.as_variable(
-            get_array_module(A).empty(
-                (A_nd.shape[0],) + feat_shape, dtype=A.dtype))
+        grad_A_nd = nd.empty(
+            (A_nd.shape[0],) + feat_shape,
+            A.dtype,
+            _get_dgl_context(context(A)))
         K.backward_lhs_binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
-            A_nd, B_nd, out_nd, grad_out_nd,
-            zerocopy_to_dgl_ndarray(grad_A),
+            A_nd, B_nd, out_nd, grad_out_nd, grad_A_nd,
             self.A_rows[1], self.B_rows[1], self.out_rows[1])
+        # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
+        grad_A = zerocopy_from_dgl_ndarray(grad_A_nd)
         grad_A = _reduce_grad(grad_A, A_nd.shape)
 
-        grad_B = chainer.as_variable(
-            get_array_module(B).empty(
-                (B_nd.shape[0],) + feat_shape, dtype=B.dtype))
+        grad_B_nd = nd.empty(
+            (B_nd.shape[0],) + feat_shape,
+            B.dtype,
+            _get_dgl_context(context(B)))
         K.backward_rhs_binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
-            A_nd, B_nd, out_nd, grad_out_nd,
-            zerocopy_to_dgl_ndarray(grad_B),
+            A_nd, B_nd, out_nd, grad_out_nd, grad_B_nd,
             self.A_rows[1], self.B_rows[1], self.out_rows[1])
+        # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
+        grad_B = zerocopy_from_dgl_ndarray(grad_B_nd)
         grad_B = _reduce_grad(grad_B, B_nd.shape)
 
         return grad_A, grad_B
@@ -366,14 +380,16 @@ class CopyReduce(chainer.FunctionNode):
         feat_shape = X.shape[1:]
 
         X_nd = _zerocopy_to_dgl_ndarray(X)
-        out = get_array_module(X).empty(
+        out_nd = nd.empty(
             (self.out_size,) + feat_shape,
-            dtype=X.dtype)
-        out_nd = _zerocopy_to_dgl_ndarray(out)
+            X.dtype,
+            _get_dgl_context(_context_of_array(X)))
 
         K.copy_reduce(
             self.reducer, self.G, self.target, X_nd, out_nd,
             self.X_rows[0], self.out_rows[0])
+        # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
+        out = _zerocopy_from_dgl_ndarray(out_nd)
 
         self.retain_inputs((0,))
         self.retain_outputs((0,))
@@ -389,14 +405,15 @@ class CopyReduce(chainer.FunctionNode):
         out_nd = zerocopy_to_dgl_ndarray(out)
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
 
-        grad_X = chainer.as_variable(
-            get_array_module(X).empty_like(X))
+        grad_X_nd = nd.empty(X.shape, X.dtype, _get_dgl_context(context(X)))
         K.backward_copy_reduce(
             self.reducer, self.G, self.target, X_nd, out_nd,
-            grad_out_nd, zerocopy_to_dgl_ndarray(grad_X),
+            grad_out_nd, grad_X_nd,
             self.X_rows[1], self.out_rows[1])
+        # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
+        grad_X = zerocopy_from_dgl_ndarray(grad_X_nd)
 
-        return grad_X
+        return grad_X,
 
 
 # pylint: disable=invalid-name

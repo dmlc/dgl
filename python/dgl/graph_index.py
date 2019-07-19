@@ -561,7 +561,7 @@ class GraphIndex(object):
         return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
-    def adjacency_matrix_scipy(self, transpose, fmt):
+    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -570,14 +570,14 @@ class GraphIndex(object):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool
             A flag to transpose the returned adjacency matrix.
         fmt : str
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
 
         Returns
         -------
@@ -591,18 +591,21 @@ class GraphIndex(object):
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            shuffle = utils.toindex(rst(2)).tonumpy()
+            shuffle = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             n = self.number_of_nodes()
-            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
+            adjmat = scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0)).tonumpy()
             n = self.number_of_nodes()
             m = self.number_of_edges()
             row, col = np.reshape(idx, (2, m))
-            shuffle = np.arange(0, m)
-            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
+            shuffle = np.arange(0, m) if return_edge_ids else np.ones_like(row)
+            adjmat = scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
         else:
             raise Exception("unknown format")
+
+        adjmat.eliminate_zeros()
+        return adjmat
 
     @utils.cached_member(cache='_cache', prefix='immu_gidx')
     def get_immutable_gidx(self, ctx):

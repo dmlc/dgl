@@ -173,8 +173,8 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
     forward, backward = gidx.get_csr_shuffle_order()
     eid = eid.tousertensor()
     nbits = gidx.bits_needed()
-    forward_map = utils.to_nbits_int(eid[forward.tousertensor()], nbits)
-    backward_map = utils.to_nbits_int(eid[backward.tousertensor()], nbits)
+    forward_map = utils.to_nbits_int(F.gather_row(eid, forward.tousertensor()), nbits)
+    backward_map = utils.to_nbits_int(F.gather_row(eid, backward.tousertensor()), nbits)
     forward_map = F.zerocopy_to_dgl_ndarray(forward_map)
     backward_map = F.zerocopy_to_dgl_ndarray(backward_map)
     edge_map = utils.CtxCachedObject(

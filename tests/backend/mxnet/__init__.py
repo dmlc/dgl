@@ -4,6 +4,7 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 import mxnet.autograd as autograd
+import operator
 
 def cuda():
     return mx.gpu()
@@ -41,6 +42,9 @@ def is_no_grad(x):
 def full(shape, fill_value, dtype, ctx):
     return nd.full(shape, fill_value, dtype=dtype, ctx=ctx)
 
+def index_set(x, i, new):
+    x[i] = new
+
 def narrow_row_set(x, start, stop, new):
     x[start:stop] = new
 
@@ -59,17 +63,13 @@ def softmax(x, dim):
 def spmm(x, y):
     return nd.dot(x, y)
 
-def add(a, b):
-    return a + b
+add = operator.add
+sub = operator.sub
+mul = operator.mul
+div = operator.truediv
 
-def sub(a, b):
-    return a - b
-
-def mul(a, b):
-    return a * b
-
-def div(a, b):
-    return a / b
+def gt0(x):
+    return x > 0
 
 def sum(x, dim):
     return x.sum(dim)

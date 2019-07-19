@@ -98,7 +98,7 @@ def check_basic(g, nf):
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
         out_deg = nf.layer_out_degree(i - 1)
-        assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
+        assert F.asnumpy(in_deg).sum(0) == F.asnumpy(out_deg).sum(0)
 
         nids = nf.layer_nid(i)
         parent_nids = nf.map_to_parent_nid(nids)
@@ -119,7 +119,7 @@ def check_basic(g, nf):
     for i in range(-1, -nf.num_layers, -1):
         in_deg = nf.layer_in_degree(i)
         out_deg = nf.layer_out_degree(i - 1)
-        assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
+        assert F.asnumpy(in_deg).sum(0) == F.asnumpy(out_deg).sum(0)
 
 
 def test_basic():
@@ -171,7 +171,10 @@ def check_apply_nodes(create_node_flow, use_negative_block_id):
         def update_func1(nodes):
             return {'h1' : new_feats}
         nf.apply_layer(l, update_func1, v=nf.layer_nid(l)[0:4])
-        assert_array_equal(F.asnumpy(nf.layers[l].data['h1'][0:4]), F.asnumpy(new_feats))
+        # NOTE: chainer doesn't support index_copy so we simulate it with scatter_add
+        # which loses precision
+        assert_allclose(F.asnumpy(nf.layers[l].data['h1'][0:4]), F.asnumpy(new_feats),
+                        rtol=1e-5, atol=1e-5)
 
 
 def test_apply_nodes():

@@ -64,18 +64,18 @@ def test_topological_nodes(n=100):
 
     layers_dgl = dgl.topological_nodes_generator(g)
 
-    adjmat = g.adjacency_matrix()
+    adjmat = g.adjacency_matrix_scipy(return_edge_ids=False)
     def tensor_topo_traverse():
         n = g.number_of_nodes()
-        mask = F.copy_to(F.ones((n, 1)), F.cpu())
-        degree = F.spmm(adjmat, mask)
-        while F.reduce_sum(mask) != 0.:
-            v = F.astype((degree == 0.), F.float32)
-            v = v * mask
+        mask = sp.csr_matrix(np.ones((n, 1)))
+        degree = adjmat * mask
+        while mask.sum() != 0.:
+            v = degree == 0
+            v = v.multiply(mask)
             mask = mask - v
-            frontier = F.copy_to(F.nonzero_1d(F.squeeze(v, 1)), F.cpu())
+            frontier = np.nonzero(v.toarray().squeeze(1))[0]
             yield frontier
-            degree -= F.spmm(adjmat, v)
+            degree -= adjmat * v
 
     layers_spmv = list(tensor_topo_traverse())
 

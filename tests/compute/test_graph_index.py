@@ -31,7 +31,7 @@ def generate_rand_graph(n):
 def check_graph_equal(g1, g2):
     adj1 = g1.adjacency_matrix(False, F.cpu())[0]
     adj2 = g2.adjacency_matrix(False, F.cpu())[0]
-    assert np.all(F.asnumpy(adj1) == F.asnumpy(adj2))
+    assert np.all(F.sparse_to_numpy(adj1) == F.sparse_to_numpy(adj2))
 
 def test_graph_gen():
     g, ig = generate_from_edgelist()
@@ -124,8 +124,9 @@ def test_node_subgraph():
     subig = ig.node_subgraph(utils.toindex(randv))
     check_basics(subg.graph, subig.graph)
     check_graph_equal(subg.graph, subig.graph)
-    assert F.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
-            == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor(), 0) == 10
+    subg_nid = F.asnumpy(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor())
+    subig_nid = F.asnumpy(map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor())
+    assert (subg_nid == subig_nid).sum(0) == 10
 
     # node_subgraphs
     randvs = []
