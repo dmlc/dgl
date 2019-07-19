@@ -14,7 +14,7 @@ def is_cuda(ctx):
 def get_context_module(ctx):
     if is_cpu(ctx):
         return np
-    elif is_gpu(ctx):
+    elif is_cuda(ctx):
         return cupy
     else:
         raise TypeError('Unknown device %s.' % ctx)

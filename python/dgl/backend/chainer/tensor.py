@@ -94,7 +94,7 @@ def device_id(ctx):
 def _get_dgl_context(ctx):
     if is_cpu(ctx):
         return nd.cpu()
-    elif is_gpu(ctx):
+    elif is_cuda(ctx):
         return nd.gpu(device_id(ctx))
     else:
         raise TypeError('Unknown device: %s.' % ctx)
@@ -258,7 +258,7 @@ def _zerocopy_to_dgl_ndarray(input_array):
     if isinstance(input_array, np.ndarray):
         return nd.array(input_array)
     elif isinstance(input_array, cupy.ndarray):
-        return nd.from_dlpack(input.data.toDlpack())
+        return nd.from_dlpack(input_array.toDlpack())
     else:
         raise TypeError('Unknown type %s.' % type(input_array))
 
