@@ -19,6 +19,6 @@ def get_context_module(ctx):
     else:
         raise TypeError('Unknown device %s.' % ctx)
 
-def get_array_module(var):
+def get_array_module(*vars):
     # get_array_module(var) doesn't work
-    return _get_array_module(var.data)
+    return _get_array_module(*[v.data for v in vars])

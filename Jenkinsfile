@@ -290,6 +290,47 @@ pipeline {
             }
           }
         }
+        stage("Chainer CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("chainer", "cpu")
+              }
+            }
+            //stage("Tutorial test") {
+            //  steps {
+            //    tutorial_test_linux("mxnet")
+            //  }
+            //}
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+        stage("Chainer GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                sh "nvidia-smi"
+                unit_test_linux("chainer", "gpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
       }
     }
   }

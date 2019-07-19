@@ -431,14 +431,14 @@ def test_recv_0deg_newfld():
     # test#2: recv only 0deg node
     old = F.randn((2, 5))
     g.ndata['h'] = old
-    g.ndata['h1'] = F.full((2, 5), -1, F.int64)  # this is necessary
+    g.ndata['h1'] = F.full((2, 5), -1, F.float32)  # this is necessary
     g.send((0, 1))
     g.recv(0)
     new = g.ndata.pop('h1')
     # 0deg check: fallback to apply
-    assert F.allclose(new[0], F.full_1d(5, -2, F.int64))
+    assert F.allclose(new[0], F.full_1d(5, -2, F.float32))
     # non-0deg check: not changed
-    assert F.allclose(new[1], F.full_1d(5, -1, F.int64))
+    assert F.allclose(new[1], F.full_1d(5, -1, F.float32))
 
 def test_update_all_0deg():
     # test#1

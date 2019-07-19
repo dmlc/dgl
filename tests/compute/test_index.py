@@ -7,8 +7,7 @@ import backend as F
 import unittest
 import os
 
-@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer' and
-                 os.getenv('DGLTESTDEV', 'cpu') == 'cpu',
+@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer',
                  'Chainer/CPU arrays currently does not support zerocopy with DLPack')
 def test_dlpack():
     # test dlpack conversion.

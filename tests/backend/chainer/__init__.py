@@ -6,6 +6,7 @@ try:
 except ImportError:
     cupy = None
 from dgl.backend.chainer.utils import *
+import numpy as np
 
 def cuda():
     return '@cupy:0'
@@ -17,7 +18,7 @@ def array_equal(a, b):
     return (a.data == b.data).all().item()
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
-    return get_array_module(a).allclose(a.data, b.data, rtol, atol)
+    return get_array_module(a, b).allclose(a.data, b.data, rtol, atol)
 
 def randn(shape):
     return chainer.as_variable(np.random.randn(*shape).astype('float32'))

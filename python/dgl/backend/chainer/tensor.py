@@ -196,9 +196,9 @@ def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
 
 def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     n_ones = chainer.as_variable(
-        get_array_module(seg_id).ones_like(seg_id.data))
+        get_array_module(seg_id).ones_like(seg_id.data).astype(input.dtype))
 
-    w = F.cast(unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0), np.float32)
+    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
     w = F.clip(w, 1., np.inf)
     y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
 
@@ -277,7 +277,11 @@ def zerocopy_from_dgl_ndarray(input):
     return chainer.as_variable(_zerocopy_from_dgl_ndarray(input))
 
 
-class BinaryReduce(chainer.FunctionNode):
+# TODO(quan):
+# Currently I could not unify the NumPy-DLPack and CuPy-DLPack interaction
+# logic, so I resorted to old-style Chainer functions.
+# The new array backend ChainerX currently does not support DLPack.
+class BinaryReduce(chainer.Function):
     # pylint: disable=invalid-name
     def __init__(self, reducer, op, G, A_target, B_target, out_size, A_rows,
                  B_rows, out_rows):
@@ -292,7 +296,7 @@ class BinaryReduce(chainer.FunctionNode):
         self.B_rows = B_rows
         self.out_rows = out_rows
 
-    def forward(self, inputs):
+    def forward_cpu(self, inputs):
         A, B = inputs
 
         A_nd = _zerocopy_to_dgl_ndarray(A)
@@ -313,44 +317,92 @@ class BinaryReduce(chainer.FunctionNode):
         # to DGL tensors to work.
         out = _zerocopy_from_dgl_ndarray(out_nd)
 
-        self.retain_inputs((0, 1))
         self.retain_outputs((0,))
+        self.feat_shape = feat_shape
 
         return out,
 
-    def backward(self, target_input_indexes, grad_outputs):
-        A, B = self.get_retained_inputs()
-        out, = self.get_retained_outputs()
+    def forward_gpu(self, inputs):
+        A, B = inputs
+
+        A_nd = _zerocopy_to_dgl_ndarray(A)
+        B_nd = _zerocopy_to_dgl_ndarray(B)
+        feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
+        out = cupy.empty((self.out_size,) + feat_shape, dtype=A.dtype)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+
+        K.binary_op_reduce(
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, self.A_rows[0], self.B_rows[0],
+            self.out_rows[0])
+
+        self.retain_outputs((0,))
+        self.feat_shape = feat_shape
+
+        return out,
+
+    def backward_cpu(self, inputs, grad_outputs):
+        A, B = inputs
+        out, = self.output_data
+        feat_shape = self.feat_shape
         grad_out, = grad_outputs
 
-        A_nd = zerocopy_to_dgl_ndarray(A)
-        B_nd = zerocopy_to_dgl_ndarray(B)
-        out_nd = zerocopy_to_dgl_ndarray(out)
-        feat_shape = K.infer_binary_feature_shape(A_nd, B_nd)
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        A_nd = _zerocopy_to_dgl_ndarray(A)
+        B_nd = _zerocopy_to_dgl_ndarray(B)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+        grad_out_nd = _zerocopy_to_dgl_ndarray(grad_out)
 
-        grad_A_nd = nd.empty(
-            (A_nd.shape[0],) + feat_shape,
-            A.dtype,
-            _get_dgl_context(context(A)))
+        grad_A_nd = nd.empty((A_nd.shape[0],) + feat_shape, A.dtype, nd.cpu())
         K.backward_lhs_binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
             A_nd, B_nd, out_nd, grad_out_nd, grad_A_nd,
             self.A_rows[1], self.B_rows[1], self.out_rows[1])
         # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
-        grad_A = zerocopy_from_dgl_ndarray(grad_A_nd)
+        grad_A = _zerocopy_from_dgl_ndarray(grad_A_nd)
         grad_A = _reduce_grad(grad_A, A_nd.shape)
 
-        grad_B_nd = nd.empty(
-            (B_nd.shape[0],) + feat_shape,
-            B.dtype,
-            _get_dgl_context(context(B)))
+        grad_B_nd = nd.empty((B_nd.shape[0],) + feat_shape, B.dtype, nd.cpu())
         K.backward_rhs_binary_op_reduce(
             self.reducer, self.op, self.G, self.A_target, self.B_target,
             A_nd, B_nd, out_nd, grad_out_nd, grad_B_nd,
             self.A_rows[1], self.B_rows[1], self.out_rows[1])
         # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
-        grad_B = zerocopy_from_dgl_ndarray(grad_B_nd)
+        grad_B = _zerocopy_from_dgl_ndarray(grad_B_nd)
+        grad_B = _reduce_grad(grad_B, B_nd.shape)
+
+        return grad_A, grad_B
+
+    def backward_gpu(self, inputs, grad_outputs):
+        A, B = inputs
+        out, = self.output_data
+        feat_shape = self.feat_shape
+        grad_out, = grad_outputs
+        # TODO (CUPY_COPY)
+        # The gradient CuPy array behaves weird with DLPack and DGL currently:
+        # without the copy, printing grad_out_nd (zerocopy of grad_out) will
+        # throw a CUDA invalid argument error, and the gradient computation
+        # will be incorrect.  I'm leaving the inspection for future.
+        grad_out = cupy.copy(grad_out)
+
+        A_nd = _zerocopy_to_dgl_ndarray(A)
+        B_nd = _zerocopy_to_dgl_ndarray(B)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+        grad_out_nd = _zerocopy_to_dgl_ndarray(grad_out)
+
+        grad_A = cupy.empty((A_nd.shape[0],) + feat_shape, dtype=A.dtype)
+        grad_A_nd = _zerocopy_to_dgl_ndarray(grad_A)
+        K.backward_lhs_binary_op_reduce(
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, grad_out_nd, grad_A_nd,
+            self.A_rows[1], self.B_rows[1], self.out_rows[1])
+        grad_A = _reduce_grad(grad_A, A_nd.shape)
+
+        grad_B = cupy.empty((B_nd.shape[0],) + feat_shape, dtype=B.dtype)
+        grad_B_nd = _zerocopy_to_dgl_ndarray(grad_B)
+        K.backward_rhs_binary_op_reduce(
+            self.reducer, self.op, self.G, self.A_target, self.B_target,
+            A_nd, B_nd, out_nd, grad_out_nd, grad_B_nd,
+            self.A_rows[1], self.B_rows[1], self.out_rows[1])
         grad_B = _reduce_grad(grad_B, B_nd.shape)
 
         return grad_A, grad_B
@@ -361,10 +413,10 @@ def binary_reduce(reducer, op, G, A_target, B_target, A, B,
                   out_size, A_rows, B_rows, out_rows):
     func = BinaryReduce(reducer, op, G, A_target, B_target, out_size, A_rows,
                         B_rows, out_rows)
-    return func.apply((A, B))[0]
+    return func(A, B)
 
 
-class CopyReduce(chainer.FunctionNode):
+class CopyReduce(chainer.Function):
     # pylint: disable=invalid-name
     def __init__(self, reducer, G, target, out_size, X_rows, out_rows):
         super(CopyReduce, self).__init__()
@@ -375,15 +427,12 @@ class CopyReduce(chainer.FunctionNode):
         self.X_rows = X_rows
         self.out_rows = out_rows
 
-    def forward(self, inputs):
+    def forward_cpu(self, inputs):
         X, = inputs
         feat_shape = X.shape[1:]
 
         X_nd = _zerocopy_to_dgl_ndarray(X)
-        out_nd = nd.empty(
-            (self.out_size,) + feat_shape,
-            X.dtype,
-            _get_dgl_context(_context_of_array(X)))
+        out_nd = nd.empty((self.out_size,) + feat_shape, X.dtype, nd.cpu())
 
         K.copy_reduce(
             self.reducer, self.G, self.target, X_nd, out_nd,
@@ -391,27 +440,62 @@ class CopyReduce(chainer.FunctionNode):
         # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
         out = _zerocopy_from_dgl_ndarray(out_nd)
 
-        self.retain_inputs((0,))
         self.retain_outputs((0,))
 
         return out,
 
-    def backward(self, target_input_indexes, grad_outputs):
-        X, = self.get_retained_inputs()
-        out, = self.get_retained_outputs()
+    def forward_gpu(self, inputs):
+        X, = inputs
+        feat_shape = X.shape[1:]
+
+        X_nd = _zerocopy_to_dgl_ndarray(X)
+        out = cupy.empty((self.out_size,) + feat_shape, dtype=X.dtype)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+
+        K.copy_reduce(
+            self.reducer, self.G, self.target, X_nd, out_nd,
+            self.X_rows[0], self.out_rows[0])
+
+        self.retain_outputs((0,))
+
+        return out,
+
+    def backward_cpu(self, inputs, grad_outputs):
+        X, = inputs
+        out, = self.output_data
         grad_out, = grad_outputs
 
-        X_nd = zerocopy_to_dgl_ndarray(X)
-        out_nd = zerocopy_to_dgl_ndarray(out)
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        X_nd = _zerocopy_to_dgl_ndarray(X)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+        grad_out_nd = _zerocopy_to_dgl_ndarray(grad_out)
 
-        grad_X_nd = nd.empty(X.shape, X.dtype, _get_dgl_context(context(X)))
+        grad_X_nd = nd.empty(X.shape, X.dtype, nd.cpu())
         K.backward_copy_reduce(
             self.reducer, self.G, self.target, X_nd, out_nd,
             grad_out_nd, grad_X_nd,
             self.X_rows[1], self.out_rows[1])
         # TODO (ZEROCOPY_BETWEEN_NUMPY_AND_DGL)
-        grad_X = zerocopy_from_dgl_ndarray(grad_X_nd)
+        grad_X = _zerocopy_from_dgl_ndarray(grad_X_nd)
+
+        return grad_X,
+
+    def backward_gpu(self, inputs, grad_outputs):
+        X, = inputs
+        out, = self.output_data
+        grad_out, = grad_outputs
+        # TODO (CUPY_COPY)
+        grad_out = cupy.copy(grad_out)
+
+        X_nd = _zerocopy_to_dgl_ndarray(X)
+        out_nd = _zerocopy_to_dgl_ndarray(out)
+        grad_out_nd = _zerocopy_to_dgl_ndarray(grad_out)
+
+        grad_X = cupy.empty(X.shape, dtype=X.dtype)
+        grad_X_nd = _zerocopy_to_dgl_ndarray(grad_X)
+        K.backward_copy_reduce(
+            self.reducer, self.G, self.target, X_nd, out_nd,
+            grad_out_nd, grad_X_nd,
+            self.X_rows[1], self.out_rows[1])
 
         return grad_X,
 
@@ -419,7 +503,7 @@ class CopyReduce(chainer.FunctionNode):
 # pylint: disable=invalid-name
 def copy_reduce(reducer, G, target, X, out_size, X_rows, out_rows):
     func = CopyReduce(reducer, G, target, out_size, X_rows, out_rows)
-    return func.apply((X,))[0]
+    return func(X)
 
 
 def _reduce_grad(grad, shape):
@@ -431,7 +515,7 @@ def _reduce_grad(grad, shape):
 
     Parameters
     ----------
-    grad: Tensor
+    grad: numpy.ndarray or cupy.ndarray
         Gradient tensor
     shape: tuple
         Shape of input tensor
@@ -450,7 +534,7 @@ def _reduce_grad(grad, shape):
     in_shape = (1,) * num_to_squeeze + in_shape
     reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))[0]
     reduce_idx += 1 # skip batch dim
-    grad = F.sum(grad, axis=tuple(reduce_idx), keepdims=True)
+    grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
 
 
