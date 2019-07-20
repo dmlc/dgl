@@ -4,6 +4,7 @@ import sys, os
 import importlib
 
 from . import backend
+from .. import env
 
 _enabled_apis = set()
 
@@ -43,7 +44,7 @@ def load_backend(mod_name):
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
-load_backend(os.environ.get('DGLBACKEND', 'pytorch').lower())
+load_backend(env.get_backend().lower())
 
 def is_enabled(api):
     """Return true if the api is enabled by the current backend.

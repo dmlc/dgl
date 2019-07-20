@@ -127,7 +127,7 @@ def test_batch_setter_getter():
     v = F.tensor([3, 4, 5])
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
-@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer',
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
                  'Chainer does not support head gradients')
 def test_batch_setter_autograd():
     g = generate_graph(grad=True)

@@ -171,7 +171,7 @@ def test_row1():
         f[rowid] = vals
     assert check_fail(failed_update_rows)
 
-@unittest.skipIf(os.getenv('DGLBACKEND') == 'chainer',
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
                  'Chainer does not support head gradients')
 def test_row2():
     # test row getter/setter autograd compatibility

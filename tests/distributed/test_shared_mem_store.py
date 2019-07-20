@@ -95,6 +95,8 @@ def server_func(num_workers, graph_name):
     g.edata['feat'] = F.tensor(efeat)
     g.run()
 
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
+                 'Shared memory is currently not supported on Chainer')
 def test_init():
     manager = Manager()
     return_dict = manager.dict()
@@ -160,6 +162,8 @@ def check_compute_func(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
+                 'Shared memory is currently not supported on Chainer')
 def test_compute():
     manager = Manager()
     return_dict = manager.dict()
@@ -205,6 +209,8 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
         traceback.print_exc()
 
 
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
+                 'Shared memory is currently not supported on Chainer')
 def test_sync_barrier():
     manager = Manager()
     return_dict = manager.dict()
@@ -251,6 +257,8 @@ def check_mem(gidx):
     gidx1 = gidx1.copyto_shared_mem("in", "test_graph5")
     gidx2 = gidx2.copyto_shared_mem("out", "test_graph6")
 
+@unittest.skipIf(dgl.env.get_backend() == 'chainer',
+                 'Shared memory is currently not supported on Chainer')
 def test_copy_shared_mem():
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
     gidx = dgl.graph_index.create_graph_index(csr, False, True)

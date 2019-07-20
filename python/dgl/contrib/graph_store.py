@@ -1090,6 +1090,8 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     SharedMemoryStoreServer
         The graph store server
     """
+    assert env.get_backend() != 'chainer', \
+            'Shared memory is currently not supported for Chainer'
     return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph,
                                    num_workers, port)
 
@@ -1116,6 +1118,9 @@ def create_graph_from_store(graph_name, store_type, port=8000):
     SharedMemoryDGLGraph
         The shared-memory DGLGraph
     """
+    # TODO: test Chainer support after numpy ndarray zerocopy is working
+    assert env.get_backend() != 'chainer', \
+            'Shared memory is currently not supported for Chainer'
     return SharedMemoryDGLGraph(graph_name, port)
 
 
