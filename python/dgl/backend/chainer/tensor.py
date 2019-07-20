@@ -377,12 +377,7 @@ class BinaryReduce(chainer.Function):
         out, = self.output_data
         feat_shape = self.feat_shape
         grad_out, = grad_outputs
-        # TODO (CUPY_COPY)
-        # The gradient CuPy array behaves weird with DLPack and DGL currently:
-        # without the copy, printing grad_out_nd (zerocopy of grad_out) will
-        # throw a CUDA invalid argument error, and the gradient computation
-        # will be incorrect.  I'm leaving the inspection for future.
-        grad_out = cupy.copy(grad_out)
+        grad_out = cupy.ascontiguousarray(grad_out)
 
         A_nd = _zerocopy_to_dgl_ndarray(A)
         B_nd = _zerocopy_to_dgl_ndarray(B)
@@ -483,8 +478,7 @@ class CopyReduce(chainer.Function):
         X, = inputs
         out, = self.output_data
         grad_out, = grad_outputs
-        # TODO (CUPY_COPY)
-        grad_out = cupy.copy(grad_out)
+        grad_out = cupy.ascontiguousarray(grad_out)
 
         X_nd = _zerocopy_to_dgl_ndarray(X)
         out_nd = _zerocopy_to_dgl_ndarray(out)
