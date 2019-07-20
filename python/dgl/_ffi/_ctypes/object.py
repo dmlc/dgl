@@ -85,7 +85,7 @@ class ObjectBase(object):
         """
         # assign handle first to avoid error raising
         self.handle = None
-        handle = __init_by_constructor__(fconstructor, args)
+        handle = __init_by_constructor__(fconstructor, args)  # pylint: disable=not-callable
         if not isinstance(handle, ObjectHandle):
             handle = ObjectHandle(handle)
         self.handle = handle

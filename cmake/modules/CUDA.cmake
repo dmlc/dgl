@@ -231,6 +231,8 @@ macro(dgl_config_cuda out_variable)
   add_definitions(-DDGL_USE_CUDA)
 
   file(GLOB_RECURSE DGL_CUDA_SRC
+    src/array/cuda/*.cc
+    src/array/cuda/*.cu
     src/kernel/cuda/*.cc
     src/kernel/cuda/*.cu
     src/runtime/cuda/*.cc

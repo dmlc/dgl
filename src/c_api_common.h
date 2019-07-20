@@ -12,6 +12,16 @@
 #include <algorithm>
 #include <vector>
 
+/*! \brief Check whether two data types are the same.*/
+inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
+  return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
+}
+
+/*! \brief Output the string representation of device context.*/
+inline std::ostream& operator << (std::ostream& os, const DLDataType& ty) {
+  return os << "code=" << ty.code << ",bits=" << ty.bits << "lanes=" << ty.lanes;
+}
+
 /*! \brief Check whether two device contexts are the same.*/
 inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
@@ -19,7 +29,7 @@ inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
 
 /*! \brief Output the string representation of device context.*/
 inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
-  return os << "" << ctx.device_type << ":" << ctx.device_id << "";
+  return os << ctx.device_type << ":" << ctx.device_id;
 }
 
 namespace dgl {
@@ -45,8 +55,7 @@ dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
 
 /*!\brief Return whether the array is a valid 1D int array*/
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
-    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
+  return arr->ndim == 1 && arr->dtype.code == kDLInt;
 }
 
 /*!
