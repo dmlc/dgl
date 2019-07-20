@@ -17,6 +17,7 @@ from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
+from .. import env
 from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
