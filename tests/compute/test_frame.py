@@ -1,4 +1,5 @@
 import numpy as np
+import dgl
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
 import backend as F
