@@ -256,9 +256,9 @@ def zerocopy_from_numpy(input):
 
 def _zerocopy_to_dgl_ndarray(input_array):
     if isinstance(input_array, np.ndarray):
-        return nd.array(input_array)
+        return nd.array(np.ascontiguousarray(input_array))
     elif isinstance(input_array, cupy.ndarray):
-        return nd.from_dlpack(input_array.toDlpack())
+        return nd.from_dlpack(cupy.ascontiguousarray(input_array).toDlpack())
     else:
         raise TypeError('Unknown type %s.' % type(input_array))
 
@@ -377,7 +377,6 @@ class BinaryReduce(chainer.Function):
         out, = self.output_data
         feat_shape = self.feat_shape
         grad_out, = grad_outputs
-        grad_out = cupy.ascontiguousarray(grad_out)
 
         A_nd = _zerocopy_to_dgl_ndarray(A)
         B_nd = _zerocopy_to_dgl_ndarray(B)
