@@ -38,7 +38,7 @@ def _move_data_to_shared_mem_array(arr, name):
     dgl_tensor = F.zerocopy_to_dgl_ndarray(arr)
     new_arr = empty_shared_mem(name, True, F.shape(arr), dtype_dict[F.dtype(arr)])
     dgl_tensor.copyto(new_arr)
-    return F.zerocopy_from_dgl_ndarray(dgl_tensor)
+    return F.zerocopy_from_dgl_ndarray(new_arr)
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
