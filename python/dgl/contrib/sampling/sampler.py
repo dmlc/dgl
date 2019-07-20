@@ -280,7 +280,7 @@ class NeighborSampler(NodeFlowSampler):
 
            p(v, u) = \frac{w_{v, u}}{\sum_{u', (v, u') \in E} w_{v, u'}}
 
-        If a str is given, the edge weight will be loaded from the feature column with
+        If a str is given, the edge weight will be loaded from the edge feature column with
         the same name.  The feature column must be a scalar column in this case.
 
         Default: None
