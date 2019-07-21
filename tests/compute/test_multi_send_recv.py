@@ -64,7 +64,7 @@ def test_multi_send():
     eid = g.edge_ids([0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
                      [1, 2, 3, 4, 5, 9, 9, 9, 9, 9])
     F.scatter_row_inplace(expected, eid, 1)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
 def test_multi_recv():
     # basic recv test
@@ -80,20 +80,20 @@ def test_multi_recv():
     g.send((u, v))
     eid = g.edge_ids(u, v)
     F.scatter_row_inplace(expected, eid, 1)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
     g.recv(v)
     F.scatter_row_inplace(expected, eid, 0) 
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
     u = [0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     F.scatter_row_inplace(expected, eid, 1)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
     g.recv(v)
     F.scatter_row_inplace(expected, eid, 0) 
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
     h1 = g.ndata['h']
 
@@ -104,22 +104,22 @@ def test_multi_recv():
     g.send((u, v))
     eid = g.edge_ids(u, v)
     F.scatter_row_inplace(expected, eid, 1)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
     u = [4, 5, 6]
     v = [9]
     g.recv(v)
     eid = g.edge_ids(u, v)
     F.scatter_row_inplace(expected, eid, 0) 
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
     u = [0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)
     F.scatter_row_inplace(expected, eid, 0) 
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
     h2 = g.ndata['h']
-    assert F.allclose(h1, h2)
+    F.assert_allclose(h1, h2)
 
 def test_multi_recv_0deg():
     # test recv with 0deg nodes;
@@ -145,17 +145,17 @@ def test_multi_recv_0deg():
     g.recv([0, 1])
     new = g.ndata['h']
     # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full((5,), 4, F.float32))
+    F.assert_allclose(new[0], F.full((5,), 4, F.float32))
     # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
+    F.assert_allclose(new[1], F.sum(old, 0) * 2)
 
     # recv again on zero degree node
     g.recv([0])
-    assert F.allclose(g.nodes[0].data['h'], F.full((5,), 8, F.float32))
+    F.assert_allclose(g.ndata['h'][0], F.full((5,), 8, F.float32))
 
     # recv again on node with no incoming message
     g.recv([1])
-    assert F.allclose(g.nodes[1].data['h'], F.sum(old, 0) * 4)
+    F.assert_allclose(g.ndata['h'][1], F.sum(old, 0) * 4)
 
 def test_send_twice_different_shape():
     g = generate_graph()
@@ -185,14 +185,14 @@ def test_send_twice_different_msg():
     g.send((0, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], old_repr[0] * 3)
+    F.assert_allclose(new_repr[1], old_repr[0] * 3)
 
     g.ndata['a'] = old_repr
     g.send((0, 1), _message_a)
     g.send((2, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], F.max(F.stack([old_repr[0], old_repr[2] * 3], 0), 0))
+    F.assert_allclose(new_repr[1], F.max(F.stack([old_repr[0], old_repr[2] * 3], 0), 0))
 
 def test_send_twice_different_field():
     g = DGLGraph()
@@ -212,8 +212,8 @@ def test_send_twice_different_field():
     g.send((0, 1), _message_b)
     g.recv([1], _reduce)
     new_repr = g.get_n_repr()
-    assert F.allclose(new_repr['a'][1], old_a[0])
-    assert F.allclose(new_repr['b'][1], old_b[0])
+    F.assert_allclose(new_repr['a'][1], old_a[0])
+    F.assert_allclose(new_repr['b'][1], old_b[0])
 
 def test_dynamic_addition():
     N = 3
@@ -250,7 +250,7 @@ def test_dynamic_addition():
                     'h2': F.randn((2, D))})
     g.send()
     expected = F.copy_to(F.ones((g.number_of_edges(),), dtype=F.int64), F.cpu())
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
     # add more edges
     g.add_edges([0, 2], [2, 0], {'h1': F.randn((2, D))})
@@ -267,7 +267,7 @@ def test_dynamic_addition():
     # a complete round of send and recv
     g.send()
     g.recv()
-    assert F.allclose(h, g.ndata['h'])
+    F.assert_allclose(h, g.ndata['h'])
 
 def test_recv_no_send():
     g = generate_graph()
@@ -281,10 +281,10 @@ def test_recv_no_send():
     g.send((1, 2), message_func)
     expected = F.copy_to(F.zeros(2, dtype=F.int64), F.cpu())
     F.index_set(expected, 1, 1)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
     g.recv(2, reduce_func)
     F.index_set(expected, 1, 0)
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    F.assert_array_equal(g._get_msg_index().tousertensor(), expected)
 
 def test_send_recv_after_conversion():
     # test send and recv after converting from a graph with edges
@@ -336,8 +336,8 @@ def test_send_recv_after_conversion():
     g2.recv([0, 2, 4, 8], reduce_func=reduce_func,
             apply_node_func=apply_node_func)
 
-    assert F.allclose(g.ndata['h'], g1.ndata['h'])
-    assert F.allclose(g.ndata['h'], g2.ndata['h'])
+    F.assert_allclose(g.ndata['h'], g1.ndata['h'])
+    F.assert_allclose(g.ndata['h'], g2.ndata['h'])
 
 
 if __name__ == '__main__':

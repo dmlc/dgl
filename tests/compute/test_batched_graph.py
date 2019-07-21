@@ -52,10 +52,10 @@ def test_batch_unbatch():
     assert bg.batch_num_edges == [4, 4]
 
     tt1, tt2 = dgl.unbatch(bg)
-    assert F.allclose(t1.ndata['h'], tt1.ndata['h'])
-    assert F.allclose(t1.edata['h'], tt1.edata['h'])
-    assert F.allclose(t2.ndata['h'], tt2.ndata['h'])
-    assert F.allclose(t2.edata['h'], tt2.edata['h'])
+    F.assert_allclose(t1.ndata['h'], tt1.ndata['h'])
+    F.assert_allclose(t1.edata['h'], tt1.edata['h'])
+    F.assert_allclose(t2.ndata['h'], tt2.ndata['h'])
+    F.assert_allclose(t2.edata['h'], tt2.edata['h'])
 
 def test_batch_unbatch1():
     t1 = tree1()
@@ -69,12 +69,12 @@ def test_batch_unbatch1():
     assert b2.batch_num_edges == [4, 4, 4]
 
     s1, s2, s3 = dgl.unbatch(b2)
-    assert F.allclose(t2.ndata['h'], s1.ndata['h'])
-    assert F.allclose(t2.edata['h'], s1.edata['h'])
-    assert F.allclose(t1.ndata['h'], s2.ndata['h'])
-    assert F.allclose(t1.edata['h'], s2.edata['h'])
-    assert F.allclose(t2.ndata['h'], s3.ndata['h'])
-    assert F.allclose(t2.edata['h'], s3.edata['h'])
+    F.assert_allclose(t2.ndata['h'], s1.ndata['h'])
+    F.assert_allclose(t2.edata['h'], s1.edata['h'])
+    F.assert_allclose(t1.ndata['h'], s2.ndata['h'])
+    F.assert_allclose(t1.edata['h'], s2.edata['h'])
+    F.assert_allclose(t2.ndata['h'], s3.ndata['h'])
+    F.assert_allclose(t2.edata['h'], s3.edata['h'])
 
     # Test batching readonly graphs
     t1.readonly()
@@ -92,16 +92,16 @@ def test_batch_unbatch1():
     assert bg.batch_num_edges == [4, 4]
 
     rs1, rs2 = dgl.unbatch(bg)
-    assert F.allclose(rs1.edges()[0], t1.edges()[0])
-    assert F.allclose(rs1.edges()[1], t1.edges()[1])
-    assert F.allclose(rs2.edges()[0], t2.edges()[0])
-    assert F.allclose(rs2.edges()[1], t2.edges()[1])
-    assert F.allclose(rs1.nodes(), t1.nodes())
-    assert F.allclose(rs2.nodes(), t2.nodes())
-    assert F.allclose(t1.ndata['h'], rs1.ndata['h'])
-    assert F.allclose(t1.edata['h'], rs1.edata['h'])
-    assert F.allclose(t2.ndata['h'], rs2.ndata['h'])
-    assert F.allclose(t2.edata['h'], rs2.edata['h'])
+    F.assert_allclose(rs1.edges()[0], t1.edges()[0])
+    F.assert_allclose(rs1.edges()[1], t1.edges()[1])
+    F.assert_allclose(rs2.edges()[0], t2.edges()[0])
+    F.assert_allclose(rs2.edges()[1], t2.edges()[1])
+    F.assert_allclose(rs1.nodes(), t1.nodes())
+    F.assert_allclose(rs2.nodes(), t2.nodes())
+    F.assert_allclose(t1.ndata['h'], rs1.ndata['h'])
+    F.assert_allclose(t1.edata['h'], rs1.edata['h'])
+    F.assert_allclose(t2.ndata['h'], rs2.ndata['h'])
+    F.assert_allclose(t2.edata['h'], rs2.edata['h'])
 
 def test_batch_unbatch2():
     # test setting/getting features after batch
@@ -114,8 +114,8 @@ def test_batch_unbatch2():
     c = dgl.batch([a, b])
     c.ndata['h'] = F.ones((7, 1))
     c.edata['w'] = F.ones((5, 1))
-    assert F.allclose(c.ndata['h'], F.ones((7, 1)))
-    assert F.allclose(c.edata['w'], F.ones((5, 1)))
+    F.assert_allclose(c.ndata['h'], F.ones((7, 1)))
+    F.assert_allclose(c.edata['w'], F.ones((5, 1)))
 
 def test_batch_send_then_recv():
     t1 = tree1()
@@ -191,7 +191,7 @@ def test_batched_edge_ordering():
     g = dgl.batch([g1, g2])
     r1 = g.edata['h'][g.edge_id(4, 5)]
     r2 = g1.edata['h'][g1.edge_id(4, 5)]
-    assert F.array_equal(r1, r2)
+    F.assert_array_equal(r1, r2)
 
 def test_batch_no_edge():
     g1 = dgl.DGLGraph()

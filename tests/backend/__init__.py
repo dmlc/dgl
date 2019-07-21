@@ -63,3 +63,10 @@ def full_1d(length, fill_value, dtype, ctx=_default_context):
 
 def softmax(x, dim):
     return _softmax(x, dim)
+
+def assert_allclose(actual, desired, rtol=1e-5, atol=1e-5):
+    np.testing.assert_allclose(
+            asnumpy(actual), asnumpy(desired), rtol, atol)
+
+def assert_array_equal(a, b):
+    np.testing.assert_array_equal(asnumpy(a), asnumpy(b))

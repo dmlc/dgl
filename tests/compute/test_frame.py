@@ -49,9 +49,9 @@ def test_column1():
     f = Frame(data)
     assert f.num_rows == N
     assert len(f) == 3
-    assert F.allclose(f['a1'].data, data['a1'])
+    F.assert_allclose(f['a1'].data, data['a1'])
     f['a1'] = data['a2']
-    assert F.allclose(f['a2'].data, data['a2'])
+    F.assert_allclose(f['a2'].data, data['a2'])
     # add a different length column should fail
     def failed_add_col():
         f['a4'] = F.zeros([N+1, D])
@@ -69,10 +69,10 @@ def test_column2():
     f = FrameRef(data, toindex([3, 4, 5, 6, 7]))
     assert f.num_rows == 5
     assert len(f) == 3
-    assert F.allclose(f['a1'], F.narrow_row(data['a1'].data, 3, 8))
+    F.assert_allclose(f['a1'], F.narrow_row(data['a1'].data, 3, 8))
     # set column should reflect on the referenced data
     f['a1'] = F.zeros([5, D])
-    assert F.allclose(F.narrow_row(data['a1'].data, 3, 8), F.zeros([5, D]))
+    F.assert_allclose(F.narrow_row(data['a1'].data, 3, 8), F.zeros([5, D]))
     # add new partial column should fail with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_add_col():
@@ -91,7 +91,7 @@ def test_append1():
     c1 = f1['a1']
     assert tuple(F.shape(c1.data)) == (2 * N, D)
     truth = F.cat([data['a1'], data['a1']], 0)
-    assert F.allclose(truth, c1.data)
+    F.assert_allclose(truth, c1.data)
     # append dict of different length columns should fail
     f3 = {'a1' : F.zeros((3, D)), 'a2' : F.zeros((3, D)), 'a3' : F.zeros((2, D))}
     def failed_append():
@@ -116,7 +116,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert F.array_equal(f._index.tousertensor(), F.copy_to(F.tensor(new_idx, dtype=F.int64), F.cpu()))
+    F.assert_array_equal(f._index.tousertensor(), F.copy_to(F.tensor(new_idx, dtype=F.int64), F.cpu()))
     assert data.num_rows == 4 * N
 
 def test_append3():
@@ -126,15 +126,15 @@ def test_append3():
     f.append(data)
     assert f.num_rows == 8
     ans = F.cat([F.zeros((5, 2)), F.ones((3, 2))], 0)
-    assert F.allclose(f['h'].data, ans)
+    F.assert_allclose(f['h'].data, ans)
     # test append with new column
     data = {'h' : 2 * F.ones((3, 2)), 'w' : 2 * F.ones((3, 2))}
     f.append(data)
     assert f.num_rows == 11
     ans1 = F.cat([ans, 2 * F.ones((3, 2))], 0)
     ans2 = F.cat([F.zeros((8, 2)), 2 * F.ones((3, 2))], 0)
-    assert F.allclose(f['h'].data, ans1)
-    assert F.allclose(f['w'].data, ans2)
+    F.assert_allclose(f['h'].data, ans1)
+    F.assert_allclose(f['w'].data, ans2)
 
 def test_row1():
     # test row getter/setter
@@ -147,13 +147,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
+        F.assert_allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
     # test duplicate keys
     rowid = Index(F.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
+        F.assert_allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
 
     # setter
     rowid = Index(F.tensor([0, 2, 4]))
@@ -163,7 +163,7 @@ def test_row1():
             }
     f[rowid] = vals
     for k, v in f[rowid].items():
-        assert F.allclose(v, F.zeros((len(rowid), D)))
+        F.assert_allclose(v, F.zeros((len(rowid), D)))
 
     # setting rows with new column should raise error with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
@@ -187,7 +187,7 @@ def test_row2():
         rows = f[rowid]
         y = rows['a1']
     F.backward(y, F.ones((len(rowid), D)))
-    assert F.allclose(F.grad(c1)[:,0], F.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
+    F.assert_allclose(F.grad(c1)[:,0], F.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
 
     f['a1'] = F.attach_grad(f['a1'])
     with F.record_grad():
@@ -197,7 +197,7 @@ def test_row2():
         rows = f[rowid]
         y = rows['a1']
     F.backward(y, F.ones((len(rowid), D)))
-    assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+    F.assert_allclose(F.grad(c1)[:,0], F.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
 
     f['a1'] = F.attach_grad(f['a1'])
     with F.record_grad():
@@ -211,8 +211,8 @@ def test_row2():
         f[rowid] = vals
         c11 = f['a1']
     F.backward(c11, F.ones((N, D)))
-    assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
-    assert F.allclose(F.grad(vals['a1']), F.ones((len(rowid), D)))
+    F.assert_allclose(F.grad(c1)[:,0], F.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    F.assert_allclose(F.grad(vals['a1']), F.ones((len(rowid), D)))
     assert F.is_no_grad(vals['a2'])
 
 def test_row3():
@@ -234,7 +234,7 @@ def test_row3():
     newidx.pop(2)
     newidx = toindex(newidx)
     for k, v in f.items():
-        assert F.allclose(v, data[k][newidx])
+        F.assert_allclose(v, data[k][newidx])
 
 def test_row4():
     # test updating row with empty frame but has preset num_rows
@@ -243,7 +243,7 @@ def test_row4():
     f[rowid] = {'h' : F.ones((3, 2))}
     ans = F.zeros((5, 2))
     F.scatter_row_inplace(ans, F.tensor([0, 2, 4]), F.ones((3, 2)))
-    assert F.allclose(f['h'], ans)
+    F.assert_allclose(f['h'], ans)
 
 def test_sharing():
     data = Frame(create_test_data())
@@ -251,9 +251,9 @@ def test_sharing():
     f2 = FrameRef(data, index=toindex([2, 3, 4, 5, 6]))
     # test read
     for k, v in f1.items():
-        assert F.allclose(F.narrow_row(data[k].data, 0, 4), v)
+        F.assert_allclose(F.narrow_row(data[k].data, 0, 4), v)
     for k, v in f2.items():
-        assert F.allclose(F.narrow_row(data[k].data, 2, 7), v)
+        F.assert_allclose(F.narrow_row(data[k].data, 2, 7), v)
     f2_a1 = f2['a1']
     # test write
     # update own ref should not been seen by the other.
@@ -262,7 +262,7 @@ def test_sharing():
             'a2' : F.zeros([2, D]),
             'a3' : F.zeros([2, D]),
             }
-    assert F.allclose(f2['a1'], f2_a1)
+    F.assert_allclose(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
     f1[Index(F.tensor([2, 3]))] = {
             'a1' : F.ones([2, D]),
@@ -270,7 +270,7 @@ def test_sharing():
             'a3' : F.ones([2, D]),
             }
     F.narrow_row_set(f2_a1, 0, 2, F.ones([2, D]))
-    assert F.allclose(f2['a1'], f2_a1)
+    F.assert_allclose(f2['a1'], f2_a1)
 
 def test_slicing():
     data = Frame(create_test_data(grad=True))
@@ -278,7 +278,7 @@ def test_slicing():
     f2 = FrameRef(data, index=toindex(slice(3, 8)))
     # test read
     for k, v in f1.items():
-        assert F.allclose(F.narrow_row(data[k].data, 1, 5), v)
+        F.assert_allclose(F.narrow_row(data[k].data, 1, 5), v)
     f2_a1 = f2['a1']    # is a tensor
     # test write
     f1[Index(F.tensor([0, 1]))] = {
@@ -286,7 +286,7 @@ def test_slicing():
             'a2': F.zeros([2, D]),
             'a3': F.zeros([2, D]),
             }
-    assert F.allclose(f2['a1'], f2_a1)
+    F.assert_allclose(f2['a1'], f2_a1)
 
     f1[Index(F.tensor([2, 3]))] = {
             'a1': F.ones([2, D]),
@@ -294,7 +294,7 @@ def test_slicing():
             'a3': F.ones([2, D]),
             }
     F.narrow_row_set(f2_a1, 0, 2, 1)
-    assert F.allclose(f2['a1'], f2_a1)
+    F.assert_allclose(f2['a1'], f2_a1)
 
     f1[toindex(slice(2, 4))] = {
             'a1': F.zeros([2, D]),
@@ -302,7 +302,7 @@ def test_slicing():
             'a3': F.zeros([2, D]),
             }
     F.narrow_row_set(f2_a1, 0, 2, 0)
-    assert F.allclose(f2['a1'], f2_a1)
+    F.assert_allclose(f2['a1'], f2_a1)
 
 def test_add_rows():
     data = Frame()
@@ -311,13 +311,13 @@ def test_add_rows():
     x = F.randn((1, 4))
     f1[Index(F.tensor([0]))] = {'x': x}
     ans = F.cat([x, F.zeros((3, 4))], 0)
-    assert F.allclose(f1['x'], ans)
+    F.assert_allclose(f1['x'], ans)
     f1.add_rows(4)
     f1[toindex(slice(4, 8))] = {'x': F.ones((4, 4)), 'y': F.ones((4, 5))}
     ans = F.cat([ans, F.ones((4, 4))], 0)
-    assert F.allclose(f1['x'], ans)
+    F.assert_allclose(f1['x'], ans)
     ans = F.cat([F.zeros((4, 5)), F.ones((4, 5))], 0)
-    assert F.allclose(f1['y'], ans)
+    F.assert_allclose(f1['y'], ans)
 
 def test_inplace():
     f = FrameRef(Frame(create_test_data()))

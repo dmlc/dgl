@@ -66,22 +66,22 @@ def test_query():
             assert i in g
         assert not g.has_node(11)
         assert not 11 in g
-        assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
+        F.assert_allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input()
         for u, v in zip(src, dst):
             assert g.has_edge_between(u, v)
         assert not g.has_edge_between(0, 0)
-        assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
+        F.assert_allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
 
         assert g.edge_id(4,4) == 5
-        assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([5,0]))
+        F.assert_allclose(g.edge_ids([4,0], [4,9]), F.tensor([5,0]))
 
         src, dst = g.find_edges([3, 6, 5])
-        assert F.allclose(src, F.tensor([5, 7, 4]))
-        assert F.allclose(dst, F.tensor([9, 9, 4]))
+        F.assert_allclose(src, F.tensor([5, 7, 4]))
+        F.assert_allclose(dst, F.tensor([9, 9, 4]))
 
         src, dst, eid = g.in_edges(9, form='all')
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
@@ -113,10 +113,10 @@ def test_query():
 
         assert g.in_degree(0) == 0
         assert g.in_degree(9) == 4
-        assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
+        F.assert_allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
         assert g.out_degree(8) == 0
         assert g.out_degree(9) == 1
-        assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
+        F.assert_allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
         assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
@@ -137,13 +137,13 @@ def test_query():
             assert i in g
         assert not g.has_node(11)
         assert not 11 in g
-        assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
+        F.assert_allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input(sort=True)
         for u, v in zip(src, dst):
             assert g.has_edge_between(u, v)
         assert not g.has_edge_between(0, 0)
-        assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
+        F.assert_allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
 
@@ -151,11 +151,11 @@ def test_query():
         # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
         # eid = [0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9]
         assert g.edge_id(4,4) == 11
-        assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([11,2]))
+        F.assert_allclose(g.edge_ids([4,0], [4,9]), F.tensor([11,2]))
 
         src, dst = g.find_edges([3, 6, 5])
-        assert F.allclose(src, F.tensor([1, 2, 2]))
-        assert F.allclose(dst, F.tensor([3, 7, 3]))
+        F.assert_allclose(src, F.tensor([1, 2, 2]))
+        F.assert_allclose(dst, F.tensor([3, 7, 3]))
 
         src, dst, eid = g.in_edges(9, form='all')
         tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
@@ -187,10 +187,10 @@ def test_query():
 
         assert g.in_degree(0) == 0
         assert g.in_degree(9) == 4
-        assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
+        F.assert_allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
         assert g.out_degree(8) == 0
         assert g.out_degree(9) == 1
-        assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
+        F.assert_allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
         assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
@@ -217,23 +217,23 @@ def test_mutation():
     g.add_nodes(5)
     g.add_nodes(5, {'h' : F.ones((5, 2))})
     ans = F.cat([F.zeros((5, 2)), F.ones((5, 2))], 0)
-    assert F.allclose(ans, g.ndata['h'])
+    F.assert_allclose(ans, g.ndata['h'])
     g.ndata['w'] = 2 * F.ones((10, 2))
-    assert F.allclose(2 * F.ones((10, 2)), g.ndata['w'])
+    F.assert_allclose(2 * F.ones((10, 2)), g.ndata['w'])
     # test add edges with data
     g.add_edges([2, 3], [3, 4])
     g.add_edges([0, 1], [1, 2], {'m' : F.ones((2, 2))})
     ans = F.cat([F.zeros((2, 2)), F.ones((2, 2))], 0)
-    assert F.allclose(ans, g.edata['m'])
+    F.assert_allclose(ans, g.edata['m'])
     # test clear and add again
     g.clear()
     g.add_nodes(5)
     g.ndata['h'] = 3 * F.ones((5, 2))
-    assert F.allclose(3 * F.ones((5, 2)), g.ndata['h'])
+    F.assert_allclose(3 * F.ones((5, 2)), g.ndata['h'])
     g.init_ndata('h1', (g.number_of_nodes(), 3), 'float32')
-    assert F.allclose(F.zeros((g.number_of_nodes(), 3)), g.ndata['h1'])
+    F.assert_allclose(F.zeros((g.number_of_nodes(), 3)), g.ndata['h1'])
     g.init_edata('h2', (g.number_of_edges(), 3), 'float32')
-    assert F.allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
+    F.assert_allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
 
 def test_scipy_adjmat():
     g = dgl.DGLGraph()

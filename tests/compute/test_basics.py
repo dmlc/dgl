@@ -53,7 +53,7 @@ def test_batch_setter_getter():
     g = generate_graph()
     # set all nodes
     g.ndata['h'] = F.zeros((10, D))
-    assert F.allclose(g.ndata['h'], F.zeros((10, D)))
+    F.assert_allclose(g.ndata['h'], F.zeros((10, D)))
     # pop nodes
     old_len = len(g.ndata)
     assert _pfc(g.pop_n_repr('h')) == [0.] * 10
@@ -139,8 +139,8 @@ def test_batch_setter_autograd():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
     F.backward(h2, F.ones((10, D)) * 2)
-    assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
-    assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
+    F.assert_array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
+    F.assert_array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
 def test_nx_conversion():
     # check conversion between networkx and DGLGraph
@@ -158,7 +158,7 @@ def test_nx_conversion():
                     node_feat[k].append(F.unsqueeze(attr[k], 0))
             for k in node_feat:
                 feat = F.cat(node_feat[k], 0)
-                assert F.allclose(feat, nf[k])
+                F.assert_allclose(feat, nf[k])
         else:
             assert len(nf) == 0
         if num_edges > 0:
@@ -170,7 +170,7 @@ def test_nx_conversion():
                     edge_feat[k][eid] = F.unsqueeze(attr[k], 0)
             for k in edge_feat:
                 feat = F.cat(edge_feat[k], 0)
-                assert F.allclose(feat, ef[k])
+                F.assert_allclose(feat, ef[k])
         else:
             assert len(ef) == 0
 
@@ -202,10 +202,10 @@ def test_nx_conversion():
     assert len(g.ndata) == 1
     assert len(g.edata) == 2
     # check feature values
-    assert F.allclose(g.ndata['n1'], n1)
+    F.assert_allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
-    assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
+    F.assert_allclose(g.edata['e1'], e1)
+    F.assert_array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
@@ -236,13 +236,13 @@ def test_nx_conversion():
     assert len(g.ndata) == 1
     assert len(g.edata) == 1
     # check feature values
-    assert F.allclose(g.ndata['n1'], n1)
+    F.assert_allclose(g.ndata['n1'], n1)
     # edge feature order follows nxg.edges()
     edge_feat = []
     for _, _, attr in nxg.edges(data=True):
         edge_feat.append(F.unsqueeze(attr['e1'], 0))
     edge_feat = F.cat(edge_feat, 0)
-    assert F.allclose(g.edata['e1'], edge_feat)
+    F.assert_allclose(g.edata['e1'], edge_feat)
 
     # Test converting from a networkx graph whose nodes are
     # not labeled with consecutive-integers.
@@ -259,8 +259,8 @@ def test_nx_conversion():
     assert g.number_of_edges() == 4
     assert g.has_edge_between(0, 1)
     assert g.has_edge_between(1, 2)
-    assert F.allclose(g.ndata['h'], F.tensor([[1.], [2.], [3.]]))
-    assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
+    F.assert_allclose(g.ndata['h'], F.tensor([[1.], [2.], [3.]]))
+    F.assert_allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
                                               [2., 3.], [2., 3.]]))
 
 def test_batch_send():
@@ -303,10 +303,10 @@ def test_apply_nodes():
     g.register_apply_node_func(_upd)
     old = g.ndata['h']
     g.apply_nodes()
-    assert F.allclose(old * 2, g.ndata['h'])
+    F.assert_allclose(old * 2, g.ndata['h'])
     u = F.tensor([0, 3, 4, 6])
     g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
-    assert F.allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
+    F.assert_allclose(F.gather_row(g.ndata['h'], u), F.zeros((4, D)))
 
 def test_apply_edges():
     def _upd(edges):
@@ -315,12 +315,12 @@ def test_apply_edges():
     g.register_apply_edge_func(_upd)
     old = g.edata['w']
     g.apply_edges()
-    assert F.allclose(old * 2, g.edata['w'])
+    F.assert_allclose(old * 2, g.edata['w'])
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([1, 2, 3, 9, 9, 9])
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
     eid = F.tensor(g.edge_ids(u, v))
-    assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
+    F.assert_allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 def test_update_routines():
     g = generate_graph()
@@ -385,9 +385,9 @@ def test_recv_0deg():
     g.recv([0, 1])
     new = g.ndata.pop('h')
     # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full_1d(5, 4, F.float32))
+    F.assert_allclose(new[0], F.full_1d(5, 4, F.float32))
     # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
+    F.assert_allclose(new[1], F.sum(old, 0) * 2)
 
     # test#2: recv only 0deg node is equal to apply
     old = F.randn((2, 5))
@@ -396,9 +396,9 @@ def test_recv_0deg():
     g.recv(0)
     new = g.ndata.pop('h')
     # 0deg check: equal to apply_nodes
-    assert F.allclose(new[0], 2 * old[0])
+    F.assert_allclose(new[0], 2 * old[0])
     # non-0deg check: untouched
-    assert F.allclose(new[1], old[1])
+    F.assert_allclose(new[1], old[1])
 
 def test_recv_0deg_newfld():
     # test recv with 0deg nodes; the reducer also creates a new field
@@ -424,9 +424,9 @@ def test_recv_0deg_newfld():
     g.recv([0, 1])
     new = g.ndata.pop('h1')
     # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
+    F.assert_allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
     # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
+    F.assert_allclose(new[1], F.sum(old, 0) * 2)
 
     # test#2: recv only 0deg node
     old = F.randn((2, 5))
@@ -436,9 +436,9 @@ def test_recv_0deg_newfld():
     g.recv(0)
     new = g.ndata.pop('h1')
     # 0deg check: fallback to apply
-    assert F.allclose(new[0], F.full_1d(5, -2, F.float32))
+    F.assert_allclose(new[0], F.full_1d(5, -2, F.float32))
     # non-0deg check: not changed
-    assert F.allclose(new[1], F.full_1d(5, -1, F.float32))
+    F.assert_allclose(new[1], F.full_1d(5, -1, F.float32))
 
 def test_update_all_0deg():
     # test#1
@@ -464,8 +464,8 @@ def test_update_all_0deg():
     # the first row of the new_repr should be the sum of all the node
     # features; while the 0-deg nodes should be initialized by the
     # initializer and applied with UDF.
-    assert F.allclose(new_repr[1:], 2*(2+F.zeros((4,5))))
-    assert F.allclose(new_repr[0], 2 * F.sum(old_repr, 0))
+    F.assert_allclose(new_repr[1:], 2*(2+F.zeros((4,5))))
+    F.assert_allclose(new_repr[0], 2 * F.sum(old_repr, 0))
 
     # test#2: graph with no edge
     g = DGLGraph()
@@ -475,7 +475,7 @@ def test_update_all_0deg():
     g.update_all(_message, _reduce, _apply)
     new_repr = g.ndata['h']
     # should fallback to apply
-    assert F.allclose(new_repr, 2*old_repr)
+    F.assert_allclose(new_repr, 2*old_repr)
 
 def test_pull_0deg():
     g = DGLGraph()
@@ -499,9 +499,9 @@ def test_pull_0deg():
     g.pull([0, 1])
     new = g.ndata.pop('h')
     # 0deg check: initialized with the func and got applied
-    assert F.allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
+    F.assert_allclose(new[0], F.full_1d(5, 4, dtype=F.float32))
     # non-0deg check
-    assert F.allclose(new[1], F.sum(old, 0) * 2)
+    F.assert_allclose(new[1], F.sum(old, 0) * 2)
 
     # test#2: pull only 0deg node
     old = F.randn((2, 5))
@@ -509,9 +509,9 @@ def test_pull_0deg():
     g.pull(0)
     new = g.ndata.pop('h')
     # 0deg check: fallback to apply
-    assert F.allclose(new[0], 2*old[0])
+    F.assert_allclose(new[0], 2*old[0])
     # non-0deg check: not touched
-    assert F.allclose(new[1], old[1])
+    F.assert_allclose(new[1], old[1])
 
 def test_send_multigraph():
     g = DGLGraph(multigraph=True)
@@ -538,14 +538,14 @@ def test_send_multigraph():
     g.send([0, 2], message_func=_message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
+    F.assert_allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
 
     g.ndata['a'] = F.zeros((3, 5))
     g.edata['a'] = old_repr
     g.send([0, 2, 3], message_func=_message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    F.assert_allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
 
     # send on multigraph
     g.ndata['a'] = F.zeros((3, 5))
@@ -553,7 +553,7 @@ def test_send_multigraph():
     g.send(([0, 2], [1, 1]), _message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], F.max(old_repr, 0))
+    F.assert_allclose(new_repr[1], F.max(old_repr, 0))
 
     # consecutive send and send_on
     g.ndata['a'] = F.zeros((3, 5))
@@ -562,7 +562,7 @@ def test_send_multigraph():
     g.send([0, 1], message_func=_message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
+    F.assert_allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
 
     # consecutive send_on
     g.ndata['a'] = F.zeros((3, 5))
@@ -571,15 +571,15 @@ def test_send_multigraph():
     g.send(1, message_func=_message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
+    F.assert_allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
 
     # send_and_recv_on
     g.ndata['a'] = F.zeros((3, 5))
     g.edata['a'] = old_repr
     g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
     new_repr = g.ndata['a']
-    assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
-    assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
+    F.assert_allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    F.assert_allclose(new_repr[[0, 2]], F.zeros((2, 5)))
 
 def test_dynamic_addition():
     N = 3
@@ -651,7 +651,7 @@ def test_group_apply_edges():
         out_feat = g.edges[eid].data['norm_feat']
         result = (g.nodes[u].data['h'] + g.nodes[v].data['h']) * g.edges[eid].data['feat']
         result = F.softmax(F.sum(result, dim=1), dim=0)
-        assert F.allclose(out_feat, result)
+        F.assert_allclose(out_feat, result)
 
     # test group by source nodes
     _test('src')

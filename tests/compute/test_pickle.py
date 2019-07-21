@@ -15,15 +15,15 @@ def _assert_is_identical(g, g2):
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges()
     src2, dst2 = g2.all_edges()
-    assert F.array_equal(src, src2)
-    assert F.array_equal(dst, dst2)
+    F.assert_array_equal(src, src2)
+    F.assert_array_equal(dst, dst2)
 
     assert len(g.ndata) == len(g2.ndata)
     assert len(g.edata) == len(g2.edata)
     for k in g.ndata:
-        assert F.allclose(g.ndata[k], g2.ndata[k])
+        F.assert_allclose(g.ndata[k], g2.ndata[k])
     for k in g.edata:
-        assert F.allclose(g.edata[k], g2.edata[k])
+        F.assert_allclose(g.edata[k], g2.edata[k])
 
 def _assert_is_identical_nodeflow(nf1, nf2):
     assert nf1.is_multigraph == nf2.is_multigraph
@@ -31,21 +31,21 @@ def _assert_is_identical_nodeflow(nf1, nf2):
     assert nf1.number_of_nodes() == nf2.number_of_nodes()
     src, dst = nf1.all_edges()
     src2, dst2 = nf2.all_edges()
-    assert F.array_equal(src, src2)
-    assert F.array_equal(dst, dst2)
+    F.assert_array_equal(src, src2)
+    F.assert_array_equal(dst, dst2)
 
     assert nf1.num_layers == nf2.num_layers
     for i in range(nf1.num_layers):
         assert nf1.layer_size(i) == nf2.layer_size(i)
         assert nf1.layers[i].data.keys() == nf2.layers[i].data.keys()
         for k in nf1.layers[i].data:
-            assert F.allclose(nf1.layers[i].data[k], nf2.layers[i].data[k])
+            F.assert_allclose(nf1.layers[i].data[k], nf2.layers[i].data[k])
     assert nf1.num_blocks == nf2.num_blocks
     for i in range(nf1.num_blocks):
         assert nf1.block_size(i) == nf2.block_size(i)
         assert nf1.blocks[i].data.keys() == nf2.blocks[i].data.keys()
         for k in nf1.blocks[i].data:
-            assert F.allclose(nf1.blocks[i].data[k], nf2.blocks[i].data[k])
+            F.assert_allclose(nf1.blocks[i].data[k], nf2.blocks[i].data[k])
 
 def _assert_is_identical_batchedgraph(bg1, bg2):
     _assert_is_identical(bg1, bg2)
@@ -55,7 +55,7 @@ def _assert_is_identical_batchedgraph(bg1, bg2):
 
 def _assert_is_identical_index(i1, i2):
     assert i1.slice_data() == i2.slice_data()
-    assert F.array_equal(i1.tousertensor(), i2.tousertensor())
+    F.assert_array_equal(i1.tousertensor(), i2.tousertensor())
 
 def _reconstruct_pickle(obj):
     f = io.BytesIO()
@@ -90,8 +90,8 @@ def test_pickling_graph_index():
 
     assert gi2.number_of_nodes() == gi.number_of_nodes()
     src_idx2, dst_idx2, _ = gi2.edges()
-    assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
-    assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
+    F.assert_array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
+    F.assert_array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
 
 
 def test_pickling_frame():
@@ -101,13 +101,13 @@ def test_pickling_frame():
     c = Column(x)
 
     c2 = _reconstruct_pickle(c)
-    assert F.allclose(c.data, c2.data)
+    F.assert_allclose(c.data, c2.data)
 
     fr = Frame({'x': x, 'y': y})
 
     fr2 = _reconstruct_pickle(fr)
-    assert F.allclose(fr2['x'].data, x)
-    assert F.allclose(fr2['y'].data, y)
+    F.assert_allclose(fr2['x'].data, x)
+    F.assert_allclose(fr2['y'].data, y)
 
     fr = Frame()
 

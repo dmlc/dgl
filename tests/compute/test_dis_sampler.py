@@ -23,10 +23,10 @@ def start_trainer():
 
         assert seed_ids == subg.layer_parent_nid(-1)
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
-        assert F.array_equal(child_src, subg.layer_nid(0))
+        F.assert_array_equal(child_src, subg.layer_nid(0))
 
         src1 = subg.map_to_parent_nid(child_src)
-        assert F.array_equal(src1, src)
+        F.assert_array_equal(src1, src)
 
 def start_sampler():
     g = generate_rand_graph(100)

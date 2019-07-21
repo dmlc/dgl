@@ -88,8 +88,8 @@ def test_copy_src_reduce():
             F.backward(F.reduce_sum(r2))
             n_grad2 = F.grad(g.ndata['u'])
 
-        assert F.allclose(r1, r2)
-        assert(F.allclose(n_grad1, n_grad2))
+        F.assert_allclose(r1, r2)
+        F.assert_allclose(n_grad1, n_grad2)
 
     _test('sum')
     _test('max')
@@ -121,8 +121,8 @@ def test_copy_edge_reduce():
             F.backward(F.reduce_sum(r2))
             e_grad2 = F.grad(g.edata['e'])
 
-        assert F.allclose(r1, r2)
-        assert(F.allclose(e_grad1, e_grad2))
+        F.assert_allclose(r1, r2)
+        F.assert_allclose(e_grad1, e_grad2)
 
     _test('sum')
     _test('max')
@@ -199,17 +199,17 @@ def test_all_binary_builtins():
 
         if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
-        assert F.allclose(r1, r2, rtol, atol)
+        F.assert_allclose(r1, r2, rtol, atol)
 
         if not F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol):
             print("left grad")
             _print_error(lhs_grad_1, lhs_grad_2)
-        assert(F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol))
+        F.assert_allclose(lhs_grad_1, lhs_grad_2, rtol, atol)
 
         if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
             print("right grad")
             _print_error(rhs_grad_1, rhs_grad_2)
-        assert(F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol))
+        F.assert_allclose(rhs_grad_1, rhs_grad_2, rtol, atol)
 
     g = dgl.DGLGraph()
     g.add_nodes(20)

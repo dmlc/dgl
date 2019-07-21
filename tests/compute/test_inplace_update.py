@@ -48,9 +48,9 @@ def test_inplace_recv():
         g.recv([0,1,2,3,9], reduce_func, apply_func, inplace=True)
         r1 = g.get_n_repr()['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace e2v
         v1 = F.clone(f)
@@ -59,9 +59,9 @@ def test_inplace_recv():
         g.recv([0,1,2,3,9], fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -96,9 +96,9 @@ def test_inplace_snr():
         g.send_and_recv((u, v), message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace v2v spmv
         v1 = F.clone(f)
@@ -107,9 +107,9 @@ def test_inplace_snr():
                         fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace e2v spmv
         v1 = F.clone(f)
@@ -118,9 +118,9 @@ def test_inplace_snr():
                         fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -154,9 +154,9 @@ def test_inplace_push():
         g.push(nodes, message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace v2v spmv
         v1 = F.clone(f)
@@ -165,9 +165,9 @@ def test_inplace_push():
                fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace e2v spmv
         v1 = F.clone(f)
@@ -176,9 +176,9 @@ def test_inplace_push():
                message_func, fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -212,9 +212,9 @@ def test_inplace_pull():
         g.pull(nodes, message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace v2v spmv
         v1 = F.clone(f)
@@ -223,9 +223,9 @@ def test_inplace_pull():
                fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
         # inplace e2v spmv
         v1 = F.clone(f)
@@ -234,9 +234,9 @@ def test_inplace_pull():
                message_func, fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert F.allclose(r1, result)
+        F.assert_allclose(r1, result)
         # check inplace
-        assert F.allclose(v1, r1)
+        F.assert_allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -260,7 +260,7 @@ def test_inplace_apply():
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, nodes, inplace=True)
     # check results correct and in place
-    assert F.allclose(nf, new_nf)
+    F.assert_allclose(nf, new_nf)
     # test apply all nodes, should not be done in place
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, inplace=True)
@@ -275,7 +275,7 @@ def test_inplace_apply():
     g.edata['e'] = ef
     g.apply_edges(apply_edge_func, edges, inplace=True)
     g.edata['e'] = ef
-    assert F.allclose(ef, new_ef)
+    F.assert_allclose(ef, new_ef)
     # test apply all edges, should not be done in place
     g.edata['e'] = ef
     g.apply_edges(apply_edge_func, inplace=True)

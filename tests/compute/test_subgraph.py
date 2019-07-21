@@ -39,7 +39,7 @@ def test_basics():
     assert len(sg.ndata) == 1
     assert len(sg.edata) == 1
     sh = sg.ndata['h']
-    assert F.allclose(h[nid], sh)
+    F.assert_allclose(h[nid], sh)
     '''
     s, d, eid
     0, 1, 0
@@ -60,11 +60,11 @@ def test_basics():
     8, 9, 15      3
     9, 0, 16   1
     '''
-    assert F.allclose(F.gather_row(l, eid), sg.edata['l'])
+    F.assert_allclose(F.gather_row(l, eid), sg.edata['l'])
     # update the node/edge features on the subgraph should NOT
     # reflect to the parent graph.
     sg.ndata['h'] = F.zeros((6, D))
-    assert F.allclose(h, g.ndata['h'])
+    F.assert_allclose(h, g.ndata['h'])
 
 def test_merge():
     # FIXME: current impl cannot handle this case!!!

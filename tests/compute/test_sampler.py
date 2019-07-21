@@ -27,12 +27,12 @@ def test_1neighbor_sampler_all():
         assert subg.number_of_nodes() == len(src) + 1
         assert subg.number_of_edges() == len(src)
 
-        assert F.array_equal(seed_ids, subg.layer_parent_nid(-1))
+        F.assert_array_equal(seed_ids, subg.layer_parent_nid(-1))
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
-        assert F.array_equal(child_src, subg.layer_nid(0))
+        F.assert_array_equal(child_src, subg.layer_nid(0))
 
         src1 = subg.map_to_parent_nid(child_src)
-        assert F.array_equal(src1, src)
+        F.assert_array_equal(src1, src)
 
 def is_sorted(arr):
     return np.sum(np.sort(arr) == arr, 0) == len(arr)
@@ -84,12 +84,12 @@ def test_10neighbor_sampler_all():
     for subg in dgl.contrib.sampling.NeighborSampler(g, 10, g.number_of_nodes(),
                                                      neighbor_type='in', num_workers=4):
         seed_ids = subg.layer_parent_nid(-1)
-        assert F.array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(-1)))
+        F.assert_array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(-1)))
 
         src, dst, eid = g.in_edges(seed_ids, form='all')
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
         src1 = subg.map_to_parent_nid(child_src)
-        assert F.array_equal(src1, src)
+        F.assert_array_equal(src1, src)
 
 def check_10neighbor_sampler(g, seeds):
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
@@ -143,7 +143,7 @@ def _test_layer_sampler(prefetch=False):
             block_parent_src = F.gather_row(src, block_parent_eid)
             block_parent_dst = F.gather_row(dst, block_parent_eid)
 
-            assert F.array_equal(block_src, block_parent_src)
+            F.assert_array_equal(block_src, block_parent_src)
 
         n_layers = sub_g.num_layers
         sub_n = sub_g.number_of_nodes()

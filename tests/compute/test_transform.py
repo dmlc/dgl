@@ -21,13 +21,13 @@ def test_line_graph():
     v = [1, 2, 0, 0]
     eid = G.edge_ids(u, v)
     L.nodes[eid].data['h'] = F.zeros((4, D))
-    assert F.allclose(G.edges[u, v].data['h'], F.zeros((4, D)))
+    F.assert_allclose(G.edges[u, v].data['h'], F.zeros((4, D)))
 
     # adding a new node feature on line graph should also reflect to a new
     # edge feature on original graph
     data = F.randn((n_edges, D))
     L.ndata['w'] = data
-    assert F.allclose(G.edata['w'], data)
+    F.assert_allclose(G.edata['w'], data)
 
 def test_no_backtracking():
     N = 5
@@ -54,7 +54,7 @@ def test_reverse():
 
     assert g.number_of_nodes() == rg.number_of_nodes()
     assert g.number_of_edges() == rg.number_of_edges()
-    assert F.allclose(F.astype(rg.has_edges_between([1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
+    F.assert_allclose(F.astype(rg.has_edges_between([1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
     assert g.edge_id(0, 1) == rg.edge_id(1, 0)
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
@@ -67,22 +67,22 @@ def test_reverse_shared_frames():
     g.edata['h'] = F.tensor([[3.], [4.], [5.]])
 
     rg = g.reverse(share_ndata=True, share_edata=True)
-    assert F.allclose(g.ndata['h'], rg.ndata['h'])
-    assert F.allclose(g.edata['h'], rg.edata['h'])
-    assert F.allclose(g.edges[[0, 2], [1, 1]].data['h'],
+    F.assert_allclose(g.ndata['h'], rg.ndata['h'])
+    F.assert_allclose(g.edata['h'], rg.edata['h'])
+    F.assert_allclose(g.edges[[0, 2], [1, 1]].data['h'],
                       rg.edges[[1, 1], [0, 2]].data['h'])
 
     rg.ndata['h'] = rg.ndata['h'] + 1
-    assert F.allclose(rg.ndata['h'], g.ndata['h'])
+    F.assert_allclose(rg.ndata['h'], g.ndata['h'])
 
     g.edata['h'] = g.edata['h'] - 1
-    assert F.allclose(rg.edata['h'], g.edata['h'])
+    F.assert_allclose(rg.edata['h'], g.edata['h'])
 
     src_msg = fn.copy_src(src='h', out='m')
     sum_reduce = fn.sum(msg='m', out='h')
 
     rg.update_all(src_msg, sum_reduce)
-    assert F.allclose(g.ndata['h'], rg.ndata['h'])
+    F.assert_allclose(g.ndata['h'], rg.ndata['h'])
 
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
