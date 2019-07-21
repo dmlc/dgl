@@ -1,1 +1,1 @@
-pip3 install cupy chainer
+pip3 install cupy==6.2.0 chainer==6.2.0
