@@ -6,12 +6,16 @@
 #include "graph_serialize.h"
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
+#include <iostream>
+#include <dgl/runtime/container.h>
+
+
+using namespace dgl::runtime;
 
 using dgl::COO;
 using dgl::COOPtr;
 using dgl::ImmutableGraph;
 using dmlc::SeekStream;
-//using dmlc::io::LocalFileSystem;
 using dgl::runtime::NDArray;
 
 namespace dmlc { DMLC_DECLARE_TRAITS(has_saveload, NDArray, true); }
@@ -29,21 +33,27 @@ enum GraphType {
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
-    LOG(INFO) << "Good";
-
-    void *g_list_handle = args[0];
-    LOG(INFO) << "Good2";
-    int num_graph = args[1];
-    std::string filename = args[2];
-    const DGLGraphSerialize *g_list = static_cast<const DGLGraphSerialize *>(g_list_handle);
-    SaveDGLGraphs(filename, num_graph, g_list_handle);
+    std::string filename = args[0];
+    List<GraphPtr> gptr_list = args[1];
+    List<List<std::string>> node_name_list = args[2];
+    List<List<DLTensor>> node_tensor_list = args[3];
+    List<List<std::string>> edge_name_list = args[4];
+    List<List<DLTensor>> edge_tensor_list = args[5];
+    std::vector<GraphPtr> gptrs = gptr_list;
+//    SaveDGLGraphs(filename,
+//                  gptr_list->,
+//                  node_name_list,
+//                  node_tensor_list,
+//                  edge_name_list,
+//                  edge_tensor_list);
 });
 
-bool SaveDGLGraphs(std::string filename, uint32_t num_graph, void *gstructs){
-  std::vector<int> aaa;
-}
-
-bool SaveDGLGraphs(std::string filename, uint32_t num_graph, const DGLGraphSerialize *gstructs) {
+bool SaveDGLGraphs(const std::string &filename,
+                   List<GraphPtr> gptr_list,
+                   List<List<std::string>> node_name_list,
+                   List<List<DLTensor>> node_tensor_list,
+                   List<List<std::string>> edge_name_list,
+                   List<List<DLTensor>> edge_tensor_list) {
   auto *fs = dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w",
                                                            true));
   CHECK(fs) << "File name is not a valid local file name";

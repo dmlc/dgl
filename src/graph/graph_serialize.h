@@ -10,7 +10,7 @@
 #include <dgl/immutable_graph.h>
 #include <dmlc/io.h>
 #include <dgl/runtime/ndarray.h>
-
+#include <dgl/runtime/container.h>
 #include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
@@ -19,29 +19,19 @@ using dgl::runtime::DGLRetValue;
 using dgl::runtime::PackedFunc;
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace serialize {
 
-
-struct DGLGraphSerialize {
-  GraphHandle g_handle;
-  uint32_t num_node_feats;
-  uint32_t num_edge_feats;
-  const char **node_names;
-  DLTensor **node_feats;
-  const char **edge_names;
-  DLTensor **edge_feats;
-};
-
 static const ImmutableGraph *ToImmutableGraph(const GraphInterface *g);
 
-bool SaveDGLGraphs(std::string filename, uint32_t num_graph, const DGLGraphSerialize *gstructs);
-
-std::vector<DGLGraphSerialize> LoadDGLGraphs(const std::string &filename,
-                                             std::vector<uint32_t> idx_list);
-
-static bool SaveDGLGraphs(std::string filename, uint32_t num_graph, void *gstructs);
+bool SaveDGLGraphs(const std::string &filename,
+                   List<GraphPtr> gptr_list,
+                   List<List<std::string>> node_name_list,
+                   List<List<DLTensor>> node_tensor_list,
+                   List<List<std::string>> edge_name_list,
+                   List<List<DLTensor>> edge_tensor_list);
 
 } // namespace serialize
 } //namespace dgl
