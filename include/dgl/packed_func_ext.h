@@ -2,7 +2,7 @@
  *  Copyright (c) 2019 by Contributors
  * \file packed_func_ext.h
  * \brief Extension package to PackedFunc
- *   This enales pass ObjectRef types into/from PackedFunc.
+ *   This enables pass ObjectRef types into/from PackedFunc.
  */
 #ifndef DGL_PACKED_FUNC_EXT_H_
 #define DGL_PACKED_FUNC_EXT_H_
