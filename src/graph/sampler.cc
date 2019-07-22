@@ -13,6 +13,7 @@
 #include <cmath>
 #include <numeric>
 #include "../c_api_common.h"
+#include "../array/common.h"  // for ATEN_FLOAT_TYPE_SWITCH
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -827,20 +828,18 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
       << "transition probability must have same number of elements as edges";
     CHECK(probability->strides == nullptr || probability->strides[0] == 1)
       << "transition probability must be contiguous tensor";
-    if (probability->dtype.bits == 32) {
-      const float *prob32 = static_cast<const float *>(probability->data);
-      nflows = _CAPI_NeighborSampling(
-          ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
-          expand_factor, num_hops, neigh_type, add_self_loop, prob32);
-    } else if (probability->dtype.bits == 64) {
-      const double *prob64 = static_cast<const double *>(probability->data);
-      nflows = _CAPI_NeighborSampling(
-          ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
-          expand_factor, num_hops, neigh_type, add_self_loop, prob64);
-    } else {
-      LOG(FATAL) << "transition probability must be either float32 or float64";
-      return;
-    }
+
+    ATEN_FLOAT_TYPE_SWITCH(
+      probability->dtype,
+      FloatType,
+      "transition probability",
+      {
+        const FloatType *prob = \
+          static_cast<const FloatType *>(probability->data);
+        nflows = _CAPI_NeighborSampling(
+            ptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
+            expand_factor, num_hops, neigh_type, add_self_loop, prob);
+    });
 
     *rv = WrapVectorReturn(nflows);
   });
