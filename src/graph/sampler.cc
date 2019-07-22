@@ -248,10 +248,10 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            int64_t num_edges, int num_hops, bool is_multigraph) {
   NodeFlow nf;
   uint64_t num_vertices = sub_vers->size();
-  nf.node_mapping = NewIdArray(num_vertices);
-  nf.edge_mapping = NewIdArray(num_edges);
-  nf.layer_offsets = NewIdArray(num_hops + 1);
-  nf.flow_offsets = NewIdArray(num_hops);
+  nf.node_mapping = aten::NewIdArray(num_vertices);
+  nf.edge_mapping = aten::NewIdArray(num_edges);
+  nf.layer_offsets = aten::NewIdArray(num_hops + 1);
+  nf.flow_offsets = aten::NewIdArray(num_hops);
 
   dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf.node_mapping->data);
   dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf.layer_offsets->data);
@@ -379,6 +379,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         int num_hops,
                         size_t num_neighbor,
                         const bool add_self_loop) {
+  CHECK_EQ(graph->NumBits(), 64) << "32 bit graph is not supported yet";
   unsigned int time_seed = randseed();
   const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
@@ -702,8 +703,9 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   CHECK_EQ(sub_indices.size(), sub_edge_ids.size());
 
   NodeFlow nf;
-  auto sub_csr = CSRPtr(new CSR(
-        VecToIdArray(sub_indptr), VecToIdArray(sub_indices), VecToIdArray(sub_edge_ids)));
+  auto sub_csr = CSRPtr(new CSR(aten::VecToIdArray(sub_indptr),
+                                aten::VecToIdArray(sub_indices),
+                                aten::VecToIdArray(sub_edge_ids)));
 
   if (neighbor_type == std::string("in")) {
     nf.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr));
@@ -711,10 +713,10 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
     nf.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr));
   }
 
-  nf.node_mapping = VecToIdArray(node_mapping);
-  nf.edge_mapping = VecToIdArray(edge_mapping);
-  nf.layer_offsets = VecToIdArray(layer_offsets);
-  nf.flow_offsets = VecToIdArray(flow_offsets);
+  nf.node_mapping = aten::VecToIdArray(node_mapping);
+  nf.edge_mapping = aten::VecToIdArray(edge_mapping);
+  nf.layer_offsets = aten::VecToIdArray(layer_offsets);
+  nf.flow_offsets = aten::VecToIdArray(flow_offsets);
 
   return nf;
 }
