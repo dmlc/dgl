@@ -350,28 +350,8 @@ class GraphInterface : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
 
-/*! \brief Base graph reference */
-class GraphRef : public runtime::ObjectRef {
- public:
-  /*! \brief empty reference */
-  GraphRef() {}
-  explicit GraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-
-  const GraphInterface* operator->() const {
-    return static_cast<const GraphInterface*>(obj_.get());
-  }
-
-  GraphInterface* operator->() {
-    return static_cast<GraphInterface*>(obj_.get());
-  }
-
-  /*! \brief get shared pointer */
-  std::shared_ptr<GraphInterface> sptr() const {
-    return CHECK_NOTNULL(std::dynamic_pointer_cast<GraphInterface>(obj_));
-  }
-
-  using ContainerType = GraphInterface;
-};
+// Define GraphRef
+DGL_DEFINE_OBJECT_REF(GraphRef, GraphInterface);
 
 /*! \brief Subgraph data structure */
 struct Subgraph {

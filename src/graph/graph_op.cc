@@ -44,22 +44,22 @@ class RangeIter : public std::iterator<std::input_iterator_tag, dgl_id_t> {
 };
 
 bool IsMutable(GraphPtr g) {
-  MGraphPtr mg = std::dynamic_pointer_cast<Graph>(g);
+  MutableGraphPtr mg = std::dynamic_pointer_cast<Graph>(g);
   return mg != nullptr;
 }
 
 }  // namespace
 
 GraphPtr GraphOp::Reverse(GraphPtr g) {
-  ImGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
+  ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
   CHECK(ig) << "Reverse is only supported on immutable graph";
   return ig->Reverse();
 }
 
 GraphPtr GraphOp::LineGraph(GraphPtr g, bool backtracking) {
-  MGraphPtr mg = std::dynamic_pointer_cast<Graph>(g);
+  MutableGraphPtr mg = std::dynamic_pointer_cast<Graph>(g);
   CHECK(mg) << "Line graph transformation is only supported on mutable graph";
-  MGraphPtr lg = Graph::Create();
+  MutableGraphPtr lg = Graph::Create();
   lg->AddVertices(g->NumEdges());
   for (size_t i = 0; i < mg->all_edges_src_.size(); ++i) {
     const auto u = mg->all_edges_src_[i];
@@ -78,10 +78,10 @@ GraphPtr GraphOp::DisjointUnion(std::vector<GraphPtr> graphs) {
   if (IsMutable(graphs[0])) {
     // Disjointly union of a list of mutable graph inputs. The result is
     // also a mutable graph.
-    MGraphPtr rst = Graph::Create();
+    MutableGraphPtr rst = Graph::Create();
     uint64_t cumsum = 0;
     for (GraphPtr gr : graphs) {
-      MGraphPtr mg = std::dynamic_pointer_cast<Graph>(gr);
+      MutableGraphPtr mg = std::dynamic_pointer_cast<Graph>(gr);
       CHECK(mg) << "All the input graphs should be mutable graphs.";
       rst->AddVertices(gr->NumVertices());
       for (uint64_t i = 0; i < gr->NumEdges(); ++i) {
@@ -111,7 +111,7 @@ GraphPtr GraphOp::DisjointUnion(std::vector<GraphPtr> graphs) {
     dgl_id_t cum_num_nodes = 0;
     dgl_id_t cum_num_edges = 0;
     for (auto g : graphs) {
-      ImGraphPtr gr = std::dynamic_pointer_cast<ImmutableGraph>(g);
+      ImmutableGraphPtr gr = std::dynamic_pointer_cast<ImmutableGraph>(g);
       CHECK(gr) << "All the input graphs should be immutable graphs.";
       // TODO(minjie): why in csr?
       const CSRPtr g_csrptr = gr->GetInCSR();
@@ -161,11 +161,11 @@ std::vector<GraphPtr> GraphOp::DisjointPartitionBySizes(
 
   std::vector<GraphPtr> rst;
   if (IsMutable(batched_graph)) {
-    // Input is a mutable graph. Partition it into several multiple graphs.
-    MGraphPtr graph = std::dynamic_pointer_cast<Graph>(batched_graph);
+    // Input is a mutable graph. Partition it into several mutable graphs.
+    MutableGraphPtr graph = std::dynamic_pointer_cast<Graph>(batched_graph);
     dgl_id_t node_offset = 0, edge_offset = 0;
     for (int64_t i = 0; i < len; ++i) {
-      MGraphPtr mg = Graph::Create();
+      MutableGraphPtr mg = Graph::Create();
       // TODO(minjie): quite ugly to expose internal members
       // copy adj
       mg->adjlist_.insert(mg->adjlist_.end(),
@@ -206,8 +206,8 @@ std::vector<GraphPtr> GraphOp::DisjointPartitionBySizes(
       edge_offset += num_edges;
     }
   } else {
-    // Input is an mutable graph. Partition it into several multiple graphs.
-    ImGraphPtr graph = std::dynamic_pointer_cast<ImmutableGraph>(batched_graph);
+    // Input is an immutable graph. Partition it into several multiple graphs.
+    ImmutableGraphPtr graph = std::dynamic_pointer_cast<ImmutableGraph>(batched_graph);
     // TODO(minjie): why in csr?
     CSRPtr in_csr_ptr = graph->GetInCSR();
     const dgl_id_t* indptr = static_cast<dgl_id_t*>(in_csr_ptr->indptr()->data);

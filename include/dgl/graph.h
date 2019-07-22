@@ -20,7 +20,7 @@ namespace dgl {
 
 class Graph;
 class GraphOp;
-typedef std::shared_ptr<Graph> MGraphPtr;
+typedef std::shared_ptr<Graph> MutableGraphPtr;
 
 /*! \brief Mutable graph based on adjacency list. */
 class Graph: public GraphInterface {
@@ -350,12 +350,12 @@ class Graph: public GraphInterface {
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
   /*! \brief Create an empty graph */
-  static MGraphPtr Create(bool multigraph = false) {
+  static MutableGraphPtr Create(bool multigraph = false) {
     return std::make_shared<Graph>(multigraph);
   }
 
   /*! \brief Create from coo */
-  static MGraphPtr CreateFromCOO(
+  static MutableGraphPtr CreateFromCOO(
       int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
     return std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph);
   }

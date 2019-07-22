@@ -48,21 +48,10 @@ struct NodeFlowObject : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(NodeFlowObject, runtime::Object);
 };
 
+// Define NodeFlow as the reference class of NodeFlowObject
 class NodeFlow : public runtime::ObjectRef {
  public:
-  /*! \brief empty reference */
-  NodeFlow() {}
-  explicit NodeFlow(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-
-  const NodeFlowObject* operator->() const {
-    return static_cast<const NodeFlowObject*>(obj_.get());
-  }
-
-  NodeFlowObject* operator->() {
-    return static_cast<NodeFlowObject*>(obj_.get());
-  }
-
-  using ContainerType = NodeFlowObject;
+  DGL_DEFINE_OBJECT_REF_METHODS(NodeFlow, runtime::ObjectRef, NodeFlowObject);
 
   /*! \brief create a new nodeflow reference */
   static NodeFlow Create() {
