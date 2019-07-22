@@ -15,6 +15,15 @@ namespace dgl {
 class GraphOp {
  public:
   /*!
+   * \brief Return a new graph with all the edges reversed.
+   *
+   * The returned graph preserves the vertex and edge index in the original graph.
+   *
+   * \return the reversed graph
+   */
+  static GraphPtr Reverse(GraphPtr graph);
+
+  /*!
    * \brief Return the line graph.
    *
    * If i~j and j~i are two edges in original graph G, then
@@ -25,7 +34,7 @@ class GraphOp {
    * \param backtracking Whether the backtracking edges are included or not
    * \return the line graph
    */
-  static Graph LineGraph(const Graph* graph, bool backtracking);
+  static GraphPtr LineGraph(GraphPtr graph, bool backtracking);
 
   /*!
    * \brief Return a disjoint union of the input graphs.
@@ -36,10 +45,13 @@ class GraphOp {
    * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
    * in the result graph. Edge ids are re-assigned similarly.
    *
+   * The input list must be either ALL mutable graphs or ALL immutable graphs.
+   * The returned graph type is also determined by the input graph type.
+   *
    * \param graphs A list of input graphs to be unioned.
    * \return the disjoint union of the graphs
    */
-  static Graph DisjointUnion(std::vector<const Graph*> graphs);
+  static GraphPtr DisjointUnion(std::vector<GraphPtr> graphs);
 
   /*!
    * \brief Partition the graph into several subgraphs.
@@ -47,12 +59,15 @@ class GraphOp {
    * This is a reverse operation of DisjointUnion. The graph will be partitioned
    * into num graphs. This requires the given number of partitions to evenly
    * divides the number of nodes in the graph.
+   *
+   * If the input graph is mutable, the result graphs are mutable.
+   * If the input graph is immutable, the result graphs are immutable.
    * 
    * \param graph The graph to be partitioned.
    * \param num The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<Graph> DisjointPartitionByNum(const Graph* graph, int64_t num);
+  static std::vector<GraphPtr> DisjointPartitionByNum(GraphPtr graph, int64_t num);
 
   /*!
    * \brief Partition the graph into several subgraphs.
@@ -60,54 +75,15 @@ class GraphOp {
    * This is a reverse operation of DisjointUnion. The graph will be partitioned
    * based on the given sizes. This requires the sum of the given sizes is equal
    * to the number of nodes in the graph.
+   *
+   * If the input graph is mutable, the result graphs are mutable.
+   * If the input graph is immutable, the result graphs are immutable.
    * 
    * \param graph The graph to be partitioned.
    * \param sizes The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<Graph> DisjointPartitionBySizes(const Graph* graph, IdArray sizes);
-
-  /*!
-  * \brief Return a readonly disjoint union of the input graphs.
-  *
-  * The new readonly graph will include all the nodes/edges in the given graphs.
-  * Nodes/Edges will be relabled in the given sequence order by batching over CSR Graphs.
-  * For example, giving input [g1, g2, g3], where
-  * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
-  * in the result graph. Edge ids are re-assigned similarly.
-  *
-  * \param ImmutableGraph A list of input graphs to be unioned.
-  * \return the disjoint union of the ImmutableGraph
-  */
-  static ImmutableGraph DisjointUnion(std::vector<const ImmutableGraph*> graphs);
-
-   /*!
-   * \brief Partition the ImmutableGraph into several immutable subgraphs.
-   *
-   * This is a reverse operation of DisjointUnion. The graph will be partitioned
-   * into num graphs. This requires the given number of partitions to evenly
-   * divides the number of nodes in the graph.
-   *
-   * \param graph The ImmutableGraph to be partitioned.
-   * \param num The number of partitions.
-   * \return a list of partitioned ImmutableGraph
-   */
-  static std::vector<ImmutableGraph> DisjointPartitionByNum(const ImmutableGraph *graph,
-          int64_t num);
-
-  /*!
-  * \brief Partition the ImmutableGraph into several immutable subgraphs.
-  *
-  * This is a reverse operation of DisjointUnion. The graph will be partitioned
-  * based on the given sizes. This requires the sum of the given sizes is equal
-  * to the number of nodes in the graph.
-  *
-  * \param graph The ImmutableGraph to be partitioned.
-  * \param sizes The number of partitions.
-  * \return a list of partitioned ImmutableGraph
-  */
-  static std::vector<ImmutableGraph> DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
-          IdArray sizes);
+  static std::vector<GraphPtr> DisjointPartitionBySizes(GraphPtr graph, IdArray sizes);
 
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.
@@ -143,7 +119,7 @@ class GraphOp {
    * \param graph The input graph.
    * \return a new immutable simple graph with no multi-edge.
    */
-  static ImmutableGraph ToSimpleGraph(const GraphInterface* graph);
+  static GraphPtr ToSimpleGraph(GraphPtr graph);
 
   /*!
    * \brief Convert the graph to a mutable bidirected graph.
@@ -155,14 +131,14 @@ class GraphOp {
    * \param graph The input graph.
    * \return a new mutable bidirected graph.
    */
-  static Graph ToBidirectedMutableGraph(const GraphInterface* graph);
+  static GraphPtr ToBidirectedMutableGraph(GraphPtr graph);
 
   /*!
    * \brief Same as BidirectedMutableGraph except that the returned graph is immutable.
    * \param graph The input graph.
    * \return a new immutable bidirected graph.
    */
-  static ImmutableGraph ToBidirectedImmutableGraph(const GraphInterface* graph);
+  static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
 };
 
 }  // namespace dgl
