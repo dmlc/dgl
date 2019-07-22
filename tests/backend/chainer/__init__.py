@@ -24,10 +24,7 @@ def randn(shape):
     return chainer.as_variable(np.random.randn(*shape).astype('float32'))
 
 def attach_grad(x):
-    if x.grad is not None:
-        x.cleargrad()
-    else:
-        x = chainer.Variable(x.data)    # creates a new variable that returns gradients
+    x = chainer.Variable(x.data)    # creates a new variable that returns gradients
     return x
 
 def backward(x, head_gradient=None):
