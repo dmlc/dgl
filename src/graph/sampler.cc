@@ -3,10 +3,10 @@
  * \file graph/sampler.cc
  * \brief DGL sampler implementation
  */
-
 #include <dgl/sampler.h>
-#include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/runtime/container.h>
+#include <dgl/packed_func_ext.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
@@ -14,11 +14,7 @@
 #include <numeric>
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
+using namespace dgl::runtime;
 
 namespace dgl {
 
@@ -246,17 +242,17 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<neighbor_info> *neigh_pos,
                            const std::string &edge_type,
                            int64_t num_edges, int num_hops, bool is_multigraph) {
-  NodeFlow nf;
+  NodeFlow nf = NodeFlow::Create();
   uint64_t num_vertices = sub_vers->size();
-  nf.node_mapping = aten::NewIdArray(num_vertices);
-  nf.edge_mapping = aten::NewIdArray(num_edges);
-  nf.layer_offsets = aten::NewIdArray(num_hops + 1);
-  nf.flow_offsets = aten::NewIdArray(num_hops);
+  nf->node_mapping = aten::NewIdArray(num_vertices);
+  nf->edge_mapping = aten::NewIdArray(num_edges);
+  nf->layer_offsets = aten::NewIdArray(num_hops + 1);
+  nf->flow_offsets = aten::NewIdArray(num_hops);
 
-  dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf.node_mapping->data);
-  dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf.layer_offsets->data);
-  dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf.flow_offsets->data);
-  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf.edge_mapping->data);
+  dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf->node_mapping->data);
+  dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf->layer_offsets->data);
+  dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf->flow_offsets->data);
+  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
 
   // Construct sub_csr_graph
   // TODO(minjie): is nodeflow a multigraph?
@@ -364,9 +360,9 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   std::iota(eid_out, eid_out + num_edges, 0);
 
   if (edge_type == std::string("in")) {
-    nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr));
+    nf->graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr));
   } else {
-    nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr));
+    nf->graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr));
   }
 
   return nf;
@@ -491,45 +487,32 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    GraphInterface* gptr = nflow->graph->Reset();
-    *rv = gptr;
+    NodeFlow nflow = args[0];
+    *rv = nflow->graph;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    NodeFlow nflow = args[0];
     *rv = nflow->node_mapping;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    NodeFlow nflow = args[0];
     *rv = nflow->edge_mapping;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    NodeFlow nflow = args[0];
     *rv = nflow->layer_offsets;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    NodeFlow nflow = args[0];
     *rv = nflow->flow_offsets;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    delete nflow;
   });
 
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
@@ -702,21 +685,21 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   CHECK_EQ(sub_indptr.back(), sub_indices.size());
   CHECK_EQ(sub_indices.size(), sub_edge_ids.size());
 
-  NodeFlow nf;
+  NodeFlow nf = NodeFlow::Create();
   auto sub_csr = CSRPtr(new CSR(aten::VecToIdArray(sub_indptr),
                                 aten::VecToIdArray(sub_indices),
                                 aten::VecToIdArray(sub_edge_ids)));
 
   if (neighbor_type == std::string("in")) {
-    nf.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr));
+    nf->graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr));
   } else {
-    nf.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr));
+    nf->graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr));
   }
 
-  nf.node_mapping = aten::VecToIdArray(node_mapping);
-  nf.edge_mapping = aten::VecToIdArray(edge_mapping);
-  nf.layer_offsets = aten::VecToIdArray(layer_offsets);
-  nf.flow_offsets = aten::VecToIdArray(flow_offsets);
+  nf->node_mapping = aten::VecToIdArray(node_mapping);
+  nf->edge_mapping = aten::VecToIdArray(edge_mapping);
+  nf->layer_offsets = aten::VecToIdArray(layer_offsets);
+  nf->flow_offsets = aten::VecToIdArray(flow_offsets);
 
   return nf;
 }
@@ -736,7 +719,7 @@ void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
-    const GraphHandle ghdl = args[0];
+    GraphRef g = args[0];
     const IdArray seed_nodes = args[1];
     const int64_t batch_start_id = args[2];
     const int64_t batch_size = args[3];
@@ -746,8 +729,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     const std::string neigh_type = args[7];
     const bool add_self_loop = args[8];
     // process args
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_nodes));
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
@@ -757,7 +739,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     // We need to make sure we have the right CSR before we enter parallel sampling.
     BuildCsr(*gptr, neigh_type);
     // generate node flows
-    std::vector<NodeFlow*> nflows(num_workers);
+    std::vector<NodeFlow> nflows(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       // create per-worker seed nodes.
@@ -767,17 +749,16 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
       std::vector<dgl_id_t> worker_seeds(end - start);
       std::copy(seed_nodes_data + start, seed_nodes_data + end,
                 worker_seeds.begin());
-      nflows[i] = new NodeFlow();
-      *nflows[i] = SamplerOp::NeighborUniformSample(
-          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
+      nflows[i] = SamplerOp::NeighborUniformSample(
+          gptr.get(), worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
     }
-    *rv = WrapVectorReturn(nflows);
+    *rv = List<NodeFlow>(nflows);
   });
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
-    const GraphHandle ghdl = args[0];
+    GraphRef g = args[0];
     const IdArray seed_nodes = args[1];
     const int64_t batch_start_id = args[2];
     const int64_t batch_size = args[3];
@@ -785,8 +766,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     const IdArray layer_sizes = args[5];
     const std::string neigh_type = args[6];
     // process args
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_nodes));
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
@@ -796,7 +776,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     // We need to make sure we have the right CSR before we enter parallel sampling.
     BuildCsr(*gptr, neigh_type);
     // generate node flows
-    std::vector<NodeFlow*> nflows(num_workers);
+    std::vector<NodeFlow> nflows(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       // create per-worker seed nodes.
@@ -806,11 +786,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
       std::vector<dgl_id_t> worker_seeds(end - start);
       std::copy(seed_nodes_data + start, seed_nodes_data + end,
                 worker_seeds.begin());
-      nflows[i] = new NodeFlow();
-      *nflows[i] = SamplerOp::LayerUniformSample(
-          gptr, worker_seeds, neigh_type, layer_sizes);
+      nflows[i] = SamplerOp::LayerUniformSample(
+          gptr.get(), worker_seeds, neigh_type, layer_sizes);
     }
-    *rv = WrapVectorReturn(nflows);
+    *rv = List<NodeFlow>(nflows);
   });
 
 }  // namespace dgl

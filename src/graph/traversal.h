@@ -11,7 +11,7 @@
 #ifndef DGL_GRAPH_TRAVERSAL_H_
 #define DGL_GRAPH_TRAVERSAL_H_
 
-#include <dgl/graph.h>
+#include <dgl/graph_interface.h>
 #include <stack>
 #include <tuple>
 #include <vector>
@@ -45,7 +45,7 @@ namespace traverse {
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
 template<typename Queue, typename VisitFn, typename FrontierFn>
-void BFSNodes(const Graph& graph,
+void BFSNodes(const GraphInterface& graph,
               IdArray source,
               bool reversed,
               Queue* queue,
@@ -63,7 +63,7 @@ void BFSNodes(const Graph& graph,
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
+  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
@@ -109,7 +109,7 @@ void BFSNodes(const Graph& graph,
  * \param make_frontier The function to indicate that a new frontier can be made;
  */
 template<typename Queue, typename VisitFn, typename FrontierFn>
-void BFSEdges(const Graph& graph,
+void BFSEdges(const GraphInterface& graph,
               IdArray source,
               bool reversed,
               Queue* queue,
@@ -126,7 +126,7 @@ void BFSEdges(const Graph& graph,
   }
   make_frontier();
 
-  const auto neighbor_iter = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
+  const auto neighbor_iter = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
   while (!queue->empty()) {
     const size_t size = queue->size();
     for (size_t i = 0; i < size; ++i) {
@@ -171,13 +171,13 @@ void BFSEdges(const Graph& graph,
  * \param make_frontier The function to indicate that a new froniter can be made;
  */
 template<typename Queue, typename VisitFn, typename FrontierFn>
-void TopologicalNodes(const Graph& graph,
+void TopologicalNodes(const GraphInterface& graph,
                       bool reversed,
                       Queue* queue,
                       VisitFn visit,
                       FrontierFn make_frontier) {
-  const auto get_degree = reversed? &Graph::OutDegree : &Graph::InDegree;
-  const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
+  const auto get_degree = reversed? &GraphInterface::OutDegree : &GraphInterface::InDegree;
+  const auto neighbor_iter = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
   uint64_t num_visited_nodes = 0;
   std::vector<uint64_t> degrees(graph.NumVertices(), 0);
   for (dgl_id_t vid = 0; vid < graph.NumVertices(); ++vid) {
@@ -237,14 +237,14 @@ enum DFSEdgeTag {
  *              tag will be given as the arguments.
  */
 template<typename VisitFn>
-void DFSLabeledEdges(const Graph& graph,
+void DFSLabeledEdges(const GraphInterface& graph,
                      dgl_id_t source,
                      bool reversed,
                      bool has_reverse_edge,
                      bool has_nontree_edge,
                      VisitFn visit) {
-  const auto succ = reversed? &Graph::PredVec : &Graph::SuccVec;
-  const auto out_edge = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
+  const auto succ = reversed? &GraphInterface::PredVec : &GraphInterface::SuccVec;
+  const auto out_edge = reversed? &GraphInterface::InEdgeVec : &GraphInterface::OutEdgeVec;
 
   if ((graph.*succ)(source).size() == 0) {
     // no out-going edges from the source node
