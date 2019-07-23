@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 import scipy
 
+from .graph import DGLGraph
+from ._ffi.object import ObjectBase, register_object
 from ._ffi.runtime_ctypes import DGLArrayHandle, DGLArray
 # from ._ffi.base import c_array
 from ._ffi.function import _init_api
@@ -13,33 +15,27 @@ from . import backend as F
 from . import utils
 from .ndarray import from_dlpack, NDArrayBase
 
-# from ._ffi._ctypes.function import _make_array
-
 _init_api("dgl.graph_serialize")
 
-GraphIndexHandle = ctypes.c_void_p
+
+@register_object("graph_serialize.GraphData")
+class GraphData(ObjectBase):
+    @staticmethod
+    def create(g: DGLGraph):
+        ghandle = g._graph
+        node_tensors = dict()
+        edge_tensors = dict()
+        for key, value in g.ndata.items():
+            node_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
+        for key, value in g.edata.items():
+            edge_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
+
+        return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
 
-# class DGLGraphSerialize(ctypes.Structure):
-#     __fields__ = [("g_handle", GraphIndexHandle),
-#                   ("num_node_feats", ctypes.c_uint32),
-#                   ("num_edge_feats", ctypes.c_uint32),
-#                   ("node_names", ctypes.c_char_p),
-#                   ("node_feats", DGLArrayHandle),
-#                   ("edge_names", ctypes.c_char_p),
-#                   ("edge_feats", DGLArrayHandle)
-#                   ]
-class DGLGraphSerialize(ctypes.Structure):
-    __fields__ = [("g_handle", GraphIndexHandle),
-                  ("num_node_feats", ctypes.c_uint32),
-                  ("num_edge_feats", ctypes.c_uint32),
-                  ("node_names", ctypes.POINTER(ctypes.c_char_p)),
-                  ("node_feats", ctypes.POINTER(DGLArrayHandle)),
-                  ("edge_names", ctypes.POINTER(ctypes.c_char_p)),
-                  ("edge_feats", ctypes.POINTER(DGLArrayHandle)),
-                  ]
-
-
+# register_object("Value")(NDArrayBase)
+# from ._ffi._ctypes.function import _make_array
+#
 def construct_graph(n):
     from .graph import DGLGraph
     g_list = []
@@ -55,68 +51,26 @@ def construct_graph(n):
         g.edata['e1'] = th.ones(3, 5)
         g.edata['e2'] = th.zeros(3, 5)
         g.ndata['n1'] = th.ones(10, 2)
-
+        g.readonly()
         g_list.append(g)
     return g_list
 
 
-def convert_list_tensor(tensor_list):
-    return [from_dlpack(F.zerocopy_to_dlpack(tensor)).handle for tensor in tensor_list]
+#
+def aaa():
+    g_list = construct_graph(3)
+
+    # g = g_list[0]
+
+    g_data = []
+    for g in g_list:
+        g_data.append(GraphData.create(g))
+
+    print(g_data)
+    print(g_data[0])
+    _CAPI_DGLSaveGraphs("/tmp/test.bin", g_data)
 
 
-def convert_str_list(str_list):
-    return [str.encode('utf-8') for str in str_list]
+aaa()
 
-
-def c_array(type, list):
-    aaa = (type * len(list))()
-    for idx, item in enumerate(list):
-        aaa[idx] = item
-    return ctypes.cast(aaa, ctypes.POINTER(type))
-
-
-def saveDGLGraph():
-    g_list = construct_graph(5)
-
-    args_list = (DGLGraphSerialize * len(g_list))()
-    args_list = ctypes.cast(args_list, ctypes.POINTER(DGLGraphSerialize))
-
-    for idx, g in enumerate(g_list):
-        arg = DGLGraphSerialize()
-        print(g)
-        print(g._graph.handle)
-        arg.g_handle = g._graph.handle
-        arg.num_node_feats = ctypes.c_uint32(len(g.ndata))
-        arg.num_edge_feats = ctypes.c_uint32(len(g.edata))
-
-        # arg.node_names = ctypes.POINTER()
-        # for name in convert_str_list(g.ndata.keys()):
-
-        arg.node_names = c_array(ctypes.c_char_p, convert_str_list(g.ndata.keys()))
-        # print(type(arg.node_names))
-        arg.node_feats = c_array(DGLArrayHandle, convert_list_tensor(g.ndata.values()))
-        arg.edge_names = c_array(ctypes.c_char_p, convert_str_list(g.edata.keys()))
-        arg.edge_feats = c_array(DGLArrayHandle, convert_list_tensor(g.edata.values()))
-        print(arg.node_names[0])
-        print(arg.node_feats)
-
-        args_list[idx] = arg
-    #
-    # args_list = c_array(ctypes.POINTER(DGLGraphSerialize), args_list)
-    # list_ptr =
-    inputs = ctypes.cast(args_list, ctypes.c_void_p)
-    import ipdb;
-    ipdb.set_trace()
-    print(list_ptr[0].value)
-    #
-    _CAPI_DGLSaveGraphs(inputs, len(args_list),
-                        "/tmp/test.bin")
-
-
-def loadDGLGraph():
-    idx_list = [1, 3]
-    idx_input = ctypes.cast(c_array(ctypes.c_uint32, idx_list), ctypes.c_void_p)
-
-    ret = _CAPI_DGLLoadGraphs("/tmp/test.bin", idx_input)
-    g_list = ctypes.cast(ret, ctypes.POINTER(DGLGraphSerialize))
-    print(g_list)
+# _CAPI_MakeGraphData(g._graph)
