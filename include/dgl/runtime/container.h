@@ -314,6 +314,10 @@ class List : public ObjectRef {
   inline bool empty() const {
     return size() == 0;
   }
+  /*! \brief Copy the content to a vector */
+  inline std::vector<T> ToVector() const {
+    return std::vector<T>(begin(), end());
+  }
   /*! \brief specify container obj */
   using ContainerType = ListObject;
 
