@@ -42,36 +42,27 @@ enum GraphType {
 
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
-.set_body([](
-DGLArgs args, DGLRetValue
-*rv) {
-GraphRef gptr = args[0];
-ImGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(gptr.sptr());
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    GraphRef gptr = args[0];
+    ImGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(gptr.sptr());
 //    List<>
-Map <std::string, Value> node_tensors = args[1];
-Map <std::string, Value> edge_tensors = args[2];
-GraphData gd = GraphData::Create();
-gd->
-setData(imGPtr, node_tensors, edge_tensors
-);
-*
-rv = gd;
-}
-);
+    Map<std::string, Value> node_tensors = args[1];
+    Map<std::string, Value> edge_tensors = args[2];
+    GraphData gd = GraphData::Create();
+    gd->setData(imGPtr, node_tensors, edge_tensors);
+    *rv = gd;
+});
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-List <GraphData> graph_data = args[1];
-SaveDGLGraphs(filename,
-        graph_data
-);
-}
-);
+    List<GraphData> graph_data = args[1];
+    SaveDGLGraphs(filename, graph_data);
+});
 
 //
 bool SaveDGLGraphs(std::string filename,
-                   List <GraphData> graph_data) {
+                   List<GraphData> graph_data) {
   auto *fs = dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w",
                                                            true));
   CHECK(fs) << "File name is not a valid local file name";
@@ -128,8 +119,8 @@ bool SaveDGLGraphs(std::string filename,
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
-std::string filename = args[0];
-List <Value> *idx_list_handle = args[1];
+    std::string filename = args[0];
+    List<Value> idx_list = args[1];
     int num_idx = args[2];
     uint32_t *idx_list_array = static_cast<uint32_t *>(idx_list_handle);
     std::vector<uint32_t> idx_list(idx_list_array, idx_list_array + num_idx);
