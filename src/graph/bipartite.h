@@ -9,6 +9,9 @@
 
 #include <dgl/graph_interface.h>
 #include <dgl/base_heterograph.h>
+#include <vector>
+#include <string>
+#include <utility>
 #include <memory>
 
 namespace dgl {

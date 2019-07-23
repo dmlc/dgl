@@ -4,8 +4,8 @@
  * \brief DGL heterogeneous graph index class.
  */
 
-#ifndef DGL_HETEROGRAPH_INTERFACE_H_
-#define DGL_HETEROGRAPH_INTERFACE_H_
+#ifndef DGL_BASE_HETEROGRAPH_H_
+#define DGL_BASE_HETEROGRAPH_H_
 
 #include <string>
 #include <vector>
@@ -39,7 +39,7 @@ struct HeteroSubgraph;
  */
 class BaseHeteroGraph : public runtime::Object {
  public:
-  BaseHeteroGraph(GraphPtr meta_graph): meta_graph_(meta_graph) {}
+  explicit BaseHeteroGraph(GraphPtr meta_graph): meta_graph_(meta_graph) {}
 
   virtual ~BaseHeteroGraph() = default;
 
@@ -401,4 +401,4 @@ HeteroGraphPtr CreateHeteroGraph(
 
 };  // namespace dgl
 
-#endif  // DGL_HETEROGRAPH_INTERFACE_H_
+#endif  // DGL_BASE_HETEROGRAPH_H_

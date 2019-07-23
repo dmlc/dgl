@@ -40,7 +40,7 @@ class Bipartite::COO : public BaseHeteroGraph {
       is_multigraph_(is_multigraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
-  COO(const aten::COOMatrix& coo)
+  explicit COO(const aten::COOMatrix& coo)
     : BaseHeteroGraph(CreateBipartiteMetaGraph()), adj_(coo) {}
 
   uint64_t NumVertexTypes() const override {
@@ -302,7 +302,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
-  CSR(const aten::CSRMatrix& csr)
+  explicit CSR(const aten::CSRMatrix& csr)
     : BaseHeteroGraph(CreateBipartiteMetaGraph()), adj_(csr) {}
 
   uint64_t NumVertexTypes() const override {

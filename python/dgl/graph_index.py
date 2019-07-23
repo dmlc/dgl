@@ -1322,7 +1322,7 @@ class HeteroGraphIndex(ObjectBase):
             Number of nodes to be added.
         """
         _CAPI_DGLHetero(self, int(ntype), int(num))
-    
+
     def add_edge(self, etype, u, v):
         """Add one edge.
 
@@ -1349,8 +1349,7 @@ class HeteroGraphIndex(ObjectBase):
         v : utils.Index
             The dst nodes.
         """
-        _CAPI_DGLHeteroAddEdges(self, int(etype),
-            u.todgltensor(), v.todgltensor())
+        _CAPI_DGLHeteroAddEdges(self, int(etype), u.todgltensor(), v.todgltensor())
 
     def clear(self):
         """Clear the graph."""
@@ -1716,7 +1715,7 @@ class HeteroGraphIndex(ObjectBase):
         dst = utils.toindex(dst)
         eid = utils.toindex(eid)
         return src, dst, eid
-    
+
     def in_degree(self, etype, v):
         """Return the in degree of the node.
 
@@ -1945,7 +1944,7 @@ def create_bipartite_from_coo(num_src, num_dst, row, col):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateBipartiteFromCOO(
-            int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+        int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
 
 def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
     """Create a bipartite graph index from CSR format
@@ -1968,8 +1967,8 @@ def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateBipartiteFromCSR(
-            int(num_src), int(num_dst),
-            indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
+        int(num_src), int(num_dst),
+        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
 
 def create_heterograph(meta_graph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.

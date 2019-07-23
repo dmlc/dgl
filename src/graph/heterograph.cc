@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file graph/heterograph.cc
+ * \brief Heterograph implementation
+ */
 #include "./heterograph.h"
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>

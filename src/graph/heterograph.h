@@ -9,6 +9,9 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
+#include <utility>
+#include <string>
+#include <vector>
 
 namespace dgl {
 
