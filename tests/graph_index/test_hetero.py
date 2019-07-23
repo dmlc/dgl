@@ -205,6 +205,148 @@ def test_subgraph():
         assert np.allclose(F.sparse_to_numpy(adj),
                 np.array([]))
 
+        # edge subgraph (preserve_nodes=False)
+        induced_edges = [toindex([0, 2]), toindex([0]), toindex([0, 1, 2])]
+        sub = g.edge_subgraph(induced_edges, False)
+        subg = sub.graph
+        assert subg.number_of_ntypes() == 3
+        assert subg.number_of_etypes() == 3
+        assert subg.number_of_nodes(0) == 2
+        assert subg.number_of_nodes(1) == 2
+        assert subg.number_of_nodes(2) == 3
+        assert subg.number_of_edges(R1) == 2
+        assert subg.number_of_edges(R2) == 1
+        assert subg.number_of_edges(R3) == 3
+        adj = subg.adjacency_matrix(R1, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0.],
+                          [1., 0.]]))
+        adj = subg.adjacency_matrix(R2, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0., 0.],
+                          [0., 0., 0.]]))
+        adj = subg.adjacency_matrix(R3, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 1.],
+                          [0., 1.],
+                          [0., 1.]]))
+        assert len(sub.induced_nodes) == 3
+        assert _array_equal(sub.induced_nodes[0], [0, 2])
+        assert _array_equal(sub.induced_nodes[1], [0, 1])
+        assert _array_equal(sub.induced_nodes[2], [0, 1, 2])
+        assert len(sub.induced_edges) == 3
+        assert _array_equal(sub.induced_edges[0], induced_edges[0])
+        assert _array_equal(sub.induced_edges[1], induced_edges[1])
+        assert _array_equal(sub.induced_edges[2], induced_edges[2])
+
+        # edge subgraph (preserve_nodes=True)
+        induced_edges = [toindex([0, 2]), toindex([0]), toindex([0, 1, 2])]
+        sub = g.edge_subgraph(induced_edges, True)
+        subg = sub.graph
+        assert subg.number_of_ntypes() == 3
+        assert subg.number_of_etypes() == 3
+        assert subg.number_of_nodes(0) == 5
+        assert subg.number_of_nodes(1) == 2
+        assert subg.number_of_nodes(2) == 3
+        assert subg.number_of_edges(R1) == 2
+        assert subg.number_of_edges(R2) == 1
+        assert subg.number_of_edges(R3) == 3
+        adj = subg.adjacency_matrix(R1, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0.],
+                          [0., 0.],
+                          [1., 0.],
+                          [0., 0.],
+                          [0., 0.]]))
+        adj = subg.adjacency_matrix(R2, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0., 0.],
+                          [0., 0., 0.]]))
+        adj = subg.adjacency_matrix(R3, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 1.],
+                          [0., 1.],
+                          [0., 1.]]))
+        assert len(sub.induced_nodes) == 3
+        assert _array_equal(sub.induced_nodes[0], [0, 1, 2, 3, 4])
+        assert _array_equal(sub.induced_nodes[1], [0, 1])
+        assert _array_equal(sub.induced_nodes[2], [0, 1, 2])
+        assert len(sub.induced_edges) == 3
+        assert _array_equal(sub.induced_edges[0], induced_edges[0])
+        assert _array_equal(sub.induced_edges[1], induced_edges[1])
+        assert _array_equal(sub.induced_edges[2], induced_edges[2])
+
+        # edge subgraph with empty induced edges (preserve_nodes=False)
+        induced_edges = [toindex([0, 2]), toindex([]), toindex([0, 1, 2])]
+        sub = g.edge_subgraph(induced_edges, False)
+        subg = sub.graph
+        assert subg.number_of_ntypes() == 3
+        assert subg.number_of_etypes() == 3
+        assert subg.number_of_nodes(0) == 2
+        assert subg.number_of_nodes(1) == 2
+        assert subg.number_of_nodes(2) == 3
+        assert subg.number_of_edges(R1) == 2
+        assert subg.number_of_edges(R2) == 0
+        assert subg.number_of_edges(R3) == 3
+        adj = subg.adjacency_matrix(R1, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0.],
+                          [1., 0.]]))
+        adj = subg.adjacency_matrix(R2, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 0., 0.],
+                          [0., 0., 0.]]))
+        adj = subg.adjacency_matrix(R3, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 1.],
+                          [0., 1.],
+                          [0., 1.]]))
+        assert len(sub.induced_nodes) == 3
+        assert _array_equal(sub.induced_nodes[0], [0, 2])
+        assert _array_equal(sub.induced_nodes[1], [0, 1])
+        assert _array_equal(sub.induced_nodes[2], [0, 1, 2])
+        assert len(sub.induced_edges) == 3
+        assert _array_equal(sub.induced_edges[0], induced_edges[0])
+        assert _array_equal(sub.induced_edges[1], induced_edges[1])
+        assert _array_equal(sub.induced_edges[2], induced_edges[2])
+
+        # edge subgraph with empty induced edges (preserve_nodes=True)
+        induced_edges = [toindex([0, 2]), toindex([]), toindex([0, 1, 2])]
+        sub = g.edge_subgraph(induced_edges, True)
+        subg = sub.graph
+        assert subg.number_of_ntypes() == 3
+        assert subg.number_of_etypes() == 3
+        assert subg.number_of_nodes(0) == 5
+        assert subg.number_of_nodes(1) == 2
+        assert subg.number_of_nodes(2) == 3
+        assert subg.number_of_edges(R1) == 2
+        assert subg.number_of_edges(R2) == 0
+        assert subg.number_of_edges(R3) == 3
+        adj = subg.adjacency_matrix(R1, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[1., 0.],
+                          [0., 0.],
+                          [1., 0.],
+                          [0., 0.],
+                          [0., 0.]]))
+        adj = subg.adjacency_matrix(R2, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 0., 0.],
+                          [0., 0., 0.]]))
+        adj = subg.adjacency_matrix(R3, True, F.cpu())[0]
+        assert np.allclose(F.sparse_to_numpy(adj),
+                np.array([[0., 1.],
+                          [0., 1.],
+                          [0., 1.]]))
+        assert len(sub.induced_nodes) == 3
+        assert _array_equal(sub.induced_nodes[0], [0, 1, 2, 3, 4])
+        assert _array_equal(sub.induced_nodes[1], [0, 1])
+        assert _array_equal(sub.induced_nodes[2], [0, 1, 2])
+        assert len(sub.induced_edges) == 3
+        assert _array_equal(sub.induced_edges[0], induced_edges[0])
+        assert _array_equal(sub.induced_edges[1], induced_edges[1])
+        assert _array_equal(sub.induced_edges[2], induced_edges[2])
+
     g = gen_from_coo()
     _test_g(g)
     g = gen_from_csr()

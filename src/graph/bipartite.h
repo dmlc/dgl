@@ -75,7 +75,11 @@ class Bipartite : public BaseHeteroGraph {
 
   bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const override;
 
+  BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const override;
+
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override;
+
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override;
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override;
 

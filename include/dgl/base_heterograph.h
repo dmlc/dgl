@@ -107,48 +107,13 @@ class BaseHeteroGraph : public runtime::Object {
   virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const {
-    const auto len = vids->shape[0];
-    BoolArray rst = aten::NewBoolArray(len);
-    const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    for (int64_t i = 0; i < len; ++i) {
-      rst_data[i] = HasVertex(vtype, vid_data[i])? 1 : 0;
-    }
-    return rst;
-  }
+  virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const {
-    const auto srclen = src_ids->shape[0];
-    const auto dstlen = dst_ids->shape[0];
-    const auto rstlen = std::max(srclen, dstlen);
-    BoolArray rst = aten::NewBoolArray(rstlen);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-    if (srclen == 1) {
-      // one-many
-      for (int64_t i = 0; i < dstlen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[0], dst_data[i])? 1 : 0;
-      }
-    } else if (dstlen == 1) {
-      // many-one
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[0])? 1 : 0;
-      }
-    } else {
-      // many-many
-      CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[i])? 1 : 0;
-      }
-    }
-    return rst;
-  }
+  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const = 0;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -394,28 +359,8 @@ class BaseHeteroGraph : public runtime::Object {
   GraphPtr meta_graph_;
 };
 
-/*! \brief Base heterograph reference */
-class HeteroGraphRef : public runtime::ObjectRef {
- public:
-  /*! \brief empty reference */
-  HeteroGraphRef() {}
-  explicit HeteroGraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-
-  const BaseHeteroGraph* operator->() const {
-    return static_cast<const BaseHeteroGraph*>(obj_.get());
-  }
-
-  BaseHeteroGraph* operator->() {
-    return static_cast<BaseHeteroGraph*>(obj_.get());
-  }
-
-  /*! \brief get shared pointer */
-  std::shared_ptr<BaseHeteroGraph> sptr() const {
-    return CHECK_NOTNULL(std::dynamic_pointer_cast<BaseHeteroGraph>(obj_));
-  }
-
-  using ContainerType = BaseHeteroGraph;
-};
+// Define HeteroGraphRef
+DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
 
 /*! \brief Heter-subgraph data structure */
 struct HeteroSubgraph : public runtime::Object {
@@ -436,28 +381,8 @@ struct HeteroSubgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
 
-/*! \brief Heter-subgraph reference class */
-class HeteroSubgraphRef : public runtime::ObjectRef {
- public:
-  /*! \brief empty reference */
-  HeteroSubgraphRef() {}
-  explicit HeteroSubgraphRef(std::shared_ptr<runtime::Object> obj): runtime::ObjectRef(obj) {}
-
-  const HeteroSubgraph* operator->() const {
-    return static_cast<const HeteroSubgraph*>(obj_.get());
-  }
-
-  HeteroSubgraph* operator->() {
-    return static_cast<HeteroSubgraph*>(obj_.get());
-  }
-
-  /*! \brief get shared pointer */
-  std::shared_ptr<HeteroSubgraph> sptr() const {
-    return CHECK_NOTNULL(std::dynamic_pointer_cast<HeteroSubgraph>(obj_));
-  }
-
-  using ContainerType = HeteroSubgraph;
-};
+// Define HeteroSubgraphRef
+DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 // creators
 

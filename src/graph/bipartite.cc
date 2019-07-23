@@ -109,7 +109,17 @@ class Bipartite::COO : public BaseHeteroGraph {
     return vid < NumVertices(vtype);
   }
 
+  BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return {};
+  }
+
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
+    LOG(INFO) << "Not enabled for COO graph.";
+    return {};
+  }
+
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
     LOG(INFO) << "Not enabled for COO graph.";
     return {};
   }
@@ -361,10 +371,21 @@ class Bipartite::CSR : public BaseHeteroGraph {
     return vid < NumVertices(vtype);
   }
 
+  BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return {};
+  }
+
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(0, src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(1, dst)) << "Invalid dst vertex id: " << dst;
     return aten::CSRIsNonZero(adj_, src, dst);
+  }
+
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
+    CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+    CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+    return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
   }
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
@@ -554,11 +575,25 @@ bool Bipartite::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
   return GetAny()->HasVertex(vtype, vid);
 }
 
+BoolArray Bipartite::HasVertices(dgl_type_t vtype, IdArray vids) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  return aten::LT(vids, NumVertices(vtype));
+}
+
 bool Bipartite::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
   if (in_csr_) {
     return in_csr_->HasEdgeBetween(etype, dst, src);
   } else {
     return GetOutCSR()->HasEdgeBetween(etype, src, dst);
+  }
+}
+
+BoolArray Bipartite::HasEdgesBetween(
+    dgl_type_t etype, IdArray src, IdArray dst) const {
+  if (in_csr_) {
+    return in_csr_->HasEdgesBetween(etype, dst, src);
+  } else {
+    return GetOutCSR()->HasEdgesBetween(etype, src, dst);
   }
 }
 

@@ -43,6 +43,11 @@ bool HeteroGraph::IsMultigraph() const {
     });
 }
 
+BoolArray HeteroGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  return aten::LT(vids, NumVertices(vtype));
+}
+
 HeteroSubgraph HeteroGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
   CHECK_EQ(vids.size(), NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
@@ -65,24 +70,81 @@ HeteroSubgraph HeteroGraph::VertexSubgraph(const std::vector<IdArray>& vids) con
 
 HeteroSubgraph HeteroGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
-  // TODO(minjie): this is not correct
   CHECK_EQ(eids.size(), NumEdgeTypes())
     << "Invalid input: the input list size must be the same as the number of edge type.";
   HeteroSubgraph ret;
   ret.induced_vertices.resize(NumVertexTypes());
   ret.induced_edges = eids;
-  std::vector<HeteroGraphPtr> subrels(NumEdgeTypes());
-  for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
-    auto pair = meta_graph_->FindEdge(etype);
-    const dgl_type_t src_vtype = pair.first;
-    const dgl_type_t dst_vtype = pair.second;
-    const auto& rel_vsg = GetRelationGraph(etype)->EdgeSubgraph(
-        {eids[etype]}, preserve_nodes);
-    subrels[etype] = rel_vsg.graph;
-    ret.induced_vertices[src_vtype] = rel_vsg.induced_vertices[0];
-    ret.induced_vertices[dst_vtype] = rel_vsg.induced_vertices[1];
+  if (preserve_nodes) {
+    // When preserve_nodes is true, simply compute EdgeSubgraph for each bipartite
+    std::vector<HeteroGraphPtr> subrels(NumEdgeTypes());
+    for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
+      auto pair = meta_graph_->FindEdge(etype);
+      const dgl_type_t src_vtype = pair.first;
+      const dgl_type_t dst_vtype = pair.second;
+      const auto& rel_vsg = GetRelationGraph(etype)->EdgeSubgraph(
+          {eids[etype]}, preserve_nodes);
+      subrels[etype] = rel_vsg.graph;
+      ret.induced_vertices[src_vtype] = rel_vsg.induced_vertices[0];
+      ret.induced_vertices[dst_vtype] = rel_vsg.induced_vertices[1];
+    }
+    ret.graph = HeteroGraphPtr(new HeteroGraph(meta_graph_, subrels));
+  } else {
+    // NOTE(minjie): EdgeSubgraph when preserve_nodes is false is quite complicated in
+    // heterograph. This is because we need to make sure bipartite graphs that incident
+    // on the same vertex type must have the same ID space. For example, suppose we have
+    // following heterograph:
+    //
+    // Meta graph: A -> B -> C
+    // Bipartite graphs:
+    // * A -> B: (0, 0), (0, 1)
+    // * B -> C: (1, 0), (1, 1)
+    //
+    // Suppose for A->B, we only keep edge (0, 0), while for B->C we only keep (1, 0). We need
+    // to make sure that in the result subgraph, node type B still has two nodes. This means
+    // we cannot simply compute EdgeSubgraph for B->C which will relabel node#1 of type B to be
+    // node #0.
+    //
+    // One implementation is as follows:
+    // (1) For each bipartite graph, slice out the edges using the given eids.
+    // (2) Make a dictionary map<vtype, vector<IdArray>>, where the key is the vertex type
+    //     and the value is the incident nodes from the bipartite graphs that has the vertex
+    //     type as either srctype or dsttype.
+    // (3) Then for each vertex type, use aten::Relabel_ on its vector<IdArray>.
+    //     aten::Relabel_ computes the union of the vertex sets and relabel
+    //     the unique elements from zero. The returned mapping array is the final induced
+    //     vertex set for that vertex type.
+    // (4) Use the relabeled edges to construct the bipartite graph.
+    // step (1) & (2)
+    std::vector<EdgeArray> subedges(NumEdgeTypes());
+    std::vector<std::vector<IdArray>> vtype2incnodes(NumVertexTypes());
+    for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
+      auto pair = meta_graph_->FindEdge(etype);
+      const dgl_type_t src_vtype = pair.first;
+      const dgl_type_t dst_vtype = pair.second;
+      auto earray = GetRelationGraph(etype)->FindEdges(0, eids[etype]);
+      vtype2incnodes[src_vtype].push_back(earray.src);
+      vtype2incnodes[dst_vtype].push_back(earray.dst);
+      subedges[etype] = earray;
+    }
+    // step (3)
+    for (dgl_type_t vtype = 0; vtype < NumVertexTypes(); ++vtype) {
+      ret.induced_vertices[vtype] = aten::Relabel_(vtype2incnodes[vtype]);
+    }
+    // step (4)
+    std::vector<HeteroGraphPtr> subrels(NumEdgeTypes());
+    for (dgl_type_t etype = 0; etype < NumEdgeTypes(); ++etype) {
+      auto pair = meta_graph_->FindEdge(etype);
+      const dgl_type_t src_vtype = pair.first;
+      const dgl_type_t dst_vtype = pair.second;
+      subrels[etype] = Bipartite::CreateFromCOO(
+        ret.induced_vertices[src_vtype]->shape[0],
+        ret.induced_vertices[dst_vtype]->shape[0],
+        subedges[etype].src,
+        subedges[etype].dst);
+    }
+    ret.graph = HeteroGraphPtr(new HeteroGraph(meta_graph_, subrels));
   }
-  ret.graph = HeteroGraphPtr(new HeteroGraph(meta_graph_, subrels));
   return ret;
 }
 

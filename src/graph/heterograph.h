@@ -73,8 +73,14 @@ class HeteroGraph : public BaseHeteroGraph {
     return vid < NumVertices(vtype);
   }
 
+  BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const override;
+
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     return GetRelationGraph(etype)->HasEdgeBetween(0, src, dst);
+  }
+
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
+    return GetRelationGraph(etype)->HasEdgesBetween(0, src_ids, dst_ids);
   }
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
