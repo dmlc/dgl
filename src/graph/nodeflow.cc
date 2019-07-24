@@ -5,9 +5,10 @@
  */
 
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/nodeflow.h>
 
-#include <string.h>
+#include <string>
 
 #include "../c_api_common.h"
 
@@ -78,15 +79,14 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     std::string format = args[1];
     int64_t layer0_size = args[2];
     int64_t start = args[3];
     int64_t end = args[4];
     const bool remap = args[5];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, remap);
+    auto ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    auto res = GetNodeFlowSlice(*ig, format, layer0_size, start, end, remap);
     *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 

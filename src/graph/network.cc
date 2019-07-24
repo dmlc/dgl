@@ -3,9 +3,10 @@
  * \file graph/network.cc
  * \brief DGL networking related APIs
  */
-
 #include "./network.h"
 
+#include <dgl/runtime/container.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/nodeflow.h>
 
@@ -15,12 +16,8 @@
 #include "./network/socket_communicator.h"
 #include "./network/common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
 using dgl::network::StringPrintf;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace network {
@@ -120,12 +117,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
-    GraphHandle ghandle = args[2];
+    GraphRef g = args[2];
     const NDArray node_mapping = args[3];
     const NDArray edge_mapping = args[4];
     const NDArray layer_offsets = args[5];
     const NDArray flow_offsets = args[6];
-    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
+    auto ptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(ptr) << "only immutable graph is allowed in send/recv";
     auto csr = ptr->GetInCSR();
     // Create a message for the meta data of ndarray
     MsgMeta msg(NF_MSG);
@@ -193,7 +191,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
     MsgMeta msg(data_meta.get(), data_size);
     if (msg.Type() == NF_MSG) {
       CHECK_EQ(msg.NDArrayCount() * 2, msg.data_shape_.size());
-      NodeFlow* nf = new NodeFlow();
+      NodeFlow nf = NodeFlow::Create();
       // node_mapping
       std::unique_ptr<char> array_0(receiver->RecvFrom(&data_size, send_id));
       CHECK_EQ(msg.data_shape_[0], 1);

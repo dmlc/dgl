@@ -200,7 +200,7 @@ IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
 }
 
 // O(E*k) pretty slow
-Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
@@ -246,7 +246,7 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   return EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
-Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
+EdgeArray Graph::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
   int64_t len = eids->shape[0];
 
@@ -272,7 +272,7 @@ Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
+EdgeArray Graph::InEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = reverse_adjlist_[vid].succ.size();
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -290,7 +290,7 @@ Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::InEdges(IdArray vids) const {
+EdgeArray Graph::InEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
@@ -318,7 +318,7 @@ Graph::EdgeArray Graph::InEdges(IdArray vids) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::OutEdges(dgl_id_t vid) const {
+EdgeArray Graph::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = adjlist_[vid].succ.size();
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -336,7 +336,7 @@ Graph::EdgeArray Graph::OutEdges(dgl_id_t vid) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
+EdgeArray Graph::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
@@ -364,7 +364,7 @@ Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-Graph::EdgeArray Graph::Edges(const std::string &order) const {
+EdgeArray Graph::Edges(const std::string &order) const {
   const int64_t len = num_edges_;
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -583,11 +583,6 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
     LOG(FATAL) << "unsupported format";
     return std::vector<IdArray>();
   }
-}
-
-GraphPtr Graph::Reverse() const {
-  LOG(FATAL) << "not implemented";
-  return nullptr;
 }
 
 }  // namespace dgl

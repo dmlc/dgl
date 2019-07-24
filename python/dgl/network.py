@@ -108,15 +108,14 @@ def _send_nodeflow(sender, nodeflow, recv_id):
         Receiver ID
     """
     assert recv_id >= 0, 'recv_id cannot be a negative number.'
-    # convert all ndarray to dgltensor
-    graph_handle = nodeflow._graph._handle
+    gidx = nodeflow._graph
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendNodeFlow(sender,
                              int(recv_id),
-                             graph_handle,
+                             gidx,
                              node_mapping,
                              edge_mapping,
                              layers_offsets,
