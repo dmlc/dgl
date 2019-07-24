@@ -784,7 +784,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     *rv = List<NodeFlow>(nflows);
   });
 
-DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
+DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
     const GraphRef g = args[0];
@@ -802,22 +802,29 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NonUniformSampling")
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
     std::vector<NodeFlow> nflows;
+
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
     CHECK(probability->ndim == 1)
       << "transition probability must be a 1-dimensional vector";
-    CHECK(probability->shape[0] == gptr->NumEdges())
-      << "transition probability must have same number of elements as edges";
-    CHECK(probability->strides == nullptr || probability->strides[0] == 1)
-      << "transition probability must be contiguous tensor";
 
     ATEN_FLOAT_TYPE_SWITCH(
       probability->dtype,
       FloatType,
       "transition probability",
       {
-        const FloatType *prob = \
-          static_cast<const FloatType *>(probability->data);
+        const FloatType *prob;
+
+        if (probability->ndim == 1 && probability->shape[0] == 0) {
+          prob = nullptr;
+        } else {
+          CHECK(probability->shape[0] == gptr->NumEdges())
+            << "transition probability must have same number of elements as edges";
+          CHECK(probability->strides == nullptr || probability->strides[0] == 1)
+            << "transition probability must be contiguous tensor";
+          prob = static_cast<const FloatType *>(probability->data);
+        }
+
         nflows = NeighborSamplingImpl(
             gptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
             expand_factor, num_hops, neigh_type, add_self_loop, prob);
