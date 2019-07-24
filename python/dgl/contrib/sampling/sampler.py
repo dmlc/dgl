@@ -330,23 +330,35 @@ class NeighborSampler(NodeFlowSampler):
 
     def fetch(self, current_nodeflow_index):
         if self._transition_prob is None:
-            prob = F.zeros((0,), F.float32, F.cpu())    # empty array
+            prob = None
         elif isinstance(self._transition_prob, str):
             prob = self.g.edata[self._transition_prob]
         else:
             prob = self._transition_prob
 
-        nfobjs = _CAPI_NeighborSampling(
-            self.g._graph,
-            self.seed_nodes.todgltensor(),
-            current_nodeflow_index, # start batch id
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
-            self._expand_factor,
-            self._num_hops,
-            self._neighbor_type,
-            self._add_self_loop,
-            F.zerocopy_to_dgl_ndarray(prob))
+        if prob is None:
+            nfobjs = _CAPI_UniformSampling(
+                self.g._graph,
+                self.seed_nodes.todgltensor(),
+                current_nodeflow_index, # start batch id
+                self.batch_size,        # batch size
+                self._num_workers,      # num batches
+                self._expand_factor,
+                self._num_hops,
+                self._neighbor_type,
+                self._add_self_loop)
+        else:
+            nfobjs = _CAPI_NonUniformSampling(
+                self.g._graph,
+                self.seed_nodes.todgltensor(),
+                current_nodeflow_index, # start batch id
+                self.batch_size,        # batch size
+                self._num_workers,      # num batches
+                self._expand_factor,
+                self._num_hops,
+                self._neighbor_type,
+                self._add_self_loop,
+                F.zerocopy_to_dgl_ndarray(prob))
 
         nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
