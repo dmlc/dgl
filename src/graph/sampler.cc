@@ -802,6 +802,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
     std::vector<NodeFlow> nflows;
+    if (probability->ndim == 1 && probability->shape[0] == 0) {
+    }
 
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
