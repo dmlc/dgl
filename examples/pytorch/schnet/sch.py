@@ -57,9 +57,9 @@ class SchNetModel(nn.Module):
         self.atom_dense_layer1 = nn.Linear(dim, 64)
         self.atom_dense_layer2 = nn.Linear(64, output_dim)
 
-    def set_mean_std(self, mean, std):
-        self.mean_per_atom = th.Tensor(mean)
-        self.std_per_atom = th.Tensor(std)
+    def set_mean_std(self, mean, std, device="cpu"):
+        self.mean_per_atom = th.tensor(mean, device=device)
+        self.std_per_atom = th.tensor(std, device=device)
 
     def forward(self, g):
         """g is the DGL.graph"""

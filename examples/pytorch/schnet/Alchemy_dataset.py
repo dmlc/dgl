@@ -61,10 +61,12 @@ class TencentAlchemyDataset(Dataset):
             # Aromatic
             h_t.append(int(d['aromatic']))
             # Hybradization
-            h_t += [int(d['hybridization'] == x)
-                    for x in (Chem.rdchem.HybridizationType.SP,
-                              Chem.rdchem.HybridizationType.SP2,
-                              Chem.rdchem.HybridizationType.SP3)]
+            h_t += [
+                int(d['hybridization'] == x)
+                for x in (Chem.rdchem.HybridizationType.SP,
+                          Chem.rdchem.HybridizationType.SP2,
+                          Chem.rdchem.HybridizationType.SP3)
+            ]
             h_t.append(d['num_h'])
             feat.append((n, torch.FloatTensor(h_t)))
 
@@ -73,12 +75,13 @@ class TencentAlchemyDataset(Dataset):
     def alchemy_edges(self, g):
         e = {}
         for n1, n2, d in g.edges(data=True):
-            e_t = [float(d['b_type'] == x)
-                   for x in (Chem.rdchem.BondType.SINGLE,
-                             Chem.rdchem.BondType.DOUBLE,
-                             Chem.rdchem.BondType.TRIPLE,
-                             Chem.rdchem.BondType.AROMATIC,
-                             "NoBond")]
+            e_t = [
+                float(d['b_type'] == x)
+                for x in (Chem.rdchem.BondType.SINGLE,
+                          Chem.rdchem.BondType.DOUBLE,
+                          Chem.rdchem.BondType.TRIPLE,
+                          Chem.rdchem.BondType.AROMATIC, "NoBond")
+            ]
             e[(n1, n2)] = e_t
         nx.set_edge_attributes(g, e, "e_feat")
 
