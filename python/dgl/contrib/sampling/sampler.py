@@ -10,7 +10,6 @@ from ..._ffi.function import _init_api
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
-from ...utils import unwrap_to_ptr_list
 
 try:
     import Queue as queue
@@ -338,8 +337,8 @@ class NeighborSampler(NodeFlowSampler):
             prob = self._transition_prob
 
         if prob is None:
-            handles = _CAPI_UniformSampling(
-                self.g.c_handle,
+            nfobjs = _CAPI_UniformSampling(
+                self.g._graph,
                 self.seed_nodes.todgltensor(),
                 current_nodeflow_index, # start batch id
                 self.batch_size,        # batch size
@@ -349,8 +348,8 @@ class NeighborSampler(NodeFlowSampler):
                 self._neighbor_type,
                 self._add_self_loop)
         else:
-            handles = _CAPI_NonUniformSampling(
-                self.g.c_handle,
+            nfobjs = _CAPI_NonUniformSampling(
+                self.g._graph,
                 self.seed_nodes.todgltensor(),
                 current_nodeflow_index, # start batch id
                 self.batch_size,        # batch size
@@ -360,9 +359,8 @@ class NeighborSampler(NodeFlowSampler):
                 self._neighbor_type,
                 self._add_self_loop,
                 F.zerocopy_to_dgl_ndarray(prob))
-        handles = unwrap_to_ptr_list(handles)
 
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
 
@@ -437,15 +435,15 @@ class LayerSampler(NodeFlowSampler):
         self._layer_sizes = utils.toindex(layer_sizes)
 
     def fetch(self, current_nodeflow_index):
-        handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
-            self.g.c_handle,
+        nfobjs = _CAPI_LayerSampling(
+            self.g._graph,
             self.seed_nodes.todgltensor(),
             current_nodeflow_index,  # start batch id
             self.batch_size,         # batch size
             self._num_workers,       # num batches
             self._layer_sizes.todgltensor(),
-            self._neighbor_type))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+            self._neighbor_type)
+        nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):

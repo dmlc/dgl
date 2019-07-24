@@ -25,25 +25,4 @@ PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     return PackedFunc(body);
 }
 
-DGL_REGISTER_GLOBAL("_GetVectorWrapperSize")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const CAPIVectorWrapper* wrapper = static_cast<const CAPIVectorWrapper*>(ptr);
-    *rv = static_cast<int64_t>(wrapper->pointers.size());
-  });
-
-DGL_REGISTER_GLOBAL("_GetVectorWrapperData")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    CAPIVectorWrapper* wrapper = static_cast<CAPIVectorWrapper*>(ptr);
-    *rv = static_cast<void*>(wrapper->pointers.data());
-  });
-
-DGL_REGISTER_GLOBAL("_FreeVectorWrapper")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    CAPIVectorWrapper* wrapper = static_cast<CAPIVectorWrapper*>(ptr);
-    delete wrapper;
-  });
-
 }  // namespace dgl
