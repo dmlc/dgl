@@ -7,13 +7,12 @@ import scipy
 
 from .graph import DGLGraph
 from ._ffi.object import ObjectBase, register_object
-from ._ffi.runtime_ctypes import DGLArrayHandle, DGLArray
 # from ._ffi.base import c_array
+from . import _api_internal
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
-from .ndarray import from_dlpack, NDArrayBase
 
 _init_api("dgl.graph_serialize")
 
@@ -29,11 +28,23 @@ class GraphData(ObjectBase):
             node_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
         for key, value in g.edata.items():
             edge_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
-
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
+    def getGraph(self):
+        ghandle = _CAPI_GDataGraphHandle(self)
+        g = DGLGraph(graph_data=ghandle, readonly=True)
+        node_tensors = _CAPI_GDataNodeTensors(self).items()
+        edge_tensors = _CAPI_GDataEdgeTensors(self).items()
 
-# register_object("Value")(NDArrayBase)
+
+    
+    @staticmethod
+    def tensor_dict(self):
+        akvs = _CAPI_GDataNodeTensors(self)
+        akvs.items()
+        return {k:v for k,v in items}
+
+# register_object("Value")(NDArrayBase)s
 # from ._ffi._ctypes.function import _make_array
 #
 def construct_graph(n):
@@ -48,9 +59,9 @@ def construct_graph(n):
 
         import torch as th
 
-        g.edata['e1'] = th.ones(3, 5)
-        g.edata['e2'] = th.zeros(3, 5)
-        g.ndata['n1'] = th.ones(10, 2)
+        g.edata['e1'] = th.ones(3, 5).float()
+        g.edata['e2'] = th.zeros(3, 5).float()
+        g.ndata['n1'] = th.ones(10, 2).float()
         g.readonly()
         g_list.append(g)
     return g_list
@@ -70,7 +81,12 @@ def aaa():
     print(g_data[0])
     _CAPI_DGLSaveGraphs("/tmp/test.bin", g_data)
 
+    print("Saved")
+
+    gdata_list = _CAPI_DGLLoadGraphs("/tmp/test.bin", [0, 1, 2])
+    GraphData.getGraph(gdata_list[0])
 
 aaa()
 
 # _CAPI_MakeGraphData(g._graph)
+# p
