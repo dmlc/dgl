@@ -1,11 +1,18 @@
-#include <tuple>
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/graph_serialize.cc
+ * \brief Graph serialization implementation
+ */
+#include "graph_serialize.h"
 #include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <dgl/runtime/container.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/object.h>
-#include "graph_serialize.h"
 
 using namespace dgl::runtime;
 
@@ -55,7 +62,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++ i) {
+    for (uint64_t i = 0; i < idxs.size(); ++i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }
     *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
@@ -110,7 +117,7 @@ bool SaveDGLGraphs(std::string filename,
   std::vector<dgl_id_t> nodes_num_list(num_graph);
   std::vector<dgl_id_t> edges_num_list(num_graph);
 
-  for (uint64_t i = 0; i < num_graph; ++ i) {
+  for (uint64_t i = 0; i < num_graph; ++i) {
     nodes_num_list[i] = graph_data[i]->gptr->NumVertices();
     edges_num_list[i] = graph_data[i]->gptr->NumEdges();
   }
@@ -122,7 +129,7 @@ bool SaveDGLGraphs(std::string filename,
   fs->Write(edges_num_list);
 
   // Write GraphData
-  for (uint64_t i = 0; i < num_graph; ++ i) {
+  for (uint64_t i = 0; i < num_graph; ++i) {
     graph_indices[i] = fs->Tell();
     GraphDataObject gdata = *graph_data[i].as<GraphDataObject>();
     fs->Write(gdata);
@@ -167,7 +174,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   std::vector<GraphData> gdata_refs(idx_list.size());
   if (idx_list.size() == 0) {
     // Read All Graphs
-    for (uint64_t i = 0; i < num_graph; ++ i) {
+    for (uint64_t i = 0; i < num_graph; ++i) {
       GraphDataObject *gdata_ptr =
               const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
       fs->Read(gdata_ptr);
@@ -175,7 +182,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   } else {
     // Read Selected Graphss
     std::sort(idx_list.begin(), idx_list.end());
-    for (uint64_t i = 0; i < idx_list.size(); ++ i) {
+    for (uint64_t i = 0; i < idx_list.size(); ++i) {
       fs->Seek(graph_indices[i]);
       gdata_refs[i] = GraphData::Create();
       GraphDataObject *gdata_ptr =
