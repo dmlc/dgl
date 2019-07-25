@@ -1,14 +1,11 @@
-//
-// Created by Allen Zhou on 2019/6/19.
-//
-
 #include <tuple>
-#include "graph_serialize.h"
+#include <iostream>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
-#include <iostream>
 #include <dgl/runtime/container.h>
-
+#include <dgl/immutable_graph.h>
+#include <dgl/runtime/object.h>
+#include "graph_serialize.h"
 
 using namespace dgl::runtime;
 
@@ -17,184 +14,197 @@ using dgl::COOPtr;
 using dgl::ImmutableGraph;
 using dmlc::SeekStream;
 using dgl::runtime::NDArray;
+using std::vector;
+using dgl::serialize::GraphData;
+using dgl::serialize::GraphDataObject;
 
-namespace dmlc { DMLC_DECLARE_TRAITS(has_saveload, NDArray, true); }
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, NDArray, true);
+DMLC_DECLARE_TRAITS(has_saveload, GraphDataObject, true);
+}
 
 namespace dgl {
 namespace serialize {
 
-typedef std::pair<std::string, NDArray> NamedTensor;
-
 enum GraphType {
-  kMutableGraph = 0,
-  kImmutableGraph = 1
+  kMutableGraph = 0ull,
+  kImmutableGraph = 1ull
 };
 
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    GraphRef gptr = args[0];
+    ImmutableGraphPtr imGPtr = ToImmutableGraph(gptr.sptr());
+//    List<>
+    Map<std::string, Value> node_tensors = args[1];
+    Map<std::string, Value> edge_tensors = args[2];
+    GraphData gd = GraphData::Create();
+    gd->setData(imGPtr, node_tensors, edge_tensors);
+    *rv = gd;
+});
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
-    List<GraphPtr> gptr_list = args[1];
-    List<List<std::string>> node_name_list = args[2];
-    List<List<DLTensor>> node_tensor_list = args[3];
-    List<List<std::string>> edge_name_list = args[4];
-    List<List<DLTensor>> edge_tensor_list = args[5];
-    std::vector<GraphPtr> gptrs = gptr_list;
-//    SaveDGLGraphs(filename,
-//                  gptr_list->,
-//                  node_name_list,
-//                  node_tensor_list,
-//                  edge_name_list,
-//                  edge_tensor_list);
+    List<GraphData> graph_data = args[1];
+    SaveDGLGraphs(filename, graph_data);
 });
 
-bool SaveDGLGraphs(const std::string &filename,
-                   List<GraphPtr> gptr_list,
-                   List<List<std::string>> node_name_list,
-                   List<List<DLTensor>> node_tensor_list,
-                   List<List<std::string>> edge_name_list,
-                   List<List<DLTensor>> edge_tensor_list) {
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    std::string filename = args[0];
+    List<Value> idxs = args[1];
+    std::vector<size_t> idx_list(idxs.size());
+    for (uint64_t i = 0; i < idxs.size(); ++ i) {
+      idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
+    }
+    *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
+});
+
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataGraphHandle")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    GraphData gdata = args[0];
+    *rv = gdata -> gptr;
+});
+
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
+.set_body([](DGLArgs args, DGLRetValue *rv){
+    GraphData gdata = args[0];
+    Map<std::string, Value> rvmap;
+    for (auto kv : gdata->node_tensors) {
+      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+    }
+    *rv = rvmap;
+});
+
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataEdgeTensors")
+.set_body([](DGLArgs args, DGLRetValue *rv){
+    GraphData gdata = args[0];
+    Map<std::string, Value> rvmap;
+    for (auto kv : gdata->edge_tensors) {
+      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+    }
+    *rv = rvmap;
+});
+
+
+constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
+
+bool SaveDGLGraphs(std::string filename,
+                   List<GraphData> graph_data) {
   auto *fs = dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w",
                                                            true));
   CHECK(fs) << "File name is not a valid local file name";
-  fs->Write(runtime::kDGLNDArrayMagic);
-  const uint32_t kVersion = 1;
+
+  // Write DGL MetaData
+  const uint64_t kVersion = 1;
+  fs->Write(kDGLSerializeMagic);
   fs->Write(kVersion);
   fs->Write(kImmutableGraph);
-
   fs->Seek(4096);
-  fs->Write(num_graph);
-  size_t indices_start_ptr = fs->Tell();
-  std::vector<uint64_t> graph_indices(num_graph);
-  fs->Write(graph_indices);
 
+  // Write Graph Meta Data
+  size_t num_graph = graph_data.size();
+
+  std::vector<dgl_id_t> graph_indices(num_graph);
   std::vector<dgl_id_t> nodes_num_list(num_graph);
   std::vector<dgl_id_t> edges_num_list(num_graph);
 
-  std::vector<const ImmutableGraph *> immutable_graphs(num_graph);
-
-  for (int i = 0; i < num_graph; ++ i) {
-    const GraphInterface *g = static_cast<const GraphInterface *>(gstructs[i].g_handle);
-    immutable_graphs[i] = ToImmutableGraph(g);
-
-    const CSRPtr g_csr = immutable_graphs[i]->GetInCSR();
-    nodes_num_list[i] = g_csr->NumVertices();
-    edges_num_list[i] = g_csr->NumEdges();
-
+  for (uint64_t i = 0; i < num_graph; ++ i) {
+    nodes_num_list[i] = graph_data[i]->gptr->NumVertices();
+    edges_num_list[i] = graph_data[i]->gptr->NumEdges();
   }
+  // Reserve spaces for graph indices
+  fs->Write(num_graph);
+  size_t indices_start_ptr = fs->Tell();
+  fs->Write(graph_indices);
   fs->Write(nodes_num_list);
   fs->Write(edges_num_list);
 
-  for (int i = 0; i < num_graph; ++ i) {
+  // Write GraphData
+  for (uint64_t i = 0; i < num_graph; ++ i) {
     graph_indices[i] = fs->Tell();
-    const CSRPtr g_csr = immutable_graphs[i]->GetInCSR();
-    fs->Write(g_csr->indptr());
-    fs->Write(g_csr->indices());
-    fs->Write(g_csr->edge_ids());
-    fs->Write(gstructs->num_node_feats);
-    fs->Write(gstructs->node_names);
-    fs->Write(gstructs->node_feats);
-    fs->Write(gstructs->num_edge_feats);
-    fs->Write(gstructs->edge_names);
-    fs->Write(gstructs->edge_feats);
+    GraphDataObject gdata= *graph_data[i].as<GraphDataObject>();
+    fs->Write(gdata);
   }
-  fs->Seek(indices_start_ptr);
-  fs->Write(graph_indices);
 
   fs->Seek(indices_start_ptr);
   fs->Write(graph_indices);
+
+  std::vector<dgl_id_t> test;
+  fs->Seek(indices_start_ptr);
+  fs->Read(&test);
+  
   return true;
 }
 
 
-
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
-.set_body([](DGLArgs args, DGLRetValue *rv) {
-    void *filename_handle = args[0];
-    void *idx_list_handle = args[1];
-    int num_idx = args[2];
-    uint32_t *idx_list_array = static_cast<uint32_t *>(idx_list_handle);
-    std::vector<uint32_t> idx_list(idx_list_array, idx_list_array + num_idx);
-    const char *name_handle = static_cast<const char *>(filename_handle);
-    std::string filename(name_handle);
-    *rv = reinterpret_cast<void *>(&LoadDGLGraphs(filename, idx_list)[0]);
-});
-
-const ImmutableGraph *ToImmutableGraph(const GraphInterface *g) {
-  const ImmutableGraph *imgr = dynamic_cast<const ImmutableGraph *>(g);
-  if (imgr) {
-    return imgr;
-  } else {
-    const Graph *mgr = dynamic_cast<const Graph *>(g);
-    CHECK(mgr) << "Invalid Graph Pointer";
-    IdArray srcs_array = mgr->Edges("srcdst").src;
-    IdArray dsts_array = mgr->Edges("srcdst").dst;
-    // TODO: Memory Leak
-    COOPtr coo(new COO(mgr->NumVertices(), srcs_array, dsts_array, mgr->IsMultigraph()));
-    const ImmutableGraph *imgptr = new ImmutableGraph(coo);
-    return imgptr;
-  }
-}
-
-std::vector<DGLGraphSerialize> LoadDGLGraphs(const std::string &filename,
-                                             std::vector<uint32_t> idx_list) {
+std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
+                                     std::vector<dgl_id_t> idx_list) {
   SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
-  uint64_t DGLMagicNum;
-  uint64_t kImmutableGraph;
-  CHECK_EQ(fs->Read(&DGLMagicNum), runtime::kDGLNDArrayMagic) << "Invalid DGL files";
-  CHECK(fs->Read(&kImmutableGraph)) << "Invalid DGL files";
-  uint32_t kVersion = 1;
-  CHECK(fs->Read(&kVersion)) << "Invalid Serialization Version";
+  // Read DGL MetaData
+  uint64_t magicNum, graphType, version;
+  fs->Read(&magicNum);
+  fs->Read(&graphType);
+  fs->Read(&version);
   fs->Seek(4096);
-  dgl_id_t num_graph;
-  CHECK(fs->Read(&num_graph)) << "Invalid number of graphs";
-  std::vector<uint64_t> graph_indices(num_graph);
-  CHECK(fs->ReadArray(&graph_indices[0], num_graph)) << "Invalid graph indices data";
-  std::vector<dgl_id_t> nodes_num_list(num_graph);
-  std::vector<dgl_id_t> edges_num_list(num_graph);
-  CHECK(fs->ReadArray(&nodes_num_list, num_graph));
-  CHECK(fs->ReadArray(&edges_num_list, num_graph));
 
-  std::sort(idx_list.begin(), idx_list.end());
-  std::vector<DGLGraphSerialize> graph_list;
+  CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
+  CHECK_EQ(graphType, GraphType::kImmutableGraph) << "Invalid DGL files";
+  CHECK_EQ(version, 1) << "Invalid Serialization Version";
 
+  // Read Graph MetaData
+  uint64_t num_graph;
+  CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
+  std::vector<dgl_id_t> graph_indices;
+  std::vector<dgl_id_t> nodes_num_list;
+  std::vector<dgl_id_t> edges_num_list;
 
-  for (int i = 0; i < idx_list.size(); ++ i) {
-    fs->Seek(graph_indices[i]);
-    NDArray indptr, indices, edge_id;
-    uint32_t num_node_feats, num_edge_feats;
-    const char **node_names, **edge_names;
-    NDArray *node_feats, *edge_feats;
-    fs->Read(&indptr);
-    fs->Read(&indices);
-    fs->Read(&edge_id);
-    fs->Read(&num_node_feats);
-    fs->ReadArray(&node_names, num_node_feats);
-    fs->ReadArray(&node_feats, num_node_feats);
-    fs->Read(&num_edge_feats);
-    fs->ReadArray(&edge_names, num_edge_feats);
-    fs->ReadArray(&edge_feats, num_edge_feats);
-    CSRPtr csr = std::make_shared<CSR>(indptr, indices, edge_id);
-    ImmutableGraph g(csr);
-//    ret_g.emplace_back(csr);
-    DGLGraphSerialize g_struct = {.g_handle= g.Reset(),
-            .num_node_feats = num_node_feats,
-            .num_edge_feats = num_node_feats,
-            .node_names = node_names,
-            .node_feats = nullptr,
-            .edge_names = edge_names,
-            .edge_feats = nullptr};
-//    DGLGraphSerialize g_struct = {.g_handle= g.Reset(),
-//            .num_node_feats = num_node_feats,
-//            .num_edge_feats = num_node_feats,
-//            .node_names = node_names,
-//            .node_feats = &node_feats,
-//            .edge_names = edge_names,
-//            .edge_feats = &edge_feats};
-    graph_list.push_back(g_struct);
+  CHECK(fs->Read(&graph_indices)) << "Invalid graph indices";
+  CHECK(fs->Read(&nodes_num_list)) << "Invalid node num list";
+  CHECK(fs->Read(&edges_num_list)) << "Invalid edge num list";
+
+  std::vector<GraphData> gdata_refs(idx_list.size());
+  if (idx_list.size() == 0)
+  {
+    // Read All Graphs
+    for (uint64_t i = 0; i < num_graph; ++i)
+    {
+      GraphDataObject *gdata_ptr = const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+      fs->Read(gdata_ptr);
+    }
   }
-  return graph_list;
+  else
+  {
+    // Read Selected Graphss
+    std::sort(idx_list.begin(), idx_list.end());
+    for (uint64_t i = 0; i < idx_list.size(); ++i)
+    {
+      fs->Seek(graph_indices[i]);
+      gdata_refs[i] = GraphData::Create();
+      GraphDataObject *gdata_ptr = const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+      fs->Read(gdata_ptr);
+    }
+  }
+
+  return gdata_refs;
+};
+
+
+ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
+  ImmutableGraphPtr imgr = std::dynamic_pointer_cast<ImmutableGraph>(g);
+ if (imgr) { 
+   return imgr;
+ } else {
+   MutableGraphPtr mgr = std::dynamic_pointer_cast<Graph>(g);
+   CHECK(mgr) << "Invalid Graph Pointer";
+   IdArray srcs_array = mgr->Edges("srcdst").src;
+   IdArray dsts_array = mgr->Edges("srcdst").dst;
+   ImmutableGraphPtr imgptr = ImmutableGraph::CreateFromCOO(mgr->NumVertices(), srcs_array, dsts_array);
+   return imgptr;
+ }
 }
+//
 }
 
 }

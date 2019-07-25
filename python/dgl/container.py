@@ -68,4 +68,4 @@ class StrMap(Map):
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
-        return [(akvs[i].value, akvs[i+1]) for i in range(0, len(akvs), 2)]
+        return [(_api_internal._ValueGet(akvs[i]), akvs[i+1]) for i in range(0, len(akvs), 2)]
