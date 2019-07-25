@@ -1,2 +1,2 @@
 from dgl import graph_serialize
-graph_serialize.saveDGLGraph() 
+# graph_serialize.saveDGLGraph()
