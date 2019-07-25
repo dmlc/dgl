@@ -64,11 +64,11 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataGraphHandle")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
-    *rv = gdata -> gptr;
+    *rv = gdata->gptr;
 });
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
-.set_body([](DGLArgs args, DGLRetValue *rv){
+.set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
     Map<std::string, Value> rvmap;
     for (auto kv : gdata->node_tensors) {
@@ -78,7 +78,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
 });
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataEdgeTensors")
-.set_body([](DGLArgs args, DGLRetValue *rv){
+.set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
     Map<std::string, Value> rvmap;
     for (auto kv : gdata->edge_tensors) {
@@ -124,7 +124,7 @@ bool SaveDGLGraphs(std::string filename,
   // Write GraphData
   for (uint64_t i = 0; i < num_graph; ++ i) {
     graph_indices[i] = fs->Tell();
-    GraphDataObject gdata= *graph_data[i].as<GraphDataObject>();
+    GraphDataObject gdata = *graph_data[i].as<GraphDataObject>();
     fs->Write(gdata);
   }
 
@@ -134,7 +134,7 @@ bool SaveDGLGraphs(std::string filename,
   std::vector<dgl_id_t> test;
   fs->Seek(indices_start_ptr);
   fs->Read(&test);
-  
+
   return true;
 }
 
@@ -165,24 +165,21 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   CHECK(fs->Read(&edges_num_list)) << "Invalid edge num list";
 
   std::vector<GraphData> gdata_refs(idx_list.size());
-  if (idx_list.size() == 0)
-  {
+  if (idx_list.size() == 0) {
     // Read All Graphs
-    for (uint64_t i = 0; i < num_graph; ++i)
-    {
-      GraphDataObject *gdata_ptr = const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+    for (uint64_t i = 0; i < num_graph; ++ i) {
+      GraphDataObject *gdata_ptr =
+              const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
       fs->Read(gdata_ptr);
     }
-  }
-  else
-  {
+  } else {
     // Read Selected Graphss
     std::sort(idx_list.begin(), idx_list.end());
-    for (uint64_t i = 0; i < idx_list.size(); ++i)
-    {
+    for (uint64_t i = 0; i < idx_list.size(); ++ i) {
       fs->Seek(graph_indices[i]);
       gdata_refs[i] = GraphData::Create();
-      GraphDataObject *gdata_ptr = const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+      GraphDataObject *gdata_ptr =
+              const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
       fs->Read(gdata_ptr);
     }
   }
@@ -193,16 +190,17 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
   ImmutableGraphPtr imgr = std::dynamic_pointer_cast<ImmutableGraph>(g);
- if (imgr) { 
-   return imgr;
- } else {
-   MutableGraphPtr mgr = std::dynamic_pointer_cast<Graph>(g);
-   CHECK(mgr) << "Invalid Graph Pointer";
-   IdArray srcs_array = mgr->Edges("srcdst").src;
-   IdArray dsts_array = mgr->Edges("srcdst").dst;
-   ImmutableGraphPtr imgptr = ImmutableGraph::CreateFromCOO(mgr->NumVertices(), srcs_array, dsts_array);
-   return imgptr;
- }
+  if (imgr) {
+    return imgr;
+  } else {
+    MutableGraphPtr mgr = std::dynamic_pointer_cast<Graph>(g);
+    CHECK(mgr) << "Invalid Graph Pointer";
+    IdArray srcs_array = mgr->Edges("srcdst").src;
+    IdArray dsts_array = mgr->Edges("srcdst").dst;
+    ImmutableGraphPtr imgptr = ImmutableGraph::CreateFromCOO(mgr->NumVertices(), srcs_array,
+                                                             dsts_array);
+    return imgptr;
+  }
 }
 //
 }
