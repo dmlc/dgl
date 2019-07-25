@@ -820,7 +820,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
         } else {
           CHECK(probability->shape[0] == gptr->NumEdges())
             << "transition probability must have same number of elements as edges";
-          CHECK(probability->strides == nullptr || probability->strides[0] == 1)
+          CHECK(probability.IsContiguous())
             << "transition probability must be contiguous tensor";
           prob = static_cast<const FloatType *>(probability->data);
         }
