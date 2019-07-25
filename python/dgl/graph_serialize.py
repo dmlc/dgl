@@ -1,3 +1,4 @@
+"""For Graph Serialization"""
 from __future__ import absolute_import
 from .graph import DGLGraph
 from ._ffi.object import ObjectBase, register_object
