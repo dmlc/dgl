@@ -6,7 +6,6 @@
 #ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
 #define DGL_GRAPH_GRAPH_SERIALIZE_H_
 
-#include "../c_api_common.h"
 #include <dgl/graph.h>
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
@@ -21,6 +20,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include "../c_api_common.h"
 
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
