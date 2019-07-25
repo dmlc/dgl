@@ -28,7 +28,6 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace serialize {
 
-
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
@@ -114,6 +113,7 @@ bool SaveDGLGraphs(std::string filename,
 std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
                                      std::vector<dgl_id_t> idx_list);
 
+ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 
 } // namespace serialize
 } //namespace dgl

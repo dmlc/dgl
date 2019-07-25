@@ -33,60 +33,26 @@ class GraphData(ObjectBase):
     def getGraph(self):
         ghandle = _CAPI_GDataGraphHandle(self)
         g = DGLGraph(graph_data=ghandle, readonly=True)
-        node_tensors = _CAPI_GDataNodeTensors(self).items()
-        edge_tensors = _CAPI_GDataEdgeTensors(self).items()
+        node_tensors_items = _CAPI_GDataNodeTensors(self).items()
+        edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
+        for k, v in node_tensors_items:
+            g.ndata[k] = F.zerocopy_from_dgl_ndarray(_api_internal._ValueGet(v))
+        for k, v in edge_tensors_items:
+            g.edata[k] = F.zerocopy_from_dgl_ndarray(_api_internal._ValueGet(v))
+        return g
 
+
+def save_graphs(filename, g_list):
+    gdata_list = [GraphData.create(g) for g in g_list]
+    _CAPI_DGLSaveGraphs(filename, gdata_list)
+
+def load_graphs(filename, idx_list=None):
+    if idx_list is None:
+        idx_list = []
+    gdata_list = _CAPI_DGLLoadGraphs(filename, idx_list)
+    return [gdata.getGraph() for gdata in gdata_list]
 
     
-    @staticmethod
-    def tensor_dict(self):
-        akvs = _CAPI_GDataNodeTensors(self)
-        akvs.items()
-        return {k:v for k,v in items}
-
-# register_object("Value")(NDArrayBase)s
-# from ._ffi._ctypes.function import _make_array
-#
-def construct_graph(n):
-    from .graph import DGLGraph
-    g_list = []
-    for i in range(n):
-        g = DGLGraph()
-        g.add_nodes(10)
-        g.add_edges(1, 2)
-        g.add_edges(3, 2)
-        g.add_edges(3, 3)
-
-        import torch as th
-
-        g.edata['e1'] = th.ones(3, 5).float()
-        g.edata['e2'] = th.zeros(3, 5).float()
-        g.ndata['n1'] = th.ones(10, 2).float()
-        g.readonly()
-        g_list.append(g)
-    return g_list
-
-
-#
-def aaa():
-    g_list = construct_graph(3)
-
-    # g = g_list[0]
-
-    g_data = []
-    for g in g_list:
-        g_data.append(GraphData.create(g))
-
-    print(g_data)
-    print(g_data[0])
-    _CAPI_DGLSaveGraphs("/tmp/test.bin", g_data)
-
-    print("Saved")
-
-    gdata_list = _CAPI_DGLLoadGraphs("/tmp/test.bin", [0, 1, 2])
-    GraphData.getGraph(gdata_list[0])
-
-aaa()
 
 # _CAPI_MakeGraphData(g._graph)
 # p
