@@ -184,7 +184,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     // Read Selected Graphss
     std::sort(idx_list.begin(), idx_list.end());
     for (uint64_t i = 0; i < idx_list.size(); ++i) {
-      fs->Seek(graph_indices[i]);
+      fs->Seek(graph_indices[idx_list[i]]);
       gdata_refs[i] = GraphData::Create();
       GraphDataObject *gdata_ptr =
               const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
