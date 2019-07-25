@@ -84,15 +84,7 @@ class GraphDataObject : public runtime::Object {
 
 class GraphData : public runtime::ObjectRef {
  public:
-  GraphData() {}
-  explicit GraphData(std::shared_ptr<runtime::Object> obj) : runtime::ObjectRef(obj) {}
-  const GraphDataObject *operator->() const {
-    return static_cast<const GraphDataObject *>(obj_.get());
-  }
-  GraphDataObject *operator->() {
-    return static_cast<GraphDataObject *>(obj_.get());
-  }
-  using ContainerType = GraphDataObject;
+  DGL_DEFINE_OBJECT_REF_METHODS(GraphData, runtime::ObjectRef, GraphDataObject);
   /*! \brief create a new GraphData reference */
   static GraphData Create() {
     return GraphData(std::make_shared<GraphDataObject>());
