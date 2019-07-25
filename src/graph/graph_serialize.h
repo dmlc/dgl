@@ -6,6 +6,7 @@
 #ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
 #define DGL_GRAPH_GRAPH_SERIALIZE_H_
 
+#include "../c_api_common.h"
 #include <dgl/graph.h>
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
@@ -15,17 +16,12 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/object.h>
 #include <dgl/packed_func_ext.h>
-#include "../c_api_common.h"
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <utility>
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
 using dgl::runtime::NDArray;
 using dgl::ImmutableGraph;
 using namespace dgl::runtime;
@@ -114,4 +110,4 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 }  // namespace serialize
 }  // namespace dgl
 
-#endif //DGL_GRAPH_GRAPH_SERIALIZE_H_
+#endif  // DGL_GRAPH_GRAPH_SERIALIZE_H_
