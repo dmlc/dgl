@@ -24,7 +24,7 @@ endif()
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" ON)
+dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
