@@ -192,7 +192,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   }
 
   return gdata_refs;
-};
+}
 
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
@@ -209,9 +209,7 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
     return imgptr;
   }
 }
-//
-}
-
-}
+} // namespace serialize
+} // namespace dgl
 
 

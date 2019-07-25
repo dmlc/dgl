@@ -1,5 +1,10 @@
-#ifndef DGL_GRAPH_SERIALIZE_H
-#define DGL_GRAPH_SERIALIZE_H
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file graph/graph_serialize.h
+ * \brief Graph serialization header
+ */
+#ifndef DGL_GRAPH_GRAPH_SERIALIZE_H_
+#define DGL_GRAPH_GRAPH_SERIALIZE_H_
 
 #include <dgl/graph.h>
 #include <dgl/array.h>
@@ -27,7 +32,6 @@ namespace serialize {
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
-
 public:
   ImmutableGraphPtr gptr;
   std::vector<NamedTensor> node_tensors;
@@ -39,13 +43,13 @@ public:
                Map<std::string, Value> edge_tensors) {
     this->gptr = gptr;
 
-    for (auto kv: node_tensors) {
+    for (auto kv : node_tensors) {
       std::string name = kv.first;
       Value v = kv.second;
       NDArray ndarray = static_cast<NDArray>(v->data);
       this->node_tensors.emplace_back(name, ndarray);
     }
-    for (auto kv: edge_tensors) {
+    for (auto kv : edge_tensors) {
       std::string &name = kv.first;
       Value v = kv.second;
       const NDArray &ndarray = static_cast<NDArray>(v->data);
@@ -114,4 +118,4 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 } // namespace serialize
 } //namespace dgl
 
-#endif //DGL_GRAPH_SERIALIZE_H
+#endif //DGL_GRAPH_GRAPH_SERIALIZE_H_
