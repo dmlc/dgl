@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
+#include <memory>
 
 #include "graph_interface.h"
 
@@ -19,21 +20,9 @@ namespace dgl {
 
 class Graph;
 class GraphOp;
+typedef std::shared_ptr<Graph> MutableGraphPtr;
 
-/*!
- * \brief Base dgl graph index class.
- *
- * DGL's graph is directed. Vertices are integers enumerated from zero.
- *
- * Removal of vertices/edges is not allowed. Instead, the graph can only be "cleared"
- * by removing all the vertices and edges.
- *
- * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
- * the input edges are represented by two id arrays for source and destination
- * vertex ids. In the general case, the two arrays should have the same length.
- * If the length of src id array is one, it represents one-many connections.
- * If the length of dst id array is one, it represents many-one connections.
- */
+/*! \brief Mutable graph based on adjacency list. */
 class Graph: public GraphInterface {
  public:
   /*! \brief default constructor */
@@ -306,15 +295,6 @@ class Graph: public GraphInterface {
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  GraphPtr Reverse() const override;
-
-  /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
@@ -359,16 +339,6 @@ class Graph: public GraphInterface {
   }
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  GraphInterface *Reset() override {
-    Graph* gptr = new Graph();
-    *gptr = std::move(*this);
-    return gptr;
-  }
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -378,6 +348,17 @@ class Graph: public GraphInterface {
    * \return a vector of three IdArray.
    */
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+
+  /*! \brief Create an empty graph */
+  static MutableGraphPtr Create(bool multigraph = false) {
+    return std::make_shared<Graph>(multigraph);
+  }
+
+  /*! \brief Create from coo */
+  static MutableGraphPtr CreateFromCOO(
+      int64_t num_nodes, IdArray src_ids, IdArray dst_ids, bool multigraph = false) {
+    return std::make_shared<Graph>(src_ids, dst_ids, num_nodes, multigraph);
+  }
 
  protected:
   friend class GraphOp;

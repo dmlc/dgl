@@ -139,7 +139,7 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
     if out_rows is None:
         out_rows = empty([])
     _CAPI_DGLKernelBinaryOpReduce(
-        reducer, op, G._handle,
+        reducer, op, G,
         int(A_target), int(B_target),
         A, B, out,
         A_rows, B_rows, out_rows)
@@ -203,7 +203,7 @@ def backward_lhs_binary_op_reduce(
     if out_rows is None:
         out_rows = empty([])
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
-        reducer, op, G._handle,
+        reducer, op, G,
         int(A_target), int(B_target),
         A_rows, B_rows, out_rows,
         A, B, out,
@@ -268,7 +268,7 @@ def backward_rhs_binary_op_reduce(
     if out_rows is None:
         out_rows = empty([])
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
-        reducer, op, G._handle,
+        reducer, op, G,
         int(A_target), int(B_target),
         A_rows, B_rows, out_rows,
         A, B, out,
@@ -365,7 +365,7 @@ def copy_reduce(reducer, G, target,
     if out_rows is None:
         out_rows = empty([])
     _CAPI_DGLKernelCopyReduce(
-        reducer, G._handle, int(target),
+        reducer, G, int(target),
         X, out, X_rows, out_rows)
 
 # pylint: disable=invalid-name
@@ -407,7 +407,7 @@ def backward_copy_reduce(reducer, G, target,
     if out_rows is None:
         out_rows = empty([])
     _CAPI_DGLKernelBackwardCopyReduce(
-        reducer, G._handle, int(target),
+        reducer, G, int(target),
         X, out, grad_out, grad_X,
         X_rows, out_rows)
 
