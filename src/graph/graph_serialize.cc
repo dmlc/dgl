@@ -1,18 +1,18 @@
 /*!
- *  Copyright (c) 2018 by Contributors
+ *  Copyright (c) 2019 by Contributors
  * \file graph/graph_serialize.cc
  * \brief Graph serialization implementation
  */
 #include "graph_serialize.h"
-#include <iostream>
-#include <string>
-#include <vector>
-#include <algorithm>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <dgl/runtime/container.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/object.h>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
 
 using namespace dgl::runtime;
 
