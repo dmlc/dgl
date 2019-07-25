@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <utility>
 
 using namespace dgl::runtime;
 
@@ -209,7 +210,7 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
     return imgptr;
   }
 }
-} // namespace serialize
-} // namespace dgl
+}  // namespace serialize
+}  // namespace dgl
 
 

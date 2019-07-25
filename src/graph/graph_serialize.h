@@ -16,7 +16,11 @@
 #include <dgl/runtime/object.h>
 #include <dgl/packed_func_ext.h>
 #include "../c_api_common.h"
-
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <utility>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -32,7 +36,7 @@ namespace serialize {
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
-public:
+ public:
   ImmutableGraphPtr gptr;
   std::vector<NamedTensor> node_tensors;
   std::vector<NamedTensor> edge_tensors;
@@ -83,28 +87,20 @@ public:
 
 
 class GraphData : public runtime::ObjectRef {
-public:
-
+ public:
   GraphData() {}
-
   explicit GraphData(std::shared_ptr<runtime::Object> obj) : runtime::ObjectRef(obj) {}
-
-
   const GraphDataObject *operator->() const {
     return static_cast<const GraphDataObject *>(obj_.get());
   }
-
   GraphDataObject *operator->() {
     return static_cast<GraphDataObject *>(obj_.get());
   }
-
   using ContainerType = GraphDataObject;
-
   /*! \brief create a new GraphData reference */
   static GraphData Create() {
     return GraphData(std::make_shared<GraphDataObject>());
   }
-
 };
 
 bool SaveDGLGraphs(std::string filename,
@@ -115,7 +111,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 
-} // namespace serialize
-} //namespace dgl
+}  // namespace serialize
+}  // namespace dgl
 
 #endif //DGL_GRAPH_GRAPH_SERIALIZE_H_
