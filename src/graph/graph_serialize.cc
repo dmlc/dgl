@@ -50,7 +50,7 @@ enum GraphType {
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphRef gptr = args[0];
-    ImGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(gptr.sptr());
+    ImmutableGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(gptr.sptr());
 //    List<>
     Map<std::string, Value> node_tensors = args[1];
     Map<std::string, Value> edge_tensors = args[2];
@@ -77,27 +77,24 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
     GraphData gdata = args[0];
     Map<std::string, Value> rvmap;
     for (const auto& kv : gdata->node_tensors) {
+      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+    }
+    *rv = rvmap;
+});
+
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataEdgeTensors")
+.set_body([](DGLArgs args, DGLRetValue *rv){
+    GraphData gdata = args[0];
+    Map<std::string, Value> rvmap;
+    for (const auto& kv : gdata->node_tensors) {
       std::string k = kv.first;
       NDArray v = kv.second;
       Value vv = Value(MakeValue(v));
       rvmap.Set(k, vv);
     }
-    // *rv = gdata->node_tensors[0].second;
     *rv = rvmap;
 });
 
-// DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensorsName")
-// .set_body([](DGLArgs args, DGLRetValue *rv) {
-//     GraphData gdata = args[0];
-//     std::vector<NamedTensor> node_tensors = gdata->node_tensors;
-//     std::vector<Value> name_list(node_tensors.size());
-//     for (int i = 0; i < node_tensors.size(); ++i){
-//       name_list[i]=MakeValue(node_tensors[i].first);
-//     }
-//     Map a();
-//     *rv = List<Value>(name_list);
-//     // Map<>
-// });
 
 constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
@@ -146,8 +143,6 @@ bool SaveDGLGraphs(std::string filename,
   fs->Seek(indices_start_ptr);
   fs->Read(&test);
   
-  LOG(INFO) << graph_indices[0];
-  LOG(INFO) << graph_indices[1];
   return true;
 }
 
@@ -190,23 +185,11 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
 
   std::sort(idx_list.begin(), idx_list.end());
 
-  // std::vector<std::shared_ptr<GraphDataObject>> graph_datas(idx_list.size());
-  // for (int i = 0; i < idx_list.size(); ++ i) {
-  //   fs->Seek(graph_indices[i]);
-  //   graph_datas[i] = std::make_shared<GraphDataObject>();
-  //   CHECK(fs->Read(graph_datas[i].get())) << "Invalid Graph";
-  // }
-
-  // std::vector<GraphData> gdata_refs;
-  // for (int i = 0; i< graph_datas.size(); ++i){
-  //   gdata_refs.emplace_back(graph_datas[i]);
-  // }
-
+  // Read Corresponding Graphs
   std::vector<GraphData> gdata_refs(idx_list.size());
   for (uint64_t i = 0; i< idx_list.size(); ++i){
     fs->Seek(graph_indices[i]);
     gdata_refs[i]=GraphData::Create();
-    // TODO(jinjing): Any better solution avoid const_cast?
     GraphDataObject * gdata_ptr= const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
     fs->Read(gdata_ptr);
   }

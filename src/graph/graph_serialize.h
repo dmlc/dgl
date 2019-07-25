@@ -34,12 +34,12 @@ typedef std::pair<std::string, NDArray> NamedTensor;
 class GraphDataObject : public runtime::Object {
 
 public:
-  ImGraphPtr gptr;
+  ImmutableGraphPtr gptr;
   std::vector<NamedTensor> node_tensors;
   std::vector<NamedTensor> edge_tensors;
   static constexpr const char *_type_key = "graph_serialize.GraphData";
 
-  void setData(ImGraphPtr gptr,
+  void setData(ImmutableGraphPtr gptr,
                Map<std::string, Value> node_tensors,
                Map<std::string, Value> edge_tensors) {
     this->gptr = gptr;
@@ -58,37 +58,13 @@ public:
     }
   }
 
-  static bool CheckND(const NDArray nd){
-    LOG(INFO) << "111111";
-    return (nd->dtype.lanes != 0);
-  }
-
   void Save(dmlc::Stream *fs) const {
-    LOG(INFO) << "Save111";
     const CSRPtr g_csr = this->gptr->GetInCSR();
     fs->Write(g_csr->indptr());
-    CHECK(CheckND(g_csr->indptr())) << "Invalid Lanes";
     fs->Write(g_csr->indices());
-    CHECK(CheckND(g_csr->indices())) << "Invalid Lanes";
     fs->Write(g_csr->edge_ids());
-    CHECK(CheckND(g_csr->edge_ids())) << "Invalid Lanes";
     fs->Write(node_tensors);
-    CHECK(CheckND(node_tensors[0].second)) << "Invalid Lanes";
     fs->Write(edge_tensors);
-//    fs->Write(this->node_tensors.size());
-//    fs->Write(this->edge_tensors.size());
-//    for (const auto &node_tensorkv: this->node_tensors) {
-//      std::string name = node_tensorkv.first;
-//      NDArray tensor = node_tensorkv.second;
-//      fs->Write(name);
-//      fs->Write(tensor);
-//    }
-//    for (const auto &edge_tensorskv: this->node_tensors) {
-//      std::string name = edge_tensorskv.first;
-//      NDArray tensor = edge_tensorskv.second;
-//      fs->Write(name);
-//      fs->Write(tensor);
-//    }
   }
 
   bool Load(dmlc::Stream *fs) {
@@ -96,14 +72,12 @@ public:
     fs->Read(&indptr);
     fs->Read(&indices);
     fs->Read(&edge_ids);
-
     this->gptr = ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, "in");
 
     fs->Read(&this->node_tensors);
     fs->Read(&this->edge_tensors);
     return true;
   }
-
 
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphDataObject, runtime::Object);
 };
