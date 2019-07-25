@@ -52,7 +52,3 @@ def load_graphs(filename, idx_list=None):
     gdata_list = _CAPI_DGLLoadGraphs(filename, idx_list)
     return [gdata.getGraph() for gdata in gdata_list]
 
-    
-
-# _CAPI_MakeGraphData(g._graph)
-# p

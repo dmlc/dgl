@@ -1,15 +1,11 @@
-//
-// Created by Allen Zhou on 2019/6/19.
-//
-
 #include <tuple>
-#include "graph_serialize.h"
+#include <iostream>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
-#include <iostream>
 #include <dgl/runtime/container.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/object.h>
+#include "graph_serialize.h"
 
 using namespace dgl::runtime;
 

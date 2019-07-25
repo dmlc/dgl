@@ -1,7 +1,3 @@
-//
-// Created by Allen Zhou on 2019/6/19.
-//
-
 #ifndef DGL_GRAPH_SERIALIZE_H
 #define DGL_GRAPH_SERIALIZE_H
 
@@ -12,9 +8,9 @@
 #include <dmlc/type_traits.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/container.h>
-#include "../c_api_common.h"
 #include <dgl/runtime/object.h>
 #include <dgl/packed_func_ext.h>
+#include "../c_api_common.h"
 
 
 using dgl::runtime::DGLArgs;
