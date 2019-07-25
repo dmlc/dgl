@@ -24,7 +24,7 @@ typedef std::shared_ptr<CSR> CSRPtr;
 typedef std::shared_ptr<COO> COOPtr;
 
 class ImmutableGraph;
-typedef std::shared_ptr<ImmutableGraph> ImGraphPtr;
+typedef std::shared_ptr<ImmutableGraph> ImmutableGraphPtr;
 
 /*!
  * \brief Graph class stored using CSR structure.
@@ -880,32 +880,32 @@ class ImmutableGraph: public GraphInterface {
   COOPtr GetCOO() const;
 
   /*! \brief Create an immutable graph from CSR. */
-  static ImGraphPtr CreateFromCSR(
+  static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
 
-  static ImGraphPtr CreateFromCSR(
+  static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
       bool multigraph, const std::string &edge_dir);
 
-  static ImGraphPtr CreateFromCSR(
+  static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
       const std::string &edge_dir, const std::string &shared_mem_name);
 
-  static ImGraphPtr CreateFromCSR(
+  static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
       bool multigraph, const std::string &edge_dir,
       const std::string &shared_mem_name);
 
-  static ImGraphPtr CreateFromCSR(
+  static ImmutableGraphPtr CreateFromCSR(
       const std::string &shared_mem_name, size_t num_vertices,
       size_t num_edges, bool multigraph,
       const std::string &edge_dir);
 
   /*! \brief Create an immutable graph from COO. */
-  static ImGraphPtr CreateFromCOO(
+  static ImmutableGraphPtr CreateFromCOO(
       int64_t num_vertices, IdArray src, IdArray dst);
 
-  static ImGraphPtr CreateFromCOO(
+  static ImmutableGraphPtr CreateFromCOO(
       int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
 
   /*!
@@ -917,14 +917,14 @@ class ImmutableGraph: public GraphInterface {
    * \param graph The input graph.
    * \return an immutable graph object.
    */
-  static ImGraphPtr ToImmutable(GraphPtr graph);
+  static ImmutableGraphPtr ToImmutable(GraphPtr graph);
 
   /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  static ImGraphPtr CopyTo(ImGraphPtr g, const DLContext& ctx);
+  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DLContext& ctx);
 
   /*!
    * \brief Copy data to shared memory.
@@ -932,15 +932,15 @@ class ImmutableGraph: public GraphInterface {
    * \param name The name of the shared memory.
    * \return The graph in the shared memory
    */
-  static ImGraphPtr CopyToSharedMem(
-      ImGraphPtr g, const std::string &edge_dir, const std::string &name);
+  static ImmutableGraphPtr CopyToSharedMem(
+      ImmutableGraphPtr g, const std::string &edge_dir, const std::string &name);
 
   /*!
    * \brief Convert the graph to use the given number of bits for storage.
    * \param bits The new number of integer bits (32 or 64).
    * \return The graph with new bit size storage.
    */
-  static ImGraphPtr AsNumBits(ImGraphPtr g, uint8_t bits);
+  static ImmutableGraphPtr AsNumBits(ImmutableGraphPtr g, uint8_t bits);
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -949,7 +949,7 @@ class ImmutableGraph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  ImGraphPtr Reverse() const;
+  ImmutableGraphPtr Reverse() const;
 
  protected:
   /* !\brief internal default constructor */

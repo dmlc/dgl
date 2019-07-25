@@ -219,6 +219,29 @@ class ObjectRef {
     return Parent::_DerivedFrom(tid);                                   \
   }
 
+/*! \brief Macro to generate common object reference class method definition */
+#define DGL_DEFINE_OBJECT_REF_METHODS(TypeName, BaseTypeName, ObjectName)        \
+  TypeName() {}                                                                  \
+  explicit TypeName(std::shared_ptr<runtime::Object> obj): BaseTypeName(obj) {}  \
+  const ObjectName* operator->() const {                                         \
+    return static_cast<const ObjectName*>(obj_.get());                           \
+  }                                                                              \
+  ObjectName* operator->() {                                                     \
+    return static_cast<ObjectName*>(obj_.get());                                 \
+  }                                                                              \
+  std::shared_ptr<ObjectName> sptr() const {                                     \
+    return CHECK_NOTNULL(std::dynamic_pointer_cast<ObjectName>(obj_));           \
+  }                                                                              \
+  operator bool() const { return this->defined(); }                              \
+  using ContainerType = ObjectName;
+
+/*! \brief Macro to generate object reference class definition */
+#define DGL_DEFINE_OBJECT_REF(TypeName, ObjectName)                                  \
+  class TypeName : public ::dgl::runtime::ObjectRef {                                \
+   public:                                                                           \
+    DGL_DEFINE_OBJECT_REF_METHODS(TypeName, ::dgl::runtime::ObjectRef, ObjectName);  \
+  };
+
 // implementations of inline functions after this
 template<typename T>
 inline bool Object::is_type() const {
