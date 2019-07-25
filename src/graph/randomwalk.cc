@@ -8,6 +8,7 @@
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/random.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
@@ -19,8 +20,7 @@ using namespace dgl::runtime;
 
 namespace dgl {
 
-using Walker = std::function<dgl_id_t(
-    const GraphInterface *, unsigned int *, dgl_id_t)>;
+using Walker = std::function<dgl_id_t(const GraphInterface *, dgl_id_t)>;
 
 namespace {
 
@@ -30,13 +30,12 @@ namespace {
  */
 dgl_id_t WalkOneHop(
     const GraphInterface *gptr,
-    unsigned int *random_seed,
     dgl_id_t cur) {
   const auto succ = gptr->SuccVec(cur);
   const size_t size = succ.size();
   if (size == 0)
     return DGL_INVALID_ID;
-  return succ[rand_r(random_seed) % size];
+  return succ[Random::RandInt(size)];
 }
 
 /*!
@@ -46,11 +45,10 @@ dgl_id_t WalkOneHop(
 template<int hops>
 dgl_id_t WalkMultipleHops(
     const GraphInterface *gptr,
-    unsigned int *random_seed,
     dgl_id_t cur) {
   dgl_id_t next;
   for (int i = 0; i < hops; ++i) {
-    if ((next = WalkOneHop(gptr, random_seed, cur)) == DGL_INVALID_ID)
+    if ((next = WalkOneHop(gptr, cur)) == DGL_INVALID_ID)
       return DGL_INVALID_ID;
     cur = next;
   }
@@ -72,7 +70,6 @@ IdArray GenericRandomWalk(
   dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
 
   // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
-  unsigned int random_seed = randseed();
   dgl_id_t next;
 
   for (int64_t i = 0; i < num_nodes; ++i) {
@@ -85,7 +82,7 @@ IdArray GenericRandomWalk(
       for (int k = 0; k < kmax; ++k) {
         const int64_t offset = (i * num_traces + j) * kmax + k;
         trace_data[offset] = cur;
-        if ((next = walker(gptr, &random_seed, cur)) == DGL_INVALID_ID)
+        if ((next = walker(gptr, cur)) == DGL_INVALID_ID)
           LOG(FATAL) << "no successors from vertex " << cur;
         cur = next;
       }
@@ -107,11 +104,8 @@ RandomWalkTraces GenericRandomWalkWithRestart(
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   const uint64_t num_nodes = seeds->shape[0];
-  int64_t restart_bound = static_cast<int64_t>(restart_prob * RAND_MAX);
 
   visit_counts.resize(gptr->NumVertices());
-
-  unsigned int random_seed = randseed();
 
   for (uint64_t i = 0; i < num_nodes; ++i) {
     int stop = 0;
@@ -130,10 +124,10 @@ RandomWalkTraces GenericRandomWalkWithRestart(
             (++num_frequent_visited_nodes == max_frequent_visited_nodes))
           stop = 1;
 
-        if ((trace_length > 0) && (rand_r(&random_seed) < restart_bound))
+        if ((trace_length > 0) && (Random::Uniform<double>() < restart_prob))
           break;
 
-        if ((next = walker(gptr, &random_seed, cur)) == DGL_INVALID_ID)
+        if ((next = walker(gptr, cur)) == DGL_INVALID_ID)
           LOG(FATAL) << "no successors from vertex " << cur;
         cur = next;
         vertices.push_back(cur);

@@ -7,6 +7,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/random.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
@@ -69,8 +70,8 @@ class ArrayHeap {
   /*
    * Sample from arrayHeap
    */
-  size_t Sample(unsigned int* seed) {
-    float xi = heap_[1] * (rand_r(seed)%100/101.0);
+  size_t Sample() {
+    float xi = heap_[1] * Random::Uniform<float>();
     int i = 1;
     while (i < limit_) {
       i = i << 1;
@@ -85,10 +86,10 @@ class ArrayHeap {
   /*
    * Sample a vector by given the size n
    */
-  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples, unsigned int* seed) {
+  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
     // sample n elements
     for (size_t i = 0; i < n; ++i) {
-      samples->at(i) = this->Sample(seed);
+      samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
   }
@@ -103,10 +104,10 @@ class ArrayHeap {
 /*
  * Uniformly sample integers from [0, set_size) without replacement.
  */
-void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out, unsigned int* seed) {
+void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
   std::unordered_set<size_t> sampled_idxs;
   while (sampled_idxs.size() < num) {
-    sampled_idxs.insert(rand_r(seed) % set_size);
+    sampled_idxs.insert(Random::RandInt(set_size));
   }
   out->clear();
   out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
@@ -143,8 +144,7 @@ void GetUniformSample(const dgl_id_t* edge_id_list,
                       const size_t ver_len,
                       const size_t max_num_neighbor,
                       std::vector<dgl_id_t>* out_ver,
-                      std::vector<dgl_id_t>* out_edge,
-                      unsigned int* seed) {
+                      std::vector<dgl_id_t>* out_edge) {
   // Copy vid_list to output
   if (ver_len <= max_num_neighbor) {
     out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
@@ -155,13 +155,12 @@ void GetUniformSample(const dgl_id_t* edge_id_list,
   std::vector<size_t> sorted_idxs;
   if (ver_len > max_num_neighbor * 2) {
     sorted_idxs.reserve(max_num_neighbor);
-    RandomSample(ver_len, max_num_neighbor, &sorted_idxs, seed);
+    RandomSample(ver_len, max_num_neighbor, &sorted_idxs);
     std::sort(sorted_idxs.begin(), sorted_idxs.end());
   } else {
     std::vector<size_t> negate;
     negate.reserve(ver_len - max_num_neighbor);
-    RandomSample(ver_len, ver_len - max_num_neighbor,
-                 &negate, seed);
+    RandomSample(ver_len, ver_len - max_num_neighbor, &negate);
     std::sort(negate.begin(), negate.end());
     NegateArray(negate, ver_len, &sorted_idxs);
   }
@@ -185,8 +184,7 @@ void GetNonUniformSample(const float* probability,
                          const size_t ver_len,
                          const size_t max_num_neighbor,
                          std::vector<dgl_id_t>* out_ver,
-                         std::vector<dgl_id_t>* out_edge,
-                         unsigned int* seed) {
+                         std::vector<dgl_id_t>* out_edge) {
   // Copy vid_list to output
   if (ver_len <= max_num_neighbor) {
     out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
@@ -200,7 +198,7 @@ void GetNonUniformSample(const float* probability,
     sp_prob[i] = probability[vid_list[i]];
   }
   ArrayHeap arrayHeap(sp_prob);
-  arrayHeap.SampleWithoutReplacement(max_num_neighbor, &sp_index, seed);
+  arrayHeap.SampleWithoutReplacement(max_num_neighbor, &sp_index);
   out_ver->resize(max_num_neighbor);
   out_edge->resize(max_num_neighbor);
   for (size_t i = 0; i < max_num_neighbor; ++i) {
@@ -376,7 +374,6 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         size_t num_neighbor,
                         const bool add_self_loop) {
   CHECK_EQ(graph->NumBits(), 64) << "32 bit graph is not supported yet";
-  unsigned int time_seed = randseed();
   const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = static_cast<dgl_id_t*>(orig_csr->edge_ids()->data);
@@ -426,8 +423,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                          ver_len,
                          num_neighbor,
                          &tmp_sampled_src_list,
-                         &tmp_sampled_edge_list,
-                         &time_seed);
+                         &tmp_sampled_edge_list);
       } else {  // non-uniform-sample
         GetNonUniformSample(probability,
                             val_list + *(indptr + dst_id),
@@ -435,8 +431,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             ver_len,
                             num_neighbor,
                             &tmp_sampled_src_list,
-                            &tmp_sampled_edge_list,
-                            &time_seed);
+                            &tmp_sampled_edge_list);
       }
       // If we need to add self loop and it doesn't exist in the sampled neighbor list.
       if (add_self_loop && std::find(tmp_sampled_src_list.begin(), tmp_sampled_src_list.end(),
@@ -551,7 +546,6 @@ namespace {
 
     size_t curr = 0;
     size_t next = node_mapping->size();
-    unsigned int rand_seed = randseed();
     for (int64_t i = num_layers - 1; i >= 0; --i) {
       const int64_t layer_size = layer_sizes_data[i];
       std::unordered_set<dgl_id_t> candidate_set;
@@ -567,7 +561,7 @@ namespace {
       std::unordered_map<dgl_id_t, size_t> n_occurrences;
       auto n_candidates = candidate_vector.size();
       for (int64_t j = 0; j != layer_size; ++j) {
-        auto dst = candidate_vector[rand_r(&rand_seed) % n_candidates];
+        auto dst = candidate_vector[Random::RandInt(n_candidates)];
         if (!n_occurrences.insert(std::make_pair(dst, 1)).second) {
           ++n_occurrences[dst];
         }
