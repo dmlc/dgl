@@ -67,8 +67,8 @@ class MGCNModel(nn.Module):
         self.node_dense_layer2 = nn.Linear(64, output_dim)
 
     def set_mean_std(self, mean, std):
-        self.mean_per_node = th.Tensor(mean)
-        self.std_per_node = th.Tensor(std)
+        self.mean_per_node = th.tensor(mean, deivce=device)
+        self.std_per_node = th.tensor(std, device=device)
 
     def forward(self, g):
 

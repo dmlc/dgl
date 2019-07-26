@@ -15,7 +15,7 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
     alchemy_dataset = TencentAlchemyDataset()
     alchemy_loader = DataLoader(dataset=alchemy_dataset,
                                 batch_size=20,
-                                collate_fn=batcher(device),
+                                collate_fn=batcher(),
                                 shuffle=False,
                                 num_workers=0)
 

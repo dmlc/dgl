@@ -28,7 +28,7 @@ class AlchemyBatcher:
         self.label = label
 
 
-def batcher(device):
+def batcher():
     def batcher_dev(batch):
         graphs, labels = zip(*batch)
         batch_graphs = dgl.batch(graphs)
