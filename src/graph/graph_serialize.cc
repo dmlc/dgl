@@ -172,23 +172,29 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   CHECK(fs->Read(&nodes_num_list)) << "Invalid node num list";
   CHECK(fs->Read(&edges_num_list)) << "Invalid edge num list";
 
-  std::vector<GraphData> gdata_refs(idx_list.size());
+
+  std::vector<GraphData> gdata_refs;
   if (idx_list.size() == 0) {
     // Read All Graphs
+    gdata_refs.resize(num_graph);
     for (uint64_t i = 0; i < num_graph; ++i) {
+      GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
-              const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+              const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());
       fs->Read(gdata_ptr);
+      gdata_refs.push_back(gdata);
     }
   } else {
     // Read Selected Graphss
+    gdata_refs.resize(idx_list.size());
     std::sort(idx_list.begin(), idx_list.end());
     for (uint64_t i = 0; i < idx_list.size(); ++i) {
       fs->Seek(graph_indices[idx_list[i]]);
-      gdata_refs[i] = GraphData::Create();
+      GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
-              const_cast<GraphDataObject *>(gdata_refs[i].as<GraphDataObject>());
+              const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());
       fs->Read(gdata_ptr);
+      gdata_refs.push_back(gdata);
     }
   }
 
