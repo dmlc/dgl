@@ -168,10 +168,10 @@ def test_setseed():
 
     # reinitialize
     dgl.contrib.sampling.seed(42)
-    for subg in dgl.contrib.sampling.NeighborSampler(
-            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         item = tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3))
-        assert item in nids
+        assert item == nids[i]
 
 if __name__ == '__main__':
     test_create_full()
