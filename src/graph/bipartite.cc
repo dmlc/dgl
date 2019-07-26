@@ -15,6 +15,7 @@ namespace {
 inline GraphPtr CreateBipartiteMetaGraph() {
   static IdArray row = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kSrcVType}));
   static IdArray col = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kDstVType}));
+  LOG(INFO) << "row size: " << row->shape[0] << " col size: " << col->shape[0];
   static GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
