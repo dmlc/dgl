@@ -17,16 +17,16 @@ namespace dgl {
  * The object is currently not threaad safe.
  */
 template <typename T>
-class LazyObject {
+class Lazy {
  public:
   /*!\brief default constructor to construct a lazy object */
-  LazyObject() {}
+  Lazy() {}
 
   /*!\brief constructor to construct an object with given value (non-lazy case) */
-  explicit LazyObject(const T& val): ptr_(new T(val)) {}
+  explicit Lazy(const T& val): ptr_(new T(val)) {}
 
   /*!\brief destructor */
-  ~LazyObject() = default;
+  ~Lazy() = default;
 
   /*!
    * \brief Get the value of this object. If the object has not been instantiated,

@@ -3,17 +3,14 @@
  * \file kernel/binary_reduce.cc
  * \brief Binary reduce C APIs and definitions.
  */
+#include <dgl/packed_func_ext.h>
 #include "./binary_reduce.h"
 #include "./common.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace kernel {
@@ -273,7 +270,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphHandle ghdl = args[2];
+    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_data = args[5];
@@ -283,10 +280,9 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
     NDArray rhs_mapping = args[9];
     NDArray out_mapping = args[10];
 
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
-    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BinaryOpReduce(reducer, op, igptr,
+    BinaryOpReduce(reducer, op, igptr.get(),
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_data, rhs_data, out_data,
         lhs_mapping, rhs_mapping, out_mapping);
@@ -346,7 +342,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphHandle ghdl = args[2];
+    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -358,11 +354,10 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_lhs_data = args[12];
 
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
-    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
     BackwardLhsBinaryOpReduce(
-        reducer, op, igptr,
+        reducer, op, igptr.get(),
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
@@ -422,7 +417,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphHandle ghdl = args[2];
+    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -434,11 +429,10 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_rhs_data = args[12];
 
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
-    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
     BackwardRhsBinaryOpReduce(
-        reducer, op, igptr,
+        reducer, op, igptr.get(),
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
@@ -469,17 +463,16 @@ void CopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphHandle ghdl = args[1];
+    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
     NDArray in_mapping = args[5];
     NDArray out_mapping = args[6];
 
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
-    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    CopyReduce(reducer, igptr,
+    CopyReduce(reducer, igptr.get(),
         static_cast<binary_op::Target>(target),
         in_data, out_data,
         in_mapping, out_mapping);
@@ -518,7 +511,7 @@ void BackwardCopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphHandle ghdl = args[1];
+    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
@@ -527,11 +520,10 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray in_mapping = args[7];
     NDArray out_mapping = args[8];
 
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
-    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
     BackwardCopyReduce(
-        reducer, igptr, static_cast<binary_op::Target>(target),
+        reducer, igptr.get(), static_cast<binary_op::Target>(target),
         in_mapping, out_mapping,
         in_data, out_data, grad_out_data,
         grad_in_data);

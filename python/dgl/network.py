@@ -3,7 +3,6 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
-from .utils import unwrap_to_ptr_list
 from . import utils
 
 _init_api("dgl.network")
@@ -64,14 +63,14 @@ def _send_nodeflow(sender, nodeflow, recv_id):
     recv_id : int
         Receiver ID
     """
-    graph_handle = nodeflow._graph._handle
+    gidx = nodeflow._graph
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendSubgraph(sender,
                              int(recv_id),
-                             graph_handle,
+                             gidx,
                              node_mapping,
                              edge_mapping,
                              layers_offsets,
@@ -137,5 +136,5 @@ def _recv_nodeflow(receiver, graph):
         else:
             raise RuntimeError('Got unexpected control code {}'.format(res))
     else:
-        hdl = unwrap_to_ptr_list(res)
-        return NodeFlow(graph, hdl[0])
+        # res is of type List<NodeFlowObject>
+        return NodeFlow(graph, res[0])

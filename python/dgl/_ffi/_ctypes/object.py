@@ -61,11 +61,6 @@ class ObjectBase(object):
                 "'%s' object has no attribute '%s'" % (str(type(self)), name))
         return RETURN_SWITCH[ret_type_code.value](ret_val)
 
-    def __setattr__(self, name, value):
-        if name != 'handle':
-            raise AttributeError('Set attribute is not allowed for DGL object.')
-        object.__setattr__(self, name, value)
-
     def __init_handle_by_constructor__(self, fconstructor, *args):
         """Initialize the handle by calling constructor function.
 

@@ -23,6 +23,9 @@ class COO;
 typedef std::shared_ptr<CSR> CSRPtr;
 typedef std::shared_ptr<COO> COOPtr;
 
+class ImmutableGraph;
+typedef std::shared_ptr<ImmutableGraph> ImmutableGraphPtr;
+
 /*!
  * \brief Graph class stored using CSR structure.
  */
@@ -167,10 +170,6 @@ class CSR : public GraphInterface {
     return {};
   }
 
-  GraphPtr Reverse() const override {
-    return Transpose();
-  }
-
   DGLIdIters SuccVec(dgl_id_t vid) const override;
 
   DGLIdIters OutEdgeVec(dgl_id_t vid) const override;
@@ -185,12 +184,6 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not support efficient InEdgeVec."
       << " Please use OutEdgeVec on the reverse CSR graph.";
     return DGLIdIters(nullptr, nullptr);
-  }
-
-  GraphInterface *Reset() override {
-    CSR* gptr = new CSR();
-    *gptr = std::move(*this);
-    return gptr;
   }
 
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
@@ -256,7 +249,7 @@ class CSR : public GraphInterface {
   aten::CSRMatrix adj_;
 
   // whether the graph is a multi-graph
-  LazyObject<bool> is_multigraph_;
+  Lazy<bool> is_multigraph_;
 
   // The name of the shared memory to store data.
   // If it's empty, data isn't stored in shared memory.
@@ -416,10 +409,6 @@ class COO : public GraphInterface {
 
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
-  GraphPtr Reverse() const override {
-    return Transpose();
-  }
-
   DGLIdIters SuccVec(dgl_id_t vid) const override {
     LOG(FATAL) << "COO graph does not support efficient SuccVec."
       << " Please use CSR graph or AdjList graph instead.";
@@ -442,12 +431,6 @@ class COO : public GraphInterface {
     LOG(FATAL) << "COO graph does not support efficient InEdgeVec."
       << " Please use CSR graph or AdjList graph instead.";
     return DGLIdIters(nullptr, nullptr);
-  }
-
-  GraphInterface *Reset() override {
-    COO* gptr = new COO();
-    *gptr = std::move(*this);
-    return gptr;
   }
 
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
@@ -517,7 +500,7 @@ class COO : public GraphInterface {
   aten::COOMatrix adj_;
 
   /*! \brief whether the graph is a multi-graph */
-  LazyObject<bool> is_multigraph_;
+  Lazy<bool> is_multigraph_;
 };
 
 /*!
@@ -841,21 +824,6 @@ class ImmutableGraph: public GraphInterface {
   Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  GraphPtr Reverse() const override {
-    if (coo_) {
-      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, coo_->Transpose()));
-    } else {
-      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_));
-    }
-  }
-
-  /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
@@ -892,16 +860,6 @@ class ImmutableGraph: public GraphInterface {
   }
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  GraphInterface *Reset() override {
-    ImmutableGraph* gptr = new ImmutableGraph();
-    *gptr = std::move(*this);
-    return gptr;
-  }
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -921,6 +879,35 @@ class ImmutableGraph: public GraphInterface {
   /* !\brief Return coo. If not exist, create from csr.*/
   COOPtr GetCOO() const;
 
+  /*! \brief Create an immutable graph from CSR. */
+  static ImmutableGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
+
+  static ImmutableGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      bool multigraph, const std::string &edge_dir);
+
+  static ImmutableGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      const std::string &edge_dir, const std::string &shared_mem_name);
+
+  static ImmutableGraphPtr CreateFromCSR(
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      bool multigraph, const std::string &edge_dir,
+      const std::string &shared_mem_name);
+
+  static ImmutableGraphPtr CreateFromCSR(
+      const std::string &shared_mem_name, size_t num_vertices,
+      size_t num_edges, bool multigraph,
+      const std::string &edge_dir);
+
+  /*! \brief Create an immutable graph from COO. */
+  static ImmutableGraphPtr CreateFromCOO(
+      int64_t num_vertices, IdArray src, IdArray dst);
+
+  static ImmutableGraphPtr CreateFromCOO(
+      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
+
   /*!
    * \brief Convert the given graph to an immutable graph.
    *
@@ -930,14 +917,14 @@ class ImmutableGraph: public GraphInterface {
    * \param graph The input graph.
    * \return an immutable graph object.
    */
-  static ImmutableGraph ToImmutable(const GraphInterface* graph);
+  static ImmutableGraphPtr ToImmutable(GraphPtr graph);
 
   /*!
    * \brief Copy the data to another context.
    * \param ctx The target context.
    * \return The graph under another context.
    */
-  ImmutableGraph CopyTo(const DLContext& ctx) const;
+  static ImmutableGraphPtr CopyTo(ImmutableGraphPtr g, const DLContext& ctx);
 
   /*!
    * \brief Copy data to shared memory.
@@ -945,85 +932,24 @@ class ImmutableGraph: public GraphInterface {
    * \param name The name of the shared memory.
    * \return The graph in the shared memory
    */
-  ImmutableGraph CopyToSharedMem(const std::string &edge_dir, const std::string &name) const;
+  static ImmutableGraphPtr CopyToSharedMem(
+      ImmutableGraphPtr g, const std::string &edge_dir, const std::string &name);
 
   /*!
    * \brief Convert the graph to use the given number of bits for storage.
    * \param bits The new number of integer bits (32 or 64).
    * \return The graph with new bit size storage.
    */
-  ImmutableGraph AsNumBits(uint8_t bits) const;
+  static ImmutableGraphPtr AsNumBits(ImmutableGraphPtr g, uint8_t bits);
 
-  /*! \brief Create an immutable graph from CSR. */
-  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-                                      const std::string &edge_dir) {
-    CSRPtr csr(new CSR(indptr, indices, edge_ids));
-    if (edge_dir == "in") {
-      return ImmutableGraph(csr, nullptr);
-    } else if (edge_dir == "out") {
-      return ImmutableGraph(nullptr, csr);
-    } else {
-      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-      return ImmutableGraph();
-    }
-  }
-
-  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-                                      bool multigraph, const std::string &edge_dir) {
-    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
-    if (edge_dir == "in") {
-      return ImmutableGraph(csr, nullptr);
-    } else if (edge_dir == "out") {
-      return ImmutableGraph(nullptr, csr);
-    } else {
-      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-      return ImmutableGraph();
-    }
-  }
-
-  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-                                      const std::string &edge_dir,
-                                      const std::string &shared_mem_name) {
-    CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
-    if (edge_dir == "in") {
-      return ImmutableGraph(csr, nullptr, shared_mem_name);
-    } else if (edge_dir == "out") {
-      return ImmutableGraph(nullptr, csr, shared_mem_name);
-    } else {
-      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-      return ImmutableGraph();
-    }
-  }
-
-  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-                                      bool multigraph, const std::string &edge_dir,
-                                      const std::string &shared_mem_name) {
-    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
-                       GetSharedMemName(shared_mem_name, edge_dir)));
-    if (edge_dir == "in") {
-      return ImmutableGraph(csr, nullptr, shared_mem_name);
-    } else if (edge_dir == "out") {
-      return ImmutableGraph(nullptr, csr, shared_mem_name);
-    } else {
-      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-      return ImmutableGraph();
-    }
-  }
-
-  static ImmutableGraph CreateFromCSR(const std::string &shared_mem_name, size_t num_vertices,
-                                      size_t num_edges, bool multigraph,
-                                      const std::string &edge_dir) {
-    CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
-                       multigraph));
-    if (edge_dir == "in") {
-      return ImmutableGraph(csr, nullptr, shared_mem_name);
-    } else if (edge_dir == "out") {
-      return ImmutableGraph(nullptr, csr, shared_mem_name);
-    } else {
-      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
-      return ImmutableGraph();
-    }
-  }
+  /*!
+   * \brief Return a new graph with all the edges reversed.
+   *
+   * The returned graph preserves the vertex and edge index in the original graph.
+   *
+   * \return the reversed graph
+   */
+  ImmutableGraphPtr Reverse() const;
 
  protected:
   /* !\brief internal default constructor */
@@ -1039,10 +965,6 @@ class ImmutableGraph: public GraphInterface {
     : in_csr_(in_csr), out_csr_(out_csr) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
     this->shared_mem_name_ = shared_mem_name;
-  }
-
-  static std::string GetSharedMemName(const std::string &name, const std::string &edge_dir) {
-    return name + "_" + edge_dir;
   }
 
   /* !\brief return pointer to any available graph structure */
