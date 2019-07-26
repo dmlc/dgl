@@ -16,5 +16,5 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
     Random::SetSeed(seed);
   });
 
-}; // namespace runtime
+};  // namespace runtime
 };  // namespace dgl
