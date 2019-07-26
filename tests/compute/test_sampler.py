@@ -164,13 +164,13 @@ def test_setseed():
     for subg in dgl.contrib.sampling.NeighborSampler(
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
         nids.append(
-            tuple(tuple(subg.layer_parent_nid(i).numpy()) for i in range(3)))
+            tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3)))
 
     # reinitialize
     dgl.contrib.sampling.seed(42)
     for subg in dgl.contrib.sampling.NeighborSampler(
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
-        item = tuple(tuple(subg.layer_parent_nid(i).numpy()) for i in range(3))
+        item = tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3))
         assert item in nids
 
 if __name__ == '__main__':
