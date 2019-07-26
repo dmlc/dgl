@@ -13,8 +13,8 @@
 namespace dgl {
 namespace {
 inline GraphPtr CreateBipartiteMetaGraph() {
-  static IdArray row = aten::VecToIdArray(std::vector<int64_t>({0}));
-  static IdArray col = aten::VecToIdArray(std::vector<int64_t>({1}));
+  static IdArray row = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kSrcVType}));
+  static IdArray col = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kDstVType}));
   static GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
