@@ -7,6 +7,7 @@
 #ifndef DGL_RUNTIME_RANDOM_H_
 #define DGL_RUNTIME_RANDOM_H_
 
+#include <dmlc/logging.h>
 #include <dmlc/omp.h>
 #include <random>
 #include <vector>
@@ -27,8 +28,17 @@ class Random {
    * \brief Set the seed of the DGL C random number generator.
    * \param seed The seed.
    */
-  static void SetSeed(const unsigned int seed) {
+  static void SetSeed(unsigned int seed) {
     GetInstance().Seed(seed);
+  }
+
+  /*!
+   * \brief Set the number of parallel random number generators.
+   *
+   * \param size The size.
+   */
+  static void SetSize(int size) {
+    GetInstance().Resize(size);
   }
 
   /*!
@@ -37,6 +47,7 @@ class Random {
    */
   template<typename IntType>
   static IntType RandInt(IntType upper) {
+    CHECK_LT(0, upper);
     auto *rng = GetInstance().Get(omp_get_thread_num());
     std::uniform_int_distribution<IntType> dist(0, upper - 1);
     return dist(*rng);
@@ -49,6 +60,7 @@ class Random {
    */
   template<typename IntType>
   static IntType RandInt(IntType lower, IntType upper) {
+    CHECK_LT(lower, upper);
     auto *rng = GetInstance().Get(omp_get_thread_num());
     std::uniform_int_distribution<IntType> dist(lower, upper - 1);
     return dist(*rng);
@@ -71,6 +83,7 @@ class Random {
    */
   template<typename FloatType>
   static FloatType Uniform(FloatType lower, FloatType upper) {
+    CHECK_LT(lower, upper);
     auto *rng = GetInstance().Get(omp_get_thread_num());
     std::uniform_real_distribution<FloatType> dist(lower, upper);
     return dist(*rng);
@@ -79,6 +92,7 @@ class Random {
  private:
   /*! \brief Private constructor that initializes seed by time */
   Random() {
+    Resize(omp_get_max_threads());
     Seed(std::chrono::system_clock::now().time_since_epoch().count());
   }
 
@@ -94,11 +108,18 @@ class Random {
   }
 
   /*! \brief Set the seed of meta RNG, then reinitialize the thread-specific RNGs */
-  void Seed(const unsigned int seed) {
+  void Seed(unsigned int seed) {
     meta_rng_.seed(seed);
-    rngs_.resize(omp_get_num_threads());
     for (auto &rng : rngs_)
       rng.seed(meta_rng_());
+  }
+
+  /*! \brief Resize the RNG array */
+  void Resize(int size) {
+    if (size <= rngs_.size())
+      return;
+    for (int i = rngs_.size(); i < size; ++i)
+      rngs_.push_back(std::mt19937_64(meta_rng_()));
   }
 
   /*! \brief Meta RNG that seeds the thread-specific RNGs */
