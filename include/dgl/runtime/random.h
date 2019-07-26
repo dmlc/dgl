@@ -28,7 +28,7 @@ class Random {
    * \brief Set the seed of the DGL C random number generator.
    * \param seed The seed.
    */
-  static void SetSeed(unsigned int seed) {
+  static void SetSeed(int seed) {
     GetInstance().Seed(seed);
   }
 
@@ -108,7 +108,7 @@ class Random {
   }
 
   /*! \brief Set the seed of meta RNG, then reinitialize the thread-specific RNGs */
-  void Seed(unsigned int seed) {
+  void Seed(int seed) {
     meta_rng_.seed(seed);
     for (auto &rng : rngs_)
       rng.seed(meta_rng_());

@@ -155,6 +155,24 @@ def test_layer_sampler():
     _test_layer_sampler()
     _test_layer_sampler(prefetch=True)
 
+def test_setseed():
+    g = generate_rand_graph(100)
+
+    nids = []
+
+    dgl.contrib.sampling.seed(42)
+    for subg in dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
+        nids.append(
+            tuple(tuple(subg.layer_parent_nid(i).numpy()) for i in range(3)))
+
+    # reinitialize
+    dgl.contrib.sampling.seed(42)
+    for subg in dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
+        item = tuple(tuple(subg.layer_parent_nid(i).numpy()) for i in range(3))
+        assert item in nids
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -162,3 +180,4 @@ if __name__ == '__main__':
     test_1neighbor_sampler()
     test_10neighbor_sampler()
     test_layer_sampler()
+    test_setseed()
