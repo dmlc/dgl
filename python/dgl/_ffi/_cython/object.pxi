@@ -1,37 +1,37 @@
 from ... import _api_internal
 from ..base import string_types
-from ..node_generic import _set_class_node_base
+from ..object_generic import _set_class_object_base
 
-"""Maps node type to its constructor"""
-NODE_TYPE = []
+"""Maps object type to its constructor"""
+OBJECT_TYPE = []
 
-def _register_node(int index, object cls):
-    """register node class"""
-    while len(NODE_TYPE) <= index:
-        NODE_TYPE.append(None)
-    NODE_TYPE[index] = cls
+def _register_object(int index, object cls):
+    """register object class"""
+    while len(OBJECT_TYPE) <= index:
+        OBJECT_TYPE.append(None)
+    OBJECT_TYPE[index] = cls
 
 
-cdef inline object make_ret_node(void* chandle):
-    global NODE_TYPE
+cdef inline object make_ret_object(void* chandle):
+    global OBJECT_TYPE
     cdef int tindex
-    cdef list node_type
+    cdef list object_type
     cdef object cls
-    node_type = NODE_TYPE
-    CALL(DGLNodeGetTypeIndex(chandle, &tindex))
-    if tindex < len(node_type):
-        cls = node_type[tindex]
+    object_type = OBJECT_TYPE
+    CALL(DGLObjectGetTypeIndex(chandle, &tindex))
+    if tindex < len(object_type):
+        cls = object_type[tindex]
         if cls is not None:
             obj = cls.__new__(cls)
         else:
-            obj = NodeBase.__new__(NodeBase)
+            obj = ObjectBase.__new__(ObjectBase)
     else:
-        obj = NodeBase.__new__(NodeBase)
-    (<NodeBase>obj).chandle = chandle
+        obj = ObjectBase.__new__(ObjectBase)
+    (<ObjectBase>obj).chandle = chandle
     return obj
 
 
-cdef class NodeBase:
+cdef class ObjectBase:
     cdef void* chandle
 
     cdef _set_handle(self, handle):
@@ -53,12 +53,12 @@ cdef class NodeBase:
             self._set_handle(value)
 
     def __dealloc__(self):
-        CALL(DGLNodeFree(self.chandle))
+        CALL(DGLObjectFree(self.chandle))
 
     def __getattr__(self, name):
         cdef DGLValue ret_val
         cdef int ret_type_code, ret_succ
-        CALL(DGLNodeGetAttr(self.chandle, c_str(name),
+        CALL(DGLObjectGetAttr(self.chandle, c_str(name),
                             &ret_val, &ret_type_code, &ret_succ))
         if ret_succ == 0:
             raise AttributeError(
@@ -79,13 +79,13 @@ cdef class NodeBase:
         Note
         ----
         We have a special calling convention to call constructor functions.
-        So the return handle is directly set into the Node object
-        instead of creating a new Node.
+        So the return handle is directly set into the Object object
+        instead of creating a new Object.
         """
         cdef void* chandle
         ConstructorCall(
             (<FunctionBase>fconstructor).chandle,
-            kNodeHandle, args, &chandle)
+            kObjectHandle, args, &chandle)
         self.chandle = chandle
 
-_set_class_node_base(NodeBase)
+_set_class_object_base(ObjectBase)

@@ -47,7 +47,8 @@ class EdgeSoftmax(th.autograd.Function):
         g.edata.pop(score_name)
         g.ndata.pop(tmp_name)
         out = g.edata.pop(out_name)
-        ctx.backward_cache = (g, out)
+        ctx.save_for_backward(out)
+        ctx.backward_cache = g
         return out
 
     @staticmethod
@@ -61,7 +62,8 @@ class EdgeSoftmax(th.autograd.Function):
         grad_score = sds - out * sds_sum  # multiple expressions
         return grad_score.data
         """
-        g, out = ctx.backward_cache
+        g = ctx.backward_cache
+        out, = ctx.saved_tensors
         # clear backward cache explicitly
         ctx.backward_cache = None
         out_name = utils.get_edata_name(g, 'out')

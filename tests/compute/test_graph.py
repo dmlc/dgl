@@ -65,9 +65,8 @@ def test_query():
             assert g.has_node(i)
             assert i in g
         assert not g.has_node(11)
-        assert not g.has_node(-1)
-        assert not -1 in g
-        assert F.allclose(g.has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+        assert not 11 in g
+        assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input()
         for u, v in zip(src, dst):
@@ -137,9 +136,8 @@ def test_query():
             assert g.has_node(i)
             assert i in g
         assert not g.has_node(11)
-        assert not g.has_node(-1)
-        assert not -1 in g
-        assert F.allclose(g.has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+        assert not 11 in g
+        assert F.allclose(g.has_nodes([0,2,10,11]), F.tensor([1,1,0,0]))
 
         src, dst = edge_pair_input(sort=True)
         for u, v in zip(src, dst):

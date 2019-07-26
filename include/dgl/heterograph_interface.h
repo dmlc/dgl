@@ -38,14 +38,6 @@ typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
  */
 class HeteroGraphInterface {
  public:
-  /* \brief structure used to represent a list of edges */
-  // TODO(minjie): move this data structure outside of class definition so
-  // it can be shared by Graph and HeteroGraph.
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   virtual ~HeteroGraphInterface() = default;
 
   ////////////////////////// query/operations on meta graph ////////////////////////
@@ -112,7 +104,7 @@ class HeteroGraphInterface {
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const {
     const auto len = vids->shape[0];
-    BoolArray rst = NewBoolArray(len);
+    BoolArray rst = aten::NewBoolArray(len);
     const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
     dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
     for (int64_t i = 0; i < len; ++i) {
@@ -129,7 +121,7 @@ class HeteroGraphInterface {
     const auto srclen = src_ids->shape[0];
     const auto dstlen = dst_ids->shape[0];
     const auto rstlen = std::max(srclen, dstlen);
-    BoolArray rst = NewBoolArray(rstlen);
+    BoolArray rst = aten::NewBoolArray(rstlen);
     dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
     const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
     const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
@@ -340,12 +332,6 @@ class HeteroGraphInterface {
    * \return the in edge id vector iterator pair.
    */
   virtual DGLIdIters InEdgeVec(dgl_type_t etype, dgl_id_t vid) const = 0;
-
-  /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  virtual HeteroGraphInterface *Reset() = 0;
 
   /*!
    * \brief Get the adjacency matrix of the graph.

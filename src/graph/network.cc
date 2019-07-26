@@ -4,6 +4,8 @@
  * \brief DGL networking related APIs
  */
 
+#include <dgl/runtime/container.h>
+#include <dgl/packed_func_ext.h>
 #include "./network.h"
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
@@ -11,11 +13,7 @@
 
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace network {
@@ -84,12 +82,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
-    GraphHandle ghandle = args[2];
+    // TODO(minjie): could simply use NodeFlow nf = args[2];
+    GraphRef g = args[2];
     const IdArray node_mapping = args[3];
     const IdArray edge_mapping = args[4];
     const IdArray layer_offsets = args[5];
     const IdArray flow_offsets = args[6];
-    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
+    auto ptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+    CHECK(ptr) << "only immutable graph is allowed in send/recv";
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
     // Write control message
@@ -159,7 +159,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     RecvData(receiver, buffer, kMaxBufferSize);
     int control = *buffer;
     if (control == CONTROL_NODEFLOW) {
-      NodeFlow* nf = new NodeFlow();
+      NodeFlow nf = NodeFlow::Create();
       CSRPtr csr;
       // Deserialize nodeflow from recv_data_buffer
       network::DeserializeSampledSubgraph(buffer+sizeof(CONTROL_NODEFLOW),
@@ -169,9 +169,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
                                           &(nf->layer_offsets),
                                           &(nf->flow_offsets));
       nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
-      std::vector<NodeFlow*> subgs(1);
-      subgs[0] = nf;
-      *rv = WrapVectorReturn(subgs);
+      List<NodeFlow> subgs;
+      subgs.push_back(nf);
+      *rv = subgs;
     } else if (control == CONTROL_END_SIGNAL) {
       *rv = CONTROL_END_SIGNAL;
     } else {

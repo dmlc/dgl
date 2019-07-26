@@ -1,21 +1,72 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
-import ctypes
-
+from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLBaseGraph
-from .graph_index import GraphIndex, transform_ids
+from .graph_index import transform_ids
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import LayerView, BlockView
 
 __all__ = ['NodeFlow']
 
-NodeFlowHandle = ctypes.c_void_p
+@register_object('graph.NodeFlow')
+class NodeFlowObject(ObjectBase):
+    """NodeFlow object"""
+
+    @property
+    def graph(self):
+        """The graph structure of this nodeflow.
+
+        Returns
+        -------
+        GraphIndex
+        """
+        return _CAPI_NodeFlowGetGraph(self)
+
+    @property
+    def layer_offsets(self):
+        """The offsets of each layer.
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetLayerOffsets(self)
+
+    @property
+    def block_offsets(self):
+        """The offsets of each block.
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetBlockOffsets(self)
+
+    @property
+    def node_mapping(self):
+        """Mapping array from nodeflow node id to parent graph
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetNodeMapping(self)
+
+    @property
+    def edge_mapping(self):
+        """Mapping array from nodeflow edge id to parent graph
+
+        Returns
+        -------
+        NDArray
+        """
+        return _CAPI_NodeFlowGetEdgeMapping(self)
 
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
@@ -36,25 +87,16 @@ class NodeFlow(DGLBaseGraph):
     ----------
     parent : DGLGraph
         The parent graph.
-    handle : NodeFlowHandle
-        The handle to the underlying C structure.
+    nfobj : NodeFlowObject
+        The nodeflow object
     """
-    def __init__(self, parent, handle):
-        # NOTE(minjie): handle is a pointer to the underlying C++ structure
-        #  defined in include/dgl/sampler.h. The constructor will save
-        #  all its members in the python side and destroy the handler
-        #  afterwards. One can view the given handle object as a transient
-        #  argument pack to construct this python class.
-        # TODO(minjie): We should use TVM's Node system as a cleaner solution later.
-        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
+    def __init__(self, parent, nfobj):
+        super(NodeFlow, self).__init__(nfobj.graph)
         self._parent = parent
-        self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
-        self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
-        self._layer_offsets = utils.toindex(
-            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
-        self._block_offsets = utils.toindex(
-            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
-        _CAPI_NodeFlowFree(handle)
+        self._node_mapping = utils.toindex(nfobj.node_mapping)
+        self._edge_mapping = utils.toindex(nfobj.edge_mapping)
+        self._layer_offsets = utils.toindex(nfobj.layer_offsets).tonumpy()
+        self._block_offsets = utils.toindex(nfobj.block_offsets).tonumpy()
         # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
                              for i in range(self.num_layers)]
@@ -293,6 +335,7 @@ class NodeFlow(DGLBaseGraph):
             The parent node id array.
         """
         nid = utils.toindex(nid)
+        # TODO(minjie): should not directly use []
         return self._node_mapping.tousertensor()[nid.tousertensor()]
 
     def map_to_parent_eid(self, eid):
@@ -309,6 +352,7 @@ class NodeFlow(DGLBaseGraph):
             The parent edge id array.
         """
         eid = utils.toindex(eid)
+        # TODO(minjie): should not directly use []
         return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
     def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
@@ -418,6 +462,7 @@ class NodeFlow(DGLBaseGraph):
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
+        # TODO(minjie): should not directly use []
         return self._node_mapping.tousertensor()[start:end]
 
     def block_eid(self, block_id):
@@ -456,6 +501,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
+        # TODO(minjie): should not directly use []
         ret = self._edge_mapping.tousertensor()[start:end]
         # If `add_self_loop` is enabled, the returned parent eid can be -1.
         # We have to make sure this case doesn't happen.
@@ -487,7 +533,7 @@ class NodeFlow(DGLBaseGraph):
         """
         block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph, "coo",
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
                                         int(self._layer_offsets[block_id + 2]),
@@ -523,7 +569,7 @@ class NodeFlow(DGLBaseGraph):
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph, fmt,
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
                                         int(self._layer_offsets[block_id + 2]),
@@ -938,7 +984,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(flow_range):
             flow_range = range(0, self.num_blocks)
         elif isinstance(flow_range, slice):
-            if slice.step != 1:
+            if flow_range.step != 1:
                 raise DGLError("We can't propogate flows and skip some of them")
             flow_range = range(flow_range.start, flow_range.stop)
         else:

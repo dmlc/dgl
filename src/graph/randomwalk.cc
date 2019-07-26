@@ -7,6 +7,7 @@
 #include <dgl/sampler.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
@@ -14,11 +15,7 @@
 #include <functional>
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
+using namespace dgl::runtime;
 
 namespace dgl {
 
@@ -218,43 +215,40 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     const IdArray seeds = args[1];
     const int num_traces = args[2];
     const int num_hops = args[3];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
 
-    *rv = RandomWalk(ptr, seeds, num_traces, num_hops);
+    *rv = RandomWalk(g.sptr().get(), seeds, num_traces, num_hops);
   });
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     const IdArray seeds = args[1];
     const double restart_prob = args[2];
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
-    const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
-        RandomWalkWithRestart(gptr, seeds, restart_prob, visit_threshold_per_seed,
+        RandomWalkWithRestart(g.sptr().get(), seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     const IdArray seeds = args[1];
     const double restart_prob = args[2];
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
-    const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         BipartiteSingleSidedRandomWalkWithRestart(
-          gptr, seeds, restart_prob, visit_threshold_per_seed,
+          g.sptr().get(), seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 

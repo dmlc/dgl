@@ -292,16 +292,18 @@ struct NDArray::Container {
 // the usages of functions are documented in place.
 inline NDArray::NDArray(Container* data)
   : data_(data) {
-  data_->IncRef();
+  if (data_)
+    data_->IncRef();
 }
 
 inline NDArray::NDArray(const NDArray& other)
   : data_(other.data_) {
-  data_->IncRef();
+  if (data_)
+    data_->IncRef();
 }
 
 inline void NDArray::reset() {
-  if (data_ != nullptr) {
+  if (data_) {
     data_->DecRef();
     data_ = nullptr;
   }
