@@ -33,15 +33,6 @@ class Random {
   }
 
   /*!
-   * \brief Set the number of parallel random number generators.
-   *
-   * \param size The size.
-   */
-  static void SetSize(int size) {
-    GetInstance().Resize(size);
-  }
-
-  /*!
    * \brief Generate a random integer uniformly from 0 (inclusive) to upper (exclusive).
    * \param upper The upper bound (exclusive)
    */
