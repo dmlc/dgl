@@ -13,8 +13,10 @@
 namespace dgl {
 namespace {
 inline GraphPtr CreateBipartiteMetaGraph() {
-  IdArray row = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kSrcVType}));
-  IdArray col = aten::VecToIdArray(std::vector<int64_t>({Bipartite::kDstVType}));
+  std::vector<int64_t> row_vec(1, Bipartite::kSrcVType);
+  std::vector<int64_t> col_vec(1, Bipartite::kDstVType);
+  IdArray row = aten::VecToIdArray(row_vec);
+  IdArray col = aten::VecToIdArray(col_vec);
   GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
@@ -32,17 +34,17 @@ class Bipartite::COO : public BaseHeteroGraph {
  public:
   COO(int64_t num_src, int64_t num_dst,
                IdArray src, IdArray dst)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()) {
+    : BaseHeteroGraph(kBipartiteMetaGraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
   COO(int64_t num_src, int64_t num_dst,
                IdArray src, IdArray dst, bool is_multigraph)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()),
+    : BaseHeteroGraph(kBipartiteMetaGraph),
       is_multigraph_(is_multigraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
   explicit COO(const aten::COOMatrix& coo)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()), adj_(coo) {}
+    : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo) {}
 
   uint64_t NumVertexTypes() const override {
     return 2;
@@ -292,19 +294,19 @@ class Bipartite::CSR : public BaseHeteroGraph {
  public:
   CSR(int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()) {
+    : BaseHeteroGraph(kBipartiteMetaGraph) {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
   CSR(int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()),
+    : BaseHeteroGraph(kBipartiteMetaGraph),
       is_multigraph_(is_multigraph) {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
   explicit CSR(const aten::CSRMatrix& csr)
-    : BaseHeteroGraph(CreateBipartiteMetaGraph()), adj_(csr) {}
+    : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr) {}
 
   uint64_t NumVertexTypes() const override {
     return 2;
@@ -760,7 +762,7 @@ HeteroGraphPtr Bipartite::CreateFromCSR(
 }
 
 Bipartite::Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
-  : BaseHeteroGraph(CreateBipartiteMetaGraph()), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+  : BaseHeteroGraph(kBipartiteMetaGraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
