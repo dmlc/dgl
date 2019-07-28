@@ -534,8 +534,8 @@ class SetTransEncoder(nn.Module):
 
     def forward(self, feat, graph):
         """
-        Compute Set Transformer Encoder.
-        
+        Compute the Encoder part of Set Transformer.
+
         Parameters
         ----------
         feat : torch.Tensor
@@ -606,7 +606,7 @@ class SetTransDecoder(nn.Module):
 
     def forward(self, feat, graph):
         """
-        Compute Set Transformer Decoder.
+        Compute the decoder part of Set Transformer.
 
         Parameters
         ----------

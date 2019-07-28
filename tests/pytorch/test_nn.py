@@ -149,6 +149,7 @@ def test_set_trans():
 
     h2 = st_dec(h1, bg)
     print(h2.shape)
+    assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
 def uniform_attention(g, shape):
     a = th.ones(shape)
