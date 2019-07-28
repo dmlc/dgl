@@ -443,6 +443,9 @@ class _PMALayer(nn.Module):
         nn.init.xavier_uniform_(self.S)
 
     def forward(self, graph, feat, pma_graph=None):
+        """
+        Compute Pooling by Multihead Attention.
+        """
         query = self.S
         if pma_graph is None:
             if isinstance(graph, BatchedDGLGraph):
