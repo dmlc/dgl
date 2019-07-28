@@ -4,27 +4,28 @@
  * \brief DGL heterogeneous graph index class.
  */
 
-#ifndef DGL_HETEROGRAPH_INTERFACE_H_
-#define DGL_HETEROGRAPH_INTERFACE_H_
+#ifndef DGL_BASE_HETEROGRAPH_H_
+#define DGL_BASE_HETEROGRAPH_H_
 
 #include <string>
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
+#include "./runtime/object.h"
 #include "graph_interface.h"
 #include "array.h"
 
 namespace dgl {
 
 // Forward declaration
+class BaseHeteroGraph;
+typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
 struct HeteroSubgraph;
-class HeteroGraphInterface;
-
-typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
 
 /*!
- * \brief Heterogenous graph APIs
+ * \brief Base heterogenous graph.
  *
  * In heterograph, nodes represent entities and edges represent relations.
  * Nodes and edges are associated with types. The same pair of entity types
@@ -36,9 +37,11 @@ typedef std::shared_ptr<HeteroGraphInterface> HeteroGraphPtr;
  *  - A dictionary of relation type to the bipartite graph representing the
  *    actual connections among entity nodes.
  */
-class HeteroGraphInterface {
+class BaseHeteroGraph : public runtime::Object {
  public:
-  virtual ~HeteroGraphInterface() = default;
+  explicit BaseHeteroGraph(GraphPtr meta_graph): meta_graph_(meta_graph) {}
+
+  virtual ~BaseHeteroGraph() = default;
 
   ////////////////////////// query/operations on meta graph ////////////////////////
 
@@ -49,14 +52,16 @@ class HeteroGraphInterface {
   virtual uint64_t NumEdgeTypes() const = 0;
 
   /*! \return the meta graph */
-  virtual const GraphInterface& GetMetaGraph() const = 0;
+  virtual GraphPtr meta_graph() const {
+    return meta_graph_;
+  }
 
   /*!
    * \brief Return the bipartite graph of the given edge type.
    * \param etype The edge type.
    * \return The bipartite graph.
    */
-  virtual const HeteroGraphInterface& GetRelationGraph(dgl_type_t etype) const = 0;
+  virtual HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const = 0;
 
   ////////////////////////// query/operations on realized graph ////////////////////////
 
@@ -102,48 +107,13 @@ class HeteroGraphInterface {
   virtual bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const = 0;
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const {
-    const auto len = vids->shape[0];
-    BoolArray rst = aten::NewBoolArray(len);
-    const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    for (int64_t i = 0; i < len; ++i) {
-      rst_data[i] = HasVertex(vtype, vid_data[i])? 1 : 0;
-    }
-    return rst;
-  }
+  virtual BoolArray HasVertices(dgl_type_t vtype, IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const {
-    const auto srclen = src_ids->shape[0];
-    const auto dstlen = dst_ids->shape[0];
-    const auto rstlen = std::max(srclen, dstlen);
-    BoolArray rst = aten::NewBoolArray(rstlen);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-    if (srclen == 1) {
-      // one-many
-      for (int64_t i = 0; i < dstlen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[0], dst_data[i])? 1 : 0;
-      }
-    } else if (dstlen == 1) {
-      // many-one
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[0])? 1 : 0;
-      }
-    } else {
-      // many-many
-      CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(etype, src_data[i], dst_data[i])? 1 : 0;
-      }
-    }
-    return rst;
-  }
+  virtual BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const = 0;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -350,7 +320,7 @@ class HeteroGraphInterface {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(
-      dgl_id_t etype, bool transpose, const std::string &fmt) const = 0;
+      dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.
@@ -380,10 +350,20 @@ class HeteroGraphInterface {
    */
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
+
+  static constexpr const char* _type_key = "graph.HeteroGraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
+
+ protected:
+  /*! \brief meta graph */
+  GraphPtr meta_graph_;
 };
 
+// Define HeteroGraphRef
+DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
+
 /*! \brief Heter-subgraph data structure */
-struct HeteroSubgraph {
+struct HeteroSubgraph : public runtime::Object {
   /*! \brief The heterograph. */
   HeteroGraphPtr graph;
   /*!
@@ -396,8 +376,29 @@ struct HeteroSubgraph {
    * The vector length is equal to the number of vertex types in the parent graph.
    */
   std::vector<IdArray> induced_edges;
+
+  static constexpr const char* _type_key = "graph.HeteroSubgraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
+
+// Define HeteroSubgraphRef
+DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
+
+// creators
+
+/*! \brief Create a bipartite graph from COO arrays */
+HeteroGraphPtr CreateBipartiteFromCOO(
+    int64_t num_src, int64_t num_dst, IdArray row, IdArray col);
+
+/*! \brief Create a bipartite graph from (out) CSR arrays */
+HeteroGraphPtr CreateBipartiteFromCSR(
+    int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids);
+
+/*! \brief Create a heterograph from meta graph and a list of bipartite graph */
+HeteroGraphPtr CreateHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
 
 };  // namespace dgl
 
-#endif  // DGL_HETEROGRAPH_INTERFACE_H_
+#endif  // DGL_BASE_HETEROGRAPH_H_
