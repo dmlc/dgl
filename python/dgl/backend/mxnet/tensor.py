@@ -115,25 +115,25 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return nd.sum(input, axis=dim)
 
-def all_sum(input):
-    return input.max()
+def reduce_sum(input):
+    return input.sum()
 
 def mean(input, dim):
     return nd.mean(input, axis=dim)
 
-def all_mean(input):
+def reduce_mean(input):
     return input.mean()
 
 def max(input, dim):
     return nd.max(input, axis=dim)
 
-def all_max(input):
+def reduce_max(input):
     return input.max()
 
 def min(input, dim):
     return nd.min(input, axis=dim)
 
-def all_min(input):
+def reduce_min(input):
     return input.min()
 
 def argsort(input, dim, descending):

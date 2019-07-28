@@ -308,7 +308,7 @@ def sum(input, dim):
     """
     pass
 
-def all_sum(input):
+def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
 
     Parameters
@@ -340,7 +340,7 @@ def mean(input, dim):
     """
     pass
 
-def all_mean(input):
+def reduce_mean(input):
     """Returns the average of all elements in the input tensor.
 
     Parameters
@@ -372,7 +372,7 @@ def max(input, dim):
     """
     pass
 
-def all_max(input):
+def reduce_max(input):
     """Returns the max of all elements in the input tensor.
 
     Parameters
@@ -404,7 +404,7 @@ def min(input, dim):
     """
     pass
 
-def all_min(input):
+def reduce_min(input):
     """Returns the min of all elements in the input tensor.
 
     Parameters

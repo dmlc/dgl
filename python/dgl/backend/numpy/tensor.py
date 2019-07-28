@@ -80,28 +80,28 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return np.sum(input, axis=dim)
 
-def all_sum(input):
+def reduce_sum(input):
     dtype = input.dtype
     return np.array(input.sum(), dtype=dtype)
 
 def mean(input, dim):
     return np.mean(input, axis=dim)
 
-def all_mean(input):
+def reduce_mean(input):
     dtype = input.dtype
     return np.array(input.mean(), dtype=dtype)
 
 def max(input, dim):
     return np.max(input, axis=dim)
 
-def all_max(input):
+def reduce_max(input):
     dtype = input.dtype
     return np.array(input.max(), dtype=dtype)
 
 def min(input, dim):
     return np.min(input, axis=dim)
 
-def all_min(input):
+def reduce_min(input):
     dtype = input.dtype
     return np.array(input.min(), dtype=dtype)
 

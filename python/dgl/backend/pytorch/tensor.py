@@ -93,27 +93,27 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return th.sum(input, dim=dim)
 
-def all_sum(input):
+def reduce_sum(input):
     return input.sum()
 
 def mean(input, dim):
     return th.mean(input, dim=dim)
 
-def all_mean(input):
+def reduce_mean(input):
     return input.mean()
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
     return th.max(input, dim=dim)[0]
 
-def all_max(input):
+def reduce_max(input):
     return input.max()
 
 def min(input, dim):
     # NOTE: the second argmin array is not returned
     return th.min(input, dim=dim)[0]
 
-def all_min(input):
+def reduce_min(input):
     return input.min()
 
 def argsort(input, dim, descending):

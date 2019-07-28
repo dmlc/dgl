@@ -77,7 +77,7 @@ class SortPooling(nn.Module):
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
         graph.ndata[self._feat_name] = feat
-        # Sort nodes according to the their last features.
+        # Sort nodes according to their last features.
         ret = topk_nodes(graph, self._feat_name, self.k).view(-1, self.k * feat.shape[-1])
         g.ndata.pop(self._feat_name)
         return ret
@@ -88,31 +88,31 @@ class GlobAttnPooling(nn.Module):
     """
     _gate_name = '_gpool_attn_gate'
     _readout_name = '_gpool_attn_readout'
-    def __init__(self, gate_nn, nn=None):
+    def __init__(self, gate_nn, feat_nn=None):
         super(GlobAttnPooling, self).__init__()
         self.gate_nn = gate_nn
-        self.nn = nn
+        self.feat_nn = feat_nn
         self.reset_parameters()
 
     def reset_parameters(self):
         for p in self.gate_nn:
             if p.dim() > 1:
                 init.xavier_uniform_(p)
-        for p in self.nn:
+        for p in self.feat_nn:
             if p.dim() > 1:
                 init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         feat = feat.unsqueeze(-1) if feat.dim() == 1 else feat
         gate = self.gate_nn(feat)
-        feat = self.nn(feat) if self.nn else feat
+        feat = self.feat_nn(feat) if self.feat_nn else feat
 
-        feat_name = get_ndata_name(graph, self.gate_name)
+        feat_name = get_ndata_name(graph, self._gate_name)
         graph.ndata[feat_name] = gate
         gate = softmax_nodes(graph, feat_name)
         graph.ndata.pop(feat_name)
 
-        feat_name = get_ndata_name(graph, self.readout_name)
+        feat_name = get_ndata_name(graph, self._readout_name)
         graph.ndata[feat_name] = feat * gate
         readout = sum_nodes(graph, feat_name)
         graph.ndata.pop(feat_name)
@@ -428,7 +428,7 @@ class SetTransDecoder(nn.Module):
 
 
 class SetTransformer(nn.Module):
-    r"""Apply Set Transformer(f""Set Transformer: A Framework for Attention-based
+    r"""(experimental)Apply Set Transformer(f""Set Transformer: A Framework for Attention-based
     Permutation-Invariant Neural Networks") over the graph.
     """
     def __init__(self):
