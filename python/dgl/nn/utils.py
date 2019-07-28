@@ -51,8 +51,8 @@ def _create_bipartite_graph(graph_u, graph_v):
             v_list.append(np.arange(v_shift + n_nodes_u, v_shift + n_nodes_u + n_nodes_v))
             v_shift += n_nodes_u + n_nodes_v
         return batch(g_list),\
-               F.zerocopy_from_numpy(np.concatenate(u_list)),\
-               F.zerocopy_from_numpy(np.concatenate(v_list))
+               F.zerocopy_from_numpy(np.concatenate(u_list).astype(np.int64)),\
+               F.zerocopy_from_numpy(np.concatenate(v_list).astype(np.int64))
     else:
         n_nodes_u = graph_u.number_of_nodes()
         n_nodes_v = graph_v.number_of_nodes()
@@ -63,7 +63,8 @@ def _create_bipartite_graph(graph_u, graph_v):
         ])
         indices = np.tile(np.arange(n_nodes_u, n_nodes_u + n_nodes_v), n_nodes_u)
         return DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True), \
-            F.zerocopy_from_numpy(u_list), F.zerocopy_from_numpy(v_list)
+            F.zerocopy_from_numpy(u_list.astype(np.int64)),\
+            F.zerocopy_from_numpy(v_list.astype(np.int64))
 
 def _create_graph_from_num_nodes(n_nodes_arr):
     r""" Create a DGLGraph (with no nodes) from number of nodes list."""
