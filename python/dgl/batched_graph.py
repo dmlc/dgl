@@ -761,20 +761,25 @@ def _max_on(graph, typestr, feat):
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         max_n_objs = max(batch_num_objs)
-        index = []
+        index, mask = [], []
         for i, num_obj in enumerate(batch_num_objs):
             if num_obj == 0:
-                dgl_warning("Graph {} has zero {}, a tensor filled with -inf of the same shape"
+                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
                             " would be returned at the corresponding row.".format(i, typestr))
+                mask.append(0.)
+            else:
+                mask.append(1.)
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
+        mask = F.tensor(mask) # used to handle graph with no nodes/edges.
         index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
+        val = F.reduce_min(feat) - 1
         feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
-                        dtype, ctx) - float('inf')
+                        dtype, ctx) + val
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
-        return F.max(feat_, 1)
+        return F.max(feat_, 1) * F.unsqueeze(mask, -1)
     else:
         return F.max(feat, 0)
 
@@ -908,7 +913,6 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
 
     keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
     order = F.argsort(keys, -1, descending=descending)
-    print(order)
     topk_indices = F.slice_axis(order, -1, 0, k)
 
     if isinstance(graph, BatchedDGLGraph):
@@ -941,8 +945,8 @@ def max_nodes(graph, feat):
     returned instead, i.e. having an extra first dimension.
     Each row of the stacked tensor contains the readout result of
     corresponding example in the batch. If an example has no nodes,
-    a tensor filled with -inf of the same shape is returned at the
-     corresponding row.
+    a zero tensor with the same shape is returned at the corresponding
+    row.
     """
     return _max_on(graph, 'nodes', feat)
 
@@ -968,8 +972,8 @@ def max_edges(graph, feat):
     returned instead, i.e. having an extra first dimension.
     Each row of the stacked tensor contains the readout result of
     corresponding example in the batch. If an example has no edges,
-    a tensor filled with -inf of the same shape is returned at the
-     corresponding row.
+    a zero tensor with the same shape is returned at the corresponding
+    row.
     """
     return _max_on(graph, 'edges', feat)
 

@@ -57,7 +57,7 @@ def test_simple_readout():
     max_bg_e = dgl.max_edges(g, 'x')
     assert F.allclose(s, F.stack([se1, F.zeros(5)], 0))
     assert F.allclose(m, F.stack([me1, F.zeros(5)], 0))
-    assert F.allclose(max_bg_e, F.stack([maxe1, F.full_1d(5, -float('inf'), F.float32)], 0))
+    assert F.allclose(max_bg_e, F.stack([maxe1, F.zeros(5)], 0))
 
 
 if __name__ == '__main__':
