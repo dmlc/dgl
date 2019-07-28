@@ -770,10 +770,10 @@ def _max_on(graph, typestr, feat):
             else:
                 mask.append(1.)
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        mask = F.tensor(mask) # used to handle graph with no nodes/edges.
-        index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
+        mask = F.copy_to(F.tensor(mask), ctx)
+        index = F.copy_to(F.tensor(index), ctx)
         val = F.reduce_min(feat) - 1
         feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
                         dtype, ctx) + val
@@ -811,9 +811,9 @@ def _softmax_on(graph, typestr, feat):
         index = []
         for i, num_obj in enumerate(batch_num_objs):
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
+        index = F.copy_to(F.tensor(index), ctx)
         feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
                         dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
@@ -850,7 +850,8 @@ def _broadcast_on(graph, typestr, feat_data):
         index = []
         for i, num_obj in enumerate(batch_num_objs):
             index.extend([i] * num_obj)
-        index = F.tensor(index)
+        ctx = F.context(feat_data)
+        index = F.copy_to(F.tensor(index), ctx)
         return F.gather_row(feat_data, index)
     else:
         n_objs = getattr(graph, num_objs_attr)()
@@ -904,9 +905,9 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
             if num_obj < k:
                 dgl_warning("Graph {}'s number of nodes is less than k".format(i))
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
+        index = F.copy_to(F.tensor(index), ctx)
         feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (batch_size, max_n_objs, hidden_size))
