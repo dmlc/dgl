@@ -16,8 +16,7 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, 
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobAttnPooling', 'Set2Set', 'MultiHeadAttention',
-           'SetAttentionBlock', 'InducedSetAttentionBlock', 'SetTransEncoder', 'SetTransDecoder',
-           'SetTransformer']
+           'SetAttnBlock', 'InducedSetAttnBlock', 'SetTransEncoder', 'SetTransDecoder']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
@@ -79,7 +78,7 @@ class SortPooling(nn.Module):
         graph.ndata[self._feat_name] = feat
         # Sort nodes according to their last features.
         ret = topk_nodes(graph, self._feat_name, self.k).view(-1, self.k * feat.shape[-1])
-        g.ndata.pop(self._feat_name)
+        graph.ndata.pop(self._feat_name)
         return ret
 
 
@@ -95,16 +94,17 @@ class GlobAttnPooling(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        for p in self.gate_nn:
+        for p in self.gate_nn.parameters():
             if p.dim() > 1:
                 init.xavier_uniform_(p)
-        for p in self.feat_nn:
-            if p.dim() > 1:
-                init.xavier_uniform_(p)
+        if self.feat_nn:
+            for p in self.feat_nn.parameters():
+                if p.dim() > 1:
+                    init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
-        feat = feat.unsqueeze(-1) if feat.dim() == 1 else feat
         gate = self.gate_nn(feat)
+        assert gate.shape[-1] == 1, "The output of gate network should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
         feat_name = get_ndata_name(graph, self._gate_name)
@@ -213,6 +213,7 @@ class MultiHeadAttention(nn.Module):
                 init.xavier_uniform_(p)
 
     def forward(self, graph, q_feat, kv_feat, q_nids, kv_nids):
+        feat_name, query_name, key_name, value_name, score_name, att_name, out_name = map()
         feat_name = get_ndata_name(graph, self._feat_name)
         query_name = get_ndata_name(graph, self._query_name)
         key_name = get_ndata_name(graph, self._key_name)
@@ -259,30 +260,25 @@ class MultiHeadAttention(nn.Module):
         return feat
 
 
-class SetAttentionBlock(nn.Module):
+class SetAttnBlock(nn.Module):
     r""" SAB block mentioned in Set-Transformer paper."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
-        super(SetAttentionBlock, self).__init__()
+        super(SetAttnBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
 
     def forward(self, graph, feat, sab_graph=None):
         if sab_graph is None:
             sab_graph = _create_fully_connected_graph(graph)
 
-        q_nids = sab_graph.nodes()
-        kv_nids = sab_graph.nodes()
-
-        if not isinstance(q_nids, th.Tensor): # TODO(zihao): this should not happen it set PyTorch as the backend.
-            q_nids = th.tensor(q_nids)
-        if not isinstance(kv_nids, th.Tensor):
-            kv_nids = th.tensor(kv_nids)
+        q_nids = th.arange(sab_graph.number_of_nodes())
+        kv_nids = q_nids
 
         return self.mha(sab_graph, feat, feat, q_nids, kv_nids)
 
-class InducedSetAttentionBlock(nn.Module):
+class InducedSetAttnBlock(nn.Module):
     r""" ISAB block mentioned in Set-Transformer paper."""
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
-        super(InducedSetAttentionBlock, self).__init__()
+        super(InducedSetAttnBlock, self).__init__()
         self.m = m
         self.I = nn.Parameter(
             th.FloatTensor(m, d_model)
@@ -360,12 +356,12 @@ class SetTransEncoder(nn.Module):
         for _ in range(n_layers):
             if block_type == 'sab':
                 layers.append(
-                    SetAttentionBlock(d_model, num_heads, d_head, d_ff,
-                                      dropouth=dropouth, dropouta=dropouta))
+                    SetAttnBlock(d_model, num_heads, d_head, d_ff,
+                                 dropouth=dropouth, dropouta=dropouta))
             elif block_type == 'isab':
                 layers.append(
-                    InducedSetAttentionBlock(m, d_model, num_heads, d_head, d_ff,
-                                             dropouth=dropouth, dropouta=dropouta))
+                    InducedSetAttnBlock(m, d_model, num_heads, d_head, d_ff,
+                                        dropouth=dropouth, dropouta=dropouta))
             else:
                 raise KeyError("Unrecognized block type {}: we only support sab/isab")
 
@@ -403,8 +399,8 @@ class SetTransDecoder(nn.Module):
         layers = []
         for _ in range(n_layers):
             layers.append(
-                SetAttentionBlock(d_model, num_heads, d_head, d_ff,
-                                  dropouth=dropouth, dropouta=dropouta))
+                SetAttnBlock(d_model, num_heads, d_head, d_ff,
+                             dropouth=dropouth, dropouta=dropouta))
 
         self.layers = nn.ModuleList(layers)
 
@@ -425,16 +421,4 @@ class SetTransDecoder(nn.Module):
             return feat.view(graph.batch_size, self.k, self.d_model)
         else:
             return feat.view(self.k, self.d_model)
-
-
-class SetTransformer(nn.Module):
-    r"""(experimental)Apply Set Transformer(f""Set Transformer: A Framework for Attention-based
-    Permutation-Invariant Neural Networks") over the graph.
-    """
-    def __init__(self):
-        pass
-
-    def forward(self, feat, graph):
-        pass
-
 

@@ -137,7 +137,9 @@ def reduce_min(input):
     return input.min()
 
 def argsort(input, dim, descending):
-    return nd.argsort(input, dim, is_ascend=not descending)
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    idx = nd.cast(idx, dtype='int64')
+    return idx
 
 def exp(input):
     return nd.exp(input)

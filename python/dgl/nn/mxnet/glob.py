@@ -70,11 +70,11 @@ class SortPooling(nn.Block):
 
     def forward(self, feat, graph):
         # Sort the feature of each node in ascending order.
-        feat, _ = feat.sort(dim=-1)
+        feat = feat.sort(axis=-1)
         graph.ndata[self._feat_name] = feat
         # Sort nodes according to their last features.
         ret = topk_nodes(graph, self._feat_name, self.k).reshape(-1, self.k * feat.shape[-1])
-        g.ndata.pop(self._feat_name)
+        graph.ndata.pop(self._feat_name)
         return ret
 
 
@@ -92,11 +92,13 @@ class GlobAttnPooling(nn.Block):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        self.gate_nn.initialize(mx.init.Xavier())
+        if self.feat_nn:
+            self.feat_nn.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):
-        feat = feat.unsqueeze(-1) if feat.ndim == 1 else feat
         gate = self.gate_nn(feat)
+        assert gate.shape[-1] == 1, "The output of gate network shoule have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
         feat_name = get_ndata_name(graph, self._gate_name)
@@ -128,7 +130,7 @@ class Set2Set(nn.Block):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        self.lstm.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):
         batch_size = 1
@@ -140,7 +142,7 @@ class Set2Set(nn.Block):
         q_star = nd.zeros((batch_size, self.output_dim), ctx=feat.context)
 
         for i in range(self.n_iters):
-            q, h = self.lstm(q_star.unsqueeze(0), h)
+            q, h = self.lstm(q_star.expand_dims(axis=0), h)
             q = q.reshape((batch_size, self.input_dim))
 
             score = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)

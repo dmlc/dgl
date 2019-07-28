@@ -391,7 +391,7 @@ def _sum_on(graph, typestr, feat, weight):
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        for i, num_obj in batch_num_objs:
+        for i, num_obj in enumerate(batch_num_objs):
             if num_obj == 0: dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
                                          " would be returned at the corresponding row.".format(i, typestr))
 
@@ -574,7 +574,7 @@ def _mean_on(graph, typestr, feat, weight):
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        for i, num_obj in batch_num_objs:
+        for i, num_obj in enumerate(batch_num_objs):
             if num_obj == 0: dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
                                          " would be returned at the corresponding row.".format(i, typestr))
 
@@ -863,9 +863,9 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     k : int
         The k in "top-k".
     descending : bool
-        Controls whether to return the largest or smallest elements.
+        Controls whether to return the largest or smallest elements, defaults to True.
     idx : int
-        The key index we sort features along.
+        The key index we sort features along, defaults to -1.
 
     Returns
     -------
@@ -880,8 +880,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     if F.ndim(data[feat]) > 2:
         raise DGLError('The {} feature `{}` should have dimension less than or equal to 2'.format(typestr, feat))
     feat = data[feat]
-    hid_dim = F.shape(feat)[-1]
-    if idx < 0: idx += hid_dim
+    hidden_size = F.shape(feat)[-1]
+    if idx < 0: idx += hidden_size
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
@@ -895,21 +895,22 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
         index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
-        feat_ = F.zeros((batch_size * max_n_objs, hid_dim), dtype, ctx) - float('inf')
+        feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
-        feat_ = F.reshape(feat_, (batch_size, max_n_objs, hid_dim))
+        feat_ = F.reshape(feat_, (batch_size, max_n_objs, hidden_size))
 
     keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
     order = F.argsort(keys, -1, descending=descending)
+    print(order)
     topk_indices = F.slice_axis(order, -1, 0, k)
 
     if isinstance(graph, BatchedDGLGraph):
-        feat_ = F.zeros((batch_size * max_n_objs, hid_dim), dtype, ctx)
+        feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx)
         feat_ = F.scatter_row(feat_, index, feat)
         topk_indices = F.reshape(topk_indices, (-1,)) +\
                        F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1)
 
-    return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hid_dim))
+    return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hidden_size))
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
@@ -1062,7 +1063,7 @@ def broadcast_edges(graph, feat_data):
 
 def topk_nodes(graph, feat, k, descending=True, idx=-1):
     """Return graph-wise top-k node features of field :attr:`feat` in
-    :attr:`graph` along given dimension :attr:`dim`. If :attr:`reverse` is
+    :attr:`graph` along given index :attr:`idx`. If :attr:`reverse` is
     set to True, return the k smallest elements instead.
 
     Parameters
@@ -1089,7 +1090,7 @@ def topk_nodes(graph, feat, k, descending=True, idx=-1):
 
 def topk_edges(graph, feat, k, descending=True, idx=-1):
     """Return graph-wise top-k edge features of field :attr:`feat` in
-    :attr:`graph` along given dimension :attr:`dim`. If :attr:`reverse` is
+    :attr:`graph` along given index :attr:`idx`. If :attr:`reverse` is
     set to True, return the k smallest elements instead.
 
     Parameters
