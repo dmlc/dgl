@@ -887,7 +887,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
                        ' equal to 2'.format(typestr, feat))
     feat = data[feat]
     hidden_size = F.shape(feat)[-1]
-    if idx < 0: idx += hidden_size
+    if idx < 0:
+        idx += hidden_size
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
