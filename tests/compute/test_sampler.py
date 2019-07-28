@@ -160,14 +160,14 @@ def test_setseed():
 
     nids = []
 
-    dgl.contrib.sampling.seed(42)
+    dgl.random.seed(42)
     for subg in dgl.contrib.sampling.NeighborSampler(
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1):
         nids.append(
             tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3)))
 
     # reinitialize
-    dgl.contrib.sampling.seed(42)
+    dgl.random.seed(42)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1)):
         item = tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3))
