@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103
+# pylint: disable= no-member, arguments-differ
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -26,6 +26,20 @@ class SumPooling(nn.Module):
         super(SumPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute sum pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = sum_nodes(graph, _feat_name)
@@ -41,6 +55,20 @@ class AvgPooling(nn.Module):
         super(AvgPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute average pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = mean_nodes(graph, _feat_name)
@@ -56,6 +84,20 @@ class MaxPooling(nn.Module):
         super(MaxPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute max pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = max_nodes(graph, _feat_name)
@@ -66,6 +108,11 @@ class MaxPooling(nn.Module):
 class SortPooling(nn.Module):
     r"""Apply sort pooling (f"An End-to-End Deep Learning Architecture
     for Graph Classification") over the graph.
+
+    Parameters
+    ----------
+    k : int
+        The number of nodes to hold for each graph.
     """
     _feat_name = '_gpool_sort'
     def __init__(self, k):
@@ -73,6 +120,20 @@ class SortPooling(nn.Module):
         self.k = k
 
     def forward(self, feat, graph):
+        r"""Compute sort pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
         graph.ndata[self._feat_name] = feat
@@ -84,6 +145,14 @@ class SortPooling(nn.Module):
 
 class GlobAttnPooling(nn.Module):
     r"""Apply global attention pooling over the graph.
+
+    Parameters
+    ----------
+    gate_nn : torch.nn.Module
+        A neural network that computes attention scores for each feature.
+    feat_nn : torch.nn.Module, optional
+        A neural network applied to each feature before combining them
+        with attention scores.
     """
     _gate_name = '_gpool_attn_gate'
     _readout_name = '_gpool_attn_readout'
@@ -91,9 +160,9 @@ class GlobAttnPooling(nn.Module):
         super(GlobAttnPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         for p in self.gate_nn.parameters():
             if p.dim() > 1:
                 init.xavier_uniform_(p)
@@ -122,6 +191,15 @@ class GlobAttnPooling(nn.Module):
 
 class Set2Set(nn.Module):
     r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over the graph.
+
+    Parameters
+    ----------
+    input_dim : int
+        Size of each input sample
+    n_iters : int
+        Number of iterations.
+    n_layers : int
+        Number of recurrent layers.
     """
     _score_name = '_gpool_s2s_score'
     _readout_name = '_gpool_s2s_readout'
@@ -132,14 +210,28 @@ class Set2Set(nn.Module):
         self.n_iters = n_iters
         self.n_layers = n_layers
         self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         for p in self.lstm.parameters():
             if p.dim() > 1:
                 init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
+        r"""Compute set2set pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
@@ -205,9 +297,9 @@ class MultiHeadAttention(nn.Module):
         self.dropa = nn.Dropout(dropouta)
         self.norm_in = nn.LayerNorm(d_model)
         self.norm_inter = nn.LayerNorm(d_model)
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
                 init.xavier_uniform_(p)
@@ -287,9 +379,9 @@ class InducedSetAttnBlock(nn.Module):
         self.mha = nn.ModuleList([
             MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                dropouth=dropouth, dropouta=dropouta) for _ in range(2)])
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         init.xavier_uniform_(self.I)
 
     def forward(self, graph, feat, isab_graph=None):
@@ -324,9 +416,9 @@ class _PMALayer(nn.Module):
         )
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         init.xavier_uniform_(self.S)
 
     def forward(self, graph, feat, pma_graph=None):

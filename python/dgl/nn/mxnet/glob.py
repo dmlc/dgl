@@ -1,5 +1,5 @@
 """MXNet modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103
+# pylint: disable= no-member, arguments-differ
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn
@@ -20,6 +20,20 @@ class SumPooling(nn.Block):
         super(SumPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute sum pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = sum_nodes(graph, _feat_name)
@@ -35,6 +49,20 @@ class AvgPooling(nn.Block):
         super(AvgPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute average pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = mean_nodes(graph, _feat_name)
@@ -50,6 +78,20 @@ class MaxPooling(nn.Block):
         super(MaxPooling, self).__init__()
 
     def forward(self, feat, graph):
+        r"""Compute max pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         _feat_name = get_ndata_name(graph, self._feat_name)
         graph.ndata[_feat_name] = feat
         readout = max_nodes(graph, _feat_name)
@@ -60,6 +102,11 @@ class MaxPooling(nn.Block):
 class SortPooling(nn.Block):
     r"""Apply sort pooling (f"An End-to-End Deep Learning Architecture
     for Graph Classification") over the graph.
+
+    Parameters
+    ----------
+    k : int
+        The number of nodes to hold for each graph.
     """
     _feat_name = '_gpool_sort'
     def __init__(self, k):
@@ -67,6 +114,20 @@ class SortPooling(nn.Block):
         self.k = k
 
     def forward(self, feat, graph):
+        r"""Compute sort pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         # Sort the feature of each node in ascending order.
         feat = feat.sort(axis=-1)
         graph.ndata[self._feat_name] = feat
@@ -78,6 +139,14 @@ class SortPooling(nn.Block):
 
 class GlobAttnPooling(nn.Block):
     r"""Apply global attention pooling over the graph.
+
+    Parameters
+    ----------
+    gate_nn : gluon.nn.Block
+        A neural network that computes attention scores for each feature.
+    feat_nn : gluon.nn.Block, optional
+        A neural network applied to each feature before combining them
+        with attention scores.
     """
     _gate_name = '_gpool_attn_gate'
     _readout_name = '_gpool_attn_readout'
@@ -87,14 +156,28 @@ class GlobAttnPooling(nn.Block):
             self.gate_nn = gate_nn
             self.feat_nn = feat_nn
 
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         self.gate_nn.initialize(mx.init.Xavier())
         if self.feat_nn:
             self.feat_nn.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):
+        r"""Compute global attention pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         gate = self.gate_nn(feat)
         assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
@@ -114,6 +197,15 @@ class GlobAttnPooling(nn.Block):
 
 class Set2Set(nn.Block):
     r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over the graph.
+
+    Parameters
+    ----------
+    input_dim : int
+        Size of each input sample
+    n_iters : int
+        Number of iterations.
+    n_layers : int
+        Number of recurrent layers.
     """
     _score_name = '_gpool_s2s_score'
     _readout_name = '_gpool_s2s_readout'
@@ -126,12 +218,26 @@ class Set2Set(nn.Block):
         with self.name_scope():
             self.lstm = gluon.rnn.LSTM(
                 self.input_dim, num_layers=n_layers, input_size=self.output_dim)
-        self.reset_parameters()
+        self._reset_parameters()
 
-    def reset_parameters(self):
+    def _reset_parameters(self):
         self.lstm.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):
+        r"""Compute set2set pooling.
+
+        Parameters
+        ----------
+        feat : mxnet.NDArray
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        mxnet.NDArray
+            The output feature
+        """
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size

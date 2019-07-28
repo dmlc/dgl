@@ -77,4 +77,3 @@ def _create_batched_graph_from_num_nodes(n_nodes_arr):
     if len(g_list) == 0:
         return g_list[0]
     return batch(g_list)
-
