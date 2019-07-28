@@ -880,7 +880,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
         :math:`(B, K, D)` we be returned, where math`B` is the batch
         size.
     """
-    data_attr, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     if F.ndim(data[feat]) > 2:
         raise DGLError('The {} feature `{}` should have dimension less than or'

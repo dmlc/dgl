@@ -22,7 +22,7 @@ class SumPooling(nn.Module):
     """
     _feat_name = '_gpool_feat'
     def __init__(self):
-        super(SumPooling, self).__init__()
+        pass
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
@@ -51,7 +51,7 @@ class AvgPooling(nn.Module):
     """
     _feat_name = '_gpool_avg'
     def __init__(self):
-        super(AvgPooling, self).__init__()
+        pass
 
     def forward(self, feat, graph):
         r"""Compute average pooling.
@@ -80,7 +80,7 @@ class MaxPooling(nn.Module):
     """
     _feat_name = '_gpool_max'
     def __init__(self):
-        super(MaxPooling, self).__init__()
+        pass
 
     def forward(self, feat, graph):
         r"""Compute max pooling.
