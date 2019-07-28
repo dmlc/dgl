@@ -1,5 +1,5 @@
 """MXNet modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, C0103
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn

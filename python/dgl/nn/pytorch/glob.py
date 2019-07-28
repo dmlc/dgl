@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, C0103
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -172,6 +172,20 @@ class GlobAttnPooling(nn.Module):
                     init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
+        r"""Compute global attention pooling.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
         gate = self.gate_nn(feat)
         assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
@@ -305,7 +319,9 @@ class MultiHeadAttention(nn.Module):
                 init.xavier_uniform_(p)
 
     def forward(self, graph, q_feat, kv_feat, q_nids, kv_nids):
-        feat_name, query_name, key_name, value_name, score_name, att_name, out_name = map()
+        """
+        Compute multi-head self-attention.
+        """
         feat_name = get_ndata_name(graph, self._feat_name)
         query_name = get_ndata_name(graph, self._query_name)
         key_name = get_ndata_name(graph, self._key_name)
@@ -360,6 +376,9 @@ class SetAttnBlock(nn.Module):
                                       dropouth=dropouth, dropouta=dropouta)
 
     def forward(self, graph, feat, sab_graph=None):
+        """
+        Compute a Set Attention Block.
+        """
         if sab_graph is None:
             sab_graph = _create_fully_connected_graph(graph)
 
@@ -385,6 +404,9 @@ class InducedSetAttnBlock(nn.Module):
         init.xavier_uniform_(self.I)
 
     def forward(self, graph, feat, isab_graph=None):
+        """
+        Compute an Induced Set Attention Block.
+        """
         query = self.I
         if isab_graph is None:
             if isinstance(graph, BatchedDGLGraph):
@@ -462,6 +484,9 @@ class SetTransEncoder(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, graph, feat):
+        """
+        Compute Set Transformer Encoder.
+        """
         if self.block_type == 'sab':
             att_graph = _create_fully_connected_graph(graph)
         else:
@@ -499,6 +524,9 @@ class SetTransDecoder(nn.Module):
         self.layers = nn.ModuleList(layers)
 
     def forward(self, graph, feat):
+        """
+        Compute Set Transformer Decoder.
+        """
         if isinstance(graph, BatchedDGLGraph):
             induced_graph = _create_batched_graph_from_num_nodes([self.k] * graph.batch_size)
         else:
