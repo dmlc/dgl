@@ -30,7 +30,8 @@ def _create_fully_connected_graph(graph):
         return DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True)
 
 def _create_bipartite_graph(graph_u, graph_v):
-    r""" Create a bipartite G(U, V, E) graph with nodes in graph_u as U and nodes in graph_v as V"""
+    r""" Create a bipartite G(U, V, E) graph with nodes in graph_u as U
+     and nodes in graph_v as V"""
     if isinstance(graph_u, BatchedDGLGraph):
         g_list = []
         if graph_u.batch_size != graph_v.batch_size:
@@ -65,8 +66,7 @@ def _create_bipartite_graph(graph_u, graph_v):
             F.zerocopy_from_numpy(u_list), F.zerocopy_from_numpy(v_list)
 
 def _create_graph_from_num_nodes(n_nodes_arr):
-    r""" Create a batched graph (with no nodes) from number of nodes list
-    to use as the latent graph in GNN layers."""
+    r""" Create a DGLGraph (with no nodes) from number of nodes list."""
     g_list = []
     for n_nodes in n_nodes_arr:
         indptr = np.zeros(n_nodes + 1, dtype=np.int64)
