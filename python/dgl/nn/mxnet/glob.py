@@ -1,15 +1,13 @@
 """MXNet modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, C0103
 import mxnet as mx
 from mxnet import gluon, nd
-from mxnet import init
 from mxnet.gluon import nn
 
-from ... import function as fn
-from ... import function as fn, BatchedDGLGraph
+from ... import BatchedDGLGraph
 from ...utils import get_ndata_name
-from ...base import dgl_warning
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes, topk_nodes
+from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+    softmax_nodes, topk_nodes
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobAttnPooling', 'Set2Set']
@@ -98,7 +96,7 @@ class GlobAttnPooling(nn.Block):
 
     def forward(self, feat, graph):
         gate = self.gate_nn(feat)
-        assert gate.shape[-1] == 1, "The output of gate network shoule have size 1 at the last axis."
+        assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
         feat_name = get_ndata_name(graph, self._gate_name)
@@ -126,7 +124,8 @@ class Set2Set(nn.Block):
         self.n_iters = n_iters
         self.n_layers = n_layers
         with self.name_scope():
-            self.lstm = gluon.rnn.LSTM(self.input_dim, num_layers=n_layers, input_size=self.output_dim)
+            self.lstm = gluon.rnn.LSTM(
+                self.input_dim, num_layers=n_layers, input_size=self.output_dim)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -159,4 +158,3 @@ class Set2Set(nn.Block):
             q_star = nd.concat(q, readout, dim=-1)
 
         return q_star
-

@@ -1,17 +1,17 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, C0103
 import torch as th
 import torch.nn as nn
 import numpy as np
 
-from ..utils import _create_fully_connected_graph, _create_bipartite_graph, _create_batched_graph_from_num_nodes
-
+from ..utils import _create_fully_connected_graph, _create_bipartite_graph, \
+    _create_batched_graph_from_num_nodes
 from torch.nn import init
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
-from ...utils import get_ndata_name, get_edata_name
-from ...base import dgl_warning
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes, softmax_nodes, topk_nodes
+from ...utils import get_ndata_name
+from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+    softmax_nodes, topk_nodes
 
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
@@ -104,7 +104,7 @@ class GlobAttnPooling(nn.Module):
 
     def forward(self, feat, graph):
         gate = self.gate_nn(feat)
-        assert gate.shape[-1] == 1, "The output of gate network should have size 1 at the last axis."
+        assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
         feat_name = get_ndata_name(graph, self._gate_name)
@@ -130,7 +130,7 @@ class Set2Set(nn.Module):
         self.input_dim = input_dim
         self.output_dim = 2 * input_dim
         self.n_iters = n_iters
-        self.n_layers= n_layers
+        self.n_layers = n_layers
         self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
         self.reset_parameters()
 
@@ -239,7 +239,7 @@ class MultiHeadAttention(nn.Module):
 
         # Compute attention score.
         graph.apply_edges(fn.u_mul_v(key_name, query_name, score_name))
-        e = graph.edata.pop(score_name).sum(dim=-1, keepdim=True) / np.sqrt(self.d_head) # Attention & Free score field.
+        e = graph.edata.pop(score_name).sum(dim=-1, keepdim=True) / np.sqrt(self.d_head)
         graph.edata[att_name] = self.dropa(edge_softmax(graph, e))
         graph.pull(q_nids,
                    fn.u_mul_e(value_name, att_name, 'm'),
@@ -264,7 +264,8 @@ class SetAttnBlock(nn.Module):
     r""" SAB block mentioned in Set-Transformer paper."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttnBlock, self).__init__()
-        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
+        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
+                                      dropouth=dropouth, dropouta=dropouta)
 
     def forward(self, graph, feat, sab_graph=None):
         if sab_graph is None:
@@ -289,7 +290,7 @@ class InducedSetAttnBlock(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.xavier_uniform_(self.I) # TODO(zihao): not sure if it is the right way, would check later.
+        init.xavier_uniform_(self.I)
 
     def forward(self, graph, feat, isab_graph=None):
         query = self.I
@@ -321,7 +322,8 @@ class _PMALayer(nn.Module):
         self.S = nn.Parameter(
             nn.FloatTensor(k, d_model)
         )
-        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff, dropouth=dropouth, dropouta=dropouta)
+        self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
+                                      dropouth=dropouth, dropouta=dropouta)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -421,4 +423,3 @@ class SetTransDecoder(nn.Module):
             return feat.view(graph.batch_size, self.k, self.d_model)
         else:
             return feat.view(self.k, self.d_model)
-

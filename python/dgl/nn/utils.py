@@ -1,14 +1,15 @@
-"""utilities used in dgl.nn modules"""
-# pylint: disable= no-member, arguments-differ
+"""Graph construction utilities used in dgl.nn modules"""
+
+import numpy as np
 
 from ..graph import DGLGraph
 from ..batched_graph import BatchedDGLGraph, batch
 from ..graph_index import from_csr
 from .. import backend as F
 
-import numpy as np
 
-__all__ = ['_create_fully_connected_graph', '_create_bipartite_graph', '_create_batched_graph_from_num_nodes']
+__all__ = ['_create_fully_connected_graph', '_create_bipartite_graph',
+           '_create_batched_graph_from_num_nodes']
 
 def _create_fully_connected_graph(graph):
     r""" Create a fully connected graph upon the given graph."""
@@ -47,7 +48,9 @@ def _create_bipartite_graph(graph_u, graph_v):
             us.append(np.arange(v_shift, v_shift + n_nodes_u))
             vs.append(np.arange(v_shift + n_nodes_u, v_shift + n_nodes_u + n_nodes_v))
             v_shift += n_nodes_u + n_nodes_v
-        return batch(gs), F.zerocopy_from_numpy(np.concatenate(us)), F.zerocopy_from_numpy(np.concatenate(vs))
+        return batch(gs),\
+               F.zerocopy_from_numpy(np.concatenate(us)),\
+               F.zerocopy_from_numpy(np.concatenate(vs))
     else:
         n_nodes_u = graph_u.number_of_nodes()
         n_nodes_v = graph_v.number_of_nodes()
@@ -73,5 +76,4 @@ def _create_batched_graph_from_num_nodes(n_nodes_arr):
     if len(gs) == 0:
         return gs[0]
     return batch(gs)
-
 

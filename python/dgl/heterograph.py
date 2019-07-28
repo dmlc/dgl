@@ -2258,4 +2258,3 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
             The node ID array in the subgraph of each node type.
         """
         pass
-

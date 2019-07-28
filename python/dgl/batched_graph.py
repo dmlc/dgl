@@ -392,8 +392,9 @@ def _sum_on(graph, typestr, feat, weight):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0: dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
-                                         " would be returned at the corresponding row.".format(i, typestr))
+            if num_obj == 0:
+                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
+                            " would be returned at the corresponding row.".format(i, typestr))
 
         seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(feat))
@@ -575,8 +576,9 @@ def _mean_on(graph, typestr, feat, weight):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0: dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
-                                         " would be returned at the corresponding row.".format(i, typestr))
+            if num_obj == 0:
+                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
+                            " would be returned at the corresponding row.".format(i, typestr))
 
         seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(feat))
@@ -761,13 +763,15 @@ def _max_on(graph, typestr, feat):
         max_n_objs = max(batch_num_objs)
         index = []
         for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0: dgl_warning("Graph {} has zero {}, a tensor filled with -inf of the same shape"
-                                         " would be returned at the corresponding row.".format(i, typestr))
+            if num_obj == 0:
+                dgl_warning("Graph {} has zero {}, a tensor filled with -inf of the same shape"
+                            " would be returned at the corresponding row.".format(i, typestr))
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
         index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
-        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]), dtype, ctx) - float('inf')
+        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
+                        dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
         return F.max(feat_, 1)
@@ -805,7 +809,8 @@ def _softmax_on(graph, typestr, feat):
         index = F.tensor(index)
         dtype = F.dtype(feat)
         ctx = F.context(feat)
-        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]), dtype, ctx) - float('inf')
+        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
+                        dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
         feat_ = F.softmax(feat_, 1)
@@ -878,7 +883,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     data_attr, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     if F.ndim(data[feat]) > 2:
-        raise DGLError('The {} feature `{}` should have dimension less than or equal to 2'.format(typestr, feat))
+        raise DGLError('The {} feature `{}` should have dimension less than or'
+                       ' equal to 2'.format(typestr, feat))
     feat = data[feat]
     hidden_size = F.shape(feat)[-1]
     if idx < 0: idx += hidden_size
