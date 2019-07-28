@@ -162,16 +162,20 @@ def test_setseed():
 
     dgl.contrib.sampling.seed(42)
     for subg in dgl.contrib.sampling.NeighborSampler(
-            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4):
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1):
         nids.append(
             tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3)))
 
     # reinitialize
     dgl.contrib.sampling.seed(42)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
-            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1)):
         item = tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3))
         assert item == nids[i]
+
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
+        pass
 
 if __name__ == '__main__':
     test_create_full()

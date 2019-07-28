@@ -7,7 +7,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
-#include <dgl/runtime/random.h>
+#include <dgl/random.h>
 #include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
@@ -71,7 +71,7 @@ class ArrayHeap {
    * Sample from arrayHeap
    */
   size_t Sample() {
-    float xi = heap_[1] * Random::Uniform<float>();
+    float xi = heap_[1] * RandomEngine::ThreadLocal()->Uniform<float>();
     int i = 1;
     while (i < limit_) {
       i = i << 1;
@@ -107,7 +107,7 @@ class ArrayHeap {
 void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
   std::unordered_set<size_t> sampled_idxs;
   while (sampled_idxs.size() < num) {
-    sampled_idxs.insert(Random::RandInt(set_size));
+    sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
   }
   out->clear();
   out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
@@ -561,7 +561,8 @@ namespace {
       std::unordered_map<dgl_id_t, size_t> n_occurrences;
       auto n_candidates = candidate_vector.size();
       for (int64_t j = 0; j != layer_size; ++j) {
-        auto dst = candidate_vector[Random::RandInt(n_candidates)];
+        auto dst = candidate_vector[
+          RandomEngine::ThreadLocal()->RandInt(n_candidates)];
         if (!n_occurrences.insert(std::make_pair(dst, 1)).second) {
           ++n_occurrences[dst];
         }

@@ -8,7 +8,7 @@
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
-#include <dgl/runtime/random.h>
+#include <dgl/random.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
@@ -35,7 +35,7 @@ dgl_id_t WalkOneHop(
   const size_t size = succ.size();
   if (size == 0)
     return DGL_INVALID_ID;
-  return succ[Random::RandInt(size)];
+  return succ[RandomEngine::ThreadLocal()->RandInt(size)];
 }
 
 /*!
@@ -124,7 +124,8 @@ RandomWalkTraces GenericRandomWalkWithRestart(
             (++num_frequent_visited_nodes == max_frequent_visited_nodes))
           stop = 1;
 
-        if ((trace_length > 0) && (Random::Uniform<double>() < restart_prob))
+        if ((trace_length > 0) &&
+            (RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob))
           break;
 
         if ((next = walker(gptr, cur)) == DGL_INVALID_ID)
