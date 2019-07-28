@@ -6,7 +6,6 @@ import numpy as np
 
 from ..utils import _create_fully_connected_graph, _create_bipartite_graph, \
     _create_batched_graph_from_num_nodes
-from torch.nn import init
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name
@@ -165,11 +164,11 @@ class GlobAttnPooling(nn.Module):
     def _reset_parameters(self):
         for p in self.gate_nn.parameters():
             if p.dim() > 1:
-                init.xavier_uniform_(p)
+                nn.init.xavier_uniform_(p)
         if self.feat_nn:
             for p in self.feat_nn.parameters():
                 if p.dim() > 1:
-                    init.xavier_uniform_(p)
+                    nn.init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         r"""Compute global attention pooling.
@@ -229,7 +228,7 @@ class Set2Set(nn.Module):
     def _reset_parameters(self):
         for p in self.lstm.parameters():
             if p.dim() > 1:
-                init.xavier_uniform_(p)
+                nn.init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         r"""Compute set2set pooling.
@@ -316,7 +315,7 @@ class MultiHeadAttention(nn.Module):
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
-                init.xavier_uniform_(p)
+                nn.init.xavier_uniform_(p)
 
     def forward(self, graph, q_feat, kv_feat, q_nids, kv_nids):
         """
@@ -401,7 +400,7 @@ class InducedSetAttnBlock(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
-        init.xavier_uniform_(self.I)
+        nn.init.xavier_uniform_(self.I)
 
     def forward(self, graph, feat, isab_graph=None):
         """
@@ -441,7 +440,7 @@ class _PMALayer(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
-        init.xavier_uniform_(self.S)
+        nn.init.xavier_uniform_(self.S)
 
     def forward(self, graph, feat, pma_graph=None):
         query = self.S
