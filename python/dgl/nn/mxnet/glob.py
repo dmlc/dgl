@@ -1,5 +1,5 @@
 """MXNet modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103
+# pylint: disable= no-member, arguments-differ, C0103, W0235
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn
@@ -16,8 +16,8 @@ class SumPooling(nn.Block):
     r"""Apply sum pooling over the graph.
     """
     _feat_name = '_gpool_feat'
-    def __init__(self, **kwargs):
-        super(SumPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(SumPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
@@ -48,8 +48,8 @@ class AvgPooling(nn.Block):
     r"""Apply average pooling over the graph.
     """
     _feat_name = '_gpool_avg'
-    def __init__(self, **kwargs):
-        super(AvgPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(AvgPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute average pooling.
@@ -80,8 +80,8 @@ class MaxPooling(nn.Block):
     r"""Apply max pooling over the graph.
     """
     _feat_name = '_gpool_max'
-    def __init__(self, **kwargs):
-        super(MaxPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(MaxPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute max pooling.
@@ -289,8 +289,9 @@ class Set2Set(nn.Block):
     def __repr__(self):
         summary = 'Set2Set('
         summary += 'in={}, out={}, ' \
-                   'n_iters={}, n_layers={}'.format(
-            self.input_dim, self.output_dim, self.n_iters, self.n_layers
-        )
+                   'n_iters={}, n_layers={}'.format(self.input_dim,
+                                                    self.output_dim,
+                                                    self.n_iters,
+                                                    self.n_layers)
         summary += ')'
         return summary

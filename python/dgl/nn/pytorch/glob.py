@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103
+# pylint: disable= no-member, arguments-differ, C0103, W0235
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -21,8 +21,8 @@ class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
     """
     _feat_name = '_gpool_feat'
-    def __init__(self, **kwargs):
-        super(SumPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(SumPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
@@ -50,8 +50,8 @@ class AvgPooling(nn.Module):
     r"""Apply average pooling over the graph.
     """
     _feat_name = '_gpool_avg'
-    def __init__(self, **kwargs):
-        super(AvgPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(AvgPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute average pooling.
@@ -79,8 +79,8 @@ class MaxPooling(nn.Module):
     r"""Apply max pooling over the graph.
     """
     _feat_name = '_gpool_max'
-    def __init__(self, **kwargs):
-        super(MaxPooling, self).__init__(**kwargs)
+    def __init__(self):
+        super(MaxPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute max pooling.
@@ -434,6 +434,9 @@ class InducedSetAttnBlock(nn.Module):
         return rst
 
     def extra_repr(self):
+        """Set the extra representation of the module.
+        which will come into effect when printing the model.
+        """
         shape_str = '({}, {})'.format(self.I.shape[0], self.I.shape[1])
         return 'InducedVector: ' + shape_str
 
@@ -471,6 +474,9 @@ class PMALayer(nn.Module):
         return self.mha(g, query, feat, q_nids, kv_nids)
 
     def extra_repr(self):
+        """Set the extra representation of the module.
+        which will come into effect when printing the model.
+        """
         shape_str = '({}, {})'.format(self.S.shape[0], self.S.shape[1])
         return 'SeedVector: ' + shape_str
 
