@@ -246,7 +246,7 @@ class Set2Set(nn.Block):
              nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context))
         q_star = nd.zeros((batch_size, self.output_dim), ctx=feat.context)
 
-        for i in range(self.n_iters):
+        for _ in range(self.n_iters):
             q, h = self.lstm(q_star.expand_dims(axis=0), h)
             q = q.reshape((batch_size, self.input_dim))
 

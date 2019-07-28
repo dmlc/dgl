@@ -253,7 +253,7 @@ class Set2Set(nn.Module):
              feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
         q_star = feat.new_zeros(batch_size, self.output_dim)
 
-        for i in range(self.n_iters):
+        for _ in range(self.n_iters):
             q, h = self.lstm(q_star.unsqueeze(0), h)
             q = q.view(batch_size, self.input_dim)
 
