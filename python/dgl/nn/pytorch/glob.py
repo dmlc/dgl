@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 from ..utils import _create_fully_connected_graph, _create_bipartite_graph, \
-    _create_batched_graph_from_num_nodes
+    _create_graph_from_num_nodes
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
 from ...utils import get_ndata_name
@@ -14,15 +14,15 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
 
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
-           'GlobAttnPooling', 'Set2Set', 'MultiHeadAttention',
-           'SetAttnBlock', 'InducedSetAttnBlock', 'SetTransEncoder', 'SetTransDecoder']
+           'GlobAttnPooling', 'Set2Set',
+           'SetTransEncoder', 'SetTransDecoder']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
     """
     _feat_name = '_gpool_feat'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(SumPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
@@ -50,8 +50,8 @@ class AvgPooling(nn.Module):
     r"""Apply average pooling over the graph.
     """
     _feat_name = '_gpool_avg'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(AvgPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute average pooling.
@@ -79,8 +79,8 @@ class MaxPooling(nn.Module):
     r"""Apply max pooling over the graph.
     """
     _feat_name = '_gpool_max'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(MaxPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute max pooling.
@@ -139,7 +139,10 @@ class SortPooling(nn.Module):
         # Sort nodes according to their last features.
         ret = topk_nodes(graph, self._feat_name, self.k).view(-1, self.k * feat.shape[-1])
         graph.ndata.pop(self._feat_name)
-        return ret
+        if isinstance(graph, BatchedDGLGraph):
+            return ret
+        else:
+            return ret.squeeze(0)
 
 
 class GlobAttnPooling(nn.Module):
@@ -268,16 +271,21 @@ class Set2Set(nn.Module):
             readout = sum_nodes(graph, feat_name)
             graph.ndata.pop(feat_name)
 
+            if readout.dim() == 1: # graph is not a BatchedDGLGraph
+                readout = readout.unsqueeze(0)
+
             q_star = th.cat([q, readout], dim=-1)
 
-        return q_star
+        if isinstance(graph, BatchedDGLGraph):
+            return q_star
+        else:
+            return q_star.squeeze(0)
 
     def extra_repr(self):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        summary = 'input_dim={input_dim}, out_dim={out_dim}' +\
-            'n_iters={n_iters}, n_layers={n_layers}'
+        summary = 'n_iters={n_iters}'
         return summary.format(**self.__dict__)
 
 
@@ -374,7 +382,7 @@ class SetAttnBlock(nn.Module):
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
 
-    def forward(self, graph, feat, sab_graph=None):
+    def forward(self, feat, graph, sab_graph=None):
         """
         Compute a Set Attention Block.
         """
@@ -402,38 +410,41 @@ class InducedSetAttnBlock(nn.Module):
     def _reset_parameters(self):
         nn.init.xavier_uniform_(self.I)
 
-    def forward(self, graph, feat, isab_graph=None):
+    def forward(self, feat, graph, isab_graph=None):
         """
         Compute an Induced Set Attention Block.
         """
         query = self.I
-        if isab_graph is None:
-            if isinstance(graph, BatchedDGLGraph):
-                induced_graph = _create_batched_graph_from_num_nodes([self.m] * graph.batch_size)
-            else:
-                induced_graph = _create_batched_graph_from_num_nodes([self.m])
+        batch_size = 1
+        if isinstance(graph, BatchedDGLGraph):
+            batch_size = graph.batch_size
 
+        if isab_graph is None:
+            induced_graph = _create_graph_from_num_nodes([self.m] * batch_size)
             isab_graph = [
                 _create_bipartite_graph(graph, induced_graph),
                 _create_bipartite_graph(induced_graph, graph)
             ]
 
-            query = query.repeat(graph.batch_size, 1)
-
+        query = query.repeat(batch_size, 1)
         for mha, (g, kv_nids, q_nids) in zip(self.mha, isab_graph):
             rst = mha(g, query, feat, q_nids, kv_nids)
             query, feat = feat, rst
 
         return rst
 
+    def extra_repr(self):
+        shape_str = '({}, {})'.format(self.I.shape[0], self.I.shape[1])
+        return 'InducedVector: ' + shape_str
 
-class _PMALayer(nn.Module):
+
+class PMALayer(nn.Module):
     r"""Pooling by Multihead Attention, used in the Decoder Module of Set Transformer."""
     def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         self.k = k
-        super(_PMALayer, self).__init__()
+        super(PMALayer, self).__init__()
         self.S = nn.Parameter(
-            nn.FloatTensor(k, d_model)
+            th.FloatTensor(k, d_model)
         )
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
@@ -442,26 +453,56 @@ class _PMALayer(nn.Module):
     def _reset_parameters(self):
         nn.init.xavier_uniform_(self.S)
 
-    def forward(self, graph, feat, pma_graph=None):
+    def forward(self, feat, graph, pma_graph=None):
         """
         Compute Pooling by Multihead Attention.
         """
         query = self.S
+        batch_size = 1
+        if isinstance(graph, BatchedDGLGraph):
+            batch_size = graph.batch_size
+
         if pma_graph is None:
-            if isinstance(graph, BatchedDGLGraph):
-                induced_graph = _create_batched_graph_from_num_nodes([self.k] * graph.batch_size)
-            else:
-                induced_graph = _create_batched_graph_from_num_nodes([self.k])
+            induced_graph = _create_graph_from_num_nodes([self.k] * batch_size)
             pma_graph = _create_bipartite_graph(graph, induced_graph)
 
         g, kv_nids, q_nids = pma_graph
-
+        query = query.repeat(batch_size, 1)
         return self.mha(g, query, feat, q_nids, kv_nids)
+
+    def extra_repr(self):
+        shape_str = '({}, {})'.format(self.S.shape[0], self.S.shape[1])
+        return 'SeedVector: ' + shape_str
 
 
 class SetTransEncoder(nn.Module):
-    r""" The Encoder module in Set Transformer paper. """
-    def __init__(self, d_model, num_heads, d_head, d_ff,
+    r"""(experimental) The Encoder module in Set Transformer paper.
+
+    Parameters
+    ----------
+    d_model : int
+        Hidden size of the model.
+    n_heads : int
+        Number of heads.
+    d_head : int
+        Hidden size of each head.
+    d_ff : int
+        Kernel size in FFN (Positionwise Feed-Forward Network) layer.
+    n_layers : int
+        Number of layers.
+    block_type : str
+        Building block type: 'sab' (Set Attention Block) or 'isab' (Induced
+        Set Attention Block).
+    m : int or None
+        Number of induced vectors in ISAB Block, set to None if block type
+        is 'sab'.
+    dropouth : float
+        Dropout rate of each sublayer.
+    dropouta : float
+        Dropout rate of attention heads.
+
+    """
+    def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
         super(SetTransEncoder, self).__init__()
         self.n_layers = n_layers
@@ -474,49 +515,81 @@ class SetTransEncoder(nn.Module):
         for _ in range(n_layers):
             if block_type == 'sab':
                 layers.append(
-                    SetAttnBlock(d_model, num_heads, d_head, d_ff,
+                    SetAttnBlock(d_model, n_heads, d_head, d_ff,
                                  dropouth=dropouth, dropouta=dropouta))
             elif block_type == 'isab':
                 layers.append(
-                    InducedSetAttnBlock(m, d_model, num_heads, d_head, d_ff,
+                    InducedSetAttnBlock(m, d_model, n_heads, d_head, d_ff,
                                         dropouth=dropouth, dropouta=dropouta))
             else:
                 raise KeyError("Unrecognized block type {}: we only support sab/isab")
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, graph, feat):
+    def forward(self, feat, graph):
         """
         Compute Set Transformer Encoder.
+        
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
         """
+        batch_size = 1
+        if isinstance(graph, BatchedDGLGraph):
+            batch_size = graph.batch_size
+
         if self.block_type == 'sab':
             att_graph = _create_fully_connected_graph(graph)
         else:
-            if isinstance(graph, BatchedDGLGraph):
-                induced_graph = _create_batched_graph_from_num_nodes([self.m] * graph.batch_size)
-            else:
-                induced_graph = _create_batched_graph_from_num_nodes([self.m])
-
+            induced_graph = _create_graph_from_num_nodes([self.m] * batch_size)
             att_graph = [
                 _create_bipartite_graph(graph, induced_graph),
                 _create_bipartite_graph(induced_graph, graph)
             ]
 
         for layer in self.layers:
-            feat = layer(graph, feat, att_graph)
+            feat = layer(feat, graph, att_graph)
 
         return feat
 
 
 class SetTransDecoder(nn.Module):
-    r""" The Decoder module in Set Transformer paper. """
-    def __init__(self, k, d_model, num_heads, d_head, d_ff, n_layers, dropouth=0., dropouta=0.):
+    r"""(experimental) The Decoder module in Set Transformer paper.
+
+    Parameters
+    ----------
+    d_model : int
+        Hidden size of the model.
+    num_heads : int
+        Number of heads.
+    d_head : int
+        Hidden size of each head.
+    d_ff : int
+        Kernel size in FFN (Positionwise Feed-Forward Network) layer.
+    n_layers : int
+        Number of layers.
+    k : int
+        Number of seed vectors in PMA (Pooling by Multihead Attention) layer.
+    dropouth : float
+        Dropout rate of each sublayer.
+    dropouta : float
+        Dropout rate of attention heads.
+    """
+    def __init__(self, d_model, num_heads, d_head, d_ff, n_layers, k, dropouth=0., dropouta=0.):
         super(SetTransDecoder, self).__init__()
         self.n_layers = n_layers
         self.k = k
         self.d_model = d_model
-        self.pma = _PMALayer(k, d_model, num_heads, d_head, d_ff,
-                             dropouth=dropouth, dropouta=dropouta)
+        self.pma = PMALayer(k, d_model, num_heads, d_head, d_ff,
+                            dropouth=dropouth, dropouta=dropouta)
         layers = []
         for _ in range(n_layers):
             layers.append(
@@ -525,23 +598,35 @@ class SetTransDecoder(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, graph, feat):
+    def forward(self, feat, graph):
         """
         Compute Set Transformer Decoder.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
         """
         if isinstance(graph, BatchedDGLGraph):
-            induced_graph = _create_batched_graph_from_num_nodes([self.k] * graph.batch_size)
+            induced_graph = _create_graph_from_num_nodes([self.k] * graph.batch_size)
         else:
-            induced_graph = _create_batched_graph_from_num_nodes([self.k])
+            induced_graph = _create_graph_from_num_nodes([self.k])
 
         pma_graph = _create_bipartite_graph(graph, induced_graph)
-        feat = self.pma(graph, feat, pma_graph=pma_graph)
+        feat = self.pma(feat, graph, pma_graph=pma_graph)
 
         sab_graph = _create_fully_connected_graph(induced_graph)
         for layer in self.layers:
-            feat = layer(graph, feat, sab_graph=sab_graph)
+            feat = layer(feat, graph, sab_graph=sab_graph)
 
         if isinstance(graph, BatchedDGLGraph):
-            return feat.view(graph.batch_size, self.k, self.d_model)
+            return feat.view(graph.batch_size, self.k * self.d_model)
         else:
-            return feat.view(self.k, self.d_model)
+            return feat.view(self.k * self.d_model)

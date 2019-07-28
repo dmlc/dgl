@@ -50,16 +50,105 @@ def test_graph_conv():
     assert not th.allclose(old_weight, new_weight)
 
 def test_set2set():
-    # TODO(zihao): finish this
-    pass
+    g = dgl.DGLGraph(nx.path_graph(10))
+
+    s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
+    print(s2s)
+
+    # test#1: basic
+    h0 = th.rand(g.number_of_nodes(), 5)
+    h1 = s2s(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g])
+    h0 = th.rand(bg.number_of_nodes(), 5)
+    h1 = s2s(h0, bg)
+    print(h1)
 
 def test_glob_att_pool():
-    # TODO(zihao): finish this
-    pass
+    g = dgl.DGLGraph(nx.path_graph(10))
+
+    gap = nn.GlobAttnPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
+    print(gap)
+
+    # test#1: basic
+    h0 = th.rand(g.number_of_nodes(), 5)
+    h1 = gap(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g, g])
+    h0 = th.rand(bg.number_of_nodes(), 5)
+    h1 = gap(h0, bg)
+    print(h1)
 
 def test_simple_pool():
-    # TODO(zihao): finish this (AvgPooling, MaxPooling, etc.)
-    pass
+    g = dgl.DGLGraph(nx.path_graph(15))
+
+    sum_pool = nn.SumPooling()
+    avg_pool = nn.AvgPooling()
+    max_pool = nn.MaxPooling()
+    sort_pool = nn.SortPooling(10) # k = 10
+    print(sum_pool, avg_pool, max_pool, sort_pool)
+
+    # test#1: basic
+    h0 = th.rand(g.number_of_nodes(), 5)
+    h1 = sum_pool(h0, g)
+    print(h1)
+    h1 = avg_pool(h0, g)
+    print(h1)
+    h1 = max_pool(h0, g)
+    print(h1)
+    h1 = sort_pool(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    g_ = dgl.DGLGraph(nx.path_graph(5))
+    bg = dgl.batch([g, g_, g, g_, g])
+    h0 = th.rand(bg.number_of_nodes(), 5)
+    h1 = sum_pool(h0, bg)
+    print(h1)
+    h1 = avg_pool(h0, bg)
+    print(h1)
+    h1 = max_pool(h0, bg)
+    print(h1)
+    h1 = sort_pool(h0, bg)
+    print(h1)
+
+def test_set_trans():
+    g = dgl.DGLGraph(nx.path_graph(15))
+
+    st_enc_0 = nn.SetTransEncoder(50, 5, 10, 100, 2, 'sab')
+    st_enc_1 = nn.SetTransEncoder(50, 5, 10, 100, 2, 'isab', 3)
+    st_dec = nn.SetTransDecoder(50, 5, 10, 100, 2, 4)
+    print(st_enc_0, st_enc_1, st_dec)
+
+    # test#1: basic
+    h0 = th.rand(g.number_of_nodes(), 50)
+    h1 = st_enc_0(h0, g)
+    print(h1.shape)
+    assert h1.shape == h0.shape
+    h1 = st_enc_1(h0, g)
+    print(h1.shape)
+    assert h1.shape == h0.shape
+
+    # test#2: batched graph
+    h2 = st_dec(h1, g)
+    print(h2.shape)
+    assert h2.shape[0] == 200 and h2.dim() == 1
+
+    bg = dgl.batch([g, g, g])
+    h0 = th.rand(bg.number_of_nodes(), 50)
+    h1 = st_enc_0(h0, bg)
+    print(h1.shape)
+    assert h1.shape == h0.shape
+    h1 = st_enc_1(h0, bg)
+    print(h1.shape)
+    assert h1.shape == h0.shape
+
+    h2 = st_dec(h1, bg)
+    print(h2.shape)
 
 def uniform_attention(g, shape):
     a = th.ones(shape)
@@ -125,3 +214,4 @@ if __name__ == '__main__':
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
+    test_set_trans()

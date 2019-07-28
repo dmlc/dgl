@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 import dgl
 import dgl.nn.mxnet as nn
-from mxnet import autograd
+from mxnet import autograd, gluon
 
 def check_eq(a, b):
     assert a.shape == b.shape
@@ -56,6 +56,74 @@ def test_graph_conv():
     h1 = conv(h0, g)
     assert "_gconv_feat" in g.ndata
 
+def test_set2set():
+    g = dgl.DGLGraph(nx.path_graph(10))
+
+    s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
+    print(s2s)
+
+    # test#1: basic
+    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h1 = s2s(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g])
+    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h1 = s2s(h0, bg)
+    print(h1)
+
+def test_glob_att_pool():
+    g = dgl.DGLGraph(nx.path_graph(10))
+
+    gap = nn.GlobAttnPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
+    print(gap)
+    # test#1: basic
+    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h1 = gap(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g, g])
+    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h1 = gap(h0, bg)
+    print(h1)
+
+
+def test_simple_pool():
+    g = dgl.DGLGraph(nx.path_graph(15))
+
+    sum_pool = nn.SumPooling()
+    avg_pool = nn.AvgPooling()
+    max_pool = nn.MaxPooling()
+    sort_pool = nn.SortPooling(10) # k = 10
+    print(sum_pool, avg_pool, max_pool, sort_pool)
+
+    # test#1: basic
+    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h1 = sum_pool(h0, g)
+    print(h1)
+    h1 = avg_pool(h0, g)
+    print(h1)
+    h1 = max_pool(h0, g)
+    print(h1)
+    h1 = sort_pool(h0, g)
+    print(h1)
+
+    # test#2: batched graph
+    g_ = dgl.DGLGraph(nx.path_graph(5))
+    bg = dgl.batch([g, g_, g, g_, g])
+    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h1 = sum_pool(h0, bg)
+    print(h1)
+    h1 = avg_pool(h0, bg)
+    print(h1)
+    h1 = max_pool(h0, bg)
+    print(h1)
+    h1 = sort_pool(h0, bg)
+    print(h1)
+
+
 def uniform_attention(g, shape):
     a = mx.nd.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
@@ -78,3 +146,6 @@ def test_edge_softmax():
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
+    test_set2set()
+    test_glob_att_pool()
+    test_simple_pool()

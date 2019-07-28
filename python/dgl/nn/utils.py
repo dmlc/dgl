@@ -10,7 +10,7 @@ from .. import backend as F
 
 
 __all__ = ['_create_fully_connected_graph', '_create_bipartite_graph',
-           '_create_batched_graph_from_num_nodes']
+           '_create_graph_from_num_nodes']
 
 def _create_fully_connected_graph(graph):
     r""" Create a fully connected graph upon the given graph."""
@@ -64,7 +64,7 @@ def _create_bipartite_graph(graph_u, graph_v):
         return DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True), \
             F.zerocopy_from_numpy(u_list), F.zerocopy_from_numpy(v_list)
 
-def _create_batched_graph_from_num_nodes(n_nodes_arr):
+def _create_graph_from_num_nodes(n_nodes_arr):
     r""" Create a batched graph (with no nodes) from number of nodes list
     to use as the latent graph in GNN layers."""
     g_list = []
@@ -74,6 +74,6 @@ def _create_batched_graph_from_num_nodes(n_nodes_arr):
         g_list.append(
             DGLGraph(from_csr(indptr, indices, False, 'out'), readonly=True)
         )
-    if len(g_list) == 0:
+    if len(g_list) == 1:
         return g_list[0]
     return batch(g_list)

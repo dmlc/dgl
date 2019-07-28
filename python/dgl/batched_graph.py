@@ -855,7 +855,9 @@ def _broadcast_on(graph, typestr, feat_data):
         return F.gather_row(feat_data, index)
     else:
         n_objs = getattr(graph, num_objs_attr)()
-        return F.stack([feat_data] * n_objs, 0)
+        if F.ndim(feat_data) == 1:
+            feat_data = F.unsqueeze(feat_data, 0)
+        return F.cat([feat_data] * n_objs, 0)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     """Internal function to take graph-wise top-k features along the
@@ -911,6 +913,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
         feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx) - float('inf')
         feat_ = F.scatter_row(feat_, index, feat)
         feat_ = F.reshape(feat_, (batch_size, max_n_objs, hidden_size))
+    else:
+        feat_ = feat
 
     keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
     order = F.argsort(keys, -1, descending=descending)
@@ -921,8 +925,9 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
         feat_ = F.scatter_row(feat_, index, feat)
         topk_indices = F.reshape(topk_indices, (-1,)) +\
                        F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1)
-
-    return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hidden_size))
+        return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hidden_size))
+    else:
+        return F.reshape(F.gather_row(feat_, topk_indices), (k, hidden_size))
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field

@@ -16,8 +16,8 @@ class SumPooling(nn.Block):
     r"""Apply sum pooling over the graph.
     """
     _feat_name = '_gpool_feat'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(SumPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
@@ -40,13 +40,16 @@ class SumPooling(nn.Block):
         graph.ndata.pop(_feat_name)
         return readout
 
+    def __repr__(self):
+        return 'SumPooling()'
+
 
 class AvgPooling(nn.Block):
     r"""Apply average pooling over the graph.
     """
     _feat_name = '_gpool_avg'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(AvgPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute average pooling.
@@ -69,13 +72,16 @@ class AvgPooling(nn.Block):
         graph.ndata.pop(_feat_name)
         return readout
 
+    def __repr__(self):
+        return 'AvgPooling()'
+
 
 class MaxPooling(nn.Block):
     r"""Apply max pooling over the graph.
     """
     _feat_name = '_gpool_max'
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        super(MaxPooling, self).__init__(**kwargs)
 
     def forward(self, feat, graph):
         r"""Compute max pooling.
@@ -97,6 +103,9 @@ class MaxPooling(nn.Block):
         readout = max_nodes(graph, _feat_name)
         graph.ndata.pop(_feat_name)
         return readout
+
+    def __repr__(self):
+        return 'MaxPooling()'
 
 
 class SortPooling(nn.Block):
@@ -134,7 +143,13 @@ class SortPooling(nn.Block):
         # Sort nodes according to their last features.
         ret = topk_nodes(graph, self._feat_name, self.k).reshape(-1, self.k * feat.shape[-1])
         graph.ndata.pop(self._feat_name)
-        return ret
+        if isinstance(graph, BatchedDGLGraph):
+            return ret
+        else:
+            return ret.squeeze(axis=0)
+
+    def __repr__(self):
+        return 'SortPooling(k={})'.format(self.k)
 
 
 class GlobAttnPooling(nn.Block):
@@ -261,6 +276,21 @@ class Set2Set(nn.Block):
             readout = sum_nodes(graph, feat_name)
             graph.ndata.pop(feat_name)
 
+            if readout.ndim == 1: # graph is not a BatchedDGLGraph
+                readout = readout.expand_dims(0)
+
             q_star = nd.concat(q, readout, dim=-1)
 
-        return q_star
+        if isinstance(graph, BatchedDGLGraph):
+            return q_star
+        else:
+            return q_star.squeeze(axis=0)
+
+    def __repr__(self):
+        summary = 'Set2Set('
+        summary += 'in={}, out={}, ' \
+                   'n_iters={}, n_layers={}'.format(
+            self.input_dim, self.output_dim, self.n_iters, self.n_layers
+        )
+        summary += ')'
+        return summary
