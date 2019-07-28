@@ -135,7 +135,10 @@ def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
 def repeat(input, repeats, dim):
-    return th.repeat_interleave(input, repeats, dim)
+    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
+    if dim < 0:
+        dim += input.dim()
+    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
 
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)

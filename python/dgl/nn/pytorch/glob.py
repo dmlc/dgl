@@ -385,6 +385,16 @@ class SetAttnBlock(nn.Module):
     def forward(self, feat, graph, sab_graph=None):
         """
         Compute a Set Attention Block.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+        sab_graph: DGLGraph or None
+            The graph to apply Message Passing on, set to None if not
+            specified.
         """
         if sab_graph is None:
             sab_graph = _create_fully_connected_graph(graph)
@@ -413,6 +423,16 @@ class InducedSetAttnBlock(nn.Module):
     def forward(self, feat, graph, isab_graph=None):
         """
         Compute an Induced Set Attention Block.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+        isab_graph: DGLGraph or None
+            The graph to apply Message Passing on, set to None if not
+            specified.
         """
         query = self.I
         batch_size = 1
@@ -459,6 +479,21 @@ class PMALayer(nn.Module):
     def forward(self, feat, graph, pma_graph=None):
         """
         Compute Pooling by Multihead Attention.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+        pma_graph: DGLGraph or None
+            The graph to apply Message Passing on, set to None if not
+            specified.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
         """
         query = self.S
         batch_size = 1
@@ -506,7 +541,6 @@ class SetTransEncoder(nn.Module):
         Dropout rate of each sublayer.
     dropouta : float
         Dropout rate of attention heads.
-
     """
     def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
