@@ -93,4 +93,4 @@ template double RandomEngine::Uniform<double>();
 template float RandomEngine::Uniform<float>(float, float);
 template double RandomEngine::Uniform<double>(double, double);
 
-};
+};  // namespace dgl

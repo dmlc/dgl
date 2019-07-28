@@ -21,7 +21,7 @@ class RandomEngine {
   RandomEngine();
 
   /*! \brief Constructor with given seed */
-  RandomEngine(uint32_t seed);
+  explicit RandomEngine(uint32_t seed);
 
   /*! \brief Get the thread-local random number generator instance */
   static RandomEngine *ThreadLocal();
@@ -54,6 +54,7 @@ class RandomEngine {
    */
   template<typename T>
   T Uniform(T lower, T upper);
+
  private:
   std::mt19937 rng_;
 };
