@@ -32,7 +32,7 @@ namespace serialize {
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
- public:
+public:
   ImmutableGraphPtr gptr;
   std::vector<NamedTensor> node_tensors;
   std::vector<NamedTensor> edge_tensors;
@@ -40,51 +40,20 @@ class GraphDataObject : public runtime::Object {
 
   void setData(ImmutableGraphPtr gptr,
                Map<std::string, Value> node_tensors,
-               Map<std::string, Value> edge_tensors) {
-    this->gptr = gptr;
+               Map<std::string, Value> edge_tensors);
 
-    for (auto kv : node_tensors) {
-      std::string name = kv.first;
-      Value v = kv.second;
-      NDArray ndarray = static_cast<NDArray>(v->data);
-      this->node_tensors.emplace_back(name, ndarray);
-    }
-    for (auto kv : edge_tensors) {
-      std::string &name = kv.first;
-      Value v = kv.second;
-      const NDArray &ndarray = static_cast<NDArray>(v->data);
-      this->edge_tensors.emplace_back(name, ndarray);
-    }
-  }
+  void Save(dmlc::Stream *fs) const;
 
-  void Save(dmlc::Stream *fs) const {
-    const CSRPtr g_csr = this->gptr->GetInCSR();
-    fs->Write(g_csr->indptr());
-    fs->Write(g_csr->indices());
-    fs->Write(g_csr->edge_ids());
-    fs->Write(node_tensors);
-    fs->Write(edge_tensors);
-  }
-
-  bool Load(dmlc::Stream *fs) {
-    NDArray indptr, indices, edge_ids;
-    fs->Read(&indptr);
-    fs->Read(&indices);
-    fs->Read(&edge_ids);
-    this->gptr = ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, "in");
-
-    fs->Read(&this->node_tensors);
-    fs->Read(&this->edge_tensors);
-    return true;
-  }
+  bool Load(dmlc::Stream *fs);
 
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphDataObject, runtime::Object);
 };
 
 
 class GraphData : public runtime::ObjectRef {
- public:
+public:
   DGL_DEFINE_OBJECT_REF_METHODS(GraphData, runtime::ObjectRef, GraphDataObject);
+
   /*! \brief create a new GraphData reference */
   static GraphData Create() {
     return GraphData(std::make_shared<GraphDataObject>());

@@ -9,6 +9,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/object.h>
+#include <dgl/graph_op.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -63,7 +64,18 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++i) {
+    for (uint64_t i = 0; i < idxs.size(); ++ i) {
+      idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
+    }
+    *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
+});
+
+DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadMetaData")
+.set_body([](DGLArgs args, DGLRetValue *rv) {
+    std::string filename = args[0];
+    List<Value> idxs = args[1];
+    std::vector<size_t> idx_list(idxs.size());
+    for (uint64_t i = 0; i < idxs.size(); ++ i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }
     *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
@@ -118,7 +130,7 @@ bool SaveDGLGraphs(std::string filename,
   std::vector<dgl_id_t> nodes_num_list(num_graph);
   std::vector<dgl_id_t> edges_num_list(num_graph);
 
-  for (uint64_t i = 0; i < num_graph; ++i) {
+  for (uint64_t i = 0; i < num_graph; ++ i) {
     nodes_num_list[i] = graph_data[i]->gptr->NumVertices();
     edges_num_list[i] = graph_data[i]->gptr->NumEdges();
   }
@@ -130,7 +142,7 @@ bool SaveDGLGraphs(std::string filename,
   fs->Write(edges_num_list);
 
   // Write GraphData
-  for (uint64_t i = 0; i < num_graph; ++i) {
+  for (uint64_t i = 0; i < num_graph; ++ i) {
     graph_indices[i] = fs->Tell();
     GraphDataObject gdata = *graph_data[i].as<GraphDataObject>();
     fs->Write(gdata);
@@ -174,10 +186,10 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
 
 
   std::vector<GraphData> gdata_refs;
-  if (idx_list.size() == 0) {
+  if (idx_list.empty()) {
     // Read All Graphs
-    gdata_refs.resize(num_graph);
-    for (uint64_t i = 0; i < num_graph; ++i) {
+    gdata_refs.reserve(num_graph);
+    for (uint64_t i = 0; i < num_graph; ++ i) {
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
               const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());
@@ -186,9 +198,10 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     }
   } else {
     // Read Selected Graphss
-    gdata_refs.resize(idx_list.size());
-    std::sort(idx_list.begin(), idx_list.end());
-    for (uint64_t i = 0; i < idx_list.size(); ++i) {
+    gdata_refs.reserve(idx_list.size());
+    // Would be better if idx_list is sorted. However the returned the graphs should be the same
+    // order as the idx_list
+    for (uint64_t i = 0; i < idx_list.size(); ++ i) {
       fs->Seek(graph_indices[idx_list[i]]);
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
@@ -201,6 +214,59 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   return gdata_refs;
 }
 
+void GraphDataObject::setData(ImmutableGraphPtr gptr,
+                              Map<std::string, Value> node_tensors,
+                              Map<std::string, Value> edge_tensors) {
+  this->gptr = gptr;
+
+  for (auto kv : node_tensors) {
+    std::string name = kv.first;
+    Value v = kv.second;
+    NDArray ndarray = static_cast<NDArray>(v->data);
+    this->node_tensors.emplace_back(name, ndarray);
+  }
+  for (auto kv : edge_tensors) {
+    std::string &name = kv.first;
+    Value v = kv.second;
+    const NDArray &ndarray = static_cast<NDArray>(v->data);
+    this->edge_tensors.emplace_back(name, ndarray);
+  }
+}
+
+void GraphDataObject::Save(dmlc::Stream *fs) const {
+  // Using in csr for storage
+  const CSRPtr g_csr = this->gptr->GetInCSR();
+  fs->Write(g_csr->indptr());
+  fs->Write(g_csr->indices());
+  fs->Write(g_csr->edge_ids());
+  fs->Write(node_tensors);
+  fs->Write(edge_tensors);
+}
+
+bool GraphDataObject::Load(dmlc::Stream *fs) {
+  NDArray indptr, indices, edge_ids;
+  fs->Read(&indptr);
+  fs->Read(&indices);
+  fs->Read(&edge_ids);
+  this->gptr = ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, "in");
+
+  fs->Read(&this->node_tensors);
+  fs->Read(&this->edge_tensors);
+  return true;
+}
+
+ImmutableGraphPtr BatchLoadedGraphs(std::vector<GraphData> gdata_list) {
+  std::vector<GraphPtr> gptrs;
+  gptrs.reserve(gdata_list.size());
+  for (auto gdata: gdata_list) {
+    gptrs.push_back(static_cast<GraphPtr>(gdata->gptr));
+  }
+  ImmutableGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(
+          GraphOp::DisjointUnion(gptrs));
+
+
+  return imGPtr;
+}
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
   ImmutableGraphPtr imgr = std::dynamic_pointer_cast<ImmutableGraph>(g);

@@ -1,36 +1,67 @@
 import backend as F
+import numpy as np
+import scipy as sp
+import time
+
+from dgl import DGLGraph
+
+
+def generate_rand_graph(n):
+    arr = (sp.sparse.random(n, n, density=0.1,
+                            format='coo') != 0).astype(np.int64)
+    return DGLGraph(arr, readonly=True)
+
 
 def construct_graph(n, readonly=True):
-    from dgl import DGLGraph
     g_list = []
     for i in range(n):
-        g = DGLGraph()
-        g.add_nodes(10)
-        g.add_edges(1, 2)
-        g.add_edges(3, 2)
-        g.add_edges(3, 3)
-
-
-        g.edata['e1'] = F.randn((3, 5))
-        g.edata['e2'] = F.ones((3, 5))
-        g.ndata['n1'] = F.randn((10, 2))
+        g = generate_rand_graph(30)
+        g.edata['e1'] = F.randn((g.number_of_edges(), 32))
+        g.edata['e2'] = F.ones((g.number_of_edges(), 32))
+        g.ndata['n1'] = F.randn((g.number_of_nodes(), 64))
         g.readonly(i % 2 == 0)
         g_list.append(g)
     return g_list
 
+
 def test_graph_serialize():
-    g_list = construct_graph(3)
+
+    t0 = time.time()
+
+    g_list = construct_graph(10000)
+
+    t1 = time.time()
 
     from dgl.graph_serialize import save_graphs, load_graphs
     save_graphs("/tmp/test.bin", g_list)
-    loadg_list = load_graphs("/tmp/test.bin", [2])
+
+    t2 = time.time()
+    idx_list = np.random.permutation(np.arange(10000)).tolist()
+    loadg_list = load_graphs("/tmp/test.bin", idx_list)
+
+    t3 = time.time()
+    idx = idx_list[0]
     load_g = loadg_list[0]
+    print("Save time: {} s".format(t2 - t1))
+    print("Load time: {} s".format(t3 - t2))
+    print("Graph Construction time: {} s".format(t1 - t0))
 
-    assert F.allclose(load_g.nodes(), g_list[2].nodes())
-    assert F.allclose(load_g.edges()[0], g_list[2].edges()[0])
-    assert F.allclose(load_g.edges()[1], g_list[2].edges()[1])
-    assert F.allclose(load_g.edata['e1'], g_list[2].edata['e1'])
-    assert F.allclose(load_g.edata['e2'], g_list[2].edata['e2'])
-    assert F.allclose(load_g.ndata['n1'], g_list[2].ndata['n1'])
+    print(idx)
+    print(load_g)
+    print(g_list[idx])
+    assert F.allclose(load_g.nodes(), g_list[idx].nodes())
+    assert F.allclose(load_g.edges()[0], g_list[idx].edges()[0])
+    assert F.allclose(load_g.edges()[1], g_list[idx].edges()[1])
+    assert F.allclose(load_g.edata['e1'], g_list[idx].edata['e1'])
+    assert F.allclose(load_g.edata['e2'], g_list[idx].edata['e2'])
+    assert F.allclose(load_g.ndata['n1'], g_list[idx].ndata['n1'])
 
-test_graph_serialize()
+    t4 = time.time()
+    import dgl
+    bg = dgl.batch(loadg_list[:10000])
+    t5 = time.time()
+    print("Batch time: {} s".format(t5 - t4))
+
+
+if __name__ == "__main__":
+    test_graph_serialize()
