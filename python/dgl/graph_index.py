@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
 
@@ -605,8 +605,7 @@ class GraphIndex(ObjectBase):
                            ' but got %s.' % (type(transpose)))
 
         if return_edge_ids is None:
-            import warnings
-            warnings.warn(
+            dgl_warning(
                 "Adjacency matrix by default currently returns edge IDs (which has one 0 entry)."
                 "  In the next release it will return 1s.",
                 FutureWarning)
