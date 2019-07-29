@@ -64,7 +64,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++ i) {
+    for (uint64_t i = 0; i < idxs.size(); ++i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }
     *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
@@ -75,7 +75,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadMetaData")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++ i) {
+    for (uint64_t i = 0; i < idxs.size(); ++i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }
     *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
@@ -130,7 +130,7 @@ bool SaveDGLGraphs(std::string filename,
   std::vector<dgl_id_t> nodes_num_list(num_graph);
   std::vector<dgl_id_t> edges_num_list(num_graph);
 
-  for (uint64_t i = 0; i < num_graph; ++ i) {
+  for (uint64_t i = 0; i < num_graph; ++i) {
     nodes_num_list[i] = graph_data[i]->gptr->NumVertices();
     edges_num_list[i] = graph_data[i]->gptr->NumEdges();
   }
@@ -142,7 +142,7 @@ bool SaveDGLGraphs(std::string filename,
   fs->Write(edges_num_list);
 
   // Write GraphData
-  for (uint64_t i = 0; i < num_graph; ++ i) {
+  for (uint64_t i = 0; i < num_graph; ++i) {
     graph_indices[i] = fs->Tell();
     GraphDataObject gdata = *graph_data[i].as<GraphDataObject>();
     fs->Write(gdata);
@@ -189,7 +189,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   if (idx_list.empty()) {
     // Read All Graphs
     gdata_refs.reserve(num_graph);
-    for (uint64_t i = 0; i < num_graph; ++ i) {
+    for (uint64_t i = 0; i < num_graph; ++i) {
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
               const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());
@@ -201,7 +201,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     gdata_refs.reserve(idx_list.size());
     // Would be better if idx_list is sorted. However the returned the graphs should be the same
     // order as the idx_list
-    for (uint64_t i = 0; i < idx_list.size(); ++ i) {
+    for (uint64_t i = 0; i < idx_list.size(); ++i) {
       fs->Seek(graph_indices[idx_list[i]]);
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
@@ -258,7 +258,7 @@ bool GraphDataObject::Load(dmlc::Stream *fs) {
 ImmutableGraphPtr BatchLoadedGraphs(std::vector<GraphData> gdata_list) {
   std::vector<GraphPtr> gptrs;
   gptrs.reserve(gdata_list.size());
-  for (auto gdata: gdata_list) {
+  for (auto gdata : gdata_list) {
     gptrs.push_back(static_cast<GraphPtr>(gdata->gptr));
   }
   ImmutableGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(

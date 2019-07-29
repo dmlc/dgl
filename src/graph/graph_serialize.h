@@ -32,7 +32,7 @@ namespace serialize {
 typedef std::pair<std::string, NDArray> NamedTensor;
 
 class GraphDataObject : public runtime::Object {
-public:
+ public:
   ImmutableGraphPtr gptr;
   std::vector<NamedTensor> node_tensors;
   std::vector<NamedTensor> edge_tensors;
@@ -51,7 +51,7 @@ public:
 
 
 class GraphData : public runtime::ObjectRef {
-public:
+ public:
   DGL_DEFINE_OBJECT_REF_METHODS(GraphData, runtime::ObjectRef, GraphDataObject);
 
   /*! \brief create a new GraphData reference */
