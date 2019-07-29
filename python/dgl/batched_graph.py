@@ -943,16 +943,15 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     # flatten
     feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx)
     feat_ = F.scatter_row(feat_, index, feat)
-    topk_indices_ = F.copy_to(
-        F.reshape(topk_indices, (-1,)) +
-        F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1), ctx)
+    topk_indices_ = F.reshape(topk_indices, (-1,)) +\
+                    F.copy_to(F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1), ctx)
 
     if isinstance(graph, BatchedDGLGraph):
         return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, hidden_size)),\
-                F.copy_to(topk_indices, ctx)
+               topk_indices
     else:
         return F.reshape(F.gather_row(feat_, topk_indices_), (k, hidden_size)),\
-                F.copy_to(F.reshape(topk_indices, (k,)), ctx)
+               topk_indices
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field

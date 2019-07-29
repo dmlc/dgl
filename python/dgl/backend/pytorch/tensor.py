@@ -146,7 +146,7 @@ def gather_row(data, row_index):
 def slice_axis(data, axis, begin, end):
     if begin >= end:
         raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
-    return th.index_select(data, axis, th.arange(begin, end))
+    return th.index_select(data, axis, th.arange(begin, end, device=data.device))
 
 def take(data, indices, dim):
     return th.gather(data, dim, indices)
