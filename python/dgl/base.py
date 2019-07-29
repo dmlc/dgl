@@ -13,8 +13,8 @@ def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL
 
-def dgl_warning(msg, type=UserWarning):
+def dgl_warning(msg, warn_type=UserWarning):
     """Print out warning messages."""
-    warnings.warn(msg, type)
+    warnings.warn(msg, warn_type)
 
 _init_internal_api()
