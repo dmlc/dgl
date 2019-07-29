@@ -617,16 +617,16 @@ class GraphIndex(ObjectBase):
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            shuffle = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
+            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             n = self.number_of_nodes()
-            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
+            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(n, n))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0)).tonumpy()
             n = self.number_of_nodes()
             m = self.number_of_edges()
             row, col = np.reshape(idx, (2, m))
-            shuffle = np.arange(0, m) if return_edge_ids else np.ones_like(row)
-            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
+            data = np.arange(0, m) if return_edge_ids else np.ones_like(row)
+            return scipy.sparse.coo_matrix((data, (row, col)), shape=(n, n))
         else:
             raise Exception("unknown format")
 
