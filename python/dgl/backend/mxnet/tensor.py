@@ -144,8 +144,8 @@ def argsort(input, dim, descending):
 def exp(input):
     return nd.exp(input)
 
-def softmax(input, axis=-1):
-    return nd.softmax(input, axis=axis)
+def softmax(input, dim=-1):
+    return nd.softmax(input, axis=dim)
 
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)

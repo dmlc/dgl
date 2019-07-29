@@ -141,7 +141,8 @@ class SortPooling(nn.Block):
         feat = feat.sort(axis=-1)
         graph.ndata[self._feat_name] = feat
         # Sort nodes according to their last features.
-        ret = topk_nodes(graph, self._feat_name, self.k).reshape(-1, self.k * feat.shape[-1])
+        ret = topk_nodes(graph, self._feat_name, self.k)[0].reshape(
+            -1, self.k * feat.shape[-1])
         graph.ndata.pop(self._feat_name)
         if isinstance(graph, BatchedDGLGraph):
             return ret

@@ -854,15 +854,15 @@ def _broadcast_on(graph, typestr, feat_data):
         index = F.copy_to(F.tensor(index), ctx)
         return F.gather_row(feat_data, index)
     else:
-        n_objs = getattr(graph, num_objs_attr)()
+        num_objs = getattr(graph, num_objs_attr)()
         if F.ndim(feat_data) == 1:
             feat_data = F.unsqueeze(feat_data, 0)
-        return F.cat([feat_data] * n_objs, 0)
+        return F.cat([feat_data] * num_objs, 0)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     """Internal function to take graph-wise top-k features along the
-    given dimension of a given field.
-    If :attr:`reverse` is set to True, return the k smallest elements
+    given index of a given field.
+    If :attr:`descending` is set to False, return the k smallest elements
     instead.
 
     Parameters
@@ -874,21 +874,34 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     feat : str
         The feature field name.
     k : int
-        The k in "top-k".
+        The :math:`k` in "top-:math`k`".
     descending : bool
-        Controls whether to return the largest or smallest elements, defaults to True.
+        Controls whether to return the largest or smallest elements,
+         defaults to True.
     idx : int
-        The key index we sort features along, defaults to -1.
+        The key index we sort features along, defaults to -1 (the
+        last dimension).
 
     Returns
     -------
-    Tensor:
-        Top-k features of the given graph with shape :math:`(K, D)`,
-        if the input graph is a BatchedDGLGraph a tensor with shape
-        :math:`(B, K, D)` we be returned, where math`B` is the batch
-        size.
+    tuple of tensors:
+        The first tensor returns top-k features of the given graph with
+         shape :math:`(K, D)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K, D)` would be returned, where
+         :math:`B` is the batch size.
+        The second tensor returns the top-k indices of the given graph
+         with shape :math:`(K)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K)` would be returned, where
+         :math:`B` is the batch size.
+
+    Notes
+    -----
+    If an example has :math:`n` nodes/edges and :math:`n<k`, in the first
+     returned tensor the :math:`n+1` to :math:`k`th rows would be padded
+     with all zero; in the second returned tensor, the behavior of :math:`n+1`
+     to :math:`k`th elements is not defined.
     """
-    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
+    data_attr, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     if F.ndim(data[feat]) > 2:
         raise DGLError('The {} feature `{}` should have dimension less than or'
@@ -901,33 +914,44 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         batch_size = len(batch_num_objs)
-        max_n_objs = max(batch_num_objs)
+        max_n_objs = max([k] + batch_num_objs)
         index = []
         for i, num_obj in enumerate(batch_num_objs):
             if num_obj < k:
-                dgl_warning("Graph {}'s number of nodes is less than k".format(i))
+                dgl_warning("Graph {}'s number of {}"
+                            " is less than k.".format(i, typestr))
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        dtype = F.dtype(feat)
-        ctx = F.context(feat)
-        index = F.copy_to(F.tensor(index), ctx)
-        feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx) - float('inf')
-        feat_ = F.scatter_row(feat_, index, feat)
-        feat_ = F.reshape(feat_, (batch_size, max_n_objs, hidden_size))
     else:
-        feat_ = feat
+        num_objs = getattr(graph, num_objs_attr)()
+        batch_size = 1
+        if num_objs < k:
+            dgl_warning("The number of {} is less than k.".format(typestr))
+        max_n_objs = max(k, num_objs)
+        index = list(range(num_objs))
 
+    dtype = F.dtype(feat)
+    ctx = F.context(feat)
+    index = F.copy_to(F.tensor(index), ctx)
+    fill_val = -float('inf') if descending else float('inf')
+    feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx) + fill_val
+    feat_ = F.scatter_row(feat_, index, feat)
+    feat_ = F.reshape(feat_, (batch_size, max_n_objs, hidden_size))
     keys = F.squeeze(F.slice_axis(feat_, -1, idx, idx+1), -1)
     order = F.argsort(keys, -1, descending=descending)
     topk_indices = F.slice_axis(order, -1, 0, k)
 
+    # flatten
+    feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx)
+    feat_ = F.scatter_row(feat_, index, feat)
+    topk_indices_ = F.reshape(topk_indices, (-1,)) + \
+                    F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1)
+
     if isinstance(graph, BatchedDGLGraph):
-        feat_ = F.zeros((batch_size * max_n_objs, hidden_size), dtype, ctx)
-        feat_ = F.scatter_row(feat_, index, feat)
-        topk_indices = F.reshape(topk_indices, (-1,)) +\
-                       F.repeat(F.arange(0, batch_size) * max_n_objs, k, -1)
-        return F.reshape(F.gather_row(feat_, topk_indices), (batch_size, k, hidden_size))
+        return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, hidden_size)),\
+                topk_indices
     else:
-        return F.reshape(F.gather_row(feat_, topk_indices), (k, hidden_size))
+        return F.reshape(F.gather_row(feat_, topk_indices_), (k, hidden_size)),\
+                F.reshape(topk_indices, (k,))
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
@@ -1098,10 +1122,22 @@ def topk_nodes(graph, feat, k, descending=True, idx=-1):
 
     Returns
     -------
-    tensor
-        The obtained tensor with shape :math:`(K, D)`, if the input graph a
-        BatchedDGLGraph, the shape of returned tensor would be :math:`(B, K, D)`,
-        where :math:`B` is the batch size of the graph.
+    tuple of tensors
+        The first tensor returns top-k node features of the given graph
+         with shape :math:`(K, D)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K, D)` would be returned, where
+         :math:`B` is the batch size.
+        The second tensor returns the top-k node indices of the given
+         graph with shape :math:`(K)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K)` would be returned, where
+         :math:`B` is the batch size.
+
+    Notes
+    -----
+    If an example has :math:`n` nodes/edges and :math:`n<k`, in the first
+     returned tensor the :math:`n+1` to :math:`k`th rows would be padded
+     with all zero; in the second returned tensor, the behavior of :math:`n+1`
+     to :math:`k`th elements is not defined.
     """
     return _topk_on(graph, 'nodes', feat, k, descending=descending, idx=idx)
 
@@ -1125,9 +1161,21 @@ def topk_edges(graph, feat, k, descending=True, idx=-1):
 
     Returns
     -------
-    tensor
-        The obtained tensor with shape (K, D), if the input graph a
-        BatchedDGLGraph, the shape of returned tensor would be (B, K, D),
-        where B is the number of examples in the batched graph.
+    tuple of tensors
+        The first tensor returns top-k edge features of the given graph
+         with shape :math:`(K, D)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K, D)` would be returned, where
+         :math:`B` is the batch size.
+        The second tensor returns the top-k edge indices of the given
+         graph with shape :math:`(K)`, if the input graph is a BatchedDGLGraph,
+         a tensor with shape :math:`(B, K)` would be returned, where
+         :math:`B` is the batch size.
+
+    Notes
+    -----
+    If an example has :math:`n` nodes/edges and :math:`n<k`, in the first
+     returned tensor the :math:`n+1` to :math:`k`th rows would be padded
+     with all zero; in the second returned tensor, the behavior of :math:`n+1`
+     to :math:`k`th elements is not defined.
     """
     return _topk_on(graph, 'edges', feat, k, descending=descending, idx=idx)

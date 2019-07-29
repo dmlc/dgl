@@ -453,15 +453,15 @@ def exp(input):
     """
     pass
 
-def softmax(input, axis=-1):
-    """Apply the softmax function on given axis.
+def softmax(input, dim=-1):
+    """Apply the softmax function on given dimension.
 
     Parameters
     ----------
     input : Tensor
         The input tensor.
-    axis : int
-        The axis along which to compute softmax.
+    dim : int
+        The dimension along which to compute softmax.
 
     Returns
     -------

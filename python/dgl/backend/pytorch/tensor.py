@@ -122,8 +122,8 @@ def argsort(input, dim, descending):
 def exp(input):
     return th.exp(input)
 
-def softmax(input, axis=-1):
-    return th.softmax(input, dim=axis)
+def softmax(input, dim=-1):
+    return th.softmax(input, dim=dim)
 
 def cat(seq, dim):
     return th.cat(seq, dim=dim)

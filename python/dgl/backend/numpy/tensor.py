@@ -113,12 +113,12 @@ def argsort(input, dim, descending):
 def exp(input):
     return np.exp(input)
 
-def softmax(input, axis=-1):
-    max_val = input.max(axis=axis)
-    minus_max = input - np.expand_dims(max_val, axis=axis)
+def softmax(input, dim=-1):
+    max_val = input.max(axis=dim)
+    minus_max = input - np.expand_dims(max_val, axis=dim)
     exp_val = np.exp(minus_max)
-    sum_val = np.sum(exp_val, axis=axis)
-    return exp_val / np.expand_dims(sum_val, axis=axis)
+    sum_val = np.sum(exp_val, axis=dim)
+    return exp_val / np.expand_dims(sum_val, axis=dim)
 
 def cat(seq, dim):
     return np.concatenate(seq, axis=dim)
