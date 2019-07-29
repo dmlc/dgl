@@ -606,8 +606,10 @@ class GraphIndex(ObjectBase):
 
         if return_edge_ids is None:
             dgl_warning(
-                "Adjacency matrix by default currently returns edge IDs (which has one 0 entry)."
-                "  In the next release it will return 1s.",
+                "Adjacency matrix by default currently returns edge IDs."
+                "  As a result there is one 0 entry which is not eliminated."
+                "  In the next release it will return 1s by default,"
+                " and 0 will be eliminated otherwise.",
                 FutureWarning)
             return_edge_ids = True
 
@@ -615,7 +617,7 @@ class GraphIndex(ObjectBase):
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            shuffle = utils.toindex(rst(2)).tonumpy()
+            shuffle = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             n = self.number_of_nodes()
             return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
         elif fmt == 'coo':
@@ -623,7 +625,7 @@ class GraphIndex(ObjectBase):
             n = self.number_of_nodes()
             m = self.number_of_edges()
             row, col = np.reshape(idx, (2, m))
-            shuffle = np.arange(0, m)
+            shuffle = np.arange(0, m) if return_edge_ids else np.ones_like(row)
             return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
         else:
             raise Exception("unknown format")
