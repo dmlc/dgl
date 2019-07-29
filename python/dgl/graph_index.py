@@ -606,9 +606,10 @@ class GraphIndex(ObjectBase):
 
         if return_edge_ids is None:
             import warnings
-            warnings.warn("Adjacency matrix by default currently returns edge IDs (which has one 0 entry)."
-                          "  In the next release it will return 1s.",
-                          FutureWarning)
+            warnings.warn(
+                "Adjacency matrix by default currently returns edge IDs (which has one 0 entry)."
+                "  In the next release it will return 1s.",
+                FutureWarning)
             return_edge_ids = True
 
         rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
