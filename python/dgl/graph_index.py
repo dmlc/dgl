@@ -577,7 +577,7 @@ class GraphIndex(ObjectBase):
         return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
-    def adjacency_matrix_scipy(self, transpose, fmt):
+    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -586,14 +586,14 @@ class GraphIndex(ObjectBase):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool
             A flag to transpose the returned adjacency matrix.
         fmt : str
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
 
         Returns
         -------
@@ -603,6 +603,14 @@ class GraphIndex(ObjectBase):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
+
+        if return_edge_ids is None:
+            import warnings
+            warnings.warn("Adjacency matrix by default currently returns edge IDs (which has one 0 entry)."
+                          "  In the next release it will return 1s.",
+                          FutureWarning)
+            return_edge_ids = True
+
         rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
