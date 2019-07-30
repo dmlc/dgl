@@ -11,12 +11,10 @@
 #include <utility>
 #include <algorithm>
 
+#include "./runtime/object.h"
 #include "array.h"
 
 namespace dgl {
-
-struct Subgraph;
-struct NodeFlow;
 
 const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
 
@@ -51,6 +49,15 @@ class DGLIdIters {
   const dgl_id_t *begin_{nullptr}, *end_{nullptr};
 };
 
+/* \brief structure used to represent a list of edges */
+typedef struct {
+  /* \brief the two endpoints and the id of the edge */
+  IdArray src, dst, id;
+} EdgeArray;
+
+// forward declaration
+struct Subgraph;
+class GraphRef;
 class GraphInterface;
 typedef std::shared_ptr<GraphInterface> GraphPtr;
 
@@ -58,15 +65,15 @@ typedef std::shared_ptr<GraphInterface> GraphPtr;
  * \brief dgl graph index interface.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero.
+ *
+ * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
+ * the input edges are represented by two id arrays for source and destination
+ * vertex ids. In the general case, the two arrays should have the same length.
+ * If the length of src id array is one, it represents one-many connections.
+ * If the length of dst id array is one, it represents many-one connections.
  */
-class GraphInterface {
+class GraphInterface : public runtime::Object {
  public:
-  /* \brief structure used to represent a list of edges */
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   virtual ~GraphInterface() = default;
 
   /*!
@@ -107,7 +114,6 @@ class GraphInterface {
   virtual uint8_t NumBits() const = 0;
 
   /*!
-   * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
   virtual bool IsMultigraph() const = 0;
@@ -124,52 +130,18 @@ class GraphInterface {
   virtual uint64_t NumEdges() const = 0;
 
   /*! \return true if the given vertex is in the graph.*/
-  virtual bool HasVertex(dgl_id_t vid) const = 0;
+  virtual bool HasVertex(dgl_id_t vid) const {
+    return vid < NumVertices();
+  }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  virtual BoolArray HasVertices(IdArray vids) const {
-    const auto len = vids->shape[0];
-    BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
-    const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    const uint64_t nverts = NumVertices();
-    for (int64_t i = 0; i < len; ++i) {
-      rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
-    }
-    return rst;
-  }
+  virtual BoolArray HasVertices(IdArray vids) const = 0;
 
   /*! \return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  virtual BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
-    const auto srclen = src_ids->shape[0];
-    const auto dstlen = dst_ids->shape[0];
-    const auto rstlen = std::max(srclen, dstlen);
-    BoolArray rst = BoolArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-    if (srclen == 1) {
-      // one-many
-      for (int64_t i = 0; i < dstlen; ++i) {
-        rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
-      }
-    } else if (dstlen == 1) {
-      // many-one
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
-      }
-    } else {
-      // many-many
-      CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-      for (int64_t i = 0; i < srclen; ++i) {
-        rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
-      }
-    }
-    return rst;
-  }
+  virtual BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const = 0;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -322,18 +294,11 @@ class GraphInterface {
    * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
+   *                       may have no incident edges.
    * \return the induced edge subgraph
    */
   virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
-
-  /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  virtual GraphPtr Reverse() const = 0;
 
   /*!
    * \brief Return the successor vector
@@ -364,12 +329,6 @@ class GraphInterface {
   virtual DGLIdIters InEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  virtual GraphInterface *Reset() = 0;
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -386,7 +345,13 @@ class GraphInterface {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
+
+  static constexpr const char* _type_key = "graph.Graph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
+
+// Define GraphRef
+DGL_DEFINE_OBJECT_REF(GraphRef, GraphInterface);
 
 /*! \brief Subgraph data structure */
 struct Subgraph {

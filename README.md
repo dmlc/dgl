@@ -1,6 +1,6 @@
 # Deep Graph Library (DGL)
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
-[![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 [Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
 [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
@@ -34,12 +34,12 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 ## News
 
+v0.3 has just been released! Huge performance improvement (up to 19x). See release note
+[here](https://github.com/dmlc/dgl/releases/tag/v0.3).
+
 We presented DGL at [GTC 2019](https://www.nvidia.com/en-us/gtc/) as an
 instructor-led training session. Check out our slides and tutorial materials
 [here](https://github.com/dglai/DGL-GTC2019)!!!
-
-v0.2 has just been released! Many features, bugfix and performance improvement. See release note
-[here](https://github.com/dmlc/dgl/releases/tag/v0.2).
 
 ## System requirements
 

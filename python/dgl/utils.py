@@ -1,12 +1,10 @@
 """Utility module."""
 from __future__ import absolute_import, division
 
-import ctypes
 from collections.abc import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
-from . import _api_internal
 from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
@@ -533,30 +531,6 @@ def get_edata_name(g, name):
     while name in g.edata:
         name += '_'
     return name
-
-def unwrap_to_ptr_list(wrapper):
-    """Convert the internal vector wrapper to a python list of ctypes.c_void_p.
-
-    The wrapper will be destroyed after this function.
-
-    Parameters
-    ----------
-    wrapper : ctypes.c_void_p
-        The handler to the wrapper.
-
-    Returns
-    -------
-    list of ctypes.c_void_p
-        A python list of void pointers.
-    """
-    size = _api_internal._GetVectorWrapperSize(wrapper)
-    if size == 0:
-        return []
-    data = _api_internal._GetVectorWrapperData(wrapper)
-    data = ctypes.cast(data, ctypes.POINTER(ctypes.c_void_p * size))
-    rst = [ctypes.c_void_p(x) for x in data.contents]
-    _api_internal._FreeVectorWrapper(wrapper)
-    return rst
 
 def to_dgl_context(ctx):
     """Convert a backend context to DGLContext"""

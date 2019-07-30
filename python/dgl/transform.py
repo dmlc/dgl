@@ -1,7 +1,6 @@
 """Module for graph transformation methods."""
 from ._ffi.function import _init_api
 from .graph import DGLGraph
-from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
 __all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
@@ -121,8 +120,8 @@ def to_simple_graph(g):
     DGLGraph
         A simple graph.
     """
-    newgidx = GraphIndex(_CAPI_DGLToSimpleGraph(g._graph.handle))
-    return DGLGraph(newgidx, readonly=True)
+    gidx = _CAPI_DGLToSimpleGraph(g._graph)
+    return DGLGraph(gidx, readonly=True)
 
 def to_bidirected(g, readonly=True):
     """Convert the graph to a bidirected graph.
@@ -165,9 +164,9 @@ def to_bidirected(g, readonly=True):
     (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
     """
     if readonly:
-        newgidx = GraphIndex(_CAPI_DGLToBidirectedImmutableGraph(g._graph.handle))
+        newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
     else:
-        newgidx = GraphIndex(_CAPI_DGLToBidirectedMutableGraph(g._graph.handle))
+        newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
     return DGLGraph(newgidx)
 
 _init_api("dgl.transform")

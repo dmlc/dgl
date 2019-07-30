@@ -148,7 +148,7 @@ def main(args):
         print("Done edge sampling")
 
         # set node/edge feature
-        node_id = torch.from_numpy(node_id).view(-1, 1)
+        node_id = torch.from_numpy(node_id).view(-1, 1).long()
         edge_type = torch.from_numpy(edge_type)
         node_norm = torch.from_numpy(node_norm).view(-1, 1)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
