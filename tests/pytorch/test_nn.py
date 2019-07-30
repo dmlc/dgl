@@ -69,7 +69,7 @@ def test_set2set():
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10))
 
-    gap = nn.GlobAttnPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
+    gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     print(gap)
 
     # test#1: basic
@@ -119,9 +119,9 @@ def test_simple_pool():
 def test_set_trans():
     g = dgl.DGLGraph(nx.path_graph(15))
 
-    st_enc_0 = nn.SetTransEncoder(50, 5, 10, 100, 2, 'sab')
-    st_enc_1 = nn.SetTransEncoder(50, 5, 10, 100, 2, 'isab', 3)
-    st_dec = nn.SetTransDecoder(50, 5, 10, 100, 2, 4)
+    st_enc_0 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'sab')
+    st_enc_1 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'isab', 3)
+    st_dec = nn.SetTransformerDecoder(50, 5, 10, 100, 2, 4)
     print(st_enc_0, st_enc_1, st_dec)
 
     # test#1: basic

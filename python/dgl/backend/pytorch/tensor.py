@@ -149,7 +149,8 @@ def slice_axis(data, axis, begin, end):
     return th.index_select(data, axis, th.arange(begin, end, device=data.device))
 
 def take(data, indices, dim):
-    return th.gather(data, dim, indices)
+    new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
+    return th.index_select(data, dim, indices.view(-1)).view(new_shape)
 
 def narrow_row(x, start, stop):
     return x[start:stop]

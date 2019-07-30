@@ -10,7 +10,7 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
-           'GlobAttnPooling', 'Set2Set']
+           'GlobalAttentionPooling', 'Set2Set']
 
 class SumPooling(nn.Block):
     r"""Apply sum pooling over the graph.
@@ -153,7 +153,7 @@ class SortPooling(nn.Block):
         return 'SortPooling(k={})'.format(self.k)
 
 
-class GlobAttnPooling(nn.Block):
+class GlobalAttentionPooling(nn.Block):
     r"""Apply global attention pooling over the graph.
 
     Parameters
@@ -167,7 +167,7 @@ class GlobAttnPooling(nn.Block):
     _gate_name = '_gpool_attn_gate'
     _readout_name = '_gpool_attn_readout'
     def __init__(self, gate_nn, feat_nn=None):
-        super(GlobAttnPooling, self).__init__()
+        super(GlobalAttentionPooling, self).__init__()
         with self.name_scope():
             self.gate_nn = gate_nn
             self.feat_nn = feat_nn

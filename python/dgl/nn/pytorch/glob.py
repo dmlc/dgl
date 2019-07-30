@@ -14,8 +14,8 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
 
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
-           'GlobAttnPooling', 'Set2Set',
-           'SetTransEncoder', 'SetTransDecoder']
+           'GlobalAttentionPooling', 'Set2Set',
+           'SetTransformerEncoder', 'SetTransformerDecoder']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
@@ -146,7 +146,7 @@ class SortPooling(nn.Module):
             return ret.squeeze(0)
 
 
-class GlobAttnPooling(nn.Module):
+class GlobalAttentionPooling(nn.Module):
     r"""Apply global attention pooling over the graph.
 
     Parameters
@@ -160,7 +160,7 @@ class GlobAttnPooling(nn.Module):
     _gate_name = '_gpool_attn_gate'
     _readout_name = '_gpool_attn_readout'
     def __init__(self, gate_nn, feat_nn=None):
-        super(GlobAttnPooling, self).__init__()
+        super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
         self._reset_parameters()
@@ -376,10 +376,10 @@ class MultiHeadAttention(nn.Module):
         return feat
 
 
-class SetAttnBlock(nn.Module):
+class SetAttentionBlock(nn.Module):
     r""" SAB block mentioned in Set-Transformer paper."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
-        super(SetAttnBlock, self).__init__()
+        super(SetAttentionBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
 
@@ -405,10 +405,10 @@ class SetAttnBlock(nn.Module):
 
         return self.mha(sab_graph, feat, feat, q_nids, kv_nids)
 
-class InducedSetAttnBlock(nn.Module):
+class InducedSetAttentionBlock(nn.Module):
     r""" ISAB block mentioned in Set-Transformer paper."""
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
-        super(InducedSetAttnBlock, self).__init__()
+        super(InducedSetAttentionBlock, self).__init__()
         self.m = m
         self.I = nn.Parameter(
             th.FloatTensor(m, d_model)
@@ -517,7 +517,7 @@ class PMALayer(nn.Module):
         return 'SeedVector: ' + shape_str
 
 
-class SetTransEncoder(nn.Module):
+class SetTransformerEncoder(nn.Module):
     r"""(experimental) The Encoder module in Set Transformer paper.
 
     Parameters
@@ -545,7 +545,7 @@ class SetTransEncoder(nn.Module):
     """
     def __init__(self, d_model, n_heads, d_head, d_ff,
                  n_layers=1, block_type='sab', m=None, dropouth=0., dropouta=0.):
-        super(SetTransEncoder, self).__init__()
+        super(SetTransformerEncoder, self).__init__()
         self.n_layers = n_layers
         self.block_type = block_type
         self.m = m
@@ -556,12 +556,12 @@ class SetTransEncoder(nn.Module):
         for _ in range(n_layers):
             if block_type == 'sab':
                 layers.append(
-                    SetAttnBlock(d_model, n_heads, d_head, d_ff,
-                                 dropouth=dropouth, dropouta=dropouta))
+                    SetAttentionBlock(d_model, n_heads, d_head, d_ff,
+                                      dropouth=dropouth, dropouta=dropouta))
             elif block_type == 'isab':
                 layers.append(
-                    InducedSetAttnBlock(m, d_model, n_heads, d_head, d_ff,
-                                        dropouth=dropouth, dropouta=dropouta))
+                    InducedSetAttentionBlock(m, d_model, n_heads, d_head, d_ff,
+                                             dropouth=dropouth, dropouta=dropouta))
             else:
                 raise KeyError("Unrecognized block type {}: we only support sab/isab")
 
@@ -602,7 +602,7 @@ class SetTransEncoder(nn.Module):
         return feat
 
 
-class SetTransDecoder(nn.Module):
+class SetTransformerDecoder(nn.Module):
     r"""(experimental) The Decoder module in Set Transformer paper.
 
     Parameters
@@ -625,7 +625,7 @@ class SetTransDecoder(nn.Module):
         Dropout rate of attention heads.
     """
     def __init__(self, d_model, num_heads, d_head, d_ff, n_layers, k, dropouth=0., dropouta=0.):
-        super(SetTransDecoder, self).__init__()
+        super(SetTransformerDecoder, self).__init__()
         self.n_layers = n_layers
         self.k = k
         self.d_model = d_model
@@ -634,8 +634,8 @@ class SetTransDecoder(nn.Module):
         layers = []
         for _ in range(n_layers):
             layers.append(
-                SetAttnBlock(d_model, num_heads, d_head, d_ff,
-                             dropouth=dropouth, dropouta=dropouta))
+                SetAttentionBlock(d_model, num_heads, d_head, d_ff,
+                                  dropouth=dropouth, dropouta=dropouta))
 
         self.layers = nn.ModuleList(layers)
 

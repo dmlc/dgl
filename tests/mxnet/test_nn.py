@@ -76,7 +76,7 @@ def test_set2set():
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10))
 
-    gap = nn.GlobAttnPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
+    gap = nn.GlobalAttentionPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
     print(gap)
     # test#1: basic
     h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
