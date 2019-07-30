@@ -8,9 +8,9 @@
 
 #include <dmlc/logging.h>
 
-#include "msg_queue.h"
-
 #include <string>
+
+#include "msg_queue.h"
 
 namespace dgl {
 namespace network {
