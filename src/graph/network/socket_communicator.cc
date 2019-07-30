@@ -21,9 +21,6 @@
 namespace dgl {
 namespace network {
 
-using dgl::network::SplitStringUsing;
-using dgl::network::Addr;
-
 
 /////////////////////////////////////// SocketSender ///////////////////////////////////////////
 
@@ -49,24 +46,23 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
                << " Please provide right address format, "
                << "e.g, 'socket://127.0.0.1:50051'. ";
   }
-  Addr address;
-  address.ip_ = ip_and_port[0];
-  address.port_ = std::stoi(ip_and_port[1]);
+  IPAddr address;
+  address.ip = ip_and_port[0];
+  address.port = std::stoi(ip_and_port[1]);
   receiver_addrs_[recv_id] = address;
-  msg_queue_[recv_id] = new MessageQueue(queue_size_);
+  msg_queue_[recv_id] =  std::make_shared<MessageQueue>(queue_size_);
 }
 
 bool SocketSender::Connect() {
-  static int kMaxTryCount = 1024;  // maximal connection: 1024
   // Create N sockets for Receiver
   for (const auto& r : receiver_addrs_) {
     int ID = r.first;
-    sockets_[ID] = new TCPSocket();
-    TCPSocket* client_socket = sockets_[ID];
+    sockets_[ID] = std::make_shared<TCPSocket>();
+    TCPSocket* client_socket = sockets_[ID].get();
     bool bo = false;
     int try_count = 0;
-    const char* ip = r.second.ip_.c_str();
-    int port = r.second.port_;
+    const char* ip = r.second.ip.c_str();
+    int port = r.second.port;
     while (bo == false && try_count < kMaxTryCount) {
       if (client_socket->Connect(ip, port)) {
         LOG(INFO) << "Connected to Receiver: " << ip << ":" << port;
@@ -74,7 +70,6 @@ bool SocketSender::Connect() {
       } else {
         LOG(ERROR) << "Cannot connect to Receiver: " << ip << ":" << port
                    << ", try again ...";
-        bo = false;
         try_count++;
 #ifdef _WIN32
         Sleep(1);
@@ -87,20 +82,24 @@ bool SocketSender::Connect() {
       return bo;
     }
     // Create a new thread for this socket connection
-    threads_[ID] = new std::thread(SendLoop, client_socket, msg_queue_[ID]);
+    threads_[ID] = std::make_shared<std::thread>(
+      SendLoop, 
+      client_socket, 
+      msg_queue_[ID].get()
+    );
   }
   return true;
 }
 
-int64_t SocketSender::Send(const char* data, int64_t size, int recv_id) {
-  CHECK_NOTNULL(data);
-  if (recv_id < 0) {
-    LOG(FATAL) << "recv_id cannot be a negative number.";
-  }
-  // Add data to message queue
-  int64_t send_size = msg_queue_[recv_id]->Add(data, size);
+int64_t SocketSender::Send(Message msg, int recv_id) {
+  CHECK_NOTNULL(msg.data);
+  CHECK_GT(msg.size, 0);
+  CHECK_GE(recv_id, 0);
+  // Add data message to message queue
+  int64_t send_size = msg_queue_[recv_id]->Add(msg);
   if (send_size < 0) {
-    LOG(FATAL) << "Error on pushing data to message queue.";
+    LOG(WARNING) << "Error on pushing data to message queue.";
+    return -1;
   }
   return send_size;
 }
@@ -117,7 +116,7 @@ void SocketSender::Finalize() {
 #endif  // _WIN32
     }
     int ID = mq.first;
-    mq.second->Signal(ID);
+    mq.second->SignalFinished(ID);
   }
   // Block main thread until all socket-threads finish their jobs
   for (auto& thread : threads_) {
@@ -133,15 +132,15 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
   CHECK_NOTNULL(socket);
   CHECK_NOTNULL(queue);
   bool exit = false;
-  while (exit == false) {
+  while (!exit) {
     // If main thread had finished its job
     if (queue->EmptyAndNoMoreAdd()) {
       exit = true;
     }
-    int64_t data_size = 0;
-    char* data = queue->Remove(&data_size);
-    if (data_size < 0) {
-      LOG(FATAL) << "Remove data from msg_queue error: " << data_size;
+    Message msg;
+    int64_t data_size = queue->Remove(&msg);
+    if (data_size < 0) {  // queue is closed
+      data_size = 0; // send an end-signal to receiver
     }
     // First send the data size
     // If exit == true, we will send zero size to reciever
@@ -149,21 +148,22 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
     while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
       int64_t max_len = sizeof(int64_t) - sent_bytes;
       int64_t tmp = socket->Send(
-      reinterpret_cast<char*>(&data_size)+sent_bytes, max_len);
-      if (tmp == -1) {
-        LOG(FATAL) << "Socket send error.";
-      }
+        reinterpret_cast<char*>(&data_size)+sent_bytes, 
+        max_len);
+      CHECK_NE(tmp, -1);
       sent_bytes += tmp;
     }
     // Then send the data
     sent_bytes = 0;
     while (sent_bytes < data_size) {
       int64_t max_len = data_size - sent_bytes;
-      int64_t tmp = socket->Send(data+sent_bytes, max_len);
-      if (tmp == -1) {
-        LOG(FATAL) << "Socket send error.";
-      }
+      int64_t tmp = socket->Send(msg.data+sent_bytes, max_len);
+      CHECK_NE(tmp, -1);
       sent_bytes += tmp;
+    }
+    // delete msg
+    if (msg.deallocator != nullptr) {
+      msg.deallocator(&msg);
     }
   }
 }
@@ -171,12 +171,8 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
 /////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
 
 bool SocketReceiver::Wait(const char* addr, int num_sender) {
-  static int kTimeOut = 10;          // 10 minutes for socket timeout
-  static int kMaxConnection = 1024;  // maximal connection: 1024
   CHECK_NOTNULL(addr);
-  if (num_sender < 0) {
-    LOG(FATAL) << "num_sender cannot be a negative number.";
-  }
+  CHECK_GT(num_sender, 0);
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
@@ -198,7 +194,7 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   // Initialize message queue for each connection
   num_sender_ = num_sender;
   for (int i = 0; i < num_sender_; ++i) {
-    msg_queue_[i] = new MessageQueue(queue_size_);
+    msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
   }
   // Initialize socket and socket-thread
   server_socket_ = new TCPSocket();
@@ -206,47 +202,59 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   // Bind socket
   if (server_socket_->Bind(ip.c_str(), port) == false) {
     LOG(FATAL) << "Cannot bind to " << ip << ":" << port;
-    return false;
   }
   LOG(INFO) << "Bind to " << ip << ":" << port;
   // Listen
   if (server_socket_->Listen(kMaxConnection) == false) {
     LOG(FATAL) << "Cannot listen on " << ip << ":" << port;
-    return false;
   }
   LOG(INFO) << "Listen on " << ip << ":" << port << ", wait sender connect ...";
   // Accept all sender sockets
   std::string accept_ip;
   int accept_port;
   for (int i = 0; i < num_sender_; ++i) {
-    sockets_[i] = new TCPSocket();
-    if (server_socket_->Accept(sockets_[i], &accept_ip, &accept_port) == false) {
-      LOG(FATAL) << "Error on accept socket.";
+    sockets_[i] = std::make_shared<TCPSocket>();
+    if (server_socket_->Accept(sockets_[i].get(), &accept_ip, &accept_port) == false) {
+      LOG(WARNING) << "Error on accept socket.";
       return false;
     }
     // create new thread for each socket
-    threads_[i] = new std::thread(RecvLoop, sockets_[i], msg_queue_[i]);
+    threads_[i] = std::make_shared<std::thread>(
+      RecvLoop, 
+      sockets_[i].get(), 
+      msg_queue_[i].get()
+    );
     LOG(INFO) << "Accept new sender: " << accept_ip << ":" << accept_port;
   }
 
   return true;
 }
 
-char* SocketReceiver::Recv(int64_t* size, int* send_id) {
-  // Get the top message
-  for (;;) {  // loop until get a message
+int64_t SocketReceiver::Recv(Message* msg, int* send_id) {
+  // loop until get a message
+  for (;;) {
     for (auto& mq : msg_queue_) {
       if (mq.second->Empty() == false) {
         *send_id = mq.first;
-        return msg_queue_[*send_id]->Remove(size);
+        int64_t data_size = msg_queue_[*send_id]->Remove(msg);
+        if (data_size < 0) {
+          LOG(WARNING) << "Error on pushing data to message queue.";
+          return -1;
+        }
+        return data_size;
       }
     }
   }
 }
 
-char* SocketReceiver::RecvFrom(int64_t* size, int send_id) {
+int64_t SocketReceiver::RecvFrom(Message* msg, int send_id) {
   // Get message from specified message queue
-  return msg_queue_[send_id]->Remove(size);
+  int64_t data_size = msg_queue_[send_id]->Remove(msg);
+  if (data_size < 0) {
+    LOG(WARNING) << "Error on pushing data to message queue.";
+    return -1;
+  }
+  return data_size;
 }
 
 void SocketReceiver::Finalize() {
@@ -261,7 +269,7 @@ void SocketReceiver::Finalize() {
 #endif  // _WIN32
     }
     int ID = mq.first;
-    mq.second->Signal(ID);
+    mq.second->SignalFinished(ID);
   }
   // Block main thread until all socket-threads finish their jobs
   for (auto& thread : threads_) {
@@ -289,27 +297,34 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
       int64_t tmp = socket->Receive(
         reinterpret_cast<char*>(&data_size)+received_bytes,
         max_len);
-      if (tmp == -1) {
-        LOG(FATAL) << "Socket recv error.";
-      }
+      CHECK_NE(tmp, -1);
       received_bytes += tmp;
     }
     if (data_size < 0) {
       LOG(FATAL) << "Recv data error (data_size: " << data_size << ")";
-    } else if (data_size == 0) {  // This is a end-signal sent by client
+    } else if (data_size == 0) {
+      // This is an end-signal sent by client
       return;
     } else {
-      char* buffer = new char[data_size];
+      char* buffer = nullptr;
+      try {
+        buffer = new char[data_size];
+      } catch(const std::bad_alloc&) {
+        LOG(FATAL) << "Cannot allocate enough memory for message, "
+                   << "(message size: " << data_size << ")";
+      }
       received_bytes = 0;
       while (received_bytes < data_size) {
         int64_t max_len = data_size - received_bytes;
         int64_t tmp = socket->Receive(buffer+received_bytes, max_len);
-        if (tmp == -1) {
-          LOG(FATAL) << "Socket recv error.";
-        }
+        CHECK_NE(tmp, -1);
         received_bytes += tmp;
       }
-      if (queue->Add(buffer, data_size) < 0) {
+      Message msg;
+      msg.data = buffer;
+      msg.size = data_size;
+      msg.deallocator = msg_clear;
+      if (queue->Add(msg) < 0) {
         LOG(FATAL) << "Push data into msg_queue error.";
       }
     }

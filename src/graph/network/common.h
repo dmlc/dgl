@@ -80,6 +80,7 @@ static inline
 void SplitStringToIteratorUsing(const StringType& full,
                                 const char* delim,
                                 ITR* result) {
+  CHECK_NOTNULL(delim);
   // Optimize the common case where delim is a single character.
   if (delim[0] != '\0' && delim[1] == '\0') {
     char c = delim[0];

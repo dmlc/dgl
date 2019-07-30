@@ -19,17 +19,16 @@
 namespace dgl {
 namespace network {
 
-using dgl::network::MessageQueue;
-using dgl::network::TCPSocket;
-using dgl::network::Sender;
-using dgl::network::Receiver;
+static int kMaxTryCount = 1024;    // maximal connection: 1024
+static int kTimeOut = 10;          // 10 minutes for socket timeout
+static int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
  * \breif Networking address
  */
-struct Addr {
-  std::string ip_;
-  int port_;
+struct IPAddr {
+  std::string ip;
+  int port;
 };
 
 /*!
@@ -59,22 +58,18 @@ class SocketSender : public Sender {
   bool Connect();
 
   /*!
-   * \brief Send data to specified Receiver. Actually pushing data into message queue.
-   * \param data data buffer for sending
-   * \param size size of data for sending
+   * \brief Send data to specified Receiver. Actually pushing message to message queue.
+   * \param msg data message
    * \param recv_id receiver's ID
    * \return bytes of data
    *   > 0 : bytes we sent
    *   - 1 : error
    *
-   * Note that, DO NOT delete the data pointer in Send() because we use zero-copy here. 
-   * The Send() API is a non-blocking API, which will return from function immediantely 
-   * if the message queue is not full, and it will be blocked when message queue is full.
-   *
-   * The Send() API is thread-safe, but we DO NOT guarantee the order of message 
+   * Send() is a non-blocking API, which returns immediately if message queue is not full.
+   * Also, the Send() API is thread-safe, but we DO NOT guarantee the order of message 
    * in multi-threading sending.
    */
-  int64_t Send(const char* data, int64_t size, int recv_id);
+  int64_t Send(Message msg, int recv_id);
 
   /*!
    * \brief Finalize SocketSender
@@ -90,22 +85,22 @@ class SocketSender : public Sender {
   /*!
    * \brief socket for each connection of receiver
    */ 
-  std::unordered_map<int /* receiver ID */, TCPSocket*> sockets_;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>> sockets_;
 
   /*!
    * \brief receivers' address
    */ 
-  std::unordered_map<int /* receiver ID */, Addr> receiver_addrs_;
+  std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
 
   /*!
    * \brief message queue for each socket connection
    */ 
-  std::unordered_map<int /* receiver ID */, MessageQueue*> msg_queue_;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
 
   /*!
    * \brief Independent thread for each socket connection
    */ 
-  std::unordered_map<int /* receiver ID */, std::thread*> threads_;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
 
   /*!
    * \brief Send-loop for each socket in per-thread
@@ -140,30 +135,34 @@ class SocketReceiver : public Receiver {
   bool Wait(const char* addr, int num_sender);
 
   /*!
-   * \brief Recv data from Sender
-   * \param size data size we received
+   * \brief Recv data from Sender. Actually removing data from msg_queue.
+   * \param msg pointer of data message
    * \param send_id which sender current msg comes from
-   * \return data buffer we received
+   * \return bytes of data
+   *   > 0 : bytes we sent
+   *   - 1 : error
    *
    * Note that, The Recv() API is a blocking API, which does not
    * return until getting data from message queue.
    *
    * The Recv() API is thread-safe.
    */
-  char* Recv(int64_t* size, int* send_id);
+  int64_t Recv(Message* msg, int* send_id);
 
   /*!
-   * \brief Recv data from a specified Sender
-   * \param size data size we received
+   * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
+   * \param msg pointer of data message
    * \param send_id sender's ID
-   * \return data buffer we received
+   * \return bytes of data
+   *   > 0 : bytes we sent
+   *   - 1 : error
    *
    * Note that, The RecvFrom() API is a blocking API, which does not
    * return until getting data from message queue.
    *
    * The RecvFrom() API is thread-safe.
    */
-  char* RecvFrom(int64_t* size, int send_id);
+  int64_t RecvFrom(Message* msg, int send_id);
 
   /*!
    * \brief Finalize SocketReceiver
@@ -189,17 +188,17 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief socket for each client connections
    */ 
-  std::unordered_map<int /* Sender (virutal) ID */, TCPSocket*> sockets_;
+  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>> sockets_;
 
   /*!
    * \brief Message queue for each socket connection
    */ 
-  std::unordered_map<int /* Sender (virtual) ID */, MessageQueue*> msg_queue_;
+  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
 
   /*!
    * \brief Independent thead for each socket connection
    */ 
-  std::unordered_map<int /* Sender (virtual) ID */, std::thread*> threads_;
+  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
 
   /*!
    * \brief Recv-loop for each socket in per-thread

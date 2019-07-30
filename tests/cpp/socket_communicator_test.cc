@@ -7,11 +7,13 @@
 #include <string.h>
 #include <string>
 
+#include "../src/graph/network/msg_queue.h"
 #include "../src/graph/network/socket_communicator.h"
 
 using std::string;
 using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
+using dgl::network::Message;
 
 void start_client();
 bool start_server();
@@ -78,7 +80,10 @@ void start_client() {
   sender.AddReceiver("socket://127.0.0.1:50091", 0);
   sender.Connect();
   for (int i = 0; i < 100; ++i) {
-    sender.Send("123456789", 9, 0);
+    Message msg;
+    msg.data = "123456789";
+    msg.size = 9;
+    sender.Send(msg, 0);
   }
   sender.Finalize();
 }
@@ -88,9 +93,10 @@ bool start_server() {
   receiver.Wait("socket://127.0.0.1:50091", 1);
   int64_t size = 0;
   char* data = nullptr;
+  Message msg;
   for (int i = 0; i < 100; ++i) {
-    data = receiver.RecvFrom(&size, 0);
+    size = receiver.RecvFrom(&msg, 0);
   }
   receiver.Finalize();
-  return string("123456789") == string(data, size);
+  return string("123456789") == string(msg.data, msg.size);
 }

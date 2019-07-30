@@ -13,22 +13,45 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <functional>
 
 namespace dgl {
 namespace network {
 
 /*!
+ * \brief Message used by network communicator and message queue.
+ */
+struct Message {
+  /*!
+   * \brief message data
+   */
+  char* data;
+  /*!
+   * \brief message size
+   */
+  int64_t size;
+  /*!
+   * \brief user-defined deallocator, which can be nullptr
+   */
+  std::function<void(Message*)> deallocator = nullptr;
+};
+
+/*!
+ * \brief Free memory buffer for message
+ */
+inline void msg_clear(Message* msg) { delete [] msg->data; }
+
+/*!
  * \brief Message Queue for network communication.
  *
- * MessageQueue is FIFO queue that adopts producer/consumer model for data pointer. 
+ * MessageQueue is FIFO queue that adopts producer/consumer model for data message. 
  * It supports one or more producer threads and one or more consumer threads. 
- * Producers invokes Add() to push data pointers into the queue, and consumers 
- * invokes Remove() to pop data pointers. Add() and Remove() use two condition
+ * Producers invokes Add() to push data message into the queue, and consumers 
+ * invokes Remove() to pop data message from queue. Add() and Remove() use two condition
  * variables to synchronize producer threads and consumer threads. Each producer 
- * invokes Signal(producer_id) to claim that it is about to finish, where producer_id 
- * is an integer uniquely identify a producer thread. This signaling mechanism 
+ * invokes SignalFinished(producer_id) to claim that it is about to finish, where 
+ * producer_id is an integer uniquely identify a producer thread. This signaling mechanism 
  * prevents consumers from waiting after all producers have finished their jobs. 
- * Note that MessageQueue uses zero-copy technology to avoid large memory copy.
  *
  * MessageQueue is thread-safe.
  * 
@@ -37,7 +60,7 @@ class MessageQueue {
  public:
   /*!
    * \brief MessageQueue constructor
-   * \param queue_size size of message queue
+   * \param queue_size size (bytes) of message queue
    * \param num_producers number of producers, use 1 by default
    */
   MessageQueue(int64_t queue_size /* in bytes */,
@@ -49,33 +72,32 @@ class MessageQueue {
   ~MessageQueue() {}
 
   /*!
-   * \brief Add data pointer to the message queue
-   * \param src data pointer
-   * \param size size of data
+   * \brief Add message to the queue
+   * \param msg data message
    * \param is_blocking Blocking if cannot add, else return
    * \return bytes added to the queue
    *   > 0 : size of message
    *   = 0 : no enough space for this message (when is_blocking == false)
-   *   - 1 : error 
+   *   -1  : error 
    */
-  int64_t Add(const char* src, int64_t size, bool is_blocking = true);
+  int64_t Add(Message msg, bool is_blocking = true);
 
   /*!
-   * \brief Remove data pointer from the queue
-   * \param size size of data
-   *   > 0 : size of data
-   *   = 0 : queue is empty (is_blocking = false)
-   *   < 0 : error
+   * \brief Remove message from the queue
+   * \param msg pointer of data msg
    * \param is_blocking Blocking if cannot remove, else return
-   * \return pointer of data buffer
+   * \return bytes removed from the queue
+   *   > 0 : size of message
+   *   = 0 : queue is empty (when is_blocking == false)
+   *   -1  : error
    */
-  char* Remove(int64_t* size, bool is_blocking = true);
+  int64_t Remove(Message* msg, bool is_blocking = true);
 
   /*!
    * \brief Signal that producer producer_id will no longer produce anything
    * \param producer_id An integer uniquely to identify a producer thread
    */
-  void Signal(int producer_id);
+  void SignalFinished(int producer_id);
 
   /*!
    * \return true if queue is empty.
@@ -88,9 +110,6 @@ class MessageQueue {
   bool EmptyAndNoMoreAdd() const;
 
  protected:
-  typedef std::pair<char*   /* data pointer */,
-                    int64_t /* data size */> Message;
-
   /*! 
    * \brief message queue 
    */

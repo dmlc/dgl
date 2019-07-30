@@ -8,6 +8,8 @@
 
 #include <dmlc/logging.h>
 
+#include "msg_queue.h"
+
 #include <string>
 
 namespace dgl {
@@ -25,13 +27,11 @@ class Sender {
  public:
   /*!
    * \brief Sender constructor
-   * \param queue_size size of message queue. 
+   * \param queue_size size (bytes) of message queue. 
    * Note that, the queue_size parameter is optional.
    */
   explicit Sender(int64_t queue_size = 0) {
-    if (queue_size < 0) {
-      LOG(FATAL) << "queue_size cannot be a negative number.";
-    }
+    CHECK_GE(queue_size, 0);
     queue_size_ = queue_size;
   }
 
@@ -51,15 +51,14 @@ class Sender {
   virtual bool Connect() = 0;
 
   /*!
-   * \brief Send binary data to specified Receiver
-   * \param data data buffer for sending
-   * \param size size of data for sending
+   * \brief Send data to specified Receiver.
+   * \param msg data message
    * \param recv_id receiver's ID
    * \return bytes of data
    *   > 0 : bytes we sent
    *   - 1 : error
    */
-  virtual int64_t Send(const char* data, int64_t size, int recv_id) = 0;
+  virtual int64_t Send(Message msg, int recv_id) = 0;
 
   /*!
    * \brief Finalize Sender
@@ -112,19 +111,23 @@ class Receiver {
 
   /*!
    * \brief Recv data from Sender
-   * \param size data size we received
+   * \param msg pointer of data message
    * \param send_id which sender current msg comes from
-   * \return data buffer we received
+   * \return bytes of data
+   *   > 0 : bytes we sent
+   *   - 1 : error
    */
-  virtual char* Recv(int64_t* size, int* send_id) = 0;
+  virtual int64_t Recv(Message* msg, int* send_id) = 0;
 
   /*!
-   * \brief Recv data from specified Sender
-   * \param size data size we received
+   * \brief Recv data from a specified Sender
+   * \param msg pointer of data message
    * \param send_id sender's ID
-   * \return data buffer we received
+   * \return bytes of data
+   *   > 0 : bytes we sent
+   *   - 1 : error
    */
-  virtual char* RecvFrom(int64_t* size, int send_id) = 0;
+  virtual int64_t RecvFrom(Message* msg, int send_id) = 0;
 
   /*!
    * \brief Finalize Receiver
