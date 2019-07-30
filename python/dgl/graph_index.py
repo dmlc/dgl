@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
 
@@ -577,7 +577,7 @@ class GraphIndex(ObjectBase):
         return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
-    def adjacency_matrix_scipy(self, transpose, fmt):
+    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -586,14 +586,14 @@ class GraphIndex(ObjectBase):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool
             A flag to transpose the returned adjacency matrix.
         fmt : str
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
 
         Returns
         -------
@@ -603,20 +603,30 @@ class GraphIndex(ObjectBase):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
+
+        if return_edge_ids is None:
+            dgl_warning(
+                "Adjacency matrix by default currently returns edge IDs."
+                "  As a result there is one 0 entry which is not eliminated."
+                "  In the next release it will return 1s by default,"
+                " and 0 will be eliminated otherwise.",
+                FutureWarning)
+            return_edge_ids = True
+
         rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            shuffle = utils.toindex(rst(2)).tonumpy()
+            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             n = self.number_of_nodes()
-            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
+            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(n, n))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0)).tonumpy()
             n = self.number_of_nodes()
             m = self.number_of_edges()
             row, col = np.reshape(idx, (2, m))
-            shuffle = np.arange(0, m)
-            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
+            data = np.arange(0, m) if return_edge_ids else np.ones_like(row)
+            return scipy.sparse.coo_matrix((data, (row, col)), shape=(n, n))
         else:
             raise Exception("unknown format")
 
