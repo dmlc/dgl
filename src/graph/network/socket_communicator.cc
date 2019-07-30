@@ -83,10 +83,9 @@ bool SocketSender::Connect() {
     }
     // Create a new thread for this socket connection
     threads_[ID] = std::make_shared<std::thread>(
-      SendLoop, 
-      client_socket, 
-      msg_queue_[ID].get()
-    );
+      SendLoop,
+      client_socket,
+      msg_queue_[ID].get());
   }
   return true;
 }
@@ -140,7 +139,7 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
     Message msg;
     int64_t data_size = queue->Remove(&msg);
     if (data_size < 0) {  // queue is closed
-      data_size = 0; // send an end-signal to receiver
+      data_size = 0;  // send an end-signal to receiver
     }
     // First send the data size
     // If exit == true, we will send zero size to reciever
@@ -148,7 +147,7 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
     while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
       int64_t max_len = sizeof(int64_t) - sent_bytes;
       int64_t tmp = socket->Send(
-        reinterpret_cast<char*>(&data_size)+sent_bytes, 
+        reinterpret_cast<char*>(&data_size)+sent_bytes,
         max_len);
       CHECK_NE(tmp, -1);
       sent_bytes += tmp;
@@ -220,10 +219,9 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
     }
     // create new thread for each socket
     threads_[i] = std::make_shared<std::thread>(
-      RecvLoop, 
-      sockets_[i].get(), 
-      msg_queue_[i].get()
-    );
+      RecvLoop,
+      sockets_[i].get(),
+      msg_queue_[i].get());
     LOG(INFO) << "Accept new sender: " << accept_ip << ":" << accept_port;
   }
 
