@@ -3040,7 +3040,7 @@ class DGLGraph(DGLBaseGraph):
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
         return subgraph.DGLSubGraph(self, sgi)
 
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):
+    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -3049,14 +3049,16 @@ class DGLGraph(DGLBaseGraph):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool, optional (default=False)
             A flag to transpose the returned adjacency matrix.
         fmt : str, optional (default='csr')
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool, optional (default=True)
+            If True, the elements in the adjacency matrix are edge ids.
+            Note that one of the element is 0.  Proceed with caution.
+            If False, the elements will be always 1.
 
         Returns
         -------
@@ -3064,7 +3066,7 @@ class DGLGraph(DGLBaseGraph):
             The scipy representation of adjacency matrix.
 
         """
-        return self._graph.adjacency_matrix_scipy(transpose, fmt)
+        return self._graph.adjacency_matrix_scipy(transpose, fmt, return_edge_ids)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
