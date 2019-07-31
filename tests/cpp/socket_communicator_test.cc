@@ -56,6 +56,9 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
   for (int i = 0; i < kNumSender; ++i) {
     client_thread[i]->join();
   }
+  for (int i = 0; i < kNumReceiver; ++i) {
+    server_thread[i]->join();
+  }
 }
 
 void start_client() {
@@ -96,6 +99,9 @@ void start_server(int id) {
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
+
+static void start_client();
+static bool start_server();
 
 DWORD WINAPI _ClientThreadFunc(LPVOID param) {
   start_client();
