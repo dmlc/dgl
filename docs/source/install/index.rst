@@ -104,19 +104,17 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 | pytorch | PyTorch | Requires 0.4.1 or later; see                     |
 |         |         | `official website <https://pytorch.org>`_        |
 +---------+---------+--------------------------------------------------+
-| mxnet   | MXNet   | Requires MXNet 1.5; since MXNet 1.5 isn't        |
-|         |         | officially released, please run the following    |
-|         |         | command to install the MXNet nightly build:      |
+| mxnet   | MXNet   | Requires MXNet 1.5                               |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
-|         |         |    pip install mxnet==1.5.0b20190705             |
+|         |         |    pip install mxnet                             |
 |         |         |                                                  |
 |         |         | or cuda version (e.g. for cuda 9.0)              |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
-|         |         |    pip install mxnet-cu90==1.5.0b20190605        |
+|         |         |    pip install mxnet-cu90                        |
 |         |         |                                                  |
 +---------+---------+--------------------------------------------------+
 | numpy   | NumPy   | Does not support gradient computation            |
