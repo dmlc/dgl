@@ -3344,3 +3344,55 @@ class DGLGraph(DGLBaseGraph):
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
     # pylint: enable=invalid-name
+
+    def local_scope(self):
+        """Return a graph object that can be used in a local function scope.
+
+        The returned graph object shares the feature data and graph structure of this graph.
+        However, any out-place mutation to the feature data will not reflect to this graph,
+        thus making it easier to use in a function scope.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors. Otherwise, user needs to
+        call ``pop`` manually, which is error-prone:
+
+        >>> def foo(g):
+        >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        Notes
+        -----
+        Internally, the returned graph shares the same feature tensors, but construct a new
+        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
+        graph will not reflect to the original graph. However, inplace operations do change
+        the shared tensor values, so will be reflected to the original graph. This function
+        also has little overhead when the number of feature tensors in this graph is small.
+
+        Returns
+        -------
+        DGLGraph
+            The graph object that can be used as a local variable.
+        """
+        return DGLGraph(self._graph,
+                        FrameRef(Frame(self._node_frame._frame)),
+                        FrameRef(Frame(self._edge_frame._frame)))

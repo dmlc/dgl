@@ -4,7 +4,6 @@ import mxnet as mx
 from mxnet import gluon
 
 from ... import function as fn
-from ...utils import get_ndata_name
 
 __all__ = ['GraphConv']
 
@@ -68,8 +67,6 @@ class GraphConv(gluon.Block):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._feat_name = "_gconv_feat"
-        self._msg_name = "_gconv_msg"
 
         with self.name_scope():
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
@@ -104,8 +101,7 @@ class GraphConv(gluon.Block):
         mxnet.NDArray
             The output feature
         """
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-
+        graph = graph.local_scope()
         if self._norm:
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(degs, -0.5)
@@ -116,16 +112,16 @@ class GraphConv(gluon.Block):
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
             feat = mx.nd.dot(feat, self.weight.data(feat.context))
-            graph.ndata[self._feat_name] = feat
-            graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
-                             fn.sum(msg=self._msg_name, out=self._feat_name))
-            rst = graph.ndata.pop(self._feat_name)
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata.pop('h')
         else:
             # aggregate first then mult W
-            graph.ndata[self._feat_name] = feat
-            graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
-                             fn.sum(msg=self._msg_name, out=self._feat_name))
-            rst = graph.ndata.pop(self._feat_name)
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata.pop('h')
             rst = mx.nd.dot(rst, self.weight.data(feat.context))
 
         if self._norm:
