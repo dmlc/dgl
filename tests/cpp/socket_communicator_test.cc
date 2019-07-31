@@ -84,6 +84,7 @@ void start_server(int id) {
       Message msg;
       EXPECT_EQ(receiver.RecvFrom(&msg, n), 9);
       EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
+      msg.deallocator(&msg);
     }
   }
   receiver.Finalize();
@@ -130,7 +131,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 static void start_client() {
-  sleep(2);
+  Sleep(2);
   SocketSender sender(kQueueSize);
   sender.AddReceiver("socket://127.0.0.1:50091", 0);
   sender.Connect();
@@ -151,4 +152,3 @@ static bool start_server() {
 }
 
 #endif
-
