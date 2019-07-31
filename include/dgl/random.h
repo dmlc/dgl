@@ -16,6 +16,15 @@ namespace dgl {
 
 using namespace dgl::runtime;
 
+namespace {
+
+inline uint32_t GetThreadId() {
+  static std::hash<std::thread::id> kThreadIdHasher;
+  return kThreadIdHasher(std::this_thread::get_id());
+}
+
+};  // namespace
+
 /*!
  * \brief Thread-local Random Number Generator class
  */
@@ -82,11 +91,6 @@ class RandomEngine {
 
  private:
   std::mt19937 rng_;
-  static std::hash<std::thread::id> kThreadIdHasher_;
-
-  uint32_t GetThreadId() {
-    return kThreadIdHasher_(std::this_thread::get_id());
-  }
 };
 
 };  // namespace dgl
