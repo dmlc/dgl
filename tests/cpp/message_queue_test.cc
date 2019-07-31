@@ -70,7 +70,6 @@ TEST(MessageQueueTest, AddRemove) {
   EXPECT_EQ(size, 5);
 }
 
-/*
 TEST(MessageQueueTest, EmptyAndNoMoreAdd) {
   MessageQueue queue(5, 2);  // size:5, num_of_producer:2
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), false);
@@ -80,17 +79,17 @@ TEST(MessageQueueTest, EmptyAndNoMoreAdd) {
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), false);
   queue.SignalFinished(2);
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), true);
-  int64_t size = 0;
-  EXPECT_EQ(queue.Remove(&size), nullptr);
 }
 
-const int kNumOfProducer = 1;
-const int kNumOfMessage = 1;
+const int kNumOfProducer = 100;
+const int kNumOfMessage = 100;
 
 void start_add(MessageQueue* queue, int id) {
   for (int i = 0; i < kNumOfMessage; ++i) {
-    int size = queue->Add("apple", 5);
-    EXPECT_EQ(size, 5);
+    Message msg;
+    msg.data = "apple";
+    msg.size = 5;
+    EXPECT_EQ(queue->Add(msg), 5);
   }
   queue->SignalFinished(id);
 }
@@ -104,13 +103,12 @@ TEST(MessageQueueTest, MultiThread) {
     thread_pool.push_back(new std::thread(start_add, &queue, i));
   }
   for (int i = 0; i < kNumOfProducer*kNumOfMessage; ++i) {
-    int64_t size = 0;
-    char* data = queue.Remove(&size);
-    EXPECT_EQ(size, 5);
-    EXPECT_EQ(string(data, size), string("apple"));
+    Message msg;
+    EXPECT_EQ(queue.Remove(&msg), 5);
+    EXPECT_EQ(string(msg.data, msg.size), string("apple"));
   }
   for (int i = 0; i < kNumOfProducer; ++i) {
     thread_pool[i]->join();
   }
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), true);
-}*/
+}
