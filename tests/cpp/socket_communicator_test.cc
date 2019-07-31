@@ -65,7 +65,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 void start_client() {
-  sleep(2); // wait server start
+  Sleep(2); // wait server start
   SocketSender sender(kQueueSize);
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
