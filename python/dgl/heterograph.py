@@ -94,7 +94,7 @@ class DGLBaseHeteroGraph(object):
     ...     ('user', 'user', 'follows'),
     ...     ('user', 'game', 'plays'),
     ...     ('developer', 'game', 'develops')])
-    >>> g = DGLBaseHeteroGraph(
+    >>> g = DGLHeteroGraph(
     ...     metagraph=metagraph,
     ...     number_of_nodes_by_type={'user': 4, 'game': 2, 'developer': 2},
     ...     edge_connections_by_type={
@@ -107,12 +107,29 @@ class DGLBaseHeteroGraph(object):
     """
 
     # pylint: disable=unused-argument
-    def __init__(
-            self,
-            metagraph,
-            number_of_nodes_by_type,
-            edge_connections_by_type):
+    def __init__(self, graph, ntypes, etypes,
+                 _ntypes_invmap=None, _etypes_invmap=None,
+                 _view_ntype=None, _view_etype=None):
         super(DGLBaseHeteroGraph, self).__init__()
+
+        self._graph = graph
+        self._ntypes = ntypes
+        self._etypes = etypes
+        self._ntypes_invmap = _ntypes_invmap or \
+            {ntype: i for i, ntype in enumerate(ntypes)}
+        self._etypes_invmap = _etypes_invmap or \
+            {etype: i for i, etype in enumerate(etypes)}
+
+        # Indicates which node/edge type it is viewing (e.g. g[ntype])
+        # The behavior of interfaces will change accordingly.
+        self._view_ntype = _view_ntype
+        self._view_etype = _view_etype
+
+    def _create_node_type_view(self, ntype):
+        return DGLBaseHeteroGraph(
+            self._graph, self._ntypes, self._etypes,
+            self._ntypes_invmap, self._etypes_invmap,
+            ntype, None)
 
     def __getitem__(self, key):
         """Returns a view on the heterogeneous graph with given node/edge
