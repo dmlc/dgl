@@ -25,12 +25,13 @@ using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
 using dgl::network::Message;
 
+const int64_t kQueueSize = 500 * 1024;
+
 #ifndef WIN32
 
 const int     kNumSender = 3;
 const int     kNumReceiver = 3;
 const int     kNumMessage = 10;
-const int64_t kQueueSize = 500 * 1024;
 
 const char* ip_addr[] = {
   "socket://127.0.0.1:50091",
@@ -129,23 +130,24 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 static void start_client() {
-  const char * msg = "123456789";
-  sleep(1);
-  SocketSender sender;
-  sender.AddReceiver("127.0.0.1", 2049, 0);
+  sleep(2);
+  SocketSender sender(kQueueSize);
+  sender.AddReceiver("socket://127.0.0.1:50091", 0);
   sender.Connect();
-  sender.Send(msg, 9, 0);
+  Message msg;
+  msg.data = "123456789";
+  msg.size = 9;
+  sender.Send(msg, 0);
   sender.Finalize();
 }
 
 static bool start_server() {
-  char serbuff[10];
-  memset(serbuff, '\0', 10);
-  SocketReceiver receiver;
-  receiver.Wait("127.0.0.1", 2049, 1, 500 * 1024);
-  receiver.Recv(serbuff, 9);
+  SocketReceiver receiver(kQueueSize);
+  receiver.Wait("socket://127.0.0.1:50091", 1);
+  Message msg;
+  EXPECT_EQ(receiver.RecvFrom(&msg, 0), 9);
   receiver.Finalize();
-  return string("123456789") == string(serbuff);
+  return string("123456789") == string(msg.data, msg.size);
 }
 
 #endif
