@@ -12,6 +12,13 @@
 #include "../src/graph/network/msg_queue.h"
 #include "../src/graph/network/socket_communicator.h"
 
+#ifndef WIN32
+#include <unistd.h>
+#else
+#include <windows.h>
+#pragma comment(lib, "ws2_32.lib")
+#endif
+
 using std::string;
 using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
@@ -30,6 +37,16 @@ const char* ip_addr[] = {
   "socket://127.0.0.1:50092",
   "socket://127.0.0.1:50093"
 };
+
+
+void Sleep(int seconds) {
+#ifndef WIN32
+  sleep(seconds);
+#else
+  Sleep(seconds * 1000);
+#endif
+}
+
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
   // start 10 client
