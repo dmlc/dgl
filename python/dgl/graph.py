@@ -3355,7 +3355,7 @@ class DGLGraph(DGLBaseGraph):
         Examples
         --------
         The following example uses PyTorch backend.
-        
+
         Avoid accidentally overriding existing feature data. This is quite common when
         implementing a NN module:
 

@@ -29,6 +29,7 @@ class EdgeSoftmax(mx.autograd.Function):
         self.g = g
 
     def forward(self, score):
+        """Forward function."""
         g = self.g.local_scope()
         g.edata['s'] = score
         g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
@@ -41,6 +42,7 @@ class EdgeSoftmax(mx.autograd.Function):
         return out
 
     def backward(self, grad_out):
+        """Backward function."""
         g = self.g.local_scope()
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
         # clear saved tensors explicitly

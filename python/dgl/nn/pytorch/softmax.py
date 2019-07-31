@@ -26,6 +26,7 @@ class EdgeSoftmax(th.autograd.Function):
 
     @staticmethod
     def forward(ctx, g, score):
+        """Forward function."""
         # remember to save the graph to backward cache before making it
         # a local variable
         ctx.backward_cache = g
@@ -42,6 +43,7 @@ class EdgeSoftmax(th.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_out):
+        """Backward function."""
         g = ctx.backward_cache
         g = g.local_scope()
         out, = ctx.saved_tensors
