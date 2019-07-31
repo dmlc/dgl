@@ -12,14 +12,6 @@
 #include "../src/graph/network/msg_queue.h"
 #include "../src/graph/network/socket_communicator.h"
 
-void Sleep(int seconds) {
-#ifndef WIN32
-  sleep(seconds);
-#else
-  Sleep(seconds * 1000);
-#endif
-}
-
 using std::string;
 using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
@@ -62,7 +54,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 void start_client() {
-  Sleep(2); // wait server start
+  sleep(2); // wait server start
   SocketSender sender(kQueueSize);
   for (int i = 0; i < kNumReceiver; ++i) {
     sender.AddReceiver(ip_addr[i], i);
@@ -99,6 +91,10 @@ void start_server(int id) {
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
+
+void sleep(int seconds) {
+  Sleep(seconds * 1000);
+}
 
 static void start_client();
 static bool start_server();
@@ -137,7 +133,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 }
 
 static void start_client() {
-  Sleep(2);
+  sleep(1);
   SocketSender sender(kQueueSize);
   sender.AddReceiver("socket://127.0.0.1:50091", 0);
   sender.Connect();
