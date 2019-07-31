@@ -1,3 +1,5 @@
+# -*- coding:utf-8 -*-
+
 import dgl
 import torch as th
 import torch.nn as nn
@@ -7,11 +9,11 @@ from layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
 
 class MGCNModel(nn.Module):
     """
-  MGCN Model from:
+    MGCN Model from:
     Chengqiang Lu, et al.
     Molecular Property Prediction: A Multilevel
     Quantum Interactions Modeling Perspective. (AAAI'2019)
-  """
+    """
 
     def __init__(self,
                  dim=128,
@@ -26,13 +28,15 @@ class MGCNModel(nn.Module):
         """
         Args:
             dim: dimension of feature maps
+            out_put_dim: the num of target propperties to predict
+            edge_dim: dimension of edge feature
             cutoff: the maximum distance between nodes
             width: width in the RBF layer
+            n_conv: number of convolutional layers
+            norm: normalization
             atom_ref: atom reference
                       used as the initial value of atom embeddings,
                       or set to None with random initialization
-            n_conv: number of convolutional layers
-            norm: normalization
             pre_train: pre_trained node embeddings
         """
         super().__init__()
@@ -66,8 +70,8 @@ class MGCNModel(nn.Module):
         self.node_dense_layer1 = nn.Linear(dim * (self.n_conv + 1), 64)
         self.node_dense_layer2 = nn.Linear(64, output_dim)
 
-    def set_mean_std(self, mean, std):
-        self.mean_per_node = th.tensor(mean, deivce=device)
+    def set_mean_std(self, mean, std, device):
+        self.mean_per_node = th.tensor(mean, device=device)
         self.std_per_node = th.tensor(std, device=device)
 
     def forward(self, g):

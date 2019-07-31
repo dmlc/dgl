@@ -2,6 +2,7 @@
 """Sample training code
 """
 
+import argparse
 import torch as th
 import torch.nn as nn
 from sch import SchNetModel
@@ -57,5 +58,12 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-M",
+                        "--model",
+                        help="model name (sch or mgcn)",
+                        default="sch")
+    parser.add_argument("--epochs", help="number of epochs", default=250)
     device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
-    train("sch", 80, device)
+    args = parser.parse_args()
+    train(args.model, int(args.epochs), device)

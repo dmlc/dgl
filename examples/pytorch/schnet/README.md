@@ -8,7 +8,22 @@ Dependencies
 ------------
 - PyTorch 1.0+
 - dgl 0.3+
+- RDKit (If use Alchemy dataset.)
 
+Usage  
+-----
+
+Example usage on Alchemy dataset:
+
++ SchNet: excepted MAE 0.065
+```py
+python train.py --model sch --epochs 250
+```
+
++ MGCN: excepted MAE 0.050
+```py
+python train.py --model mgcn --epochs 250
+```
 
 Codes
 -----
