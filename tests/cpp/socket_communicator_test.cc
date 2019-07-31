@@ -25,6 +25,8 @@ using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
 using dgl::network::Message;
 
+#ifndef WIN32
+
 const int     kNumSender = 3;
 const int     kNumReceiver = 3;
 const int     kNumMessage = 10;
@@ -35,8 +37,6 @@ const char* ip_addr[] = {
   "socket://127.0.0.1:50092",
   "socket://127.0.0.1:50093"
 };
-
-#ifndef WIN32
 
 static void start_client();
 static void start_server(int id);
