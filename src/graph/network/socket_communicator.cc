@@ -321,7 +321,7 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
       Message msg;
       msg.data = buffer;
       msg.size = data_size;
-      msg.deallocator = msg_clear;
+      msg.deallocator = DefaultMessageDeleter;
       if (queue->Add(msg) < 0) {
         LOG(FATAL) << "Push data into msg_queue error.";
       }

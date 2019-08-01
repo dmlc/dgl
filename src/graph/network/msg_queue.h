@@ -27,7 +27,7 @@ struct Message {
    */
   char* data;
   /*!
-   * \brief message size
+   * \brief message size in bytes
    */
   int64_t size;
   /*!
@@ -39,7 +39,7 @@ struct Message {
 /*!
  * \brief Free memory buffer for message
  */
-inline void msg_clear(Message* msg) { delete [] msg->data; }
+inline void DefaultMessageDeleter(Message* msg) { delete [] msg->data; }
 
 /*!
  * \brief Message Queue for network communication.

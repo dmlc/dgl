@@ -205,7 +205,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
     Message send_msg;
     send_msg.data = data;
     send_msg.size = size;
-    send_msg.deallocator = msg_clear;
+    send_msg.deallocator = DefaultMessageDeleter;
     CHECK_NE(sender->Send(send_msg, recv_id), -1);
     // send node_mapping
     Message node_mapping_msg;
@@ -255,7 +255,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
     Message send_msg;
     send_msg.data = data;
     send_msg.size = size;
-    send_msg.deallocator = msg_clear;
+    send_msg.deallocator = DefaultMessageDeleter;
     CHECK_NE(sender->Send(send_msg, recv_id), -1);
   });
 
