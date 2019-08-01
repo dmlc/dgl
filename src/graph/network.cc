@@ -6,6 +6,7 @@
 #include "./network.h"
 
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/ndarray.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/nodeflow.h>
@@ -273,50 +274,109 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       Message array_0;
       CHECK_NE(receiver->RecvFrom(&array_0, send_id), -1);
       CHECK_EQ(msg.data_shape_[0], 1);
-      nf->node_mapping = NDArray::Empty(
-        {msg.data_shape_[1]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->node_mapping->data), array_0.data, array_0.size);
-      array_0.deallocator(&array_0);
+      DLTensor node_mapping_tensor;
+      node_mapping_tensor.data = array_0.data;
+      node_mapping_tensor.ctx = DLContext{kDLCPU, 0};
+      node_mapping_tensor.ndim = 1;
+      node_mapping_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      node_mapping_tensor.shape = new int64_t[1];
+      node_mapping_tensor.shape[0] = msg.data_shape_[1];
+      node_mapping_tensor.byte_offset = 0;
+      DLManagedTensor *node_mapping_managed_tensor = new DLManagedTensor();
+      node_mapping_managed_tensor->dl_tensor = node_mapping_tensor;
+      nf->node_mapping = NDArray::FromDLPack(node_mapping_managed_tensor);
       // edge_mapping
       Message array_1;
       CHECK_NE(receiver->RecvFrom(&array_1, send_id), -1);
       CHECK_EQ(msg.data_shape_[2], 1);
-      nf->edge_mapping = NDArray::Empty(
-        {msg.data_shape_[3]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->edge_mapping->data), array_1.data, array_1.size);
-      array_1.deallocator(&array_1);
+      DLTensor edge_mapping_tensor;
+      edge_mapping_tensor.data = array_1.data;
+      edge_mapping_tensor.ctx = DLContext{kDLCPU, 0};
+      edge_mapping_tensor.ndim = 1;
+      edge_mapping_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      edge_mapping_tensor.shape = new int64_t[1];
+      edge_mapping_tensor.shape[0] = msg.data_shape_[3];
+      edge_mapping_tensor.byte_offset = 0;
+      DLManagedTensor *edge_mapping_managed_tensor = new DLManagedTensor();
+      edge_mapping_managed_tensor->dl_tensor = edge_mapping_tensor;
+      nf->edge_mapping = NDArray::FromDLPack(edge_mapping_managed_tensor);
       // layer_offset
       Message array_2;
       CHECK_NE(receiver->RecvFrom(&array_2, send_id), -1);
       CHECK_EQ(msg.data_shape_[4], 1);
-      nf->layer_offsets = NDArray::Empty(
-        {msg.data_shape_[5]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->layer_offsets->data), array_2.data, array_2.size);
-      array_2.deallocator(&array_2);
+      DLTensor layer_offsets_tensor;
+      layer_offsets_tensor.data = array_2.data;
+      layer_offsets_tensor.ctx = DLContext{kDLCPU, 0};
+      layer_offsets_tensor.ndim = 1;
+      layer_offsets_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      layer_offsets_tensor.shape = new int64_t[1];
+      layer_offsets_tensor.shape[0] = msg.data_shape_[5];
+      layer_offsets_tensor.byte_offset = 0;
+      DLManagedTensor *layer_offsets_managed_tensor = new DLManagedTensor();
+      layer_offsets_managed_tensor->dl_tensor = layer_offsets_tensor;
+      nf->layer_offsets = NDArray::FromDLPack(layer_offsets_managed_tensor);
       // flow_offset
       Message array_3;
       CHECK_NE(receiver->RecvFrom(&array_3, send_id), -1);
       CHECK_EQ(msg.data_shape_[6], 1);
-      nf->flow_offsets = NDArray::Empty(
-        {msg.data_shape_[7]}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-      memcpy(static_cast<char*>(nf->flow_offsets->data), array_3.data, array_3.size);
-      array_3.deallocator(&array_3);
+      DLTensor flow_offsets_tensor;
+      flow_offsets_tensor.data = array_3.data;
+      flow_offsets_tensor.ctx = DLContext{kDLCPU, 0};
+      flow_offsets_tensor.ndim = 1;
+      flow_offsets_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      flow_offsets_tensor.shape = new int64_t[1];
+      flow_offsets_tensor.shape[0] = msg.data_shape_[7];
+      flow_offsets_tensor.byte_offset = 0;
+      DLManagedTensor *flow_offsets_managed_tensor = new DLManagedTensor();
+      flow_offsets_managed_tensor->dl_tensor = flow_offsets_tensor;
+      nf->flow_offsets = NDArray::FromDLPack(flow_offsets_managed_tensor);
       // CSR indptr
-      CSRPtr csr(new CSR(msg.data_shape_[1], msg.data_shape_[3], false));
       Message array_4;
       CHECK_NE(receiver->RecvFrom(&array_4, send_id), -1);
-      memcpy(static_cast<char*>(csr->indptr()->data), array_4.data, array_4.size);
-      array_4.deallocator(&array_4);
+      CHECK_EQ(msg.data_shape_[8], 1);
+      DLTensor indptr_tensor;
+      indptr_tensor.data = array_4.data;
+      indptr_tensor.ctx = DLContext{kDLCPU, 0};
+      indptr_tensor.ndim = 1;
+      indptr_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      indptr_tensor.shape = new int64_t[1];
+      indptr_tensor.shape[0] = msg.data_shape_[9];
+      indptr_tensor.byte_offset = 0;
+      DLManagedTensor *indptr_managed_tensor = new DLManagedTensor();
+      indptr_managed_tensor->dl_tensor = indptr_tensor;
+      NDArray indptr = NDArray::FromDLPack(indptr_managed_tensor);
       // CSR indice
       Message array_5;
       CHECK_NE(receiver->RecvFrom(&array_5, send_id), -1);
-      memcpy(static_cast<char*>(csr->indices()->data), array_5.data, array_5.size);
-      array_5.deallocator(&array_5);
+      CHECK_EQ(msg.data_shape_[10], 1);
+      DLTensor indice_tensor;
+      indice_tensor.data = array_5.data;
+      indice_tensor.ctx = DLContext{kDLCPU, 0};
+      indice_tensor.ndim = 1;
+      indice_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      indice_tensor.shape = new int64_t[1];
+      indice_tensor.shape[0] = msg.data_shape_[11];
+      indice_tensor.byte_offset = 0;
+      DLManagedTensor *indice_managed_tensor = new DLManagedTensor();
+      indice_managed_tensor->dl_tensor = indice_tensor;
+      NDArray indice = NDArray::FromDLPack(indice_managed_tensor);
       // CSR edge_ids
       Message array_6;
       CHECK_NE(receiver->RecvFrom(&array_6, send_id), -1);
-      memcpy(static_cast<char*>(csr->edge_ids()->data), array_6.data, array_6.size);
-      array_6.deallocator(&array_6);
+      CHECK_EQ(msg.data_shape_[12], 1);
+      DLTensor edge_id_tensor;
+      edge_id_tensor.data = array_6.data;
+      edge_id_tensor.ctx = DLContext{kDLCPU, 0};
+      edge_id_tensor.ndim = 1;
+      edge_id_tensor.dtype = DLDataType{kDLInt, 64, 1};
+      edge_id_tensor.shape = new int64_t[1];
+      edge_id_tensor.shape[0] = msg.data_shape_[13];
+      edge_id_tensor.byte_offset = 0;
+      DLManagedTensor *edge_id_managed_tensor = new DLManagedTensor();
+      edge_id_managed_tensor->dl_tensor = edge_id_tensor;
+      NDArray edge_ids = NDArray::FromDLPack(edge_id_managed_tensor);
+      // Create CSR
+      CSRPtr csr(new CSR(indptr, indice, edge_ids));
       nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
       *rv = nf;
     } else if (msg.msg_type() == kEndMsg) {

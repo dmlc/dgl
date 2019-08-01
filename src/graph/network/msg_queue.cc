@@ -33,7 +33,7 @@ STATUS MessageQueue::Add(Message msg, bool is_blocking) {
   }
   std::unique_lock<std::mutex> lock(mutex_);
   if (finished_producers_.size() >= num_producers_) {
-    LOG(WARNING) << "Queue is closed.";
+    LOG(WARNING) << "Message queue is closed.";
     return QUEUE_CLOSE;
   }
   if (msg.size > free_size_ && !is_blocking) {
@@ -58,7 +58,7 @@ STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
       return QUEUE_EMPTY;
     }
     if (finished_producers_.size() >= num_producers_) {
-      LOG(WARNING) << "Queue is closed.";
+      LOG(WARNING) << "Message queue is closed.";
       return QUEUE_CLOSE;
     }
   }
@@ -67,7 +67,7 @@ STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
     return !queue_.empty() || exit_flag_.load();
   });
   if (finished_producers_.size() >= num_producers_ && queue_.empty()) {
-    LOG(WARNING) << "Queue is closed.";
+    LOG(WARNING) << "Message queue is closed.";
     return QUEUE_CLOSE;
   }
 
