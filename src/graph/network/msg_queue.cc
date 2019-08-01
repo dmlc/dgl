@@ -37,7 +37,6 @@ STATUS MessageQueue::Add(Message msg, bool is_blocking) {
     return QUEUE_CLOSE;
   }
   if (msg.size > free_size_ && !is_blocking) {
-    LOG(WARNING) << "Queue is full.";
     return QUEUE_FULL;
   }
   cond_not_full_.wait(lock, [&]() {
@@ -56,7 +55,6 @@ STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (queue_.empty()) {
     if (!is_blocking) {
-      LOG(WARNING) << "Queue is empty.";
       return QUEUE_EMPTY;
     }
     if (finished_producers_.size() >= num_producers_) {

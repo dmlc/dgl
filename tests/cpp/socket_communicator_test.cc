@@ -66,6 +66,12 @@ void start_client() {
       EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
+  for (int i = 0; i < kNumMessage; ++i) {
+    for (int n = 0; n < kNumReceiver; ++n) {
+      Message msg = {"123456789", 9};
+      EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
+    }
+  }
   sender.Finalize();
 }
 
@@ -79,6 +85,13 @@ void start_server(int id) {
       EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
       msg.deallocator(&msg);
     }
+  }
+  for (int n = 0; n < kNumSender*kNumMessage; ++n) {
+    Message msg;
+    int recv_id;
+    EXPECT_EQ(receiver.Recv(&msg, &recv_id), REMOVE_SUCCESS);
+    EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
+    msg.deallocator(&msg);
   }
   receiver.Finalize();
 }
