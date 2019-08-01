@@ -62,10 +62,8 @@ void start_client() {
   sender.Connect();
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
-      Message msg;
-      msg.data = "123456789";
-      msg.size = 9;
-      sender.Send(msg, n);
+      Message msg = {"123456789", 9};
+      EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
   sender.Finalize();
@@ -77,7 +75,7 @@ void start_server(int id) {
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumSender; ++n) {
       Message msg;
-      EXPECT_EQ(receiver.RecvFrom(&msg, n), 9);
+      EXPECT_EQ(receiver.RecvFrom(&msg, n), REMOVE_SUCCESS);
       EXPECT_EQ(string(msg.data, msg.size), string("123456789"));
       msg.deallocator(&msg);
     }
@@ -148,7 +146,7 @@ static bool start_server() {
   SocketReceiver receiver(kQueueSize);
   receiver.Wait("socket://127.0.0.1:8001", 1);
   Message msg;
-  EXPECT_EQ(receiver.RecvFrom(&msg, 0), 9);
+  EXPECT_EQ(receiver.RecvFrom(&msg, 0), REMOVE_SUCCESS);
   receiver.Finalize();
   return string("123456789") == string(msg.data, msg.size);
 }

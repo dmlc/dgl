@@ -54,11 +54,9 @@ class Sender {
    * \brief Send data to specified Receiver.
    * \param msg data message
    * \param recv_id receiver's ID
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    */
-  virtual int64_t Send(Message msg, int recv_id) = 0;
+  virtual STATUS Send(Message msg, int recv_id) = 0;
 
   /*!
    * \brief Finalize Sender
@@ -113,21 +111,17 @@ class Receiver {
    * \brief Recv data from Sender
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    */
-  virtual int64_t Recv(Message* msg, int* send_id) = 0;
+  virtual STATUS Recv(Message* msg, int* send_id) = 0;
 
   /*!
    * \brief Recv data from a specified Sender
    * \param msg pointer of data message
    * \param send_id sender's ID
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    */
-  virtual int64_t RecvFrom(Message* msg, int send_id) = 0;
+  virtual STATUS RecvFrom(Message* msg, int send_id) = 0;
 
   /*!
    * \brief Finalize Receiver

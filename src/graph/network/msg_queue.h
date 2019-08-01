@@ -18,10 +18,34 @@
 namespace dgl {
 namespace network {
 
+typedef int STATUS;
+
+/*!
+ * \brief Status code of message queue
+ */
+#define  ADD_SUCCESS     3400   // Add message successfully
+#define  MSG_GT_SIZE     3401   // Message size beyond queue size
+#define  MSG_LE_ZERO     3402   // Message size is not a positive number
+#define  QUEUE_CLOSE     3403   // Cannot add message when queue closed
+#define  QUEUE_FULL      3404   // Cannot add message when queue is full
+#define  REMOVE_SUCCESS  3405   // Remove message successfully
+#define  QUEUE_EMPTY     3406   // Cannot remove when queue is empty
+
 /*!
  * \brief Message used by network communicator and message queue.
  */
 struct Message {
+  /*!
+   * \brief Constructor
+   */
+  Message() { }
+
+  /*!
+   * \brief Constructor
+   */ 
+  Message(char* data_ptr, int64_t data_size) 
+  : data(data_ptr), size(data_size) { }
+
   /*!
    * \brief message data
    */
@@ -75,23 +99,17 @@ class MessageQueue {
    * \brief Add message to the queue
    * \param msg data message
    * \param is_blocking Blocking if cannot add, else return
-   * \return bytes added to the queue
-   *   > 0 : size of message
-   *   = 0 : no enough space for this message (when is_blocking == false)
-   *   -1  : error 
+   * \return Status code
    */
-  int64_t Add(Message msg, bool is_blocking = true);
+  STATUS Add(Message msg, bool is_blocking = true);
 
   /*!
    * \brief Remove message from the queue
    * \param msg pointer of data msg
    * \param is_blocking Blocking if cannot remove, else return
-   * \return bytes removed from the queue
-   *   > 0 : size of message
-   *   = 0 : queue is empty (when is_blocking == false)
-   *   -1  : error
+   * \return Status code
    */
-  int64_t Remove(Message* msg, bool is_blocking = true);
+  STATUS Remove(Message* msg, bool is_blocking = true);
 
   /*!
    * \brief Signal that producer producer_id will no longer produce anything

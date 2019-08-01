@@ -252,9 +252,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
     int64_t size = 0;
     char* data = msg.Serialize(&size);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    Message send_msg;
-    send_msg.data = data;
-    send_msg.size = size;
+    Message send_msg = {data, size};
     send_msg.deallocator = DefaultMessageDeleter;
     CHECK_NE(sender->Send(send_msg, recv_id), -1);
   });

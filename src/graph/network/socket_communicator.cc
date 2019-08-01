@@ -90,17 +90,13 @@ bool SocketSender::Connect() {
   return true;
 }
 
-int64_t SocketSender::Send(Message msg, int recv_id) {
+STATUS SocketSender::Send(Message msg, int recv_id) {
   CHECK_NOTNULL(msg.data);
   CHECK_GT(msg.size, 0);
   CHECK_GE(recv_id, 0);
   // Add data message to message queue
-  int64_t send_size = msg_queue_[recv_id]->Add(msg);
-  if (send_size < 0) {
-    LOG(WARNING) << "Error on pushing data to message queue.";
-    return -1;
-  }
-  return send_size;
+  STATUS code = msg_queue_[recv_id]->Add(msg);
+  return code;
 }
 
 void SocketSender::Finalize() {
@@ -132,30 +128,27 @@ void SocketSender::SendLoop(TCPSocket* socket, MessageQueue* queue) {
   CHECK_NOTNULL(queue);
   bool exit = false;
   while (!exit) {
-    // If main thread had finished its job
-    if (queue->EmptyAndNoMoreAdd()) {
+    Message msg;
+    STATUS code = queue->Remove(&msg);
+    if (code == QUEUE_CLOSE) {
+      msg.size = 0;  // send an end-signal to receiver
       exit = true;
     }
-    Message msg;
-    int64_t data_size = queue->Remove(&msg);
-    if (data_size < 0) {  // queue is closed
-      data_size = 0;  // send an end-signal to receiver
-    }
-    // First send the data size
+    // First send the size
     // If exit == true, we will send zero size to reciever
     int64_t sent_bytes = 0;
     while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
       int64_t max_len = sizeof(int64_t) - sent_bytes;
       int64_t tmp = socket->Send(
-        reinterpret_cast<char*>(&data_size)+sent_bytes,
+        reinterpret_cast<char*>(&msg.size)+sent_bytes,
         max_len);
       CHECK_NE(tmp, -1);
       sent_bytes += tmp;
     }
     // Then send the data
     sent_bytes = 0;
-    while (sent_bytes < data_size) {
-      int64_t max_len = data_size - sent_bytes;
+    while (sent_bytes < msg.size) {
+      int64_t max_len = msg.size - sent_bytes;
       int64_t tmp = socket->Send(msg.data+sent_bytes, max_len);
       CHECK_NE(tmp, -1);
       sent_bytes += tmp;
@@ -228,31 +221,26 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   return true;
 }
 
-int64_t SocketReceiver::Recv(Message* msg, int* send_id) {
+STATUS SocketReceiver::Recv(Message* msg, int* send_id) {
   // loop until get a message
   for (;;) {
     for (auto& mq : msg_queue_) {
-      if (mq.second->Empty() == false) {
-        *send_id = mq.first;
-        int64_t data_size = msg_queue_[*send_id]->Remove(msg);
-        if (data_size < 0) {
-          LOG(WARNING) << "Error on pushing data to message queue.";
-          return -1;
-        }
-        return data_size;
+      *send_id = mq.first;
+      // We use non-block remove here
+      STATUS code = msg_queue_[*send_id]->Remove(msg, false);
+      if (code == QUEUE_EMPTY) {
+        continue;  // jump to the next queue
+      } else {
+        return code;
       }
     }
   }
 }
 
-int64_t SocketReceiver::RecvFrom(Message* msg, int send_id) {
+STATUS SocketReceiver::RecvFrom(Message* msg, int send_id) {
   // Get message from specified message queue
-  int64_t data_size = msg_queue_[send_id]->Remove(msg);
-  if (data_size < 0) {
-    LOG(WARNING) << "Error on pushing data to message queue.";
-    return -1;
-  }
-  return data_size;
+  STATUS code = msg_queue_[send_id]->Remove(msg);
+  return code;
 }
 
 void SocketReceiver::Finalize() {
@@ -322,9 +310,7 @@ void SocketReceiver::RecvLoop(TCPSocket* socket, MessageQueue* queue) {
       msg.data = buffer;
       msg.size = data_size;
       msg.deallocator = DefaultMessageDeleter;
-      if (queue->Add(msg) < 0) {
-        LOG(FATAL) << "Push data into msg_queue error.";
-      }
+      queue->Add(msg);
     }
   }
 }

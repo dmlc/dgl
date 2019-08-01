@@ -21,24 +21,24 @@ MessageQueue::MessageQueue(int64_t queue_size, int num_producers) {
   num_producers_ = num_producers;
 }
 
-int64_t MessageQueue::Add(Message msg, bool is_blocking) {
+STATUS MessageQueue::Add(Message msg, bool is_blocking) {
   // check if message is too long to fit into the queue
   if (msg.size > queue_size_) {
     LOG(WARNING) << "Message is larger than the queue.";
-    return -1;
+    return MSG_GT_SIZE;
   }
   if (msg.size <= 0) {
     LOG(WARNING) << "Message size (" << msg.size << ") is negative or zero.";
-    return -1;
+    return MSG_LE_ZERO;
   }
   std::unique_lock<std::mutex> lock(mutex_);
   if (finished_producers_.size() >= num_producers_) {
-    LOG(WARNING) << "Can't add to buffer when flag_no_more is set.";
-    return -1;
+    LOG(WARNING) << "Queue is closed.";
+    return QUEUE_CLOSE;
   }
   if (msg.size > free_size_ && !is_blocking) {
-    LOG(WARNING) << "Queue is full and message lost.";
-    return 0;
+    LOG(WARNING) << "Queue is full.";
+    return QUEUE_FULL;
   }
   cond_not_full_.wait(lock, [&]() {
     return msg.size <= free_size_;
@@ -49,18 +49,19 @@ int64_t MessageQueue::Add(Message msg, bool is_blocking) {
   // not empty signal
   cond_not_empty_.notify_one();
 
-  return msg.size;
+  return ADD_SUCCESS;
 }
 
-int64_t MessageQueue::Remove(Message* msg, bool is_blocking) {
+STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (queue_.empty()) {
     if (!is_blocking) {
       LOG(WARNING) << "Queue is empty.";
-      return 0;
+      return QUEUE_EMPTY;
     }
     if (finished_producers_.size() >= num_producers_) {
-      return -1;
+      LOG(WARNING) << "Queue is closed.";
+      return QUEUE_CLOSE;
     }
   }
 
@@ -68,7 +69,8 @@ int64_t MessageQueue::Remove(Message* msg, bool is_blocking) {
     return !queue_.empty() || exit_flag_.load();
   });
   if (finished_producers_.size() >= num_producers_ && queue_.empty()) {
-    return -1;
+    LOG(WARNING) << "Queue is closed.";
+    return QUEUE_CLOSE;
   }
 
   Message & old_msg = queue_.front();
@@ -79,7 +81,7 @@ int64_t MessageQueue::Remove(Message* msg, bool is_blocking) {
   free_size_ += old_msg.size;
   cond_not_full_.notify_one();
 
-  return old_msg.size;
+  return REMOVE_SUCCESS;
 }
 
 void MessageQueue::SignalFinished(int producer_id) {

@@ -61,15 +61,13 @@ class SocketSender : public Sender {
    * \brief Send data to specified Receiver. Actually pushing message to message queue.
    * \param msg data message
    * \param recv_id receiver's ID
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    *
    * Send() is a non-blocking API, which returns immediately if message queue is not full.
    * Also, the Send() API is thread-safe, but we DO NOT guarantee the order of message 
    * in multi-threading sending.
    */
-  int64_t Send(Message msg, int recv_id);
+  STATUS Send(Message msg, int recv_id);
 
   /*!
    * \brief Finalize SocketSender
@@ -138,31 +136,27 @@ class SocketReceiver : public Receiver {
    * \brief Recv data from Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id which sender current msg comes from
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    *
    * Note that, The Recv() API is a blocking API, which does not
    * return until getting data from message queue.
    *
    * The Recv() API is thread-safe.
    */
-  int64_t Recv(Message* msg, int* send_id);
+  STATUS Recv(Message* msg, int* send_id);
 
   /*!
    * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
    * \param msg pointer of data message
    * \param send_id sender's ID
-   * \return bytes of data
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
    *
    * Note that, The RecvFrom() API is a blocking API, which does not
    * return until getting data from message queue.
    *
    * The RecvFrom() API is thread-safe.
    */
-  int64_t RecvFrom(Message* msg, int send_id);
+  STATUS RecvFrom(Message* msg, int send_id);
 
   /*!
    * \brief Finalize SocketReceiver

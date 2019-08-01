@@ -17,57 +17,41 @@ using dgl::network::MessageQueue;
 TEST(MessageQueueTest, AddRemove) {
   MessageQueue queue(5, 1);  // size:5, num_of_producer:1
   // msg 1
-  Message msg_1;
-  msg_1.data = "111";
-  msg_1.size = 3;
-  EXPECT_EQ(queue.Add(msg_1), 3);
+  Message msg_1 = {"111", 3};
+  EXPECT_EQ(queue.Add(msg_1), ADD_SUCCESS);
   // msg 2
-  Message msg_2;
-  msg_2.data = "22";
-  msg_2.size = 2;
-  EXPECT_EQ(queue.Add(msg_2), 2);
+  Message msg_2 = {"22", 2};
+  EXPECT_EQ(queue.Add(msg_2), ADD_SUCCESS);
   // msg 3
-  Message msg_3;
-  msg_3.data = "xxxx";
-  msg_3.size = 4;
-  EXPECT_EQ(0, queue.Add(msg_3, false));  // non-blocking add
+  Message msg_3 = {"xxxx", 4};
+  EXPECT_EQ(queue.Add(msg_3, false), QUEUE_FULL);
   // msg 4
   Message msg_4;
-  int64_t size = queue.Remove(&msg_4);
-  EXPECT_EQ(size, 3);
+  EXPECT_EQ(queue.Remove(&msg_4), REMOVE_SUCCESS);
   EXPECT_EQ(string(msg_4.data, msg_4.size), string("111"));
   // msg 5
   Message msg_5;
-  size = queue.Remove(&msg_5);
-  EXPECT_EQ(size, 2);
+  EXPECT_EQ(queue.Remove(&msg_5), REMOVE_SUCCESS);
   EXPECT_EQ(string(msg_5.data, msg_5.size), string("22"));
   // msg 6
-  Message msg_6;
-  msg_6.data = "33333";
-  msg_6.size = 5;
-  EXPECT_EQ(queue.Add(msg_6), 5);
+  Message msg_6 = {"33333", 5};
+  EXPECT_EQ(queue.Add(msg_6), ADD_SUCCESS);
   // msg 7
   Message msg_7;
-  size = queue.Remove(&msg_7);
-  EXPECT_EQ(size, 5);
+  EXPECT_EQ(queue.Remove(&msg_7), REMOVE_SUCCESS);
   EXPECT_EQ(string(msg_7.data, msg_7.size), string("33333"));
   // msg 8
   Message msg_8;
-  EXPECT_EQ(0, queue.Remove(&msg_8, false));  // non-blocking remove
+  EXPECT_EQ(queue.Remove(&msg_8, false), QUEUE_EMPTY);  // non-blocking remove
   // msg 9
-  Message msg_9;
-  msg_9.data = "666666";
-  msg_9.size = 6;
-  EXPECT_EQ(queue.Add(msg_9), -1);      // exceed queue size
+  Message msg_9 = {"666666", 6};
+  EXPECT_EQ(queue.Add(msg_9), MSG_GT_SIZE);      // exceed queue size
   // msg 10
-  Message msg_10;
-  msg_10.data = "55555";
-  msg_10.size = 5;
-  EXPECT_EQ(queue.Add(msg_10), 5);
+  Message msg_10 = {"55555", 5};
+  EXPECT_EQ(queue.Add(msg_10), ADD_SUCCESS);
   // msg 11
   Message msg_11;
-  size = queue.Remove(&msg_11);
-  EXPECT_EQ(size, 5);
+  EXPECT_EQ(queue.Remove(&msg_11), REMOVE_SUCCESS);
 }
 
 TEST(MessageQueueTest, EmptyAndNoMoreAdd) {
@@ -86,10 +70,8 @@ const int kNumOfMessage = 100;
 
 void start_add(MessageQueue* queue, int id) {
   for (int i = 0; i < kNumOfMessage; ++i) {
-    Message msg;
-    msg.data = "apple";
-    msg.size = 5;
-    EXPECT_EQ(queue->Add(msg), 5);
+    Message msg = {"apple", 5};
+    EXPECT_EQ(queue->Add(msg), ADD_SUCCESS);
   }
   queue->SignalFinished(id);
 }
@@ -104,7 +86,7 @@ TEST(MessageQueueTest, MultiThread) {
   }
   for (int i = 0; i < kNumOfProducer*kNumOfMessage; ++i) {
     Message msg;
-    EXPECT_EQ(queue.Remove(&msg), 5);
+    EXPECT_EQ(queue.Remove(&msg), REMOVE_SUCCESS);
     EXPECT_EQ(string(msg.data, msg.size), string("apple"));
   }
   for (int i = 0; i < kNumOfProducer; ++i) {
