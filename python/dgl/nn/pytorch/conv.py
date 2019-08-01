@@ -106,7 +106,7 @@ class GraphConv(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph = graph.local_scope()
+        graph = graph.local_var()
         if self._norm:
             norm = th.pow(graph.in_degrees().float(), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)

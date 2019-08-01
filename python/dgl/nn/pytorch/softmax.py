@@ -30,7 +30,7 @@ class EdgeSoftmax(th.autograd.Function):
         # remember to save the graph to backward cache before making it
         # a local variable
         ctx.backward_cache = g
-        g = g.local_scope()
+        g = g.local_var()
         g.edata['s'] = score
         g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
         g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
@@ -45,7 +45,7 @@ class EdgeSoftmax(th.autograd.Function):
     def backward(ctx, grad_out):
         """Backward function."""
         g = ctx.backward_cache
-        g = g.local_scope()
+        g = g.local_var()
         out, = ctx.saved_tensors
         # clear backward cache explicitly
         ctx.backward_cache = None

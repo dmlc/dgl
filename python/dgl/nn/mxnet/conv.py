@@ -101,7 +101,7 @@ class GraphConv(gluon.Block):
         mxnet.NDArray
             The output feature
         """
-        graph = graph.local_scope()
+        graph = graph.local_var()
         if self._norm:
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(degs, -0.5)

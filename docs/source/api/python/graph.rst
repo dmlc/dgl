@@ -95,6 +95,7 @@ Using Node/edge features
     DGLGraph.edge_attr_schemes
     DGLGraph.set_n_initializer
     DGLGraph.set_e_initializer
+    DGLGraph.local_var
     DGLGraph.local_scope
 
 Computing with DGLGraph
