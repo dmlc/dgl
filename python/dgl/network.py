@@ -146,7 +146,7 @@ def _recv_nodeflow(receiver, graph):
 
     Returns
     -------
-    NodeFlow or end-signal
+    NodeFlow or an end-signal
     """
     res = _CAPI_ReceiverRecvNodeFlow(receiver)
     if isinstance(res, int):

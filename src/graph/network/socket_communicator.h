@@ -48,12 +48,16 @@ class SocketSender : public Sender {
    * \brief Add receiver's address and ID to the sender's namebook
    * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
    * \param id receiver's ID
+   *
+   * AddReceiver() is not thread-safe and only one thread can invoke this API.
    */
   void AddReceiver(const char* addr, int recv_id);
 
   /*!
    * \brief Connect with all the Receivers
    * \return True for success and False for fail
+   *
+   * Connect() is not thread-safe and only one thread can invoke this API.
    */
   bool Connect();
 
@@ -63,14 +67,19 @@ class SocketSender : public Sender {
    * \param recv_id receiver's ID
    * \return Status code
    *
-   * Send() is a non-blocking API, which returns immediately if message queue is not full.
-   * Also, the Send() API is thread-safe, but we DO NOT guarantee the order of message 
-   * in multi-threading sending.
+   * (1) The send is non-blocking. There is no guarantee that the message has been 
+   *     physically sent out when the function returns.
+   * (2) The communicator will assume the responsibility of the given message.
+   * (3) The API is multi-thread safe.
+   * (4) Messages sent to the same receiver are guaranteed to be received in the same order. 
+   *     There is no guarantee for messages sent to different receivers.
    */
   STATUS Send(Message msg, int recv_id);
 
   /*!
    * \brief Finalize SocketSender
+   *
+   * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize();
 
@@ -129,6 +138,8 @@ class SocketReceiver : public Receiver {
    * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
    * \return True for success and False for fail
+   *
+   * Wait() is not thread-safe and only one thread can invoke this API.
    */
   bool Wait(const char* addr, int num_sender);
 
@@ -138,10 +149,10 @@ class SocketReceiver : public Receiver {
    * \param send_id which sender current msg comes from
    * \return Status code
    *
-   * Note that, The Recv() API is a blocking API, which does not
-   * return until getting data from message queue.
-   *
-   * The Recv() API is thread-safe.
+   * (1) The Recv() API is blocking, which will not 
+   *     return until getting data from message queue.
+   * (2) The Recv() API is thread-safe.
+   * (3) Memory allocated by communicator but will not own it after the function returns.
    */
   STATUS Recv(Message* msg, int* send_id);
 
@@ -151,15 +162,17 @@ class SocketReceiver : public Receiver {
    * \param send_id sender's ID
    * \return Status code
    *
-   * Note that, The RecvFrom() API is a blocking API, which does not
-   * return until getting data from message queue.
-   *
-   * The RecvFrom() API is thread-safe.
+   * (1) The RecvFrom() API is blocking, which will not 
+   *     return until getting data from message queue.
+   * (2) The RecvFrom() API is thread-safe.
+   * (3) Memory allocated by communicator but will not own it after the function returns.
    */
   STATUS RecvFrom(Message* msg, int send_id);
 
   /*!
    * \brief Finalize SocketReceiver
+   *
+   * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize();
 
