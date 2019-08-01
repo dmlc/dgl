@@ -3360,6 +3360,7 @@ class DGLGraph(DGLBaseGraph):
         implementing a NN module:
 
         >>> def foo(g):
+        >>>     g = g.local_scope()
         >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
         >>>     return g.ndata['h']
         >>>
@@ -3372,6 +3373,7 @@ class DGLGraph(DGLBaseGraph):
         call ``pop`` manually, which is error-prone:
 
         >>> def foo(g):
+        >>>     g = g.local_scope()
         >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
         >>>     return g.ndata['xxx']
         >>>
