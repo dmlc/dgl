@@ -135,7 +135,7 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 static void start_client() {
   sleep(1);
   SocketSender sender(kQueueSize);
-  sender.AddReceiver("socket://127.0.0.1:50091", 0);
+  sender.AddReceiver("socket://127.0.0.1:8001", 0);
   sender.Connect();
   Message msg;
   msg.data = "123456789";
@@ -146,7 +146,7 @@ static void start_client() {
 
 static bool start_server() {
   SocketReceiver receiver(kQueueSize);
-  receiver.Wait("socket://127.0.0.1:50091", 1);
+  receiver.Wait("socket://127.0.0.1:8001", 1);
   Message msg;
   EXPECT_EQ(receiver.RecvFrom(&msg, 0), 9);
   receiver.Finalize();
