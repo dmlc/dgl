@@ -43,7 +43,7 @@ struct Message {
   /*!
    * \brief Constructor
    */ 
-  Message(char* data_ptr, int64_t data_size) 
+  Message(char* data_ptr, int64_t data_size)
   : data(data_ptr), size(data_size) { }
 
   /*!
