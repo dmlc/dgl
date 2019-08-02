@@ -4,8 +4,7 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from .softmax import edge_softmax
-from ... import function as fn, BatchedDGLGraph
+from ... import BatchedDGLGraph
 from ...backend import pytorch as F
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
@@ -306,14 +305,25 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x, mem, lengths_x, lengths_mem):
         """
         Compute multi-head self-attention.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor used to compute queries.
+        mem : torch.Tensor
+            The memory tensor used to compute keys and values.
+        lengths_x : list
+            The array of node numbers, used to segment x.
+        lengths_mem : list
+            The array of node numbers, used to segment mem.
         """
-        batch_size = x.shape[0]
-        max_len_x = x.shape[1]
-        max_len_mem = mem.shape[1]
+        batch_size = len(lengths_x)
+        max_len_x = max(lengths_x)
+        max_len_mem = max(lengths_mem)
 
         queries = self.proj_q(x).view(-1, self.num_heads, self.d_head)
-        keys = self.proj_k(x).view(-1, self.num_heads, self.d_head)
-        values = self.proj_v(x).view(-1, self.num_heads, self.d_head)
+        keys = self.proj_k(mem).view(-1, self.num_heads, self.d_head)
+        values = self.proj_v(mem).view(-1, self.num_heads, self.d_head)
 
         # padding to (B, max_len_x/mem, num_heads, d_head)
         queries = F.pad_packed_tensor(queries, lengths_x, 0)
@@ -331,7 +341,7 @@ class MultiHeadAttention(nn.Module):
             mask[i, :lengths_x[i], :lengths_mem[i]].fill_(1)
         # reshape mask to the same shape as e
         mask = mask.unsqueeze(1)
-        e.masked_fill_(mask==0, -float('inf'))
+        e.masked_fill_(mask == 0, -float('inf'))
 
         # apply softmax
         alpha = th.softmax(e, dim=-1)
@@ -339,7 +349,7 @@ class MultiHeadAttention(nn.Module):
         out = th.einsum('bhxy,byhd->bxhd', alpha, values)
         # project to output
         out = self.proj_o(
-            out.view(batch_size, max_len_x, self.num_heads * self.d_head))
+            out.contiguous().view(batch_size, max_len_x, self.num_heads * self.d_head))
         # pack tensor
         out = F.pack_padded_tensor(out, lengths_x)
 
@@ -359,7 +369,7 @@ class SetAttentionBlock(nn.Module):
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
 
-    def forward(self, feat, graph):
+    def forward(self, feat, lengths):
         """
         Compute a Set Attention Block.
 
@@ -367,13 +377,9 @@ class SetAttentionBlock(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
+        lengths : list
+            The array of node numbers, used to segment feat tensor.
         """
-        if isinstance(graph, BatchedDGLGraph):
-            lengths = graph.batch_num_nodes
-        else:
-            lengths = [graph.number_of_nodes()]
         return self.mha(feat, feat, lengths, lengths)
 
 
@@ -394,7 +400,7 @@ class InducedSetAttentionBlock(nn.Module):
     def _reset_parameters(self):
         nn.init.xavier_uniform_(self.inducing_points)
 
-    def forward(self, feat, graph):
+    def forward(self, feat, lengths):
         """
         Compute an Induced Set Attention Block.
 
@@ -402,24 +408,18 @@ class InducedSetAttentionBlock(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
+        lengths : list
+            The array of node numbers, used to segment feat tensor.
 
         Returns
         -------
         torch.Tensor
             The output feature
         """
-        batch_size = 1
-        if isinstance(graph, BatchedDGLGraph):
-            batch_size = graph.batch_size
-            lengths_x = graph.batch_num_nodes
-        else:
-            lengths_x = [graph.number_of_nodes()]
-
+        batch_size = len(lengths)
         query = self.inducing_points.repeat(batch_size, 1)
-        memory = self.mha(query, feat, [self.m] * batch_size, lengths_x)
-        return self.mha(feat, memory, lengths_x, [self.m] * batch_size)
+        memory = self.mha[0](query, feat, [self.m] * batch_size, lengths)
+        return self.mha[1](feat, memory, lengths, [self.m] * batch_size)
 
     def extra_repr(self):
         """Set the extra representation of the module.
@@ -451,7 +451,7 @@ class PMALayer(nn.Module):
     def _reset_parameters(self):
         nn.init.xavier_uniform_(self.seed_vectors)
 
-    def forward(self, feat, graph):
+    def forward(self, feat, lengths):
         """
         Compute Pooling by Multihead Attention.
 
@@ -459,23 +459,17 @@ class PMALayer(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
+        lengths : list
+            The array of node numbers, used to segment feat tensor.
 
         Returns
         -------
         torch.Tensor
             The output feature
         """
-        batch_size = 1
-        if isinstance(graph, BatchedDGLGraph):
-            batch_size = graph.batch_size
-            lengths_x = graph.batch_num_nodes
-        else:
-            lengths_x = [graph.number_of_nodes()]
-
-        query = self.seed_vectors.repeat(self.k, 1)
-        return self.mha(query, self.ffn(feat), [self.k] * batch_size, lengths_x)
+        batch_size = len(lengths)
+        query = self.seed_vectors.repeat(batch_size, 1)
+        return self.mha(query, self.ffn(feat), [self.k] * batch_size, lengths)
 
     def extra_repr(self):
         """Set the extra representation of the module.
@@ -551,8 +545,13 @@ class SetTransformerEncoder(nn.Module):
         torch.Tensor
             The output feature
         """
+        if isinstance(graph, BatchedDGLGraph):
+            lengths = graph.batch_num_nodes
+        else:
+            lengths = [graph.number_of_nodes()]
+
         for layer in self.layers:
-            feat = layer(feat, graph)
+            feat = layer(feat, lengths)
 
         return feat
 
@@ -610,10 +609,16 @@ class SetTransformerDecoder(nn.Module):
         torch.Tensor
             The output feature
         """
-        feat = self.pma(feat, graph)
+        if isinstance(graph, BatchedDGLGraph):
+            len_pma = graph.batch_num_nodes
+            len_sab = [self.k] * graph.batch_size
+        else:
+            len_pma = [graph.number_of_nodes()]
+            len_sab = [self.k]
 
+        feat = self.pma(feat, len_pma)
         for layer in self.layers:
-            feat = layer(feat, graph)
+            feat = layer(feat, len_sab)
 
         if isinstance(graph, BatchedDGLGraph):
             return feat.view(graph.batch_size, self.k * self.d_model)
