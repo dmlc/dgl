@@ -4,10 +4,9 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from ..utils import _create_fully_connected_graph, _create_bipartite_graph, \
-    _create_graph_from_num_nodes
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
+from ...backend import pytorch as F
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
@@ -283,10 +282,10 @@ class MultiHeadAttention(nn.Module):
         self.num_heads = num_heads
         self.d_head = d_head
         self.d_ff = d_ff
-        self.W_q = nn.Linear(d_model, num_heads * d_head, bias=False)
-        self.W_k = nn.Linear(d_model, num_heads * d_head, bias=False)
-        self.W_v = nn.Linear(d_model, num_heads * d_head, bias=False)
-        self.W_o = nn.Linear(num_heads * d_head, d_model, bias=False)
+        self.proj_q = nn.Linear(d_model, num_heads * d_head, bias=False)
+        self.proj_k = nn.Linear(d_model, num_heads * d_head, bias=False)
+        self.proj_v = nn.Linear(d_model, num_heads * d_head, bias=False)
+        self.proj_o = nn.Linear(num_heads * d_head, d_model, bias=False)
         self.ffn = nn.Sequential(
             nn.Linear(d_model, d_ff),
             nn.ReLU(),
@@ -304,38 +303,53 @@ class MultiHeadAttention(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, graph, q_feat, kv_feat, q_nids, kv_nids):
+    def forward(self, x, mem, lengths_x, lengths_mem):
         """
         Compute multi-head self-attention.
         """
-        graph = graph.local_var()
+        batch_size = x.shape[0]
+        max_len_x = x.shape[1]
+        max_len_mem = mem.shape[1]
 
-        # Copy q_feat and kv_feat to graph data frame
-        graph.nodes[q_nids].data['h'] = q_feat
-        graph.nodes[kv_nids].data['h'] = kv_feat
+        queries = self.proj_q(x).view(-1, self.num_heads, self.d_head)
+        keys = self.proj_k(x).view(-1, self.num_heads, self.d_head)
+        values = self.proj_v(x).view(-1, self.num_heads, self.d_head)
 
-        # Compute queries, keys and values.
-        graph.nodes[q_nids].data['q'] =\
-            self.W_q(graph.nodes[q_nids].data['h']).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids].data['k'] =\
-            self.W_k(graph.nodes[kv_nids].data['h']).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids].data['v'] =\
-            self.W_v(graph.nodes[kv_nids].data['h']).view(-1, self.num_heads, self.d_head)
+        # padding to (B, max_len_x/mem, num_heads, d_head)
+        queries = F.pad_packed_tensor(queries, lengths_x, 0)
+        keys = F.pad_packed_tensor(keys, lengths_mem, 0)
+        values = F.pad_packed_tensor(values, lengths_mem, 0)
 
-        # Compute attention score.
-        graph.apply_edges(fn.u_mul_v('k', 'q', 'e'))
-        e = graph.edata['e'].sum(dim=-1, keepdim=True) / np.sqrt(self.d_head)
-        graph.edata['alpha'] = self.dropa(edge_softmax(graph, e))
-        graph.pull(q_nids,
-                   fn.u_mul_e('v', 'alpha', 'm'),
-                   fn.sum('m', 'o'))
-        sa = self.W_o(graph.nodes[q_nids].data['o'].view(-1, self.num_heads * self.d_head))
-        feat = self.norm_in(q_feat + sa)
+        # attention score with shape (B, num_heads, max_len_x, max_len_mem)
+        e = th.einsum('bxhd,byhd->bhxy', queries, keys)
+        # normalize
+        e = e / np.sqrt(self.d_head)
 
-        # Position-wise Feed Forward Network
-        feat = self.norm_inter(feat + self.ffn(feat))
+        # generate mask
+        mask = th.zeros(batch_size, max_len_x, max_len_mem).to(e.device)
+        for i in range(batch_size):
+            mask[i, :lengths_x[i], :lengths_mem[i]].fill_(1)
+        # reshape mask to the same shape as e
+        mask = mask.unsqueeze(1)
+        e.masked_fill_(mask==0, -float('inf'))
 
-        return feat
+        # apply softmax
+        alpha = th.softmax(e, dim=-1)
+        # sum of value weighted by alpha
+        out = th.einsum('bhxy,byhd->bxhd', alpha, values)
+        # project to output
+        out = self.proj_o(
+            out.view(batch_size, max_len_x, self.num_heads * self.d_head))
+        # pack tensor
+        out = F.pack_padded_tensor(out, lengths_x)
+
+        # intra norm
+        x = self.norm_in(x + out)
+
+        # inter norm
+        x = self.norm_inter(x + self.ffn(x))
+
+        return x
 
 
 class SetAttentionBlock(nn.Module):
@@ -345,7 +359,7 @@ class SetAttentionBlock(nn.Module):
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
 
-    def forward(self, feat, graph, sab_graph=None):
+    def forward(self, feat, graph):
         """
         Compute a Set Attention Block.
 
@@ -355,24 +369,21 @@ class SetAttentionBlock(nn.Module):
             The input feature
         graph : DGLGraph or BatchedDGLGraph
             The graph.
-        sab_graph: DGLGraph, BatchedDGLGraph or None
-            The graph to apply Message Passing on, set to None if not
-            specified.
         """
-        if sab_graph is None:
-            sab_graph = _create_fully_connected_graph(graph)
+        if isinstance(graph, BatchedDGLGraph):
+            lengths = graph.batch_num_nodes
+        else:
+            lengths = [graph.number_of_nodes()]
+        return self.mha(feat, feat, lengths, lengths)
 
-        q_nids = th.arange(sab_graph.number_of_nodes())
-        kv_nids = q_nids
-
-        return self.mha(sab_graph, feat, feat, q_nids, kv_nids)
 
 class InducedSetAttentionBlock(nn.Module):
     r""" ISAB block mentioned in Set-Transformer paper."""
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
-        self.I = nn.Parameter(
+        self.d_model = d_model
+        self.inducing_points = nn.Parameter(
             th.FloatTensor(m, d_model)
         )
         self.mha = nn.ModuleList([
@@ -381,9 +392,9 @@ class InducedSetAttentionBlock(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
-        nn.init.xavier_uniform_(self.I)
+        nn.init.xavier_uniform_(self.inducing_points)
 
-    def forward(self, feat, graph, isab_graph=None):
+    def forward(self, feat, graph):
         """
         Compute an Induced Set Attention Block.
 
@@ -393,53 +404,54 @@ class InducedSetAttentionBlock(nn.Module):
             The input feature
         graph : DGLGraph or BatchedDGLGraph
             The graph.
-        isab_graph: DGLGraph, BatchedDGLGraph or None
-            The graph to apply Message Passing on, set to None if not
-            specified.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
         """
-        query = self.I
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
+            lengths_x = graph.batch_num_nodes
+        else:
+            lengths_x = [graph.number_of_nodes()]
 
-        if isab_graph is None:
-            induced_graph = _create_graph_from_num_nodes([self.m] * batch_size)
-            isab_graph = [
-                _create_bipartite_graph(graph, induced_graph),
-                _create_bipartite_graph(induced_graph, graph)
-            ]
-
-        query = query.repeat(batch_size, 1)
-        for mha, (g, kv_nids, q_nids) in zip(self.mha, isab_graph):
-            rst = mha(g, query, feat, q_nids, kv_nids)
-            query, feat = feat, rst
-
-        return rst
+        query = self.inducing_points.repeat(batch_size, 1)
+        memory = self.mha(query, feat, [self.m] * batch_size, lengths_x)
+        return self.mha(feat, memory, lengths_x, [self.m] * batch_size)
 
     def extra_repr(self):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        shape_str = '({}, {})'.format(self.I.shape[0], self.I.shape[1])
+        shape_str = '({}, {})'.format(self.inducing_points.shape[0], self.inducing_points.shape[1])
         return 'InducedVector: ' + shape_str
 
 
 class PMALayer(nn.Module):
     r"""Pooling by Multihead Attention, used in the Decoder Module of Set Transformer."""
     def __init__(self, k, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
-        self.k = k
         super(PMALayer, self).__init__()
-        self.S = nn.Parameter(
+        self.k = k
+        self.d_model = d_model
+        self.seed_vectors = nn.Parameter(
             th.FloatTensor(k, d_model)
         )
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                       dropouth=dropouth, dropouta=dropouta)
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.ReLU(),
+            nn.Dropout(dropouth),
+            nn.Linear(d_ff, d_model)
+        )
         self._reset_parameters()
 
     def _reset_parameters(self):
-        nn.init.xavier_uniform_(self.S)
+        nn.init.xavier_uniform_(self.seed_vectors)
 
-    def forward(self, feat, graph, pma_graph=None):
+    def forward(self, feat, graph):
         """
         Compute Pooling by Multihead Attention.
 
@@ -449,33 +461,27 @@ class PMALayer(nn.Module):
             The input feature
         graph : DGLGraph or BatchedDGLGraph
             The graph.
-        pma_graph: DGLGraph, BatchedDGLGraph or None
-            The graph to apply Message Passing on, set to None if not
-            specified.
 
         Returns
         -------
         torch.Tensor
             The output feature
         """
-        query = self.S
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
+            lengths_x = graph.batch_num_nodes
+        else:
+            lengths_x = [graph.number_of_nodes()]
 
-        if pma_graph is None:
-            induced_graph = _create_graph_from_num_nodes([self.k] * batch_size)
-            pma_graph = _create_bipartite_graph(graph, induced_graph)
-
-        g, kv_nids, q_nids = pma_graph
-        query = query.repeat(batch_size, 1)
-        return self.mha(g, query, feat, q_nids, kv_nids)
+        query = self.seed_vectors.repeat(self.k, 1)
+        return self.mha(query, self.ffn(feat), [self.k] * batch_size, lengths_x)
 
     def extra_repr(self):
         """Set the extra representation of the module.
         which will come into effect when printing the model.
         """
-        shape_str = '({}, {})'.format(self.S.shape[0], self.S.shape[1])
+        shape_str = '({}, {})'.format(self.seed_vectors.shape[0], self.seed_vectors.shape[1])
         return 'SeedVector: ' + shape_str
 
 
@@ -545,21 +551,8 @@ class SetTransformerEncoder(nn.Module):
         torch.Tensor
             The output feature
         """
-        batch_size = 1
-        if isinstance(graph, BatchedDGLGraph):
-            batch_size = graph.batch_size
-
-        if self.block_type == 'sab':
-            att_graph = _create_fully_connected_graph(graph)
-        else:
-            induced_graph = _create_graph_from_num_nodes([self.m] * batch_size)
-            att_graph = [
-                _create_bipartite_graph(graph, induced_graph),
-                _create_bipartite_graph(induced_graph, graph)
-            ]
-
         for layer in self.layers:
-            feat = layer(feat, graph, att_graph)
+            feat = layer(feat, graph)
 
         return feat
 
@@ -617,17 +610,10 @@ class SetTransformerDecoder(nn.Module):
         torch.Tensor
             The output feature
         """
-        if isinstance(graph, BatchedDGLGraph):
-            induced_graph = _create_graph_from_num_nodes([self.k] * graph.batch_size)
-        else:
-            induced_graph = _create_graph_from_num_nodes([self.k])
+        feat = self.pma(feat, graph)
 
-        pma_graph = _create_bipartite_graph(graph, induced_graph)
-        feat = self.pma(feat, graph, pma_graph=pma_graph)
-
-        sab_graph = _create_fully_connected_graph(induced_graph)
         for layer in self.layers:
-            feat = layer(feat, graph, sab_graph=sab_graph)
+            feat = layer(feat, graph)
 
         if isinstance(graph, BatchedDGLGraph):
             return feat.view(graph.batch_size, self.k * self.d_model)

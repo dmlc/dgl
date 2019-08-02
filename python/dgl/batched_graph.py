@@ -760,26 +760,9 @@ def _max_on(graph, typestr, feat):
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        max_n_objs = max(batch_num_objs)
-        index, mask = [], []
-        for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0:
-                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
-                            " would be returned at the corresponding row.".format(i, typestr))
-                mask.append(0.)
-            else:
-                mask.append(1.)
-            index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        dtype = F.dtype(feat)
-        ctx = F.context(feat)
-        mask = F.copy_to(F.tensor(mask), ctx)
-        index = F.copy_to(F.tensor(index), ctx)
-        val = F.reduce_min(feat) - 1
-        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
-                        dtype, ctx) + val
-        feat_ = F.scatter_row(feat_, index, feat)
-        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
-        return F.max(feat_, 1) * F.unsqueeze(mask, -1)
+        feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
+        feat = F.max(feat, 1)
+        return feat
     else:
         return F.max(feat, 0)
 
@@ -807,20 +790,9 @@ def _softmax_on(graph, typestr, feat):
 
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        max_n_objs = max(batch_num_objs)
-        index = []
-        for i, num_obj in enumerate(batch_num_objs):
-            index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
-        dtype = F.dtype(feat)
-        ctx = F.context(feat)
-        index = F.copy_to(F.tensor(index), ctx)
-        feat_ = F.zeros((len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]),
-                        dtype, ctx) - float('inf')
-        feat_ = F.scatter_row(feat_, index, feat)
-        feat_ = F.reshape(feat_, (len(batch_num_objs), max_n_objs, *F.shape(feat)[1:]))
-        feat_ = F.softmax(feat_, 1)
-        feat_ = F.reshape(feat_, (len(batch_num_objs) * max_n_objs, *F.shape(feat)[1:]))
-        return F.gather_row(feat_, index)
+        feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
+        feat = F.softmax(feat, 1)
+        return F.pack_padded_tensor(feat, batch_num_objs)
     else:
         return F.softmax(feat, 0)
 

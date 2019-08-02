@@ -761,6 +761,47 @@ def ones(shape, dtype, ctx):
     """
     pass
 
+def pad_packed_tensor(input, lengths, value):
+    """Pads a packed batch of variable length tensors with given value.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor with shape :math:`(N, *)`
+    lengths : list or tensor
+        The array of tensor lengths (of the first dimension) :math:`L`.
+        It should satisfy :math:`\sum_{i=1}^{B}L_i = N`,
+        where :math:`B` is the length of :math:`L`.
+    value : float
+        The value to fill in the tensor.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor with shape :math:`(B, \max_i(L_i), *)`
+    """
+    pass
+
+def pack_padded_tensor(input, lengths):
+    """Packs a tensor containing padded sequence of variable length.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor with shape :math:`(B, L, *)`, where :math:`B` is
+        the batch size and :math:`L` is the maximum length of the batch.
+    lengths : list or tensor
+        The array of tensor lengths (of the first dimension) :math:`L`.
+        :math:`\max_i(L_i)` should equal :math:`L`.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor with shape :math:`(N, *)` where
+        :math:`N = \sum_{i=1}^{B}L_i`
+    """
+    pass
+
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     """Computes the sum along segments of a tensor.
 

@@ -6,6 +6,7 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 import numbers
+import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
 
@@ -218,6 +219,31 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
+
+def pad_packed_tensor(input, lengths, value):
+    old_shape = input.shape
+    if isinstance(lengths, nd.NDArray):
+        max_len = as_scalar(input.max())
+    else:
+        max_len = builtins.max(lengths)
+    batch_size = len(lengths)
+    ctx = input.context
+    dtype = input.dtype
+    x = nd.full((batch_size * max_len, *old_shape[1:]), value, ctx=ctx, dtype=dtype)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return scatter_row(x, index, input).reshape(batch_size * max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    ctx = input.context
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return gather_row(input.reshape(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     # TODO: support other dimensions

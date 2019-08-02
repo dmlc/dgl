@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import torch as th
+import builtins
 from torch.utils import dlpack
 
 from ... import ndarray as nd
@@ -178,6 +179,31 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
+
+def pad_packed_tensor(input, lengths, value):
+    old_shape = input.shape
+    if isinstance(lengths, th.Tensor):
+        max_len = as_scalar(lengths.max())
+    else:
+        max_len = builtins.max(lengths)
+    batch_size = len(lengths)
+    device = input.device
+    x = input.new(batch_size * max_len, *old_shape[1:])
+    x.fill_(value)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = th.LongTensor(index, device=device)
+    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    device = input.device
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = th.LongTensor(index, device=device)
+    return gather_row(input.view(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
