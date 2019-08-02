@@ -258,6 +258,16 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
     CHECK_NE(sender->Send(send_msg, recv_id), -1);
   });
 
+static void ConstructNFTensor(DLTensor *tensor, char* data, int64_t shape_0) {
+  tensor->data = data;
+  tensor->ctx = DLContext{kDLCPU, 0};
+  tensor->ndim = 1;
+  tensor->dtype = DLDataType{kDLInt, 64, 1};
+  tensor->shape = new int64_t[1];
+  tensor->shape[0] = shape_0;
+  tensor->byte_offset = 0;
+}
+
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
@@ -275,13 +285,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_0, send_id), -1);
       CHECK_EQ(msg.data_shape_[0], 1);
       DLTensor node_mapping_tensor;
-      node_mapping_tensor.data = array_0.data;
-      node_mapping_tensor.ctx = DLContext{kDLCPU, 0};
-      node_mapping_tensor.ndim = 1;
-      node_mapping_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      node_mapping_tensor.shape = new int64_t[1];
-      node_mapping_tensor.shape[0] = msg.data_shape_[1];
-      node_mapping_tensor.byte_offset = 0;
+      ConstructNFTensor(&node_mapping_tensor, array_0.data, msg.data_shape_[1]);
       DLManagedTensor *node_mapping_managed_tensor = new DLManagedTensor();
       node_mapping_managed_tensor->dl_tensor = node_mapping_tensor;
       nf->node_mapping = NDArray::FromDLPack(node_mapping_managed_tensor);
@@ -290,13 +294,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_1, send_id), -1);
       CHECK_EQ(msg.data_shape_[2], 1);
       DLTensor edge_mapping_tensor;
-      edge_mapping_tensor.data = array_1.data;
-      edge_mapping_tensor.ctx = DLContext{kDLCPU, 0};
-      edge_mapping_tensor.ndim = 1;
-      edge_mapping_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      edge_mapping_tensor.shape = new int64_t[1];
-      edge_mapping_tensor.shape[0] = msg.data_shape_[3];
-      edge_mapping_tensor.byte_offset = 0;
+      ConstructNFTensor(&edge_mapping_tensor, array_1.data, msg.data_shape_[3]);
       DLManagedTensor *edge_mapping_managed_tensor = new DLManagedTensor();
       edge_mapping_managed_tensor->dl_tensor = edge_mapping_tensor;
       nf->edge_mapping = NDArray::FromDLPack(edge_mapping_managed_tensor);
@@ -305,13 +303,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_2, send_id), -1);
       CHECK_EQ(msg.data_shape_[4], 1);
       DLTensor layer_offsets_tensor;
-      layer_offsets_tensor.data = array_2.data;
-      layer_offsets_tensor.ctx = DLContext{kDLCPU, 0};
-      layer_offsets_tensor.ndim = 1;
-      layer_offsets_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      layer_offsets_tensor.shape = new int64_t[1];
-      layer_offsets_tensor.shape[0] = msg.data_shape_[5];
-      layer_offsets_tensor.byte_offset = 0;
+      ConstructNFTensor(&layer_offsets_tensor, array_2.data, msg.data_shape_[5]);
       DLManagedTensor *layer_offsets_managed_tensor = new DLManagedTensor();
       layer_offsets_managed_tensor->dl_tensor = layer_offsets_tensor;
       nf->layer_offsets = NDArray::FromDLPack(layer_offsets_managed_tensor);
@@ -320,13 +312,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_3, send_id), -1);
       CHECK_EQ(msg.data_shape_[6], 1);
       DLTensor flow_offsets_tensor;
-      flow_offsets_tensor.data = array_3.data;
-      flow_offsets_tensor.ctx = DLContext{kDLCPU, 0};
-      flow_offsets_tensor.ndim = 1;
-      flow_offsets_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      flow_offsets_tensor.shape = new int64_t[1];
-      flow_offsets_tensor.shape[0] = msg.data_shape_[7];
-      flow_offsets_tensor.byte_offset = 0;
+      ConstructNFTensor(&flow_offsets_tensor, array_3.data, msg.data_shape_[7]);
       DLManagedTensor *flow_offsets_managed_tensor = new DLManagedTensor();
       flow_offsets_managed_tensor->dl_tensor = flow_offsets_tensor;
       nf->flow_offsets = NDArray::FromDLPack(flow_offsets_managed_tensor);
@@ -335,13 +321,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_4, send_id), -1);
       CHECK_EQ(msg.data_shape_[8], 1);
       DLTensor indptr_tensor;
-      indptr_tensor.data = array_4.data;
-      indptr_tensor.ctx = DLContext{kDLCPU, 0};
-      indptr_tensor.ndim = 1;
-      indptr_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      indptr_tensor.shape = new int64_t[1];
-      indptr_tensor.shape[0] = msg.data_shape_[9];
-      indptr_tensor.byte_offset = 0;
+      ConstructNFTensor(&indptr_tensor, array_4.data, msg.data_shape_[9]);
       DLManagedTensor *indptr_managed_tensor = new DLManagedTensor();
       indptr_managed_tensor->dl_tensor = indptr_tensor;
       NDArray indptr = NDArray::FromDLPack(indptr_managed_tensor);
@@ -350,13 +330,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_5, send_id), -1);
       CHECK_EQ(msg.data_shape_[10], 1);
       DLTensor indice_tensor;
-      indice_tensor.data = array_5.data;
-      indice_tensor.ctx = DLContext{kDLCPU, 0};
-      indice_tensor.ndim = 1;
-      indice_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      indice_tensor.shape = new int64_t[1];
-      indice_tensor.shape[0] = msg.data_shape_[11];
-      indice_tensor.byte_offset = 0;
+      ConstructNFTensor(&indice_tensor, array_5.data, msg.data_shape_[11]);
       DLManagedTensor *indice_managed_tensor = new DLManagedTensor();
       indice_managed_tensor->dl_tensor = indice_tensor;
       NDArray indice = NDArray::FromDLPack(indice_managed_tensor);
@@ -365,13 +339,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
       CHECK_NE(receiver->RecvFrom(&array_6, send_id), -1);
       CHECK_EQ(msg.data_shape_[12], 1);
       DLTensor edge_id_tensor;
-      edge_id_tensor.data = array_6.data;
-      edge_id_tensor.ctx = DLContext{kDLCPU, 0};
-      edge_id_tensor.ndim = 1;
-      edge_id_tensor.dtype = DLDataType{kDLInt, 64, 1};
-      edge_id_tensor.shape = new int64_t[1];
-      edge_id_tensor.shape[0] = msg.data_shape_[13];
-      edge_id_tensor.byte_offset = 0;
+      ConstructNFTensor(&edge_id_tensor, array_6.data, msg.data_shape_[13]);
       DLManagedTensor *edge_id_managed_tensor = new DLManagedTensor();
       edge_id_managed_tensor->dl_tensor = edge_id_tensor;
       NDArray edge_ids = NDArray::FromDLPack(edge_id_managed_tensor);
