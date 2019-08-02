@@ -2,7 +2,6 @@
 # pylint: disable= no-member, arguments-differ
 import mxnet as mx
 
-from ... import utils
 from ... import function as fn
 
 __all__ = ['edge_softmax']
@@ -30,7 +29,9 @@ class EdgeSoftmax(mx.autograd.Function):
         self.g = g
 
     def forward(self, score):
-        """
+        """Forward function.
+
+        Pseudo-code:
         score = dgl.EData(g, score)
         score_max = score.dst_max()  # of type dgl.NData
         score = score - score_max  # edge_sub_dst, ret dgl.EData
@@ -38,47 +39,38 @@ class EdgeSoftmax(mx.autograd.Function):
         out = score / score_sum    # edge_div_dst, ret dgl.EData
         return out.data
         """
-        g = self.g
-        score_name = utils.get_edata_name(g, 'score')
-        tmp_name = utils.get_ndata_name(g, 'tmp')
-        out_name = utils.get_edata_name(g, 'out')
-        g.edata[score_name] = score
-        g.update_all(fn.copy_e(score_name, 'm'), fn.max('m', tmp_name))
-        g.apply_edges(fn.e_sub_v(score_name, tmp_name, out_name))
-        g.edata[out_name] = g.edata[out_name].exp()
-        g.update_all(fn.copy_e(out_name, 'm'), fn.sum('m', tmp_name))
-        g.apply_edges(fn.e_div_v(out_name, tmp_name, out_name))
-        g.edata.pop(score_name)
-        g.ndata.pop(tmp_name)
-        out = g.edata.pop(out_name)
+        g = self.g.local_var()
+        g.edata['s'] = score
+        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        g.edata['out'] = g.edata['out'].exp()
+        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = g.edata['out']
         self.save_for_backward(out)
         return out
 
     def backward(self, grad_out):
-        """
+        """Backward function.
+
+        Pseudo-code:
         g, out = ctx.backward_cache
         grad_out = dgl.EData(g, grad_out)
         out = dgl.EData(g, out)
         sds = out * grad_out  # type dgl.EData
         sds_sum = sds.dst_sum()  # type dgl.NData
         grad_score = sds - sds * sds_sum  # multiple expressions
-        return grad_score.data
         """
-        g = self.g
+        g = self.g.local_var()
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
         # clear saved tensors explicitly
         self.saved_tensors = None
-        out_name = utils.get_edata_name(g, 'out')
-        accum_name = utils.get_ndata_name(g, 'accum')
-        grad_score_name = utils.get_edata_name(g, 'grad_score')
-        g.edata[out_name] = out
-        g.edata[grad_score_name] = out * grad_out
-        g.update_all(fn.copy_e(grad_score_name, 'm'), fn.sum('m', accum_name))
-        g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
-        g.ndata.pop(accum_name)
-        grad_score = g.edata.pop(grad_score_name) - g.edata.pop(out_name)
+        g.edata['out'] = out
+        g.edata['grad_score'] = out * grad_out
+        g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        grad_score = g.edata['grad_score'] - g.edata['out']
         return grad_score
-
 
 def edge_softmax(graph, logits):
     r"""Compute edge softmax.

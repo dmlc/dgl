@@ -24,10 +24,14 @@ def test_graph_conv():
     # test#1: basic
     h0 = mx.nd.ones((3, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
     h0 = mx.nd.ones((3, 5, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
 
     conv = nn.GraphConv(5, 2)
@@ -36,9 +40,13 @@ def test_graph_conv():
     # test#3: basic
     h0 = mx.nd.ones((3, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     # test#4: basic
     h0 = mx.nd.ones((3, 5, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
 
     conv = nn.GraphConv(5, 2)
     conv.initialize(ctx=ctx)
@@ -47,14 +55,21 @@ def test_graph_conv():
         # test#3: basic
         h0 = mx.nd.ones((3, 5))
         h1 = conv(h0, g)
+        assert len(g.ndata) == 0
+        assert len(g.edata) == 0
         # test#4: basic
         h0 = mx.nd.ones((3, 5, 5))
         h1 = conv(h0, g)
+        assert len(g.ndata) == 0
+        assert len(g.edata) == 0
 
-    # test repeated features
-    g.ndata["_gconv_feat"] = 2 * mx.nd.ones((3, 1))
+    # test not override features
+    g.ndata["h"] = 2 * mx.nd.ones((3, 1))
     h1 = conv(h0, g)
-    assert "_gconv_feat" in g.ndata
+    assert len(g.ndata) == 1
+    assert len(g.edata) == 0
+    assert "h" in g.ndata
+    check_eq(g.ndata['h'], 2 * mx.nd.ones((3, 1)))
 
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
@@ -134,12 +149,16 @@ def test_edge_softmax():
     g = dgl.DGLGraph(nx.path_graph(3))
     edata = mx.nd.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
             1e-4, 1e-4)
 
     # Test higher dimension case
     edata = mx.nd.ones((g.number_of_edges(), 3, 1))
     a = nn.edge_softmax(g, edata)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
             1e-4, 1e-4)
 
