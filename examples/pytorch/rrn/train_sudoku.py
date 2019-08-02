@@ -5,35 +5,23 @@ import torch
 from torch.optim import Adam
 import os
 import numpy as np
-import logging
-
-
-def accuracy(preds, target):
-    batch_size = preds.size(0)
-    right_count = 0
-    for i in range(batch_size):
-        if torch.all(torch.eq(preds[i], target[i])).__bool__():
-            right_count += 1
-    return right_count / batch_size
 
 
 def main(args):
-    device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
+    if args.gpu < 0 or not torch.cuda.is_available():
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda', args.gpu)
 
     if args.do_train:
         if not os.path.exists(args.output_dir):
             os.mkdir(args.output_dir)
 
-        logging.basicConfig(filename=os.path.join(args.output_dir, 'train.log'), filemode='w', level=logging.DEBUG)
-        # print = logging.info
-
         model = SudokuNN(num_steps=args.steps, edge_drop=args.edge_drop).to(device)
         train_dataloader = sudoku_dataloader(args.batch_size, segment='train')
         dev_dataloader = sudoku_dataloader(args.batch_size, segment='valid')
 
-        t_total = len(train_dataloader) * args.epochs
-
-        opt = Adam(model.parameters(), lr=2e-4, weight_decay=1e-4)
+        opt = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         best_dev_acc = 0.0
         for epoch in range(args.epochs):
@@ -120,7 +108,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='sudoku')
+    parser = argparse.ArgumentParser(description='Recurrent Relational Network on sudoku task.')
     parser.add_argument("--output_dir", type=str, default=None, required=True,
                         help="The directory to save model")
     parser.add_argument("--do_train", default=False, action="store_true",
@@ -135,6 +123,12 @@ if __name__ == "__main__":
                         help="Dropout rate at edges.")
     parser.add_argument("--steps", type=int, default=32,
                         help="Number of message passing steps.")
+    parser.add_argument("--gpu", type=int, default=-1,
+                        help="gpu")
+    parser.add_argument("--lr", type=float, default=2e-4,
+                        help="Learning rate")
+    parser.add_argument("--weight_decay", type=float, default=1e-4,
+                        help="weight decay (L2 penalty)")
 
     args = parser.parse_args()
 

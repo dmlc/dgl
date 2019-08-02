@@ -1,7 +1,15 @@
+"""
+Recurrent Relational Network(RRN) module
+
+References:
+- Recurrent Relational Networks
+- Paper: https://arxiv.org/abs/1711.08028
+- Original Code: https://github.com/rasmusbergpalm/recurrent-relational-networks
+"""
+
 import torch
 from torch import nn
 import dgl.function as fn
-import dgl
 
 
 class RRNLayer(nn.Module):

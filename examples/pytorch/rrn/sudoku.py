@@ -1,3 +1,7 @@
+"""
+SudokuNN module based on RRN for solving sudoku puzzles
+"""
+
 from rrn import RRN
 from torch import nn
 import torch

@@ -56,7 +56,7 @@ class ListDataset(Dataset):
 
 def _get_sudoku_dataset(segment='train'):
     assert segment in ['train', 'valid', 'test']
-    url = "https://www.dropbox.com/s/rp3hbjs91xiqdgc/sudoku-hard.zip?dl=1"
+    url = " https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/sudoku-hard.zip"
     zip_fname = "/tmp/sudoku-hard.zip"
     dest_dir = '/tmp/sudoku-hard/'
 
@@ -80,7 +80,6 @@ def _get_sudoku_dataset(segment='train'):
             return list(map(int, list(x)))
 
         encoded = [(parse(q), parse(a)) for q, a in samples]
-        # q, a = zip(*encoded)
         return encoded
 
     data = encode(data)
@@ -89,6 +88,18 @@ def _get_sudoku_dataset(segment='train'):
 
 
 def sudoku_dataloader(batch_size, segment='train'):
+    """
+    Get a DataLoader instance for dataset of sudoku. Every iteration of the dataloader returns
+    a DGLGraph instance, the ndata of the graph contains:
+    'q': question, e.g. the sudoku puzzle to be solved, the position is to be filled with number from 1-9
+         if the value in the position is 0
+    'a': answer, the ground truth of the sudoku puzzle
+    'row': row index for each position in the grid
+    'col': column index for each position in the grid
+    :param batch_size: Batch size for the dataloader
+    :param segment: The segment of the datasets, must in ['train', 'valid', 'test']
+    :return: A pytorch DataLoader instance
+    """
     data = _get_sudoku_dataset(segment)
     q, a = zip(*data)
 
@@ -106,13 +117,11 @@ def sudoku_dataloader(batch_size, segment='train'):
     def collate_fn(batch):
         graph_list = []
         for q, a in batch:
-            # q = copy(a)
-            # q[0] = 0
             q = torch.tensor(q, dtype=torch.long)
             a = torch.tensor(a, dtype=torch.long)
             graph = copy(basic_graph)
-            graph.ndata['q'] = q
-            graph.ndata['a'] = a
+            graph.ndata['q'] = q  # q means question
+            graph.ndata['a'] = a  # a means answer
             graph.ndata['row'] = torch.tensor(rows, dtype=torch.long)
             graph.ndata['col'] = torch.tensor(cols, dtype=torch.long)
             graph_list.append(graph)
