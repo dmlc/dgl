@@ -197,7 +197,9 @@ class Frame(MutableMapping):
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
             self._columns = {k : Column.create(v) for k, v in data.items()}
-            if len(self._columns) != 0:
+            if isinstance(data, (Frame, FrameRef)):
+                self._num_rows = data.num_rows
+            elif len(self._columns) != 0:
                 self._num_rows = len(next(iter(self._columns.values())))
             else:
                 self._num_rows = 0
