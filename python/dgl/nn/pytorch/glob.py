@@ -8,7 +8,6 @@ from ..utils import _create_fully_connected_graph, _create_bipartite_graph, \
     _create_graph_from_num_nodes
 from .softmax import edge_softmax
 from ... import function as fn, BatchedDGLGraph
-from ...utils import get_ndata_name
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
@@ -20,7 +19,6 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
     """
-    _feat_name = '_gpool_feat'
     def __init__(self):
         super(SumPooling, self).__init__()
 
@@ -39,17 +37,15 @@ class SumPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = sum_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph.local_var()
+        graph.ndata['h'] = feat
+        readout = sum_nodes(graph, 'h')
         return readout
 
 
 class AvgPooling(nn.Module):
     r"""Apply average pooling over the graph.
     """
-    _feat_name = '_gpool_avg'
     def __init__(self):
         super(AvgPooling, self).__init__()
 
@@ -68,17 +64,15 @@ class AvgPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = mean_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph.local_var()
+        graph.ndata['h'] = feat
+        readout = mean_nodes(graph, 'h')
         return readout
 
 
 class MaxPooling(nn.Module):
     r"""Apply max pooling over the graph.
     """
-    _feat_name = '_gpool_max'
     def __init__(self):
         super(MaxPooling, self).__init__()
 
@@ -97,10 +91,9 @@ class MaxPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = max_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph.local_var()
+        graph.ndata['h'] = feat
+        readout = max_nodes(graph, 'h')
         return readout
 
 
@@ -113,7 +106,6 @@ class SortPooling(nn.Module):
     k : int
         The number of nodes to hold for each graph.
     """
-    _feat_name = '_gpool_sort'
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
@@ -133,13 +125,13 @@ class SortPooling(nn.Module):
         torch.Tensor
             The output feature
         """
+        graph.local_var()
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
-        graph.ndata[self._feat_name] = feat
+        graph.ndata['h'] = feat
         # Sort nodes according to their last features.
-        ret = topk_nodes(graph, self._feat_name, self.k)[0].view(
+        ret = topk_nodes(graph, 'h', self.k)[0].view(
             -1, self.k * feat.shape[-1])
-        graph.ndata.pop(self._feat_name)
         if isinstance(graph, BatchedDGLGraph):
             return ret
         else:
@@ -157,8 +149,6 @@ class GlobalAttentionPooling(nn.Module):
         A neural network applied to each feature before combining them
         with attention scores.
     """
-    _gate_name = '_gpool_attn_gate'
-    _readout_name = '_gpool_attn_readout'
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
@@ -189,19 +179,18 @@ class GlobalAttentionPooling(nn.Module):
         torch.Tensor
             The output feature
         """
+        graph.local_var()
         gate = self.gate_nn(feat)
         assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
-        feat_name = get_ndata_name(graph, self._gate_name)
-        graph.ndata[feat_name] = gate
-        gate = softmax_nodes(graph, feat_name)
-        graph.ndata.pop(feat_name)
+        graph.ndata['gate'] = gate
+        gate = softmax_nodes(graph, 'gate')
+        graph.ndata.pop('gate')
 
-        feat_name = get_ndata_name(graph, self._readout_name)
-        graph.ndata[feat_name] = feat * gate
-        readout = sum_nodes(graph, feat_name)
-        graph.ndata.pop(feat_name)
+        graph.ndata['r'] = feat * gate
+        readout = sum_nodes(graph, 'r')
+        graph.ndata.pop('r')
 
         return readout
 
@@ -218,8 +207,6 @@ class Set2Set(nn.Module):
     n_layers : int
         Number of recurrent layers.
     """
-    _score_name = '_gpool_s2s_score'
-    _readout_name = '_gpool_s2s_readout'
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
         self.input_dim = input_dim
@@ -249,28 +236,26 @@ class Set2Set(nn.Module):
         torch.Tensor
             The output feature
         """
+        graph.local_var()
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
 
         h = (feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
              feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
+
         q_star = feat.new_zeros(batch_size, self.output_dim)
 
         for _ in range(self.n_iters):
             q, h = self.lstm(q_star.unsqueeze(0), h)
             q = q.view(batch_size, self.input_dim)
 
-            score = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
-            feat_name = get_ndata_name(graph, self._score_name)
-            graph.ndata[feat_name] = score
-            score = softmax_nodes(graph, feat_name)
-            graph.ndata.pop(feat_name)
+            e = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
+            graph.ndata['e'] = e
+            alpha = softmax_nodes(graph, 'e')
 
-            feat_name = get_ndata_name(graph, self._readout_name)
-            graph.ndata[feat_name] = feat * score
-            readout = sum_nodes(graph, feat_name)
-            graph.ndata.pop(feat_name)
+            graph.ndata['r'] = feat * alpha
+            readout = sum_nodes(graph, 'r')
 
             if readout.dim() == 1: # graph is not a BatchedDGLGraph
                 readout = readout.unsqueeze(0)
@@ -292,13 +277,6 @@ class Set2Set(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     r""" Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
-    _query_name = '_gpool_mha_query'
-    _key_name = '_gpool_mha_key'
-    _value_name = '_gpool_mha_value'
-    _score_name = '_gpool_mha_score'
-    _att_name = '_gpool_mha_att'
-    _out_name = '_gpool_mha_out'
-    _feat_name = '_gpool_mha_feat'
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
@@ -330,45 +308,29 @@ class MultiHeadAttention(nn.Module):
         """
         Compute multi-head self-attention.
         """
-        feat_name = get_ndata_name(graph, self._feat_name)
-        query_name = get_ndata_name(graph, self._query_name)
-        key_name = get_ndata_name(graph, self._key_name)
-        value_name = get_ndata_name(graph, self._value_name)
-        score_name = get_ndata_name(graph, self._score_name)
-        att_name = get_ndata_name(graph, self._att_name)
-        out_name = get_ndata_name(graph, self._out_name)
+        graph.local_var()
 
         # Copy q_feat and kv_feat to graph data frame
-        graph.nodes[q_nids].data[feat_name] = q_feat
-        graph.nodes[kv_nids].data[feat_name] = kv_feat
+        graph.nodes[q_nids].data['h'] = q_feat
+        graph.nodes[kv_nids].data['h'] = kv_feat
 
         # Compute queries, keys and values.
-        graph.nodes[q_nids].data[query_name] =\
-            self.W_q(graph.nodes[q_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids].data[key_name] =\
-            self.W_k(graph.nodes[kv_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
-        graph.nodes[kv_nids].data[value_name] =\
-            self.W_v(graph.nodes[kv_nids].data[feat_name]).view(-1, self.num_heads, self.d_head)
-
-        # Free node features.
-        graph.ndata.pop(feat_name)
+        graph.nodes[q_nids].data['q'] =\
+            self.W_q(graph.nodes[q_nids].data['q']).view(-1, self.num_heads, self.d_head)
+        graph.nodes[kv_nids].data['k'] =\
+            self.W_k(graph.nodes[kv_nids].data['k']).view(-1, self.num_heads, self.d_head)
+        graph.nodes[kv_nids].data['v'] =\
+            self.W_v(graph.nodes[kv_nids].data['v']).view(-1, self.num_heads, self.d_head)
 
         # Compute attention score.
-        graph.apply_edges(fn.u_mul_v(key_name, query_name, score_name))
-        e = graph.edata.pop(score_name).sum(dim=-1, keepdim=True) / np.sqrt(self.d_head)
-        graph.edata[att_name] = self.dropa(edge_softmax(graph, e))
+        graph.apply_edges(fn.u_mul_v('k', 'q', 'e'))
+        e = graph.edata['e'].sum(dim=-1, keepdim=True) / np.sqrt(self.d_head)
+        graph.edata['alpha'] = self.dropa(edge_softmax(graph, e))
         graph.pull(q_nids,
-                   fn.u_mul_e(value_name, att_name, 'm'),
-                   fn.sum('m', out_name))
-        sa = self.W_o(graph.nodes[q_nids].data[out_name].view(-1, self.num_heads * self.d_head))
+                   fn.u_mul_e('v', 'alpha', 'm'),
+                   fn.sum('m', 'o'))
+        sa = self.W_o(graph.nodes[q_nids].data['o'].view(-1, self.num_heads * self.d_head))
         feat = self.norm_in(q_feat + sa)
-
-        # Free queries, keys, values, outputs and attention weights.
-        graph.ndata.pop(query_name)
-        graph.ndata.pop(key_name)
-        graph.ndata.pop(value_name)
-        graph.ndata.pop(out_name)
-        graph.edata.pop(att_name)
 
         # Position-wise Feed Forward Network
         feat = self.norm_inter(feat + self.ffn(feat))

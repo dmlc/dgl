@@ -5,7 +5,6 @@ from mxnet import gluon, nd
 from mxnet.gluon import nn
 
 from ... import BatchedDGLGraph
-from ...utils import get_ndata_name
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
@@ -15,7 +14,6 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
 class SumPooling(nn.Block):
     r"""Apply sum pooling over the graph.
     """
-    _feat_name = '_gpool_feat'
     def __init__(self):
         super(SumPooling, self).__init__()
 
@@ -34,10 +32,10 @@ class SumPooling(nn.Block):
         mxnet.NDArray
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = sum_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph = graph.local_var()
+        graph.ndata['h'] = feat
+        readout = sum_nodes(graph, 'h')
+        graph.ndata.pop('h')
         return readout
 
     def __repr__(self):
@@ -47,7 +45,6 @@ class SumPooling(nn.Block):
 class AvgPooling(nn.Block):
     r"""Apply average pooling over the graph.
     """
-    _feat_name = '_gpool_avg'
     def __init__(self):
         super(AvgPooling, self).__init__()
 
@@ -66,10 +63,10 @@ class AvgPooling(nn.Block):
         mxnet.NDArray
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = mean_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph = graph.local_var()
+        graph.ndata['h'] = feat
+        readout = mean_nodes(graph, 'h')
+        graph.ndata.pop('h')
         return readout
 
     def __repr__(self):
@@ -79,7 +76,6 @@ class AvgPooling(nn.Block):
 class MaxPooling(nn.Block):
     r"""Apply max pooling over the graph.
     """
-    _feat_name = '_gpool_max'
     def __init__(self):
         super(MaxPooling, self).__init__()
 
@@ -98,10 +94,10 @@ class MaxPooling(nn.Block):
         mxnet.NDArray
             The output feature
         """
-        _feat_name = get_ndata_name(graph, self._feat_name)
-        graph.ndata[_feat_name] = feat
-        readout = max_nodes(graph, _feat_name)
-        graph.ndata.pop(_feat_name)
+        graph = graph.local_var()
+        graph.ndata['h'] = feat
+        readout = max_nodes(graph, 'h')
+        graph.ndata.pop('h')
         return readout
 
     def __repr__(self):
@@ -117,7 +113,6 @@ class SortPooling(nn.Block):
     k : int
         The number of nodes to hold for each graph.
     """
-    _feat_name = '_gpool_sort'
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
@@ -138,12 +133,12 @@ class SortPooling(nn.Block):
             The output feature
         """
         # Sort the feature of each node in ascending order.
+        graph = graph.local_var()
         feat = feat.sort(axis=-1)
-        graph.ndata[self._feat_name] = feat
+        graph.ndata['h'] = feat
         # Sort nodes according to their last features.
-        ret = topk_nodes(graph, self._feat_name, self.k)[0].reshape(
+        ret = topk_nodes(graph, 'h', self.k)[0].reshape(
             -1, self.k * feat.shape[-1])
-        graph.ndata.pop(self._feat_name)
         if isinstance(graph, BatchedDGLGraph):
             return ret
         else:
@@ -164,8 +159,6 @@ class GlobalAttentionPooling(nn.Block):
         A neural network applied to each feature before combining them
         with attention scores.
     """
-    _gate_name = '_gpool_attn_gate'
-    _readout_name = '_gpool_attn_readout'
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
         with self.name_scope():
@@ -194,19 +187,16 @@ class GlobalAttentionPooling(nn.Block):
         mxnet.NDArray
             The output feature
         """
+        graph = graph.local_var()
         gate = self.gate_nn(feat)
         assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
 
-        feat_name = get_ndata_name(graph, self._gate_name)
-        graph.ndata[feat_name] = gate
-        gate = softmax_nodes(graph, feat_name)
-        graph.ndata.pop(feat_name)
+        graph.ndata['gate'] = gate
+        gate = softmax_nodes(graph, 'gate')
 
-        feat_name = get_ndata_name(graph, self._readout_name)
-        graph.ndata[feat_name] = feat * gate
-        readout = sum_nodes(graph, feat_name)
-        graph.ndata.pop(feat_name)
+        graph.ndata['r'] = feat * gate
+        readout = sum_nodes(graph, 'r')
 
         return readout
 
@@ -223,8 +213,6 @@ class Set2Set(nn.Block):
     n_layers : int
         Number of recurrent layers.
     """
-    _score_name = '_gpool_s2s_score'
-    _readout_name = '_gpool_s2s_readout'
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
         self.input_dim = input_dim
@@ -254,6 +242,7 @@ class Set2Set(nn.Block):
         mxnet.NDArray
             The output feature
         """
+        graph.local_var()
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
@@ -266,16 +255,12 @@ class Set2Set(nn.Block):
             q, h = self.lstm(q_star.expand_dims(axis=0), h)
             q = q.reshape((batch_size, self.input_dim))
 
-            score = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
-            feat_name = get_ndata_name(graph, self._score_name)
-            graph.ndata[feat_name] = score
-            score = softmax_nodes(graph, feat_name)
-            graph.ndata.pop(feat_name)
+            e = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
+            graph.ndata['e'] = e
+            alpha = softmax_nodes(graph, 'e')
 
-            feat_name = get_ndata_name(graph, self._readout_name)
-            graph.ndata[feat_name] = feat * score
-            readout = sum_nodes(graph, feat_name)
-            graph.ndata.pop(feat_name)
+            graph.ndata['r'] = feat * alpha
+            readout = sum_nodes(graph, 'r')
 
             if readout.ndim == 1: # graph is not a BatchedDGLGraph
                 readout = readout.expand_dims(0)
