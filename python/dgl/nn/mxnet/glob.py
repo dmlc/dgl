@@ -242,7 +242,7 @@ class Set2Set(nn.Block):
         mxnet.NDArray
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size

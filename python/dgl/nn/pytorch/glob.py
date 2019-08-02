@@ -37,7 +37,7 @@ class SumPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         graph.ndata['h'] = feat
         readout = sum_nodes(graph, 'h')
         return readout
@@ -64,7 +64,7 @@ class AvgPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         graph.ndata['h'] = feat
         readout = mean_nodes(graph, 'h')
         return readout
@@ -91,7 +91,7 @@ class MaxPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         graph.ndata['h'] = feat
         readout = max_nodes(graph, 'h')
         return readout
@@ -125,7 +125,7 @@ class SortPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
         graph.ndata['h'] = feat
@@ -179,7 +179,7 @@ class GlobalAttentionPooling(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         gate = self.gate_nn(feat)
         assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
         feat = self.feat_nn(feat) if self.feat_nn else feat
@@ -236,7 +236,7 @@ class Set2Set(nn.Module):
         torch.Tensor
             The output feature
         """
-        graph.local_var()
+        graph = graph.local_var()
         batch_size = 1
         if isinstance(graph, BatchedDGLGraph):
             batch_size = graph.batch_size
@@ -308,7 +308,7 @@ class MultiHeadAttention(nn.Module):
         """
         Compute multi-head self-attention.
         """
-        graph.local_var()
+        graph = graph.local_var()
 
         # Copy q_feat and kv_feat to graph data frame
         graph.nodes[q_nids].data['h'] = q_feat
