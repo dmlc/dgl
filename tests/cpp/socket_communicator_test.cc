@@ -13,9 +13,11 @@
 #include "../src/graph/network/socket_communicator.h"
 
 using std::string;
+
 using dgl::network::SocketSender;
 using dgl::network::SocketReceiver;
 using dgl::network::Message;
+using dgl::network::DefaultMessageDeleter;
 
 const int64_t kQueueSize = 500 * 1024;
 
@@ -60,16 +62,21 @@ void start_client() {
     sender.AddReceiver(ip_addr[i], i);
   }
   sender.Connect();
-  std::string str_data("123456789");
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
-      Message msg = {const_cast<char*>(str_data.data()), 9};
+      char* str_data = new char[9];
+      memcpy(str_data, "123456789", 9);
+      Message msg = {str_data, 9};
+      msg.deallocator = DefaultMessageDeleter;
       EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
-      Message msg = {const_cast<char*>(str_data.data()), 9};
+      char* str_data = new char[9];
+      memcpy(str_data, "123456789", 9);
+      Message msg = {str_data, 9};
+      msg.deallocator = DefaultMessageDeleter;
       EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
@@ -149,8 +156,10 @@ static void start_client() {
   SocketSender sender(kQueueSize);
   sender.AddReceiver("socket://127.0.0.1:8001", 0);
   sender.Connect();
-  std::string str_data("123456789");
-  Message msg = {const_cast<char*>(str_data.data()), 9};
+  char* str_data = new char[9];
+  memcpy(str_data, "123456789", 9);
+  Message msg = {str_data, 9};
+  msg.deallocator = DefaultMessageDeleter;
   sender.Send(msg, 0);
   sender.Finalize();
 }
