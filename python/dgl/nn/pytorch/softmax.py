@@ -26,7 +26,16 @@ class EdgeSoftmax(th.autograd.Function):
 
     @staticmethod
     def forward(ctx, g, score):
-        """Forward function."""
+        """Forward function.
+
+        Pseudo-code:
+        score = dgl.EData(g, score)
+        score_max = score.dst_max()  # of type dgl.NData
+        score = score - score_max  # edge_sub_dst, ret dgl.EData
+        score_sum = score.dst_sum()  # of type dgl.NData
+        out = score / score_sum    # edge_div_dst, ret dgl.EData
+        return out.data
+        """
         # remember to save the graph to backward cache before making it
         # a local variable
         ctx.backward_cache = g
@@ -43,7 +52,17 @@ class EdgeSoftmax(th.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_out):
-        """Backward function."""
+        """Backward function.
+
+        Pseudo-code:
+        g, out = ctx.backward_cache
+        grad_out = dgl.EData(g, grad_out)
+        out = dgl.EData(g, out)
+        sds = out * grad_out  # type dgl.EData
+        sds_sum = sds.dst_sum()  # type dgl.NData
+        grad_score = sds - sds * sds_sum  # multiple expressions
+        return grad_score.data
+        """
         g = ctx.backward_cache
         g = g.local_var()
         out, = ctx.saved_tensors

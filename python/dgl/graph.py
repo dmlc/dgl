@@ -3370,11 +3370,12 @@ class DGLGraph(DGLBaseGraph):
         >>> newh = foo(g)  # get tensor of all ones
         >>> print(g.ndata['h'])  # still get tensor of all zeros
 
-        Automatically garbage collect locally-defined tensors. Otherwise, user needs to
-        call ``pop`` manually, which is error-prone:
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
 
         >>> def foo(g):
         >>>     g = g.local_var()
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
         >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
         >>>     return g.ndata['xxx']
         >>>
@@ -3428,11 +3429,12 @@ class DGLGraph(DGLBaseGraph):
         >>> newh = foo(g)  # get tensor of all ones
         >>> print(g.ndata['h'])  # still get tensor of all zeros
 
-        Automatically garbage collect locally-defined tensors. Otherwise, user needs to
-        call ``pop`` manually, which is error-prone:
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
 
         >>> def foo(g):
         >>>     with g.local_scope():
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
         >>>         g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
         >>>         return g.ndata['xxx']
         >>>
