@@ -202,7 +202,7 @@ def pack_padded_tensor(input, lengths):
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
-    index = th.LongTensor(index, device=device)
+    index = th.tensor(index).to(device)
     return gather_row(input.view(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
