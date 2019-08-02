@@ -60,15 +60,16 @@ void start_client() {
     sender.AddReceiver(ip_addr[i], i);
   }
   sender.Connect();
+  std::string str_data("123456789");
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
-      Message msg = {"123456789", 9};
+      Message msg = {const_cast<char*>(str_data.data()), 9};
       EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
   for (int i = 0; i < kNumMessage; ++i) {
     for (int n = 0; n < kNumReceiver; ++n) {
-      Message msg = {"123456789", 9};
+      Message msg = {const_cast<char*>(str_data.data()), 9};
       EXPECT_EQ(sender.Send(msg, n), ADD_SUCCESS);
     }
   }
@@ -148,9 +149,8 @@ static void start_client() {
   SocketSender sender(kQueueSize);
   sender.AddReceiver("socket://127.0.0.1:8001", 0);
   sender.Connect();
-  Message msg;
-  msg.data = "123456789";
-  msg.size = 9;
+  std::string str_data("123456789");
+  Message msg = {const_cast<char*>(str_data.data()), 9};
   sender.Send(msg, 0);
   sender.Finalize();
 }

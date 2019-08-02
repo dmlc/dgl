@@ -17,13 +17,16 @@ using dgl::network::MessageQueue;
 TEST(MessageQueueTest, AddRemove) {
   MessageQueue queue(5, 1);  // size:5, num_of_producer:1
   // msg 1
-  Message msg_1 = {"111", 3};
+  std::string str_1("111");
+  Message msg_1 = {const_cast<char*>(str_1.data()), 3};
   EXPECT_EQ(queue.Add(msg_1), ADD_SUCCESS);
   // msg 2
-  Message msg_2 = {"22", 2};
+  std::string str_2("22");
+  Message msg_2 = {const_cast<char*>(str_2.data()), 2};
   EXPECT_EQ(queue.Add(msg_2), ADD_SUCCESS);
   // msg 3
-  Message msg_3 = {"xxxx", 4};
+  std::string str_3("xxxx");
+  Message msg_3 = {const_cast<char*>(str_3.data()), 4};
   EXPECT_EQ(queue.Add(msg_3, false), QUEUE_FULL);
   // msg 4
   Message msg_4;
@@ -34,7 +37,8 @@ TEST(MessageQueueTest, AddRemove) {
   EXPECT_EQ(queue.Remove(&msg_5), REMOVE_SUCCESS);
   EXPECT_EQ(string(msg_5.data, msg_5.size), string("22"));
   // msg 6
-  Message msg_6 = {"33333", 5};
+  std::string str_6("33333");
+  Message msg_6 = {const_cast<char*>(str_6.data()), 5};
   EXPECT_EQ(queue.Add(msg_6), ADD_SUCCESS);
   // msg 7
   Message msg_7;
@@ -44,10 +48,12 @@ TEST(MessageQueueTest, AddRemove) {
   Message msg_8;
   EXPECT_EQ(queue.Remove(&msg_8, false), QUEUE_EMPTY);  // non-blocking remove
   // msg 9
-  Message msg_9 = {"666666", 6};
+  std::string str_9("666666");
+  Message msg_9 = {const_cast<char*>(str_9.data()), 6};
   EXPECT_EQ(queue.Add(msg_9), MSG_GT_SIZE);      // exceed queue size
   // msg 10
-  Message msg_10 = {"55555", 5};
+  std::string str_10("55555");
+  Message msg_10 = {const_cast<char*>(str_10.data()), 5};
   EXPECT_EQ(queue.Add(msg_10), ADD_SUCCESS);
   // msg 11
   Message msg_11;
@@ -68,9 +74,11 @@ TEST(MessageQueueTest, EmptyAndNoMoreAdd) {
 const int kNumOfProducer = 100;
 const int kNumOfMessage = 100;
 
+std::string str_apple("apple");
+
 void start_add(MessageQueue* queue, int id) {
   for (int i = 0; i < kNumOfMessage; ++i) {
-    Message msg = {"apple", 5};
+    Message msg = {const_cast<char*>(str_apple.data()), 5};
     EXPECT_EQ(queue->Add(msg), ADD_SUCCESS);
   }
   queue->SignalFinished(id);
