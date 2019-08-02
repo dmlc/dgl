@@ -13,6 +13,9 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
 
 class SumPooling(nn.Block):
     r"""Apply sum pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(SumPooling, self).__init__()
@@ -44,6 +47,9 @@ class SumPooling(nn.Block):
 
 class AvgPooling(nn.Block):
     r"""Apply average pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
@@ -75,6 +81,9 @@ class AvgPooling(nn.Block):
 
 class MaxPooling(nn.Block):
     r"""Apply max pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \max_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -151,6 +160,9 @@ class SortPooling(nn.Block):
 class GlobalAttentionPooling(nn.Block):
     r"""Apply global attention pooling over the graph.
 
+    .. math::
+        `r^{(i)} = \sum_{k=1}^{N_i}\textrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
+
     Parameters
     ----------
     gate_nn : gluon.nn.Block
@@ -203,6 +215,15 @@ class GlobalAttentionPooling(nn.Block):
 
 class Set2Set(nn.Block):
     r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over the graph.
+
+    For each individual graph in the batch, set2set computes
+    .. math::
+        q_t &=& \textrm{LSTM} (q^*_{t-1})
+        \alpha_{i,t} &=& \textrm{softmax}(x_i \cdot q_t)
+        r_t &=& \sum_{i=1}^N \alpha_{i,t} x_i
+        q^*_t &=& q_t \Vert r_t
+
+    for this graph.
 
     Parameters
     ----------

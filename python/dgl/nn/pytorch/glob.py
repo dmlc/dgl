@@ -16,12 +16,16 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(SumPooling, self).__init__()
 
     def forward(self, feat, graph):
         r"""Compute sum pooling.
+
 
         Parameters
         ----------
@@ -43,6 +47,9 @@ class SumPooling(nn.Module):
 
 class AvgPooling(nn.Module):
     r"""Apply average pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
@@ -70,6 +77,9 @@ class AvgPooling(nn.Module):
 
 class MaxPooling(nn.Module):
     r"""Apply max pooling over the graph.
+
+    .. math::
+        `r^{(i)} = \max_{k=1}^{N_i} x^{(i)}_k`
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -139,6 +149,9 @@ class SortPooling(nn.Module):
 class GlobalAttentionPooling(nn.Module):
     r"""Apply global attention pooling over the graph.
 
+    .. math::
+        `r^{(i)} = \sum_{k=1}^{N_i}\textrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
+
     Parameters
     ----------
     gate_nn : torch.nn.Module
@@ -195,6 +208,15 @@ class GlobalAttentionPooling(nn.Module):
 
 class Set2Set(nn.Module):
     r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over the graph.
+
+    For each individual graph in the batch, set2set computes
+    .. math::
+        q_t &=& \textrm{LSTM} (q^*_{t-1})
+        \alpha_{i,t} &=& \textrm{softmax}(x_i \cdot q_t)
+        r_t &=& \sum_{i=1}^N \alpha_{i,t} x_i
+        q^*_t &=& q_t \Vert r_t
+
+    for this graph.
 
     Parameters
     ----------

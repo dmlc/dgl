@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from collections.abc import Iterable
 import numpy as np
 
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, is_all, DGLError
 from .frame import FrameRef, Frame
 from .graph import DGLGraph
 from . import graph_index as gi
@@ -391,11 +391,6 @@ def _sum_on(graph, typestr, feat, weight):
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0:
-                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
-                            " would be returned at the corresponding row.".format(i, typestr))
-
         seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(feat))
         y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
@@ -575,11 +570,6 @@ def _mean_on(graph, typestr, feat, weight):
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        for i, num_obj in enumerate(batch_num_objs):
-            if num_obj == 0:
-                dgl_warning("Graph {} has zero {}, a zero tensor with the same shape"
-                            " would be returned at the corresponding row.".format(i, typestr))
-
         seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(feat))
         if weight is not None:
@@ -758,6 +748,9 @@ def _max_on(graph, typestr, feat):
     data = getattr(graph, data_attr)
     feat = data[feat]
 
+    # TODO: the current solution pads the different graph sizes to the same,
+    #  a more efficient way is to use segment max, we need to implement it in
+    #  the future.
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
@@ -787,6 +780,9 @@ def _softmax_on(graph, typestr, feat):
     data = getattr(graph, data_attr)
     feat = data[feat]
 
+    # TODO: the current solution pads the different graph sizes to the same,
+    #  a more efficient way is to use segment sum/max, we need to implement
+    #  it in the future.
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
@@ -888,15 +884,10 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=-1):
         max_n_objs = max([k] + batch_num_objs)
         index = []
         for i, num_obj in enumerate(batch_num_objs):
-            if num_obj < k:
-                dgl_warning("Graph {}'s number of {}"
-                            " is less than k.".format(i, typestr))
             index.extend(range(i * max_n_objs, i * max_n_objs + num_obj))
     else:
         num_objs = getattr(graph, num_objs_attr)()
         batch_size = 1
-        if num_objs < k:
-            dgl_warning("The number of {} is less than k.".format(typestr))
         max_n_objs = max(k, num_objs)
         index = list(range(num_objs))
 
@@ -946,8 +937,8 @@ def max_nodes(graph, feat):
     returned instead, i.e. having an extra first dimension.
     Each row of the stacked tensor contains the readout result of
     corresponding example in the batch. If an example has no nodes,
-    a zero tensor with the same shape is returned at the corresponding
-    row.
+    a tensor filed with -inf of the same shape is returned at the
+    corresponding row.
     """
     return _max_on(graph, 'nodes', feat)
 
@@ -973,8 +964,8 @@ def max_edges(graph, feat):
     returned instead, i.e. having an extra first dimension.
     Each row of the stacked tensor contains the readout result of
     corresponding example in the batch. If an example has no edges,
-    a zero tensor with the same shape is returned at the corresponding
-    row.
+    a tensor filled with -inf of the same shape is returned at the
+    corresponding row.
     """
     return _max_on(graph, 'edges', feat)
 
