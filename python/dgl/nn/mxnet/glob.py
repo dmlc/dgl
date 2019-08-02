@@ -24,7 +24,7 @@ class SumPooling(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -55,7 +55,7 @@ class AvgPooling(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -86,7 +86,7 @@ class MaxPooling(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -124,7 +124,7 @@ class SortPooling(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -179,7 +179,7 @@ class GlobalAttentionPooling(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -234,7 +234,7 @@ class Set2Set(nn.Block):
         ----------
         feat : mxnet.NDArray
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns

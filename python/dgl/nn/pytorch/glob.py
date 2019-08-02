@@ -29,7 +29,7 @@ class SumPooling(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -56,7 +56,7 @@ class AvgPooling(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -83,7 +83,7 @@ class MaxPooling(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -117,7 +117,7 @@ class SortPooling(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -228,7 +228,7 @@ class Set2Set(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -353,9 +353,9 @@ class SetAttentionBlock(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
-        sab_graph: DGLGraph or None
+        sab_graph: DGLGraph, BatchedDGLGraph or None
             The graph to apply Message Passing on, set to None if not
             specified.
         """
@@ -391,9 +391,9 @@ class InducedSetAttentionBlock(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
-        isab_graph: DGLGraph or None
+        isab_graph: DGLGraph, BatchedDGLGraph or None
             The graph to apply Message Passing on, set to None if not
             specified.
         """
@@ -447,9 +447,9 @@ class PMALayer(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
-        pma_graph: DGLGraph or None
+        pma_graph: DGLGraph, BatchedDGLGraph or None
             The graph to apply Message Passing on, set to None if not
             specified.
 
@@ -537,7 +537,7 @@ class SetTransformerEncoder(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
@@ -609,7 +609,7 @@ class SetTransformerDecoder(nn.Module):
         ----------
         feat : torch.Tensor
             The input feature
-        graph : DGLGraph
+        graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
