@@ -5,7 +5,6 @@ from torch import nn
 from torch.nn import init
 
 from ... import function as fn
-from ...utils import get_ndata_name
 
 __all__ = ['GraphConv']
 
@@ -69,8 +68,6 @@ class GraphConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._feat_name = "_gconv_feat"
-        self._msg_name = "_gconv_msg"
 
         self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
         if bias:
@@ -109,8 +106,7 @@ class GraphConv(nn.Module):
         torch.Tensor
             The output feature
         """
-        self._feat_name = get_ndata_name(graph, self._feat_name)
-
+        graph = graph.local_var()
         if self._norm:
             norm = th.pow(graph.in_degrees().float(), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
@@ -120,16 +116,16 @@ class GraphConv(nn.Module):
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
             feat = th.matmul(feat, self.weight)
-            graph.ndata[self._feat_name] = feat
-            graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
-                             fn.sum(msg=self._msg_name, out=self._feat_name))
-            rst = graph.ndata.pop(self._feat_name)
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata['h']
         else:
             # aggregate first then mult W
-            graph.ndata[self._feat_name] = feat
-            graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
-                             fn.sum(msg=self._msg_name, out=self._feat_name))
-            rst = graph.ndata.pop(self._feat_name)
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata['h']
             rst = th.matmul(rst, self.weight)
 
         if self._norm:
