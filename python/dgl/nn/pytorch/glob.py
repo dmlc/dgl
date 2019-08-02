@@ -316,11 +316,11 @@ class MultiHeadAttention(nn.Module):
 
         # Compute queries, keys and values.
         graph.nodes[q_nids].data['q'] =\
-            self.W_q(graph.nodes[q_nids].data['q']).view(-1, self.num_heads, self.d_head)
+            self.W_q(graph.nodes[q_nids].data['h']).view(-1, self.num_heads, self.d_head)
         graph.nodes[kv_nids].data['k'] =\
-            self.W_k(graph.nodes[kv_nids].data['k']).view(-1, self.num_heads, self.d_head)
+            self.W_k(graph.nodes[kv_nids].data['h']).view(-1, self.num_heads, self.d_head)
         graph.nodes[kv_nids].data['v'] =\
-            self.W_v(graph.nodes[kv_nids].data['v']).view(-1, self.num_heads, self.d_head)
+            self.W_v(graph.nodes[kv_nids].data['h']).view(-1, self.num_heads, self.d_head)
 
         # Compute attention score.
         graph.apply_edges(fn.u_mul_v('k', 'q', 'e'))
@@ -480,7 +480,7 @@ class PMALayer(nn.Module):
 
 
 class SetTransformerEncoder(nn.Module):
-    r"""(experimental) The Encoder module in Set Transformer paper.
+    r"""The Encoder module in Set Transformer paper.
 
     Parameters
     ----------
@@ -565,7 +565,7 @@ class SetTransformerEncoder(nn.Module):
 
 
 class SetTransformerDecoder(nn.Module):
-    r"""(experimental) The Decoder module in Set Transformer paper.
+    r"""The Decoder module in Set Transformer paper.
 
     Parameters
     ----------
