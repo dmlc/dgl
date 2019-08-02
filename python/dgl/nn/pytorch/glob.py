@@ -339,7 +339,6 @@ class MultiHeadAttention(nn.Module):
         mask = th.zeros(batch_size, max_len_x, max_len_mem).to(e.device)
         for i in range(batch_size):
             mask[i, :lengths_x[i], :lengths_mem[i]].fill_(1)
-        # reshape mask to the same shape as e
         mask = mask.unsqueeze(1)
         e.masked_fill_(mask == 0, -float('inf'))
 

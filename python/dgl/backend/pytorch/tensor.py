@@ -193,7 +193,7 @@ def pad_packed_tensor(input, lengths, value):
     index = []
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
-    index = th.LongTensor(index, device=device)
+    index = th.tensor(index).to(device)
     return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):

@@ -234,7 +234,7 @@ def pad_packed_tensor(input, lengths, value):
     for i, l in enumerate(lengths):
         index.extend(range(i * max_len, i * max_len + l))
     index = nd.array(index, ctx=ctx)
-    return scatter_row(x, index, input).reshape(batch_size * max_len, *old_shape[1:])
+    return scatter_row(x, index, input).reshape(batch_size, max_len, *old_shape[1:])
 
 def pack_padded_tensor(input, lengths):
     batch_size, max_len = input.shape[:2]

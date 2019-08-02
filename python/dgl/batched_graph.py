@@ -761,8 +761,7 @@ def _max_on(graph, typestr, feat):
     if isinstance(graph, BatchedDGLGraph):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
-        feat = F.max(feat, 1)
-        return feat
+        return F.max(feat, 1)
     else:
         return F.max(feat, 0)
 
