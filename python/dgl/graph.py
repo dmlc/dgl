@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 from collections import defaultdict
+from contextlib import contextmanager
 import networkx as nx
 
 import dgl
@@ -3040,7 +3041,7 @@ class DGLGraph(DGLBaseGraph):
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
         return subgraph.DGLSubGraph(self, sgi)
 
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):
+    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -3049,14 +3050,16 @@ class DGLGraph(DGLBaseGraph):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool, optional (default=False)
             A flag to transpose the returned adjacency matrix.
         fmt : str, optional (default='csr')
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool, optional (default=True)
+            If True, the elements in the adjacency matrix are edge ids.
+            Note that one of the element is 0.  Proceed with caution.
+            If False, the elements will be always 1.
 
         Returns
         -------
@@ -3064,7 +3067,7 @@ class DGLGraph(DGLBaseGraph):
             The scipy representation of adjacency matrix.
 
         """
-        return self._graph.adjacency_matrix_scipy(transpose, fmt)
+        return self._graph.adjacency_matrix_scipy(transpose, fmt, return_edge_ids)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
@@ -3342,3 +3345,112 @@ class DGLGraph(DGLBaseGraph):
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
     # pylint: enable=invalid-name
+
+    def local_var(self):
+        """Return a graph object that can be used in a local function scope.
+
+        The returned graph object shares the feature data and graph structure of this graph.
+        However, any out-place mutation to the feature data will not reflect to this graph,
+        thus making it easier to use in a function scope.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
+        >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        Notes
+        -----
+        Internally, the returned graph shares the same feature tensors, but construct a new
+        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
+        graph will not reflect to the original graph. However, inplace operations do change
+        the shared tensor values, so will be reflected to the original graph. This function
+        also has little overhead when the number of feature tensors in this graph is small.
+
+        See Also
+        --------
+        local_var
+
+        Returns
+        -------
+        DGLGraph
+            The graph object that can be used as a local variable.
+        """
+        return DGLGraph(self._graph,
+                        FrameRef(Frame(self._node_frame._frame)),
+                        FrameRef(Frame(self._edge_frame._frame)))
+
+    @contextmanager
+    def local_scope(self):
+        """Enter a local scope context for this graph.
+
+        By entering a local scope, any out-place mutation to the feature data will
+        not reflect to the original graph, thus making it easier to use in a function scope.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     with g.local_scope():
+        >>>         g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>         return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
+
+        >>> def foo(g):
+        >>>     with g.local_scope():
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
+        >>>         g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>         return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        See Also
+        --------
+        local_var
+        """
+        old_nframe = self._node_frame
+        old_eframe = self._edge_frame
+        self._node_frame = FrameRef(Frame(self._node_frame._frame))
+        self._edge_frame = FrameRef(Frame(self._edge_frame._frame))
+        yield
+        self._node_frame = old_nframe
+        self._edge_frame = old_eframe
