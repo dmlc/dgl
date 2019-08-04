@@ -7,11 +7,13 @@
 #define DGL_GRAPH_NETWORK_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/ndarray.h>
 
 #include <string.h>
 #include <vector>
 
 #include "../c_api_common.h"
+#include "./network/msg_queue.h"
 
 using dgl::runtime::NDArray;
 
@@ -21,6 +23,13 @@ namespace network {
 // Max size of message queue for communicator is 200 MB
 // TODO(chao): Make this number configurable
 const int64_t kQueueSize = 200 * 1024 * 1024;
+
+/*!
+ * \brief Free memory buffer of NodeFlow
+ */
+inline void NDArrayDeleter(Message* msg) { 
+  delete reinterpret_cast<NDArray*>(msg->aux_handler); 
+}
 
 /*!
  * \brief Message type for DGL distributed training

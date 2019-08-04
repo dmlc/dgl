@@ -26,7 +26,7 @@ typedef int STATUS;
 #define  ADD_SUCCESS     3400   // Add message successfully
 #define  MSG_GT_SIZE     3401   // Message size beyond queue size
 #define  MSG_LE_ZERO     3402   // Message size is not a positive number
-#define  QUEUE_CLOSE     3403   // Cannot add message when queue closed
+#define  QUEUE_CLOSE     3403   // Cannot add message when queue is closed
 #define  QUEUE_FULL      3404   // Cannot add message when queue is full
 #define  REMOVE_SUCCESS  3405   // Remove message successfully
 #define  QUEUE_EMPTY     3406   // Cannot remove when queue is empty
@@ -55,13 +55,17 @@ struct Message {
    */
   int64_t size;
   /*!
+   * \brief aux_data pointer handler
+   */
+  void* aux_handler;
+  /*!
    * \brief user-defined deallocator, which can be nullptr
    */
   std::function<void(Message*)> deallocator = nullptr;
 };
 
 /*!
- * \brief Free memory buffer for message
+ * \brief Free memory buffer of message
  */
 inline void DefaultMessageDeleter(Message* msg) { delete [] msg->data; }
 
