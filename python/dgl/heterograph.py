@@ -1049,6 +1049,17 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     ...     'developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
     >>> g = DGLHeteroGraph([follows, plays, develops])
 
+    Then one can query the graph structure as follows:
+
+    >>> g['user'].number_of_nodes()
+    3
+    >>> g['plays'].number_of_edges()
+    4
+    >>> g['develops'].out_degrees() # out-degrees of source nodes of 'develops' relation
+    tensor([1, 1])
+    >>> g['develops'].in_edges(0)   # in-edges of destination node 0 of 'develops' relation
+    (tensor([0]), tensor([0]))
+
     Notes
     -----
     Currently, all heterogeneous graphs are readonly.
@@ -1061,7 +1072,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             edge_frame=None,
             multigraph=None,
             readonly=True):
-        assert readonly, "Only readonly heterogeneous graphs are supported'
+        assert readonly, "Only readonly heterogeneous graphs are supported"
         if isinstance(graph_data, list):
             if not isinstance(graph_data[0], DGLBaseBipartite):
                 raise TypeError('Only list of DGLBaseBipartite is supported')
