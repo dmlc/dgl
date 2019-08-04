@@ -1,110 +1,21 @@
 """Classes for heterogeneous graphs."""
 import networkx as nx
+from . import heterograph_index
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
 
-    A Heterogeneous graph is defined as a graph with node types and edge
-    types.
-
-    If two edges share the same edge type, then their source nodes, as well
-    as their destination nodes, also have the same type (the source node
-    types don't have to be the same as the destination node types).
-
     Parameters
     ----------
-    metagraph : NetworkX MultiGraph or compatible data structure
-        The set of node types and edge types, as well as the
-        source/destination node type of each edge type is specified in the
-        metagraph.
-        The edge types are specified as edge keys on the NetworkX MultiGraph.
-        The node types and edge types must be strings.
-    number_of_nodes_by_type : dict[str, int]
-        Number of nodes for each node type.
-    edge_connections_by_type : dict
-        Specifies how edges would connect nodes of the source type to nodes of
-        the destination type in the following form:
-
-            {edge_type: edge_specifier}
-
-        where ``edge_type`` is a triplet of
-
-                  (source_node_type_name,
-                   destination_node_type_name,
-                   edge_type_name)
-
-        and ``edge_specifier`` can be either of the following:
-
-        * (source_node_id_tensor, destination_node_id_tensor)
-            * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
-              IDs within the source and destination node type respectively.
-            * source node id and destination node id are both in their own ID space.
-              That is, source nodes and destination nodes may have the same ID,
-              but they are different nodes if they belong to different node types.
-
-        * scipy.sparse.matrix
-          By default, the rows represent the destination of an edge, and the
-          column represents the source.
-
-    Examples
-    --------
-    Suppose that we want to construct the following heterogeneous graph:
-
-    .. graphviz::
-
-       digraph G {
-           Alice -> Bob [label=follows]
-           Bob -> Carol [label=follows]
-           Alice -> Tetris [label=plays]
-           Bob -> Tetris [label=plays]
-           Bob -> Minecraft [label=plays]
-           Carol -> Minecraft [label=plays]
-           Nintendo -> Tetris [label=develops]
-           Mojang -> Minecraft [label=develops]
-           {rank=source; Alice; Bob; Carol}
-           {rank=sink; Nintendo; Mojang}
-       }
-
-    One can analyze the graph and figure out the metagraph as follows:
-
-    .. graphviz::
-
-       digraph G {
-           User -> User [label=follows]
-           User -> Game [label=plays]
-           Developer -> Game [label=develops]
-       }
-
-    Suppose that one maps the users, games and developers to the following
-    IDs:
-
-        User name   Alice   Bob     Carol
-        User ID     0       1       2
-
-        Game name   Tetris  Minecraft
-        Game ID     0       1
-
-        Developer name  Nintendo    Mojang
-        Developer ID    0           1
-
-    One can construct the graph as follows:
-
-    >>> import networkx as nx
-    >>> metagraph = nx.MultiGraph([
-    ...     ('user', 'user', 'follows'),
-    ...     ('user', 'game', 'plays'),
-    ...     ('developer', 'game', 'develops')])
-    >>> g = DGLHeteroGraph(
-    ...     metagraph=metagraph,
-    ...     number_of_nodes_by_type={'user': 4, 'game': 2, 'developer': 2},
-    ...     edge_connections_by_type={
-    ...         # Alice follows Bob and Bob follows Carol
-    ...         ('user', 'user', 'follows'): ([0, 1], [1, 2]),
-    ...         # Alice and Bob play Tetris and Bob and Carol play Minecraft
-    ...         ('user', 'game', 'plays'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-    ...         # Nintendo develops Tetris and Mojang develops Minecraft
-    ...         ('developer', 'game', 'develops'): ([0, 1], [0, 1])})
+    graph : graph index, optional
+        The graph index
+    ntypes : list[str]
+        The node type names
+    etypes : list[str]
+        The edge type names
+    _ntypes_invmap, _etypes_invmap, _view_ntype_idx, _view_etype_idx :
+        Internal arguments
     """
 
     # pylint: disable=unused-argument
@@ -151,6 +62,14 @@ class DGLBaseHeteroGraph(object):
     @property
     def is_view(self):
         return self.is_node_type_view or self.is_edge_type_view
+
+    @property
+    def node_types(self):
+        return self._ntypes
+
+    @property
+    def edge_types(self):
+        return self._etypes
 
     def __getitem__(self, key):
         """Returns a view on the heterogeneous graph with given node/edge
@@ -984,30 +903,147 @@ class DGLBaseHeteroGraph(object):
         return self._graph.out_degrees(v).tousertensor()
 
 
+class DGLBaseBipartite(DGLBaseHeteroGraph):
+    """Base bipartite graph class.
+    """
+    @classmethod
+    def from_csr(cls, srctype, dsttype, etype, num_src, num_dst, indptr, indices,
+                 edge_ids):
+        """Create a bipartite graph from CSR format.
+
+        Parameters
+        ----------
+        srctype : str
+            Name of source node type.
+        dsttype : str
+            Name of destination node type.
+        etype : str
+            Name of edge type.
+        num_src : int
+            Number of nodes in the source type.
+        num_dst : int
+            Number of nodes in the destination type.
+        indptr, indices, edge_ids : Tensor, Tensor, Tensor
+            The indptr, indices, and entries of the CSR matrix.
+            The entries are edge IDs of the bipartite graph.
+            The rows represent the source nodes and the columns represent the
+            destination nodes.
+        """
+        indptr = utils.toindex(indptr)
+        indices = utils.toindex(indices)
+        edge_ids = utils.toindex(edge_ids)
+        graph = heterograph_index.create_bipartite_from_csr(
+            num_src, num_dst, indptr, indices, edge_ids)
+        return cls(graph, [srctype, dsttype], [etype])
+
+    @classmethod
+    def from_coo(cls, srctype, dsttype, etype, num_src, num_dst, row, col):
+        """Create a bipartite graph from COO format.
+
+        Parameters
+        ----------
+        srctype : str
+            Name of source node type.
+        dsttype : str
+            Name of destination node type.
+        etype : str
+            Name of edge type.
+        num_src : int
+            Number of nodes in the source type.
+        num_dst : int
+            Number of nodes in the destination type.
+        row, col : Tensor, Tensor
+            The row indices (source node IDs) and column indices (destination node IDs)
+            of the COO matrix, ordered by edge IDs.
+        """
+        row = utils.toindex(row)
+        col = utils.toindex(col)
+        graph = heterograph_index.create_bipartite_from_coo(num_src, num_dst, row, col)
+        return cls(graph, [srctype, dsttype], [etype])
+
+
 class DGLHeteroGraph(DGLBaseHeteroGraph):
     """Base heterogeneous graph class.
 
-    The graph stores nodes, edges and also their (type-specific) features.
+    A Heterogeneous graph is defined as a graph with node types and edge
+    types.
 
-    Heterogeneous graphs are by default multigraphs.
+    If two edges share the same edge type, then their source nodes, as well
+    as their destination nodes, also have the same type (the source node
+    types don't have to be the same as the destination node types).
 
     Parameters
     ----------
-    graph_data : graph data
-        It can be one of the following formats:
+    graph_data :
+        The graph data.  It can be one of the followings:
 
-        * ``(metagraph, bipartite_list)``
+        * list[DGLBaseBipartite]
 
-          ``metagraph`` can be a NetworkX graph with node labels as node type
-          names, and edge types in the ``type`` field of edge data.
+          One could directly supply a list of bipartite graphs.  The metagraph
+          would be then automatically figured out from the bipartite graph list.
 
-          ``bipartite_list`` is a list of DGLBipartiteGraph.
-    node_frame : dict[str, FrameRef], optional
-        Node feature storage per type
-    edge_frame : dict[str, FrameRef], optional
-        Edge feature storage per type
-    readonly : bool, optional
-        Whether the graph structure is read-only (default: False)
+          The bipartite graphs should not share the same edge type names.
+          
+          If two bipartite graphs share the same source node type, then the edges
+          in the heterogeneous graph will share the same source node set.  This also
+          applies to sharing the same destination node type, or having the same type
+          for source nodes of one and destination nodes of the other.
+    node_frame : dict[str, dict[str, Tensor]]
+        The node frames for each node type
+    edge_frame : dict[str, dict[str, Tensor]]
+        The edge frames for each edge type
+    multigraph : bool
+        Whether the heterogeneous graph is a multigraph.
+    readonly : bool
+        Whether the heterogeneous graph is readonly.
+
+    Examples
+    --------
+    Suppose that we want to construct the following heterogeneous graph:
+
+    .. graphviz::
+
+       digraph G {
+           Alice -> Bob [label=follows]
+           Bob -> Carol [label=follows]
+           Alice -> Tetris [label=plays]
+           Bob -> Tetris [label=plays]
+           Bob -> Minecraft [label=plays]
+           Carol -> Minecraft [label=plays]
+           Nintendo -> Tetris [label=develops]
+           Mojang -> Minecraft [label=develops]
+           {rank=source; Alice; Bob; Carol}
+           {rank=sink; Nintendo; Mojang}
+       }
+
+    One can analyze the graph and figure out the metagraph as follows:
+
+    .. graphviz::
+
+       digraph G {
+           User -> User [label=follows]
+           User -> Game [label=plays]
+           Developer -> Game [label=develops]
+       }
+
+    Suppose that one maps the users, games and developers to the following
+    IDs:
+
+        User name   Alice   Bob     Carol
+        User ID     0       1       2
+
+        Game name   Tetris  Minecraft
+        Game ID     0       1
+
+        Developer name  Nintendo    Mojang
+        Developer ID    0           1
+
+    One can construct the graph as follows:
+
+    >>> follows = DGLBaseBipartite('user', 'user', 'follows', 3, 3, [0, 1], [1, 2])
+    >>> plays = DGLBaseBipartite('user', 'game', 'plays', 3, 2, [0, 1, 1, 2], [0, 0, 1, 1])
+    >>> develops = DGLBaseBipartite('developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
+    >>> g = DGLHeteroGraph(develops)
     """
     # pylint: disable=unused-argument
     def __init__(
@@ -1017,10 +1053,41 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             edge_frame=None,
             multigraph=None,
             readonly=False):
-        metagraph, bipartite_list = graph_data
+        if isinstance(graph_data, list):
+            if not isinstance(graph_data[0], DGLBaseBipartite):
+                raise TypeError('Only list of DGLBaseBipartite is supported')
 
-        super(DGLHeteroGraph, self).__init__(
-            metagraph, number_of_nodes_by_type, edge_connections_by_type)
+            srctypes, dsttypes, etypes = [], [], []
+            ntypes = []
+            ntypes_invmap = {}
+            etypes_invmap = {}
+            for bipartite in graph_data:
+                srctype, dsttype = bipartite.node_types
+                etype, = bipartite.edge_types
+
+                srctypes.append(srctype)
+                dsttypes.append(dsttype)
+                etypes_invmap[etype] = len(etypes_invmap)
+                etypes.append(etype)
+
+                if srctype not in ntypes_invmap:
+                    ntypes_invmap[srctype] = len(ntypes_invmap)
+                    ntypes.append(srctype)
+                if dsttype not in ntypes_invmap:
+                    ntypes_invmap[dsttype] = len(ntypes_invmap)
+                    ntypes.append(dsttype)
+
+            srctypes = [ntypes_invmap[srctype] for srctype in srctypes]
+            dsttypes = [ntypes_invmap[dsttype] for dsttype in dsttypes]
+
+            metagraph_index = graph_index.create_graph_index(
+                list(zip(srctypes, dsttypes)), None, True)  # metagraph is always immutable
+            hg_index = heterograph_index.create_heterograph(
+                metagraph_index, [bipartite._graph for bipartite in graph_data])
+
+            super(DGLHeteroGraph, self).__init__(hg_index, ntypes, etypes)
+        else:
+            raise TypeError('Unrecognized graph data type %s' % type(graph_data))
 
     def add_nodes(self, node_type, num, data=None):
         """Add multiple new nodes of the same node type
@@ -1075,7 +1142,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         >>> g['plays'].number_of_edges()
         5
         """
-        pass
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        self._graph.add_edge(u, v)
+        # TODO: frame
 
     def add_edges(self, u, v, etype, data=None):
         """Add multiple edges of ``etype`` between list of source nodes ``u``
@@ -1105,7 +1175,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         >>> g['plays'].number_of_edges()
         6
         """
-        pass
+        self._graph.add_edges(u, v)
+        # TODO: frame
 
     def from_networkx(
             self,
