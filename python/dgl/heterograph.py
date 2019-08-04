@@ -1048,6 +1048,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     >>> develops = DGLBaseBipartite.from_coo(
     ...     'developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
     >>> g = DGLHeteroGraph([follows, plays, develops])
+
+    Notes
+    -----
+    Currently, all heterogeneous graphs are readonly.
     """
     # pylint: disable=unused-argument
     def __init__(
@@ -1056,7 +1060,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             node_frame=None,
             edge_frame=None,
             multigraph=None,
-            readonly=False):
+            readonly=True):
+        assert readonly, "Only readonly heterogeneous graphs are supported'
         if isinstance(graph_data, list):
             if not isinstance(graph_data[0], DGLBaseBipartite):
                 raise TypeError('Only list of DGLBaseBipartite is supported')
