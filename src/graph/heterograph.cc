@@ -114,17 +114,33 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must be a bipartite graph.";
   }
   // create num verts per type
-  num_verts_per_type_.resize(meta_graph_->NumVertices(), -1);
-  for (dgl_type_t vtype = 0; vtype < meta_graph_->NumVertices(); ++vtype) {
-    for (dgl_type_t etype : meta_graph->OutEdgeVec(vtype)) {
-      const auto nv = rel_graphs[etype]->NumVertices(Bipartite::kSrcVType);
-      if (num_verts_per_type_[vtype] < 0) {
-        num_verts_per_type_[vtype] = nv;
-      } else {
-        CHECK_EQ(num_verts_per_type_[vtype], nv)
-          << "Mismatch number of vertices for vertex type " << vtype;
-      }
-    }
+  num_verts_per_type_.resize(meta_graph->NumVertices(), -1);
+
+  EdgeArray etype_array = meta_graph->Edges();
+  dgl_type_t *srctypes = static_cast<dgl_type_t *>(etype_array.src->data);
+  dgl_type_t *dsttypes = static_cast<dgl_type_t *>(etype_array.dst->data);
+  dgl_type_t *etypes = static_cast<dgl_type_t *>(etype_array.id->data);
+
+  for (size_t i = 0; i < meta_graph->NumEdges(); ++i) {
+    dgl_type_t srctype = srctypes[i];
+    dgl_type_t dsttype = dsttypes[i];
+    dgl_type_t etype = etypes[i];
+    size_t nv;
+
+    // # nodes of source type
+    nv = rel_graphs[etype]->NumVertices(Bipartite::kSrcVType);
+    if (num_verts_per_type_[srctype] < 0)
+      num_verts_per_type_[srctype] = nv;
+    else
+      CHECK_EQ(num_verts_per_type_[srctype], nv)
+        << "Mismatch number of vertices for vertex type " << srctype;
+    // # nodes of destination type
+    nv = rel_graphs[etype]->NumVertices(Bipartite::kDstVType);
+    if (num_verts_per_type_[dsttype] < 0)
+      num_verts_per_type_[dsttype] = nv;
+    else
+      CHECK_EQ(num_verts_per_type_[dsttype], nv)
+        << "Mismatch number of vertices for vertex type " << dsttype;
   }
 }
 

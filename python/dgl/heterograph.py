@@ -1,6 +1,9 @@
 """Classes for heterogeneous graphs."""
 import networkx as nx
-from . import heterograph_index
+from . import heterograph_index, graph_index
+from . import utils
+from . import backend as F
+from .base import ALL, is_all
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
@@ -49,7 +52,7 @@ class DGLBaseHeteroGraph(object):
         return DGLBaseHeteroGraph(
             self._graph, self._ntypes, self._etypes,
             self._ntypes_invmap, self._etypes_invmap,
-            etype, None)
+            None, etype)
 
     @property
     def is_node_type_view(self):
@@ -105,7 +108,7 @@ class DGLBaseHeteroGraph(object):
             if key in self._ntypes_invmap:
                 return self._create_node_type_view(self._ntypes_invmap[key])
             elif key in self._etypes_invmap:
-                return self._create_edge_type_view(self._ntypes_invmap[key])
+                return self._create_edge_type_view(self._etypes_invmap[key])
             else:
                 raise KeyError('%s is neither a node type or an edge type' % key)
 
@@ -145,7 +148,7 @@ class DGLBaseHeteroGraph(object):
         """
         etype_idx = self._etypes_invmap[etype]
         srctype_idx, dsttype_idx = self._endpoint_types(etype_idx)
-        return self._ntypes[srctype_index], self._ntypes[dsttype_index]
+        return self._ntypes[srctype_idx], self._ntypes[dsttype_idx]
 
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
@@ -155,15 +158,8 @@ class DGLBaseHeteroGraph(object):
         int
             The number of nodes
         """
-        if self.is_node_view:
-            return self._graph.number_of_nodes(self._view_ntype_idx)
-        elif self.is_edge_view:
-            srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
-            return self._graph.number_of_nodes(srctype_idx) + \
-                   self._graph.number_of_nodes(dsttype_idx)
-        else:
-            return sum(self._graph.number_of_nodes(i)
-                       for i in range(len(self._ntypes)))
+        assert self.is_node_type_view, 'only supported on node type views'
+        return self._graph.number_of_nodes(self._view_ntype_idx)
 
     def __len__(self):
         """Return the number of nodes in the graph."""
@@ -190,13 +186,8 @@ class DGLBaseHeteroGraph(object):
         int
             The number of edges
         """
-        if self.is_node_view:
-            raise RuntimeError('not supported on node type views')
-        elif self.is_edge_view:
-            return self._graph.number_of_edges(self._view_etype_idx)
-        else:
-            return sum(self._graph.number_of_edges(i)
-                       for i in range(len(self._etypes)))
+        assert self.is_edge_type_view, 'only supported on edge type views'
+        return self._graph.number_of_edges(self._view_etype_idx)
 
     def has_node(self, vid):
         """Return True if the graph contains node `vid`.
@@ -234,8 +225,8 @@ class DGLBaseHeteroGraph(object):
         --------
         has_nodes
         """
-        assert self.is_node_view, 'only supported on node type views'
-        return self._graph.has_node(vid)
+        assert self.is_node_type_view, 'only supported on node type views'
+        return self._graph.has_node(self._view_ntype_idx, vid)
 
     def __contains__(self, vid):
         """Return True if the graph contains node `vid`.
@@ -287,7 +278,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_node
         """
-        assert self.is_node_view, 'only supported on node type views'
+        assert self.is_node_type_view, 'only supported on node type views'
         vids = utils.toindex(vids)
         rst = self._graph.has_nodes(self._view_ntype_idx, vids)
         return rst.tousertensor()
@@ -328,7 +319,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edges_between
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         return self._graph.has_edge_between(self._view_etype_idx, u, v)
 
     def has_edges_between(self, u, v):
@@ -367,7 +358,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edge_between
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         u = utils.toindex(u)
         v = utils.toindex(v)
         rst = self._graph.has_edges_between(self._view_etype_idx, u, v)
@@ -411,7 +402,7 @@ class DGLBaseHeteroGraph(object):
         --------
         successors
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         return self._graph.predecessors(self._view_etype_idx, v).tousertensor()
 
     def successors(self, v):
@@ -452,7 +443,7 @@ class DGLBaseHeteroGraph(object):
         --------
         predecessors
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         return self._graph.successors(self._view_etype_idx, v).tousertensor()
 
     def edge_id(self, u, v, force_multi=False):
@@ -494,7 +485,7 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_ids
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         idx = self._graph.edge_id(self._view_etype_idx, u, v)
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
@@ -545,7 +536,7 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_id
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(self._view_etype_idx, u, v)
@@ -586,7 +577,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 1]))
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(self._view_etype_idx, eid)
         return src.tousertensor(), dst.tousertensor()
@@ -631,7 +622,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].in_edges(0, 'eid')
         tensor([0, 1])
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
 
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(self._view_etype_idx, v)
@@ -684,7 +675,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].out_edges(0, 'eid')
         tensor([0])
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(self._view_etype_idx, v)
         if form == 'all':
@@ -741,7 +732,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].all_edges('uv')
         (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         src, dst, eid = self._graph.edges(self._view_etype_idx, order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
@@ -782,7 +773,7 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degrees
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         return self._graph.in_degree(self._view_etype_idx, v)
 
     def in_degrees(self, v=ALL):
@@ -820,9 +811,10 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degree
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
+        _, dsttype_idx = self._endpoint_types(self._view_etype_idx)
         if is_all(v):
-            v = utils.toindex(slice(0, self.number_of_nodes()))
+            v = utils.toindex(slice(0, self._graph.number_of_nodes(dsttype_idx)))
         else:
             v = utils.toindex(v)
         return self._graph.in_degrees(self._view_etype_idx, v).tousertensor()
@@ -857,7 +849,7 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degrees
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
         return self._graph.out_degree(self._view_etype_idx, v)
 
     def out_degrees(self, v=ALL):
@@ -895,17 +887,26 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degree
         """
-        assert self.is_edge_view, 'only supported on edge type views'
+        assert self.is_edge_type_view, 'only supported on edge type views'
+        srctype_idx, _ = self._endpoint_types(self._view_etype_idx)
         if is_all(v):
-            v = utils.toindex(slice(0, self.number_of_nodes()))
+            v = utils.toindex(slice(0, self._graph.number_of_nodes(srctype_idx)))
         else:
             v = utils.toindex(v)
-        return self._graph.out_degrees(v).tousertensor()
+        return self._graph.out_degrees(self._view_etype_idx, v).tousertensor()
 
 
 class DGLBaseBipartite(DGLBaseHeteroGraph):
     """Base bipartite graph class.
     """
+    def __init__(self, graph, srctype, dsttype, etype):
+        super(DGLBaseBipartite, self).__init__(
+            graph,
+            [srctype, dsttype] if srctype != dsttype else [srctype],
+            [etype])
+        self.srctype = srctype
+        self.dsttype = dsttype
+
     @classmethod
     def from_csr(cls, srctype, dsttype, etype, num_src, num_dst, indptr, indices,
                  edge_ids):
@@ -934,7 +935,7 @@ class DGLBaseBipartite(DGLBaseHeteroGraph):
         edge_ids = utils.toindex(edge_ids)
         graph = heterograph_index.create_bipartite_from_csr(
             num_src, num_dst, indptr, indices, edge_ids)
-        return cls(graph, [srctype, dsttype], [etype])
+        return cls(graph, srctype, dsttype, etype)
 
     @classmethod
     def from_coo(cls, srctype, dsttype, etype, num_src, num_dst, row, col):
@@ -959,7 +960,7 @@ class DGLBaseBipartite(DGLBaseHeteroGraph):
         row = utils.toindex(row)
         col = utils.toindex(col)
         graph = heterograph_index.create_bipartite_from_coo(num_src, num_dst, row, col)
-        return cls(graph, [srctype, dsttype], [etype])
+        return cls(graph, srctype, dsttype, etype)
 
 
 class DGLHeteroGraph(DGLBaseHeteroGraph):
@@ -1040,10 +1041,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     One can construct the graph as follows:
 
-    >>> follows = DGLBaseBipartite('user', 'user', 'follows', 3, 3, [0, 1], [1, 2])
-    >>> plays = DGLBaseBipartite('user', 'game', 'plays', 3, 2, [0, 1, 1, 2], [0, 0, 1, 1])
-    >>> develops = DGLBaseBipartite('developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
-    >>> g = DGLHeteroGraph(develops)
+    >>> follows = DGLBaseBipartite.from_coo(
+    ...     'user', 'user', 'follows', 3, 3, [0, 1], [1, 2])
+    >>> plays = DGLBaseBipartite.from_coo(
+    ...     'user', 'game', 'plays', 3, 2, [0, 1, 1, 2], [0, 0, 1, 1])
+    >>> develops = DGLBaseBipartite.from_coo(
+    ...     'developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
+    >>> g = DGLHeteroGraph([follows, plays, develops])
     """
     # pylint: disable=unused-argument
     def __init__(
@@ -1062,8 +1066,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             ntypes_invmap = {}
             etypes_invmap = {}
             for bipartite in graph_data:
-                srctype, dsttype = bipartite.node_types
                 etype, = bipartite.edge_types
+                srctype = bipartite.srctype
+                dsttype = bipartite.dsttype
 
                 srctypes.append(srctype)
                 dsttypes.append(dsttype)
@@ -2374,7 +2379,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         pass
 
     def __repr__(self):
-        pass
+        return super(DGLHeteroGraph, self).__repr__()
 
 # pylint: disable=abstract-method
 class DGLHeteroSubGraph(DGLHeteroGraph):
