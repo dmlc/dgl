@@ -1,4 +1,5 @@
 """Classes for heterogeneous graphs."""
+import networkx as nx
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
@@ -109,21 +110,23 @@ class DGLBaseHeteroGraph(object):
     # pylint: disable=unused-argument
     def __init__(self, graph, ntypes, etypes,
                  _ntypes_invmap=None, _etypes_invmap=None,
-                 _view_ntype=None, _view_etype=None):
+                 _view_ntype_idx=None, _view_etype_idx=None):
         super(DGLBaseHeteroGraph, self).__init__()
 
         self._graph = graph
         self._ntypes = ntypes
         self._etypes = etypes
+        # inverse mapping from ntype str to int
         self._ntypes_invmap = _ntypes_invmap or \
             {ntype: i for i, ntype in enumerate(ntypes)}
+        # inverse mapping from etype str to int
         self._etypes_invmap = _etypes_invmap or \
             {etype: i for i, etype in enumerate(etypes)}
 
-        # Indicates which node/edge type it is viewing (e.g. g[ntype])
+        # Indicates which node/edge type (int) it is viewing (e.g. g[ntype])
         # The behavior of interfaces will change accordingly.
-        self._view_ntype = _view_ntype
-        self._view_etype = _view_etype
+        self._view_ntype_idx = _view_ntype_idx
+        self._view_etype_idx = _view_etype_idx
 
     def _create_node_type_view(self, ntype):
         return DGLBaseHeteroGraph(
@@ -131,21 +134,30 @@ class DGLBaseHeteroGraph(object):
             self._ntypes_invmap, self._etypes_invmap,
             ntype, None)
 
+    def _create_edge_type_view(self, etype):
+        return DGLBaseHeteroGraph(
+            self._graph, self._ntypes, self._etypes,
+            self._ntypes_invmap, self._etypes_invmap,
+            etype, None)
+
+    @property
+    def is_node_type_view(self):
+        return self._view_ntype_idx is not None
+
+    @property
+    def is_edge_type_view(self):
+        return self._view_etype_idx is not None
+
+    @property
+    def is_view(self):
+        return self.is_node_type_view or self.is_edge_type_view
+
     def __getitem__(self, key):
         """Returns a view on the heterogeneous graph with given node/edge
         type:
 
-        * If ``key`` is a str, it returns a heterogeneous subgraph induced
-          from nodes of type ``key``.
-        * If ``key`` is a pair of str (type_A, type_B), it returns a
-          heterogeneous subgraph induced from the union of both node types.
-        * If ``key`` is a triplet of str
-
-              (src_type_name, dst_type_name, edge_type_name)
-
-          It returns a heterogeneous subgraph induced from the edges with
-          source type name ``src_type_name``, destination type name
-          ``dst_type_name``, and edge type name ``edge_type_name``.
+        If ``key`` is a str, it returns a heterogeneous subgraph induced
+        from nodes or edges of type ``key``.
 
         The view would share the frames with the parent graph; any
         modifications on one's frames would reflect on the other.
@@ -156,11 +168,11 @@ class DGLBaseHeteroGraph(object):
 
             g['user'].update_all(...)
 
-        would not create a subgraph of users.
+        would not actually create a subgraph of users.
 
         Parameters
         ----------
-        key : str or tuple
+        key : str
             See above
 
         Returns
@@ -168,12 +180,53 @@ class DGLBaseHeteroGraph(object):
         DGLBaseHeteroGraphView
             The induced subgraph view.
         """
-        pass
+        if self.is_view:
+            raise RuntimeError('Cannot create a view from a view')
+        else:
+            if key in self._ntypes_invmap:
+                return self._create_node_type_view(self._ntypes_invmap[key])
+            elif key in self._etypes_invmap:
+                return self._create_edge_type_view(self._ntypes_invmap[key])
+            else:
+                raise KeyError('%s is neither a node type or an edge type' % key)
 
     @property
     def metagraph(self):
-        """Return the metagraph as networkx.MultiDiGraph."""
-        pass
+        """Return the metagraph as networkx.MultiDiGraph.
+
+        The nodes are labeled with node type names.
+        The edges have a field "type" holding the edge type names.
+        """
+        nx_graph = self._graph.metagraph.to_networkx()
+        for i, uv in enumerate(nx_graph.edges):
+            nx_graph.edges[uv]['type'] = self._etypes[nx_graph.edges[uv]['id']]
+        nx.relabel_nodes(
+            nx_graph,
+            {i: ntype for i, ntype in enumerate(self._ntypes)},
+            copy=False)
+        return nx_graph
+
+    def _endpoint_types(self, etype):
+        """Return the source and destination node type (int) of given edge
+        type (int)."""
+        return self._graph.metagraph.find_edge(etype)
+
+    def endpoint_types(self, etype):
+        """Return the source and destination node type of the given edge type.
+
+        Parameters
+        ----------
+        etype : str
+            The edge type.
+
+        Returns
+        -------
+        srctype, dsttype : str, str
+            The source node type and destination node type.
+        """
+        etype_idx = self._etypes_invmap[etype]
+        srctype_idx, dsttype_idx = self._endpoint_types(etype_idx)
+        return self._ntypes[srctype_index], self._ntypes[dsttype_index]
 
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
@@ -183,118 +236,32 @@ class DGLBaseHeteroGraph(object):
         int
             The number of nodes
         """
-        pass
+        if self.is_node_view:
+            return self._graph.number_of_nodes(self._view_ntype_idx)
+        elif self.is_edge_view:
+            srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
+            return self._graph.number_of_nodes(srctype_idx) + \
+                   self._graph.number_of_nodes(dsttype_idx)
+        else:
+            return sum(self._graph.number_of_nodes(i)
+                       for i in range(len(self._ntypes)))
 
     def __len__(self):
         """Return the number of nodes in the graph."""
-        pass
-
-    # TODO: REVIEW
-    def add_nodes(self, num, node_type, data=None):
-        """Add multiple new nodes of the same node type
-
-        Parameters
-        ----------
-        num : int
-            Number of nodes to be added.
-        node_type : str
-            Type of the added nodes.  Must appear in the metagraph.
-        data : dict, optional
-            Feature data of the added nodes.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['game'].number_of_nodes()
-        2
-        >>> g.add_nodes(3, 'game')  # add 3 new games
-        >>> g['game'].number_of_nodes()
-        5
-        """
-        pass
-
-    # TODO: REVIEW
-    def add_edge(self, u, v, utype, vtype, etype, data=None):
-        """Add an edge of ``etype`` between u of type ``utype`` and v of type
-        ``vtype``.
-
-        Parameters
-        ----------
-        u : int
-            The source node ID of type ``utype``.  Must exist in the graph.
-        v : int
-            The destination node ID of type ``vtype``.  Must exist in the
-            graph.
-        utype : str
-            The source node type name.  Must exist in the metagraph.
-        vtype : str
-            The destination node type name.  Must exist in the metagraph.
-        etype : str
-            The edge type name.  Must exist in the metagraph.
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        4
-        >>> g.add_edge(2, 0, 'user', 'game', 'plays')
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        5
-        """
-        pass
-
-    def add_edges(self, u, v, utype, vtype, etype, data=None):
-        """Add multiple edges of ``etype`` between list of source nodes ``u``
-        of type ``utype`` and list of destination nodes ``v`` of type
-        ``vtype``.  A single edge is added between every pair of ``u[i]`` and
-        ``v[i]``.
-
-        Parameters
-        ----------
-        u : list, tensor
-            The source node IDs of type ``utype``.  Must exist in the graph.
-        v : list, tensor
-            The destination node IDs of type ``vtype``.  Must exist in the
-            graph.
-        utype : str
-            The source node type name.  Must exist in the metagraph.
-        vtype : str
-            The destination node type name.  Must exist in the metagraph.
-        etype : str
-            The edge type name.  Must exist in the metagraph.
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        4
-        >>> g.add_edges([0, 2], [1, 0], 'user', 'game', 'plays')
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        6
-        """
-        pass
+        return self.number_of_nodes()
 
     @property
     def is_multigraph(self):
         """True if the graph is a multigraph, False otherwise.
         """
-        pass
+        assert not self.is_view, 'not supported on views'
+        return self._graph.is_multigraph()
 
     @property
     def is_readonly(self):
         """True if the graph is readonly, False otherwise.
         """
-        pass
+        return self._graph.is_readonly()
 
     def number_of_edges(self):
         """Return the number of edges in the graph.
@@ -304,7 +271,13 @@ class DGLBaseHeteroGraph(object):
         int
             The number of edges
         """
-        pass
+        if self.is_node_view:
+            raise RuntimeError('not supported on node type views')
+        elif self.is_edge_view:
+            return self._graph.number_of_edges(self._view_etype_idx)
+        else:
+            return sum(self._graph.number_of_edges(i)
+                       for i in range(len(self._etypes)))
 
     def has_node(self, vid):
         """Return True if the graph contains node `vid`.
@@ -342,7 +315,8 @@ class DGLBaseHeteroGraph(object):
         --------
         has_nodes
         """
-        pass
+        assert self.is_node_view, 'only supported on node type views'
+        return self._graph.has_node(vid)
 
     def __contains__(self, vid):
         """Return True if the graph contains node `vid`.
@@ -359,7 +333,7 @@ class DGLBaseHeteroGraph(object):
         >>> 0 in g['user']
         True
         """
-        pass
+        return self.has_node(self._view_ntype_idx, vid)
 
     def has_nodes(self, vids):
         """Return a 0-1 array ``a`` given the node ID array ``vids``.
@@ -394,7 +368,10 @@ class DGLBaseHeteroGraph(object):
         --------
         has_node
         """
-        pass
+        assert self.is_node_view, 'only supported on node type views'
+        vids = utils.toindex(vids)
+        rst = self._graph.has_nodes(self._view_ntype_idx, vids)
+        return rst.tousertensor()
 
     def has_edge_between(self, u, v):
         """Return True if the edge (u, v) is in the graph.
@@ -404,7 +381,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].has_edge_between(u, v)
+           g['edgetype'].has_edge_between(u, v)
 
         Parameters
         ----------
@@ -421,18 +398,19 @@ class DGLBaseHeteroGraph(object):
         Examples
         --------
         Check whether Alice plays Tetris
-        >>> g['user', 'game', 'plays'].has_edge_between(0, 1)
+        >>> g['plays'].has_edge_between(0, 1)
         True
 
         And whether Alice plays Minecraft
-        >>> g['user', 'game', 'plays'].has_edge_between(0, 2)
+        >>> g['plays'].has_edge_between(0, 2)
         False
 
         See Also
         --------
         has_edges_between
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        return self._graph.has_edge_between(self._view_etype_idx, u, v)
 
     def has_edges_between(self, u, v):
         """Return a 0-1 array `a` given the source node ID array `u` and
@@ -445,7 +423,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].has_edges_between(u, v)
+           g['edgetype'].has_edges_between(u, v)
 
         Parameters
         ----------
@@ -463,14 +441,18 @@ class DGLBaseHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g['user', 'game', 'plays'].has_edges_between([0, 0], [1, 2])
+        >>> g['plays'].has_edges_between([0, 0], [1, 2])
         tensor([1, 0])
 
         See Also
         --------
         has_edge_between
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        rst = self._graph.has_edges_between(self._view_etype_idx, u, v)
+        return rst.tousertensor()
 
     def predecessors(self, v):
         """Return the predecessors of node `v` in the graph with the same
@@ -484,7 +466,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].predecessors(v)
+           g['edgetype'].predecessors(v)
 
         Parameters
         ----------
@@ -501,7 +483,7 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Query who plays Tetris:
-        >>> g['user', 'game', 'plays'].predecessors(0)
+        >>> g['plays'].predecessors(0)
         tensor([0, 1])
 
         This indicates User #0 (Alice) and User #1 (Bob).
@@ -510,7 +492,8 @@ class DGLBaseHeteroGraph(object):
         --------
         successors
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        return self._graph.predecessors(self._view_etype_idx, v).tousertensor()
 
     def successors(self, v):
         """Return the successors of node `v` in the graph with the same edge
@@ -524,7 +507,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].successors(v)
+           g['edgetype'].successors(v)
 
         Parameters
         ----------
@@ -541,7 +524,7 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Asks which game Alice plays:
-        >>> g['user', 'game', 'plays'].successors(0)
+        >>> g['plays'].successors(0)
         tensor([0])
 
         This indicates Game #0 (Tetris).
@@ -550,7 +533,8 @@ class DGLBaseHeteroGraph(object):
         --------
         predecessors
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        return self._graph.successors(self._view_etype_idx, v).tousertensor()
 
     def edge_id(self, u, v, force_multi=False):
         """Return the edge ID, or an array of edge IDs, between source node
@@ -561,7 +545,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_id(u, v)
+           g['edgetype'].edge_id(u, v)
 
         Parameters
         ----------
@@ -584,14 +568,16 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the edge ID of "Bob plays Tetris"
-        >>> g['user', 'game', 'plays'].edge_id(1, 0)
+        >>> g['plays'].edge_id(1, 0)
         1
 
         See Also
         --------
         edge_ids
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        idx = self._graph.edge_id(self._view_etype_idx, u, v)
+        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
     def edge_ids(self, u, v, force_multi=False):
         """Return all edge IDs between source node array `u` and destination
@@ -602,7 +588,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -633,14 +619,21 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the edge IDs of "Alice plays Tetris" and "Bob plays Minecraft".
-        >>> g['user', 'game', 'plays'].edge_ids([0, 1], [0, 1])
+        >>> g['plays'].edge_ids([0, 1], [0, 1])
         tensor([0, 2])
 
         See Also
         --------
         edge_id
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        src, dst, eid = self._graph.edge_ids(self._view_etype_idx, u, v)
+        if force_multi or self.is_multigraph:
+            return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        else:
+            return eid.tousertensor()
 
     def find_edges(self, eid):
         """Given an edge ID array, return the source and destination node ID
@@ -652,7 +645,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -671,10 +664,13 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the user and game of gameplay #0 and #2:
-        >>> g['user', 'game', 'plays'].find_edges([0, 2])
+        >>> g['plays'].find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 1]))
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        eid = utils.toindex(eid)
+        src, dst, _ = self._graph.find_edges(self._view_etype_idx, eid)
+        return src.tousertensor(), dst.tousertensor()
 
     def in_edges(self, v, form='uv'):
         """Return the inbound edges of the node(s).
@@ -684,7 +680,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -713,10 +709,21 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the gameplay IDs of game #0 (Tetris)
-        >>> g['user', 'game', 'plays'].in_edges(0, 'eid')
+        >>> g['plays'].in_edges(0, 'eid')
         tensor([0, 1])
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+
+        v = utils.toindex(v)
+        src, dst, eid = self._graph.in_edges(self._view_etype_idx, v)
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
     def out_edges(self, v, form='uv'):
         """Return the outbound edges of the node(s).
@@ -726,7 +733,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -755,10 +762,20 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the gameplay IDs of user #0 (Alice)
-        >>> g['user', 'game', 'plays'].out_edges(0, 'eid')
+        >>> g['plays'].out_edges(0, 'eid')
         tensor([0])
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        v = utils.toindex(v)
+        src, dst, eid = self._graph.out_edges(self._view_etype_idx, v)
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
     def all_edges(self, form='uv', order=None):
         """Return all the edges.
@@ -768,7 +785,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -802,10 +819,19 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the user-game pairs for all gameplays:
-        >>> g['user', 'game', 'plays'].all_edges('uv')
+        >>> g['plays'].all_edges('uv')
         (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        src, dst, eid = self._graph.edges(self._view_etype_idx, order)
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
     def in_degree(self, v):
         """Return the in-degree of node ``v``.
@@ -815,7 +841,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -830,14 +856,15 @@ class DGLBaseHeteroGraph(object):
         Examples
         --------
         Find how many users are playing Game #0 (Tetris):
-        >>> g['user', 'game', 'plays'].in_degree(0)
+        >>> g['plays'].in_degree(0)
         2
 
         See Also
         --------
         in_degrees
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        return self._graph.in_degree(self._view_etype_idx, v)
 
     def in_degrees(self, v=ALL):
         """Return the array `d` of in-degrees of the node array `v`.
@@ -849,7 +876,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -867,14 +894,19 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find how many users are playing Game #0 and #1 (Tetris and Minecraft):
-        >>> g['user', 'game', 'plays'].in_degrees([0, 1])
+        >>> g['plays'].in_degrees([0, 1])
         tensor([2, 2])
 
         See Also
         --------
         in_degree
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        if is_all(v):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
+        return self._graph.in_degrees(self._view_etype_idx, v).tousertensor()
 
     def out_degree(self, v):
         """Return the out-degree of node `v`.
@@ -884,7 +916,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -899,14 +931,15 @@ class DGLBaseHeteroGraph(object):
         Examples
         --------
         Find how many games User #0 Alice is playing
-        >>> g['user', 'game', 'plays'].out_degree(0)
+        >>> g['plays'].out_degree(0)
         1
 
         See Also
         --------
         out_degrees
         """
-        pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        return self._graph.out_degree(self._view_etype_idx, v)
 
     def out_degrees(self, v=ALL):
         """Return the array `d` of out-degrees of the node array `v`.
@@ -918,7 +951,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+           g['edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -936,27 +969,19 @@ class DGLBaseHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find how many games User #0 and #1 (Alice and Bob) are playing
-        >>> g['user', 'game', 'plays'].out_degrees([0, 1])
+        >>> g['plays'].out_degrees([0, 1])
         tensor([1, 2])
 
         See Also
         --------
         out_degree
         """
-        pass
-
-
-class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
-    """View on a heterogeneous graph, constructed from
-    DGLBaseHeteroGraph.__getitem__().
-
-    It is semantically the same as a subgraph, except that
-
-    * The subgraph itself is not materialized until the user explicitly
-    queries the subgraph structure (e.g. calling ``in_edges``, but not
-    ``update_all``).
-    """
-    pass
+        assert self.is_edge_view, 'only supported on edge type views'
+        if is_all(v):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
+        return self._graph.out_degrees(v).tousertensor()
 
 
 class DGLHeteroGraph(DGLBaseHeteroGraph):
@@ -968,8 +993,15 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     Parameters
     ----------
-    metagraph, number_of_nodes_by_type, edge_connections_by_type :
-        See DGLBaseHeteroGraph
+    graph_data : graph data
+        It can be one of the following formats:
+
+        * ``(metagraph, bipartite_list)``
+
+          ``metagraph`` can be a NetworkX graph with node labels as node type
+          names, and edge types in the ``type`` field of edge data.
+
+          ``bipartite_list`` is a list of DGLBipartiteGraph.
     node_frame : dict[str, FrameRef], optional
         Node feature storage per type
     edge_frame : dict[str, FrameRef], optional
@@ -980,14 +1012,100 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     # pylint: disable=unused-argument
     def __init__(
             self,
-            metagraph,
-            number_of_nodes_by_type,
-            edge_connections_by_type,
+            graph_data=None,
             node_frame=None,
             edge_frame=None,
+            multigraph=None,
             readonly=False):
+        metagraph, bipartite_list = graph_data
+
         super(DGLHeteroGraph, self).__init__(
             metagraph, number_of_nodes_by_type, edge_connections_by_type)
+
+    def add_nodes(self, node_type, num, data=None):
+        """Add multiple new nodes of the same node type
+
+        Parameters
+        ----------
+        node_type : str
+            Type of the added nodes.  Must appear in the metagraph.
+        num : int
+            Number of nodes to be added.
+        data : dict, optional
+            Feature data of the added nodes.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['game'].number_of_nodes()
+        2
+        >>> g.add_nodes(3, 'game')  # add 3 new games
+        >>> g['game'].number_of_nodes()
+        5
+        """
+        self._graph.add_nodes(node_type, num)
+        # TODO: frame
+
+    def add_edge(self, etype, u, v, data=None):
+        """Add an edge of ``etype`` between u of the source node type, and v
+        of the destination node type..
+
+        Parameters
+        ----------
+        etype : str
+            The edge type name.  Must exist in the metagraph.
+        u : int
+            The source node ID of type ``utype``.  Must exist in the graph.
+        v : int
+            The destination node ID of type ``vtype``.  Must exist in the
+            graph.
+        data : dict, optional
+            Feature data of the added edge.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['plays'].number_of_edges()
+        4
+        >>> g.add_edge(2, 0, 'plays')
+        >>> g['plays'].number_of_edges()
+        5
+        """
+        pass
+
+    def add_edges(self, u, v, etype, data=None):
+        """Add multiple edges of ``etype`` between list of source nodes ``u``
+        and list of destination nodes ``v`` of type ``vtype``.  A single edge
+        is added between every pair of ``u[i]`` and ``v[i]``.
+
+        Parameters
+        ----------
+        u : list, tensor
+            The source node IDs of type ``utype``.  Must exist in the graph.
+        v : list, tensor
+            The destination node IDs of type ``vtype``.  Must exist in the
+            graph.
+        etype : str
+            The edge type name.  Must exist in the metagraph.
+        data : dict, optional
+            Feature data of the added edge.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['plays'].number_of_edges()
+        4
+        >>> g.add_edges([0, 2], [1, 0], 'plays')
+        >>> g['plays'].number_of_edges()
+        6
+        """
+        pass
 
     def from_networkx(
             self,
