@@ -32,7 +32,7 @@ class HeteroGraphIndex(ObjectBase):
         pass
 
     @property
-    def meta_graph(self):
+    def metagraph(self):
         """Meta graph
 
         Returns
@@ -44,11 +44,11 @@ class HeteroGraphIndex(ObjectBase):
 
     def number_of_ntypes(self):
         """Return number of node types."""
-        return self.meta_graph.number_of_nodes()
+        return self.metagraph.number_of_nodes()
 
     def number_of_etypes(self):
         """Return number of edge types."""
-        return self.meta_graph.number_of_edges()
+        return self.metagraph.number_of_edges()
 
     def get_relation_graph(self, etype):
         """Get the bipartite graph of the given edge/relation type.
@@ -75,7 +75,7 @@ class HeteroGraphIndex(ObjectBase):
         num : int
             Number of nodes to be added.
         """
-        _CAPI_DGLHetero(self, int(ntype), int(num))
+        _CAPI_DGLHeteroAddVertices(self, int(ntype), int(num))
 
     def add_edge(self, etype, u, v):
         """Add one edge.
@@ -580,7 +580,7 @@ class HeteroGraphIndex(ObjectBase):
         fmt = F.get_preferred_sparse_format()
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         # convert to framework-specific sparse matrix
-        srctype, dsttype = self.meta_graph.find_edge(etype)
+        srctype, dsttype = self.metagraph.find_edge(etype)
         nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
         ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
         nnz = self.number_of_edges(etype)
@@ -724,12 +724,12 @@ def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
         int(num_src), int(num_dst),
         indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
 
-def create_heterograph(meta_graph, rel_graphs):
+def create_heterograph(metagraph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
     ----------
-    meta_graph : GraphIndex
+    metagraph : GraphIndex
         Meta-graph.
     rel_graphs : list of HeteroGraphIndex
         Bipartite graph of each relation.
@@ -738,6 +738,6 @@ def create_heterograph(meta_graph, rel_graphs):
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateHeteroGraph(meta_graph, rel_graphs)
+    return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
 
 _init_api("dgl.heterograph_index")
