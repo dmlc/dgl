@@ -15,7 +15,7 @@ __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'SetTransformerEncoder', 'SetTransformerDecoder']
 
 class SumPooling(nn.Module):
-    r"""Apply sum pooling over the graph.
+    r"""Apply sum pooling over the nodes in the graph.
 
     .. math::
         `r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k`
@@ -46,7 +46,7 @@ class SumPooling(nn.Module):
 
 
 class AvgPooling(nn.Module):
-    r"""Apply average pooling over the graph.
+    r"""Apply average pooling over the nodes in the graph.
 
     .. math::
         `r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k`
@@ -76,7 +76,7 @@ class AvgPooling(nn.Module):
 
 
 class MaxPooling(nn.Module):
-    r"""Apply max pooling over the graph.
+    r"""Apply max pooling over the nodes in the graph.
 
     .. math::
         `r^{(i)} = \max_{k=1}^{N_i} x^{(i)}_k`
@@ -107,7 +107,7 @@ class MaxPooling(nn.Module):
 
 class SortPooling(nn.Module):
     r"""Apply sort pooling (f"An End-to-End Deep Learning Architecture
-    for Graph Classification") over the graph.
+    for Graph Classification") over the nodes in the graph.
 
     Parameters
     ----------
@@ -147,10 +147,10 @@ class SortPooling(nn.Module):
 
 
 class GlobalAttentionPooling(nn.Module):
-    r"""Apply global attention pooling over the graph.
+    r"""Apply global attention pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \sum_{k=1}^{N_i}\textrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
+        `r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
 
     Parameters
     ----------
@@ -207,12 +207,13 @@ class GlobalAttentionPooling(nn.Module):
 
 
 class Set2Set(nn.Module):
-    r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over the graph.
+    r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over
+    the nodes in the graph.
 
     For each individual graph in the batch, set2set computes
     .. math::
-        q_t &=& \textrm{LSTM} (q^*_{t-1})
-        \alpha_{i,t} &=& \textrm{softmax}(x_i \cdot q_t)
+        q_t &=& \mathrm{LSTM} (q^*_{t-1})
+        \alpha_{i,t} &=& \mathrm{softmax}(x_i \cdot q_t)
         r_t &=& \sum_{i=1}^N \alpha_{i,t} x_i
         q^*_t &=& q_t \Vert r_t
 
