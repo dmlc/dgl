@@ -1,13 +1,9 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
-import numpy as np
-import networkx as nx
-import scipy
-
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import DGLError, dgl_warning
+from .base import DGLError
 from . import backend as F
 from . import utils
 
