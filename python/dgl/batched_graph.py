@@ -882,7 +882,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
         batch_num_objs = [getattr(graph, num_objs_attr)()]
         batch_size = 1
 
-    l = max(max(batch_num_objs), k)
+    length = max(max(batch_num_objs), k)
     fill_val = -float('inf') if descending else float('inf')
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, fill_val, l_min=k)
 
@@ -898,13 +898,13 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     feat_ = F.pad_packed_tensor(feat, batch_num_objs, 0, l_min=k)
 
     if idx is not None:
-        feat_ = F.reshape(feat_, (batch_size * l, -1))
-        shift = F.repeat(F.arange(0, batch_size) * l, k, -1)
+        feat_ = F.reshape(feat_, (batch_size * length, -1))
+        shift = F.repeat(F.arange(0, batch_size) * length, k, -1)
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) + shift
     else:
         feat_ = F.reshape(feat_, (-1,))
-        shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * l * hidden_size +\
+        shift = F.repeat(F.arange(0, batch_size), k * hidden_size, -1) * length * hidden_size +\
                 F.cat([F.arange(0, hidden_size)] * batch_size * k, -1)
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift

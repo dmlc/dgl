@@ -185,7 +185,7 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
-def pad_packed_tensor(input, lengths, value, l_min):
+def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
         max_len = as_scalar(lengths.max())
