@@ -1,7 +1,7 @@
 import numpy as np
 import dgl
 import dgl.ndarray as nd
-import dgl.graph_index as dgl_gidx
+import dgl.heterograph_index as dgl_gidx
 from dgl.utils import toindex
 import backend as F
 
