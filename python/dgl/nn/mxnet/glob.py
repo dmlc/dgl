@@ -26,14 +26,17 @@ class SumPooling(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -60,14 +63,17 @@ class AvgPooling(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -94,14 +100,17 @@ class MaxPooling(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -132,14 +141,17 @@ class SortPooling(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         # Sort the feature of each node in ascending order.
         graph = graph.local_var()
@@ -190,14 +202,17 @@ class GlobalAttentionPooling(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         graph = graph.local_var()
         gate = self.gate_nn(feat)
@@ -255,14 +270,17 @@ class Set2Set(nn.Block):
         Parameters
         ----------
         feat : mxnet.NDArray
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         mxnet.NDArray
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         graph = graph.local_var()
         batch_size = 1

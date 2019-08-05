@@ -30,14 +30,17 @@ class SumPooling(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -60,14 +63,17 @@ class AvgPooling(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -90,14 +96,17 @@ class MaxPooling(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, *)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(*)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, *)`.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
@@ -124,21 +133,24 @@ class SortPooling(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         graph = graph.local_var()
         # Sort the feature of each node in ascending order.
         feat, _ = feat.sort(dim=-1)
         graph.ndata['h'] = feat
         # Sort nodes according to their last features.
-        ret = topk_nodes(graph, 'h', self.k)[0].view(
+        ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
             -1, self.k * feat.shape[-1])
         if isinstance(graph, BatchedDGLGraph):
             return ret
@@ -181,14 +193,17 @@ class GlobalAttentionPooling(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         graph = graph.local_var()
         gate = self.gate_nn(feat)
@@ -248,14 +263,17 @@ class Set2Set(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         graph = graph.local_var()
         batch_size = 1
@@ -398,7 +416,7 @@ class SetAttentionBlock(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature.
         lengths : list
             The array of node numbers, used to segment feat tensor.
         """
@@ -429,7 +447,7 @@ class InducedSetAttentionBlock(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature.
         lengths : list
             The array of node numbers, used to segment feat tensor.
 
@@ -480,7 +498,7 @@ class PMALayer(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature.
         lengths : list
             The array of node numbers, used to segment feat tensor.
 
@@ -558,14 +576,15 @@ class SetTransformerEncoder(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(N, D)`.
         """
         if isinstance(graph, BatchedDGLGraph):
             lengths = graph.batch_num_nodes
@@ -622,14 +641,17 @@ class SetTransformerDecoder(nn.Module):
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature with shape :math:`(N, D)` where
+            :math:`N` is the number of nodes in the graph.
         graph : DGLGraph or BatchedDGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature with shape :math:`(D)` (if
+            input graph is a BatchedDGLGraph, the result shape
+            would be :math:`(B, D)`.
         """
         if isinstance(graph, BatchedDGLGraph):
             len_pma = graph.batch_num_nodes
