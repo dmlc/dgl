@@ -174,7 +174,8 @@ class GlobalAttentionPooling(nn.Block):
     <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
 
     .. math::
-        r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}\left(x^{(i)}_k\right)\right) f_{feat}\left(x^{(i)}_k\right)
+        r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}
+        \left(x^{(i)}_k\right)\right) f_{feat}\left(x^{(i)}_k\right)
 
     Parameters
     ----------
