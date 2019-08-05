@@ -145,6 +145,11 @@ def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
 
 def slice_axis(data, axis, begin, end):
+    dim = data.shape[axis]
+    if begin < 0:
+        begin += dim
+    if end <= 0:
+        end += dim
     if begin >= end:
         raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
     return th.index_select(data, axis, th.arange(begin, end, device=data.device))
@@ -180,12 +185,16 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
-def pad_packed_tensor(input, lengths, value):
+def pad_packed_tensor(input, lengths, value, l_min):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
         max_len = as_scalar(lengths.max())
     else:
         max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
     batch_size = len(lengths)
     device = input.device
     x = input.new(batch_size * max_len, *old_shape[1:])

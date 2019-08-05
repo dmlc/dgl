@@ -761,7 +761,7 @@ def ones(shape, dtype, ctx):
     """
     pass
 
-def pad_packed_tensor(input, lengths, value):
+def pad_packed_tensor(input, lengths, value, l_min=None):
     """Pads a packed batch of variable length tensors with given value.
 
     Parameters
@@ -774,11 +774,14 @@ def pad_packed_tensor(input, lengths, value):
         where :math:`B` is the length of :math:`L`.
     value : float
         The value to fill in the tensor.
+    l_min : int or None, defaults to None.
+        The minimum length each tensor need to be padded to, if set to None,
+        then there is no minimum length requirement.
 
     Returns
     -------
     Tensor
-        The obtained tensor with shape :math:`(B, \max_i(L_i), *)`
+        The obtained tensor with shape :math:`(B, \max(\max_i(L_i), l_{min}), *)`
     """
     pass
 

@@ -187,6 +187,11 @@ def gather_row(data, row_index):
         return data[row_index,]
 
 def slice_axis(data, axis, begin, end):
+    dim = data.shape[axis]
+    if begin < 0:
+        begin += dim
+    if end <= 0:
+        end += dim
     return nd.slice_axis(data, axis, begin, end)
 
 def take(data, indices, dim):
@@ -220,12 +225,16 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
 
-def pad_packed_tensor(input, lengths, value):
+def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
         max_len = as_scalar(input.max())
     else:
         max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
     batch_size = len(lengths)
     ctx = input.context
     dtype = input.dtype
