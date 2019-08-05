@@ -438,6 +438,22 @@ def argsort(input, dim, descending):
         A framework-specific tensor.
     """
 
+def topk(input, k, dim, descending=True):
+    """Return the k largest elements of the given input tensor along the given dimension.
+
+    If descending is False then the k smallest elements are returned.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The dim to sort along.
+    descending : bool
+        Controls whether to return largest/smallest elements.
+    """
+    pass
+
 def exp(input):
     """Returns a new tensor with the exponential of the elements of the input tensor `input`.
 

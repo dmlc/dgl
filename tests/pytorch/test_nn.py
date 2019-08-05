@@ -70,13 +70,15 @@ def test_set2set():
     # test#1: basic
     h0 = th.rand(g.number_of_nodes(), 5)
     h1 = s2s(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 and h1.dim() == 1
 
     # test#2: batched graph
-    bg = dgl.batch([g, g, g])
+    g1 = dgl.DGLGraph(nx.path_graph(11))
+    g2 = dgl.DGLGraph(nx.path_graph(5))
+    bg = dgl.batch([g, g1, g2])
     h0 = th.rand(bg.number_of_nodes(), 5)
     h1 = s2s(h0, bg)
-    print(h1)
+    assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10))
@@ -87,13 +89,13 @@ def test_glob_att_pool():
     # test#1: basic
     h0 = th.rand(g.number_of_nodes(), 5)
     h1 = gap(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 and h1.dim() == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
     h0 = th.rand(bg.number_of_nodes(), 5)
     h1 = gap(h0, bg)
-    print(h1)
+    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_simple_pool():
     g = dgl.DGLGraph(nx.path_graph(15))
@@ -107,26 +109,45 @@ def test_simple_pool():
     # test#1: basic
     h0 = th.rand(g.number_of_nodes(), 5)
     h1 = sum_pool(h0, g)
-    print(h1)
+    assert th.allclose(h1, th.sum(h0, 0))
     h1 = avg_pool(h0, g)
-    print(h1)
+    assert th.allclose(h1, th.mean(h0, 0))
     h1 = max_pool(h0, g)
-    print(h1)
+    assert th.allclose(h1, th.max(h0, 0)[0])
     h1 = sort_pool(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 * 5 and h1.dim() == 1
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = th.rand(bg.number_of_nodes(), 5)
+
     h1 = sum_pool(h0, bg)
-    print(h1)
+    truth = th.stack([th.sum(h0[:15], 0),
+                      th.sum(h0[15:20], 0),
+                      th.sum(h0[20:35], 0),
+                      th.sum(h0[35:40], 0),
+                      th.sum(h0[40:55], 0)], 0)
+    assert th.allclose(h1, truth)
+
     h1 = avg_pool(h0, bg)
-    print(h1)
+    truth = th.stack([th.mean(h0[:15], 0),
+                      th.mean(h0[15:20], 0),
+                      th.mean(h0[20:35], 0),
+                      th.mean(h0[35:40], 0),
+                      th.mean(h0[40:55], 0)], 0)
+    assert th.allclose(h1, truth)
+
     h1 = max_pool(h0, bg)
-    print(h1)
+    truth = th.stack([th.max(h0[:15], 0)[0],
+                      th.max(h0[15:20], 0)[0],
+                      th.max(h0[20:35], 0)[0],
+                      th.max(h0[35:40], 0)[0],
+                      th.max(h0[40:55], 0)[0]], 0)
+    assert th.allclose(h1, truth)
+
     h1 = sort_pool(h0, bg)
-    print(h1)
+    assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
 def test_set_trans():
     g = dgl.DGLGraph(nx.path_graph(15))
@@ -139,28 +160,23 @@ def test_set_trans():
     # test#1: basic
     h0 = th.rand(g.number_of_nodes(), 50)
     h1 = st_enc_0(h0, g)
-    print(h1.shape)
     assert h1.shape == h0.shape
     h1 = st_enc_1(h0, g)
-    print(h1.shape)
     assert h1.shape == h0.shape
-
-    # test#2: batched graph
     h2 = st_dec(h1, g)
-    print(h2.shape)
     assert h2.shape[0] == 200 and h2.dim() == 1
 
-    bg = dgl.batch([g, g, g])
+    # test#2: batched graph
+    g1 = dgl.DGLGraph(nx.path_graph(5))
+    g2 = dgl.DGLGraph(nx.path_graph(10))
+    bg = dgl.batch([g, g1, g2])
     h0 = th.rand(bg.number_of_nodes(), 50)
     h1 = st_enc_0(h0, bg)
-    print(h1.shape)
     assert h1.shape == h0.shape
     h1 = st_enc_1(h0, bg)
-    print(h1.shape)
     assert h1.shape == h0.shape
 
     h2 = st_dec(h1, bg)
-    print(h2.shape)
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
 def uniform_attention(g, shape):

@@ -728,7 +728,7 @@ def mean_edges(graph, feat, weight=None):
 
 def _max_on(graph, typestr, feat):
     """Internal function to take elementwise maximum
-    over node or edge features.
+     over node or edge features.
 
     Parameters
     ----------
@@ -760,7 +760,7 @@ def _max_on(graph, typestr, feat):
 
 def _softmax_on(graph, typestr, feat):
     """Internal function of applying batch-wise graph-level softmax
-    over node or edge features of a given field.
+     over node or edge features of a given field.
 
     Parameters
     ----------
@@ -826,10 +826,14 @@ def _broadcast_on(graph, typestr, feat_data):
         return F.cat([feat_data] * num_objs, 0)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
-    """Internal function to take graph-wise top-k features along the
-    given index of a given field.
-    If :attr:`descending` is set to False, return the k smallest elements
-    instead.
+    """Internal function to take graph-wise top-k node/edge features of
+     field :attr:`feat` in :attr:`graph` ranked by keys at given
+     index :attr:`idx`. If :attr:`descending` is set to False, return the
+     k smallest elements instead.
+
+    If idx is set to None, the function would return top-k value of all
+     indices, which is equivalent to calling `th.topk(graph.ndata[feat], dim=0)`
+     for each example of the input graph.
 
     Parameters
     ---------
@@ -919,7 +923,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
 
 def max_nodes(graph, feat):
     """Take elementwise maximum over all the values of node field
-    :attr:`feat` in :attr:`graph`
+     :attr:`feat` in :attr:`graph`
 
     Parameters
     ----------
@@ -965,17 +969,17 @@ def max_nodes(graph, feat):
     Notes
     -----
     If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
-    returned instead, i.e. having an extra first dimension.
-    Each row of the stacked tensor contains the readout result of
-    corresponding example in the batch. If an example has no nodes,
-    a tensor filed with -inf of the same shape is returned at the
-    corresponding row.
+     returned instead, i.e. having an extra first dimension.
+     Each row of the stacked tensor contains the readout result of
+     corresponding example in the batch. If an example has no nodes,
+     a tensor filed with -inf of the same shape is returned at the
+     corresponding row.
     """
     return _max_on(graph, 'nodes', feat)
 
 def max_edges(graph, feat):
     """Take elementwise maximum over all the values of edge field
-    :attr:`feat` in :attr:`graph`
+     :attr:`feat` in :attr:`graph`
 
     Parameters
     ----------
@@ -996,7 +1000,7 @@ def max_edges(graph, feat):
     >>> import torch as th
 
     Create two :class:`~dgl.DGLGraph` objects and initialize their
-    node features.
+     node features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
     >>> g1.add_nodes(2)
@@ -1023,11 +1027,11 @@ def max_edges(graph, feat):
     Notes
     -----
     If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
-    returned instead, i.e. having an extra first dimension.
-    Each row of the stacked tensor contains the readout result of
-    corresponding example in the batch. If an example has no edges,
-    a tensor filled with -inf of the same shape is returned at the
-    corresponding row.
+     returned instead, i.e. having an extra first dimension.
+     Each row of the stacked tensor contains the readout result of
+     corresponding example in the batch. If an example has no edges,
+     a tensor filled with -inf of the same shape is returned at the
+     corresponding row.
     """
     return _max_on(graph, 'edges', feat)
 
@@ -1054,7 +1058,7 @@ def softmax_nodes(graph, feat):
     >>> import torch as th
 
     Create two :class:`~dgl.DGLGraph` objects and initialize their
-    node features.
+     node features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
     >>> g1.add_nodes(2)
@@ -1083,14 +1087,14 @@ def softmax_nodes(graph, feat):
     Notes
     -----
     If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at
-    each example in the batch.
+     each example in the batch.
     """
     return _softmax_on(graph, 'nodes', feat)
 
 
 def softmax_edges(graph, feat):
     """Apply batch-wise graph-level softmax over all the values of edge field
-    :attr:`feat` in :attr:`graph`.
+     :attr:`feat` in :attr:`graph`.
 
     Parameters
     ----------
@@ -1142,7 +1146,7 @@ def softmax_edges(graph, feat):
     Notes
     -----
     If graph is a :class:`BatchedDGLGraph` object, the softmax is applied at each
-    example in the batch.
+     example in the batch.
     """
     return _softmax_on(graph, 'edges', feat)
 
@@ -1170,7 +1174,7 @@ def broadcast_nodes(graph, feat_data):
     >>> import torch as th
 
     Create two :class:`~dgl.DGLGraph` objects and initialize their
-    node features.
+     node features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
     >>> g1.add_nodes(2)
@@ -1185,7 +1189,7 @@ def broadcast_nodes(graph, feat_data):
             [0.2721, 0.4629, 0.7269, 0.0724, 0.1014]])
 
     Broadcast feature to all nodes in the batched graph, feat[i] is broadcast to nodes
-    in the i-th example in the batch.
+     in the i-th example in the batch.
     >>> dgl.broadcast_nodes(bg, feat)
     tensor([[0.4325, 0.7710, 0.5541, 0.0544, 0.9368],
             [0.4325, 0.7710, 0.5541, 0.0544, 0.9368],
@@ -1268,8 +1272,13 @@ def broadcast_edges(graph, feat_data):
 
 def topk_nodes(graph, feat, k, descending=True, idx=None):
     """Return graph-wise top-k node features of field :attr:`feat` in
-    :attr:`graph` along given index :attr:`idx`. If :attr:`reverse` is
-    set to True, return the k smallest elements instead.
+     :attr:`graph` ranked by keys at given index :attr:`idx`. If :attr:
+     `descending` is set to False, return the k smallest elements instead.
+
+    If idx is set to None, the function would return top-k value of all
+     indices, which is equivalent to calling
+     :code:`torch.topk(graph.ndata[feat], dim=0)`
+     for each example of the input graph.
 
     Parameters
     ----------
@@ -1282,7 +1291,7 @@ def topk_nodes(graph, feat, k, descending=True, idx=None):
     descending : bool
         Controls whether to return the largest or smallest elements.
     idx : int or None, defaults to None
-        The key index we sort :attr:`feat` on, if set to None, we sort
+        The index of keys we rank :attr:`feat` on, if set to None, we sort
         the whole :attr:`feat`.
 
     Returns
@@ -1377,8 +1386,14 @@ def topk_nodes(graph, feat, k, descending=True, idx=None):
 
 def topk_edges(graph, feat, k, descending=True, idx=None):
     """Return graph-wise top-k edge features of field :attr:`feat` in
-    :attr:`graph` along given index :attr:`idx`. If :attr:`reverse` is
-    set to True, return the k smallest elements instead.
+     :attr:`graph` ranked by keys at given index :attr:`idx`. If
+     :attr:`descending` is set to False, return the k smallest elements
+     instead.
+
+    If idx is set to None, the function would return top-k value of all
+     indices, which is equivalent to calling
+     :code:`torch.topk(graph.edata[feat], dim=0)`
+     for each example of the input graph.
 
     Parameters
     ----------

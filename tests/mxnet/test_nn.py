@@ -5,9 +5,8 @@ import dgl
 import dgl.nn.mxnet as nn
 from mxnet import autograd, gluon
 
-def check_eq(a, b):
-    assert a.shape == b.shape
-    assert mx.nd.sum(a == b).asnumpy() == int(np.prod(list(a.shape)))
+def check_close(a, b):
+    assert np.allclose(a.asnumpy(), b.asnumpy(), rtol=1e-4, atol=1e-4)
 
 def _AXWb(A, X, W, b):
     X = mx.nd.dot(X, W.data(X.context))
@@ -26,13 +25,13 @@ def test_graph_conv():
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
-    check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+    check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
     h0 = mx.nd.ones((3, 5, 5))
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
-    check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+    check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
 
     conv = nn.GraphConv(5, 2)
     conv.initialize(ctx=ctx)
@@ -69,7 +68,7 @@ def test_graph_conv():
     assert len(g.ndata) == 1
     assert len(g.edata) == 0
     assert "h" in g.ndata
-    check_eq(g.ndata['h'], 2 * mx.nd.ones((3, 1)))
+    check_close(g.ndata['h'], 2 * mx.nd.ones((3, 1)))
 
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
@@ -80,13 +79,13 @@ def test_set2set():
     # test#1: basic
     h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
     h1 = s2s(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g])
     h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
     h1 = s2s(h0, bg)
-    print(h1)
+    assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10))
@@ -96,14 +95,13 @@ def test_glob_att_pool():
     # test#1: basic
     h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
     h1 = gap(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
     h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
     h1 = gap(h0, bg)
-    print(h1)
-
+    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_simple_pool():
     g = dgl.DGLGraph(nx.path_graph(15))
@@ -117,26 +115,44 @@ def test_simple_pool():
     # test#1: basic
     h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
     h1 = sum_pool(h0, g)
-    print(h1)
+    check_close(h1, mx.nd.sum(h0, 0))
     h1 = avg_pool(h0, g)
-    print(h1)
+    check_close(h1, mx.nd.mean(h0, 0))
     h1 = max_pool(h0, g)
-    print(h1)
+    check_close(h1, mx.nd.max(h0, 0))
     h1 = sort_pool(h0, g)
-    print(h1)
+    assert h1.shape[0] == 10 * 5 and h1.ndim == 1
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
     h1 = sum_pool(h0, bg)
-    print(h1)
+    truth = mx.nd.stack(mx.nd.sum(h0[:15], 0),
+                        mx.nd.sum(h0[15:20], 0),
+                        mx.nd.sum(h0[20:35], 0),
+                        mx.nd.sum(h0[35:40], 0),
+                        mx.nd.sum(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
     h1 = avg_pool(h0, bg)
-    print(h1)
+    truth = mx.nd.stack(mx.nd.mean(h0[:15], 0),
+                        mx.nd.mean(h0[15:20], 0),
+                        mx.nd.mean(h0[20:35], 0),
+                        mx.nd.mean(h0[35:40], 0),
+                        mx.nd.mean(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
     h1 = max_pool(h0, bg)
-    print(h1)
+    truth = mx.nd.stack(mx.nd.max(h0[:15], 0),
+                        mx.nd.max(h0[15:20], 0),
+                        mx.nd.max(h0[20:35], 0),
+                        mx.nd.max(h0[35:40], 0),
+                        mx.nd.max(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
     h1 = sort_pool(h0, bg)
-    print(h1)
+    assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
 
 def uniform_attention(g, shape):

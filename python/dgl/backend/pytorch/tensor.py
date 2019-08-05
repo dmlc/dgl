@@ -120,6 +120,9 @@ def reduce_min(input):
 def argsort(input, dim, descending):
     return th.argsort(input, dim=dim, descending=descending)
 
+def topk(input, k, dim, descending=True):
+    return th.topk(input, k, dim, largest=descending)[0]
+
 def exp(input):
     return th.exp(input)
 

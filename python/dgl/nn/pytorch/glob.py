@@ -42,10 +42,10 @@ class SumPooling(nn.Module):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = sum_nodes(graph, 'h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = sum_nodes(graph, 'h')
+            return readout
 
 
 class AvgPooling(nn.Module):
@@ -75,10 +75,10 @@ class AvgPooling(nn.Module):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = mean_nodes(graph, 'h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = mean_nodes(graph, 'h')
+            return readout
 
 
 class MaxPooling(nn.Module):
@@ -108,10 +108,10 @@ class MaxPooling(nn.Module):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = max_nodes(graph, 'h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = max_nodes(graph, 'h')
+            return readout
 
 
 class SortPooling(nn.Module):
@@ -141,21 +141,21 @@ class SortPooling(nn.Module):
         Returns
         -------
         torch.Tensor
-            The output feature with shape :math:`(D)` (if
+            The output feature with shape :math:`(k * D)` (if
             input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            would be :math:`(B, k * D)`.
         """
-        graph = graph.local_var()
-        # Sort the feature of each node in ascending order.
-        feat, _ = feat.sort(dim=-1)
-        graph.ndata['h'] = feat
-        # Sort nodes according to their last features.
-        ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
-            -1, self.k * feat.shape[-1])
-        if isinstance(graph, BatchedDGLGraph):
-            return ret
-        else:
-            return ret.squeeze(0)
+        with graph.local_scope():
+            # Sort the feature of each node in ascending order.
+            feat, _ = feat.sort(dim=-1)
+            graph.ndata['h'] = feat
+            # Sort nodes according to their last features.
+            ret = topk_nodes(graph, 'h', self.k, idx=-1)[0].view(
+                -1, self.k * feat.shape[-1])
+            if isinstance(graph, BatchedDGLGraph):
+                return ret
+            else:
+                return ret.squeeze(0)
 
 
 class GlobalAttentionPooling(nn.Module):
@@ -205,20 +205,20 @@ class GlobalAttentionPooling(nn.Module):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, D)`.
         """
-        graph = graph.local_var()
-        gate = self.gate_nn(feat)
-        assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
-        feat = self.feat_nn(feat) if self.feat_nn else feat
+        with graph.local_scope():
+            gate = self.gate_nn(feat)
+            assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
+            feat = self.feat_nn(feat) if self.feat_nn else feat
 
-        graph.ndata['gate'] = gate
-        gate = softmax_nodes(graph, 'gate')
-        graph.ndata.pop('gate')
+            graph.ndata['gate'] = gate
+            gate = softmax_nodes(graph, 'gate')
+            graph.ndata.pop('gate')
 
-        graph.ndata['r'] = feat * gate
-        readout = sum_nodes(graph, 'r')
-        graph.ndata.pop('r')
+            graph.ndata['r'] = feat * gate
+            readout = sum_nodes(graph, 'r')
+            graph.ndata.pop('r')
 
-        return readout
+            return readout
 
 
 class Set2Set(nn.Module):
@@ -275,36 +275,36 @@ class Set2Set(nn.Module):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, D)`.
         """
-        graph = graph.local_var()
-        batch_size = 1
-        if isinstance(graph, BatchedDGLGraph):
-            batch_size = graph.batch_size
+        with graph.local_scope():
+            batch_size = 1
+            if isinstance(graph, BatchedDGLGraph):
+                batch_size = graph.batch_size
 
-        h = (feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
-             feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
+            h = (feat.new_zeros((self.n_layers, batch_size, self.input_dim)),
+                 feat.new_zeros((self.n_layers, batch_size, self.input_dim)))
 
-        q_star = feat.new_zeros(batch_size, self.output_dim)
+            q_star = feat.new_zeros(batch_size, self.output_dim)
 
-        for _ in range(self.n_iters):
-            q, h = self.lstm(q_star.unsqueeze(0), h)
-            q = q.view(batch_size, self.input_dim)
+            for _ in range(self.n_iters):
+                q, h = self.lstm(q_star.unsqueeze(0), h)
+                q = q.view(batch_size, self.input_dim)
 
-            e = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
-            graph.ndata['e'] = e
-            alpha = softmax_nodes(graph, 'e')
+                e = (feat * broadcast_nodes(graph, q)).sum(dim=-1, keepdim=True)
+                graph.ndata['e'] = e
+                alpha = softmax_nodes(graph, 'e')
 
-            graph.ndata['r'] = feat * alpha
-            readout = sum_nodes(graph, 'r')
+                graph.ndata['r'] = feat * alpha
+                readout = sum_nodes(graph, 'r')
 
-            if readout.dim() == 1: # graph is not a BatchedDGLGraph
-                readout = readout.unsqueeze(0)
+                if readout.dim() == 1: # graph is not a BatchedDGLGraph
+                    readout = readout.unsqueeze(0)
 
-            q_star = th.cat([q, readout], dim=-1)
+                q_star = th.cat([q, readout], dim=-1)
 
-        if isinstance(graph, BatchedDGLGraph):
-            return q_star
-        else:
-            return q_star.squeeze(0)
+            if isinstance(graph, BatchedDGLGraph):
+                return q_star
+            else:
+                return q_star.squeeze(0)
 
     def extra_repr(self):
         """Set the extra representation of the module.

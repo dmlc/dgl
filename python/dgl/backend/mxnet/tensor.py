@@ -137,6 +137,9 @@ def min(input, dim):
 def reduce_min(input):
     return input.min()
 
+def topk(input, k, dim, descending=True):
+    return nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending)
+
 def argsort(input, dim, descending):
     idx = nd.argsort(input, dim, is_ascend=not descending)
     idx = nd.cast(idx, dtype='int64')

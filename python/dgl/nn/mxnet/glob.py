@@ -38,11 +38,11 @@ class SumPooling(nn.Block):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = sum_nodes(graph, 'h')
-        graph.ndata.pop('h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = sum_nodes(graph, 'h')
+            graph.ndata.pop('h')
+            return readout
 
     def __repr__(self):
         return 'SumPooling()'
@@ -75,11 +75,11 @@ class AvgPooling(nn.Block):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = mean_nodes(graph, 'h')
-        graph.ndata.pop('h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = mean_nodes(graph, 'h')
+            graph.ndata.pop('h')
+            return readout
 
     def __repr__(self):
         return 'AvgPooling()'
@@ -112,11 +112,11 @@ class MaxPooling(nn.Block):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, *)`.
         """
-        graph = graph.local_var()
-        graph.ndata['h'] = feat
-        readout = max_nodes(graph, 'h')
-        graph.ndata.pop('h')
-        return readout
+        with graph.local_scope():
+            graph.ndata['h'] = feat
+            readout = max_nodes(graph, 'h')
+            graph.ndata.pop('h')
+            return readout
 
     def __repr__(self):
         return 'MaxPooling()'
@@ -149,21 +149,21 @@ class SortPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(D)` (if
+            The output feature with shape :math:`(k * D)` (if
             input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            would be :math:`(B, k * D)`.
         """
         # Sort the feature of each node in ascending order.
-        graph = graph.local_var()
-        feat = feat.sort(axis=-1)
-        graph.ndata['h'] = feat
-        # Sort nodes according to their last features.
-        ret = topk_nodes(graph, 'h', self.k)[0].reshape(
-            -1, self.k * feat.shape[-1])
-        if isinstance(graph, BatchedDGLGraph):
-            return ret
-        else:
-            return ret.squeeze(axis=0)
+        with graph.local_scope():
+            feat = feat.sort(axis=-1)
+            graph.ndata['h'] = feat
+            # Sort nodes according to their last features.
+            ret = topk_nodes(graph, 'h', self.k)[0].reshape(
+                -1, self.k * feat.shape[-1])
+            if isinstance(graph, BatchedDGLGraph):
+                return ret
+            else:
+                return ret.squeeze(axis=0)
 
     def __repr__(self):
         return 'SortPooling(k={})'.format(self.k)
@@ -214,18 +214,18 @@ class GlobalAttentionPooling(nn.Block):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, D)`.
         """
-        graph = graph.local_var()
-        gate = self.gate_nn(feat)
-        assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
-        feat = self.feat_nn(feat) if self.feat_nn else feat
+        with graph.local_scope():
+            gate = self.gate_nn(feat)
+            assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
+            feat = self.feat_nn(feat) if self.feat_nn else feat
 
-        graph.ndata['gate'] = gate
-        gate = softmax_nodes(graph, 'gate')
+            graph.ndata['gate'] = gate
+            gate = softmax_nodes(graph, 'gate')
 
-        graph.ndata['r'] = feat * gate
-        readout = sum_nodes(graph, 'r')
+            graph.ndata['r'] = feat * gate
+            readout = sum_nodes(graph, 'r')
 
-        return readout
+            return readout
 
 
 class Set2Set(nn.Block):
@@ -282,35 +282,35 @@ class Set2Set(nn.Block):
             input graph is a BatchedDGLGraph, the result shape
             would be :math:`(B, D)`.
         """
-        graph = graph.local_var()
-        batch_size = 1
-        if isinstance(graph, BatchedDGLGraph):
-            batch_size = graph.batch_size
+        with graph.local_scope():
+            batch_size = 1
+            if isinstance(graph, BatchedDGLGraph):
+                batch_size = graph.batch_size
 
-        h = (nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context),
-             nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context))
-        q_star = nd.zeros((batch_size, self.output_dim), ctx=feat.context)
+            h = (nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context),
+                 nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context))
+            q_star = nd.zeros((batch_size, self.output_dim), ctx=feat.context)
 
-        for _ in range(self.n_iters):
-            q, h = self.lstm(q_star.expand_dims(axis=0), h)
-            q = q.reshape((batch_size, self.input_dim))
+            for _ in range(self.n_iters):
+                q, h = self.lstm(q_star.expand_dims(axis=0), h)
+                q = q.reshape((batch_size, self.input_dim))
 
-            e = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
-            graph.ndata['e'] = e
-            alpha = softmax_nodes(graph, 'e')
+                e = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
+                graph.ndata['e'] = e
+                alpha = softmax_nodes(graph, 'e')
 
-            graph.ndata['r'] = feat * alpha
-            readout = sum_nodes(graph, 'r')
+                graph.ndata['r'] = feat * alpha
+                readout = sum_nodes(graph, 'r')
 
-            if readout.ndim == 1: # graph is not a BatchedDGLGraph
-                readout = readout.expand_dims(0)
+                if readout.ndim == 1: # graph is not a BatchedDGLGraph
+                    readout = readout.expand_dims(0)
 
-            q_star = nd.concat(q, readout, dim=-1)
+                q_star = nd.concat(q, readout, dim=-1)
 
-        if isinstance(graph, BatchedDGLGraph):
-            return q_star
-        else:
-            return q_star.squeeze(axis=0)
+            if isinstance(graph, BatchedDGLGraph):
+                return q_star
+            else:
+                return q_star.squeeze(axis=0)
 
     def __repr__(self):
         summary = 'Set2Set('
