@@ -18,7 +18,7 @@ class SumPooling(nn.Module):
     r"""Apply sum pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
     """
     def __init__(self):
         super(SumPooling, self).__init__()
@@ -52,7 +52,7 @@ class AvgPooling(nn.Module):
     r"""Apply average pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
@@ -85,7 +85,7 @@ class MaxPooling(nn.Module):
     r"""Apply max pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \max_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -115,8 +115,8 @@ class MaxPooling(nn.Module):
 
 
 class SortPooling(nn.Module):
-    r"""Apply sort pooling (f"An End-to-End Deep Learning Architecture
-    for Graph Classification") over the nodes in the graph.
+    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
 
     Parameters
     ----------
@@ -159,10 +159,11 @@ class SortPooling(nn.Module):
 
 
 class GlobalAttentionPooling(nn.Module):
-    r"""Apply global attention pooling over the nodes in the graph.
+    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
+        r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}\left(x^{(i)}_k\right)\right) f_{feat}\left(x^{(i)}_k\right)
 
     Parameters
     ----------
@@ -222,15 +223,19 @@ class GlobalAttentionPooling(nn.Module):
 
 
 class Set2Set(nn.Module):
-    r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over
-    the nodes in the graph.
+    r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
+    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
 
     For each individual graph in the batch, set2set computes
+
     .. math::
-        q_t &=& \mathrm{LSTM} (q^*_{t-1})
-        \alpha_{i,t} &=& \mathrm{softmax}(x_i \cdot q_t)
-        r_t &=& \sum_{i=1}^N \alpha_{i,t} x_i
-        q^*_t &=& q_t \Vert r_t
+        q_t &= \mathrm{LSTM} (q^*_{t-1})
+
+        \alpha_{i,t} &= \mathrm{softmax}(x_i \cdot q_t)
+
+        r_t &= \sum_{i=1}^N \alpha_{i,t} x_i
+
+        q^*_t &= q_t \Vert r_t
 
     for this graph.
 
@@ -315,7 +320,7 @@ class Set2Set(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    r""" Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
+    r"""Multi-Head Attention block, used in Transformer, Set Transformer and so on."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(MultiHeadAttention, self).__init__()
         self.d_model = d_model
@@ -403,7 +408,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class SetAttentionBlock(nn.Module):
-    r""" SAB block mentioned in Set-Transformer paper."""
+    r"""SAB block mentioned in Set-Transformer paper."""
     def __init__(self, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(SetAttentionBlock, self).__init__()
         self.mha = MultiHeadAttention(d_model, num_heads, d_head, d_ff,
@@ -424,7 +429,7 @@ class SetAttentionBlock(nn.Module):
 
 
 class InducedSetAttentionBlock(nn.Module):
-    r""" ISAB block mentioned in Set-Transformer paper."""
+    r"""ISAB block mentioned in Set-Transformer paper."""
     def __init__(self, m, d_model, num_heads, d_head, d_ff, dropouth=0., dropouta=0.):
         super(InducedSetAttentionBlock, self).__init__()
         self.m = m
@@ -520,7 +525,8 @@ class PMALayer(nn.Module):
 
 
 class SetTransformerEncoder(nn.Module):
-    r"""The Encoder module in Set Transformer paper.
+    r"""The Encoder module in `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
     ----------
@@ -598,7 +604,8 @@ class SetTransformerEncoder(nn.Module):
 
 
 class SetTransformerDecoder(nn.Module):
-    r"""The Decoder module in Set Transformer paper.
+    r"""The Decoder module in `Set Transformer: A Framework for Attention-based
+    Permutation-Invariant Neural Networks <https://arxiv.org/pdf/1810.00825.pdf>`__.
 
     Parameters
     ----------

@@ -15,7 +15,7 @@ class SumPooling(nn.Block):
     r"""Apply sum pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
     """
     def __init__(self):
         super(SumPooling, self).__init__()
@@ -52,7 +52,7 @@ class AvgPooling(nn.Block):
     r"""Apply average pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
     """
     def __init__(self):
         super(AvgPooling, self).__init__()
@@ -89,7 +89,7 @@ class MaxPooling(nn.Block):
     r"""Apply max pooling over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \max_{k=1}^{N_i} x^{(i)}_k`
+        r^{(i)} = \max_{k=1}^{N_i} \left( x^{(i)}_k \right)
     """
     def __init__(self):
         super(MaxPooling, self).__init__()
@@ -123,8 +123,8 @@ class MaxPooling(nn.Block):
 
 
 class SortPooling(nn.Block):
-    r"""Apply sort pooling (f"An End-to-End Deep Learning Architecture
-    for Graph Classification") over the nodes in the graph.
+    r"""Apply Sort Pooling (`An End-to-End Deep Learning Architecture for Graph Classification
+    <https://www.cse.wustl.edu/~ychen/public/DGCNN.pdf>`__) over the nodes in the graph.
 
     Parameters
     ----------
@@ -170,10 +170,11 @@ class SortPooling(nn.Block):
 
 
 class GlobalAttentionPooling(nn.Block):
-    r"""Apply global attention pooling over the nodes in the graph.
+    r"""Apply Global Attention Pooling (`Gated Graph Sequence Neural Networks
+    <https://arxiv.org/abs/1511.05493.pdf>`__) over the nodes in the graph.
 
     .. math::
-        `r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}(f_{gate}(x^{(i)}_k)) f_{feat}(x^{(i)}_k)`
+        r^{(i)} = \sum_{k=1}^{N_i}\mathrm{softmax}\left(f_{gate}\left(x^{(i)}_k\right)\right) f_{feat}\left(x^{(i)}_k\right)
 
     Parameters
     ----------
@@ -229,15 +230,19 @@ class GlobalAttentionPooling(nn.Block):
 
 
 class Set2Set(nn.Block):
-    r"""Apply Set2Set (f"Order Matters: Sequence to sequence for sets") over
-    the nodes in the graph.
+    r"""Apply Set2Set (`Order Matters: Sequence to sequence for sets
+    <https://arxiv.org/pdf/1511.06391.pdf>`__) over the nodes in the graph.
 
     For each individual graph in the batch, set2set computes
+
     .. math::
-        q_t &=& \mathrm{LSTM} (q^*_{t-1})
-        \alpha_{i,t} &=& \mathrm{softmax}(x_i \cdot q_t)
-        r_t &=& \sum_{i=1}^N \alpha_{i,t} x_i
-        q^*_t &=& q_t \Vert r_t
+        q_t &= \mathrm{LSTM} (q^*_{t-1})
+
+        \alpha_{i,t} &= \mathrm{softmax}(x_i \cdot q_t)
+
+        r_t &= \sum_{i=1}^N \alpha_{i,t} x_i
+
+        q^*_t &= q_t \Vert r_t
 
     for this graph.
 
