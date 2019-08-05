@@ -5,6 +5,8 @@ from . import utils
 from . import backend as F
 from .base import ALL, is_all
 
+__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
+
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
@@ -56,22 +58,27 @@ class DGLBaseHeteroGraph(object):
 
     @property
     def is_node_type_view(self):
+        """Whether this is a node type view of a heterograph."""
         return self._view_ntype_idx is not None
 
     @property
     def is_edge_type_view(self):
+        """Whether this is an edge type view of a heterograph."""
         return self._view_etype_idx is not None
 
     @property
     def is_view(self):
+        """Whether this is a node/edge type view of a heterograph."""
         return self.is_node_type_view or self.is_edge_type_view
 
     @property
     def node_types(self):
+        """Return the list of node types."""
         return self._ntypes
 
     @property
     def edge_types(self):
+        """Return the list of edge types."""
         return self._etypes
 
     def __getitem__(self, key):
@@ -104,13 +111,13 @@ class DGLBaseHeteroGraph(object):
         """
         if self.is_view:
             raise RuntimeError('Cannot create a view from a view')
+
+        if key in self._ntypes_invmap:
+            return self._create_node_type_view(self._ntypes_invmap[key])
+        elif key in self._etypes_invmap:
+            return self._create_edge_type_view(self._etypes_invmap[key])
         else:
-            if key in self._ntypes_invmap:
-                return self._create_node_type_view(self._ntypes_invmap[key])
-            elif key in self._etypes_invmap:
-                return self._create_edge_type_view(self._etypes_invmap[key])
-            else:
-                raise KeyError('%s is neither a node type or an edge type' % key)
+            raise KeyError('%s is neither a node type or an edge type' % key)
 
     @property
     def metagraph(self):
@@ -120,8 +127,8 @@ class DGLBaseHeteroGraph(object):
         The edges have a field "type" holding the edge type names.
         """
         nx_graph = self._graph.metagraph.to_networkx()
-        for i, uv in enumerate(nx_graph.edges):
-            nx_graph.edges[uv]['type'] = self._etypes[nx_graph.edges[uv]['id']]
+        for u_v in nx_graph.edges:
+            nx_graph.edges[u_v]['type'] = self._etypes[nx_graph.edges[u_v]['id']]
         nx.relabel_nodes(
             nx_graph,
             {i: ntype for i, ntype in enumerate(self._ntypes)},
@@ -243,7 +250,7 @@ class DGLBaseHeteroGraph(object):
         >>> 0 in g['user']
         True
         """
-        return self.has_node(self._view_ntype_idx, vid)
+        return self.has_node(vid)
 
     def has_nodes(self, vids):
         """Return a 0-1 array ``a`` given the node ID array ``vids``.
@@ -487,7 +494,7 @@ class DGLBaseHeteroGraph(object):
         """
         assert self.is_edge_type_view, 'only supported on edge type views'
         idx = self._graph.edge_id(self._view_etype_idx, u, v)
-        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
+        return idx.tousertensor() if force_multi or self._graph.is_multigraph() else idx[0]
 
     def edge_ids(self, u, v, force_multi=False):
         """Return all edge IDs between source node array `u` and destination
@@ -540,7 +547,7 @@ class DGLBaseHeteroGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(self._view_etype_idx, u, v)
-        if force_multi or self.is_multigraph:
+        if force_multi or self._graph.is_multigraph():
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
             return eid.tousertensor()
@@ -984,7 +991,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
           would be then automatically figured out from the bipartite graph list.
 
           The bipartite graphs should not share the same edge type names.
-          
+
           If two bipartite graphs share the same source node type, then the edges
           in the heterogeneous graph will share the same source node set.  This also
           applies to sharing the same destination node type, or having the same type
@@ -2394,6 +2401,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """
         pass
 
+    # TODO: replace this after implementing frame
+    # pylint: disable=useless-super-delegation
     def __repr__(self):
         return super(DGLHeteroGraph, self).__repr__()
 
