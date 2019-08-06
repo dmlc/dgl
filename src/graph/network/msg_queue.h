@@ -15,6 +15,8 @@
 #include <atomic>
 #include <functional>
 
+#include <dgl/runtime/ndarray.h>
+
 namespace dgl {
 namespace network {
 
@@ -55,9 +57,10 @@ struct Message {
    */
   int64_t size;
   /*!
-   * \brief aux_data pointer handler
+   * \brief To avoid NDArray been freed during the send(), we
+   * can hold a reference of current NDArray in the message.
    */
-  void* aux_handler;
+  runtime::NDArray array_handler;
   /*!
    * \brief user-defined deallocator, which can be nullptr
    */
