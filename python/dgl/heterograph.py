@@ -1140,8 +1140,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         >>> g['game'].number_of_nodes()
         5
         """
-        self._graph.add_nodes(node_type, num)
-        # TODO: frame
+        pass
 
     def add_edge(self, etype, u, v, data=None):
         """Add an edge of ``etype`` between u of the source node type, and v
@@ -1170,10 +1169,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         >>> g['plays'].number_of_edges()
         5
         """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
-        self._graph.add_edge(u, v)
-        # TODO: frame
+        pass
 
     def add_edges(self, u, v, etype, data=None):
         """Add multiple edges of ``etype`` between list of source nodes ``u``
@@ -1203,8 +1199,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         >>> g['plays'].number_of_edges()
         6
         """
-        self._graph.add_edges(u, v)
-        # TODO: frame
+        pass
 
     def from_networkx(
             self,
