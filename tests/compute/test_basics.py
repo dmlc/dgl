@@ -654,6 +654,93 @@ def test_group_apply_edges():
     # test group by destination nodes
     _test('dst')
 
+def test_local_var():
+    g = DGLGraph(nx.path_graph(5))
+    g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
+    g.edata['w'] = F.zeros((g.number_of_edges(), 4))
+    # test override
+    def foo(g):
+        g = g.local_var()
+        g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['w'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update
+    def foo(g):
+        g = g.local_var()
+        g.nodes[[2, 3]].data['h'] = F.ones((2, 3))
+        g.edges[[2, 3]].data['w'] = F.ones((2, 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update 2
+    def foo(g):
+        g = g.local_var()
+        g.apply_nodes(lambda nodes: {'h' : nodes.data['h'] + 10}, [2, 3])
+        g.apply_edges(lambda edges: {'w' : edges.data['w'] + 10}, [2, 3])
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test auto-pop
+    def foo(g):
+        g = g.local_var()
+        g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
+
+def test_local_scope():
+    g = DGLGraph(nx.path_graph(5))
+    g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
+    g.edata['w'] = F.zeros((g.number_of_edges(), 4))
+    # test override
+    def foo(g):
+        with g.local_scope():
+            g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['w'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update
+    def foo(g):
+        with g.local_scope():
+            g.nodes[[2, 3]].data['h'] = F.ones((2, 3))
+            g.edges[[2, 3]].data['w'] = F.ones((2, 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update 2
+    def foo(g):
+        with g.local_scope():
+            g.apply_nodes(lambda nodes: {'h' : nodes.data['h'] + 10}, [2, 3])
+            g.apply_edges(lambda edges: {'w' : edges.data['w'] + 10}, [2, 3])
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test auto-pop
+    def foo(g):
+        with g.local_scope():
+            g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
+
+    # test nested scope
+    def foo(g):
+        with g.local_scope():
+            g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+            with g.local_scope():
+                g.ndata['hhh'] = F.ones((g.number_of_nodes(), 3))
+                g.edata['www'] = F.ones((g.number_of_edges(), 4))
+            assert 'hhh' not in g.ndata
+            assert 'www' not in g.edata
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
 
 if __name__ == '__main__':
     test_nx_conversion()
@@ -672,3 +759,5 @@ if __name__ == '__main__':
     test_dynamic_addition()
     test_repr()
     test_group_apply_edges()
+    test_local_var()
+    test_local_scope()
