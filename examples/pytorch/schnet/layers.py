@@ -242,12 +242,13 @@ class VEConv(nn.Module):
         if self._update_edge:
             g.apply_edges(self.update_edge)
 
-        g.update_all(message_func=[
-            fn.u_mul_e("new_node", "h", "m_0"),
-            fn.copy_e("edge_f", "m_1")],
-                     reduce_func=[
-            fn.sum("m_0", "new_node_0"),
-            fn.sum("m_1", "new_node_1")])
+        g.update_all(
+            message_func=[
+                fn.u_mul_e("new_node", "h", "m_0"),
+                fn.copy_e("edge_f", "m_1")],
+            reduce_func=[
+                fn.sum("m_0", "new_node_0"),
+                fn.sum("m_1", "new_node_1")])
         g.ndata["new_node"] = g.ndata.pop("new_node_0") + g.ndata.pop(
             "new_node_1")
 
