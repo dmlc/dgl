@@ -211,7 +211,7 @@ class TencentAlchemyDataset(Dataset):
         download(_urls['Alchemy'] + "%s.zip" % mode,
                  path=str(self.zip_file_path))
         if not os.path.exists(str(self.file_dir)):
-            archive = zipfile.ZipFile(self.zip_file_path)
+            archive = zipfile.ZipFile(str(self.zip_file_path))
             archive.extractall('./Alchemy_data')
             archive.close()
 
@@ -219,7 +219,7 @@ class TencentAlchemyDataset(Dataset):
 
     def _load(self):
         if self.mode == 'dev':
-            target_file = pathlib.Path(self.file_dir, "train.csv")
+            target_file = pathlib.Path(self.file_dir, "dev_target.csv")
             self.target = pd.read_csv(target_file,
                                       index_col=0,
                                       usecols=[

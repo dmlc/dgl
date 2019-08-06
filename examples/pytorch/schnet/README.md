@@ -8,14 +8,14 @@ Dependencies
 ------------
 - PyTorch 1.0+
 - dgl 0.3+
-- RDKit (If use Alchemy dataset.)
+- RDKit (If use [Alchemy dataset](https://arxiv.org/abs/1906.09427).)
 
 Usage  
 -----
 
 Example usage on Alchemy dataset:
 
-+ SchNet: excepted MAE 0.065
++ SchNet: excepted MAE 0.065  
 ```py
 python train.py --model sch --epochs 250
 ```
@@ -24,6 +24,8 @@ python train.py --model sch --epochs 250
 ```py
 python train.py --model mgcn --epochs 250
 ```
+
+*With Tesla V100, SchNet takes 80s/epoch and MGCN takes 110s/epoch.*
 
 Codes
 -----
