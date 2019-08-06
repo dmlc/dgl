@@ -244,11 +244,45 @@ def test_edge_softmax():
     assert len(g.edata) == 2
     assert th.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     
+def test_rgcn():
+    etype = []
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # 5 etypes
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+
+    rgc_basis = nn.RelGraphConvBasis(10, 5, 5)
+    h = th.randn((100, 10))
+    r = th.tensor(etype)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, 5]
+
+    rgc_basis = nn.RelGraphConvBDD(10, 5, 5)
+    h = th.randn((100, 10))
+    r = th.tensor(etype)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, 5]
+
+    # with norm
+    norm = th.zeros((g.number_of_edges(), 1))
+
+    rgc_basis = nn.RelGraphConvBasis(10, 5, 5)
+    h = th.randn((100, 10))
+    r = th.tensor(etype)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, 5]
+
+    rgc_basis = nn.RelGraphConvBDD(10, 5, 5)
+    h = th.randn((100, 10))
+    r = th.tensor(etype)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, 5]
 
 if __name__ == '__main__':
-    test_graph_conv()
-    test_edge_softmax()
-    test_set2set()
-    test_glob_att_pool()
-    test_simple_pool()
-    test_set_trans()
+    #test_graph_conv()
+    #test_edge_softmax()
+    #test_set2set()
+    #test_glob_att_pool()
+    #test_simple_pool()
+    #test_set_trans()
+    test_rgcn()
