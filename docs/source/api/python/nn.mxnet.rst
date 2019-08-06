@@ -17,12 +17,10 @@ dgl.nn.mxnet.glob
 
 .. automodule:: dgl.nn.mxnet.glob
     :members:
+    :show-inheritance:
 
 dgl.nn.mxnet.softmax
 --------------------
 
 .. automodule:: dgl.nn.mxnet.softmax
-
-.. autoclass:: dgl.nn.mxnet.softmax.EdgeSoftmax
-    :members: forward
-    :show-inheritance:
+    :members: edge_softmax

@@ -14,7 +14,6 @@ dgl.nn.pytorch.conv
 
 dgl.nn.pytorch.glob
 -------------------
-
 .. automodule:: dgl.nn.pytorch.glob
 
 .. autoclass:: dgl.nn.pytorch.glob.SumPooling
@@ -53,7 +52,4 @@ dgl.nn.pytorch.softmax
 ----------------------
 
 .. automodule:: dgl.nn.pytorch.softmax
-
-.. autoclass:: dgl.nn.pytorch.softmax.EdgeSoftmax
-    :members: forward
-    :show-inheritance:
+    :members: edge_softmax
