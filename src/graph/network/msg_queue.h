@@ -6,6 +6,8 @@
 #ifndef DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 #define DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 
+#include <dgl/runtime/ndarray.h>
+
 #include <queue>
 #include <set>
 #include <string>
@@ -14,8 +16,6 @@
 #include <condition_variable>
 #include <atomic>
 #include <functional>
-
-#include <dgl/runtime/ndarray.h>
 
 namespace dgl {
 namespace network {
