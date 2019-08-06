@@ -74,6 +74,21 @@ def tensor(data, dtype=None):
     """
     pass
 
+def as_scalar(data):
+    """Returns a scalar whose value is copied from this array.
+
+    Parameters
+    ----------
+    data : Tensor
+        The input data
+
+    Returns
+    -------
+    scalar
+        The scalar value in the tensor.
+    """
+    pass
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -293,6 +308,21 @@ def sum(input, dim):
     """
     pass
 
+def reduce_sum(input):
+    """Returns the sum of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
 def mean(input, dim):
     """Reduce average the input tensor along the given dim.
 
@@ -307,6 +337,21 @@ def mean(input, dim):
     -------
     Tensor
         A framework-specific tensor.
+    """
+    pass
+
+def reduce_mean(input):
+    """Returns the average of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
     """
     pass
 
@@ -326,6 +371,121 @@ def max(input, dim):
         A framework-specific tensor.
     """
     pass
+
+def reduce_max(input):
+    """Returns the max of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
+def min(input, dim):
+    """Reduce min the input tensor along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The reduce dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
+def reduce_min(input):
+    """Returns the min of all elements in the input tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor with shape (1,)
+    """
+    pass
+
+
+def argsort(input, dim, descending):
+    """Return the indices that would sort the input along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The dim to sort along.
+    descending : bool
+        Controls the sorting order (False: ascending, True: descending)
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+
+def topk(input, k, dim, descending=True):
+    """Return the k largest elements of the given input tensor along the given dimension.
+
+    If descending is False then the k smallest elements are returned.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The dim to sort along.
+    descending : bool
+        Controls whether to return largest/smallest elements.
+    """
+    pass
+
+def exp(input):
+    """Returns a new tensor with the exponential of the elements of the input tensor `input`.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
+def softmax(input, dim=-1):
+    """Apply the softmax function on given dimension.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The dimension along which to compute softmax.
+
+    Returns
+    -------
+    Tensor
+        The output tensor.
+    """
+    pass
+
 
 def cat(seq, dim):
     """Concat the sequence of tensors in the given dimension.
@@ -381,6 +541,25 @@ def split(input, sizes_or_sections, dim):
     """
     pass
 
+def repeat(input, repeats, dim):
+    """Repeats elements of an array.
+
+    Parameters
+    ----------
+    input : Tensor
+        Input data array
+    repeats : int
+        The number of repetitions for each element
+    dim : int
+        The dim along which to repeat values.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor.
+    """
+    pass
+
 def gather_row(data, row_index):
     """Slice out the data given the row index.
 
@@ -395,6 +574,41 @@ def gather_row(data, row_index):
     -------
     Tensor
         The sliced data. The first dimension should equal to ``len(row_index)``.
+    """
+    pass
+
+def slice_axis(data, axis, begin, end):
+    """Slice along a given axis.
+    Returns an array slice along a given axis starting from :attr:`begin` index to :attr:`end` index.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor.
+    axis : int
+        The axis along to slice the tensor.
+    begin : int
+        Indicates the begin index.
+    end : int
+        Indicates the end index.
+    Returns:
+    --------
+    Tensor
+        The sliced tensor.
+    """
+    pass
+
+def take(data, indices, dim):
+    """Takes elements from an input array along the given dim.
+
+    Parameters
+    ----------
+    data : Tensor
+        The data tensor.
+    indices : Tensor
+        The indices tensor.
+    dim : Tensor
+        The dimension to gather along.
     """
     pass
 
@@ -560,6 +774,50 @@ def ones(shape, dtype, ctx):
     -------
     Tensor
         The one tensor.
+    """
+    pass
+
+def pad_packed_tensor(input, lengths, value, l_min=None):
+    """Pads a packed batch of variable length tensors with given value.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor with shape :math:`(N, *)`
+    lengths : list or tensor
+        The array of tensor lengths (of the first dimension) :math:`L`.
+        It should satisfy :math:`\sum_{i=1}^{B}L_i = N`,
+        where :math:`B` is the length of :math:`L`.
+    value : float
+        The value to fill in the tensor.
+    l_min : int or None, defaults to None.
+        The minimum length each tensor need to be padded to, if set to None,
+        then there is no minimum length requirement.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor with shape :math:`(B, \max(\max_i(L_i), l_{min}), *)`
+    """
+    pass
+
+def pack_padded_tensor(input, lengths):
+    """Packs a tensor containing padded sequence of variable length.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor with shape :math:`(B, L, *)`, where :math:`B` is
+        the batch size and :math:`L` is the maximum length of the batch.
+    lengths : list or tensor
+        The array of tensor lengths (of the first dimension) :math:`L`.
+        :math:`\max_i(L_i)` should equal :math:`L`.
+
+    Returns
+    -------
+    Tensor
+        The obtained tensor with shape :math:`(N, *)` where
+        :math:`N = \sum_{i=1}^{B}L_i`
     """
     pass
 
