@@ -2,6 +2,34 @@
  *  Copyright (c) 2019 by Contributors
  * \file graph/graph_serialize.cc
  * \brief Graph serialization implementation
+ *
+ * The storage structure is
+ * {
+ *   // MetaData Section
+ *   uint64_t kDGLSerializeMagic
+ *   uint64_t kVersion
+ *   uint64_t GraphType
+ *   ** Reserved Area till 4kB **
+ *
+ *   dgl_id_t num_graphs
+ *   vector<dgl_id_t> graph_indices (start address of each graph)
+ *   vector<dgl_id_t> nodes_num_list (list of number of nodes for each graph)
+ *   vector<dgl_id_t> edges_num_list (list of number of edges for each graph)
+ *
+ *   vector<GraphData> graph_datas;
+ *
+ * }
+ *
+ * Storage of GraphData is
+ * {
+ *   // Everything uses in csr
+ *   NDArray indptr
+ *   NDArray indices
+ *   NDArray edge_ids
+ *   vector<pair<string, NDArray>> node_tensors;
+ *   vector<pair<string, NDArray>> edge_tensors;
+ * }
+ *
  */
 #include "graph_serialize.h"
 #include <dmlc/io.h>
@@ -44,7 +72,6 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphRef gptr = args[0];
     ImmutableGraphPtr imGPtr = ToImmutableGraph(gptr.sptr());
-//    List<>
     Map<std::string, Value> node_tensors = args[1];
     Map<std::string, Value> edge_tensors = args[2];
     GraphData gd = GraphData::Create();
@@ -60,17 +87,6 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 });
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
-.set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<Value> idxs = args[1];
-    std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++i) {
-      idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
-    }
-    *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
-});
-
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadMetaData")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<Value> idxs = args[1];
@@ -124,7 +140,7 @@ bool SaveDGLGraphs(std::string filename,
   fs->Seek(4096);
 
   // Write Graph Meta Data
-  size_t num_graph = graph_data.size();
+  dgl_id_t num_graph = graph_data.size();
 
   std::vector<dgl_id_t> graph_indices(num_graph);
   std::vector<dgl_id_t> nodes_num_list(num_graph);
@@ -136,7 +152,7 @@ bool SaveDGLGraphs(std::string filename,
   }
   // Reserve spaces for graph indices
   fs->Write(num_graph);
-  size_t indices_start_ptr = fs->Tell();
+  dgl_id_t indices_start_ptr = fs->Tell();
   fs->Write(graph_indices);
   fs->Write(nodes_num_list);
   fs->Write(edges_num_list);
@@ -171,11 +187,11 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   fs->Seek(4096);
 
   CHECK_EQ(magicNum, kDGLSerializeMagic) << "Invalid DGL files";
-  CHECK_EQ(graphType, GraphType::kImmutableGraph) << "Invalid DGL files";
+  CHECK_EQ(graphType, kImmutableGraph) << "Invalid DGL files";
   CHECK_EQ(version, 1) << "Invalid Serialization Version";
 
   // Read Graph MetaData
-  uint64_t num_graph;
+  dgl_id_t num_graph;
   CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
   std::vector<dgl_id_t> graph_indices;
   std::vector<dgl_id_t> nodes_num_list;

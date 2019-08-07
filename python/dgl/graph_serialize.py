@@ -18,12 +18,20 @@ class GraphData(ObjectBase):
     def create(g: DGLGraph):
         """Create GraphData"""
         ghandle = g._graph
-        node_tensors = dict()
-        edge_tensors = dict()
-        for key, value in g.ndata.items():
-            node_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
-        for key, value in g.edata.items():
-            edge_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
+        if len(g.ndata) != 0:
+            node_tensors = dict()
+            for key, value in g.ndata.items():
+                node_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
+        else:
+            node_tensors = None
+
+        if len(g.edata) != 0:
+            edge_tensors = dict()
+            for key, value in g.edata.items():
+                edge_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
+        else:
+            edge_tensors = None
+
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
     def get_graph(self):
@@ -43,9 +51,11 @@ def save_graphs(filename, g_list):
     """
     Save DGLGraphs to file
     :param filename: file to store DGLGraphs
-    :param g_list: list of DGLGraph
+    :param g_list: DGLGraph or list of DGLGraph
     :return:
     """
+    if isinstance(g_list, DGLGraph):
+        g_list = [g_list]
     gdata_list = [GraphData.create(g) for g in g_list]
     _CAPI_DGLSaveGraphs(filename, gdata_list)
 
@@ -54,9 +64,11 @@ def load_graphs(filename, idx_list=None):
     """
     Load DGLGraphs from file
     :param filename: file to load DGLGraphs
-    :param idx_list: index of graph to be loaded. If not specified, will load all graphs from file
-    :return: list of DGLGraphs
+    :param idx_list: list of index of graph to be loaded. If not specified, will load all graphs
+    from file
+    :return: list of immutable DGLGraphs
     """
+    assert isinstance(idx_list, list)
     if idx_list is None:
         idx_list = []
     gdata_list = _CAPI_DGLLoadGraphs(filename, idx_list)

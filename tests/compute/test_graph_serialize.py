@@ -7,6 +7,7 @@ import os
 
 from dgl import DGLGraph
 import dgl
+from dgl.graph_serialize import save_graphs, load_graphs
 
 np.random.seed(44)
 
@@ -29,7 +30,7 @@ def construct_graph(n, readonly=True):
     return g_list
 
 
-def test_graph_serialize():
+def test_graph_serialize_with_feature():
     num_graphs = 100
 
     t0 = time.time()
@@ -76,5 +77,33 @@ def test_graph_serialize():
     os.unlink(path)
 
 
+def test_graph_serialize_without_feature():
+    num_graphs = 100
+    g_list = [generate_rand_graph(30) for _ in range(num_graphs)]
+
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+
+    save_graphs(path, g_list)
+
+    idx_list = np.random.permutation(np.arange(num_graphs)).tolist()
+    loadg_list = load_graphs(path, idx_list)
+
+    idx = idx_list[0]
+    load_g = loadg_list[0]
+
+    assert F.allclose(load_g.nodes(), g_list[idx].nodes())
+
+    load_edges = load_g.all_edges('uv', 'eid')
+    g_edges = g_list[idx].all_edges('uv', 'eid')
+    assert F.allclose(load_edges[0], g_edges[0])
+    assert F.allclose(load_edges[1], g_edges[1])
+
+    os.unlink(path)
+
+
 if __name__ == "__main__":
-    test_graph_serialize()
+    test_graph_serialize_with_feature()
+    test_graph_serialize_without_feature()
