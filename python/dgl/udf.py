@@ -76,8 +76,8 @@ class EdgeBatch(object):
             in the batch.
         """
         if is_all(self._edges[2]):
-            self._edges[2] = utils.toindex(F.arange(
-                0, self._g.number_of_edges()))
+            self._edges = self._edges[:2] + (utils.toindex(F.arange(
+                0, self._g.number_of_nodes())),)
         u, v, eid = self._edges
         return (u.tousertensor(), v.tousertensor(), eid.tousertensor())
 
