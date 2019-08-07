@@ -2,6 +2,8 @@ import backend as F
 import numpy as np
 import scipy as sp
 import time
+import tempfile
+import os
 
 from dgl import DGLGraph
 
@@ -33,11 +35,17 @@ def test_graph_serialize():
     t1 = time.time()
 
     from dgl.graph_serialize import save_graphs, load_graphs
-    save_graphs("/tmp/test.bin", g_list)
+
+    # create a temporary file and immediately release it so DGL can open it.
+    f = tempfile.NamedTemporaryFile(delete=False)
+    path = f.name
+    f.close()
+    
+    save_graphs(path, g_list)
 
     t2 = time.time()
     idx_list = np.random.permutation(np.arange(10000)).tolist()
-    loadg_list = load_graphs("/tmp/test.bin", idx_list)
+    loadg_list = load_graphs(path, idx_list)
 
     t3 = time.time()
     idx = idx_list[0]
@@ -50,6 +58,7 @@ def test_graph_serialize():
     print(load_g)
     print(g_list[idx])
     assert F.allclose(load_g.nodes(), g_list[idx].nodes())
+    print(load_g.edges()[0], g_list[idx].edges()[0])
     assert F.allclose(load_g.edges()[0], g_list[idx].edges()[0])
     assert F.allclose(load_g.edges()[1], g_list[idx].edges()[1])
     assert F.allclose(load_g.edata['e1'], g_list[idx].edata['e1'])
@@ -61,6 +70,8 @@ def test_graph_serialize():
     bg = dgl.batch(loadg_list[:10000])
     t5 = time.time()
     print("Batch time: {} s".format(t5 - t4))
+
+    os.unlink(path)
 
 
 if __name__ == "__main__":
