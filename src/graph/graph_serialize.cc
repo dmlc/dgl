@@ -155,6 +155,7 @@ bool SaveDGLGraphs(std::string filename,
   fs->Seek(indices_start_ptr);
   fs->Read(&test);
 
+  delete fs;
   return true;
 }
 
@@ -211,6 +212,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     }
   }
 
+  delete fs;
   return gdata_refs;
 }
 

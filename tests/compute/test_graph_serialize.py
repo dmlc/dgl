@@ -7,6 +7,8 @@ import os
 
 from dgl import DGLGraph
 
+np.random.seed(44)
+
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1,
