@@ -490,48 +490,6 @@ def is_iterable(obj):
     """Return true if the object is an iterable."""
     return isinstance(obj, Iterable)
 
-def get_ndata_name(g, name):
-    """Return a node data name that does not exist in the given graph.
-
-    The given name is directly returned if it does not exist in the given graph.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph.
-    name : str
-        The proposed name.
-
-    Returns
-    -------
-    str
-        The node data name that does not exist.
-    """
-    while name in g.ndata:
-        name += '_'
-    return name
-
-def get_edata_name(g, name):
-    """Return an edge data name that does not exist in the given graph.
-
-    The given name is directly returned if it does not exist in the given graph.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph.
-    name : str
-        The proposed name.
-
-    Returns
-    -------
-    str
-        The node data name that does not exist.
-    """
-    while name in g.edata:
-        name += '_'
-    return name
-
 def to_dgl_context(ctx):
     """Convert a backend context to DGLContext"""
     device_type = nd.DGLContext.STR2MASK[F.device_type(ctx)]

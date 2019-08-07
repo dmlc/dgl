@@ -20,36 +20,6 @@ using dgl::runtime::NDArray;
 namespace dgl {
 
 namespace {
-// Convert EdgeArray structure to PackedFunc.
-template<class EdgeArray>
-PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        *rv = std::move(ea.src);
-      } else if (which == 1) {
-        *rv = std::move(ea.dst);
-      } else if (which == 2) {
-        *rv = std::move(ea.id);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-// Convert CSRArray structure to PackedFunc.
-PackedFunc ConvertAdjToPackedFunc(const std::vector<IdArray>& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if ((size_t) which < ea.size()) {
-        *rv = std::move(ea[which]);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
 
 // Convert Subgraph structure to PackedFunc.
 PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
@@ -256,6 +226,18 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
     *rv = ConvertEdgeArrayToPackedFunc(g->EdgeIds(src, dst));
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdge")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    const dgl_id_t eid = args[1];
+    const auto& pair = g->FindEdge(eid);
+    *rv = PackedFunc([pair] (DGLArgs args, DGLRetValue* rv) {
+        const int choice = args[0];
+        const int64_t ret = (choice == 0? pair.first : pair.second);
+        *rv = ret;
+      });
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
@@ -347,7 +329,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     bool transpose = args[1];
     std::string format = args[2];
     auto res = g->GetAdj(transpose, format);
-    *rv = ConvertAdjToPackedFunc(res);
+    *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")

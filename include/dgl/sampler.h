@@ -13,24 +13,6 @@
 #include "graph_interface.h"
 #include "nodeflow.h"
 
-#ifdef _MSC_VER
-// rand in MS compiler works well in multi-threading.
-inline int rand_r(unsigned *seed) {
-  return rand();
-}
-
-inline unsigned int randseed() {
-  unsigned int seed = time(nullptr);
-  srand(seed);  // need to set seed manually since there's no rand_r
-  return seed;
-}
-#define _CRT_RAND_S
-#else
-inline unsigned int randseed() {
-  return time(nullptr);
-}
-#endif
-
 namespace dgl {
 
 class ImmutableGraph;

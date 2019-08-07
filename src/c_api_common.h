@@ -9,6 +9,8 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/packed_func.h>
 #include <dgl/runtime/registry.h>
+#include <dgl/array.h>
+#include <dgl/graph_interface.h>
 #include <algorithm>
 #include <vector>
 
@@ -69,6 +71,8 @@ dgl::runtime::NDArray CopyVectorToNDArray(
   std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(a->data));
   return a;
 }
+
+runtime::PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea);
 
 }  // namespace dgl
 
