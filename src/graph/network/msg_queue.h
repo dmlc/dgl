@@ -57,11 +57,6 @@ struct Message {
    */
   int64_t size;
   /*!
-   * \brief To avoid NDArray been freed during the send(), we
-   * can hold a reference of current NDArray in the message.
-   */
-  runtime::NDArray array_handler;
-  /*!
    * \brief user-defined deallocator, which can be nullptr
    */
   std::function<void(Message*)> deallocator = nullptr;

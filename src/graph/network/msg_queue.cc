@@ -71,11 +71,10 @@ STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
     return QUEUE_CLOSE;
   }
 
-  Message & old_msg = queue_.front();
+  Message old_msg = queue_.front();
   queue_.pop();
   msg->data = old_msg.data;
   msg->size = old_msg.size;
-  msg->array_handler = old_msg.array_handler;
   msg->deallocator = old_msg.deallocator;
   free_size_ += old_msg.size;
   cond_not_full_.notify_one();
