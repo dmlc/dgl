@@ -3,7 +3,9 @@ import networkx as nx
 from . import heterograph_index, graph_index
 from . import utils
 from . import backend as F
-from .base import ALL, is_all
+from .frame import Frame, FrameRef
+from .view import NodeView, EdgeView
+from .base import ALL, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
 
@@ -26,7 +28,7 @@ class DGLBaseHeteroGraph(object):
     # pylint: disable=unused-argument
     def __init__(self, graph, ntypes, etypes,
                  _ntypes_invmap=None, _etypes_invmap=None,
-                 _view_etype_idx=None):
+                 _view_ntype_idx=None, _view_etype_idx=None):
         super(DGLBaseHeteroGraph, self).__init__()
 
         self._graph = graph
@@ -41,63 +43,37 @@ class DGLBaseHeteroGraph(object):
 
         # Indicates which node/edge type (int) it is viewing (e.g. g[ntype])
         # The behavior of interfaces will change accordingly.
+        self._view_ntype_idx = _view_ntype_idx
         self._view_etype_idx = _view_etype_idx
 
-    def _create_view(self, etype_idx):
+    def _create_view(self, ntype_idx, etype_idx):
         return DGLBaseHeteroGraph(
             self._graph, self._ntypes, self._etypes,
-            self._ntypes_invmap, self._etypes_invmap, etype_idx)
+            self._ntypes_invmap, self._etypes_invmap,
+            ntype_idx, etype_idx)
+
+    @property
+    def is_node_type_view(self):
+        return self._view_ntype_idx is not None
+
+    @property
+    def is_edge_type_view(self):
+        return self._view_etype_idx is not None
 
     @property
     def is_view(self):
         """Whether this is a node/view of a heterograph."""
-        return self._view_etype_idx is not None
+        return self.is_node_type_view or self.is_edge_type_view
 
     @property
-    def node_types(self):
-        """Return the list of node types."""
+    def all_node_types(self):
+        """Return the list of node types of the entire heterograph."""
         return self._ntypes
 
     @property
-    def edge_types(self):
-        """Return the list of edge types."""
+    def all_edge_types(self):
+        """Return the list of edge types of the entire heterograph."""
         return self._etypes
-
-    def __getitem__(self, key):
-        """Returns a view on the heterogeneous graph with given node/edge
-        type:
-
-        If ``key`` is a str, it returns a heterogeneous subgraph induced
-        from nodes or edges of type ``key``.
-
-        The view would share the frames with the parent graph; any
-        modifications on one's frames would reflect on the other.
-
-        Note that the subgraph itself is not materialized until someone
-        queries the subgraph structure.  This implies that calling computation
-        methods such as
-
-            g['user'].update_all(...)
-
-        would not actually create a subgraph of users.
-
-        Parameters
-        ----------
-        key : str
-            See above
-
-        Returns
-        -------
-        DGLBaseHeteroGraphView
-            The induced subgraph view.
-        """
-        if self.is_view:
-            raise RuntimeError('Cannot create a view from a view')
-
-        if key in self._etypes_invmap:
-            return self._create_view(self._etypes_invmap[key])
-        else:
-            raise KeyError('%s is not an edge type' % key)
 
     @property
     def metagraph(self):
@@ -137,13 +113,96 @@ class DGLBaseHeteroGraph(object):
         srctype_idx, dsttype_idx = self._endpoint_types(etype_idx)
         return self._ntypes[srctype_idx], self._ntypes[dsttype_idx]
 
-    def number_of_nodes(self, ntype):
-        """Return the number of nodes with the given type in the graph.
+    def node_types(self):
+        """Return the list of node types appearing in the current view.
 
-        Parameters
-        ----------
-        ntype : str
-            The node type name
+        Returns
+        -------
+        list[str]
+            List of node types
+
+        Examples
+        --------
+        Getting all node types.
+        >>> g.node_types()
+        ['user', 'game', 'developer']
+
+        Getting all node types appearing in the subgraph induced by "users"
+        (which should only yield "user").
+        >>> g['user'].node_types()
+        ['user']
+
+        The node types appearing in subgraph induced by "plays" relationship,
+        which should only give "user" and "game".
+        >>> g['plays'].node_types()
+        ['user', 'game']
+        """
+        if self.is_node_type_view:
+            return [self._ntypes[self._view_ntype_idx]]
+        elif self.is_edge_type_view:
+            srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
+            srctype = self._ntypes[srctype_idx]
+            dsttype = self._etypes[dsttype_idx]
+            return [srctype, dsttype] if srctype != dsttype else [srctype]
+        else:
+            return self._ntypes
+
+    def edge_types(self):
+        """Return the list of edge types appearing in the current view.
+
+        Returns
+        -------
+        list[str]
+            List of edge types
+
+        Examples
+        --------
+        Getting all edge types.
+        >>> g.edge_types()
+        ['follows', 'plays', 'develops']
+
+        Getting all edge types appearing in subgraph induced by "users".
+        >>> g['user'].edge_types()
+        ['follows']
+
+        The edge types appearing in subgraph induced by "plays" relationship,
+        which should only give "plays".
+        >>> g['plays'].edge_types()
+        ['plays']
+        """
+        if self.is_node_type_view:
+            etype_indices = self._graph.metagraph.edge_id(
+                self._view_ntype_idx, self._view_ntype_idx).tonumpy()
+            return [self._etypes[etype_idx] for etype_idx in etype_indices]
+        elif self.is_edge_type_view:
+            return [self._etypes[self._view_etype_idx]]
+        else:
+            return self._etypes
+
+    @property
+    def _current_ntype_idx(self):
+        """Checks the uniqueness of node type in the view and get the index
+        of that node type.
+
+        This allows reading/writing node frame data.
+        """
+        node_types = self.node_types()
+        assert len(node_types) == 1
+        return self._ntypes_invmap[node_types[0]]
+
+    @property
+    def _current_etype_idx(self):
+        """Checks the uniqueness of edge type in the view and get the index
+        of that node type.
+
+        This allows reading/writing edge frame data and message passing routines.
+        """
+        edge_types = self.edge_types()
+        assert len(edge_types) == 1
+        return self._etypes_invmap[edge_types[0]]
+
+    def number_of_nodes(self):
+        """Return the number of nodes in the current view of the heterograph.
 
         Returns
         -------
@@ -152,11 +211,12 @@ class DGLBaseHeteroGraph(object):
 
         Examples
         --------
+
         >>> g.number_of_nodes('user')
         3
         """
-        assert not self.is_view, 'not supported on views'
-        return self._graph.number_of_nodes(self.node_types.index(ntype))
+        # TODO: relax to multiple types
+        return self._graph.number_of_nodes(self._current_ntype_idx)
 
     @property
     def is_multigraph(self):
@@ -179,10 +239,10 @@ class DGLBaseHeteroGraph(object):
         int
             The number of edges
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.number_of_edges(self._view_etype_idx)
+        # TODO: relax to multiple types
+        return self._graph.number_of_edges(self._current_etype_idx)
 
-    def has_node(self, ntype, vid):
+    def has_node(self, vid):
         """Return True if the graph contains node `vid` of type `ntype`.
 
         Parameters
@@ -209,7 +269,7 @@ class DGLBaseHeteroGraph(object):
         has_nodes
         """
         assert not self.is_view, 'not supported on views'
-        return self._graph.has_node(self.node_types.index(ntype), vid)
+        return self._graph.has_node(self._view_ntype_idx, vid)
 
     def has_nodes(self, ntype, vids):
         """Return a 0-1 array ``a`` given the node ID array ``vids``.
@@ -246,7 +306,7 @@ class DGLBaseHeteroGraph(object):
         """
         assert not self.is_view, 'not supported on views'
         vids = utils.toindex(vids)
-        rst = self._graph.has_nodes(self.node_types.index(ntype), vids)
+        rst = self._graph.has_nodes(self._view_ntype_idx, vids)
         return rst.tousertensor()
 
     def has_edge_between(self, u, v):
@@ -955,9 +1015,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
           in the heterogeneous graph will share the same source node set.  This also
           applies to sharing the same destination node type, or having the same type
           for source nodes of one and destination nodes of the other.
-    node_frame : dict[str, dict[str, Tensor]]
+    node_frames : dict[str, dict[str, Tensor]]
         The node frames for each node type
-    edge_frame : dict[str, dict[str, Tensor]]
+    edge_frames : dict[str, dict[str, Tensor]]
         The edge frames for each edge type
     multigraph : bool
         Whether the heterogeneous graph is a multigraph.
@@ -1034,11 +1094,26 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def __init__(
             self,
             graph_data=None,
-            node_frame=None,
-            edge_frame=None,
+            node_frames=None,
+            edge_frames=None,
             multigraph=None,
-            readonly=True):
+            readonly=True,
+            _view_ntype_idx=None,
+            _view_etype_idx=None):
         assert readonly, "Only readonly heterogeneous graphs are supported"
+
+        # Creating a view of another graph?
+        if isinstance(graph_data, DGLHeteroGraph):
+            super(DGLHeteroGraph, self).__init__(
+                graph_data._graph, graph_data._ntypes, graph_data._etypes,
+                graph_data._ntypes_invmap, graph_data._etypes_invmap,
+                graph_data._view_ntype_idx, graph_data._view_etype_idx)
+            self._node_frames = graph_data._node_frames
+            self._edge_frames = graph_data._edge_frames
+            self._view_ntype_idx = _view_ntype_idx
+            self._view_etype_idx = _view_etype_idx
+            return
+
         if isinstance(graph_data, list):
             if not isinstance(graph_data[0], DGLBaseBipartite):
                 raise TypeError('Only list of DGLBaseBipartite is supported')
@@ -1048,7 +1123,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             ntypes_invmap = {}
             etypes_invmap = {}
             for bipartite in graph_data:
-                etype, = bipartite.edge_types
+                etype, = bipartite.all_edge_types
                 srctype = bipartite.srctype
                 dsttype = bipartite.dsttype
 
@@ -1075,6 +1150,33 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             super(DGLHeteroGraph, self).__init__(hg_index, ntypes, etypes)
         else:
             raise TypeError('Unrecognized graph data type %s' % type(graph_data))
+
+        # node and edge frame
+        if node_frames is None:
+            self._node_frames = [
+                FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+                for i in range(len(self._ntypes))]
+        else:
+            self._node_frames = node_frames
+
+        if edge_frames is None:
+            self._edge_frames = [
+                FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+                for i in range(len(self._etypes))]
+        else:
+            self._edge_frames = edge_frames
+
+    def _create_view(self, ntype_idx, etype_idx):
+        return DGLHeteroGraph(
+            graph_data=self, _view_ntype_idx=ntype_idx, _view_etype_idx=etype_idx)
+
+    def __getitem__(self, key):
+        if key in self._ntypes_invmap:
+            return self._create_view(self._ntypes_invmap[key], None)
+        elif key in self._etypes_invmap:
+            return self._create_view(None, self._etypes_invmap[key])
+        else:
+            raise KeyError(key)
 
     def add_nodes(self, node_type, num, data=None):
         """Add multiple new nodes of the same node type
@@ -1207,7 +1309,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """
         pass
 
-    def node_attr_schemes(self, ntype):
+    def node_attr_schemes(self):
         """Return the node feature schemes for a given node type.
 
         Each feature scheme is a named tuple that stores the shape and data type
@@ -1223,9 +1325,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        pass
+        return self._node_frames[self._current_ntype_idx].schemes
 
-    def edge_attr_schemes(self, etype):
+    def edge_attr_schemes(self):
         """Return the edge feature schemes for a given edge type.
 
         Each feature scheme is a named tuple that stores the shape and data type
@@ -1242,7 +1344,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        pass
+        return self._edge_frames[self._current_etype_idx].schemes
 
     def set_n_initializer(self, ntype, initializer, field=None):
         """Set the initializer for empty node features of given type.
@@ -1305,7 +1407,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         To set features of User #0 and #2 in a heterogeneous graph:
         >>> g['user'].nodes[[0, 2]].data['h'] = torch.zeros(2, 5)
         """
-        pass
+        return NodeView(self)
 
     @property
     def ndata(self):
@@ -1324,7 +1426,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         To set features of games in a heterogeneous graph:
         >>> g['game'].ndata['h'] = torch.zeros(2, 5)
         """
-        pass
+        return self.nodes[:].data
 
     @property
     def edges(self):
@@ -1345,7 +1447,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Minecraft) in a heterogeneous graph:
         >>> g['user', 'game', 'plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
         """
-        pass
+        return EdgeView(self)
 
     @property
     def edata(self):
@@ -1363,9 +1465,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         --------
         >>> g['developer', 'game', 'develops'].edata['h'] = torch.zeros(2, 5)
         """
-        pass
+        return self.edges[:].data
 
-    def set_n_repr(self, data, ntype, u=ALL, inplace=False):
+    def set_n_repr(self, data, u=ALL, inplace=False):
         """Set node(s) representation of a single node type.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1380,14 +1482,29 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         ----------
         data : dict of tensor
             Node representation.
-        ntype : str
-            Node type.
         u : node, container or tensor
             The node(s).
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        ntype_idx = self._current_ntype_idx
+
+        if is_all(u):
+            num_nodes = self.number_of_nodes()
+        else:
+            u = utils.toindex(u)
+            num_nodes = len(u)
+        for key, val in data.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_nodes:
+                raise DGLError('Expect number of features to match number of nodes (len(u)).'
+                               ' Got %d and %d instead.' % (nfeats, num_nodes))
+
+        if is_all(u):
+            for key, val in data.items():
+                self._node_frames[ntype_idx][key] = val
+        else:
+            self._node_frame[ntype_idx].update_rows(u, data, inplace=inplace)
 
     def get_n_repr(self, ntype, u=ALL):
         """Get node(s) representation of a single node type.
@@ -1406,15 +1523,23 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict from feature name to feature tensor.
         """
-        pass
+        node_types = self.node_types()
+        assert len(node_types) == 1
+        ntype_idx = self._ntypes_invmap[node_types[0]]
 
-    def pop_n_repr(self, ntype, key):
+        if len(self.node_attr_schemes()) == 0:
+            return dict()
+        if is_all(u):
+            return dict(self._node_frames[ntype_idx])
+        else:
+            u = utils.toindex(u)
+            return self._node_frames[ntype_idx].select_rows(u)
+
+    def pop_n_repr(self, key):
         """Get and remove the specified node repr of a given node type.
 
         Parameters
         ----------
-        ntype : str
-            The node type.
         key : str
             The attribute name.
 
@@ -1425,7 +1550,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """
         pass
 
-    def set_e_repr(self, data, etype, edges=ALL, inplace=False):
+    def set_e_repr(self, data, edges=ALL, inplace=False):
         """Set edge(s) representation of a single edge type.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1439,9 +1564,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         ----------
         data : tensor or dict of tensor
             Edge representation.
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         edges : edges
             Edges can be either
 
@@ -1453,7 +1575,43 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        etype_idx = self._current_etype_idx
+
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            _, _, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+
+        # sanity check
+        if not utils.is_dict_like(data):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(data))
+
+        if is_all(eid):
+            num_edges = self.number_of_edges()
+        else:
+            eid = utils.toindex(eid)
+            num_edges = len(eid)
+        for key, val in data.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_edges:
+                raise DGLError('Expect number of features to match number of edges.'
+                               ' Got %d and %d instead.' % (nfeats, num_edges))
+        # set
+        if is_all(eid):
+            # update column
+            for key, val in data.items():
+                self._edge_frames[etype_idx][key] = val
+        else:
+            # update row
+            self._edge_frames[etype_idx].update_rows(eid, data, inplace=inplace)
 
     def get_e_repr(self, etype, edges=ALL):
         """Get edge(s) representation.
@@ -1472,7 +1630,27 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict
         """
-        pass
+        etype_idx = self._current_etype_idx
+
+        if len(self.edge_attr_schemes()) == 0:
+            return dict()
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            _, _, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+
+        if is_all(eid):
+            return dict(self._edge_frame[etype_idx])
+        else:
+            eid = utils.toindex(eid)
+            return self._edge_frame[etype_idx].select_rows(eid)
 
     def pop_e_repr(self, etype, key):
         """Get and remove the specified edge repr of a single edge type.
