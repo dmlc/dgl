@@ -15,12 +15,12 @@ Usage
 
 Example usage on Alchemy dataset:
 
-+ SchNet: excepted MAE 0.065  
++ SchNet: expected MAE 0.065  
 ```py
 python train.py --model sch --epochs 250
 ```
 
-+ MGCN: excepted MAE 0.050
++ MGCN: expected MAE 0.050
 ```py
 python train.py --model mgcn --epochs 250
 ```
