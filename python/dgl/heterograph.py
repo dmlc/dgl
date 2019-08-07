@@ -19,14 +19,14 @@ class DGLBaseHeteroGraph(object):
         The node type names
     etypes : list[str]
         The edge type names
-    _ntypes_invmap, _etypes_invmap, _view_ntype_idx, _view_etype_idx :
+    _ntypes_invmap, _etypes_invmap, _view_etype_idx :
         Internal arguments
     """
 
     # pylint: disable=unused-argument
     def __init__(self, graph, ntypes, etypes,
                  _ntypes_invmap=None, _etypes_invmap=None,
-                 _view_ntype_idx=None, _view_etype_idx=None):
+                 _view_etype_idx=None):
         super(DGLBaseHeteroGraph, self).__init__()
 
         self._graph = graph
@@ -41,35 +41,17 @@ class DGLBaseHeteroGraph(object):
 
         # Indicates which node/edge type (int) it is viewing (e.g. g[ntype])
         # The behavior of interfaces will change accordingly.
-        self._view_ntype_idx = _view_ntype_idx
         self._view_etype_idx = _view_etype_idx
 
-    def _create_node_type_view(self, ntype):
+    def _create_view(self, etype_idx):
         return DGLBaseHeteroGraph(
             self._graph, self._ntypes, self._etypes,
-            self._ntypes_invmap, self._etypes_invmap,
-            ntype, None)
-
-    def _create_edge_type_view(self, etype):
-        return DGLBaseHeteroGraph(
-            self._graph, self._ntypes, self._etypes,
-            self._ntypes_invmap, self._etypes_invmap,
-            None, etype)
-
-    @property
-    def is_node_type_view(self):
-        """Whether this is a node type view of a heterograph."""
-        return self._view_ntype_idx is not None
-
-    @property
-    def is_edge_type_view(self):
-        """Whether this is an edge type view of a heterograph."""
-        return self._view_etype_idx is not None
+            self._ntypes_invmap, self._etypes_invmap, etype_idx)
 
     @property
     def is_view(self):
-        """Whether this is a node/edge type view of a heterograph."""
-        return self.is_node_type_view or self.is_edge_type_view
+        """Whether this is a node/view of a heterograph."""
+        return self._view_etype_idx is not None
 
     @property
     def node_types(self):
@@ -112,12 +94,10 @@ class DGLBaseHeteroGraph(object):
         if self.is_view:
             raise RuntimeError('Cannot create a view from a view')
 
-        if key in self._ntypes_invmap:
-            return self._create_node_type_view(self._ntypes_invmap[key])
-        elif key in self._etypes_invmap:
-            return self._create_edge_type_view(self._etypes_invmap[key])
+        if key in self._etypes_invmap:
+            return self._create_view(self._etypes_invmap[key])
         else:
-            raise KeyError('%s is neither a node type or an edge type' % key)
+            raise KeyError('%s is not an edge type' % key)
 
     @property
     def metagraph(self):
@@ -157,20 +137,26 @@ class DGLBaseHeteroGraph(object):
         srctype_idx, dsttype_idx = self._endpoint_types(etype_idx)
         return self._ntypes[srctype_idx], self._ntypes[dsttype_idx]
 
-    def number_of_nodes(self):
-        """Return the number of nodes in the graph.
+    def number_of_nodes(self, ntype):
+        """Return the number of nodes with the given type in the graph.
+
+        Parameters
+        ----------
+        ntype : str
+            The node type name
 
         Returns
         -------
         int
             The number of nodes
-        """
-        assert self.is_node_type_view, 'only supported on node type views'
-        return self._graph.number_of_nodes(self._view_ntype_idx)
 
-    def __len__(self):
-        """Return the number of nodes in the graph."""
-        return self.number_of_nodes()
+        Examples
+        --------
+        >>> g.number_of_nodes('user')
+        3
+        """
+        assert not self.is_view, 'not supported on views'
+        return self._graph.number_of_nodes(self.node_types.index(ntype))
 
     @property
     def is_multigraph(self):
@@ -193,21 +179,16 @@ class DGLBaseHeteroGraph(object):
         int
             The number of edges
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.number_of_edges(self._view_etype_idx)
 
-    def has_node(self, vid):
-        """Return True if the graph contains node `vid`.
-
-        Only works if the graph has one node type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['vtype'].has_node(vid)
+    def has_node(self, ntype, vid):
+        """Return True if the graph contains node `vid` of type `ntype`.
 
         Parameters
         ----------
+        ntype : str
+            The node type.
         vid : int
             The node ID.
 
@@ -218,41 +199,19 @@ class DGLBaseHeteroGraph(object):
 
         Examples
         --------
-        >>> g['user'].has_node(0)
+        >>> g.has_node('user', 0)
         True
-        >>> g['user'].has_node(4)
+        >>> g.has_node('user', 4)
         False
-
-        Equivalently,
-
-        >>> 0 in g['user']
-        True
 
         See Also
         --------
         has_nodes
         """
-        assert self.is_node_type_view, 'only supported on node type views'
-        return self._graph.has_node(self._view_ntype_idx, vid)
+        assert not self.is_view, 'not supported on views'
+        return self._graph.has_node(self.node_types.index(ntype), vid)
 
-    def __contains__(self, vid):
-        """Return True if the graph contains node `vid`.
-
-        Only works if the graph has one node type.  For multiple types,
-        query with
-
-        .. code::
-
-           vid in g['vtype']
-
-        Examples
-        --------
-        >>> 0 in g['user']
-        True
-        """
-        return self.has_node(vid)
-
-    def has_nodes(self, vids):
+    def has_nodes(self, ntype, vids):
         """Return a 0-1 array ``a`` given the node ID array ``vids``.
 
         ``a[i]`` is 1 if the graph contains node ``vids[i]``, 0 otherwise.
@@ -262,7 +221,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['vtype'].has_nodes(vids)
+           g.has_nodes(ntype, vids)
 
         Parameters
         ----------
@@ -278,16 +237,16 @@ class DGLBaseHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g['user'].has_nodes([0, 1, 2, 3, 4])
+        >>> g.has_nodes('user', [0, 1, 2, 3, 4])
         tensor([1, 1, 1, 0, 0])
 
         See Also
         --------
         has_node
         """
-        assert self.is_node_type_view, 'only supported on node type views'
+        assert not self.is_view, 'not supported on views'
         vids = utils.toindex(vids)
-        rst = self._graph.has_nodes(self._view_ntype_idx, vids)
+        rst = self._graph.has_nodes(self.node_types.index(ntype), vids)
         return rst.tousertensor()
 
     def has_edge_between(self, u, v):
@@ -326,7 +285,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edges_between
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.has_edge_between(self._view_etype_idx, u, v)
 
     def has_edges_between(self, u, v):
@@ -365,7 +324,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edge_between
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         u = utils.toindex(u)
         v = utils.toindex(v)
         rst = self._graph.has_edges_between(self._view_etype_idx, u, v)
@@ -409,7 +368,7 @@ class DGLBaseHeteroGraph(object):
         --------
         successors
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.predecessors(self._view_etype_idx, v).tousertensor()
 
     def successors(self, v):
@@ -450,7 +409,7 @@ class DGLBaseHeteroGraph(object):
         --------
         predecessors
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.successors(self._view_etype_idx, v).tousertensor()
 
     def edge_id(self, u, v, force_multi=False):
@@ -492,7 +451,7 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_ids
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         idx = self._graph.edge_id(self._view_etype_idx, u, v)
         return idx.tousertensor() if force_multi or self._graph.is_multigraph() else idx[0]
 
@@ -543,7 +502,7 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_id
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         u = utils.toindex(u)
         v = utils.toindex(v)
         src, dst, eid = self._graph.edge_ids(self._view_etype_idx, u, v)
@@ -584,7 +543,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 1]))
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(self._view_etype_idx, eid)
         return src.tousertensor(), dst.tousertensor()
@@ -629,7 +588,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].in_edges(0, 'eid')
         tensor([0, 1])
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
 
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(self._view_etype_idx, v)
@@ -682,7 +641,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].out_edges(0, 'eid')
         tensor([0])
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(self._view_etype_idx, v)
         if form == 'all':
@@ -739,7 +698,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].all_edges('uv')
         (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         src, dst, eid = self._graph.edges(self._view_etype_idx, order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
@@ -780,7 +739,7 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degrees
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.in_degree(self._view_etype_idx, v)
 
     def in_degrees(self, v=ALL):
@@ -818,7 +777,7 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degree
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         _, dsttype_idx = self._endpoint_types(self._view_etype_idx)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(dsttype_idx)))
@@ -856,7 +815,7 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degrees
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         return self._graph.out_degree(self._view_etype_idx, v)
 
     def out_degrees(self, v=ALL):
@@ -894,7 +853,7 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degree
         """
-        assert self.is_edge_type_view, 'only supported on edge type views'
+        assert self.is_view, 'only supported on views'
         srctype_idx, _ = self._endpoint_types(self._view_etype_idx)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(srctype_idx)))
