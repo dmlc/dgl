@@ -42,12 +42,12 @@ def test_query():
         }
 
     # node & edge types
-    assert set(ntypes) == set(g.node_types)
-    assert set(etypes) == set(g.edge_types)
+    assert set(ntypes) == set(g.all_node_types)
+    assert set(etypes) == set(g.all_edge_types)
 
     # metagraph
     mg = g.metagraph
-    assert set(g.node_types) == set(mg.nodes)
+    assert set(g.all_node_types) == set(mg.nodes)
     etype_triplets = [(u, v, e['type']) for u, v, e in mg.edges(data=True)]
     assert set([
         ('user', 'user', 'follows'),
@@ -60,19 +60,19 @@ def test_query():
         assert (u, v) == g.endpoint_types(e)
 
     # number of nodes
-    assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
+    assert [g[ntype].number_of_nodes() for ntype in ntypes] == [3, 2, 2]
 
     # number of edges
     assert [g[etype].number_of_edges() for etype in etypes] == [2, 4, 2, 2]
 
     # has_node & has_nodes
     for ntype in ntypes:
-        n = g.number_of_nodes(ntype)
+        n = g[ntype].number_of_nodes()
         for i in range(n):
-            assert g.has_node(ntype, i)
-        assert not g.has_node(ntype, n)
+            assert g[ntype].has_node(i)
+        assert not g[ntype].has_node(n)
         assert np.array_equal(
-            F.asnumpy(g.has_nodes(ntype, [0, n])).astype('int32'), [1, 0])
+            F.asnumpy(g[ntype].has_nodes([0, n])).astype('int32'), [1, 0])
 
     for etype in etypes:
         srcs, dsts = edges[etype]
@@ -132,10 +132,32 @@ def test_query():
         src_count = Counter(srcs)
         dst_count = Counter(dsts)
         utype, vtype = g.endpoint_types(etype)
-        for i in range(g.number_of_nodes(utype)):
+        for i in range(g[utype].number_of_nodes()):
             assert out_degrees[i] == src_count[i]
-        for i in range(g.number_of_nodes(vtype)):
+        for i in range(g[vtype].number_of_nodes()):
             assert in_degrees[i] == dst_count[i]
+
+def test_frame():
+    g = create_test_heterograph()
+
+    f1 = F.randn((3, 6))
+    f2 = F.randn((2, 4))
+    g['user'].ndata['h'] = f1       # ok
+    g['user'].edata['x'] = f2       # ok - only one edge type in users subgraph
+    f3 = g['follows'].edata['x']    # ok
+    assert F.array_equal(f2, f3)    # they are shared
+    f3[0] = 0
+    f2 = g['user'].edata['x']
+    assert F.array_equal(f2, f3)
+
+def test_transparent_homograph():
+    import dgl.heterograph
+
+    g = dgl.heterograph.DGLGraph2([(0, 1), (1, 2), (2, 3)])
+    g.ndata['x'] = F.randn((4, 6))
+    g.edata['a'] = F.randn((3, 7))
 
 if __name__ == '__main__':
     test_query()
+    test_frame()
+    test_transparent_homograph()

@@ -5,9 +5,9 @@ from . import utils
 from . import backend as F
 from .frame import Frame, FrameRef
 from .view import NodeView, EdgeView
-from .base import ALL, is_all, DGLError
+from .base import ALL, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE, is_all, DGLError
 
-__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
+__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite', 'DGLGraph2']
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
@@ -45,6 +45,8 @@ class DGLBaseHeteroGraph(object):
         # The behavior of interfaces will change accordingly.
         self._view_ntype_idx = _view_ntype_idx
         self._view_etype_idx = _view_etype_idx
+
+        self._cache = {}
 
     def _create_view(self, ntype_idx, etype_idx):
         return DGLBaseHeteroGraph(
@@ -180,6 +182,7 @@ class DGLBaseHeteroGraph(object):
             return self._etypes
 
     @property
+    @utils.cached_member('_cache', '_current_ntype_idx')
     def _current_ntype_idx(self):
         """Checks the uniqueness of node type in the view and get the index
         of that node type.
@@ -191,6 +194,7 @@ class DGLBaseHeteroGraph(object):
         return self._ntypes_invmap[node_types[0]]
 
     @property
+    @utils.cached_member('_cache', '_current_ntype_idx')
     def _current_etype_idx(self):
         """Checks the uniqueness of edge type in the view and get the index
         of that node type.
@@ -268,10 +272,9 @@ class DGLBaseHeteroGraph(object):
         --------
         has_nodes
         """
-        assert not self.is_view, 'not supported on views'
-        return self._graph.has_node(self._view_ntype_idx, vid)
+        return self._graph.has_node(self._current_ntype_idx, vid)
 
-    def has_nodes(self, ntype, vids):
+    def has_nodes(self, vids):
         """Return a 0-1 array ``a`` given the node ID array ``vids``.
 
         ``a[i]`` is 1 if the graph contains node ``vids[i]``, 0 otherwise.
@@ -304,9 +307,8 @@ class DGLBaseHeteroGraph(object):
         --------
         has_node
         """
-        assert not self.is_view, 'not supported on views'
         vids = utils.toindex(vids)
-        rst = self._graph.has_nodes(self._view_ntype_idx, vids)
+        rst = self._graph.has_nodes(self._current_ntype_idx, vids)
         return rst.tousertensor()
 
     def has_edge_between(self, u, v):
@@ -345,8 +347,7 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edges_between
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.has_edge_between(self._view_etype_idx, u, v)
+        return self._graph.has_edge_between(self._current_etype_idx, u, v)
 
     def has_edges_between(self, u, v):
         """Return a 0-1 array `a` given the source node ID array `u` and
@@ -384,10 +385,9 @@ class DGLBaseHeteroGraph(object):
         --------
         has_edge_between
         """
-        assert self.is_view, 'only supported on views'
         u = utils.toindex(u)
         v = utils.toindex(v)
-        rst = self._graph.has_edges_between(self._view_etype_idx, u, v)
+        rst = self._graph.has_edges_between(self._current_etype_idx, u, v)
         return rst.tousertensor()
 
     def predecessors(self, v):
@@ -428,8 +428,7 @@ class DGLBaseHeteroGraph(object):
         --------
         successors
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.predecessors(self._view_etype_idx, v).tousertensor()
+        return self._graph.predecessors(self._current_etype_idx, v).tousertensor()
 
     def successors(self, v):
         """Return the successors of node `v` in the graph with the same edge
@@ -469,8 +468,7 @@ class DGLBaseHeteroGraph(object):
         --------
         predecessors
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.successors(self._view_etype_idx, v).tousertensor()
+        return self._graph.successors(self._current_etype_idx, v).tousertensor()
 
     def edge_id(self, u, v, force_multi=False):
         """Return the edge ID, or an array of edge IDs, between source node
@@ -511,8 +509,7 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_ids
         """
-        assert self.is_view, 'only supported on views'
-        idx = self._graph.edge_id(self._view_etype_idx, u, v)
+        idx = self._graph.edge_id(self._current_etype_idx, u, v)
         return idx.tousertensor() if force_multi or self._graph.is_multigraph() else idx[0]
 
     def edge_ids(self, u, v, force_multi=False):
@@ -562,10 +559,9 @@ class DGLBaseHeteroGraph(object):
         --------
         edge_id
         """
-        assert self.is_view, 'only supported on views'
         u = utils.toindex(u)
         v = utils.toindex(v)
-        src, dst, eid = self._graph.edge_ids(self._view_etype_idx, u, v)
+        src, dst, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
         if force_multi or self._graph.is_multigraph():
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
@@ -603,9 +599,8 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].find_edges([0, 2])
         (tensor([0, 1]), tensor([0, 1]))
         """
-        assert self.is_view, 'only supported on views'
         eid = utils.toindex(eid)
-        src, dst, _ = self._graph.find_edges(self._view_etype_idx, eid)
+        src, dst, _ = self._graph.find_edges(self._current_etype_idx, eid)
         return src.tousertensor(), dst.tousertensor()
 
     def in_edges(self, v, form='uv'):
@@ -648,10 +643,8 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].in_edges(0, 'eid')
         tensor([0, 1])
         """
-        assert self.is_view, 'only supported on views'
-
         v = utils.toindex(v)
-        src, dst, eid = self._graph.in_edges(self._view_etype_idx, v)
+        src, dst, eid = self._graph.in_edges(self._current_etype_idx, v)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -701,9 +694,8 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].out_edges(0, 'eid')
         tensor([0])
         """
-        assert self.is_view, 'only supported on views'
         v = utils.toindex(v)
-        src, dst, eid = self._graph.out_edges(self._view_etype_idx, v)
+        src, dst, eid = self._graph.out_edges(self._current_etype_idx, v)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -758,8 +750,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].all_edges('uv')
         (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
         """
-        assert self.is_view, 'only supported on views'
-        src, dst, eid = self._graph.edges(self._view_etype_idx, order)
+        src, dst, eid = self._graph.edges(self._current_etype_idx, order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -799,8 +790,7 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degrees
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.in_degree(self._view_etype_idx, v)
+        return self._graph.in_degree(self._current_etype_idx, v)
 
     def in_degrees(self, v=ALL):
         """Return the array `d` of in-degrees of the node array `v`.
@@ -837,13 +827,12 @@ class DGLBaseHeteroGraph(object):
         --------
         in_degree
         """
-        assert self.is_view, 'only supported on views'
-        _, dsttype_idx = self._endpoint_types(self._view_etype_idx)
+        _, dsttype_idx = self._endpoint_types(self._current_etype_idx)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(dsttype_idx)))
         else:
             v = utils.toindex(v)
-        return self._graph.in_degrees(self._view_etype_idx, v).tousertensor()
+        return self._graph.in_degrees(self._current_etype_idx, v).tousertensor()
 
     def out_degree(self, v):
         """Return the out-degree of node `v`.
@@ -875,8 +864,7 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degrees
         """
-        assert self.is_view, 'only supported on views'
-        return self._graph.out_degree(self._view_etype_idx, v)
+        return self._graph.out_degree(self._current_etype_idx, v)
 
     def out_degrees(self, v=ALL):
         """Return the array `d` of out-degrees of the node array `v`.
@@ -913,13 +901,12 @@ class DGLBaseHeteroGraph(object):
         --------
         out_degree
         """
-        assert self.is_view, 'only supported on views'
-        srctype_idx, _ = self._endpoint_types(self._view_etype_idx)
+        srctype_idx, _ = self._endpoint_types(self._current_etype_idx)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(srctype_idx)))
         else:
             v = utils.toindex(v)
-        return self._graph.out_degrees(self._view_etype_idx, v).tousertensor()
+        return self._graph.out_degrees(self._current_etype_idx, v).tousertensor()
 
 
 class DGLBaseBipartite(DGLBaseHeteroGraph):
@@ -1647,10 +1634,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             eid = utils.toindex(edges)
 
         if is_all(eid):
-            return dict(self._edge_frame[etype_idx])
+            return dict(self._edge_frames[etype_idx])
         else:
             eid = utils.toindex(eid)
-            return self._edge_frame[etype_idx].select_rows(eid)
+            return self._edge_frames[etype_idx].select_rows(eid)
 
     def pop_e_repr(self, etype, key):
         """Get and remove the specified edge repr of a single edge type.
@@ -2626,3 +2613,27 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
             The node ID array in the subgraph of each node type.
         """
         pass
+
+
+class DGLGraph2(DGLHeteroGraph):
+    def __init__(
+            self,
+            graph_data=None,
+            node_frame=None,
+            edge_frame=None,
+            multigraph=None,
+            readonly=True):
+        if isinstance(graph_data, list):
+            from .factory import graph_from_edge_list
+
+            bipartite = graph_from_edge_list(graph_data)
+            super(DGLGraph2, self).__init__(
+                    [bipartite],
+                    [node_frame] if node_frame is not None else None,
+                    [edge_frame] if edge_frame is not None else None,
+                    multigraph,
+                    readonly)
+
+            # Directly initialize a view of the underlying heterograph to hide the
+            # latter.
+            self._view_ntype_idx = self._view_etype_idx = 0
