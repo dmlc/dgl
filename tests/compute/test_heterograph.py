@@ -1,17 +1,25 @@
 
 import dgl
-from dgl.heterograph import DGLBaseBipartite, DGLHeteroGraph
 from collections import Counter
 import numpy as np
+import scipy.sparse as ssp
 import backend as F
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
-    follows = DGLBaseBipartite.from_coo('user', 'user', 'follows', 3, 3, [0, 1], [1, 2])
-    plays = DGLBaseBipartite.from_coo('user', 'game', 'plays', 3, 2, [0, 1, 1, 2], [0, 0, 1, 1])
-    wishes = DGLBaseBipartite.from_coo('user', 'game', 'wishes', 3, 2, [0, 2], [1, 0])
-    develops = DGLBaseBipartite.from_coo('developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
-    g = DGLHeteroGraph([follows, plays, wishes, develops])
+    follows = dgl.bipartite_from_edge_list(
+        'user', 'user', 'follows', [(0, 1), (1, 2)], 3, 3)
+
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    plays = dgl.bipartite_from_scipy('user', 'game', 'plays', plays_spmat)
+
+    wishes_spmat = ssp.coo_matrix(([1, 0], ([2, 0], [0, 1])))
+    wishes = dgl.bipartite_from_scipy('user', 'game', 'wishes', wishes_spmat, True)
+
+    develops = dgl.bipartite_from_edge_list(
+        'developer', 'game', 'develops', [(0, 0), (1, 1)], 2, 2)
+
+    g = dgl.DGLHeteroGraph([follows, plays, wishes, develops])
     return g
 
 def test_query():
@@ -52,19 +60,19 @@ def test_query():
         assert (u, v) == g.endpoint_types(e)
 
     # number of nodes
-    assert [g[ntype].number_of_nodes() for ntype in ntypes] == [3, 2, 2]
+    assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
 
     # number of edges
     assert [g[etype].number_of_edges() for etype in etypes] == [2, 4, 2, 2]
 
     # has_node & has_nodes
     for ntype in ntypes:
-        n = g[ntype].number_of_nodes()
+        n = g.number_of_nodes(ntype)
         for i in range(n):
-            assert g[ntype].has_node(i)
-        assert not g[ntype].has_node(n)
+            assert g.has_node(ntype, i)
+        assert not g.has_node(ntype, n)
         assert np.array_equal(
-            F.asnumpy(g[ntype].has_nodes([0, n])).astype('int32'), [1, 0])
+            F.asnumpy(g.has_nodes(ntype, [0, n])).astype('int32'), [1, 0])
 
     for etype in etypes:
         srcs, dsts = edges[etype]
@@ -124,9 +132,9 @@ def test_query():
         src_count = Counter(srcs)
         dst_count = Counter(dsts)
         utype, vtype = g.endpoint_types(etype)
-        for i in range(g[utype].number_of_nodes()):
+        for i in range(g.number_of_nodes(utype)):
             assert out_degrees[i] == src_count[i]
-        for i in range(g[vtype].number_of_nodes()):
+        for i in range(g.number_of_nodes(vtype)):
             assert in_degrees[i] == dst_count[i]
 
 if __name__ == '__main__':
