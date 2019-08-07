@@ -60,4 +60,3 @@ def bipartite_from_scipy(src_type, dst_type, edge_type, spmat, with_edge_id=Fals
     data = spmat.data if with_edge_id else list(range(len(indices)))
     return DGLBaseBipartite.from_csr(
         src_type, dst_type, edge_type, num_src, num_dst, indptr, indices, data)
-
