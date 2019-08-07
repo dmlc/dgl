@@ -2633,7 +2633,3 @@ class DGLGraph2(DGLHeteroGraph):
                     [edge_frame] if edge_frame is not None else None,
                     multigraph,
                     readonly)
-
-            # Directly initialize a view of the underlying heterograph to hide the
-            # latter.
-            self._view_ntype_idx = self._view_etype_idx = 0
