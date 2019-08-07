@@ -6,6 +6,8 @@
 #ifndef DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 #define DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 
+#include <dgl/runtime/ndarray.h>
+
 #include <queue>
 #include <set>
 #include <string>
@@ -54,10 +56,6 @@ struct Message {
    * \brief message size in bytes
    */
   int64_t size;
-  /*!
-   * \brief aux_data pointer handler
-   */
-  void* aux_handler;
   /*!
    * \brief user-defined deallocator, which can be nullptr
    */

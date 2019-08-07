@@ -215,50 +215,50 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendNodeFlow")
     Message node_mapping_msg;
     node_mapping_msg.data = static_cast<char*>(node_mapping->data);
     node_mapping_msg.size = node_mapping.GetSize();
-    node_mapping_msg.aux_handler = &node_mapping;
-    node_mapping_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    node_mapping_msg.deallocator = [node_mapping](Message*) {};
     CHECK_NE(sender->Send(node_mapping_msg, recv_id), -1);
     // send edege_mapping
     Message edge_mapping_msg;
     edge_mapping_msg.data = static_cast<char*>(edge_mapping->data);
     edge_mapping_msg.size = edge_mapping.GetSize();
-    edge_mapping_msg.aux_handler = &edge_mapping;
-    edge_mapping_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    edge_mapping_msg.deallocator = [edge_mapping](Message*) {};
     CHECK_NE(sender->Send(edge_mapping_msg, recv_id), -1);
     // send layer_offsets
     Message layer_offsets_msg;
     layer_offsets_msg.data = static_cast<char*>(layer_offsets->data);
     layer_offsets_msg.size = layer_offsets.GetSize();
-    layer_offsets_msg.aux_handler = &layer_offsets;
-    layer_offsets_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    layer_offsets_msg.deallocator = [layer_offsets](Message*) {};
     CHECK_NE(sender->Send(layer_offsets_msg, recv_id), -1);
     // send flow_offset
     Message flow_offsets_msg;
     flow_offsets_msg.data = static_cast<char*>(flow_offsets->data);
     flow_offsets_msg.size = flow_offsets.GetSize();
-    flow_offsets_msg.aux_handler = &flow_offsets;
-    flow_offsets_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    flow_offsets_msg.deallocator = [flow_offsets](Message*) {};
     CHECK_NE(sender->Send(flow_offsets_msg, recv_id), -1);
     // send csr->indptr
     Message indptr_msg;
     indptr_msg.data = static_cast<char*>(indptr->data);
     indptr_msg.size = indptr.GetSize();
-    indptr_msg.aux_handler = &indptr;
-    indptr_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    indptr_msg.deallocator = [indptr](Message*) {};
     CHECK_NE(sender->Send(indptr_msg, recv_id), -1);
     // send csr->indices
     Message indices_msg;
     indices_msg.data = static_cast<char*>(indice->data);
     indices_msg.size = indice.GetSize();
-    indices_msg.aux_handler = &indice;
-    indices_msg.deallocator = NDArrayDeleter;
+    // capture the array in the closure
+    indices_msg.deallocator = [indice](Message*) {};
     CHECK_NE(sender->Send(indices_msg, recv_id), -1);
     // send csr->edge_ids
     Message edge_ids_msg;
-    edge_ids_msg.data = static_cast<char*>(csr->edge_ids()->data);
-    edge_ids_msg.size = csr->edge_ids().GetSize();
-    edge_ids_msg.aux_handler = &edge_ids;
-    edge_ids_msg.deallocator = NDArrayDeleter;
+    edge_ids_msg.data = static_cast<char*>(edge_ids->data);
+    edge_ids_msg.size = edge_ids.GetSize();
+    // capture the array in the closure
+    edge_ids_msg.deallocator = [edge_ids](Message*) {};
     CHECK_NE(sender->Send(edge_ids_msg, recv_id), -1);
   });
 
