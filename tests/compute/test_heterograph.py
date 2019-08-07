@@ -145,7 +145,9 @@ def test_frame():
     g['user'].ndata['h'] = f1       # ok
     g['user'].edata['x'] = f2       # ok - only one edge type in users subgraph
     f3 = g['follows'].edata['x']    # ok
+    f4 = g['follows'].ndata['h']
     assert F.array_equal(f2, f3)    # they are shared
+    assert F.array_equal(f1, f4)
     f3[0] = 0
     f2 = g['user'].edata['x']
     assert F.array_equal(f2, f3)

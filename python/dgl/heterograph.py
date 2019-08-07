@@ -144,7 +144,7 @@ class DGLBaseHeteroGraph(object):
         elif self.is_edge_type_view:
             srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
             srctype = self._ntypes[srctype_idx]
-            dsttype = self._etypes[dsttype_idx]
+            dsttype = self._ntypes[dsttype_idx]
             return [srctype, dsttype] if srctype != dsttype else [srctype]
         else:
             return self._ntypes
@@ -1493,15 +1493,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         else:
             self._node_frame[ntype_idx].update_rows(u, data, inplace=inplace)
 
-    def get_n_repr(self, ntype, u=ALL):
+    def get_n_repr(self, u=ALL):
         """Get node(s) representation of a single node type.
 
         The returned feature tensor batches multiple node features on the first dimension.
 
         Parameters
         ----------
-        ntype : str
-            Node type.
         u : node, container or tensor
             The node(s).
 
@@ -1600,14 +1598,11 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             # update row
             self._edge_frames[etype_idx].update_rows(eid, data, inplace=inplace)
 
-    def get_e_repr(self, etype, edges=ALL):
+    def get_e_repr(self, edges=ALL):
         """Get edge(s) representation.
 
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         edges : edges
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
