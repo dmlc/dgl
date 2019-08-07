@@ -25,13 +25,6 @@ namespace network {
 const int64_t kQueueSize = 200 * 1024 * 1024;
 
 /*!
- * \brief Free memory buffer of NodeFlow
- */
-inline void NDArrayDeleter(Message* msg) {
-  delete reinterpret_cast<NDArray*>(msg->aux_handler);
-}
-
-/*!
  * \brief Message type for DGL distributed training
  */
 enum MessageType {
