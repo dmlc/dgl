@@ -6,6 +6,7 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 import numbers
+import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
 
@@ -37,6 +38,9 @@ def tensor(data, dtype=None):
         else:
             dtype = np.float32
     return nd.array(data, dtype=dtype)
+
+def as_scalar(data):
+    return data.asscalar()
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -112,11 +116,40 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return nd.sum(input, axis=dim)
 
+def reduce_sum(input):
+    return input.sum()
+
 def mean(input, dim):
     return nd.mean(input, axis=dim)
 
+def reduce_mean(input):
+    return input.mean()
+
 def max(input, dim):
     return nd.max(input, axis=dim)
+
+def reduce_max(input):
+    return input.max()
+
+def min(input, dim):
+    return nd.min(input, axis=dim)
+
+def reduce_min(input):
+    return input.min()
+
+def topk(input, k, dim, descending=True):
+    return nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending)
+
+def argsort(input, dim, descending):
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    idx = nd.cast(idx, dtype='int64')
+    return idx
+
+def exp(input):
+    return nd.exp(input)
+
+def softmax(input, dim=-1):
+    return nd.softmax(input, axis=dim)
 
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
@@ -143,6 +176,9 @@ def split(x, sizes_or_sections, dim):
     else:
         return nd.split(x, sizes_or_sections, axis=dim)
 
+def repeat(input, repeats, dim):
+    return nd.repeat(input, repeats, axis=dim)
+
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
     if len(row_index) == 0:
@@ -152,6 +188,17 @@ def gather_row(data, row_index):
         return nd.take(data, row_index)
     else:
         return data[row_index,]
+
+def slice_axis(data, axis, begin, end):
+    dim = data.shape[axis]
+    if begin < 0:
+        begin += dim
+    if end <= 0:
+        end += dim
+    return nd.slice_axis(data, axis, begin, end)
+
+def take(data, indices, dim):
+    return nd.take(data, indices, dim)
 
 def narrow_row(data, start, stop):
     return data[start:stop]
@@ -180,6 +227,35 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
+
+def pad_packed_tensor(input, lengths, value, l_min=None):
+    old_shape = input.shape
+    if isinstance(lengths, nd.NDArray):
+        max_len = as_scalar(input.max())
+    else:
+        max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
+    batch_size = len(lengths)
+    ctx = input.context
+    dtype = input.dtype
+    x = nd.full((batch_size * max_len, *old_shape[1:]), value, ctx=ctx, dtype=dtype)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return scatter_row(x, index, input).reshape(batch_size, max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    ctx = input.context
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return gather_row(input.reshape(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     # TODO: support other dimensions

@@ -14,162 +14,75 @@ namespace network {
 using std::string;
 
 MessageQueue::MessageQueue(int64_t queue_size, int num_producers) {
-  CHECK_LT(0, queue_size);
-  try {
-    queue_ = new char[queue_size];
-  } catch(const std::bad_alloc&) {
-    LOG(FATAL) << "Not enough memory for message queue.";
-  }
-  memset(queue_, '\0', queue_size);
-
+  CHECK_GE(queue_size, 0);
+  CHECK_GE(num_producers, 0);
   queue_size_ = queue_size;
   free_size_ = queue_size;
-  write_pointer_ = 0;
   num_producers_ = num_producers;
 }
 
-MessageQueue::~MessageQueue() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (nullptr != queue_) {
-    delete [] queue_;
-    queue_ = nullptr;
-  }
-}
-
-int64_t MessageQueue::Add(const char* src, int64_t size, bool is_blocking) {
+STATUS MessageQueue::Add(Message msg, bool is_blocking) {
   // check if message is too long to fit into the queue
-  if (size > queue_size_) {
-    LOG(ERROR) << "Message is larger than the queue.";
-    return -1;
+  if (msg.size > queue_size_) {
+    LOG(WARNING) << "Message is larger than the queue.";
+    return MSG_GT_SIZE;
   }
-  if (size <= 0) {
-    LOG(ERROR) << "Message size (" << size << ") is negative or zero.";
-    return -1;
+  if (msg.size <= 0) {
+    LOG(WARNING) << "Message size (" << msg.size << ") is negative or zero.";
+    return MSG_LE_ZERO;
   }
   std::unique_lock<std::mutex> lock(mutex_);
   if (finished_producers_.size() >= num_producers_) {
-    LOG(ERROR) << "Can't add to buffer when flag_no_more is set.";
-    return -1;
+    LOG(WARNING) << "Message queue is closed.";
+    return QUEUE_CLOSE;
   }
-  if (size > free_size_ && !is_blocking) {
-    LOG(WARNING) << "Queue is full and message lost.";
-    return 0;
+  if (msg.size > free_size_ && !is_blocking) {
+    return QUEUE_FULL;
   }
   cond_not_full_.wait(lock, [&]() {
-    return size <= free_size_;
+    return msg.size <= free_size_;
   });
-  // Write data into buffer:
-  // If there has enough space on tail of buffer, just append data
-  // else, write till in the end of buffer and return to head of buffer
-  message_positions_.push(std::make_pair(write_pointer_, size));
-  free_size_ -= size;
-  if (write_pointer_ + size <= queue_size_) {
-    memcpy(&queue_[write_pointer_], src, size);
-    write_pointer_ += size;
-    if (write_pointer_ == queue_size_) {
-      write_pointer_ = 0;
-    }
-  } else {
-    int64_t size_partial = queue_size_ - write_pointer_;
-    memcpy(&queue_[write_pointer_], src, size_partial);
-    memcpy(queue_, &src[size_partial], size - size_partial);
-    write_pointer_ = size - size_partial;
-  }
-
+  // Add data pointer to queue
+  queue_.push(msg);
+  free_size_ -= msg.size;
   // not empty signal
   cond_not_empty_.notify_one();
 
-  return size;
+  return ADD_SUCCESS;
 }
 
-int64_t MessageQueue::Add(const string &src, bool is_blocking) {
-  return Add(src.data(), src.size(), is_blocking);
-}
-
-int64_t MessageQueue::Remove(char *dest, int64_t max_size, bool is_blocking) {
-  int64_t retval;
-
+STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
   std::unique_lock<std::mutex> lock(mutex_);
-  if (message_positions_.empty()) {
+  if (queue_.empty()) {
     if (!is_blocking) {
-      return 0;
+      return QUEUE_EMPTY;
     }
     if (finished_producers_.size() >= num_producers_) {
-      return 0;
+      LOG(WARNING) << "Message queue is closed.";
+      return QUEUE_CLOSE;
     }
   }
 
   cond_not_empty_.wait(lock, [this] {
-    return !message_positions_.empty() || exit_flag_.load();
+    return !queue_.empty() || exit_flag_.load();
   });
-  if (finished_producers_.size() >= num_producers_) {
-    return 0;
+  if (finished_producers_.size() >= num_producers_ && queue_.empty()) {
+    LOG(WARNING) << "Message queue is closed.";
+    return QUEUE_CLOSE;
   }
 
-  MessagePosition & pos = message_positions_.front();
-  // check if message is too long
-  if (pos.second > max_size) {
-    LOG(ERROR) << "Message size exceeds limit, information lost.";
-    retval = -1;
-  } else {
-    // read from buffer:
-    // if this message stores in consecutive memory, just read
-    // else, read from buffer tail then return to the head
-    if (pos.first + pos.second <= queue_size_) {
-      memcpy(dest, &queue_[pos.first], pos.second);
-    } else {
-      int64_t size_partial = queue_size_ - pos.first;
-      memcpy(dest, &queue_[pos.first], size_partial);
-      memcpy(&dest[size_partial], queue_, pos.second - size_partial);
-    }
-    retval = pos.second;
-  }
-  free_size_ += pos.second;
-  message_positions_.pop();
-
+  Message old_msg = queue_.front();
+  queue_.pop();
+  msg->data = old_msg.data;
+  msg->size = old_msg.size;
+  msg->deallocator = old_msg.deallocator;
+  free_size_ += old_msg.size;
   cond_not_full_.notify_one();
 
-  return retval;
+  return REMOVE_SUCCESS;
 }
 
-int64_t MessageQueue::Remove(string *dest, bool is_blocking) {
-  int64_t retval;
-
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (message_positions_.empty()) {
-    if (!is_blocking) {
-      return 0;
-    }
-    if (finished_producers_.size() >= num_producers_) {
-      return 0;
-    }
-  }
-
-  cond_not_empty_.wait(lock, [this] {
-    return !message_positions_.empty() || exit_flag_.load();
-  });
-
-  MessagePosition & pos = message_positions_.front();
-  // read from buffer:
-  // if this message stores in consecutive memory, just read
-  // else, read from buffer tail then return to the head
-  if (pos.first + pos.second <= queue_size_) {
-    dest->assign(&queue_[pos.first], pos.second);
-  } else {
-    int64_t size_partial = queue_size_ - pos.first;
-    dest->assign(&queue_[pos.first], size_partial);
-    dest->append(queue_, pos.second - size_partial);
-  }
-  retval = pos.second;
-  free_size_ += pos.second;
-  message_positions_.pop();
-
-  cond_not_full_.notify_one();
-
-  return retval;
-}
-
-void MessageQueue::Signal(int producer_id) {
+void MessageQueue::SignalFinished(int producer_id) {
   std::lock_guard<std::mutex> lock(mutex_);
   finished_producers_.insert(producer_id);
   // if all producers have finished, consumers should be
@@ -180,9 +93,14 @@ void MessageQueue::Signal(int producer_id) {
   }
 }
 
+bool MessageQueue::Empty() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return queue_.size() == 0;
+}
+
 bool MessageQueue::EmptyAndNoMoreAdd() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return message_positions_.size() == 0 &&
+  return queue_.size() == 0 &&
          finished_producers_.size() >= num_producers_;
 }
 

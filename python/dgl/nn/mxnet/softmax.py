@@ -32,12 +32,15 @@ class EdgeSoftmax(mx.autograd.Function):
         """Forward function.
 
         Pseudo-code:
-        score = dgl.EData(g, score)
-        score_max = score.dst_max()  # of type dgl.NData
-        score = score - score_max  # edge_sub_dst, ret dgl.EData
-        score_sum = score.dst_sum()  # of type dgl.NData
-        out = score / score_sum    # edge_div_dst, ret dgl.EData
-        return out.data
+
+        .. code:: python
+
+            score = dgl.EData(g, score)
+            score_max = score.dst_max()  # of type dgl.NData
+            score = score - score_max  # edge_sub_dst, ret dgl.EData
+            score_sum = score.dst_sum()  # of type dgl.NData
+            out = score / score_sum    # edge_div_dst, ret dgl.EData
+            return out.data
         """
         g = self.g.local_var()
         g.edata['s'] = score
@@ -54,12 +57,15 @@ class EdgeSoftmax(mx.autograd.Function):
         """Backward function.
 
         Pseudo-code:
-        g, out = ctx.backward_cache
-        grad_out = dgl.EData(g, grad_out)
-        out = dgl.EData(g, out)
-        sds = out * grad_out  # type dgl.EData
-        sds_sum = sds.dst_sum()  # type dgl.NData
-        grad_score = sds - sds * sds_sum  # multiple expressions
+
+        .. code:: python
+
+            g, out = ctx.backward_cache
+            grad_out = dgl.EData(g, grad_out)
+            out = dgl.EData(g, out)
+            sds = out * grad_out  # type dgl.EData
+            sds_sum = sds.dst_sum()  # type dgl.NData
+            grad_score = sds - sds * sds_sum  # multiple expressions
         """
         g = self.g.local_var()
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
@@ -74,6 +80,19 @@ class EdgeSoftmax(mx.autograd.Function):
 
 def edge_softmax(graph, logits):
     r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    An example of using edge softmax is in
+    `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
+    the attention weights are computed with such an edge softmax operation.
 
     Parameters
     ----------
@@ -90,13 +109,40 @@ def edge_softmax(graph, logits):
     Notes
     -----
         * Input shape: :math:`(N, *, 1)` where * means any number of
-            additional dimensions, :math:`N` is the number of edges.
+          additional dimensions, :math:`N` is the number of edges.
         * Return shape: :math:`(N, *, 1)`
 
     Examples
     --------
-    >>> import dgl.function as fn
-    >>> attention = EdgeSoftmax(logits, graph)
+    >>> from dgl.nn.mxnet.softmax import edge_softmax
+    >>> import dgl
+    >>> from mxnet import nd
+
+    Create a :code:`DGLGraph` object and initialize its edge features.
+
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(3)
+    >>> g.add_edges([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2])
+    >>> edata = nd.ones((6, 1))
+    >>> edata
+    [[1.]
+     [1.]
+     [1.]
+     [1.]
+     [1.]
+     [1.]]
+    <NDArray 6x1 @cpu(0)>
+
+    Apply edge softmax on g:
+
+    >>> edge_softmax(g, edata)
+    [[1.        ]
+     [0.5       ]
+     [0.33333334]
+     [0.5       ]
+     [0.33333334]
+     [0.33333334]]
+    <NDArray 6x1 @cpu(0)>
     """
     softmax_op = EdgeSoftmax(graph)
     return softmax_op(logits)
