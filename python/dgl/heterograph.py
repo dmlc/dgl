@@ -190,7 +190,7 @@ class DGLBaseHeteroGraph(object):
         This allows reading/writing node frame data.
         """
         node_types = self.node_types()
-        assert len(node_types) == 1
+        assert len(node_types) == 1, "only available for subgraphs with one node type"
         return self._ntypes_invmap[node_types[0]]
 
     @property
@@ -202,7 +202,7 @@ class DGLBaseHeteroGraph(object):
         This allows reading/writing edge frame data and message passing routines.
         """
         edge_types = self.edge_types()
-        assert len(edge_types) == 1
+        assert len(edge_types) == 1, "only available for subgraphs with one edge type"
         return self._etypes_invmap[edge_types[0]]
 
     def number_of_nodes(self):
