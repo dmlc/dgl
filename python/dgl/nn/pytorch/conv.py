@@ -5,8 +5,9 @@ from torch import nn
 from torch.nn import init
 
 from ... import function as fn
+from .softmax import edge_softmax
 
-__all__ = ['GraphConv']
+__all__ = ['GraphConv', 'GraphAttention']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -148,3 +149,81 @@ class GraphConv(nn.Module):
         if '_activation' in self.__dict__:
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
+    
+
+class GraphAttention(nn.Module):
+    r"""Apply graph attention over an input signal.
+
+    TODO(zihao): docstring
+    """
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 num_heads,
+                 feat_drop,
+                 attn_drop,
+                 alpha,
+                 residual=False,
+                 activation=None):
+        super(GraphAttention, self).__init__()
+        self._num_heads = num_heads
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
+        self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
+        self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
+        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else lambda x : x
+        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else lambda x : x
+        self.leaky_relu = nn.LeakyReLU(alpha)
+        self._residual = residual
+        if residual:
+            if in_feats != out_feats:
+                self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
+            else:
+                self.res_fc = None
+        self._reset_parameters()
+
+        self.activation = activation
+
+    def _reset_parameters(self):
+        nn.init.xavier_normal_(self.fc.weight, gain=1.414)
+        nn.init.xavier_normal_(self.attn_l, gain=1.414)
+        nn.init.xavier_normal_(self.attn_r, gain=1.414)
+        if self._residual and self.res_fc is not None:
+            nn.init.xavier_normal_(self.res_fc.weight, gain=1.414)
+
+    def forward(self, feat, graph):
+        r"""Compute graph attention
+
+        TODO(zihao): docstring
+        """
+        graph = graph.local_var()
+        h = self.feat_drop(feat)
+        feat = self.fc(h).view(-1, self._num_heads, self._out_feats)
+        el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
+        er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
+        graph.ndata.update({'ft': feat, 'el': el, 'er': er})
+
+        # compute edge attention
+        graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
+        e = self.leaky_relu(graph.edata.pop('e'))
+        # compute softmax
+        graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
+        # message passing
+        graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
+                     fn.sum('m', 'ft'))
+        rst = graph.ndata['ft']
+
+        # residual
+        if self._residual:
+            if self.res_fc is not None:
+                resval = self.res_fc(h).view(-1, self._num_heads, self._out_feats)
+            else:
+                resval = h.unsqueeze(1)
+            rst = rst + resval
+
+        # activation
+        if self.activation:
+            rst = self.activation(rst)
+
+        return rst
