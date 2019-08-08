@@ -45,7 +45,8 @@ def schedule_send(graph, u, v, eid, message_func):
         The message function
     """
     var_mf = var.FEAT_DICT(graph._msg_frame)
-    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_src_nf = var.FEAT_DICT(graph._src_frame)
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)
     var_eid = var.IDX(eid)
 
@@ -54,8 +55,8 @@ def schedule_send(graph, u, v, eid, message_func):
                         v=v,
                         eid=eid,
                         mfunc=message_func,
-                        var_src_nf=var_nf,
-                        var_dst_nf=var_nf,
+                        var_src_nf=var_src_nf,
+                        var_dst_nf=var_dst_nf,
                         var_ef=var_ef)
 
     # write tmp msg back
@@ -96,7 +97,7 @@ def schedule_recv(graph,
         if apply_func is not None:
             schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         # sort and unique the argument
         recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))
         recv_nodes = utils.toindex(recv_nodes)
@@ -105,12 +106,12 @@ def schedule_recv(graph,
         reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, eid),
                                    recv_nodes)
         # apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
+        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
         # set message indicator to 0
         graph._set_msg_index(graph._get_msg_index().set_items(eid, 0))
         if not graph._get_msg_index().has_nonzero():
@@ -148,7 +149,8 @@ def schedule_snr(graph,
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
     recv_nodes = utils.toindex(recv_nodes)
     # create vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_src_nf = var.FEAT_DICT(graph._src_frame, name='src_nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='dst_nf')
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
@@ -159,8 +161,8 @@ def schedule_snr(graph,
         edge_tuples, graph.number_of_nodes())
     out_map_creator = lambda nbits: _build_idx_map(recv_nodes, nbits)
     reduced_feat = _gen_send_reduce(graph=graph,
-                                    src_node_frame=graph._node_frame,
-                                    dst_node_frame=graph._node_frame,
+                                    src_node_frame=graph._src_frame,
+                                    dst_node_frame=graph._dst_frame,
                                     edge_frame=graph._edge_frame,
                                     message_func=message_func,
                                     reduce_func=reduce_func,
@@ -170,12 +172,12 @@ def schedule_snr(graph,
                                     adj_creator=adj_creator,
                                     out_map_creator=out_map_creator)
     # generate apply schedule
-    final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat,
+    final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf, reduced_feat,
                                    apply_func)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
     else:
-        ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
 
 def schedule_update_all(graph,
                         message_func,
@@ -203,7 +205,7 @@ def schedule_update_all(graph,
         eid = utils.toindex(slice(0, graph.number_of_edges())) # ALL
         recv_nodes = utils.toindex(slice(0, graph.number_of_nodes())) # ALL
         # create vars
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         var_eid = var.IDX(eid)
         # generate send + reduce
@@ -213,8 +215,8 @@ def schedule_update_all(graph,
         adj_creator = lambda: spmv.build_gidx_and_mapping_graph(graph)
         out_map_creator = lambda nbits: None
         reduced_feat = _gen_send_reduce(graph=graph,
-                                        src_node_frame=graph._node_frame,
-                                        dst_node_frame=graph._node_frame,
+                                        src_node_frame=graph._src_frame,
+                                        dst_node_frame=graph._dst_frame,
                                         edge_frame=graph._edge_frame,
                                         message_func=message_func,
                                         reduce_func=reduce_func,
@@ -224,9 +226,9 @@ def schedule_update_all(graph,
                                         adj_creator=adj_creator,
                                         out_map_creator=out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
+        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
-        ir.WRITE_DICT_(var_nf, final_feat)
+        ir.WRITE_DICT_(var_dst_nf, final_feat)
 
 def schedule_apply_nodes(graph,
                          v,
@@ -326,10 +328,12 @@ def schedule_apply_edges(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_src_nf = var.FEAT_DICT(graph._src_frame)
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)
     var_out = _gen_send(graph=graph, u=u, v=v, eid=eid, mfunc=apply_func,
-                        var_src_nf=var_nf, var_dst_nf=var_nf, var_ef=var_ef)
+                        var_src_nf=var_src_nf, var_dst_nf=var_dst_nf,
+                        var_ef=var_ef)
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_eid = var.IDX(eid)
     # schedule apply edges
@@ -443,7 +447,7 @@ def schedule_pull(graph,
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
         # create vars
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         var_pull_nodes = var.IDX(pull_nodes, name='pull_nodes')
         var_u = var.IDX(u)
         var_v = var.IDX(v)
@@ -453,17 +457,17 @@ def schedule_pull(graph,
         num_nodes = graph.number_of_nodes()
         adj_creator = lambda: spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
         out_map_creator = lambda nbits: _build_idx_map(pull_nodes, nbits)
-        reduced_feat = _gen_send_reduce(graph, graph._node_frame,
-                                        graph._node_frame, graph._edge_frame,
+        reduced_feat = _gen_send_reduce(graph, graph._src_frame,
+                                        graph._dst_frame, graph._edge_frame,
                                         message_func, reduce_func, var_eid,
                                         var_pull_nodes, uv_getter, adj_creator,
                                         out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_pull_nodes, var_nf, reduced_feat, apply_func)
+        final_feat = _apply_with_accum(graph, var_pull_nodes, var_dst_nf, reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_pull_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_(var_dst_nf, var_pull_nodes, final_feat)
 
 def schedule_group_apply_edge(graph,
                               u, v, eid,
@@ -494,11 +498,12 @@ def schedule_group_apply_edge(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_src_nf = var.FEAT_DICT(graph._src_frame, name='src_nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='dst_nf')
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_out = var.FEAT_DICT(name='new_ef')
     db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
-                                     var_nf, var_ef, var_out)
+                                     var_src_nf, var_dst_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
@@ -719,11 +724,11 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     # node frame.
     # TODO(minjie): should replace this with an IR call to make the program
     # stateless.
-    tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
+    tmpframe = FrameRef(frame_like(graph._dst_frame._frame, len(recv_nodes)))
 
     # vars
     var_msg = var.FEAT_DICT(graph._msg_frame, 'msg')
-    var_nf = var.FEAT_DICT(graph._node_frame, 'nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, 'nf')
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
@@ -744,7 +749,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     else:
         # gen degree bucketing schedule for UDF recv
         db.gen_degree_bucketing_schedule(graph, rfunc, eid, dst, recv_nodes,
-                                         var_nf, var_msg, var_out)
+                                         var_dst_nf, var_msg, var_out)
         return var_out
 
 def _gen_send_reduce(

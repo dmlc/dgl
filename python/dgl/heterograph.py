@@ -3,6 +3,8 @@ import networkx as nx
 from . import heterograph_index, graph_index
 from . import utils
 from . import backend as F
+from . import init
+from .runtime import ir, scheduler, Runtime
 from .frame import Frame, FrameRef
 from .view import NodeView, EdgeView
 from .base import ALL, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE, is_all, DGLError
@@ -197,13 +199,35 @@ class DGLBaseHeteroGraph(object):
     @utils.cached_member('_cache', '_current_ntype_idx')
     def _current_etype_idx(self):
         """Checks the uniqueness of edge type in the view and get the index
-        of that node type.
+        of that edge type.
 
         This allows reading/writing edge frame data and message passing routines.
         """
         edge_types = self.edge_types()
         assert len(edge_types) == 1, "only available for subgraphs with one edge type"
         return self._etypes_invmap[edge_types[0]]
+
+    @property
+    @utils.cached_member('_cache', '_current_srctype_idx')
+    def _current_srctype_idx(self):
+        """Checks the uniqueness of edge type in the view and get the index
+        of the source type.
+
+        This allows reading/writing edge frame data and message passing routines.
+        """
+        srctype_idx, dsttype_idx = self._endpoint_types(self._current_etype_idx)
+        return srctype_idx
+
+    @property
+    @utils.cached_member('_cache', '_current_dsttype_idx')
+    def _current_dsttype_idx(self):
+        """Checks the uniqueness of edge type in the view and get the index
+        of the destination type.
+
+        This allows reading/writing edge frame data and message passing routines.
+        """
+        srctype_idx, dsttype_idx = self._endpoint_types(self._current_etype_idx)
+        return dsttype_idx
 
     def number_of_nodes(self):
         """Return the number of nodes in the current view of the heterograph.
@@ -1153,9 +1177,26 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         else:
             self._edge_frames = edge_frames
 
+        # message indicators
+        self._msg_indices = [None] * len(self._etypes)
+        self._msg_frames = []
+        for i in range(len(self._etypes)):
+            frame = FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+            frame.set_initializer(init.zero_initializer)
+            self._msg_frames.append(frame)
+
     def _create_view(self, ntype_idx, etype_idx):
         return DGLHeteroGraph(
             graph_data=self, _view_ntype_idx=ntype_idx, _view_etype_idx=etype_idx)
+
+    def _get_msg_index(self):
+        if self._msg_indices[self._current_etype_idx] is None:
+            self._msg_indices[self._current_etype_idx] = utils.zero_index(
+                size=self.number_of_edges())
+        return self._msg_indices[self._current_etype_idx]
+
+    def _set_msg_index(self, index):
+        self._msg_indices[self._current_etype_idx] = index
 
     def __getitem__(self, key):
         if key in self._ntypes_invmap:
@@ -1164,6 +1205,22 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             return self._create_view(None, self._etypes_invmap[key])
         else:
             raise KeyError(key)
+
+    @property
+    def _node_frame(self):
+        return self._node_frames[self._current_ntype_idx]
+
+    @property
+    def _edge_frame(self):
+        return self._edge_frames[self._current_etype_idx]
+
+    @property
+    def _src_frame(self):
+        return self._node_frames[self._current_srctype_idx]
+
+    @property
+    def _dst_frame(self):
+        return self._node_frames[self._current_dsttype_idx]
 
     def add_nodes(self, node_type, num, data=None):
         """Add multiple new nodes of the same node type
@@ -1312,7 +1369,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        return self._node_frames[self._current_ntype_idx].schemes
+        return self._node_frame.schemes
 
     def edge_attr_schemes(self):
         """Return the edge feature schemes for a given edge type.
@@ -1331,9 +1388,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        return self._edge_frames[self._current_etype_idx].schemes
+        return self._edge_frame.schemes
 
-    def set_n_initializer(self, ntype, initializer, field=None):
+    def set_n_initializer(self, initializer, field=None):
         """Set the initializer for empty node features of given type.
 
         Initializer is a callable that returns a tensor given the shape, data type
@@ -1352,7 +1409,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The feature field name. Default is set an initializer for all the
             feature fields.
         """
-        pass
+        self._node_frame.set_initializer(initializer, field)
 
     def set_e_initializer(self, etype, initializer, field=None):
         """Set the initializer for empty edge features of given type.
@@ -1374,7 +1431,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The feature field name. Default is set an initializer for all the
             feature fields.
         """
-        pass
+        self._edge_frame.set_initializer(initializer, field)
 
     @property
     def nodes(self):
@@ -1474,8 +1531,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        ntype_idx = self._current_ntype_idx
-
         if is_all(u):
             num_nodes = self.number_of_nodes()
         else:
@@ -1489,9 +1544,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         if is_all(u):
             for key, val in data.items():
-                self._node_frames[ntype_idx][key] = val
+                self._node_frame[key] = val
         else:
-            self._node_frame[ntype_idx].update_rows(u, data, inplace=inplace)
+            self._node_frame.update_rows(u, data, inplace=inplace)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation of a single node type.
@@ -1508,17 +1563,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict from feature name to feature tensor.
         """
-        node_types = self.node_types()
-        assert len(node_types) == 1
-        ntype_idx = self._ntypes_invmap[node_types[0]]
-
         if len(self.node_attr_schemes()) == 0:
             return dict()
         if is_all(u):
-            return dict(self._node_frames[ntype_idx])
+            return dict(self._node_frame)
         else:
             u = utils.toindex(u)
-            return self._node_frames[ntype_idx].select_rows(u)
+            return self._node_frame.select_rows(u)
 
     def pop_n_repr(self, key):
         """Get and remove the specified node repr of a given node type.
@@ -1533,7 +1584,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Tensor
             The popped representation
         """
-        pass
+        return self._node_frame.pop(key)
 
     def set_e_repr(self, data, edges=ALL, inplace=False):
         """Set edge(s) representation of a single edge type.
@@ -1560,8 +1611,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        etype_idx = self._current_etype_idx
-
         # parse argument
         if is_all(edges):
             eid = ALL
@@ -1593,10 +1642,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         if is_all(eid):
             # update column
             for key, val in data.items():
-                self._edge_frames[etype_idx][key] = val
+                self._edge_frame[key] = val
         else:
             # update row
-            self._edge_frames[etype_idx].update_rows(eid, data, inplace=inplace)
+            self._edge_frame.update_rows(eid, data, inplace=inplace)
 
     def get_e_repr(self, edges=ALL):
         """Get edge(s) representation.
@@ -1612,8 +1661,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict
         """
-        etype_idx = self._current_etype_idx
-
         if len(self.edge_attr_schemes()) == 0:
             return dict()
         # parse argument
@@ -1629,10 +1676,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             eid = utils.toindex(edges)
 
         if is_all(eid):
-            return dict(self._edge_frames[etype_idx])
+            return dict(self._edge_frame)
         else:
             eid = utils.toindex(eid)
-            return self._edge_frames[etype_idx].select_rows(eid)
+            return self._edge_frame.select_rows(eid)
 
     def pop_e_repr(self, etype, key):
         """Get and remove the specified edge repr of a single edge type.
@@ -1650,7 +1697,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Tensor
             The popped representation
         """
-        pass
+        self._edge_frame.pop(key)
 
     def register_message_func(self, func):
         """Register global message function for each edge type provided.
@@ -1796,18 +1843,25 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Examples
         --------
         >>> g['user'].ndata['h'] = torch.ones(3, 5)
-        >>> g['user'].apply_nodes(lambda x: {'h': x * 2})
+        >>> g['user'].apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2})
         >>> g['user'].ndata['h']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
-        >>> g.apply_nodes({'user': lambda x: {'h': x * 2}})
-        >>> g['user'].ndata['h']
-        tensor([[4., 4., 4., 4., 4.],
-                [4., 4., 4., 4., 4.],
-                [4., 4., 4., 4., 4.]])
         """
-        pass
+        assert not utils.is_dict_like(func), \
+            "multiple-type message passing is not implemented"
+
+        if is_all(v):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_nodes(graph=self,
+                                           v=v,
+                                           apply_func=func,
+                                           inplace=inplace)
+            Runtime.run(prog)
 
     def apply_edges(self, func, edges=ALL, inplace=False):
         """Apply the function on the edges with the same type to update their
@@ -1841,18 +1895,38 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Examples
         --------
-        >>> g['user', 'game', 'plays'].edata['h'] = torch.ones(3, 5)
-        >>> g['user', 'game', 'plays'].apply_edges(lambda x: {'h': x * 2})
-        >>> g['user', 'game', 'plays'].edata['h']
+        >>> g['plays'].edata['h'] = torch.ones(4, 5)
+        >>> g['plays'].apply_edges(lambda edges: {'h': edges.data['h'] * 2})
+        >>> g['plays'].edata['h']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
+                [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
-        >>> g.apply_edges({('user', 'game', 'plays'): lambda x: {'h': x * 2}})
-        tensor([[4., 4., 4., 4., 4.],
-                [4., 4., 4., 4., 4.],
-                [4., 4., 4., 4., 4.]])
         """
-        pass
+        assert not utils.is_dict_like(func), \
+            "multiple-type message passing is not implemented"
+
+        if is_all(edges):
+            u, v, _ = self._graph.edges(self._current_etype_idx, 'eid')
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+
+        with ir.prog() as prog:
+            scheduler.schedule_apply_edges(graph=self,
+                                           u=u,
+                                           v=v,
+                                           eid=eid,
+                                           apply_func=func,
+                                           inplace=inplace)
+            Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
         """Group the edges by nodes and apply the function of the grouped
@@ -1887,7 +1961,34 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        assert not utils.is_dict_like(func), \
+            "multiple-type message passing is not implemented"
+
+        if group_by not in ('src', 'dst'):
+            raise DGLError("Group_by should be either src or dst")
+
+        if is_all(edges):
+            u, v, _ = self._graph.edges(self._current_etype_idx)
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+
+        with ir.prog() as prog:
+            scheduler.schedule_group_apply_edge(graph=self,
+                                                u=u,
+                                                v=v,
+                                                eid=eid,
+                                                apply_func=func,
+                                                group_by=group_by,
+                                                inplace=inplace)
+            Runtime.run(prog)
 
     # TODO: REVIEW
     def send(self, edges=ALL, message_func=None):
@@ -1939,7 +2040,31 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         On multigraphs, if :math:`u` and :math:`v` are specified, then the messages will be sent
         along all edges between :math:`u` and :math:`v`.
         """
-        pass
+        assert not utils.is_dict_like(message_func), \
+            "multiple-type message passing is not implemented"
+        assert message_func is not None
+
+        if is_all(edges):
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+            u, v, _ = self._graph.edges(self._current_etype_idx)
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+
+        if len(eid) == 0:
+            # no edge to be triggered
+            return
+
+        with ir.prog() as prog:
+            scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
+                                    message_func=message_func)
+            Runtime.run(prog)
 
     def recv(self,
              v=ALL,
@@ -2003,7 +2128,28 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the node types in ``v``, the node types in ``apply_node_func``,
           and the destination types in ``reduce_func`` must be the same.
         """
-        pass
+        assert not utils.is_dict_like(reduce_func) and \
+            not utils.is_dict_like(apply_node_func), \
+            "multiple-type message passing is not implemented"
+        assert reduce_func is not None
+
+        if is_all(v):
+            v = F.arange(0, self.number_of_nodes())
+        elif isinstance(v, int):
+            v = [v]
+        v = utils.toindex(v)
+        if len(v) == 0:
+            # no vertex to be triggered.
+            return
+
+        with ir.prog() as prog:
+            scheduler.schedule_recv(graph=self,
+                                    recv_nodes=v,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
+            Runtime.run(prog)
+
 
     def send_and_recv(self,
                       edges,
@@ -2074,7 +2220,35 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``edges``, ``message_func`` and ``reduce_func``
           must also be the same.
         """
-        pass
+        assert not utils.is_dict_like(message_func) and \
+            not utils.is_dict_like(reduce_func) and \
+            not utils.is_dict_like(apply_node_func), \
+            "multiple-type message passing is not implemented"
+        assert message_func is not None
+        assert reduce_func is not None
+
+        if isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+
+        if len(u) == 0:
+            # no edges to be triggered
+            return
+
+        with ir.prog() as prog:
+            scheduler.schedule_snr(graph=self,
+                                   edge_tuples=(u, v, eid),
+                                   message_func=message_func,
+                                   reduce_func=reduce_func,
+                                   apply_func=apply_node_func,
+                                   inplace=inplace)
+            Runtime.run(prog)
 
     def pull(self,
              v,
@@ -2141,7 +2315,24 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        assert not utils.is_dict_like(message_func) and \
+            not utils.is_dict_like(reduce_func) and \
+            not utils.is_dict_like(apply_node_func), \
+            "multiple-type message passing is not implemented"
+        assert message_func is not None
+        assert reduce_func is not None
+
+        v = utils.toindex(v)
+        if len(v) == 0:
+            return
+        with ir.prog() as prog:
+            scheduler.schedule_pull(graph=self,
+                                    pull_nodes=v,
+                                    message_func=message_func,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
+            Runtime.run(prog)
 
     def push(self,
              u,
@@ -2206,7 +2397,24 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        assert not utils.is_dict_like(message_func) and \
+            not utils.is_dict_like(reduce_func) and \
+            not utils.is_dict_like(apply_node_func), \
+            "multiple-type message passing is not implemented"
+        assert message_func is not None
+        assert reduce_func is not None
+
+        u = utils.toindex(u)
+        if len(u) == 0:
+            return
+        with ir.prog() as prog:
+            scheduler.schedule_push(graph=self,
+                                    u=u,
+                                    message_func=message_func,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
+            Runtime.run(prog)
 
     def update_all(self,
                    message_func="default",
@@ -2260,7 +2468,19 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        assert not utils.is_dict_like(message_func) and \
+            not utils.is_dict_like(reduce_func) and \
+            not utils.is_dict_like(apply_node_func), \
+            "multiple-type message passing is not implemented"
+        assert message_func is not None
+        assert reduce_func is not None
+
+        with ir.prog() as prog:
+            scheduler.schedule_update_all(graph=self,
+                                          message_func=message_func,
+                                          reduce_func=reduce_func,
+                                          apply_func=apply_node_func)
+            Runtime.run(prog)
 
     # TODO should we support this?
     def prop_nodes(self,

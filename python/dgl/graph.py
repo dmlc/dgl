@@ -939,6 +939,14 @@ class DGLGraph(DGLBaseGraph):
     def _set_msg_index(self, index):
         self._msg_index = index
 
+    @property
+    def _src_frame(self):
+        return self._node_frame
+
+    @property
+    def _dst_frame(self):
+        return self._node_frame
+
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
 

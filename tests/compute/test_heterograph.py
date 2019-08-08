@@ -1,5 +1,6 @@
 
 import dgl
+import dgl.function as fn
 from collections import Counter
 import numpy as np
 import scipy.sparse as ssp
@@ -148,7 +149,7 @@ def test_frame():
     f4 = g['follows'].ndata['h']
     assert F.array_equal(f2, f3)    # they are shared
     assert F.array_equal(f1, f4)
-    f3[0] = 0
+    F.scatter_row_inplace(f3, 0, 0)
     f2 = g['user'].edata['x']
     assert F.array_equal(f2, f3)
 
@@ -159,7 +160,33 @@ def test_transparent_homograph():
     g.ndata['x'] = F.randn((4, 6))
     g.edata['a'] = F.randn((3, 7))
 
+def test_apply():
+    def node_udf(nodes):
+        return {'h': nodes.data['h'] * 2}
+    def edge_udf(edges):
+        return {'h': edges.data['h'] * 2 + edges.src['h']}
+
+    g = create_test_heterograph()
+    g['user'].ndata['h'] = F.ones((3, 5))
+    g['user'].apply_nodes(node_udf)
+    assert F.array_equal(g['user'].ndata['h'], F.ones((3, 5)) * 2)
+
+    g['plays'].edata['h'] = F.ones((4, 5))
+    g['plays'].apply_edges(edge_udf)
+    assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 4)
+
+def test_updates():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    g['user'].ndata['h'] = x
+    g['plays'].update_all(fn.copy_u('h', 'm'), fn.sum('m', 'y'))
+    y = g['game'].ndata['y']
+    assert F.array_equal(y[0], x[0] + x[1])
+    assert F.array_equal(y[1], x[1] + x[2])
+
 if __name__ == '__main__':
     test_query()
     test_frame()
     test_transparent_homograph()
+    test_apply()
+    test_updates()
