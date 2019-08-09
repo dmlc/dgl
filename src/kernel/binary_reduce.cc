@@ -4,11 +4,13 @@
  * \brief Binary reduce C APIs and definitions.
  */
 #include <dgl/packed_func_ext.h>
+#include <dgl/immutable_graph.h>
 #include "./binary_reduce.h"
 #include "./common.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
+#include "./csr_interface.h"
 
 using namespace dgl::runtime;
 
@@ -201,6 +203,23 @@ inline bool NeedSwitchOrder(const std::string& op,
     && lhs > rhs;
 }
 
+class ImmutableGraphCSRWrapper : public CSRWrapper {
+ public:
+  ImmutableGraphCSRWrapper(const ImmutableGraph* graph) :
+    gptr_(graph) { }
+
+  aten::CSRMatrix GetInCSRMatrix() const override {
+    return gptr_->GetInCSR()->ToCSRMatrix();
+  }
+
+  aten::CSRMatrix GetOutCSRMatrix() const override {
+    return gptr_->GetOutCSR()->ToCSRMatrix();
+  }
+
+ private:
+  const ImmutableGraph* gptr_;
+};
+
 }  // namespace
 
 
@@ -226,7 +245,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const ImmutableGraphCSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_data, NDArray rhs_data,
     NDArray out_data,
