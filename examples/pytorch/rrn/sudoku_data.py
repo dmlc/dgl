@@ -56,7 +56,7 @@ class ListDataset(Dataset):
 
 def _get_sudoku_dataset(segment='train'):
     assert segment in ['train', 'valid', 'test']
-    url = " https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/sudoku-hard.zip"
+    url = "https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/sudoku-hard.zip"
     zip_fname = "/tmp/sudoku-hard.zip"
     dest_dir = '/tmp/sudoku-hard/'
 
@@ -130,12 +130,3 @@ def sudoku_dataloader(batch_size, segment='train'):
 
     dataloader = DataLoader(dataset, batch_size, sampler=data_sampler, collate_fn=collate_fn)
     return dataloader
-
-
-if __name__ == '__main__':
-    train_dataloader = sudoku_dataloader(1)
-    for g in train_dataloader:
-        print(g)
-        break
-
-
