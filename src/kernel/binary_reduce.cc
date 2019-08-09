@@ -228,6 +228,12 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
   const ImmutableGraph* gptr_;
 };
 
+class BipartiteCSRWrapper : public CSRWrapper {
+ public:
+  explicit BipartiteCSRWrapper(const Bipartite* graph) :
+    gptr_(graph) { }
+};
+
 }  // namespace
 
 
