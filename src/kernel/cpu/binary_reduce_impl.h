@@ -7,13 +7,13 @@
 #define DGL_KERNEL_CPU_BINARY_REDUCE_IMPL_H_
 
 #include <minigun/minigun.h>
-#include <dgl/immutable_graph.h>
 
 #include <algorithm>
 
 #include "../binary_reduce_impl_decl.h"
 #include "../utils.h"
 #include "./functor.h"
+#include "../csr_interface.h"
 
 namespace dgl {
 namespace kernel {
@@ -148,27 +148,27 @@ template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
-                      const ImmutableGraph* graph,
+                      const CSRWrapper& graph,
                       GData<Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
   // csr
-  auto outcsr = graph->GetOutCSR();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr->indptr(), outcsr->indices());
+  auto outcsr = graph.GetOutCSRMatrix();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
@@ -181,27 +181,27 @@ template <int XPU, int NDim, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
   const minigun::advance::RuntimeConfig& rtcfg,
-  const ImmutableGraph* graph,
+  const CSRWrapper& graph,
   BcastGData<NDim, Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cpu::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
   // csr
-  auto outcsr = graph->GetOutCSR();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr->indptr(), outcsr->indices());
+  auto outcsr = graph.GetOutCSRMatrix();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
@@ -215,7 +215,7 @@ void CallBinaryReduceBcast(
   template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
-      const ImmutableGraph* graph,                                 \
+      const CSRWrapper& graph,                                     \
       GData<IDX, dtype>* gdata);
 
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \
@@ -223,7 +223,7 @@ void CallBinaryReduceBcast(
                                  lhs_tgt, rhs_tgt,                  \
                                  op<dtype>, REDUCER<XPU, dtype>>(   \
       const minigun::advance::RuntimeConfig& rtcfg,                 \
-      const ImmutableGraph* graph,                                  \
+      const CSRWrapper& graph,                                      \
       BcastGData<ndim, IDX, dtype>* gdata);
 
 #define EVAL(F, ...) MSVC_EXPAND(F(__VA_ARGS__))
