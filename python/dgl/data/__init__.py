@@ -11,6 +11,7 @@ from .reddit import RedditDataset
 from .ppi import PPIDataset
 from .tu import TUDataset
 from .gindt import GINDataset
+from .molecule import *
 
 
 def register_data_args(parser):

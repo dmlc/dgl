@@ -57,3 +57,14 @@ Protein-Protein Interaction dataset
 
 .. autoclass:: PPIDataset
     :members: __getitem__, __len__
+
+Molecular Graphs
+````````````````
+
+To work on molecular graphs, make sure you have installed `RDKit <https://www.rdkit.org/docs/Install.html>`__.
+
+.. autofunction:: dgl.data.molecule.default_atom_featurizer
+.. autofunction:: dgl.data.molecule.mol2dgl
+
+.. autoclass:: Tox21
+    :members: num_datapoints, num_tasks, feat_size

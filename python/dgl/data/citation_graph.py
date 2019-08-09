@@ -1,7 +1,7 @@
 """Cora, citeseer, pubmed dataset.
 
-(lingfan): following dataset loading and preprocessing code from tkipf/gcn
-https://github.com/tkipf/gcn/blob/master/gcn/utils.py
+(lingfan): following dataset loading and preprocessing code from tkipf/gcn_for_property_prediction
+https://github.com/tkipf/gcn_for_property_prediction/blob/master/gcn_for_property_prediction/utils.py
 """
 from __future__ import absolute_import
 
@@ -37,7 +37,7 @@ class CitationGraphDataset(object):
         self._load()
 
     def _load(self):
-        """Loads input data from gcn/data directory
+        """Loads input data from gcn_for_property_prediction/data directory
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
         ind.name.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
