@@ -205,7 +205,7 @@ inline bool NeedSwitchOrder(const std::string& op,
 
 class ImmutableGraphCSRWrapper : public CSRWrapper {
  public:
-  ImmutableGraphCSRWrapper(const ImmutableGraph* graph) :
+  explicit ImmutableGraphCSRWrapper(const ImmutableGraph* graph) :
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
