@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from distutils.version import LooseVersion
 
 import torch as th
+import builtins
 from torch.utils import dlpack
 
 from ... import ndarray as nd
@@ -25,6 +26,9 @@ def cpu():
 
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
+
+def as_scalar(data):
+    return data.item()
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -90,12 +94,40 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return th.sum(input, dim=dim)
 
+def reduce_sum(input):
+    return input.sum()
+
 def mean(input, dim):
     return th.mean(input, dim=dim)
+
+def reduce_mean(input):
+    return input.mean()
 
 def max(input, dim):
     # NOTE: the second argmax array is not returned
     return th.max(input, dim=dim)[0]
+
+def reduce_max(input):
+    return input.max()
+
+def min(input, dim):
+    # NOTE: the second argmin array is not returned
+    return th.min(input, dim=dim)[0]
+
+def reduce_min(input):
+    return input.min()
+
+def argsort(input, dim, descending):
+    return th.argsort(input, dim=dim, descending=descending)
+
+def topk(input, k, dim, descending=True):
+    return th.topk(input, k, dim, largest=descending)[0]
+
+def exp(input):
+    return th.exp(input)
+
+def softmax(input, dim=-1):
+    return th.softmax(input, dim=dim)
 
 def cat(seq, dim):
     return th.cat(seq, dim=dim)
@@ -106,8 +138,28 @@ def stack(seq, dim):
 def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 
+def repeat(input, repeats, dim):
+    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
+    if dim < 0:
+        dim += input.dim()
+    return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+
 def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
+
+def slice_axis(data, axis, begin, end):
+    dim = data.shape[axis]
+    if begin < 0:
+        begin += dim
+    if end <= 0:
+        end += dim
+    if begin >= end:
+        raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
+    return th.index_select(data, axis, th.arange(begin, end, device=data.device))
+
+def take(data, indices, dim):
+    new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
+    return th.index_select(data, dim, indices.view(-1)).view(new_shape)
 
 def narrow_row(x, start, stop):
     return x[start:stop]
@@ -135,6 +187,35 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
+
+def pad_packed_tensor(input, lengths, value, l_min=None):
+    old_shape = input.shape
+    if isinstance(lengths, th.Tensor):
+        max_len = as_scalar(lengths.max())
+    else:
+        max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
+    batch_size = len(lengths)
+    device = input.device
+    x = input.new(batch_size * max_len, *old_shape[1:])
+    x.fill_(value)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = th.tensor(index).to(device)
+    return scatter_row(x, index, input).view(batch_size, max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    device = input.device
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = th.tensor(index).to(device)
+    return gather_row(input.view(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)

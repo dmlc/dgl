@@ -22,6 +22,11 @@ def cpu():
 def tensor(data, dtype=None):
     return np.array(data, dtype)
 
+def as_scalar(data):
+    if data.dim() > 1:
+        raise ValueError('The data must have shape (1,).')
+    return data[0]
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -75,8 +80,45 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return np.sum(input, axis=dim)
 
+def reduce_sum(input):
+    dtype = input.dtype
+    return np.array(input.sum(), dtype=dtype)
+
+def mean(input, dim):
+    return np.mean(input, axis=dim)
+
+def reduce_mean(input):
+    dtype = input.dtype
+    return np.array(input.mean(), dtype=dtype)
+
 def max(input, dim):
     return np.max(input, axis=dim)
+
+def reduce_max(input):
+    dtype = input.dtype
+    return np.array(input.max(), dtype=dtype)
+
+def min(input, dim):
+    return np.min(input, axis=dim)
+
+def reduce_min(input):
+    dtype = input.dtype
+    return np.array(input.min(), dtype=dtype)
+
+def argsort(input, dim, descending):
+    if descending:
+        return np.argsort(-input, axis=dim)
+    return np.argsort(input, axis=dim)
+
+def exp(input):
+    return np.exp(input)
+
+def softmax(input, dim=-1):
+    max_val = input.max(axis=dim)
+    minus_max = input - np.expand_dims(max_val, axis=dim)
+    exp_val = np.exp(minus_max)
+    sum_val = np.sum(exp_val, axis=dim)
+    return exp_val / np.expand_dims(sum_val, axis=dim)
 
 def cat(seq, dim):
     return np.concatenate(seq, axis=dim)
@@ -92,8 +134,19 @@ def split(input, sizes_or_sections, dim):
         idx = np.cumsum(sizes_or_sections)[0:-1]
     return np.split(input, idx, axis=dim)
 
+def repeat(input, repeats, dim):
+    return np.repeat(input, repeats, axis=dim)
+
 def gather_row(data, row_index):
     return data[row_index]
+
+def slice_axis(data, axis, begin, end):
+    if begin >= end:
+        raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
+    return np.take(data, np.arange(begin, end), axis=axis)
+
+def take(data, indices, dim):
+    return np.take(data, indices, axis=dim)
 
 def scatter_row(data, row_index, value):
     # NOTE: inplace instead of out-place
