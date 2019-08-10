@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file graph/bipartite.h
+ * \brief Bipartite graph
+ */
 
 #ifndef DGL_GRAPH_BIPARTITE_H_
 #define DGL_GRAPH_BIPARTITE_H_
