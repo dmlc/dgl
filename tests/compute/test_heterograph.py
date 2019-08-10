@@ -9,7 +9,7 @@ import backend as F
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
     follows = dgl.bipartite_from_edge_list(
-        'user', 'user', 'follows', [(0, 1), (1, 2)], 3, 3)
+        'user', 'user', 'follows', [0, 1], [1, 2], 3, 3)
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     plays = dgl.bipartite_from_scipy('user', 'game', 'plays', plays_spmat)
@@ -18,7 +18,7 @@ def create_test_heterograph():
     wishes = dgl.bipartite_from_scipy('user', 'game', 'wishes', wishes_spmat, True)
 
     develops = dgl.bipartite_from_edge_list(
-        'developer', 'game', 'develops', [(0, 0), (1, 1)], 2, 2)
+        'developer', 'game', 'develops', [0, 1], [0, 1], 2, 2)
 
     g = dgl.DGLHeteroGraph([follows, plays, wishes, develops])
     return g
@@ -186,11 +186,12 @@ def test_updates():
 
     g['user'].ndata['h'] = x
     g['plays'].send_and_recv(
-            [[0, 0], [1, 1]],
+            ([0, 1, 2], [0, 1, 1]),
             fn.copy_u('h', 'm'),
             fn.sum('m', 'y2'))
     y = g['game'].ndata['y2']
-    assert F.array_equal(y, F.slice_rows(x, 0, 0, 2))
+    assert F.array_equal(y[0], x[0])
+    assert F.array_equal(y[1], x[1] + x[2])
 
 if __name__ == '__main__':
     test_query()

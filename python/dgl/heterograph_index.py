@@ -17,6 +17,7 @@ class HeteroGraphIndex(ObjectBase):
     """
     def __new__(cls):
         obj = ObjectBase.__new__(cls)
+        obj._cache = {}
         return obj
 
     def __getstate__(self):
@@ -72,6 +73,7 @@ class HeteroGraphIndex(ObjectBase):
             Number of nodes to be added.
         """
         _CAPI_DGLHeteroAddVertices(self, int(ntype), int(num))
+        self.clear_cache()
 
     def add_edge(self, etype, u, v):
         """Add one edge.
@@ -86,6 +88,7 @@ class HeteroGraphIndex(ObjectBase):
             The dst node.
         """
         _CAPI_DGLHeteroAddEdge(self, int(etype), int(u), int(v))
+        self.clear_cache()
 
     def add_edges(self, etype, u, v):
         """Add many edges.
@@ -100,10 +103,12 @@ class HeteroGraphIndex(ObjectBase):
             The dst nodes.
         """
         _CAPI_DGLHeteroAddEdges(self, int(etype), u.todgltensor(), v.todgltensor())
+        self.clear_cache()
 
     def clear(self):
         """Clear the graph."""
         _CAPI_DGLHeteroClear(self)
+        self._cache.clear()
 
     def ctx(self):
         """Return the context of this graph index.
@@ -487,6 +492,7 @@ class HeteroGraphIndex(ObjectBase):
         eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
+    @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, etype, order=None):
         """Return all the edges
 
@@ -689,6 +695,48 @@ class HeteroGraphIndex(ObjectBase):
         """
         eids = [edges.todgltensor() for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
+
+    @utils.cached_member(cache='_cache', prefix='bipartite')
+    def get_bipartite(self, etype, ctx):
+        """Create a bipartite graph from given edge type and copy to the given device
+        context.
+
+        Note: this internal function is for DGL scheduler use only
+
+        Parameters
+        ----------
+        etype : int, or None
+            If the graph index is a Bipartite graph index, this argument must be None.
+            Otherwise, it represents the edge type.
+        ctx : DGLContext
+            The context of the returned graph.
+
+        Returns
+        -------
+        HeteroGraphIndex
+        """
+        g = self.get_relation_graph(etype) if etype is not None else self
+        return g.asbits(self.bits_needed(etype or 0)).copy_to(ctx)
+
+    def get_csr_shuffle_order(self, etype):
+        """Return the edge shuffling order when a coo graph is converted to csr format
+
+        Parameters
+        ----------
+        etype : int
+            The edge type
+
+        Returns
+        -------
+        tuple of two utils.Index
+            The first element of the tuple is the shuffle order for outward graph
+            The second element of the tuple is the shuffle order for inward graph
+        """
+        csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
+        order = csr(2)
+        rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), False, "csr")
+        rev_order = rev_csr(2)
+        return utils.toindex(order), utils.toindex(rev_order)
 
 @register_object('graph.HeteroSubgraph')
 class HeteroSubgraphIndex(ObjectBase):

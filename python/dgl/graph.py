@@ -49,6 +49,12 @@ class DGLBaseGraph(object):
         """
         return self._graph.number_of_nodes()
 
+    def _number_of_src_nodes(self):
+        return self.number_of_nodes()
+
+    def _number_of_dst_nodes(self):
+        return self.number_of_nodes()
+
     def __len__(self):
         """Return the number of nodes in the graph."""
         return self.number_of_nodes()

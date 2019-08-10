@@ -2,7 +2,7 @@
 from .heterograph import DGLBaseBipartite
 from .base import DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE
 
-def bipartite_from_edge_list(src_type, dst_type, edge_type, edge_list,
+def bipartite_from_edge_list(src_type, dst_type, edge_type, u, v,
                              num_src=None, num_dst=None):
     """Create a bipartite graph component of a heterogeneous graph with a
     list of edges.
@@ -15,8 +15,8 @@ def bipartite_from_edge_list(src_type, dst_type, edge_type, edge_list,
         The destination type name.
     edge_type : str
         The edge type name.
-    edge_list : list[tuple[int, int]]
-        List of (source node ID, destination node ID) tuples.
+    u, v : list[int]
+        List of source and destination node IDs.
     num_src : int, optional
         The number of nodes of source type.
 
@@ -28,17 +28,16 @@ def bipartite_from_edge_list(src_type, dst_type, edge_type, edge_list,
         By default, the value is the maximum of the destination node IDs in
         the edge list plus 1.
     """
-    num_src = num_src or (max(e[0] for e in edge_list) + 1)
-    num_dst = num_dst or (max(e[1] for e in edge_list) + 1)
-    src, dst = zip(*edge_list)
+    num_src = num_src or (max(u) + 1)
+    num_dst = num_dst or (max(v) + 1)
     return DGLBaseBipartite.from_coo(
-        src_type, dst_type, edge_type, num_src, num_dst, list(src), list(dst))
+        src_type, dst_type, edge_type, num_src, num_dst, u, v)
 
-def graph_from_edge_list(edge_list):
-    num_nodes = max(max(u, v) for u, v in edge_list) + 1
+def graph_from_edge_list(u, v):
+    num_nodes = max(max(u), max(v)) + 1
     return bipartite_from_edge_list(
-        DEFAULT_NODE_TYPE, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE, edge_list,
-        num_nodes, num_nodes)
+        DEFAULT_NODE_TYPE, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE,
+        u, v, num_nodes, num_nodes)
 
 def bipartite_from_scipy(src_type, dst_type, edge_type, spmat, with_edge_id=False):
     """Create a bipartite graph component of a heterogeneous graph with a

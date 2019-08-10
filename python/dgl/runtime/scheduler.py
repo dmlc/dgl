@@ -158,7 +158,7 @@ def schedule_snr(graph,
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
     adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
-        edge_tuples, graph.number_of_nodes())
+        edge_tuples, graph._number_of_src_nodes(), graph._number_of_dst_nodes())
     out_map_creator = lambda nbits: _build_idx_map(recv_nodes, nbits)
     reduced_feat = _gen_send_reduce(graph=graph,
                                     src_node_frame=graph._src_frame,
@@ -199,11 +199,11 @@ def schedule_update_all(graph,
     if graph.number_of_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
-            nodes = utils.toindex(slice(0, graph.number_of_nodes()))
+            nodes = utils.toindex(slice(0, graph._number_of_dst_nodes()))
             schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
         eid = utils.toindex(slice(0, graph.number_of_edges())) # ALL
-        recv_nodes = utils.toindex(slice(0, graph.number_of_nodes())) # ALL
+        recv_nodes = utils.toindex(slice(0, graph._number_of_dst_nodes())) # ALL
         # create vars
         var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
@@ -454,8 +454,8 @@ def schedule_pull(graph,
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        num_nodes = graph.number_of_nodes()
-        adj_creator = lambda: spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+        adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
+            (u, v, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         out_map_creator = lambda nbits: _build_idx_map(pull_nodes, nbits)
         reduced_feat = _gen_send_reduce(graph, graph._src_frame,
                                         graph._dst_frame, graph._edge_frame,
@@ -732,9 +732,8 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
-        num_nodes = graph.number_of_nodes()
         adj, edge_map, nbits = spmv.build_gidx_and_mapping_uv(
-            (src, dst, eid), num_nodes)
+            (src, dst, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         # using edge map instead of message map because messages are in global
         # message frame
         var_out_map = _build_idx_map(recv_nodes, nbits)
@@ -939,8 +938,8 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
             # full graph case
             res = spmv.build_gidx_and_mapping_graph(graph)
         else:
-            num_nodes = graph.number_of_nodes()
-            res = spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+            res = spmv.build_gidx_and_mapping_uv(
+                (u, v, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         adj, edge_map, _ = res
         # create a tmp message frame
         tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))

@@ -246,6 +246,12 @@ class DGLBaseHeteroGraph(object):
         # TODO: relax to multiple types
         return self._graph.number_of_nodes(self._current_ntype_idx)
 
+    def _number_of_src_nodes(self):
+        return self._graph.number_of_nodes(self._current_srctype_idx)
+
+    def _number_of_dst_nodes(self):
+        return self._graph.number_of_nodes(self._current_dsttype_idx)
+
     @property
     def is_multigraph(self):
         """True if the graph is a multigraph, False otherwise.
@@ -2153,9 +2159,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     def send_and_recv(self,
                       edges,
-                      message_func="default",
-                      reduce_func="default",
-                      apply_node_func="default",
+                      message_func=None,
+                      reduce_func=None,
+                      apply_node_func=None,
                       inplace=False):
         """Send messages along edges with the same edge type, and let destinations
         receive them.
@@ -2417,9 +2423,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             Runtime.run(prog)
 
     def update_all(self,
-                   message_func="default",
-                   reduce_func="default",
-                   apply_node_func="default"):
+                   message_func=None,
+                   reduce_func=None,
+                   apply_node_func=None):
         """Send messages through all edges and update all nodes.
 
         Optionally, apply a function to update the node features after receive.
@@ -2840,8 +2846,8 @@ class DGLGraph2(DGLHeteroGraph):
             readonly=True):
         if isinstance(graph_data, list):
             from .factory import graph_from_edge_list
-
-            bipartite = graph_from_edge_list(graph_data)
+            u, v = zip(*graph_data)
+            bipartite = graph_from_edge_list(u, v)
             super(DGLGraph2, self).__init__(
                     [bipartite],
                     [node_frame] if node_frame is not None else None,
