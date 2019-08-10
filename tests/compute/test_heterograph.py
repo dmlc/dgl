@@ -146,19 +146,12 @@ def test_frame():
     g['user'].ndata['h'] = f1       # ok
     g['user'].edata['x'] = f2       # ok - only one edge type in users subgraph
     f3 = g['follows'].edata['x']    # ok
-    f4 = g['follows'].ndata['h']
+    f4 = g['follows'].ndata['h']    # ok - only one node type in follows subgraph
     assert F.array_equal(f2, f3)    # they are shared
     assert F.array_equal(f1, f4)
     F.scatter_row_inplace(f3, 0, 0)
     f2 = g['user'].edata['x']
     assert F.array_equal(f2, f3)
-
-def test_transparent_homograph():
-    import dgl.heterograph
-
-    g = dgl.heterograph.DGLGraph2([(0, 1), (1, 2), (2, 3)])
-    g.ndata['x'] = F.randn((4, 6))
-    g.edata['a'] = F.randn((3, 7))
 
 def test_apply():
     def node_udf(nodes):
@@ -196,6 +189,5 @@ def test_updates():
 if __name__ == '__main__':
     test_query()
     test_frame()
-    test_transparent_homograph()
     test_apply()
     test_updates()

@@ -117,6 +117,15 @@ class DGLBaseHeteroGraph(object):
         srctype_idx, dsttype_idx = self._endpoint_types(etype_idx)
         return self._ntypes[srctype_idx], self._ntypes[dsttype_idx]
 
+    def _node_types(self):
+        if self.is_node_type_view:
+            return [self._view_ntype_idx]
+        elif self.is_edge_type_view:
+            srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
+            return [srctype_idx, dsttype_idx] if srctype_idx != dsttype_idx else [srctype_idx]
+        else:
+            return range(len(self._ntypes))
+
     def node_types(self):
         """Return the list of node types appearing in the current view.
 
@@ -141,15 +150,22 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].node_types()
         ['user', 'game']
         """
-        if self.is_node_type_view:
-            return [self._ntypes[self._view_ntype_idx]]
-        elif self.is_edge_type_view:
-            srctype_idx, dsttype_idx = self._endpoint_types(self._view_etype_idx)
-            srctype = self._ntypes[srctype_idx]
-            dsttype = self._ntypes[dsttype_idx]
-            return [srctype, dsttype] if srctype != dsttype else [srctype]
-        else:
+        ntypes = self._node_types()
+        if isinstance(ntypes, range):
+            # assuming that the range object always covers the entire node type list
             return self._ntypes
+        else:
+            return [self._ntypes[i] for i in ntypes]
+
+    def _edge_types(self):
+        if self.is_node_type_view:
+            etype_indices = self._graph.metagraph.edge_id(
+                self._view_ntype_idx, self._view_ntype_idx)
+            return etype_indices
+        elif self.is_edge_type_view:
+            return [self._view_etype_idx]
+        else:
+            return range(len(self._etypes))
 
     def edge_types(self):
         """Return the list of edge types appearing in the current view.
@@ -174,14 +190,11 @@ class DGLBaseHeteroGraph(object):
         >>> g['plays'].edge_types()
         ['plays']
         """
-        if self.is_node_type_view:
-            etype_indices = self._graph.metagraph.edge_id(
-                self._view_ntype_idx, self._view_ntype_idx).tonumpy()
-            return [self._etypes[etype_idx] for etype_idx in etype_indices]
-        elif self.is_edge_type_view:
-            return [self._etypes[self._view_etype_idx]]
-        else:
+        etypes = self._edge_types()
+        if isinstance(etypes, range):
             return self._etypes
+        else:
+            return [self._etypes[i] for i in etypes]
 
     @property
     @utils.cached_member('_cache', '_current_ntype_idx')
@@ -191,21 +204,21 @@ class DGLBaseHeteroGraph(object):
 
         This allows reading/writing node frame data.
         """
-        node_types = self.node_types()
+        node_types = self._node_types()
         assert len(node_types) == 1, "only available for subgraphs with one node type"
-        return self._ntypes_invmap[node_types[0]]
+        return node_types[0]
 
     @property
-    @utils.cached_member('_cache', '_current_ntype_idx')
+    @utils.cached_member('_cache', '_current_etype_idx')
     def _current_etype_idx(self):
         """Checks the uniqueness of edge type in the view and get the index
         of that edge type.
 
         This allows reading/writing edge frame data and message passing routines.
         """
-        edge_types = self.edge_types()
+        edge_types = self._edge_types()
         assert len(edge_types) == 1, "only available for subgraphs with one edge type"
-        return self._etypes_invmap[edge_types[0]]
+        return edge_types[0]
 
     @property
     @utils.cached_member('_cache', '_current_srctype_idx')
@@ -2834,23 +2847,3 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
             The node ID array in the subgraph of each node type.
         """
         pass
-
-
-class DGLGraph2(DGLHeteroGraph):
-    def __init__(
-            self,
-            graph_data=None,
-            node_frame=None,
-            edge_frame=None,
-            multigraph=None,
-            readonly=True):
-        if isinstance(graph_data, list):
-            from .factory import graph_from_edge_list
-            u, v = zip(*graph_data)
-            bipartite = graph_from_edge_list(u, v)
-            super(DGLGraph2, self).__init__(
-                    [bipartite],
-                    [node_frame] if node_frame is not None else None,
-                    [edge_frame] if edge_frame is not None else None,
-                    multigraph,
-                    readonly)
