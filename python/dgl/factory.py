@@ -1,6 +1,5 @@
 """Factory routines from/to DGLGraphs and DGLHeteroGraphs."""
 from .heterograph import DGLBaseBipartite
-from .base import DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE
 
 def bipartite_from_edge_list(src_type, dst_type, edge_type, u, v,
                              num_src=None, num_dst=None):
@@ -32,12 +31,6 @@ def bipartite_from_edge_list(src_type, dst_type, edge_type, u, v,
     num_dst = num_dst or (max(v) + 1)
     return DGLBaseBipartite.from_coo(
         src_type, dst_type, edge_type, num_src, num_dst, u, v)
-
-def graph_from_edge_list(u, v):
-    num_nodes = max(max(u), max(v)) + 1
-    return bipartite_from_edge_list(
-        DEFAULT_NODE_TYPE, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE,
-        u, v, num_nodes, num_nodes)
 
 def bipartite_from_scipy(src_type, dst_type, edge_type, spmat, with_edge_id=False):
     """Create a bipartite graph component of a heterogeneous graph with a

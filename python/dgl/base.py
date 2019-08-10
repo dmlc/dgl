@@ -9,11 +9,6 @@ from ._ffi.function import _init_internal_api
 # A special symbol for selecting all nodes or edges.
 ALL = "__ALL__"
 
-DEFAULT_NODE_TYPE = "__DEFAULT_N__"
-DEFAULT_EDGE_TYPE = "__DEFAULT_E__"
-DEFAULT_SRC_TYPE = "__DEFAULT_S__"
-DEFAULT_DST_TYPE = "__DEFAULT_D__"
-
 def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""
     return isinstance(arg, str) and arg == ALL

@@ -1,16 +1,16 @@
 """Module for SPMV rules."""
 from __future__ import absolute_import
+from functools import partial
 
-from ..base import DGLError, DEFAULT_SRC_TYPE, DEFAULT_DST_TYPE, DEFAULT_EDGE_TYPE
+from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import from_coo, GraphIndex
+from ..graph_index import GraphIndex
 from ..heterograph_index import HeteroGraphIndex, create_bipartite_from_coo
 
 from . import ir
 from .ir import var
-from functools import partial
 
 
 def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame,

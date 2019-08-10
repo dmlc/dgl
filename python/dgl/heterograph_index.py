@@ -145,8 +145,8 @@ class HeteroGraphIndex(ObjectBase):
         """
         stype, dtype = self.metagraph.find_edge(etype)
         if (self.number_of_edges(etype) >= 0x80000000 or
-            self.number_of_nodes(stype) >= 0x80000000 or
-            self.number_of_nodes(dtype) >= 0x80000000):
+                self.number_of_nodes(stype) >= 0x80000000 or
+                self.number_of_nodes(dtype) >= 0x80000000):
             return 64
         else:
             return 32
