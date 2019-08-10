@@ -53,13 +53,13 @@ Bipartite::COO::COO(
   adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
 }
 
-explicit Bipartite::COO::COO(const aten::COOMatrix& coo)
+Bipartite::COO::COO(const aten::COOMatrix& coo)
   : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo)
 {
 }
 
 HeteroSubgraph Bipartite::COO::EdgeSubgraph(
-    const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
+    const std::vector<IdArray>& eids, bool preserve_nodes) const {
   CHECK_EQ(eids.size(), 1) << "Edge type number mismatch.";
   HeteroSubgraph subg;
   if (!preserve_nodes) {
@@ -112,7 +112,7 @@ Bipartite::CSR::CSR(
   adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
 }
 
-explicit CSR(const aten::CSRMatrix& csr)
+Bipartite::CSR::CSR(const aten::CSRMatrix& csr)
   : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr)
 {
 }
