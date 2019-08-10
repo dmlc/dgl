@@ -54,8 +54,7 @@ Bipartite::COO::COO(
 }
 
 Bipartite::COO::COO(const aten::COOMatrix& coo)
-  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo)
-{
+  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo) {
 }
 
 HeteroSubgraph Bipartite::COO::EdgeSubgraph(
@@ -113,8 +112,7 @@ Bipartite::CSR::CSR(
 }
 
 Bipartite::CSR::CSR(const aten::CSRMatrix& csr)
-  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr)
-{
+  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr) {
 }
 
 //////////////////////////////////////////////////////////
@@ -328,6 +326,37 @@ HeteroGraphPtr Bipartite::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids) {
   CSRPtr csr(new CSR(num_src, num_dst, indptr, indices, edge_ids));
   return HeteroGraphPtr(new Bipartite(nullptr, csr, nullptr));
+}
+
+HeteroGraphPtr Bipartite::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
+  if (g->NumBits() == bits) {
+    return g;
+  } else {
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+    CHECK_NOTNULL(bg);
+    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+    return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
+  }
+}
+
+HeteroGraphPtr Bipartite::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+  if (ctx == g->Context()) {
+    return g;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+  CHECK_NOTNULL(bg);
+  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
+  return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
 }
 
 Bipartite::Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)

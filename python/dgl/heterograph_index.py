@@ -125,6 +125,61 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroNumBits(self)
 
+    def bits_needed(self, etype):
+        """Return the number of integer bits needed to represent the bipartite graph.
+
+        Parameters
+        ----------
+        etype : int
+            The edge type.
+
+        Returns
+        -------
+        int
+            The number of bits needed.
+        """
+        stype, dtype = self.metagraph.find_edge(etype)
+        if (self.number_of_edges(etype) >= 0x80000000 or
+            self.number_of_nodes(stype) >= 0x80000000 or
+            self.number_of_nodes(dtype) >= 0x80000000):
+            return 64
+        else:
+            return 32
+
+    def asbits(self, bits):
+        """Transform the graph to a new one with the given number of bits storage.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        bits : int
+            The number of integer bits (32 or 64)
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The graph index stored using the given number of bits.
+        """
+        return _CAPI_DGLHeteroAsNumBits(self, int(bits))
+
+    def copy_to(self, ctx):
+        """Copy this immutable graph index to the given device context.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The graph index on the given device context.
+        """
+        return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
+
     def is_multigraph(self):
         """Return whether the graph is a multigraph
 

@@ -184,6 +184,14 @@ def test_updates():
     assert F.array_equal(y[0], x[0] + x[1])
     assert F.array_equal(y[1], x[1] + x[2])
 
+    g['user'].ndata['h'] = x
+    g['plays'].send_and_recv(
+            [[0, 0], [1, 1]],
+            fn.copy_u('h', 'm'),
+            fn.sum('m', 'y2'))
+    y = g['game'].ndata['y2']
+    assert F.array_equal(y, F.slice_rows(x, 0, 0, 2))
+
 if __name__ == '__main__':
     test_query()
     test_frame()

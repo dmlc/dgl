@@ -547,4 +547,24 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSubgraphGetInducedEdges")
     *rv = induced_edges;
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int bits = args[1];
+    HeteroGraphPtr hg_new = Bipartite::AsNumBits(hg.sptr(), bits);
+    *rv = HeteroGraphRef(hg_new);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int device_type = args[1];
+    int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    HeteroGraphPtr hg_new = Bipartite::CopyTo(hg.sptr(), ctx);
+    *rv = HeteroGraphRef(hg_new);
+  });
+
 }  // namespace dgl

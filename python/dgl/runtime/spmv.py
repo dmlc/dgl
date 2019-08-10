@@ -145,7 +145,9 @@ def build_gidx_and_mapping_graph(graph):
     if isinstance(gidx, GraphIndex):
         return gidx.get_immutable_gidx, None, gidx.bits_needed()
     elif isinstance(gidx, HeteroGraphIndex):
-        return gidx.get_relation_graph(graph._current_etype_idx), None, gidx.nbits()
+        return (gidx.get_relation_graph(graph._current_etype_idx),
+                None,
+                gidx.bits_needed(graph._current_etype_idx))
 
 
 def build_gidx_and_mapping_uv(edge_tuples, num_nodes):

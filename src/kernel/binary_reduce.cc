@@ -319,27 +319,32 @@ void BinaryOpReduce(
   }
 }
 
-#define CSRWRAPPER_SWITCH(gptr, wrapper, ...) do {                \
-  auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(gptr);   \
-  if (igptr != nullptr) {                                         \
+// Comes from DGLArgValue::AsObjectRef() that allows argvalue to be either a GraphRef
+// or a HeteroGraphRef
+#define CSRWRAPPER_SWITCH(argvalue, wrapper, ...) do {            \
+  DGLArgValue argval = (argvalue);                                \
+  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);         \
+  std::shared_ptr<Object>& sptr =                                 \
+      *argval.ptr<std::shared_ptr<Object>>();                     \
+  if (ObjectTypeChecker<GraphRef>::Check(sptr.get())) {           \
+    GraphRef g = argval;                                          \
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()); \
+    CHECK_NOTNULL(igptr);                                         \
     ImmutableGraphCSRWrapper wrapper(igptr.get());                \
     {__VA_ARGS__}                                                 \
-    break;                                                        \
-  }                                                               \
-  auto bgptr = std::dynamic_pointer_cast<Bipartite>(gptr);        \
-  if (bgptr != nullptr) {                                         \
+  } else if (ObjectTypeChecker<HeteroGraphRef>::Check(sptr.get())) { \
+    HeteroGraphRef g = argval;                                    \
+    auto bgptr = std::dynamic_pointer_cast<Bipartite>(g.sptr());  \
+    CHECK_NOTNULL(bgptr);                                         \
     BipartiteCSRWrapper wrapper(bgptr.get());                     \
     {__VA_ARGS__}                                                 \
-    break;                                                        \
   }                                                               \
-  LOG(FATAL) << "object is neither ImmutableGraph nor Bipartite"; \
 } while (0)
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_data = args[5];
@@ -349,7 +354,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
     NDArray rhs_mapping = args[9];
     NDArray out_mapping = args[10];
 
-    CSRWRAPPER_SWITCH(g.sptr(), wrapper, {
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
       BinaryOpReduce(reducer, op, wrapper,
           static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
           lhs_data, rhs_data, out_data,
@@ -411,7 +416,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -423,7 +427,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_lhs_data = args[12];
 
-    CSRWRAPPER_SWITCH(g.sptr(), wrapper, {
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
       BackwardLhsBinaryOpReduce(
           reducer, op, wrapper,
           static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
@@ -486,7 +490,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -498,7 +501,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_rhs_data = args[12];
 
-    CSRWRAPPER_SWITCH(g.sptr(), wrapper, {
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
       BackwardRhsBinaryOpReduce(
           reducer, op, wrapper,
           static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
@@ -532,14 +535,13 @@ void CopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
     NDArray in_mapping = args[5];
     NDArray out_mapping = args[6];
 
-    CSRWRAPPER_SWITCH(g.sptr(), wrapper, {
+    CSRWRAPPER_SWITCH(args[1], wrapper, {
       CopyReduce(reducer, wrapper,
           static_cast<binary_op::Target>(target),
           in_data, out_data,
@@ -580,7 +582,6 @@ void BackwardCopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
@@ -589,7 +590,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray in_mapping = args[7];
     NDArray out_mapping = args[8];
 
-    CSRWRAPPER_SWITCH(g.sptr(), wrapper, {
+    CSRWRAPPER_SWITCH(args[1], wrapper, {
       BackwardCopyReduce(
           reducer, wrapper, static_cast<binary_op::Target>(target),
           in_mapping, out_mapping,

@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "../c_api_common.h"
+
 namespace dgl {
 
 /*!
@@ -139,6 +141,12 @@ class Bipartite : public BaseHeteroGraph {
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids);
+
+  /*! \brief Convert the graph to use the given number of bits for storage */
+  static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
+
+  /*! \brief Copy the data to another context */
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
   /*! \return Return the in-edge CSR format. Create from other format if not exist. */
   CSRPtr GetInCSR() const;
@@ -443,6 +451,34 @@ class Bipartite::CSR : public BaseHeteroGraph {
 
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
+  }
+
+  CSR AsNumBits(uint8_t bits) const {
+    if (NumBits() == bits) {
+      return *this;
+    } else {
+      CSR ret(
+          adj_.num_rows, adj_.num_cols,
+          aten::AsNumBits(adj_.indptr, bits),
+          aten::AsNumBits(adj_.indices, bits),
+          aten::AsNumBits(adj_.data, bits));
+      ret.is_multigraph_ = is_multigraph_;
+      return ret;
+    }
+  }
+
+  CSR CopyTo(const DLContext& ctx) const {
+    if (Context() == ctx) {
+      return *this;
+    } else {
+      CSR ret(
+          adj_.num_rows, adj_.num_cols,
+          adj_.indptr.CopyTo(ctx),
+          adj_.indices.CopyTo(ctx),
+          adj_.data.CopyTo(ctx));
+      ret.is_multigraph_ = is_multigraph_;
+      return ret;
+    }
   }
 
   bool IsMultigraph() const override {
