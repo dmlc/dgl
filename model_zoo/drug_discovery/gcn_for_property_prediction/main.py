@@ -12,6 +12,7 @@ from dgl.data.utils import download, _get_dgl_url
 from model import GCNClassifier
 
 def setup_device(args):
+    """Decide if to use gpu and set torch device correspondingly."""
     cuda_available = torch.cuda.is_available()
     if cuda_available and (not args['cuda']):
         print('You may use gpu for a better speed.')
@@ -26,6 +27,7 @@ def setup_device(args):
     return args
 
 def setup(args):
+    """Device set up and set random seed."""
     args = setup_device(args)
 
     # Setup random seed
@@ -37,6 +39,18 @@ def setup(args):
     return args
 
 def save_checkpoint(model, optimizer, checkpoint_path):
+    """Save the state dicts of the model and optimizer
+    in a dictionary.
+
+    Parameters
+    ----------
+    model
+        Model to save
+    optimizer
+        Optimizer to save
+    checkpoint_path : str
+        Path to save checkpoint
+    """
     torch.save({
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict()
@@ -44,12 +58,27 @@ def save_checkpoint(model, optimizer, checkpoint_path):
     print('checkpoint saved')
 
 def load_checkpoint(model, checkpoint_path, load_optimizer, optimizer=None):
+    """Load checkpoint for model (and optimizer).
+
+    Parameters
+    ----------
+    model
+        Model to load checkpoint
+    checkpoint_path : str
+        Path to saved checkpoint
+    load_optimizer : bool
+        Whether to load checkpoint for the optimizer
+    optimizer
+        Default to be None. If load_optimizer, this must be the
+        optimizer to load checkpoint.
+    """
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'])
     if load_optimizer:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
 def load_pretrained_model(model):
+    """Download a checkpoint and load a pre-trained model."""
     print('Loading pretrained model...')
     url_to_pretrained = _get_dgl_url('pre_trained/gcn_tox21.pth')
     local_pretrained_path = 'pre_trained.pth'
@@ -57,6 +86,21 @@ def load_pretrained_model(model):
     load_checkpoint(model, local_pretrained_path, load_optimizer=False)
 
 def roc_auc_averaged_over_tasks(w, y_pred, y_true):
+    """Compute roc-auc scores and average them over tasks.
+    Non-existing labels are masked out based on w.
+
+    All three input tensors have the same shape (N, M), where
+    N is the number of datapoints and M is the number of tasks.
+
+    Parameters
+    ----------
+    w : Tensor of dtype float32
+        Weights
+    y_pred : Tensor of dtype float32
+        Predicted logits
+    y_true : Tensor of dtype float32
+        Ground truth
+    """
     y_pred = torch.sigmoid(y_pred)
     n_tasks = y_true.shape[1]
     total_score = 0
@@ -69,6 +113,30 @@ def roc_auc_averaged_over_tasks(w, y_pred, y_true):
 
 def run_a_train_epoch(device, num_epochs, epoch, model, loss_criterion,
                       metric_criterion, optimizer, data_loader, atom_data_field):
+    """Train the model for a full epoch.
+
+    Parameters
+    ----------
+    device : str
+        Device for computation
+    num_epochs : int
+        Number of total epochs
+    epoch : int
+        Current epoch
+    model
+        Model being trained
+    loss_criterion
+        Function to compute loss based on the prediction and ground truth,
+        binary cross entropy in this case
+    metric_criterion
+        Model evaluation function, roc-auc score in this case
+    optimizer
+        Optimizer for training
+    data_loader
+        Data_loader for training set
+    atom_data_field : str
+        Name for storing atom features in DGLGraphs
+    """
     model.train()
     print('Start training')
     w = []
@@ -79,6 +147,7 @@ def run_a_train_epoch(device, num_epochs, epoch, model, loss_criterion,
         atom_feats = bg.ndata.pop(atom_data_field)
         atom_feats, labels = atom_feats.to(device), labels.to(device)
         logits = model(atom_feats, bg)
+        # Mask non-existing labels
         loss = (loss_criterion(logits, labels) * (weights != 0).float()).mean()
         optimizer.zero_grad()
         loss.backward()
@@ -96,6 +165,21 @@ def run_a_train_epoch(device, num_epochs, epoch, model, loss_criterion,
         epoch + 1, num_epochs, train_score))
 
 def run_an_eval_epoch(device, model, metric_criterion, data_loader, atom_data_field):
+    """Evaluate the model on the validation or test set for a full epoch.
+
+    Parameters
+    ----------
+    device : str
+        Device for computation
+    model
+        Model to be evaluated
+    metric_criterion
+        Model evaluation function, roc-auc score in this case
+    data_loader
+        Data_loader for the validation or test set
+    atom_data_field : str
+        Name for storing atom features in DGLGraphs
+    """
     model.eval()
     w = []
     y_pred = []
@@ -115,13 +199,42 @@ def run_an_eval_epoch(device, model, metric_criterion, data_loader, atom_data_fi
     return eval_score
 
 def collate(data):
+    """Batching a list of datapoints for dataloader
+
+    Parameters
+    ----------
+    data : list of 3-tuples
+        Each tuple is for a single datapoint, consisting of
+        a DGLGraph, all-task labels and all-task weights
+
+    Returns
+    -------
+    bg : BatchedDGLGraph
+        Batched DGLGraphs
+    labels : Tensor of dtype float32 and shape (B, 12)
+        Batched datapoint labels. B is len(data) and
+        12 is the number of total tasks.
+    weights : Tensor of dtype float32 and shape (B, 12)
+        Batched datapoint weights.
+    """
     graphs, labels, weights = map(list, zip(*data))
     bg = dgl.batch(graphs)
     bg.set_n_initializer(dgl.init.zero_initializer)
     bg.set_e_initializer(dgl.init.zero_initializer)
-    return bg, torch.stack(labels, dim=0), torch.stack(weights, dim=0)
+    labels = torch.stack(labels, dim=0)
+    weights = torch.stack(weights, dim=0)
+    return bg, labels, weights
 
 def train(args, dataset, model):
+    """Train a model and save the one that performs the best on the validation set.
+
+    Parameters
+    ----------
+    args : dict
+        Configurations
+    dataset
+    model
+    """
     train_loader = DataLoader(dataset.train_set, batch_size=args['batch_size'],
                               collate_fn=collate)
     val_loader = DataLoader(dataset.val_set, batch_size=len(dataset.val_set),
@@ -145,6 +258,15 @@ def train(args, dataset, model):
     load_checkpoint(model, args['checkpoint_path'], load_optimizer=False, optimizer=None)
 
 def test(args, dataset, model):
+    """Evaluate the model on the test set.
+
+    Parameters
+    ----------
+    args : dict
+        Configurations
+    dataset
+    model
+    """
     test_loader = DataLoader(dataset.test_set, batch_size=len(dataset.test_set),
                              collate_fn=collate)
     # Evaluation on the test set
@@ -162,11 +284,11 @@ if __name__ == '__main__':
     parser.add_argument('-ne', '--num-epochs', type=int, default=10,
                         help='Number of epochs for training')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
-                        help='Batch size for prediction')
+                        help='Batch size for a training iteration')
     parser.add_argument('-lr', '--lr', type=float, default=0.001,
                         help='Learning rate for gradient descent')
     parser.add_argument('-d', '--dropout', type=float, default=0.1,
-                        help='Dropout rate')
+                        help='Dropout rate, 0 means no dropout')
     parser.add_argument('-p', '--pre-trained', action='store_true',
                         help='Whether to skip training and use a pre-trained model')
     parser.add_argument('-cp', '--checkpoint-path', type=str, default='checkpoint.pth',
@@ -174,7 +296,9 @@ if __name__ == '__main__':
     args = parser.parse_args().__dict__
     args = setup(args)
 
+    # Load dataset
     dataset = Tox21()
+    # Initialize model
     model = GCNClassifier(in_feats=dataset.feat_size,
                           gcn_hidden_feats=[64, 64],
                           n_tasks=dataset.num_tasks,
@@ -183,7 +307,9 @@ if __name__ == '__main__':
     model = model.to(args['device'])
 
     if args['pre_trained']:
+        # Skip training and load a pre-trained model
         load_pretrained_model(model)
     else:
+        # Train a model from scratch
         train(args, dataset, model)
     test(args, dataset, model)
