@@ -9,7 +9,7 @@ from .frame import Frame, FrameRef
 from .view import NodeView, EdgeView
 from .base import ALL, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE, is_all, DGLError
 
-__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite', 'DGLGraph2']
+__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
