@@ -149,7 +149,6 @@ def schedule_snr(graph,
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
     recv_nodes = utils.toindex(recv_nodes)
     # create vars
-    var_src_nf = var.FEAT_DICT(graph._src_frame, name='src_nf')
     var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='dst_nf')
     var_u = var.IDX(u)
     var_v = var.IDX(v)

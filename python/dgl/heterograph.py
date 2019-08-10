@@ -7,7 +7,7 @@ from . import init
 from .runtime import ir, scheduler, Runtime
 from .frame import Frame, FrameRef
 from .view import NodeView, EdgeView
-from .base import ALL, DEFAULT_NODE_TYPE, DEFAULT_EDGE_TYPE, is_all, DGLError
+from .base import ALL, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
 
@@ -58,10 +58,12 @@ class DGLBaseHeteroGraph(object):
 
     @property
     def is_node_type_view(self):
+        """Whether this is a node type view of a heterograph."""
         return self._view_ntype_idx is not None
 
     @property
     def is_edge_type_view(self):
+        """Whether this is an edge type view of a heterograph."""
         return self._view_etype_idx is not None
 
     @property
@@ -228,7 +230,7 @@ class DGLBaseHeteroGraph(object):
 
         This allows reading/writing edge frame data and message passing routines.
         """
-        srctype_idx, dsttype_idx = self._endpoint_types(self._current_etype_idx)
+        srctype_idx, _ = self._endpoint_types(self._current_etype_idx)
         return srctype_idx
 
     @property
@@ -239,7 +241,7 @@ class DGLBaseHeteroGraph(object):
 
         This allows reading/writing edge frame data and message passing routines.
         """
-        srctype_idx, dsttype_idx = self._endpoint_types(self._current_etype_idx)
+        _, dsttype_idx = self._endpoint_types(self._current_etype_idx)
         return dsttype_idx
 
     def number_of_nodes(self):
