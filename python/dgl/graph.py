@@ -9,7 +9,7 @@ import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
-from .frame import FrameRef, Frame, Scheme
+from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from . import graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -3460,19 +3460,3 @@ class DGLGraph(DGLBaseGraph):
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
-
-def sync_frame_initializer(new_frame, reference_frame):
-    """Set the initializers of the new_frame to be the same as the reference_frame.
-
-    Parameters
-    ----------
-    new_frame : Frame
-        The frame to set initializers
-    reference_frame : Frame
-        The frame to copy initializers
-    """
-    new_frame._default_initializer = reference_frame._default_initializer
-    # set per-col initializer
-    # TODO(minjie): hack; cannot rely on keys as the _initializers
-    #   now supports non-exist columns.
-    new_frame._initializers = reference_frame._initializers

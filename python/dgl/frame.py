@@ -903,9 +903,21 @@ def frame_like(other, num_rows):
     # set global initializr
     if other.get_initializer() is None:
         other._warn_and_set_initializer()
-    newf._default_initializer = other._default_initializer
+    sync_frame_initializer(newf, other)
+    return newf
+
+def sync_frame_initializer(new_frame, reference_frame):
+    """Set the initializers of the new_frame to be the same as the reference_frame.
+
+    Parameters
+    ----------
+    new_frame : Frame
+        The frame to set initializers
+    reference_frame : Frame
+        The frame to copy initializers
+    """
+    new_frame._default_initializer = reference_frame._default_initializer
     # set per-col initializer
     # TODO(minjie): hack; cannot rely on keys as the _initializers
     #   now supports non-exist columns.
-    newf._initializers = other._initializers
-    return newf
+    new_frame._initializers = reference_frame._initializers
