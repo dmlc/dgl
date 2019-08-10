@@ -6,12 +6,15 @@
 #include <dgl/array.h>
 #include <dgl/lazy.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/base_heterograph.h>
 
 #include "./bipartite.h"
 #include "../c_api_common.h"
 
 namespace dgl {
+
 namespace {
+
 inline GraphPtr CreateBipartiteMetaGraph() {
   std::vector<int64_t> row_vec(1, Bipartite::kSrcVType);
   std::vector<int64_t> col_vec(1, Bipartite::kDstVType);
@@ -20,9 +23,99 @@ inline GraphPtr CreateBipartiteMetaGraph() {
   GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
-static const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
-}  // namespace
+const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
 
+};  // namespace
+
+//////////////////////////////////////////////////////////
+//
+// COO graph implementation
+//
+//////////////////////////////////////////////////////////
+
+Bipartite::COO::COO(
+    int64_t num_src,
+    int64_t num_dst,
+    IdArray src,
+    IdArray dst)
+  : BaseHeteroGraph(kBipartiteMetaGraph) {
+  adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
+}
+
+Bipartite::COO::COO(
+    int64_t num_src,
+    int64_t num_dst,
+    IdArray src,
+    IdArray dst,
+    bool is_multigraph)
+  : BaseHeteroGraph(kBipartiteMetaGraph),
+    is_multigraph_(is_multigraph) {
+  adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
+}
+
+explicit Bipartite::COO::COO(const aten::COOMatrix& coo)
+  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo)
+{
+}
+
+HeteroSubgraph Bipartite::COO::EdgeSubgraph(
+    const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
+  CHECK_EQ(eids.size(), 1) << "Edge type number mismatch.";
+  HeteroSubgraph subg;
+  if (!preserve_nodes) {
+    IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
+    subg.induced_vertices.emplace_back(aten::Relabel_({new_src}));
+    subg.induced_vertices.emplace_back(aten::Relabel_({new_dst}));
+    const auto new_nsrc = subg.induced_vertices[0]->shape[0];
+    const auto new_ndst = subg.induced_vertices[1]->shape[0];
+    subg.graph = std::make_shared<COO>(
+        new_nsrc, new_ndst, new_src, new_dst);
+    subg.induced_edges = eids;
+  } else {
+    IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
+    subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(0), NumBits(), Context()));
+    subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(1), NumBits(), Context()));
+    subg.graph = std::make_shared<COO>(
+        NumVertices(0), NumVertices(1), new_src, new_dst);
+    subg.induced_edges = eids;
+  }
+  return subg;
+}
+
+//////////////////////////////////////////////////////////
+//
+// CSR graph implementation
+//
+//////////////////////////////////////////////////////////
+
+Bipartite::CSR::CSR(
+    int64_t num_src,
+    int64_t num_dst,
+    IdArray indptr,
+    IdArray indices,
+    IdArray edge_ids)
+  : BaseHeteroGraph(kBipartiteMetaGraph) {
+  adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
+}
+
+Bipartite::CSR::CSR(
+    int64_t num_src,
+    int64_t num_dst,
+    IdArray indptr,
+    IdArray indices,
+    IdArray edge_ids,
+    bool is_multigraph)
+  : BaseHeteroGraph(kBipartiteMetaGraph),
+    is_multigraph_(is_multigraph) {
+  adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
+}
+
+explicit CSR(const aten::CSRMatrix& csr)
+  : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr)
+{
+}
 
 //////////////////////////////////////////////////////////
 //
@@ -55,7 +148,7 @@ bool Bipartite::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
 }
 
 BoolArray Bipartite::HasVertices(dgl_type_t vtype, IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices(vtype));
 }
 

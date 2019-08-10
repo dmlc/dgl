@@ -59,9 +59,9 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
-  CHECK(IsValidIdArray(indptr));
-  CHECK(IsValidIdArray(indices));
-  CHECK(IsValidIdArray(edge_ids));
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
@@ -69,9 +69,9 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   : is_multigraph_(is_multigraph) {
-  CHECK(IsValidIdArray(indptr));
-  CHECK(IsValidIdArray(indices));
-  CHECK(IsValidIdArray(edge_ids));
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
@@ -79,9 +79,9 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
          const std::string &shared_mem_name): shared_mem_name_(shared_mem_name) {
-  CHECK(IsValidIdArray(indptr));
-  CHECK(IsValidIdArray(indices));
-  CHECK(IsValidIdArray(edge_ids));
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
@@ -98,9 +98,9 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
          const std::string &shared_mem_name): is_multigraph_(is_multigraph),
          shared_mem_name_(shared_mem_name) {
-  CHECK(IsValidIdArray(indptr));
-  CHECK(IsValidIdArray(indices));
-  CHECK(IsValidIdArray(edge_ids));
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
@@ -140,7 +140,7 @@ EdgeArray CSR::OutEdges(dgl_id_t vid) const {
 }
 
 EdgeArray CSR::OutEdges(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   auto csrsubmat = aten::CSRSliceRows(adj_, vids);
   auto coosubmat = aten::CSRToCOO(csrsubmat, false);
   // Note that the row id in the csr submat is relabled, so
@@ -150,7 +150,7 @@ EdgeArray CSR::OutEdges(IdArray vids) const {
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   return aten::CSRGetRowNNZ(adj_, vids);
 }
 
@@ -161,8 +161,8 @@ bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
 }
 
 BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
   return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
 }
 
@@ -192,7 +192,7 @@ EdgeArray CSR::Edges(const std::string &order) const {
 }
 
 Subgraph CSR::VertexSubgraph(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
   IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
   CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
@@ -268,16 +268,16 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
 //
 //////////////////////////////////////////////////////////
 COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
-  CHECK(IsValidIdArray(src));
-  CHECK(IsValidIdArray(dst));
+  CHECK(aten::IsValidIdArray(src));
+  CHECK(aten::IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
   adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
 }
 
 COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
   : is_multigraph_(is_multigraph) {
-  CHECK(IsValidIdArray(src));
-  CHECK(IsValidIdArray(dst));
+  CHECK(aten::IsValidIdArray(src));
+  CHECK(aten::IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
   adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
 }
@@ -297,7 +297,7 @@ std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
 }
 
 EdgeArray COO::FindEdges(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
   return EdgeArray{aten::IndexSelect(adj_.row, eids),
                    aten::IndexSelect(adj_.col, eids),
                    eids};
@@ -312,7 +312,7 @@ EdgeArray COO::Edges(const std::string &order) const {
 }
 
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array.";
   if (!preserve_nodes) {
     IdArray new_src = aten::IndexSelect(adj_.row, eids);
     IdArray new_dst = aten::IndexSelect(adj_.col, eids);
@@ -370,7 +370,7 @@ COO COO::AsNumBits(uint8_t bits) const {
 //////////////////////////////////////////////////////////
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices());
 }
 

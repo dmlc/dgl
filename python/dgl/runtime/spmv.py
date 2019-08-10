@@ -5,7 +5,8 @@ from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import from_coo
+from ..graph_index import from_coo, GraphIndex
+from ..heterograph_index import HeteroGraphIndex
 
 from . import ir
 from .ir import var
@@ -127,8 +128,8 @@ def build_gidx_and_mapping_graph(graph):
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph
+    graph : DGLGraph or DGLHeteroGraph
+        The homogeneous graph, or a bipartite view of the heterogeneous graph.
 
     Returns
     -------
@@ -141,7 +142,10 @@ def build_gidx_and_mapping_graph(graph):
         Number of ints needed to represent the graph
     """
     gidx = graph._graph
-    return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    if isinstance(gidx, GraphIndex):
+        return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    elif isinstance(gidx, HeteroGraphIndex):
+        return gidx.get_relation_graph(graph._current_etype_idx), None, gidx.nbits()
 
 
 def build_gidx_and_mapping_uv(edge_tuples, num_nodes):

@@ -156,7 +156,7 @@ bool HeteroGraph::IsMultigraph() const {
 }
 
 BoolArray HeteroGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices(vtype));
 }
 

@@ -731,7 +731,7 @@ std::vector<NodeFlow> NeighborSamplingImpl(const ImmutableGraphPtr gptr,
                                            const bool add_self_loop,
                                            const ValueType *probability) {
     // process args
-    CHECK(IsValidIdArray(seed_nodes));
+    CHECK(aten::IsValidIdArray(seed_nodes));
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
@@ -841,7 +841,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     // process args
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
-    CHECK(IsValidIdArray(seed_nodes));
+    CHECK(aten::IsValidIdArray(seed_nodes));
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
