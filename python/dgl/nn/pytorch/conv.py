@@ -7,7 +7,7 @@ from torch.nn import init
 from ... import function as fn
 from .softmax import edge_softmax
 
-__all__ = ['GraphConv', 'GraphAttention']
+__all__ = ['GraphConv', 'GraphAttention', 'GraphSAGE']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -227,3 +227,32 @@ class GraphAttention(nn.Module):
             rst = self.activation(rst)
 
         return rst
+
+
+class GraphSAGE(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 dropout,
+                 aggregator_type,
+                 bn=False,
+                 bias=True,
+                 activation=None):
+        super(GraphSAGE, self).__init__()
+
+        # aggregator type: mean/max/lstm
+        if aggregator_type == 'mean':
+            pass
+        elif aggregator_type == 'max':
+            pass
+        else: # lstm
+            pass
+
+    def forward(self, feat, graph):
+        pass
+
+
+
+
+
+
