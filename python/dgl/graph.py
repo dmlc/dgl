@@ -3258,7 +3258,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if is_all(edges):
             eid = ALL
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
