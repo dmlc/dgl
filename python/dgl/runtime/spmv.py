@@ -149,6 +149,8 @@ def build_gidx_and_mapping_graph(graph):
         return (partial(gidx.get_bipartite, graph._current_etype_idx),
                 None,
                 gidx.bits_needed(graph._current_etype_idx))
+    else:
+        raise TypeError('unknown graph index type %s' % type(gidx))
 
 
 def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
