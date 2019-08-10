@@ -8,6 +8,8 @@
 - RDKit 2019.03.2
     - We recommend installation with `conda install -c conda-forge rdkit`. For other installation recipes, see the 
     [official documentation](https://www.rdkit.org/docs/Install.html).
+- requests 2.22.0
+    - Install with `pip install requests`
 
 ## Modeling
 

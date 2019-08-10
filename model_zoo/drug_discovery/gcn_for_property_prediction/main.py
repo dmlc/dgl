@@ -165,11 +165,11 @@ if __name__ == '__main__':
                         help='Batch size for prediction')
     parser.add_argument('-lr', '--lr', type=float, default=0.001,
                         help='Learning rate for gradient descent')
-    parser.add_argument('-d', '--dropout', type=float, default=0.25,
+    parser.add_argument('-d', '--dropout', type=float, default=0.1,
                         help='Dropout rate')
     parser.add_argument('-p', '--pre-trained', action='store_true',
                         help='Whether to skip training and use a pre-trained model')
-    parser.add_argument('-cp', '--checkpoint-path', type=str, default='pretrained_model.pth',
+    parser.add_argument('-cp', '--checkpoint-path', type=str, default='checkpoint.pth',
                         help='Path to save and reload model checkpoint')
     args = parser.parse_args().__dict__
     args = setup(args)
