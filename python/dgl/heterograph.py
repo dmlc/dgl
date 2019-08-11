@@ -632,7 +632,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].find_edges(eid)
 
         Parameters
         ----------
@@ -666,7 +666,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].in_edges(v, form)
 
         Parameters
         ----------
@@ -717,7 +717,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].out_edges(v, form)
 
         Parameters
         ----------
@@ -768,7 +768,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].all_edges(form, order)
 
         Parameters
         ----------
@@ -823,7 +823,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].in_degree(v)
 
         Parameters
         ----------
@@ -857,7 +857,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].in_degrees(v)
 
         Parameters
         ----------
@@ -897,7 +897,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].out_degree(v)
 
         Parameters
         ----------
@@ -931,7 +931,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].edge_ids(u, v)
+           g['edgetype'].out_degrees(v)
 
         Parameters
         ----------
@@ -1396,39 +1396,58 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         pass
 
     def node_attr_schemes(self):
-        """Return the node feature schemes for a given node type.
+        """Return the node feature schemes.
 
         Each feature scheme is a named tuple that stores the shape and data type
-        of the node feature
+        of the node feature.
 
-        Parameters
-        ----------
-        ntype : str
-            The node type
+        Only works if the graph has one node type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['nodetype'].node_attr_schemes()
 
         Returns
         -------
         dict of str to schemes
             The schemes of node feature columns.
+
+        Examples
+        --------
+        The following uses PyTorch backend.
+
+        >>> g['user'].ndata['h'] = torch.randn(3, 4)
+        >>> g['user'].node_attr_schemes()
+        {'h': Scheme(shape=(4,), dtype=torch.float32)}
         """
         return self._node_frame.schemes
 
     def edge_attr_schemes(self):
-        """Return the edge feature schemes for a given edge type.
+        """Return the edge feature schemes.
 
         Each feature scheme is a named tuple that stores the shape and data type
-        of the edge feature
+        of the edge feature.
 
-        Parameters
-        ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['edgetype'].edge_attr_schemes()
 
         Returns
         -------
         dict of str to schemes
             The schemes of node feature columns.
+
+        Examples
+        --------
+        The following uses PyTorch backend.
+
+        >>> g['plays'].edata['h'] = torch.randn(4, 4)
+        >>> g['plays'].edge_attr_schemes()
+        {'h': Scheme(shape=(4,), dtype=torch.float32)}
         """
         return self._edge_frame.schemes
 
@@ -1441,10 +1460,15 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         When a subset of the nodes are assigned a new feature, initializer is
         used to create feature for rest of the nodes.
 
+        Only works if the graph has one node type.  For multiple types,
+        set with
+
+        .. code::
+
+           g['nodetype'].set_n_initializer(initializer, field)
+
         Parameters
         ----------
-        ntype : str
-            The node type name.
         initializer : callable
             The initializer.
         field : str, optional
@@ -1462,11 +1486,15 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         When a subset of the edges are assigned a new feature, initializer is
         used to create feature for rest of the edges.
 
+        Only works if the graph has one edge type.  For multiple types,
+        set with
+
+        .. code::
+
+           g['edgetype'].set_e_initializer(initializer, field)
+
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         initializer : callable
             The initializer.
         field : str, optional
@@ -1480,13 +1508,12 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """Return a node view that can used to set/get feature data of a
         single node type.
 
-        Notes
-        -----
-        An error is raised if the graph contains multiple node types.  Use
+        Only works if the graph has one node type.  For multiple types,
+        set and get feature data with
 
-            g[ntype]
+        .. code::
 
-        to select nodes with type ``ntype``.
+           g['nodetype'].nodes
 
         Examples
         --------
@@ -1499,13 +1526,12 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def ndata(self):
         """Return the data view of all the nodes of a single node type.
 
-        Notes
-        -----
-        An error is raised if the graph contains multiple node types.  Use
+        Only works if the graph has one node type.  For multiple types,
+        set and get feature data with
 
-            g[ntype]
+        .. code::
 
-        to select nodes with type ``ntype``.
+           g['nodetype'].ndata
 
         Examples
         --------
@@ -1519,19 +1545,18 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """Return an edges view that can used to set/get feature data of a
         single edge type.
 
-        Notes
-        -----
-        An error is raised if the graph contains multiple edge types.  Use
+        Only works if the graph has one edge type.  For multiple types,
+        set and get feature data with
 
-            g[src_type, dst_type, edge_type]
+        .. code::
 
-        to select edges with type ``(src_type, dst_type, edge_type)``.
+           g['edgetype'].edges
 
         Examples
         --------
         To set features of gameplays #1 (Bob -> Tetris) and #3 (Carol ->
         Minecraft) in a heterogeneous graph:
-        >>> g['user', 'game', 'plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
+        >>> g['plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
         """
         return EdgeView(self)
 
@@ -1539,17 +1564,16 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def edata(self):
         """Return the data view of all the edges of a single edge type.
 
-        Notes
-        -----
-        An error is raised if the graph contains multiple edge types.  Use
+        Only works if the graph has one edge type.  For multiple types,
+        set and get feature data with
 
-            g[src_type, dst_type, edge_type]
+        .. code::
 
-        to select edges with type ``(src_type, dst_type, edge_type)``.
+           g['edgetype'].edges
 
         Examples
         --------
-        >>> g['developer', 'game', 'develops'].edata['h'] = torch.zeros(2, 5)
+        >>> g['develops'].edata['h'] = torch.zeros(2, 5)
         """
         return self.edges[:].data
 
@@ -1563,6 +1587,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         All update will be done out of place to work with autograd unless the
         inplace flag is true.
+
+        Only works if the graph has one node type.  For multiple types,
+        set feature data with
+
+        .. code::
+
+           g['nodetype'].set_n_repr(data, u, inplace)
 
         Parameters
         ----------
@@ -1595,6 +1626,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         The returned feature tensor batches multiple node features on the first dimension.
 
+        Only works if the graph has one node type.  For multiple types,
+        get feature data with
+
+        .. code::
+
+           g['nodetype'].get_n_repr(u)
+
         Parameters
         ----------
         u : node, container or tensor
@@ -1615,6 +1653,14 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     def pop_n_repr(self, key):
         """Get and remove the specified node repr of a given node type.
+
+        Only works if the graph has one node type.  For multiple types,
+        pop feature data with
+
+        .. code::
+
+           g['nodetype'].pop_n_repr(key)
+           del g['nodetype'].ndata[key]  # equivalent
 
         Parameters
         ----------
@@ -1637,6 +1683,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         All update will be done out of place to work with autograd unless the
         inplace flag is true.
+
+        Only works if the graph has one edge type.  For multiple types,
+        set feature data with
+
+        .. code::
+
+           g['edgetype'].set_e_repr(data, u, inplace)
 
         Parameters
         ----------
@@ -1692,6 +1745,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def get_e_repr(self, edges=ALL):
         """Get edge(s) representation.
 
+        Only works if the graph has one edge type.  For multiple types,
+        get feature data with
+
+        .. code::
+
+           g['edgetype'].get_e_repr(u)
+
         Parameters
         ----------
         edges : edges
@@ -1726,11 +1786,16 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def pop_e_repr(self, etype, key):
         """Get and remove the specified edge repr of a single edge type.
 
+        Only works if the graph has one node type.  For multiple types,
+        pop feature data with
+
+        .. code::
+
+           g['edgetype'].pop_e_repr(key)
+           del g['edgetype'].edata[key]  # equivalent
+
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         key : str
           The attribute name.
 
@@ -1751,16 +1816,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Parameters
         ----------
-        func : callable, dict[etype, callable]
+        func : callable
             Message function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
 
         See Also
         --------
@@ -1770,7 +1828,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         push
         update_all
         """
-        pass
+        raise NotImplementedError
 
     def register_reduce_func(self, func):
         """Register global message reduce function for each edge type provided.
@@ -1782,16 +1840,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Parameters
         ----------
-        func : callable, dict[etype, callable]
+        func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
 
         See Also
         --------
@@ -1801,7 +1852,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         pull
         update_all
         """
-        pass
+        raise NotImplementedError
 
     def register_apply_node_func(self, func):
         """Register global node apply function for each node type provided.
@@ -1813,21 +1864,16 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Parameters
         ----------
-        func : callable, dict[str, callable]
+        func : callable
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``func`` is not a
-            dict, it will throw an error.
 
         See Also
         --------
         apply_nodes
         register_apply_edge_func
         """
-        pass
+        raise NotImplementedError
 
     def register_apply_edge_func(self, func):
         """Register global edge apply function for each edge type provided.
@@ -1837,23 +1883,16 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Parameters
         ----------
-        func : callable, dict[etype, callable]
+        func : callable
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
 
         See Also
         --------
         apply_edges
         register_apply_node_func
         """
-        pass
+        raise NotImplementedError
 
     def apply_nodes(self, func, v=ALL, inplace=False):
         """Apply the function on the nodes with the same type to update their
@@ -1861,24 +1900,20 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         If None is provided for ``func``, nothing will happen.
 
+        Only works if the graph has one node type.  For multiple types,
+        use
+
+        .. code::
+
+           g['nodetype'].apply_nodes(func, v, inplace)
+
         Parameters
         ----------
-        func : callable, dict[str, callable], or None
+        func : callable or None
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``func`` is not a
-            dict, it will throw an error.
-        v : int, iterable of int, tensor, dict, optional
+        v : int, iterable of int, tensor, optional
             The (type-specific) node (ids) on which to apply ``func``.
-
-            If ``func`` is not a dict, then ``v`` must not be a dict.
-            If ``func`` is a dict, then ``v`` must either be
-            * ALL: for computing on all nodes with the given types in ``func``.
-            * a dict of int, iterable of int, or tensors, with the same keys
-              as ``func``, indicating the nodes to be updated for each type.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -1911,27 +1946,21 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         If None is provided for ``func``, nothing will happen.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].apply_edges(func, edges, inplace)
+
         Parameters
         ----------
-        func : callable, dict[etype, callable], or None
+        func : callable or None
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
-        edges : any valid edge specification, dict, optional
+        edges : any valid edge specification, optional
             Edges on which to apply ``func``. See :func:`send` for valid
             edge specification.
-
-            If ``func`` is not a dict, then ``edges`` must not be a dict.
-            If ``func`` is a dict, then ``edges`` must either be
-            * ALL: for computing on all edges with the given types in ``func``.
-            * a dict of int, iterable of int, or tensors, with the same keys
-              as ``func``, indicating the edges to be updated for each type.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -1975,31 +2004,25 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         edges to update their features.  The edges are of the same edge type
         (hence having the same source and destination node type).
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].group_apply_edges(group_by, func, edges, inplace)
+
         Parameters
         ----------
         group_by : str
             Specify how to group edges. Expected to be either 'src' or 'dst'
-        func : callable, dict[etype, callable]
+        func : callable
             Apply function on the edge.  The function should be
             an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
             be (bucket_size, degrees, *feature_shape), and
             return the dict with values of the same shapes.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
-        edges : valid edges type, dict, optional
+        edges : valid edges type, optional
             Edges on which to group and apply ``func``. See :func:`send` for valid
             edges type. Default is all the edges.
-
-            If ``func`` is not a dict, then ``edges`` must not be a dict.
-            If ``func`` is a dict, then ``edges`` must either be
-            * ALL: for computing on all edges with the given types in ``func``.
-            * a dict of int, iterable of int, or tensors, with the same keys
-              as ``func``, indicating the edges to be updated for each type.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
@@ -2032,7 +2055,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                                                 inplace=inplace)
             Runtime.run(prog)
 
-    # TODO: REVIEW
     def send(self, edges=ALL, message_func=None):
         """Send messages along the given edges with the same edge type.
 
@@ -2044,7 +2066,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * ``int iterable`` / ``tensor`` : Specify multiple edges using their edge ids.
         * ``pair of int iterable`` / ``pair of tensors`` :
           Specify multiple edges using their endpoints.
-        * a dict of all the above, if ``message_func`` is a dict.
+
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].send(edges, message_func)
 
         The UDF returns messages on the edges and can be later fetched in
         the destination node's ``mailbox``. Receiving will consume the messages.
@@ -2055,27 +2083,12 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Parameters
         ----------
-        edges : valid edges type, dict, optional
+        edges : valid edges type, optional
             Edges on which to apply ``message_func``. Default is sending along all
             the edges.
-
-            If ``message_func`` is not a dict, then ``edges`` must not be a dict.
-            If ``message_func`` is a dict, then ``edges`` must either be
-            * ALL: for computing on all edges with the given types in
-              ``message_func``.
-            * a dict of int, iterable of int, or tensors, with the same keys
-              as ``message_func``, indicating the edges to be updated for each
-              type.
-        message_func : callable, dict[etype, callable]
+        message_func : callable
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``message_func`` is
-            not a dict, it will throw an error.
 
         Notes
         -----
@@ -2130,45 +2143,25 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         The provided UDF maybe called multiple times so it is recommended to provide
         function with no side effect.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].recv(v, reduce_func, apply_node_func, inplace)
+
         Parameters
         ----------
-        v : int, container or tensor, dict, optional
+        v : int, container or tensor, optional
             The node(s) to be updated. Default is receiving all the nodes.
-
-            If ``apply_node_func`` is not a dict, then ``v`` must not be a
-            dict.
-            If ``apply_node_func`` is a dict, then ``v`` must either be
-            * ALL: for computing on all nodes with the given types in
-              ``apply_node_func``.
-            * a dict of int, iterable of int, or tensors, indicating the nodes
-              to be updated for each type.
-        reduce_func : callable, dict[etype, callable], optional
+        reduce_func : callable, optional
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-        apply_node_func : callable, dict[str, callable]
+        apply_node_func : callable
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``apply_func`` is not
-            a dict, it will throw an error.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
-
-        Notes
-        -----
-        If the graph is heterogeneous (i.e. having more than one node/edge
-        type),
-        * the node types in ``v``, the node types in ``apply_node_func``,
-          and the destination types in ``reduce_func`` must be the same.
         """
         assert not utils.is_dict_like(reduce_func) and \
             not utils.is_dict_like(apply_node_func), \
@@ -2192,7 +2185,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                                     inplace=inplace)
             Runtime.run(prog)
 
-
     def send_and_recv(self,
                       edges,
                       message_func=None,
@@ -2209,58 +2201,29 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         ``recv(self, dst, reduce_func, apply_node_func)``, where ``dst``
         are the destinations of the ``edges``.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].send_and_recv(edges, message_func, reduce_func, apply_node_func, inplace)
+
         Parameters
         ----------
         edges : valid edges type
             Edges on which to apply ``func``. See :func:`send` for valid
             edges type.
-
-            If the functions are not dicts, then ``edges`` must not be a dict.
-            If the functions are dicts, then ``edges`` must either be
-            * ALL: for computing on all edges with the given types in the
-              functions.
-            * a dict of int, iterable of int, or tensors, indicating the edges
-              to be updated for each type.
-        message_func : callable, dict[etype, callable], optional
+        message_func : callable, optional
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``message_func`` is
-            not a dict, it will throw an error.
-        reduce_func : callable, dict[etype, callable], optional
+        reduce_func : callable, optional
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-        apply_node_func : callable, dict[str, callable], optional
+        apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``apply_func`` is not
-            a dict, it will throw an error.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
-
-        Notes
-        -----
-        If the graph is heterogeneous (i.e. having more than one node/edge
-        type),
-        * the destination type of ``edges``, the node types in
-          ``apply_node_func``, and the destination types in ``reduce_func``
-          must be the same.
-        * the edge type of ``edges``, ``message_func`` and ``reduce_func``
-          must also be the same.
         """
         assert not utils.is_dict_like(message_func) and \
             not utils.is_dict_like(reduce_func) and \
@@ -2308,54 +2271,26 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
           by the column initializer (see :func:`set_n_initializer`). The feature shapes and
           dtypes will be inferred.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].pull(v, message_func, reduce_func, apply_node_func, inplace)
+
         Parameters
         ----------
-        v : int, container or tensor, dict, optional
+        v : int, container or tensor, optional
             The node(s) to be updated. Default is receiving all the nodes.
-
-            If the functions are not dicts, then ``v`` must not be a dict.
-            If the functions are dicts, then ``v`` must either be
-            * ALL: for computing on all nodes with the given types in the
-              functions.
-            * a dict of int, iterable of int, or tensors, indicating the nodes
-              to be updated for each type.
-        message_func : callable, dict[etype, callable], optional
+        message_func : callable, optional
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``message_func`` is
-            not a dict, it will throw an error.
-        reduce_func : callable, dict[etype, callable], optional
+        reduce_func : callable, optional
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-        apply_node_func : callable, dict[str, callable], optional
+        apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``apply_func`` is not
-            a dict, it will throw an error.
-
-        Notes
-        -----
-        If the graph is heterogeneous (i.e. having more than one node/edge
-        type),
-        * the node types of ``v``, the node types in ``apply_node_func``,
-          and the destination types in ``reduce_func`` must be the same.
-        * the edge type of ``message_func`` and ``reduce_func`` must also be
-          the same.
         """
         assert not utils.is_dict_like(message_func) and \
             not utils.is_dict_like(reduce_func) and \
@@ -2386,58 +2321,28 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         Optionally, apply a function to update the node features after receive.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].push(e, message_func, reduce_func, apply_node_func, inplace)
+
         Parameters
         ----------
-        u : int, container or tensor, dict
+        u : int, container or tensor
             The node(s) to push messages out.
-
-            If the functions are not dicts, then ``v`` must not be a dict.
-            If the functions are dicts, then ``v`` must either be
-            * ALL: for computing on all nodes with the given types in the
-              functions.
-            * a dict of int, iterable of int, or tensors, indicating the nodes
-              to be updated for each type.
-        message_func : callable, dict[etype, callable], optional
+        message_func : callable, optional
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``message_func`` is
-            not a dict, it will throw an error.
-        reduce_func : callable, dict[etype, callable], optional
+        reduce_func : callable, optional
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-        apply_node_func : callable, dict[str, callable], optional
+        apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``apply_func`` is not
-            a dict, it will throw an error.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
-
-        Notes
-        -----
-        If the graph is heterogeneous (i.e. having more than one node/edge
-        type),
-        * the node types in ``apply_node_func`` and the destination types in
-          ``reduce_func`` must be the same.
-        * the source types of ``message_func`` and the node types of ``u`` must
-          be the same.
-        * the edge type of ``message_func`` and ``reduce_func`` must also be
-          the same.
         """
         assert not utils.is_dict_like(message_func) and \
             not utils.is_dict_like(reduce_func) and \
@@ -2470,45 +2375,24 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         ``send(self, self.edges(), message_func)`` and
         ``recv(self, self.nodes(), reduce_func, apply_node_func)``.
 
+        Only works if the graph has one edge type.  For multiple types,
+        use
+
+        .. code::
+
+           g['edgetype'].update_all(message_func, reduce_func, apply_node_func)
+
         Parameters
         ----------
-        message_func : callable, dict[etype, callable], optional
+        message_func : callable, optional
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``message_func`` is
-            not a dict, it will throw an error.
-        reduce_func : callable, dict[etype, callable], optional
+        reduce_func : callable, optional
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-        apply_node_func : callable, dict[str, callable], optional
+        apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``apply_func`` is not
-            a dict, it will throw an error.
-
-        Notes
-        -----
-        If the graph is heterogeneous (i.e. having more than one node/edge
-        type),
-        * the node types in ``apply_node_func`` and the destination types in
-          ``reduce_func`` must be the same.
-        * the edge type of ``message_func`` and ``reduce_func`` must also be
-          the same.
         """
         assert not utils.is_dict_like(message_func) and \
             not utils.is_dict_like(reduce_func) and \
@@ -2524,7 +2408,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                                           apply_func=apply_node_func)
             Runtime.run(prog)
 
-    # TODO should we support this?
     def prop_nodes(self,
                    nodes_generator,
                    message_func=None,
@@ -2534,7 +2417,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """
         raise NotImplementedError('not supported')
 
-    # TODO should we support this?
     def prop_edges(self,
                    edges_generator,
                    message_func=None,

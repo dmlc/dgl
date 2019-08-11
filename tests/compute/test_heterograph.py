@@ -175,41 +175,46 @@ def test_updates():
         return {'m': edges.src['h']}
     def reduce_func(nodes):
         return {'y': F.sum(nodes.mailbox['m'], 1)}
+    def apply_func(nodes):
+        return {'y': nodes.data['y'] * 2}
     g = create_test_heterograph()
     x = F.randn((3, 5))
     g['user'].ndata['h'] = x
 
-    for msg, red in itertools.product(
-            [fn.copy_u('h', 'm'), msg_func], [fn.sum('m', 'y'), reduce_func]):
-        g['plays'].update_all(msg, red)
+    for msg, red, apply in itertools.product(
+            [fn.copy_u('h', 'm'), msg_func], [fn.sum('m', 'y'), reduce_func],
+            [None, apply_func]):
+        multiplier = 1 if apply is None else 2
+
+        g['plays'].update_all(msg, red, apply)
         y = g['game'].ndata['y']
-        assert F.array_equal(y[0], x[0] + x[1])
-        assert F.array_equal(y[1], x[1] + x[2])
+        assert F.array_equal(y[0], (x[0] + x[1]) * multiplier)
+        assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
         del g['game'].ndata['y']
 
-        g['plays'].send_and_recv(([0, 1, 2], [0, 1, 1]), msg, red)
+        g['plays'].send_and_recv(([0, 1, 2], [0, 1, 1]), msg, red, apply)
         y = g['game'].ndata['y']
-        assert F.array_equal(y[0], x[0])
-        assert F.array_equal(y[1], x[1] + x[2])
+        assert F.array_equal(y[0], x[0] * multiplier)
+        assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
         del g['game'].ndata['y']
 
         g['plays'].send(([0, 1, 2], [0, 1, 1]), msg)
-        g['plays'].recv([0, 1], red)
+        g['plays'].recv([0, 1], red, apply)
         y = g['game'].ndata['y']
-        assert F.array_equal(y[0], x[0])
-        assert F.array_equal(y[1], x[1] + x[2])
+        assert F.array_equal(y[0], x[0] * multiplier)
+        assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
         del g['game'].ndata['y']
 
         # pulls from destination (game) node 0
-        g['plays'].pull(0, msg, red)
+        g['plays'].pull(0, msg, red, apply)
         y = g['game'].ndata['y']
-        assert F.array_equal(y[0], x[0] + x[1])
+        assert F.array_equal(y[0], (x[0] + x[1]) * multiplier)
         del g['game'].ndata['y']
 
         # pushes from source (user) node 0
-        g['plays'].push(0, msg, red)
+        g['plays'].push(0, msg, red, apply)
         y = g['game'].ndata['y']
-        assert F.array_equal(y[0], x[0])
+        assert F.array_equal(y[0], x[0] * multiplier)
         del g['game'].ndata['y']
 
 if __name__ == '__main__':
