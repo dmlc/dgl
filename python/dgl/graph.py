@@ -3353,6 +3353,8 @@ class DGLGraph(DGLBaseGraph):
         However, any out-place mutation to the feature data will not reflect to this graph,
         thus making it easier to use in a function scope.
 
+        If set, the local graph object will use same initializers for node features and edge features.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3418,6 +3420,8 @@ class DGLGraph(DGLBaseGraph):
 
         By entering a local scope, any out-place mutation to the feature data will
         not reflect to the original graph, thus making it easier to use in a function scope.
+
+        If set, the local scope will use same initializers for node features and edge features.
 
         Examples
         --------
