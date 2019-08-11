@@ -684,7 +684,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             raise Exception("graph store only supports CPU context for node data")
         init = self._node_frame.get_initializer(ndata_name)
         if init is None:
-            self._node_frame._frame._warn_and_set_initializer()
+            self._node_frame._set_zero_default_initializer()
         init = self._node_frame.get_initializer(ndata_name)
         init = self._init_manager.serialize(init)
         self.proxy.init_ndata(init, ndata_name, tuple(shape), dtype)
@@ -712,7 +712,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             raise Exception("graph store only supports CPU context for edge data")
         init = self._edge_frame.get_initializer(edata_name)
         if init is None:
-            self._edge_frame._frame._warn_and_set_initializer()
+            self._edge_frame._frame._set_zero_default_initializer()
         init = self._edge_frame.get_initializer(edata_name)
         init = self._init_manager.serialize(init)
         self.proxy.init_edata(init, edata_name, tuple(shape), dtype)
