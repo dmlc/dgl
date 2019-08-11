@@ -8,6 +8,8 @@ from .. import backend as F
 from ..frame import frame_like, FrameRef
 from ..function.base import BuiltinFunction
 from ..udf import EdgeBatch, NodeBatch
+from ..graph_index import GraphIndex
+from ..heterograph_index import HeteroGraphIndex
 
 from . import ir
 from .ir import var
@@ -27,6 +29,15 @@ __all__ = [
     "schedule_push",
     "schedule_pull"
 ]
+
+def _dispatch(graph, method, *args, **kwargs):
+    graph_index = graph._graph
+    if isinstance(graph_index, GraphIndex):
+        return getattr(graph._graph, method)(*args, **kwargs)
+    elif isinstance(graph_index, HeteroGraphIndex):
+        return getattr(graph._graph, method)(graph._current_etype_idx, *args, **kwargs)
+    else:
+        raise TypeError('unknown type %s' % type(graph_index))
 
 def schedule_send(graph, u, v, eid, message_func):
     """get send schedule
@@ -84,7 +95,7 @@ def schedule_recv(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    src, dst, eid = graph._graph.in_edges(recv_nodes)
+    src, dst, eid = _dispatch(graph, 'in_edges', recv_nodes)
     if len(eid) > 0:
         nonzero_idx = graph._get_msg_index().get_items(eid).nonzero()
         eid = eid.get_items(nonzero_idx)
@@ -209,7 +220,7 @@ def schedule_update_all(graph,
         var_eid = var.IDX(eid)
         # generate send + reduce
         def uv_getter():
-            src, dst, _ = graph._graph.edges('eid')
+            src, dst, _ = _dispatch(graph, 'edges', 'eid')
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_gidx_and_mapping_graph(graph)
         out_map_creator = lambda nbits: None
@@ -404,7 +415,7 @@ def schedule_push(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    u, v, eid = graph._graph.out_edges(u)
+    u, v, eid = _dispatch(graph, 'out_edges', u)
     if len(eid) == 0:
         # All the pushing nodes have no out edges. No computation is scheduled.
         return
@@ -437,7 +448,7 @@ def schedule_pull(graph,
     # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
     #   can be specialized to SPMV. This needs support for creating adjmat
     #   directly from pull node frontier.
-    u, v, eid = graph._graph.in_edges(pull_nodes)
+    u, v, eid = _dispatch(graph, 'in_edges', pull_nodes)
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:

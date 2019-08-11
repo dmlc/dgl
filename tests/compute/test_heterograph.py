@@ -186,6 +186,24 @@ def test_updates():
     assert F.array_equal(y[0], x[0])
     assert F.array_equal(y[1], x[1] + x[2])
 
+    g['plays'].send(
+            ([0, 1, 2], [0, 1, 1]),
+            fn.copy_u('h', 'm'))
+    g['plays'].recv([0, 1], fn.sum('m', 'y3'))
+    y = g['game'].ndata['y3']
+    assert F.array_equal(y[0], x[0])
+    assert F.array_equal(y[1], x[1] + x[2])
+
+    # pulls from destination (game) node 0
+    g['plays'].pull(0, fn.copy_u('h', 'm'), fn.sum('m', 'y4'))
+    y = g['game'].ndata['y4']
+    assert F.array_equal(y[0], x[0] + x[1])
+
+    # pushes from source (user) node 0
+    g['plays'].push(0, fn.copy_u('h', 'm'), fn.sum('m', 'y5'))
+    y = g['game'].ndata['y5']
+    assert F.array_equal(y[0], x[0])
+
 if __name__ == '__main__':
     test_query()
     test_frame()

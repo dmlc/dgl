@@ -1142,6 +1142,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 graph_data._view_ntype_idx, graph_data._view_etype_idx)
             self._node_frames = graph_data._node_frames
             self._edge_frames = graph_data._edge_frames
+            self._msg_frames = graph_data._msg_frames
+            self._msg_indices = graph_data._msg_indices
             self._view_ntype_idx = _view_ntype_idx
             self._view_etype_idx = _view_etype_idx
             return
@@ -1229,19 +1231,28 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     @property
     def _node_frame(self):
+        # overrides DGLGraph._node_frame
         return self._node_frames[self._current_ntype_idx]
 
     @property
     def _edge_frame(self):
+        # overrides DGLGraph._edge_frame
         return self._edge_frames[self._current_etype_idx]
 
     @property
     def _src_frame(self):
+        # overrides DGLGraph._src_frame
         return self._node_frames[self._current_srctype_idx]
 
     @property
     def _dst_frame(self):
+        # overrides DGLGraph._dst_frame
         return self._node_frames[self._current_dsttype_idx]
+
+    @property
+    def _msg_frame(self):
+        # overrides DGLGraph._msg_frame
+        return self._msg_frames[self._current_etype_idx]
 
     def add_nodes(self, node_type, num, data=None):
         """Add multiple new nodes of the same node type
@@ -2273,9 +2284,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     def pull(self,
              v,
-             message_func="default",
-             reduce_func="default",
-             apply_node_func="default",
+             message_func=None,
+             reduce_func=None,
+             apply_node_func=None,
              inplace=False):
         """Pull messages from the node(s)' predecessors and then update their features.
 
@@ -2357,9 +2368,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     def push(self,
              u,
-             message_func="default",
-             reduce_func="default",
-             apply_node_func="default",
+             message_func=None,
+             reduce_func=None,
+             apply_node_func=None,
              inplace=False):
         """Send message from the node(s) to their successors and update them.
 
@@ -2506,9 +2517,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     # TODO should we support this?
     def prop_nodes(self,
                    nodes_generator,
-                   message_func="default",
-                   reduce_func="default",
-                   apply_node_func="default"):
+                   message_func=None,
+                   reduce_func=None,
+                   apply_node_func=None):
         """Node propagation in heterogeneous graph is not supported.
         """
         raise NotImplementedError('not supported')
@@ -2516,9 +2527,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     # TODO should we support this?
     def prop_edges(self,
                    edges_generator,
-                   message_func="default",
-                   reduce_func="default",
-                   apply_node_func="default"):
+                   message_func=None,
+                   reduce_func=None,
+                   apply_node_func=None):
         """Edge propagation in heterogeneous graph is not supported.
         """
         raise NotImplementedError('not supported')
