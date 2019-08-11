@@ -3258,7 +3258,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if is_all(edges):
             eid = ALL
-            u, v, _ = self._graph.edges('eid')
+            u, v, _ = self._graph.edges()
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3403,6 +3403,9 @@ class DGLGraph(DGLBaseGraph):
         """
         local_node_frame = FrameRef(Frame(self._node_frame._frame))
         local_edge_fraem = FrameRef(Frame(self._edge_frame._frame))
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
         sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
         sync_frame_initializer(local_edge_fraem._frame, self._edge_frame._frame)
         return DGLGraph(self._graph,
@@ -3455,6 +3458,9 @@ class DGLGraph(DGLBaseGraph):
         old_eframe = self._edge_frame
         self._node_frame = FrameRef(Frame(self._node_frame._frame))
         self._edge_frame = FrameRef(Frame(self._edge_frame._frame))
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
         sync_frame_initializer(self._node_frame._frame, old_nframe._frame)
         sync_frame_initializer(self._edge_frame._frame, old_eframe._frame)
         yield
