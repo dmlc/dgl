@@ -150,10 +150,16 @@ def test_frame():
     f3 = g['follows'].edata['x']    # ok
     f4 = g['follows'].ndata['h']    # ok - only one node type in follows subgraph
     assert F.array_equal(f2, f3)    # they are shared
-    assert F.array_equal(f1, f4)
+    assert F.array_equal(f1, f4)    # they are also shared
     F.scatter_row_inplace(f3, 0, 0)
+    F.scatter_row_inplace(f4, 0, 0)
     f2 = g['user'].edata['x']
+    f1 = g['user'].ndata['h']
     assert F.array_equal(f2, f3)
+    assert F.array_equal(f1, f4)
+
+    assert F.array_equal(g['follows'].edges[0].data['x'], F.zeros((1, 4)))
+    assert F.array_equal(g['user'].nodes[0].data['h'], F.zeros((1, 6)))
 
 def test_apply():
     def node_udf(nodes):
