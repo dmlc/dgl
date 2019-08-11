@@ -9,7 +9,7 @@ import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
-from .frame import FrameRef, Frame, Scheme
+from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from . import graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -3353,6 +3353,8 @@ class DGLGraph(DGLBaseGraph):
         However, any out-place mutation to the feature data will not reflect to this graph,
         thus making it easier to use in a function scope.
 
+        If set, the local graph object will use same initializers for node features and edge features.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3401,9 +3403,16 @@ class DGLGraph(DGLBaseGraph):
         DGLGraph
             The graph object that can be used as a local variable.
         """
+        local_node_frame = FrameRef(Frame(self._node_frame._frame))
+        local_edge_fraem = FrameRef(Frame(self._edge_frame._frame))
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
+        sync_frame_initializer(local_edge_fraem._frame, self._edge_frame._frame)
         return DGLGraph(self._graph,
-                        FrameRef(Frame(self._node_frame._frame)),
-                        FrameRef(Frame(self._edge_frame._frame)))
+                        local_node_frame,
+                        local_edge_fraem)
 
     @contextmanager
     def local_scope(self):
@@ -3411,6 +3420,8 @@ class DGLGraph(DGLBaseGraph):
 
         By entering a local scope, any out-place mutation to the feature data will
         not reflect to the original graph, thus making it easier to use in a function scope.
+
+        If set, the local scope will use same initializers for node features and edge features.
 
         Examples
         --------
@@ -3451,6 +3462,11 @@ class DGLGraph(DGLBaseGraph):
         old_eframe = self._edge_frame
         self._node_frame = FrameRef(Frame(self._node_frame._frame))
         self._edge_frame = FrameRef(Frame(self._edge_frame._frame))
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        sync_frame_initializer(self._node_frame._frame, old_nframe._frame)
+        sync_frame_initializer(self._edge_frame._frame, old_eframe._frame)
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
