@@ -4,6 +4,7 @@ import dgl.function as fn
 from collections import Counter
 import numpy as np
 import scipy.sparse as ssp
+import itertools
 import backend as F
 
 def create_test_heterograph():
@@ -169,40 +170,46 @@ def test_apply():
     assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 4)
 
 def test_updates():
+    def msg_func(edges):
+        return {'m': edges.src['h']}
+    def reduce_func(nodes):
+        return {'y': F.sum(nodes.mailbox['m'], 1)}
     g = create_test_heterograph()
     x = F.randn((3, 5))
     g['user'].ndata['h'] = x
-    g['plays'].update_all(fn.copy_u('h', 'm'), fn.sum('m', 'y'))
-    y = g['game'].ndata['y']
-    assert F.array_equal(y[0], x[0] + x[1])
-    assert F.array_equal(y[1], x[1] + x[2])
 
-    g['user'].ndata['h'] = x
-    g['plays'].send_and_recv(
-            ([0, 1, 2], [0, 1, 1]),
-            fn.copy_u('h', 'm'),
-            fn.sum('m', 'y2'))
-    y = g['game'].ndata['y2']
-    assert F.array_equal(y[0], x[0])
-    assert F.array_equal(y[1], x[1] + x[2])
+    for msg, red in itertools.product(
+            [fn.copy_u('h', 'm'), msg_func], [fn.sum('m', 'y'), reduce_func]):
+        g['plays'].update_all(msg, red)
+        y = g['game'].ndata['y']
+        assert F.array_equal(y[0], x[0] + x[1])
+        assert F.array_equal(y[1], x[1] + x[2])
+        del g['game'].ndata['y']
 
-    g['plays'].send(
-            ([0, 1, 2], [0, 1, 1]),
-            fn.copy_u('h', 'm'))
-    g['plays'].recv([0, 1], fn.sum('m', 'y3'))
-    y = g['game'].ndata['y3']
-    assert F.array_equal(y[0], x[0])
-    assert F.array_equal(y[1], x[1] + x[2])
+        g['plays'].send_and_recv(([0, 1, 2], [0, 1, 1]), msg, red)
+        y = g['game'].ndata['y']
+        assert F.array_equal(y[0], x[0])
+        assert F.array_equal(y[1], x[1] + x[2])
+        del g['game'].ndata['y']
 
-    # pulls from destination (game) node 0
-    g['plays'].pull(0, fn.copy_u('h', 'm'), fn.sum('m', 'y4'))
-    y = g['game'].ndata['y4']
-    assert F.array_equal(y[0], x[0] + x[1])
+        g['plays'].send(([0, 1, 2], [0, 1, 1]), msg)
+        g['plays'].recv([0, 1], red)
+        y = g['game'].ndata['y']
+        assert F.array_equal(y[0], x[0])
+        assert F.array_equal(y[1], x[1] + x[2])
+        del g['game'].ndata['y']
 
-    # pushes from source (user) node 0
-    g['plays'].push(0, fn.copy_u('h', 'm'), fn.sum('m', 'y5'))
-    y = g['game'].ndata['y5']
-    assert F.array_equal(y[0], x[0])
+        # pulls from destination (game) node 0
+        g['plays'].pull(0, msg, red)
+        y = g['game'].ndata['y']
+        assert F.array_equal(y[0], x[0] + x[1])
+        del g['game'].ndata['y']
+
+        # pushes from source (user) node 0
+        g['plays'].push(0, msg, red)
+        y = g['game'].ndata['y']
+        assert F.array_equal(y[0], x[0])
+        del g['game'].ndata['y']
 
 if __name__ == '__main__':
     test_query()
