@@ -3258,7 +3258,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if is_all(edges):
             eid = ALL
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3401,13 +3401,9 @@ class DGLGraph(DGLBaseGraph):
         DGLGraph
             The graph object that can be used as a local variable.
         """
-        local_node_frame = FrameRef(Frame(self._node_frame._frame))
-        local_edge_fraem = FrameRef(Frame(self._edge_frame._frame))
-        sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
-        sync_frame_initializer(local_edge_fraem._frame, self._edge_frame._frame)
         return DGLGraph(self._graph,
-                        local_node_frame,
-                        local_edge_fraem)
+                        FrameRef(Frame(self._node_frame._frame)),
+                        FrameRef(Frame(self._edge_frame._frame)))
 
     @contextmanager
     def local_scope(self):
@@ -3455,24 +3451,6 @@ class DGLGraph(DGLBaseGraph):
         old_eframe = self._edge_frame
         self._node_frame = FrameRef(Frame(self._node_frame._frame))
         self._edge_frame = FrameRef(Frame(self._edge_frame._frame))
-        sync_frame_initializer(self._node_frame._frame, old_nframe._frame)
-        sync_frame_initializer(self._edge_frame._frame, old_eframe._frame)
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
-
-def sync_frame_initializer(new_frame, reference_frame):
-    """Set the initializers of the new_frame to be the same as the reference_frame.
-
-    Parameters
-    ----------
-    new_frame : Frame
-        The frame to set initializers
-    reference_frame : Frame
-        The frame to copy initializers
-    """
-    new_frame._default_initializer = reference_frame._default_initializer
-    # set per-col initializer
-    # TODO(minjie): hack; cannot rely on keys as the _initializers
-    #   now supports non-exist columns.
-    new_frame._initializers = reference_frame._initializers
