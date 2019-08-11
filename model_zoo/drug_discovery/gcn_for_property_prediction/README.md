@@ -109,6 +109,8 @@ Other options include:
 Note that due to some possible randomness you may get different numbers for DeepChem example and our model. To get
 match exact results for this model, please use the pre-trained model as in the usage section.
 
+The training takes less than a minute.
+
 ## Next Steps
 
 In this model, we used a pre-built graph convolution layer. If you want to develop your own graph neural networks and 
