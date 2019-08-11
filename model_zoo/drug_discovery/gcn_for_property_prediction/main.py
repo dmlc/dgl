@@ -236,7 +236,7 @@ def train(args, dataset, model):
     model
     """
     train_loader = DataLoader(dataset.train_set, batch_size=args['batch_size'],
-                              collate_fn=collate)
+                              collate_fn=collate, num_workers=args['num_workers'])
     val_loader = DataLoader(dataset.val_set, batch_size=len(dataset.val_set),
                             collate_fn=collate)
 
@@ -281,6 +281,8 @@ if __name__ == '__main__':
                         help='Whether to use cuda')
     parser.add_argument('-s', '--seed', type=int, default=0,
                         help='Random seed to use')
+    parser.add_argument('-nw', '--num-workers', type=int, default=0,
+                        help='Number of workers for training data loader')
     parser.add_argument('-ne', '--num-epochs', type=int, default=10,
                         help='Number of epochs for training')
     parser.add_argument('-b', '--batch-size', type=int, default=32,
