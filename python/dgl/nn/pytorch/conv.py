@@ -3,6 +3,7 @@
 import torch as th
 from torch import nn
 from torch.nn import init
+import torch.nn.functional as F
 
 from ... import function as fn
 from .softmax import edge_softmax
@@ -228,31 +229,117 @@ class GraphAttention(nn.Module):
 
         return rst
 
-
-class GraphSAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 dropout,
-                 aggregator_type,
-                 bn=False,
-                 bias=True,
-                 activation=None):
-        super(GraphSAGE, self).__init__()
-
-        # aggregator type: mean/max/lstm
-        if aggregator_type == 'mean':
-            pass
-        elif aggregator_type == 'max':
-            pass
-        else: # lstm
-            pass
-
-    def forward(self, feat, graph):
+    def extra_repr(self):
         pass
 
 
+class GraphSAGE(nn.Module):
+    r"""Apply GraphSAGE layer over an input signal.
 
+    TODO(zihao): docstring
+    """
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 feat_drop,
+                 aggregator_type,
+                 bias=False,
+                 norm=None,
+                 activation=None):
+        super(GraphSAGE, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._aggre_type = aggregator_type
+        self._norm = norm
+        self.feat_drop = nn.Dropout(feat_drop)
+        self.activation = activation
+        # aggregator type: mean/pool/lstm/gcn
+        if aggregator_type == 'pool':
+            self.fc_pool = nn.Linear(in_feats, in_feats)
+        else: # lstm
+            self.lstm = nn.LSTM(in_feats, in_feats, batch_first=True)
 
+        if aggregator_type != 'gcn':
+            self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
+        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
+        self._reset_parameters()
 
+    def _reset_parameters(self):
+        gain = nn.init.calculate_gain('relu')
+        if self._aggre_type == 'pool':
+            nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
+        else: # lstm
+            pass
 
+        if self._aggre_type != 'gcn':
+            nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
+        nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
+
+    def _lstm_reducer(self, nodes):
+        # TODO(zihao): this implementation is slow.
+        input = nodes.mailbox['m'] # (B, L, D)
+        batch_size = input.shape[0]
+        h = (input.new_zeros((1, batch_size, self._in_feats)),
+             input.new_zeros((1, batch_size, self._in_feats)))
+        _, (rst, _) = self.lstm(input, h)
+        return {'neigh': rst.squeeze(0)}
+
+    def forward(self, feat, graph):
+        r"""Compute the output of a GraphSAGE layer.
+
+        TODO(zihao): docstring
+        """
+        graph = graph.local_var()
+        feat = self.feat_drop(feat)
+        h_self = feat
+        if self._aggre_type == 'mean':
+            graph.ndata['h'] = feat
+            graph.update_all(
+                fn.copy_src('h', 'm'),
+                fn.sum('m', 'neigh')
+            )
+            # divide in_degrees
+            degs = graph.in_degrees().float()
+            degs = degs.to(feat.device)
+            eps = 1e-8
+            h_neigh = (graph.ndata['neigh'] + eps) / (degs.unsqueeze(-1) + eps)
+        elif self._aggre_type == 'gcn':
+            graph.ndata['h'] = feat
+            graph.update_all(
+                fn.copy_src('h', 'm'),
+                fn.sum('m', 'neigh')
+            )
+            # divide in_degrees
+            degs = graph.in_degrees().float()
+            degs = degs.to(feat.device)
+            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']) / (degs.unsqueeze(-1) + 1)
+        elif self._aggre_type == 'pool':
+            graph.ndata['h'] = F.relu(self.fc_pool(feat))
+            graph.update_all(
+                fn.copy_src('h', 'm'),
+                fn.max('m', 'neigh')
+            )
+            h_neigh = graph.ndata['neigh']
+        else: # lstm:
+            graph.ndata['h'] = feat
+            graph.update_all(
+                fn.copy_src('h', 'm'),
+                self._lstm_reducer,
+            )
+            h_neigh = graph.ndata['neigh']
+
+        if self._aggre_type == 'gcn':
+            rst = self.fc_neigh(h_neigh)
+        else:
+            rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+
+        if self.activation is not None:
+            rst = self.activation(rst)
+
+        if self._norm is not None:
+            rst = self._norm(rst)
+
+        return rst
+
+    def extra_repr(self):
+        pass
