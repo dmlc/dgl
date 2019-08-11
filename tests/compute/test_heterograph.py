@@ -63,6 +63,7 @@ def test_query():
 
     # number of nodes
     assert [g[ntype].number_of_nodes() for ntype in ntypes] == [3, 2, 2]
+    assert [g[etype].number_of_nodes() for etype in etypes] == [3, 5, 5, 4]
 
     # number of edges
     assert [g[etype].number_of_edges() for etype in etypes] == [2, 4, 2, 2]

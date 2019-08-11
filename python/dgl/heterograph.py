@@ -23,7 +23,7 @@ class DGLBaseHeteroGraph(object):
         The node type names
     etypes : list[str]
         The edge type names
-    _ntypes_invmap, _etypes_invmap, _view_etype_idx :
+    _ntypes_invmap, _etypes_invmap, _view_ntype_idx, _view_etype_idx :
         Internal arguments
     """
 
@@ -254,12 +254,14 @@ class DGLBaseHeteroGraph(object):
 
         Examples
         --------
-
-        >>> g.number_of_nodes('user')
+        >>> g['user'].number_of_nodes()
         3
+        >>> g['plays'].number_of_nodes()
+        5
+        >>> g.number_of_nodes()
+        7
         """
-        # TODO: relax to multiple types
-        return self._graph.number_of_nodes(self._current_ntype_idx)
+        return sum(self._graph.number_of_nodes(ntype) for ntype in self._node_types())
 
     def _number_of_src_nodes(self):
         return self._graph.number_of_nodes(self._current_srctype_idx)
@@ -287,9 +289,17 @@ class DGLBaseHeteroGraph(object):
         -------
         int
             The number of edges
+
+        Examples
+        --------
+        >>> g['plays'].number_of_edges()
+        4
+        >>> g['user'].number_of_edges()
+        2
+        >>> g.number_of_edges()
+        8
         """
-        # TODO: relax to multiple types
-        return self._graph.number_of_edges(self._current_etype_idx)
+        return sum(self._graph.number_of_edges(etype) for etype in self._edge_types())
 
     def has_node(self, vid):
         """Return True if the graph contains node `vid` of type `ntype`.
@@ -308,9 +318,9 @@ class DGLBaseHeteroGraph(object):
 
         Examples
         --------
-        >>> g.has_node('user', 0)
+        >>> g['user'].has_node(0)
         True
-        >>> g.has_node('user', 4)
+        >>> g['user'].has_node(4)
         False
 
         See Also
@@ -329,7 +339,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g.has_nodes(ntype, vids)
+           g['nodetype'].has_nodes(vids)
 
         Parameters
         ----------
@@ -345,7 +355,7 @@ class DGLBaseHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g.has_nodes('user', [0, 1, 2, 3, 4])
+        >>> g['user'].has_nodes([0, 1, 2, 3, 4])
         tensor([1, 1, 1, 0, 0])
 
         See Also
