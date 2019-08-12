@@ -25,37 +25,61 @@ namespace network {
 const int64_t kQueueSize = 200 * 1024 * 1024;
 
 /*!
+ * \brief Create NDArray from raw data
+ */
+NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
+                             DLDataType dtype,
+                             DLContext ctx,
+                             void* raw);
+
+/*!
  * \brief Message type for DGL distributed training
  */
 enum MessageType {
- /*!
-  * \brief Message for send/recv NodeFlow
-  */
+  /*!
+   * \brief Message for send/recv NodeFlow
+   */
   kNodeFlowMsg = 0,
- /*!
-  * \brief Message for end-signal
-  */
-  kEndMsg = 1
+  /*!
+   * \brief Message for end-signal
+   */
+  kEndMsg = 1,
+  /*!
+   * \brief Initialize KVServer
+   */
+  kInitMsg = 2,
+  /*!
+   * \brief Push msg to KVServer
+   */
+  kPushMsg = 3,
+  /*!
+   * \brief Pull msg from KVServer
+   */
+  kPullMsg = 4,
+  /*!
+   * \brief PullBack msg from KVServer
+   */
+  kPullBackMsg = 5
 };
 
 /*!
- * \brief Meta data for communicator message
+ * \brief Meta data for NDArray message
  */
-class MsgMeta {
+class ArrayMeta {
  public:
   /*!
-   * \brief MsgMeta constructor.
+   * \brief ArrayMeta constructor.
    * \param msg_type type of message
    */
-  explicit MsgMeta(int msg_type)
+  explicit ArrayMeta(int msg_type)
   : msg_type_(msg_type), ndarray_count_(0) {}
 
   /*!
-   * \brief Construct MsgMeta from binary data buffer.
+   * \brief Construct ArrayMeta from binary data buffer.
    * \param buffer data buffer
    * \param size data size
    */
-  MsgMeta(char* buffer, int64_t size) {
+  ArrayMeta(char* buffer, int64_t size) {
     CHECK_NOTNULL(buffer);
     this->Deserialize(buffer, size);
   }
@@ -75,20 +99,20 @@ class MsgMeta {
   }
 
   /*!
-   * \brief Add NDArray meta data to MsgMeta
+   * \brief Add NDArray meta data to ArrayMeta
    * \param array DGL NDArray
    */
   void AddArray(const NDArray& array);
 
   /*!
-   * \brief Serialize MsgMeta to data buffer
+   * \brief Serialize ArrayMeta to data buffer
    * \param size size of serialized message
    * \return pointer of data buffer
    */
   char* Serialize(int64_t* size);
 
   /*!
-   * \brief Deserialize MsgMeta from data buffer
+   * \brief Deserialize ArrayMeta from data buffer
    * \param buffer data buffer
    * \param size size of data buffer
    */
@@ -111,6 +135,61 @@ class MsgMeta {
   std::vector<int64_t> data_shape_;
 };
 
+/*!
+ * \brief C structure for holding DGL KVServer message
+ */
+class KVStoreMsg {
+ public:
+  /*!
+   * \brief KVStoreMsg constructor.
+   */
+  KVStoreMsg() {}
+
+  /*!
+   * \brief Construct KVStoreMsg from binary data buffer.
+   * \param buffer data buffer
+   * \param size data size
+   */
+  KVStoreMsg(char* buffer, int64_t size) {
+    CHECK_NOTNULL(buffer);
+    this->Deserialize(buffer, size);
+  }
+  /*!
+   * \brief Serialize KVStoreMsg to data buffer
+   *  Note that we don't serialize ID and data here. 
+   * \param size size of serialized message
+   * \return pointer of data buffer
+   */
+  char* Serialize(int64_t* size);
+
+  /*!
+   * \brief Deserialize KVStoreMsg from data buffer
+   * \param buffer data buffer
+   * \param size size of data buffer
+   */
+  void Deserialize(char* buffer, int64_t size);
+
+ /*!
+  * \brief Message type of kvstore
+  */
+  int msg_type;
+ /*!
+  * \brief Sender's ID
+  */
+  int rank;
+ /*!
+  * \brief data name
+  */
+  std::string name;
+ /*!
+  * \brief data ID
+  */
+  NDArray id;
+ /*!
+  * \brief data matrix
+  */
+  NDArray data;
+};
 
 }  // namespace network
 }  // namespace dgl

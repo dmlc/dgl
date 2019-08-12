@@ -179,6 +179,9 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return th.reshape(input ,shape)
 
+def uniform(shape, dtype, ctx, low, high):
+    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
+
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 

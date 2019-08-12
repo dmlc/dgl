@@ -219,6 +219,9 @@ def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
 
+def uniform(shape, dtype, ctx, low, high):
+    return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
 
