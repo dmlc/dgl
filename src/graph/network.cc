@@ -36,7 +36,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   for (int i = 0; i < tensor.ndim; ++i) {
     tensor.shape[i] = shape[i];
   }
-  tensor.strides = new int64_t[tensor.ndim]; 
+  tensor.strides = new int64_t[tensor.ndim];
   for (int i = 0; i < tensor.ndim; ++i) {
     tensor.strides[i] = 1;
   }
@@ -522,7 +522,7 @@ DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
     CHECK_EQ(meta.data_shape_[0], 1);
     kv_msg->id = CreateNDArrayFromRaw(
       {meta.data_shape_[1]},
-      DLDataType{kDLInt, 64, 1}, 
+      DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0},
       recv_id_msg.data);
     // Recv Data NDArray

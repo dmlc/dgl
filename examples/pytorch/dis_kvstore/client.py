@@ -18,7 +18,7 @@ def start_client(args):
 
     client.connect()
 
-    client.init_data('embed', [10, 3], 0.0, 0.0)
+    client.init_data(name='embed', shape=[10, 3], low=0.0, high=0.0)
 
     #time.sleep(100)
 

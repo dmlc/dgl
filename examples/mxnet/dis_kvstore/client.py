@@ -18,7 +18,7 @@ def start_client(args):
 
     client.connect()
 
-    client.init_data('embed', [10, 3], 0.0, 0.0)
+    client.init_data(name='embed', shape=[10, 3], low=0.0, high=0.0)
 
     tensor_id = mx.nd.array([0, 1, 2], dtype='int64')
     tensor_data = mx.nd.array([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
