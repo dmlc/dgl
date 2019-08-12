@@ -343,3 +343,32 @@ class GraphSAGE(nn.Module):
 
     def extra_repr(self):
         pass
+
+
+class GatedGraphConv(nn.Module):
+    def __init__(self):
+        super(GatedGraphConv, self).__init__()
+
+    def forward(self, feat, graph):
+        pass
+
+
+class ChebyNet(nn.Module):
+    def __init__(self):
+        super(ChebyNet, self).__init__()
+
+    def forward(self, feat, graph):
+        pass
+
+
+class SimplifyingGraphConv(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 k=1,
+                 bias=False):
+        super(SimplifyingGraphConv, self).__init__()
+
+    def forward(self, feat, graph):
+        pass
+
