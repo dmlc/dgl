@@ -158,7 +158,7 @@ if __name__ == '__main__':
                         help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
-    parser.add_argument("--aggregator-type", type=str, default="mean",
+    parser.add_argument("--aggregator-type", type=str, default="gcn",
                         help="Aggregator type: mean/gcn/pool/lstm")
     args = parser.parse_args()
     print(args)

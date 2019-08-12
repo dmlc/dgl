@@ -4,6 +4,7 @@ Simplifying Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1902.07153
 Code: https://github.com/Tiiiger/SGC
 SGC implementation in DGL.
+# TODO(zihao): change this code to use dgl.nn.*.conv
 """
 import argparse, time, math
 import numpy as np

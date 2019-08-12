@@ -294,15 +294,19 @@ class GraphSAGE(nn.Module):
         h_self = feat
         if self._aggre_type == 'mean':
             graph.ndata['h'] = feat
-            graph.update_all(
-                fn.copy_src('h', 'm'),
-                fn.sum('m', 'neigh')
-            )
-            # divide in_degrees
             degs = graph.in_degrees().float()
             degs = degs.to(feat.device)
             eps = 1e-8
-            h_neigh = (graph.ndata['neigh'] + eps) / (degs.unsqueeze(-1) + eps)
+            graph.ndata['deg'] = degs.unsqueeze(-1)
+            graph.update_all(
+                fn.copy_src('h', 'm'),
+                fn.sum('m', 'neigh'),
+                lambda nodes: {
+                    'neigh': (nodes.data['neigh'] + eps) / (nodes.data['deg'] + eps)
+                }
+            )
+            # divide in_degrees
+            h_neigh = graph.ndata['neigh']
         elif self._aggre_type == 'gcn':
             graph.ndata['h'] = feat
             graph.update_all(
@@ -353,6 +357,54 @@ class GatedGraphConv(nn.Module):
         pass
 
 
+class GINConv(nn.Module):
+    def __init__(self,
+                 nn,
+                 aggregator_type,
+                 eps=0,
+                 learn_eps=False):
+        super(GINConv, self).__init__()
+        self.nn = nn
+        self._aggre_type = aggregator_type
+        if learn_eps:
+            self.eps = th.nn.Parameter(th.FloatTensor([eps]))
+        else:
+            self.register_buffer('eps', th.FloatTensor([eps]))
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        pass # TODO
+
+    def forward(self, feat, graph):
+        graph = graph.local_var()
+        graph.ndata['h'] = feat
+        if self._aggre_type == 'sum':
+            reducer = fn.sum('m', 'neigh')
+            apply_func = 'default'
+        elif self._aggre_type == 'max':
+            reducer = fn.max('m', 'neigh')
+            apply_func = 'default'
+        elif self._aggre_type == 'mean':
+            reducer = fn.sum('m', 'neigh')
+            degs = graph.in_degrees().float()
+            degs = degs.to(feat.device)
+            eps = 1e-8
+            graph.ndata['deg'] = degs.unsqueeze(-1)
+            apply_func = lambda nodes: {
+                'neigh': (nodes.data['neigh'] + eps) / (nodes.data['deg'] + eps)
+            }
+
+        graph.update_all(fn.copy_u('h', 'm'),
+                         reducer,
+                         apply_func)
+
+        rst = self.nn((1 + self.eps) * feat + graph.ndata['neigh'])
+
+        return rst
+
+
+
 class ChebyNet(nn.Module):
     def __init__(self):
         super(ChebyNet, self).__init__()
@@ -361,14 +413,47 @@ class ChebyNet(nn.Module):
         pass
 
 
-class SimplifyingGraphConv(nn.Module):
+class SGConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
                  k=1,
+                 cached=False,
                  bias=False):
-        super(SimplifyingGraphConv, self).__init__()
+        super(SGConv, self).__init__()
+        self.fc = nn.Linear(in_feats, out_feats, bias=bias)
+        self._cached = cached
+        self._cached_h = None
+        self.k = k
 
     def forward(self, feat, graph):
-        pass
+        graph = graph.local_var()
+        if self._cached_h is not None:
+            feat = self._cached_h
+        else:
+            # compute normalization
+            degs = graph.in_degrees().float()
+            norm = th.pow(degs, -0.5)
+            norm[th.isinf(norm)] = 0
+            norm = norm.to(feat.device).unsqueeze(1)
+            # compute (D^-1 A D) X
+            for _ in range(self.k):
+                feat = feat * norm
+                graph.ndata['h'] = feat
+                graph.update_all(fn.copy_u('h', 'm'),
+                                 fn.sum('m', 'h'))
+                feat = graph.ndata.pop('h')
+                feat = feat * norm
+
+            if self._cached:
+                self._cached_h = feat
+
+        return self.fc(feat)
+
+
+
+
+
+
+
 
