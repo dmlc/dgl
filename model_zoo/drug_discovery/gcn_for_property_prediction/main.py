@@ -38,27 +38,23 @@ def setup(args):
         torch.cuda.manual_seed(args['seed'])
     return args
 
-def save_checkpoint(model, optimizer, checkpoint_path):
-    """Save the state dicts of the model and optimizer
-    in a dictionary.
+def save_checkpoint(model, checkpoint_path):
+    """Save the state dicts of the model in a dictionary.
 
     Parameters
     ----------
     model
         Model to save
-    optimizer
-        Optimizer to save
     checkpoint_path : str
         Path to save checkpoint
     """
     torch.save({
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict()
     }, checkpoint_path)
     print('checkpoint saved')
 
-def load_checkpoint(model, checkpoint_path, load_optimizer, optimizer=None):
-    """Load checkpoint for model (and optimizer).
+def load_checkpoint(model, checkpoint_path):
+    """Load checkpoint for model.
 
     Parameters
     ----------
@@ -66,16 +62,9 @@ def load_checkpoint(model, checkpoint_path, load_optimizer, optimizer=None):
         Model to load checkpoint
     checkpoint_path : str
         Path to saved checkpoint
-    load_optimizer : bool
-        Whether to load checkpoint for the optimizer
-    optimizer
-        Default to be None. If load_optimizer, this must be the
-        optimizer to load checkpoint.
     """
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'])
-    if load_optimizer:
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
 def load_pretrained_model(model):
     """Download a checkpoint and load a pre-trained model."""
@@ -83,7 +72,7 @@ def load_pretrained_model(model):
     url_to_pretrained = _get_dgl_url('pre_trained/gcn_tox21.pth')
     local_pretrained_path = 'pre_trained.pth'
     download(url_to_pretrained, path=local_pretrained_path)
-    load_checkpoint(model, local_pretrained_path, load_optimizer=False)
+    load_checkpoint(model, local_pretrained_path)
 
 def roc_auc_averaged_over_tasks(w, y_pred, y_true):
     """Compute roc-auc scores and average them over tasks.
@@ -251,11 +240,11 @@ def train(args, dataset, model):
                                       val_loader, dataset.atom_data_field)
         if val_score > best_val_score:
             best_val_score = val_score
-            save_checkpoint(model, optimizer, args['checkpoint_path'])
+            save_checkpoint(model, args['checkpoint_path'])
         print('epoch {:d}/{:d}, validation roc-auc score {:.4f}, best validation roc-auc score {:.4f}'.format(
             epoch + 1, args['num_epochs'], val_score, best_val_score))
 
-    load_checkpoint(model, args['checkpoint_path'], load_optimizer=False, optimizer=None)
+    load_checkpoint(model, args['checkpoint_path'])
 
 def test(args, dataset, model):
     """Evaluate the model on the test set.
