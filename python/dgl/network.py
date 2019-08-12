@@ -1,16 +1,15 @@
 """DGL Distributed Training Infrastructure."""
 from __future__ import absolute_import
 
-from ._ffi.function import _init_api
-from .nodeflow import NodeFlow
-from . import utils
-
-import dgl.backend as F
-
 import time
 import signal
 from enum import Enum
 from collections import namedtuple
+
+import dgl.backend as F
+from ._ffi.function import _init_api
+from .nodeflow import NodeFlow
+from . import utils
 
 _init_api("dgl.network")
 
@@ -19,13 +18,13 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
-def keyboardInterruptHandler(signal, frame):
+def keyboard_interrupt_handler(my_signal):
     """Users can use [Ctl + C] to exit loop service
     """
-    print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up DGL ...".format(signal))
+    print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up DGL ...".format(my_signal))
     exit(0)
 
-signal.signal(signal.SIGINT, keyboardInterruptHandler)
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 def _network_wait():
     """Sleep for a few seconds
@@ -181,6 +180,8 @@ def _recv_nodeflow(receiver, graph):
 
 
 class KVMsgType(Enum):
+    """Type of kvstore message
+    """
     FINAL = 1
     INIT = 2
     PUSH = 3
@@ -217,14 +218,14 @@ def _send_kv_msg(sender, msg, recv_id):
         receiver's ID
     """
     if msg.type == KVMsgType.PULL:
-        ID = F.zerocopy_to_dgl_ndarray(msg.id)
+        tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
         _CAPI_SenderSendKVMsg(
             sender,
             int(recv_id),
             msg.type.value,
             msg.rank,
             msg.name,
-            ID)
+            tensor_id)
     elif msg.type == KVMsgType.FINAL:
         _CAPI_SenderSendKVMsg(
             sender,
@@ -232,7 +233,7 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.type.value,
             msg.rank)
     else:
-        ID = F.zerocopy_to_dgl_ndarray(msg.id)
+        tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
         data = F.zerocopy_to_dgl_ndarray(msg.data)
         _CAPI_SenderSendKVMsg(
             sender,
@@ -240,7 +241,7 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.type.value,
             msg.rank,
             msg.name,
-            ID,
+            tensor_id,
             data)
 
 def _recv_kv_msg(receiver):
@@ -261,12 +262,12 @@ def _recv_kv_msg(receiver):
     rank = _CAPI_ReceiverGetKVMsgRank(msg_ptr)
     if msg_type == KVMsgType.PULL:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
-        ID = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
         msg = KVStoreMsg(
             type=msg_type,
             rank=rank,
             name=name,
-            id=ID,
+            id=tensor_id,
             data=None)
         return msg
     elif msg_type == KVMsgType.FINAL:
@@ -279,16 +280,14 @@ def _recv_kv_msg(receiver):
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
-        id = _CAPI_ReceiverGetKVMsgID(msg_ptr)
-        ID = F.zerocopy_from_dgl_ndarray(id)
-        data = _CAPI_ReceiverGetKVMsgData(msg_ptr)
-        Data = F.zerocopy_from_dgl_ndarray(data)
+        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        data = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgData(msg_ptr))
         msg = KVStoreMsg(
             type=msg_type,
             rank=rank,
             name=name,
-            id=ID,
-            data=Data)
+            id=tensor_id,
+            data=data)
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
