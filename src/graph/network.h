@@ -11,6 +11,7 @@
 
 #include <string.h>
 #include <vector>
+#include <string>
 
 #include "../c_api_common.h"
 #include "./network/msg_queue.h"
