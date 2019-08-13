@@ -15,6 +15,7 @@ Utils
     utils.download
     utils.check_sha1
     utils.extract_archive
+    utils.Subset
 
 Dataset Classes
 ---------------
@@ -61,10 +62,14 @@ Protein-Protein Interaction dataset
 Molecular Graphs
 ````````````````
 
-To work on molecular graphs, make sure you have installed `RDKit <https://www.rdkit.org/docs/Install.html>`__.
+To work on molecular graphs, make sure you have installed `RDKit 2018.09.3 <https://www.rdkit.org/docs/Install.html>`__.
 
-.. autofunction:: dgl.data.molecule.default_atom_featurizer
+.. autofunction:: dgl.data.molecule.one_hot_encoding
+.. autoclass:: dgl.data.molecule.BaseAtomFeaturizer
+.. autoclass:: BaseAtomFeaturizer.DefaultAtomFeaturizer
+    :members: feat_size, __call__
 .. autofunction:: dgl.data.molecule.mol2dgl
-
+.. autofunction:: dgl.data.molecule.consecutive_split
+.. autoclass:: BinaryClassificationDataset
 .. autoclass:: Tox21
-    :members: num_datapoints, num_tasks, feat_size
+    :members: __len__, __getitem__, num_tasks, task_pos_weights

@@ -13,7 +13,7 @@ except ImportError:
         pass
     requests = requests_failed_to_import
 
-__all__ = ['download', 'check_sha1', 'extract_archive', 'get_download_dir']
+__all__ = ['download', 'check_sha1', 'extract_archive', 'get_download_dir', 'Subset']
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
@@ -163,3 +163,39 @@ def get_download_dir():
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname
+
+class Subset(object):
+    """Subset of a dataset at specified indices
+
+    Code adapted from PyTorch.
+
+    Parameters
+    ----------
+    dataset
+        dataset[i] should return the ith datapoint
+    indices : list
+        List of datapoint indices to construct the subset
+    """
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __getitem__(self, item):
+        """Get the datapoint indexed by item
+
+        Returns
+        -------
+        tuple
+            datapoint
+        """
+        return self.dataset[self.indices[item]]
+
+    def __len__(self):
+        """Get subset size
+
+        Returns
+        -------
+        int
+            Number of datapoints in the subset
+        """
+        return len(self.indices)

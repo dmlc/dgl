@@ -7,7 +7,7 @@ from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from dgl.data import Tox21
+from dgl.data import Tox21, DefaultAtomFeaturizer
 from dgl.data.utils import download, _get_dgl_url
 from model import GCNClassifier
 
@@ -132,7 +132,7 @@ def run_a_train_epoch(device, num_epochs, epoch, model, loss_criterion,
     y_pred = []
     y_true = []
     for batch_id, batch_data in enumerate(data_loader):
-        bg, labels, weights = batch_data
+        smiles, bg, labels, weights = batch_data
         atom_feats = bg.ndata.pop(atom_data_field)
         atom_feats, labels = atom_feats.to(device), labels.to(device)
         logits = model(atom_feats, bg)
@@ -175,7 +175,7 @@ def run_an_eval_epoch(device, model, metric_criterion, data_loader, atom_data_fi
     y_true = []
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
-            bg, labels, weights = batch_data
+            smiles, bg, labels, weights = batch_data
             atom_feats = bg.ndata.pop(atom_data_field)
             atom_feats, labels = atom_feats.to(device), labels.to(device)
             logits = model(atom_feats, bg)
@@ -198,6 +198,8 @@ def collate(data):
 
     Returns
     -------
+    smiles : list
+        List of smiles
     bg : BatchedDGLGraph
         Batched DGLGraphs
     labels : Tensor of dtype float32 and shape (B, 12)
@@ -206,13 +208,13 @@ def collate(data):
     weights : Tensor of dtype float32 and shape (B, 12)
         Batched datapoint weights.
     """
-    graphs, labels, weights = map(list, zip(*data))
+    smiles, graphs, labels, weights = map(list, zip(*data))
     bg = dgl.batch(graphs)
     bg.set_n_initializer(dgl.init.zero_initializer)
     bg.set_e_initializer(dgl.init.zero_initializer)
     labels = torch.stack(labels, dim=0)
     weights = torch.stack(weights, dim=0)
-    return bg, labels, weights
+    return smiles, bg, labels, weights
 
 def train(args, dataset, model):
     """Train a model and save the one that performs the best on the validation set.
@@ -235,9 +237,9 @@ def train(args, dataset, model):
 
     for epoch in range(args['num_epochs']):
         run_a_train_epoch(args['device'], args['num_epochs'], epoch, model, criterion,
-                          roc_auc_averaged_over_tasks, optimizer, train_loader, dataset.atom_data_field)
+                          roc_auc_averaged_over_tasks, optimizer, train_loader, args['atom_data_field'])
         val_score = run_an_eval_epoch(args['device'], model, roc_auc_averaged_over_tasks,
-                                      val_loader, dataset.atom_data_field)
+                                      val_loader, args['atom_data_field'])
         if val_score > best_val_score:
             best_val_score = val_score
             save_checkpoint(model, args['checkpoint_path'])
@@ -260,7 +262,7 @@ def test(args, dataset, model):
                              collate_fn=collate)
     # Evaluation on the test set
     test_score = run_an_eval_epoch(args['device'], model, roc_auc_averaged_over_tasks,
-                                   test_loader, dataset.atom_data_field)
+                                   test_loader, args['atom_data_field'])
     print('test roc-auc score {:.4f}'.format(test_score))
 
 if __name__ == '__main__':
@@ -286,9 +288,11 @@ if __name__ == '__main__':
     args = setup(args)
 
     # Load dataset
-    dataset = Tox21()
+    atom_featurizer = DefaultAtomFeaturizer()
+    args['atom_data_field'] = atom_featurizer.atom_data_field
+    dataset = Tox21(atom_featurizer=atom_featurizer)
     # Initialize model
-    model = GCNClassifier(in_feats=dataset.feat_size,
+    model = GCNClassifier(in_feats=atom_featurizer.feat_size,
                           gcn_hidden_feats=[64, 64],
                           n_tasks=dataset.num_tasks,
                           classifier_hidden_feats=64,
