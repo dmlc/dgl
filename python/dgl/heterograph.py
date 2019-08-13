@@ -1,6 +1,6 @@
 """Classes for heterogeneous graphs."""
-import networkx as nx
 from collections import defaultdict
+import networkx as nx
 import scipy.sparse as ssp
 from . import heterograph_index, graph_index
 from . import utils
@@ -1146,8 +1146,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         if isinstance(graph_data, tuple):
             metagraph, edges_by_type = graph_data
             if not isinstance(metagraph, nx.MultiDiGraph):
-                raise TypeError(
-                        'Metagraph should be networkx.MultiDiGraph')
+                raise TypeError('Metagraph should be networkx.MultiDiGraph')
 
             # create metagraph graph index
             srctypes, dsttypes, etypes = [], [], []
@@ -1197,7 +1196,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 elif isinstance(edges, list):
                     u, v = zip(*edges)
                     bipartite = bipartite_from_edge_list(
-                            u, v, num_nodes[srctype], num_nodes[dsttype])
+                        u, v, num_nodes[srctype], num_nodes[dsttype])
                 bipartites.append(bipartite)
 
             hg_index = heterograph_index.create_heterograph(metagraph_index, bipartites)
