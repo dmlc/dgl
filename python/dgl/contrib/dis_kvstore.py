@@ -41,13 +41,11 @@ class KVServer(object):
         assert server_id >= 0, 'server_id cannot be a negative number.'
         assert len(client_namebook) > 0, 'client_namebook cannot be empty.'
         assert len(server_addr.split(':')) == 2, 'Incorrect IP format.'
-        self._is_init = {}  # Key is client id and value is bool
+        self._is_init = set()  # Contains tensor name
         self._data_store = {}  # Key is name string and value is tensor
         self._server_id = server_id
         self._client_namebook = client_namebook
         self._client_count = len(client_namebook)
-        for i in range(self._client_count):
-            self._is_init[i] = False;
         self._addr = server_addr
         self._sender = _create_sender(net_type)
         self._receiver = _create_receiver(net_type)
@@ -72,7 +70,7 @@ class KVServer(object):
         while True:
             msg = _recv_kv_msg(self._receiver)
             if msg.type == KVMsgType.INIT:
-                if self._is_init[msg.rank] == False:
+                if (msg.name in self._is_init) == False:
                     # we hack the msg format here
                     data_shape = F.asnumpy(msg.id).tolist();
                     low_high = (F.asnumpy(msg.data).tolist())[0]
@@ -80,7 +78,7 @@ class KVServer(object):
                         shape=data_shape,
                         low=low_high[0],
                         high=low_high[1])
-                    self._is_init[msg.rank] = True
+                    self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
                 # convert global ID to local ID
                 local_id = self._remap_id(msg.name, msg.id)
