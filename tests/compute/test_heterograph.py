@@ -6,22 +6,24 @@ import numpy as np
 import scipy.sparse as ssp
 import itertools
 import backend as F
+import networkx as nx
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
-    follows = dgl.bipartite_from_edge_list(
-        'user', 'user', 'follows', [0, 1], [1, 2], 3, 3)
+    mg = nx.MultiDiGraph([
+        ('user', 'user', 'follows'),
+        ('user', 'game', 'plays'),
+        ('user', 'game', 'wishes'),
+        ('developer', 'game', 'develops')])
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    plays = dgl.bipartite_from_scipy('user', 'game', 'plays', plays_spmat)
+    g = dgl.DGLHeteroGraph((mg, {
+        'follows': [(0, 1), (1, 2)],
+        'plays': plays_spmat,
+        'wishes': [(0, 1), (2, 0)],
+        'develops': [(0, 0), (1, 1)],
+        }))
 
-    wishes_spmat = ssp.coo_matrix(([1, 0], ([2, 0], [0, 1])))
-    wishes = dgl.bipartite_from_scipy('user', 'game', 'wishes', wishes_spmat, True)
-
-    develops = dgl.bipartite_from_edge_list(
-        'developer', 'game', 'develops', [0, 1], [0, 1], 2, 2)
-
-    g = dgl.DGLHeteroGraph([follows, plays, wishes, develops])
     return g
 
 def test_query():
@@ -50,7 +52,7 @@ def test_query():
     # metagraph
     mg = g.metagraph
     assert set(g.all_node_types) == set(mg.nodes)
-    etype_triplets = [(u, v, e['type']) for u, v, e in mg.edges(data=True)]
+    etype_triplets = [(u, v, e) for u, v, e in mg.edges(keys=True)]
     assert set([
         ('user', 'user', 'follows'),
         ('user', 'game', 'plays'),

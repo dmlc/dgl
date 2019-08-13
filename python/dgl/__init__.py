@@ -18,7 +18,6 @@ from .backend import load_backend
 from .batched_graph import *
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
-from .factory import *
 from .nodeflow import *
 from .traversal import *
 from .transform import *

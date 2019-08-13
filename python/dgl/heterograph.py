@@ -1,5 +1,7 @@
 """Classes for heterogeneous graphs."""
 import networkx as nx
+from collections import defaultdict
+import scipy.sparse as ssp
 from . import heterograph_index, graph_index
 from . import utils
 from . import backend as F
@@ -9,7 +11,7 @@ from .frame import Frame, FrameRef
 from .view import NodeView, EdgeView
 from .base import ALL, is_all, DGLError
 
-__all__ = ['DGLHeteroGraph', 'DGLBaseBipartite']
+__all__ = ['DGLHeteroGraph']
 
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
@@ -86,16 +88,16 @@ class DGLBaseHeteroGraph(object):
         """Return the metagraph as networkx.MultiDiGraph.
 
         The nodes are labeled with node type names.
-        The edges have a field "type" holding the edge type names.
+        The edges have their keys holding the edge type names.
         """
         nx_graph = self._graph.metagraph.to_networkx()
+        nx_return_graph = nx.MultiDiGraph()
         for u_v in nx_graph.edges:
-            nx_graph.edges[u_v]['type'] = self._etypes[nx_graph.edges[u_v]['id']]
-        nx.relabel_nodes(
-            nx_graph,
-            {i: ntype for i, ntype in enumerate(self._ntypes)},
-            copy=False)
-        return nx_graph
+            etype = self._etypes[nx_graph.edges[u_v]['id']]
+            srctype = self._ntypes[u_v[0]]
+            dsttype = self._ntypes[u_v[1]]
+            nx_return_graph.add_edge(srctype, dsttype, etype)
+        return nx_return_graph
 
     def _endpoint_types(self, etype):
         """Return the source and destination node type (int) of given edge
@@ -964,71 +966,51 @@ class DGLBaseHeteroGraph(object):
         return self._graph.out_degrees(self._current_etype_idx, v).tousertensor()
 
 
-class DGLBaseBipartite(DGLBaseHeteroGraph):
-    """Base bipartite graph class.
+def bipartite_from_edge_list(u, v, num_src=None, num_dst=None):
+    """Create a bipartite graph component of a heterogeneous graph with a
+    list of edges.
+
+    Parameters
+    ----------
+    u, v : list[int]
+        List of source and destination node IDs.
+    num_src : int, optional
+        The number of nodes of source type.
+
+        By default, the value is the maximum of the source node IDs in the
+        edge list plus 1.
+    num_dst : int, optional
+        The number of nodes of destination type.
+
+        By default, the value is the maximum of the destination node IDs in
+        the edge list plus 1.
     """
-    def __init__(self, graph, srctype, dsttype, etype):
-        super(DGLBaseBipartite, self).__init__(
-            graph,
-            [srctype, dsttype] if srctype != dsttype else [srctype],
-            [etype])
-        self.srctype = srctype
-        self.dsttype = dsttype
+    num_src = num_src or (max(u) + 1)
+    num_dst = num_dst or (max(v) + 1)
+    u = utils.toindex(u)
+    v = utils.toindex(v)
+    return heterograph_index.create_bipartite_from_coo(num_src, num_dst, u, v)
 
-    @classmethod
-    def from_csr(cls, srctype, dsttype, etype, num_src, num_dst, indptr, indices,
-                 edge_ids):
-        """Create a bipartite graph from CSR format.
+def bipartite_from_scipy(spmat, with_edge_id=False):
+    """Create a bipartite graph component of a heterogeneous graph with a
+    scipy sparse matrix.
 
-        Parameters
-        ----------
-        srctype : str
-            Name of source node type.
-        dsttype : str
-            Name of destination node type.
-        etype : str
-            Name of edge type.
-        num_src : int
-            Number of nodes in the source type.
-        num_dst : int
-            Number of nodes in the destination type.
-        indptr, indices, edge_ids : Tensor, Tensor, Tensor
-            The indptr, indices, and entries of the CSR matrix.
-            The entries are edge IDs of the bipartite graph.
-            The rows represent the source nodes and the columns represent the
-            destination nodes.
-        """
-        indptr = utils.toindex(indptr)
-        indices = utils.toindex(indices)
-        edge_ids = utils.toindex(edge_ids)
-        graph = heterograph_index.create_bipartite_from_csr(
-            num_src, num_dst, indptr, indices, edge_ids)
-        return cls(graph, srctype, dsttype, etype)
-
-    @classmethod
-    def from_coo(cls, srctype, dsttype, etype, num_src, num_dst, row, col):
-        """Create a bipartite graph from COO format.
-
-        Parameters
-        ----------
-        srctype : str
-            Name of source node type.
-        dsttype : str
-            Name of destination node type.
-        etype : str
-            Name of edge type.
-        num_src : int
-            Number of nodes in the source type.
-        num_dst : int
-            Number of nodes in the destination type.
-        row, col : Tensor, Tensor
-            The row indices (source node IDs) and column indices (destination node IDs)
-            of the COO matrix, ordered by edge IDs.
-        """
-        row = utils.toindex(row)
-        col = utils.toindex(col)
-        graph = heterograph_index.create_bipartite_from_coo(num_src, num_dst, row, col)
-        return cls(graph, srctype, dsttype, etype)
+    Parameters
+    ----------
+    spmat : scipy sparse matrix
+        The bipartite graph matrix whose rows represent sources and columns
+        represent destinations.
+    with_edge_id : bool
+        If True, the entries in the sparse matrix are treated as edge IDs.
+        Otherwise, the entries are ignored and edges will be added in
+        (source, destination) order.
+    """
+    spmat = spmat.tocsr()
+    num_src, num_dst = spmat.shape
+    indptr = utils.toindex(spmat.indptr)
+    indices = utils.toindex(spmat.indices)
+    data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
+    return heterograph_index.create_bipartite_from_csr(num_src, num_dst, indptr, indices, data)
 
 
 class DGLHeteroGraph(DGLBaseHeteroGraph):
@@ -1046,17 +1028,19 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     graph_data :
         The graph data.  It can be one of the followings:
 
-        * list[DGLBaseBipartite]
+        * (nx.MultiDiGraph, dict[str, list[tuple[int, int]]])
+        * (nx.MultiDiGraph, dict[str, scipy.sparse.matrix])
 
-          One could directly supply a list of bipartite graphs.  The metagraph
-          would be then automatically figured out from the bipartite graph list.
+          The first element is the metagraph of the heterogeneous graph, as a
+          networkx directed graph.  Its nodes represent the node types, and
+          its edges represent the edge types.  The edge type name should be
+          stored as edge keys.
 
-          The bipartite graphs should not share the same edge type names.
-
-          If two bipartite graphs share the same source node type, then the edges
-          in the heterogeneous graph will share the same source node set.  This also
-          applies to sharing the same destination node type, or having the same type
-          for source nodes of one and destination nodes of the other.
+          The second element is a mapping from edge type to edge list.  The
+          edge list can be either a list of (u, v) pairs, or a scipy sparse
+          matrix whose rows represents sources and columns represents
+          destinations.  The edges will be added in the (source, destination)
+          order.
     node_frames : dict[str, dict[str, Tensor]]
         The node frames for each node type
     edge_frames : dict[str, dict[str, Tensor]]
@@ -1109,13 +1093,14 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     One can construct the graph as follows:
 
-    >>> follows = DGLBaseBipartite.from_coo(
-    ...     'user', 'user', 'follows', 3, 3, [0, 1], [1, 2])
-    >>> plays = DGLBaseBipartite.from_coo(
-    ...     'user', 'game', 'plays', 3, 2, [0, 1, 1, 2], [0, 0, 1, 1])
-    >>> develops = DGLBaseBipartite.from_coo(
-    ...     'developer', 'game', 'develops', 2, 2, [0, 1], [0, 1])
-    >>> g = DGLHeteroGraph([follows, plays, develops])
+    >>> mg = nx.MultiDiGraph([('user', 'user', 'follows'),
+    ...                       ('user', 'game', 'plays'),
+    ...                       ('developer', 'game', 'develops')])
+    >>> g = DGLHeteroGraph(
+    ...         mg, {
+    ...             'follows': [(0, 1), (1, 2)],
+    ...             'plays': [(0, 0), (1, 0), (1, 1), (2, 1)],
+    ...             'develops': [(0, 0), (1, 1)]})
 
     Then one can query the graph structure as follows:
 
@@ -1158,19 +1143,18 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             self._view_etype_idx = _view_etype_idx
             return
 
-        if isinstance(graph_data, list):
-            if not isinstance(graph_data[0], DGLBaseBipartite):
-                raise TypeError('Only list of DGLBaseBipartite is supported')
+        if isinstance(graph_data, tuple):
+            metagraph, edges_by_type = graph_data
+            if not isinstance(metagraph, nx.MultiDiGraph):
+                raise TypeError(
+                        'Metagraph should be networkx.MultiDiGraph')
 
+            # create metagraph graph index
             srctypes, dsttypes, etypes = [], [], []
             ntypes = []
             ntypes_invmap = {}
             etypes_invmap = {}
-            for bipartite in graph_data:
-                etype, = bipartite.all_edge_types
-                srctype = bipartite.srctype
-                dsttype = bipartite.dsttype
-
+            for srctype, dsttype, etype in metagraph.edges(keys=True):
                 srctypes.append(srctype)
                 dsttypes.append(dsttype)
                 etypes_invmap[etype] = len(etypes_invmap)
@@ -1188,8 +1172,35 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
             metagraph_index = graph_index.create_graph_index(
                 list(zip(srctypes, dsttypes)), None, True)  # metagraph is always immutable
-            hg_index = heterograph_index.create_heterograph(
-                metagraph_index, [bipartite._graph for bipartite in graph_data])
+
+            # create base bipartites
+            bipartites = []
+            num_nodes = defaultdict(int)
+            # count the number of nodes for each type
+            for srctype, dsttype, etype in zip(srctypes, dsttypes, etypes):
+                edges = edges_by_type[etype]
+                if ssp.issparse(edges):
+                    num_src, num_dst = edges.shape
+                elif isinstance(edges, list):
+                    u, v = zip(*edges)
+                    num_src = max(u) + 1
+                    num_dst = max(v) + 1
+                else:
+                    raise TypeError('unknown edge list type %s' % type(edges))
+                num_nodes[srctype] = max(num_nodes[srctype], num_src)
+                num_nodes[dsttype] = max(num_nodes[dsttype], num_dst)
+            # create actual objects
+            for srctype, dsttype, etype in zip(srctypes, dsttypes, etypes):
+                edges = edges_by_type[etype]
+                if ssp.issparse(edges):
+                    bipartite = bipartite_from_scipy(edges)
+                elif isinstance(edges, list):
+                    u, v = zip(*edges)
+                    bipartite = bipartite_from_edge_list(
+                            u, v, num_nodes[srctype], num_nodes[dsttype])
+                bipartites.append(bipartite)
+
+            hg_index = heterograph_index.create_heterograph(metagraph_index, bipartites)
 
             super(DGLHeteroGraph, self).__init__(hg_index, ntypes, etypes)
         else:
