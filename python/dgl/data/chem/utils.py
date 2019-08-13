@@ -5,8 +5,11 @@ import pickle
 
 from dgl import DGLGraph
 
-
-rdkit = None
+try:
+    from rdkit import Chem
+    from rdkit.Chem import rdmolfiles, rdmolops
+except ImportError:
+    pass
 
 def one_hot_encoding(x, allowable_set):
     """One-hot encoding.
@@ -140,14 +143,6 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
 
 def smile2graph(smile, add_self_loop=False, atom_featurizer=None, bond_featurizer=None):
     # Graph construction
-    # Lazy Import rdkit
-    global rdkit 
-    if rdkit is None:
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import rdmolfiles, rdmolops
-        except ImportError:
-            raise ImportError("Please install rdkit (Recommended Version is 2018.03.9)")
     mol = Chem.MolFromSmiles(smile)
     new_order = rdmolfiles.CanonicalRankAtoms(mol)
     mol = rdmolops.RenumberAtoms(mol, new_order)
