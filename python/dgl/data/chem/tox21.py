@@ -13,7 +13,7 @@ except ImportError:
 
 
 class Tox21(CSVDataset):
-    _urls = 'dataset/tox21.csv.gz'
+    _url = 'dataset/tox21.csv.gz'
 
     def __init__(self, smile2graph=smile2graph):
         if 'pandas' not in sys.modules:
@@ -21,7 +21,7 @@ class Tox21(CSVDataset):
             dgl_warning("Please install pandas")
 
         data_path = get_download_dir() + '/tox21.csv.gz'
-        download(_get_dgl_url(self._urls), path=data_path)
+        download(_get_dgl_url(self._url), path=data_path)
         df = pd.read_csv(data_path)
         self.id = df['mol_id']
 
