@@ -24,7 +24,7 @@ def one_hot_encoding(x, allowable_set):
     Returns
     -------
     list
-        List of boolean values where only one value is True.
+        List of boolean values where at most one value is True.
         If the i-th value is True, then we must have
         x == allowable_set[i].
     """
@@ -35,8 +35,8 @@ class BaseAtomFeaturizer(object):
     """An abstract class for atom featurizers
 
     All atom featurizers that map a molecule to atom features should subclass it.
-    All subclasses should overrite ``_featurize_atom``, which featurizes a single
-    atom and ``__call__``, which featurize all atoms in a molecule.
+    All subclasses should overwrite ``_featurize_atom``, which featurizes a single
+    atom and ``__call__``, which featurizes all atoms in a molecule.
     """
 
     def _featurize_atom(self, atom):
@@ -142,7 +142,32 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
 
 
 def smile2graph(smile, add_self_loop=False, atom_featurizer=None, bond_featurizer=None):
-    # Graph construction
+    """Convert SMILES into a DGLGraph.
+
+    The **i** th atom in the molecule, i.e. ``mol.GetAtomWithIdx(i)``, corresponds to the
+    **i** th node in the returned DGLGraph.
+
+    The **i** th bond in the molecule, i.e. ``mol.GetBondWithIdx(i)``, corresponds to the
+    **(2i)**-th and **(2i+1)**-th edges in the returned DGLGraph. The **(2i)**-th and
+    **(2i+1)**-th edges will be separately from **u** to **v** and **v** to **u**, where
+    **u** is ``bond.GetBeginAtomIdx()`` and **v** is ``bond.GetEndAtomIdx()``.
+
+    If self loops are added, the last **n** edges will separately be self loops for
+    atoms ``0, 1, ..., n-1``.
+
+    Parameters
+    ----------
+    smiles : str
+        String of SMILES
+    add_self_loop : bool
+        Whether to add self loops in DGLGraphs.
+    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
+    """
     mol = Chem.MolFromSmiles(smile)
     new_order = rdmolfiles.CanonicalRankAtoms(mol)
     mol = rdmolops.RenumberAtoms(mol, new_order)
