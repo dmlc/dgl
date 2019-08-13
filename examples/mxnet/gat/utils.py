@@ -26,4 +26,4 @@ class EarlyStopping:
 
     def save_checkpoint(self, model):
         '''Saves model when validation loss decrease.'''
-        model.save_parameters('model.param')
+        model.save_parameters('model.param') 
