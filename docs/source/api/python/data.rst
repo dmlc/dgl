@@ -15,7 +15,9 @@ Utils
     utils.download
     utils.check_sha1
     utils.extract_archive
-    utils.Subset
+
+.. autoclass:: dgl.data.utils.Subset
+    :members: __getitem__, __len__
 
 Dataset Classes
 ---------------

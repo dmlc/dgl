@@ -43,8 +43,8 @@ class BaseAtomFeaturizer(object):
     """An abstract class for atom featurizers
 
     All atom featurizers that map a molecule to atom features should subclass it.
-    All subclasses should overrite :math:`_featurize_atom`, which featurizes a single
-    atom and :math:`__call__`, which featurize all atoms in a molecule.
+    All subclasses should overrite ``_featurize_atom``, which featurizes a single
+    atom and ``__call__``, which featurize all atoms in a molecule.
     """
     def _featurize_atom(self, atom):
         return NotImplementedError
