@@ -9,7 +9,6 @@ try:
 except ImportError:
     raise ImportError("Please install pandas")
 
-
 class Tox21(CSVDataset):
     _urls = 'dataset/tox21.csv.gz'
 
