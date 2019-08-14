@@ -1,4 +1,4 @@
-# This is a simple client demo shows how to use DGL distributed kvstore.
+# This is a simple pytorch client demo shows how to use DGL distributed kvstore.
 # In this demo, we initialize two embeddings on server and push/pull data to/from it.
 import dgl
 import torch

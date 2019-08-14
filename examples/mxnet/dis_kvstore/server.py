@@ -1,3 +1,5 @@
+# This is a simple MXNet server demo shows how to use DGL distributed kvstore.
+# In this demo, we initialize two embeddings on server and push/pull data to/from it.
 import dgl
 import torch
 import argparse
