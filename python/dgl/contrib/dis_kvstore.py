@@ -73,11 +73,14 @@ class KVServer(object):
                 if (msg.name in self._is_init) == False:
                     # we hack the msg format here
                     data_shape = F.asnumpy(msg.id).tolist();
-                    low_high = (F.asnumpy(msg.data).tolist())[0]
+                    array_0 = (F.asnumpy(msg.data).tolist())[0] 
+                    array_1 = (F.asnumpy(msg.data).tolist())[1]
+                    init_type = 'zero' if array_0[0] == 0.0 else 'uniform'
                     self._init_data(name=msg.name,
                         shape=data_shape,
-                        low=low_high[0],
-                        high=low_high[1])
+                        init_type=init_type,
+                        low=array_1[0],
+                        high=array_1[1])
                     self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
                 # convert global ID to local ID
@@ -110,8 +113,8 @@ class KVServer(object):
         """
         return self._server_id
 
-    def _init_data(self, name, shape, low, high):
-        """Initialize kvstore tensor with random values in uniform distribution.
+    def _init_data(self, name, shape, init_type, low, high):
+        """Initialize kvstore tensor.
 
         Parameters
         ----------
@@ -119,17 +122,27 @@ class KVServer(object):
             data name
         shape : list of int
             The tensor shape
+        init_type : str
+            initialize method, including 'zero' and 'uniform'
         low : float
             min threshold
         high : float
             max threshold
         """
-        self._data_store[name] = F.uniform(
-            shape=shape,
-            dtype=F.float32,
-            ctx=F.cpu(),
-            low=low,
-            high=high)
+        if init_type == 'uniform':
+            self._data_store[name] = F.uniform(
+                shape=shape,
+                dtype=F.float32,
+                ctx=F.cpu(),
+                low=low,
+                high=high)
+        elif init_type == 'zero':
+            self._data_store[name] = F.zeros(
+                shape=shape,
+                dtype=F.float32,
+                ctx=F.cpu())
+        else:
+            raise RuntimeError('Unknown initial method')
 
     def _push_handler(self, name, ID, data):
         """User-defined handler for PUSH message. 
@@ -243,8 +256,8 @@ class KVClient(object):
         client_ip, client_port = self._addr.split(':')
         _receiver_wait(self._receiver, client_ip, int(client_port), self._server_count)
 
-    def init_data(self, name, shape, low, high):
-        """Initialize kvstore tensor with random values in uniform distribution.
+    def init_data(self, name, shape, init_type='zero', low=0.0, high=0.0):
+        """Initialize kvstore tensor
 
         Parameters
         ----------
@@ -252,14 +265,18 @@ class KVClient(object):
             data name
         shape : list of int
             shape of tensor
+        init_type : str
+            initialize method, including 'zero' and 'uniform'
         low : float
-            min threshold
+            min threshold, if use 'uniform'
         high : float
-            max threshold
+            max threshold, if use 'uniform'
         """
         self._data_size[name] = shape[0]
         count = math.ceil(shape[0] / self._server_count)
-        threshold = F.tensor([[low, high]])
+        # We hack the msg format here
+        init_type = 0.0 if type == 'zero' else 1.0
+        threshold = F.tensor([[init_type, init_type], [low, high]])
         # partition shape on server
         for server_id in range(self._server_count):
             par_shape = shape.copy()

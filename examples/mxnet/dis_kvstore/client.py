@@ -22,9 +22,9 @@ def start_client(args):
 
     client.connect()
 
-    # Initialize data on server with random values in uniform distribution
-    client.init_data(name='embed_0', shape=[10, 3], low=0.0, high=0.0)
-    client.init_data(name='embed_1', shape=[11, 3], low=0.0, high=0.0)
+    # Initialize data on server
+    client.init_data(name='embed_0', shape=[10, 3], init_type='zero')
+    client.init_data(name='embed_1', shape=[11, 3], init_type='uniform', low=0.0, high=0.0)
 
     tensor_id = mx.nd.array([0, 1, 2], dtype='int64')
     tensor_data = mx.nd.array([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
