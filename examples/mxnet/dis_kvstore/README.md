@@ -7,9 +7,3 @@ You can run examples by:
 ```
 ./run.sh
 ```
-
-or
-
-```
-./run_udf.sh
-```
