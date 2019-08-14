@@ -24,7 +24,7 @@ class CSVDataset(object):
     ----------
     df: pandas.DataFrame
     Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
-    One column includes smiles and other columns for binary labels.
+    One column includes smiles and other columns for labels.
     Column names other than smiles column would be considered as task names.
 
     smile2graph: callable, str -> DGLGraph
