@@ -10,6 +10,7 @@ from dgl import DGLGraph
 from .utils import smile2graph
 from ..utils import download, get_download_dir, _get_dgl_url, Subset
 
+
 class CSVDataset(object):
     """CSVDataset
 
@@ -37,14 +38,16 @@ class CSVDataset(object):
     cache_file_path: str
     Path to store the preprocessed data
     """
-    
+
     def __init__(self, df, smile2graph=smile2graph, smile_column='smiles', cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
-            dgl_warning("Please install RDKit (Recommended Version is 2018.09.3)")
+            dgl_warning(
+                "Please install RDKit (Recommended Version is 2018.09.3)")
         self.df = df
         self.smiles = self.df[smile_column].tolist()
         self.task_names = self.df.columns.drop([smile_column]).tolist()
+        self.n_tasks = len(self.task_names)
         self.cache_file_path = cache_file_path
         self._pre_process(smile2graph)
 
@@ -71,8 +74,8 @@ class CSVDataset(object):
 
         _label_values = self.df[self.task_names].values
         # np.nan_to_num will also turn inf into a very large number
-        self.labels =  F.zerocopy_from_numpy(np.nan_to_num(_label_values))
-        self.mask =  F.zerocopy_from_numpy(~np.isnan(_label_values).astype(np.float32))
+        self.labels = np.nan_to_num(_label_values).astype(np.float32)
+        self.mask = (~np.isnan(_label_values)).astype(np.float32)
 
     def __getitem__(self, item):
         """Get the ith datapoint
@@ -88,11 +91,11 @@ class CSVDataset(object):
         Tensor of dtype float32
             Weights of the datapoint for all tasks
         """
-        return self.smiles[item], self.graphs[item], self.labels[item], self.mask[item]
+        return self.smiles[item], self.graphs[item], F.zerocopy_from_numpy(self.labels[item]),  F.zerocopy_from_numpy(self.mask[item])
 
     def __len__(self):
         """Length of Dataset
-        
+
         Return
         ------
         int

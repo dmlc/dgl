@@ -4,6 +4,7 @@ import os
 import pickle
 
 from dgl import DGLGraph
+import dgl
 
 try:
     from rdkit import Chem
@@ -141,7 +142,7 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
         return {self.atom_data_field: atom_features}
 
 
-def smile2graph(smile, add_self_loop=False, atom_featurizer=None, bond_featurizer=None):
+def smile2graph(smile, add_self_loop=False, atom_featurizer=DefaultAtomFeaturizer(), bond_featurizer=None):
     """Convert SMILES into a DGLGraph.
 
     The **i** th atom in the molecule, i.e. ``mol.GetAtomWithIdx(i)``, corresponds to the

@@ -1,0 +1,2 @@
+from .gcn import GCNClassifier
+
