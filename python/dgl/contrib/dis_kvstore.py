@@ -10,7 +10,7 @@ import math
 import dgl.backend as F
 
 def ReadNetworkConfigure(filename):
-    """Read networking configuration from file
+    """Read networking configuration from file.
 
     Parameters
     ----------
@@ -101,7 +101,7 @@ class KVServer(object):
             if msg.type == KVMsgType.INIT:
                 if (msg.name in self._is_init) == False:
                     # we hack the msg format here
-                    data_shape = F.asnumpy(msg.id).tolist();
+                    data_shape = F.asnumpy(msg.id).tolist()
                     array_0 = (F.asnumpy(msg.data).tolist())[0] 
                     array_1 = (F.asnumpy(msg.data).tolist())[1]
                     init_type = 'zero' if array_0[0] == 0.0 else 'uniform'
