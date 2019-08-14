@@ -5,13 +5,7 @@ import torch
 import time
 import argparse
 
-# In this example, we have 2 kv-client and 2 kv-server
-# TODO(chao): Read namebook from configure file.
-client_namebook = { 0:'127.0.0.1:50051',
-                    1:'127.0.0.1:50052' }
-
-server_namebook = { 0:'127.0.0.1:50053',
-                    1:'127.0.0.1:50054' }
+server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
 
 def start_client(args):
     # Initialize client and connect to server

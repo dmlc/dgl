@@ -4,12 +4,7 @@ import dgl
 import torch
 import argparse
 
-# In this example, we have 2 kvclient and 2 kvserver
-client_namebook = { 0:'127.0.0.1:50051',
-                    1:'127.0.0.1:50052' }
-
-server_namebook = { 0:'127.0.0.1:50053',
-                    1:'127.0.0.1:50054' }
+server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
 
 def start_server(args):
     server = dgl.contrib.KVServer(

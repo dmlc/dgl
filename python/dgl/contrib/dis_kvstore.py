@@ -9,6 +9,35 @@ from ..network import KVMsgType, KVStoreMsg
 import math
 import dgl.backend as F
 
+def ReadNetworkConfigure(filename):
+    """Read networking configuration from file
+
+    Parameters
+    ----------
+    filename : str
+        name of target configure file
+
+    Returns
+    -------
+    dict
+        server namebook
+    dict
+        client namebook
+    """
+    server_namebook = {}
+    client_namebook = {}
+    lines = [line.rstrip('\n') for line in open(filename)]
+    for line in lines:
+        node_type, addr, node_id = line.split(' ')
+        if node_type == 'server':
+            server_namebook[int(node_id)] = addr
+        elif node_type == 'client':
+            client_namebook[int(node_id)] = addr
+        else:
+            raise RuntimeError("Unknown node type: %s", node_type)
+
+    return server_namebook, client_namebook
+
 class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
