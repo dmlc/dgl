@@ -1,7 +1,16 @@
 import dgl
+import numpy as np
 import os
+import random
 import torch
 from sklearn.metrics import roc_auc_score
+
+def set_random_seed(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 class Meter(object):
     def __init__(self):

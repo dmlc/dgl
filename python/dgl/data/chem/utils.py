@@ -1,10 +1,7 @@
 import dgl.backend as F
 import numpy as np
-import os
-import pickle
 
 from dgl import DGLGraph
-import dgl
 
 try:
     from rdkit import Chem

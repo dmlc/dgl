@@ -6,13 +6,14 @@ from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from utils import Meter, EarlyStopping, collate_molgraphs
+from utils import Meter, EarlyStopping, collate_molgraphs, set_random_seed
 
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     batch_size = 128
     learning_rate = 0.001
     num_epochs = 100
+    set_random_seed()
 
     # Interchangeable with other Dataset
     dataset = Tox21()
