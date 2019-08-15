@@ -33,7 +33,7 @@ def main(args):
 
     model.to(device)
 
-    if args['pre_trained']:
+    if args.pre_trained:
         num_epochs = 0
         model_zoo.load_pretrained('GCN_Tox21')
     else:

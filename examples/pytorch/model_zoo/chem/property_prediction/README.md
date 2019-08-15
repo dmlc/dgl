@@ -21,6 +21,8 @@ convolutions over multiple datasets.
 To train a model from scratch, simply call `python classification.py`. To skip training and use the pre-trained model,
 call `python classification.py -p`.
 
+We use GPU whenever it is available.
+
 ### Performance
 
 #### GCN on Tox21
