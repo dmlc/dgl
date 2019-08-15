@@ -34,7 +34,8 @@ class Meter(object):
 
 class EarlyStopping(object):
     def __init__(self, patience=10, filename="es_checkpoint.pth"):
-        assert not os.path.exists(filename), 'Filename {} is occupied.'.format(filename)
+        assert not os.path.exists(filename), \
+            'Filename {} is occupied. Either rename it or delete it.'.format(filename)
         self.patience = patience
         self.counter = 0
         self.filename = filename

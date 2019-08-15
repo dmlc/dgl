@@ -35,7 +35,7 @@ def main(args):
 
     if args.pre_trained:
         num_epochs = 0
-        model_zoo.load_pretrained('GCN_Tox21')
+        model_zoo.chem.load_pretrained('GCN_Tox21')
     else:
         loss_criterion = BCEWithLogitsLoss(pos_weight=torch.tensor(
             dataset.task_pos_weights).to(device), reduction='none')
