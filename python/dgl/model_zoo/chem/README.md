@@ -1,4 +1,4 @@
-# DGL for Drug Discovery
+# DGL for Chemistry
 
 With atoms being nodes and bonds being edges, molecular graphs are among the core objects for study in drug discovery. 
 As drug discovery is known to be costly and time consuming, deep learning on graphs can be potentially beneficial for 
@@ -25,7 +25,7 @@ molecular graph topology, which may be viewed as a learned fingerprint [3]. For 
 `gcn for property prediction`.
 
 ### Models
-- **Graph Convolutional Networks**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
+- **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
 network and they can be easily extended for graph level prediction.
 
 ## References
