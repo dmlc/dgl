@@ -1,5 +1,4 @@
 Model Zoo
 ==========
 
-Here's example for using model zoo.
-
+Here are examples of using the model zoo.

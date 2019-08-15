@@ -1,17 +1,15 @@
 Model Zoo API
 ==================
 
-We tend to provide two major API for model zoo. We will focus on PyTorch for the first release. 
-
+We provide two major APIs for the model zoo. For the time being, only PyTorch is supported.
 - `model_zoo.chem.[Model_Name]` to load the model skeleton
 - `model_zoo.chem.load_pretrained([Pretrained_Model_Name])` to load the model with pretrained weights
 
 Models would be placed in `python/dgl/model_zoo/chem`.
 
-Each Model should contains the following elements:
+Each Model should contain the following elements:
 - Papers related to the model
 - Model's input and output
-- What dataset could use this
+- Dataset compatible with the model
 - Documentation for all the customizable configs
 - Credits (Contributor infomation)
-

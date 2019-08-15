@@ -8,10 +8,10 @@ A Dataset class should implement `__getitem__(self, index)` and `__len__(self)`m
 ```python
 class CustomDataset:
     def __init__(self):
-        # Initialize Dataset and preprocessing data
+        # Initialize Dataset and preprocess data
 
     def __getitem__(self, index):
-        # Return the corresponding data/label needed for training/evaluation based on index
+        # Return the corresponding DGLGraph/label needed for training/evaluation based on index
         return self.graphs[index], self.labels[index]
 
     def __len__(self):
@@ -30,4 +30,5 @@ g.ndata['h'] = F.zerocopy_from_numpy(h)
 # Now g.ndata is a PyTorch Tensor or a MXNet NDArray based on backend used 
 ```
 
-An example you can refer to is CSVDataset(csv_dataset.py).
+If your dataset is in `.csv` format, you may use
+[`CSVDataset`](https://github.com/dmlc/dgl/blob/master/python/dgl/data/chem/csv_dataset.py).
