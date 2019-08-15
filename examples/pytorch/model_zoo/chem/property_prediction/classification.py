@@ -27,21 +27,19 @@ def main(args):
     test_loader = DataLoader(
         testset, batch_size=batch_size, collate_fn=collate_molgraphs)
 
-    # Interchangeable with other model in model zoo
-    model = model_zoo.chem.GCNClassifier(in_feats=74,
-                                         gcn_hidden_feats=[64, 64],
-                                         n_tasks=dataset.n_tasks)
-
-    model.to(device)
-
     if args.pre_trained:
         num_epochs = 0
-        model_zoo.chem.load_pretrained('GCN_Tox21')
+        model = model_zoo.chem.load_pretrained('GCN_Tox21')
     else:
+        # Interchangeable with other models
+        model = model_zoo.chem.GCNClassifier(in_feats=74,
+                                             gcn_hidden_feats=[64, 64],
+                                             n_tasks=dataset.n_tasks)
         loss_criterion = BCEWithLogitsLoss(pos_weight=torch.tensor(
             dataset.task_pos_weights).to(device), reduction='none')
         optimizer = Adam(model.parameters(), lr=learning_rate)
         stopper = EarlyStopping(patience=10)
+    model.to(device)
 
     for epoch in range(num_epochs):
         model.train()
