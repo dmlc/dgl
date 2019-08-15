@@ -1,4 +1,4 @@
-from . import GCNClassifier
+from .gcn import GCNClassifier
 import torch
 from ...data.utils import _get_dgl_url, download
 
