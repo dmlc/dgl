@@ -13,6 +13,6 @@ def load_pretrained(model_name):
         checkpoint = torch.load(local_pretrained_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         return model
-     else:
+    else:
         raise RuntimeError("No {} pretrained model found ".format(model_name))
 
