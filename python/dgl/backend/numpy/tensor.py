@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import numpy as onp
 from mxnet import numpy as np
 import mxnet as mx
 import scipy.sparse as sp
@@ -7,17 +8,15 @@ import warnings
 from ... import ndarray as dglnd
 from ... import kernel as K
 
-warnings.warn('Detect using numpy backend. Please be aware that numpy does not support autograd!')
-
 def data_type_dict():
-    return {'float16' : np.float16,
-            'float32' : np.float32,
-            'float64' : np.float64,
-            'uint8'   : np.uint8,
-            'int8'    : np.int8,
-            'int16'   : np.int16,
-            'int32'   : np.int32,
-            'int64'   : np.int64}
+    return {'float16' : onp.float16,
+            'float32' : onp.float32,
+            'float64' : onp.float64,
+            'uint8'   : onp.uint8,
+            'int8'    : onp.int8,
+            'int16'   : onp.int16,
+            'int32'   : onp.int32,
+            'int64'   : onp.int64}
 
 def cpu():
     return mx.cpu()
@@ -232,13 +231,13 @@ def zerocopy_to_dlpack(arr):
     return arr.to_dlpack_for_read()
 
 def zerocopy_from_dlpack(dlpack_arr):
-    return nd.from_dlpack(dlpack_arr).as_np_ndarray()
+    return mx.nd.from_dlpack(dlpack_arr).as_np_ndarray()
 
 def zerocopy_to_numpy(input):
     # NOTE: not zerocopy
     return arr.asnumpy()
 
-def zerocopy_from_numpy(np_array):
+def zerocopy_from_numpy(np_data):
     return mx.nd.from_numpy(np_data, zero_copy=True).as_np_ndarray()
 
 def one_hot(t, num_classes=-1):
