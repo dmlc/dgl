@@ -33,7 +33,7 @@ In practice, this can be quite difficult due to the scarcity of labeled data.
 ### Featurization and Representation Learning
 
 Fingerprint has been a widely used concept in cheminformatics. Chemists developed hand designed rules to convert 
-molecules infto binary strings where each bit indicates the presence or absence of a particular substructure. The
+molecules into binary strings where each bit indicates the presence or absence of a particular substructure. The
 development of fingerprints makes the comparison of molecules a lot easier. Previous machine learning methods are 
 mostly developed based on molecule fingerprints.
 

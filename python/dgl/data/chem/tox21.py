@@ -3,14 +3,12 @@ import sys
 
 from .csv_dataset import CSVDataset
 from .utils import smile2graph
-from ..utils import get_download_dir, download, _get_dgl_url, Subset
+from ..utils import get_download_dir, download, _get_dgl_url
 
-       
 try:
     import pandas as pd
 except ImportError:
     pass
-
 
 class Tox21(CSVDataset):
     

@@ -9,7 +9,6 @@ try:
 except ImportError:
     pass
 
-
 def one_hot_encoding(x, allowable_set):
     """One-hot encoding.
 
@@ -29,7 +28,6 @@ def one_hot_encoding(x, allowable_set):
     """
     return list(map(lambda s: x == s, allowable_set))
 
-
 class BaseAtomFeaturizer(object):
     """An abstract class for atom featurizers
 
@@ -43,7 +41,6 @@ class BaseAtomFeaturizer(object):
 
     def __call__(self, mol):
         return NotImplementedError
-
 
 class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     """A default featurizer for atoms.

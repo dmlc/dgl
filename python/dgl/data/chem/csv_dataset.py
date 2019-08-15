@@ -8,7 +8,6 @@ import sys
 
 from dgl import DGLGraph
 from .utils import smile2graph
-from ..utils import download, get_download_dir, _get_dgl_url, Subset
 
 
 class CSVDataset(object):
@@ -16,7 +15,8 @@ class CSVDataset(object):
 
     This is a general class for loading data from csv or pd.DataFrame.
 
-    In data pre-processing, we set non-existing labels to be 0, and returning mask with 1 where label exists.
+    In data pre-processing, we set non-existing labels to be 0,
+    and returning mask with 1 where label exists.
 
     All molecules are converted into DGLGraphs. After the first-time construction, the
     DGLGraphs will be saved for reloading so that we do not need to reconstruct them every time.
@@ -39,7 +39,8 @@ class CSVDataset(object):
     Path to store the preprocessed data
     """
 
-    def __init__(self, df, smile2graph=smile2graph, smile_column='smiles', cache_file_path="csvdata_dglgraph.pkl"):
+    def __init__(self, df, smile2graph=smile2graph, smile_column='smiles',
+                 cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning(
@@ -88,7 +89,9 @@ class CSVDataset(object):
         Tensor of dtype float32
             Weights of the datapoint for all tasks
         """
-        return self.smiles[item], self.graphs[item], F.zerocopy_from_numpy(self.labels[item]),  F.zerocopy_from_numpy(self.mask[item])
+        return self.smiles[item], self.graphs[item], \
+               F.zerocopy_from_numpy(self.labels[item]),  \
+               F.zerocopy_from_numpy(self.mask[item])
 
     def __len__(self):
         """Length of Dataset

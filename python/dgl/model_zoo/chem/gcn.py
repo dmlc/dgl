@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import dgl
 from dgl.nn.pytorch import GraphConv
 
-
 class GCNLayer(nn.Module):
     def __init__(self, in_feats, out_feats, activation=F.relu,
                  residual=True, batchnorm=True, dropout=0.):
@@ -67,7 +66,6 @@ class GCNLayer(nn.Module):
 
         return new_feats
 
-
 class MLPBinaryClassifier(nn.Module):
     def __init__(self, in_feats, hidden_feats, n_tasks, dropout=0.):
         """MLP for soft binary classification over multiple tasks from molecule representations.
@@ -105,7 +103,6 @@ class MLPBinaryClassifier(nn.Module):
         FloatTensor of shape (B, n_tasks)
         """
         return self.predict(h)
-
 
 class GCNClassifier(nn.Module):
     def __init__(self, in_feats, gcn_hidden_feats, n_tasks, classifier_hidden_feats=128,
