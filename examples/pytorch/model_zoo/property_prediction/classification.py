@@ -77,6 +77,7 @@ def main():
             epoch + 1, num_epochs, val_roc_auc, stopper.best_score))
 
     test_meter = Meter()
+    model.eval()
     for batch_id, batch_data in enumerate(test_loader):
         smiles, bg, labels, mask = batch_data
         atom_feats = bg.ndata.pop(atom_data_field)
@@ -84,4 +85,6 @@ def main():
         logits = model(atom_feats, bg)
         test_meter.update(logits, labels, mask)
     print('test roc-auc score {:.4f}'.format(test_meter.roc_auc_averaged_over_tasks()))
+
+    
 main()

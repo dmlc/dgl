@@ -32,7 +32,7 @@ class Meter():
 
 
 class EarlyStopping:
-    def __init__(self, patience=10, filename="es_checkpoint.pt"):
+    def __init__(self, patience=10, filename="es_checkpoint.pth"):
         self.patience = patience
         self.counter = 0
         self.filename = filename

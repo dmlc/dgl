@@ -1,0 +1,33 @@
+
+# Customize Dataset
+
+Generally we follow the practise of PyTorch. 
+
+A Dataset class should implement `_getitem_(self, index)` and `__len__(self)`method
+
+```python
+class CustomDataset:
+    def __init__(self):
+        # Initialize Dataset and preprocessing data
+
+    def __getitem__(self, index):
+        # Return the corresponding data/label needed for training/evaluation based on index
+        return self.graphs[index], self.labels[index]
+
+    def __len__(self):
+        return len(self.graphs)
+```
+
+DGL supports various backends such as MXNet and PyTorch, therefore we want our dataset to be also backend agnostic.
+We prefer user using numpy array in the dataset, and not including any operator/tensor from the specific backend. 
+If you want to convert the numpy array to the corresponding tensor, you can use the following code
+
+```python
+import dgl.backend as F
+
+# g is a DGLGraph, h is a numpy array
+g.ndata['h'] = F.zerocopy_from_numpy(h)
+# Now g.ndata is a PyTorch Tensor or a MXNet NDArray based on backend used 
+```
+
+An example you can refer to is CSVDataset(csv_dataset.py).
