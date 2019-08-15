@@ -21,8 +21,7 @@ development of fingerprints makes the comparison of molecules a lot easier. Prev
 mostly developed based on molecule fingerprints.
 
 Graph neural networks make it possible for a data-driven representation of molecules out of the atoms, bonds and 
-molecular graph topology, which may be viewed as a learned fingerprint [3]. For details, checkout the README of 
-`gcn for property prediction`.
+molecular graph topology, which may be viewed as a learned fingerprint [3]. 
 
 ### Models
 - **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
