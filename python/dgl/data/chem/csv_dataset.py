@@ -65,10 +65,7 @@ class CSVDataset(object):
             with open(self.cache_file_path, 'rb') as f:
                 self.graphs = pickle.load(f)
         else:
-            self.graphs = []
-            for id, s in enumerate(self.smiles):
-                self.graphs.append(smile2graph(s))
-
+            self.graphs = [smile2graph(s) for s in self.smiles]
             with open(self.cache_file_path, 'wb') as f:
                 pickle.dump(self.graphs, f)
 
