@@ -3,14 +3,12 @@ import sys
 
 from .csv_dataset import CSVDataset
 from .utils import smile2graph
-from ..utils import get_download_dir, download, _get_dgl_url, Subset
+from ..utils import get_download_dir, download, _get_dgl_url
 
-       
 try:
     import pandas as pd
 except ImportError:
     pass
-
 
 class Tox21(CSVDataset):
     
@@ -49,6 +47,7 @@ class Tox21(CSVDataset):
         self.id = df['mol_id']
 
         df = df.drop(columns=['mol_id'])
+
         super().__init__(df, smile2graph, cache_file_path="tox21_dglgraph.pkl")
         self._weight_balancing()
 

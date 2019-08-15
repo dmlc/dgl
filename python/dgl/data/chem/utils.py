@@ -1,7 +1,5 @@
 import dgl.backend as F
 import numpy as np
-import os
-import pickle
 
 from dgl import DGLGraph
 
@@ -30,7 +28,6 @@ def one_hot_encoding(x, allowable_set):
     """
     return list(map(lambda s: x == s, allowable_set))
 
-
 class BaseAtomFeaturizer(object):
     """An abstract class for atom featurizers
 
@@ -45,8 +42,7 @@ class BaseAtomFeaturizer(object):
     def __call__(self, mol):
         return NotImplementedError
 
-
-class DefaultAtomFeaturizer(BaseAtomFeaturizer):
+class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     """A default featurizer for atoms.
 
     The atom features include:
@@ -76,7 +72,7 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
     """
 
     def __init__(self, atom_data_field='h'):
-        super(DefaultAtomFeaturizer, self).__init__()
+        super(CanonicalAtomFeaturizer, self).__init__()
         self.atom_data_field = atom_data_field
 
     @property
@@ -140,8 +136,7 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
 
         return {self.atom_data_field: atom_features}
 
-
-def smile2graph(smile, add_self_loop=False, atom_featurizer=None, bond_featurizer=None):
+def smile2graph(smile, add_self_loop=False, atom_featurizer=CanonicalAtomFeaturizer(), bond_featurizer=None):
     """Convert SMILES into a DGLGraph.
 
     The **i** th atom in the molecule, i.e. ``mol.GetAtomWithIdx(i)``, corresponds to the
@@ -163,7 +158,7 @@ def smile2graph(smile, add_self_loop=False, atom_featurizer=None, bond_featurize
         Whether to add self loops in DGLGraphs.
     atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for atoms in a molecule, which can be used to update
-        ndata for a DGLGraph.
+        ndata for a DGLGraph. Default to CanonicalAtomFeaturizer().
     bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for bonds in a molecule, which can be used to update
         edata for a DGLGraph.
