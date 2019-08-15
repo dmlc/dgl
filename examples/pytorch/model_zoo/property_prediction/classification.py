@@ -14,10 +14,9 @@ def main():
     learning_rate = 0.001
     num_epochs = 100
 
-    # Interchangable to other Dataset
+    # Interchangable with other Dataset
     dataset = Tox21()
     atom_data_field = 'h'
-
 
     trainset, valset, testset = split_dataset(dataset, [0.8, 0.1, 0.1])
     train_loader = DataLoader(
@@ -27,7 +26,7 @@ def main():
     test_loader = DataLoader(
         testset, batch_size=batch_size, collate_fn=collate_molgraphs)
 
-    # Interchangable to other model in model zoo
+    # Interchangable with other model in model zoo
     model = model_zoo.chem.GCNClassifier(74, [64, 64], dataset.n_tasks)
 
     model.to(device)
@@ -41,7 +40,6 @@ def main():
         model.train()
         print('Start training')
         train_meter = Meter()
-        model.train()
         for batch_id, batch_data in enumerate(train_loader):
             smiles, bg, labels, mask = batch_data
             atom_feats = bg.ndata.pop(atom_data_field)
@@ -57,7 +55,6 @@ def main():
                 epoch + 1, num_epochs, batch_id + 1, len(train_loader), loss.item()))
             train_meter.update(logits, labels, mask)
         train_roc_auc = train_meter.roc_auc_averaged_over_tasks()
-
         
         val_meter = Meter()
         model.eval()
