@@ -69,9 +69,9 @@ def collate_molgraphs(data):
     """Batching a list of datapoints for dataloader
     Parameters
     ----------
-    data : list of 3-tuples
+    data : list of 4-tuples
         Each tuple is for a single datapoint, consisting of
-        a DGLGraph, all-task labels and all-task weights
+        A SMILE, a DGLGraph, all-task labels and all-task weights
     Returns
     -------
     smiles : list
