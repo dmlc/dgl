@@ -4,7 +4,7 @@ With atoms being nodes and bonds being edges, molecular graphs are among the cor
 As drug discovery is known to be costly and time consuming, deep learning on graphs can be potentially beneficial for 
 improving the efficiency of drug discovery [1], [2].
 
-With pre-trained models and training scripts, we hope this dgl model zoo on drug discovery will be helpful for both
+With pre-trained models and training scripts, we hope this dgl model zoo on chemistry will be helpful for both
 the chemistry community and the deep learning community to further their research.
 
 ## Property Prediction
