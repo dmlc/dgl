@@ -9,7 +9,7 @@ Classification tasks require assigning discrete labels to a molecule, e.g. molec
 a public database measuring toxicity of compounds, which has been used in the 2014 Tox21 Data Challenge. The dataset
 contains qualitative toxicity measurements for 8014 compounds on 12 different targets, including nuclear receptors and
 stress response pathways. Each target yields a binary prediction problem. MoleculeNet [1] randomly splits the dataset
-into training, validation and test set with a 80/10/10 ratio. By default we use the same split method.
+into training, validation and test set with a 80/10/10 ratio. By default we follow their split method.
 
 ### Models
 - **Graph Convolutional Network** [2]. Graph Convolutional Networks (GCN) have been one of the most popular graph neural
