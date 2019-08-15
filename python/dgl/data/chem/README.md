@@ -3,7 +3,7 @@
 
 Generally we follow the practise of PyTorch. 
 
-A Dataset class should implement `_getitem_(self, index)` and `__len__(self)`method
+A Dataset class should implement `__getitem__(self, index)` and `__len__(self)`method
 
 ```python
 class CustomDataset:
