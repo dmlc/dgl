@@ -1,9 +1,15 @@
-"""Module for graph transformation methods."""
+"""Module for graph transformation utilities."""
 from ._ffi.function import _init_api
 from .graph import DGLGraph
+from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph
+from .backend import asnumpy
+import numpy as np
+from scipy import sparse
 
-__all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
+
+__all__ = ['line_graph', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
+           'laplacian_lambda_max']
 
 
 def line_graph(g, backtracking=True, shared=False):
@@ -25,6 +31,40 @@ def line_graph(g, backtracking=True, shared=False):
     graph_data = g._graph.line_graph(backtracking)
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
+
+# Add jit here
+def duplicate(arr, times):
+    n = len(arr)
+    lengths = 0
+    for i in range(n):
+        lengths += times[i]
+
+    rst = np.empty(shape=(lengths), dtype=np.int64)
+    cnt = 0
+    for i in range(n):
+        for j in range(times[i]):
+            rst[cnt] = arr[i]
+            cnt += 1
+    return rst
+
+def khop_graph(g, k):
+    """Return the graph that includes all :math:`k`-hop neighbors of the given graph as edges.
+    The adjacency matrix of the returned graph is :math:`A^k`
+    (where :math:`A` is the adjacency matrix of :math:`g`).
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+    k : int
+        The :math:`k` in `k`-hop graph.
+    """
+    n = g.number_of_nodes()
+    adj_new = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_new = adj_new.tocoo()
+    multiplicity = adj_new.data
+    row = duplicate(adj_new.row, multiplicity)
+    col = duplicate(adj_new.col, multiplicity)
+    return DGLGraph(from_coo(n, row, col, True, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
     """Return the reverse of a graph
@@ -168,5 +208,22 @@ def to_bidirected(g, readonly=True):
     else:
         newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
     return DGLGraph(newgidx)
+
+def laplacian_lambda_max(g):
+    """Return the largest eigenvalue of the normalized symmetric laplacian of g.
+
+    The eigenvalue of the normalized symmetric of any graph is less than or equal to 2,
+    ref: https://en.wikipedia.org/wiki/Laplacian_matrix#Properties
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    """
+    n = g.number_of_nodes()
+    adj = g.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
+    norm = sparse.diags(asnumpy(g.in_degrees()) ** -0.5, dtype=float)
+    laplacian = sparse.eye(n) - norm * adj * norm
+    return sparse.linalg.eigs(laplacian, 1, which='LM', return_eigenvectors=False)[0].real
 
 _init_api("dgl.transform")
