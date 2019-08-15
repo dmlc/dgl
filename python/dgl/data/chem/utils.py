@@ -12,6 +12,7 @@ try:
 except ImportError:
     pass
 
+
 def one_hot_encoding(x, allowable_set):
     """One-hot encoding.
 
@@ -142,6 +143,75 @@ class DefaultAtomFeaturizer(BaseAtomFeaturizer):
         return {self.atom_data_field: atom_features}
 
 
+# class Smile2Graph(object):
+#     def __init__(self, add_self_loop=False, atom_featurizer=DefaultAtomFeaturizer(), bond_featurizer=None):
+#         self.atom_featurizer = atom_featurizer
+#         self.bond_featurizer = bond_featurizer
+#         self.add_self_loop = add_self_loop
+
+#     def __call__(self, smile):
+#         """Convert SMILES into a DGLGraph.
+
+#         The **i** th atom in the molecule, i.e. ``mol.GetAtomWithIdx(i)``, corresponds to the
+#         **i** th node in the returned DGLGraph.
+
+#         The **i** th bond in the molecule, i.e. ``mol.GetBondWithIdx(i)``, corresponds to the
+#         **(2i)**-th and **(2i+1)**-th edges in the returned DGLGraph. The **(2i)**-th and
+#         **(2i+1)**-th edges will be separately from **u** to **v** and **v** to **u**, where
+#         **u** is ``bond.GetBeginAtomIdx()`` and **v** is ``bond.GetEndAtomIdx()``.
+
+#         If self loops are added, the last **n** edges will separately be self loops for
+#         atoms ``0, 1, ..., n-1``.
+
+#         Parameters
+#         ----------
+#         smiles : str
+#             String of SMILES
+#         add_self_loop : bool
+#             Whether to add self loops in DGLGraphs.
+#         atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+#             Featurization for atoms in a molecule, which can be used to update
+#             ndata for a DGLGraph. 
+#         bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+#             Featurization for bonds in a molecule, which can be used to update
+#             edata for a DGLGraph.
+#         """
+#         mol = Chem.MolFromSmiles(smile)
+#         new_order = rdmolfiles.CanonicalRankAtoms(mol)
+#         mol = rdmolops.RenumberAtoms(mol, new_order)
+#         g = DGLGraph()
+#         num_atoms = mol.GetNumAtoms()
+#         g.add_nodes(num_atoms)
+
+#         src_list = []
+#         dst_list = []
+#         num_bonds = mol.GetNumBonds()
+#         for i in range(num_bonds):
+#             bond = mol.GetBondWithIdx(i)
+#             u = bond.GetBeginAtomIdx()
+#             v = bond.GetEndAtomIdx()
+#             src_list.extend([u, v])
+#             dst_list.extend([v, u])
+#         g.add_edges(src_list, dst_list)
+
+#         if self.add_self_loop:
+#             nodes = g.nodes()
+#             g.add_edges(nodes, nodes)
+
+#         # Featurization
+#         if self.atom_featurizer is not None:
+#             g.ndata.update(self.atom_featurizer(mol))
+
+#         if self.bond_featurizer is not None:
+#             g.edata.update(self.bond_featurizer(mol))
+
+#         return g
+
+#     @property
+#     def info(self):
+#         return {"n_field": [('h', 74)], "e_field": []}
+
+
 def smile2graph(smile, add_self_loop=False, atom_featurizer=DefaultAtomFeaturizer(), bond_featurizer=None):
     """Convert SMILES into a DGLGraph.
 
@@ -164,7 +234,7 @@ def smile2graph(smile, add_self_loop=False, atom_featurizer=DefaultAtomFeaturize
         Whether to add self loops in DGLGraphs.
     atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for atoms in a molecule, which can be used to update
-        ndata for a DGLGraph.
+        ndata for a DGLGraph. Default to DefaultAtomFeaturizer().
     bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for bonds in a molecule, which can be used to update
         edata for a DGLGraph.
