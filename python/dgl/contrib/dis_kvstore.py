@@ -412,6 +412,12 @@ class KVClient(object):
 
         return self._merge_msg(msg_list)
     
+    def barrier(self):
+        """Barrier for all client nodes
+        """
+        pass
+
+
     def shut_down(self):
         """Shutdown all KVServer nodes
 
