@@ -1,6 +1,8 @@
 # PinSage model
 
 NOTE: this version is not using NodeFlow yet.
+      
+This example only work with Python 3.6+
 
 First, download and extract from https://dgl.ai.s3.us-east-2.amazonaws.com/dataset/ml-1m.tar.gz
 
