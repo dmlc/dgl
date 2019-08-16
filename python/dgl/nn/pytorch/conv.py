@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
+from . import utils
 from ... import function as fn
 
 __all__ = ['GraphConv', 'RelGraphConvBasis', 'RelGraphConvBDD']
@@ -203,7 +204,10 @@ class _BaseRelGraphConv(nn.Module):
         g : DGLGraph
             The graph.
         h : torch.Tensor
-            Input node features. Shape: (|V|, D)
+            Input node features. Could be either:
+              - (|V|, D) dense tensor
+              - (|V|,) int64 vector, representing the categorical values of each
+                node. We then treat the input feature as an one-hot encoding feature.
         r : torch.Tensor
             Edge type tensor. Shape: (|E|,)
         norm : torch.Tensor
@@ -220,7 +224,7 @@ class _BaseRelGraphConv(nn.Module):
         if norm is not None:
             g.edata['norm'] = norm
         if self.self_loop:
-            loop_message = th.mm(g.ndata['h'], self.loop_weight)
+            loop_message = utils.matmul_maybe_select(g.ndata['h'], self.loop_weight)
             loop_message = self.dropout(loop_message)
 
         # message passing
@@ -283,8 +287,7 @@ class RelGraphConvBasis(_BaseRelGraphConv):
         self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
         if self.num_bases < self.num_rels:
             # linear combination coefficients
-            self.w_comp = nn.Parameter(th.Tensor(self.num_rels,
-                                                    self.num_bases))
+            self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         if self.num_bases < self.num_rels:
             nn.init.xavier_uniform_(self.w_comp,
@@ -300,8 +303,7 @@ class RelGraphConvBasis(_BaseRelGraphConv):
         else:
             weight = self.weight
 
-        w = weight.index_select(0, edges.data['type'])
-        msg = th.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+        msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
         if 'norm' in edges.data:
             msg = msg * edges.data['norm']
         return {'msg': msg}
@@ -346,6 +348,8 @@ class RelGraphConvBDD(_BaseRelGraphConv):
         self.num_bases = num_bases
         if self.num_bases is None or self.num_bases > self.num_rels:
             self.num_bases = self.num_rels
+        if in_feat % num_bases != 0 or out_feat % num_bases != 0:
+            raise ValueError('Feature size must be a multiplier of num_bases.')
 
         self.out_feat = out_feat
         self.submat_in = in_feat // self.num_bases
@@ -357,6 +361,8 @@ class RelGraphConvBDD(_BaseRelGraphConv):
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
     def message_func(self, edges):
+        if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
+            raise TypeError('Block decomposition does not allow integer ID feature.')
         weight = self.weight.index_select(0, edges.data['type']).view(
                     -1, self.submat_in, self.submat_out)
         node = edges.src['h'].view(-1, 1, self.submat_in)

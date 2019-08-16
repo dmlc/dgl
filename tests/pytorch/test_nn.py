@@ -248,41 +248,52 @@ def test_rgcn():
     etype = []
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     # 5 etypes
+    R = 5
     for i in range(g.number_of_edges()):
         etype.append(i % 5)
+    B = 2
+    I = 10
+    O = 8
 
-    rgc_basis = nn.RelGraphConvBasis(10, 5, 5)
-    h = th.randn((100, 10))
+    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_basis(g, h, r)
-    assert list(h_new.shape) == [100, 5]
+    assert list(h_new.shape) == [100, O]
 
-    rgc_basis = nn.RelGraphConvBDD(10, 5, 5)
-    h = th.randn((100, 10))
+    rgc_bdd = nn.RelGraphConvBDD(I, O, R, B)
+    h = th.randn((100, I))
     r = th.tensor(etype)
-    h_new = rgc_basis(g, h, r)
-    assert list(h_new.shape) == [100, 5]
+    h_new = rgc_bdd(g, h, r)
+    assert list(h_new.shape) == [100, O]
 
     # with norm
     norm = th.zeros((g.number_of_edges(), 1))
 
-    rgc_basis = nn.RelGraphConvBasis(10, 5, 5)
-    h = th.randn((100, 10))
+    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_basis(g, h, r, norm)
-    assert list(h_new.shape) == [100, 5]
+    assert list(h_new.shape) == [100, O]
 
-    rgc_basis = nn.RelGraphConvBDD(10, 5, 5)
-    h = th.randn((100, 10))
+    rgc_bdd = nn.RelGraphConvBDD(I, O, R, B)
+    h = th.randn((100, I))
     r = th.tensor(etype)
-    h_new = rgc_basis(g, h, r, norm)
-    assert list(h_new.shape) == [100, 5]
+    h_new = rgc_bdd(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    # id input
+    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    h = th.randint(0, I, (100,))
+    r = th.tensor(etype)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
 
 if __name__ == '__main__':
-    #test_graph_conv()
-    #test_edge_softmax()
-    #test_set2set()
-    #test_glob_att_pool()
-    #test_simple_pool()
-    #test_set_trans()
+    test_graph_conv()
+    test_edge_softmax()
+    test_set2set()
+    test_glob_att_pool()
+    test_simple_pool()
+    test_set_trans()
     test_rgcn()

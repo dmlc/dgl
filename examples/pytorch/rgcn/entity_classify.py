@@ -14,8 +14,8 @@ import time
 import torch
 import torch.nn.functional as F
 from dgl import DGLGraph
+from dgl.nn.pytorch import RelGraphConvBasis
 from dgl.contrib.data import load_data
-import dgl.function as fn
 from functools import partial
 
 from layers import RGCNBasisLayer as RGCNLayer
@@ -33,10 +33,14 @@ class EntityClassify(BaseRGCN):
                          activation=F.relu, is_input_layer=True)
 
     def build_hidden_layer(self, idx):
+        #return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels, num_bases,
+                #activation=F.relu)
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
                          activation=F.relu)
 
     def build_output_layer(self):
+        #return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels, num_bases,
+                #activation=partial(F.softmax, dim=1))
         return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
                          activation=partial(F.softmax, dim=1))
 
