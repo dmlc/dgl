@@ -18,7 +18,6 @@ from dgl.nn.pytorch import RelGraphConvBasis
 from dgl.contrib.data import load_data
 from functools import partial
 
-from layers import RGCNBasisLayer as RGCNLayer
 from model import BaseRGCN
 
 class EntityClassify(BaseRGCN):
@@ -81,7 +80,6 @@ def main(args):
     g = DGLGraph()
     g.add_nodes(num_nodes)
     g.add_edges(data.edge_src, data.edge_dst)
-    g.edata.update({'type': edge_type, 'norm': edge_norm})
 
     # create model
     model = EntityClassify(len(g),

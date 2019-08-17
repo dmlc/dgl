@@ -108,6 +108,7 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
     return g, uniq_v, rel, norm, samples, labels
 
 def comp_deg_norm(g):
+    g = g.local_var()
     in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
     norm = 1.0 / in_deg
     norm[np.isinf(norm)] = 0
@@ -187,9 +188,8 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
 
 # TODO (lingfan): implement filtered metrics
 # return MRR (raw), and Hits @ (1, 3, 10)
-def evaluate(test_graph, model, test_triplets, num_entity, hits=[], eval_bz=100):
+def calc_mrr(embedding, w, test_triplets, num_entity, hits=[], eval_bz=100):
     with torch.no_grad():
-        embedding, w = model.evaluate(test_graph)
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
         o = test_triplets[:, 2]
@@ -209,4 +209,3 @@ def evaluate(test_graph, model, test_triplets, num_entity, hits=[], eval_bz=100)
             avg_count = torch.mean((ranks <= hit).float())
             print("Hits (raw) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
-
