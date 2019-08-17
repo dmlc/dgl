@@ -30,15 +30,18 @@ class EntityClassify(BaseRGCN):
 
     def build_input_layer(self):
         return RelGraphConvBasis(self.num_nodes, self.h_dim, self.num_rels,
-                self.num_bases, activation=F.relu, dropout=self.dropout)
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_hidden_layer(self, idx):
         return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels,
-                self.num_bases, activation=F.relu, dropout=self.dropout)
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_output_layer(self):
         return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels,
-                self.num_bases, activation=partial(F.softmax, dim=1))
+                self.num_bases, activation=partial(F.softmax, dim=1),
+                self_loop=self.use_self_loop)
 
 def main(args):
     # load graph data
@@ -155,6 +158,8 @@ if __name__ == '__main__':
             help="l2 norm coef")
     parser.add_argument("--relabel", default=False, action='store_true',
             help="remove untouched nodes and relabel")
+    parser.add_argument("--use-self-loop", default=False, action='store_true',
+            help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
