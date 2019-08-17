@@ -48,8 +48,7 @@ def bmm_maybe_select(A, B, index):
     """Slice submatrices of A by the given index and perform bmm.
 
     B is a 3D tensor of shape (N, D1, D2), which can be viewed as a stack of
-    N matrices of shape (D1, D2). The input index is an integer vector of length
-    M.
+    N matrices of shape (D1, D2). The input index is an integer vector of length M.
     A could be either:
     (1) a dense tensor of shape (M, D1),
     (2) an integer vector of length M.
@@ -80,7 +79,11 @@ def bmm_maybe_select(A, B, index):
         return tensor
     """
     if A.dtype == th.int64 and len(A.shape) == 1:
-        return B[index, A, :]
+        # following is a faster version of B[index, A, :]
+        #return B[index, A, :]
+        B = B.view(-1, B.shape[2])
+        flatidx = index * B.shape[1] + A
+        return B.index_select(0, flatidx)
     else:
         BB = B.index_select(0, index)
         return th.bmm(A.unsqueeze(1), BB).squeeze()
