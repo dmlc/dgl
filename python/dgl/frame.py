@@ -215,10 +215,8 @@ class Frame(MutableMapping):
         self._remote_init_builder = None
         self._default_initializer = None
 
-    def _warn_and_set_initializer(self):
-        dgl_warning('Initializer is not set. Use zero initializer instead.'
-                    ' To suppress this warning, use `set_initializer` to'
-                    ' explicitly specify which initializer to use.')
+    def _set_zero_default_initializer(self):
+        """Set the default initializer to be zero initializer."""
         self._default_initializer = zero_initializer
 
     def get_initializer(self, column=None):
@@ -279,7 +277,7 @@ class Frame(MutableMapping):
             return None
 
         if self.get_initializer(name) is None:
-            self._warn_and_set_initializer()
+            self._set_zero_default_initializer()
         initializer = self.get_initializer(name)
         return self._remote_init_builder(initializer, name)
 
@@ -364,7 +362,7 @@ class Frame(MutableMapping):
             init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         else:
             if self.get_initializer(name) is None:
-                self._warn_and_set_initializer()
+                self._set_zero_default_initializer()
             initializer = self.get_initializer(name)
             init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
                                     ctx, slice(0, self.num_rows))
@@ -386,7 +384,7 @@ class Frame(MutableMapping):
             scheme = col.scheme
             ctx = F.context(col.data)
             if self.get_initializer(key) is None:
-                self._warn_and_set_initializer()
+                self._set_zero_default_initializer()
             initializer = self.get_initializer(key)
             new_data = initializer((num_rows,) + scheme.shape, scheme.dtype,
                                    ctx, slice(self._num_rows, self._num_rows + num_rows))
@@ -433,7 +431,7 @@ class Frame(MutableMapping):
                 scheme = col.scheme
                 ctx = F.context(col.data)
                 if self.get_initializer(key) is None:
-                    self._warn_and_set_initializer()
+                    self._set_zero_default_initializer()
                 initializer = self.get_initializer(key)
                 new_data = initializer((other.num_rows,) + scheme.shape,
                                        scheme.dtype, ctx,
@@ -902,10 +900,23 @@ def frame_like(other, num_rows):
     newf = Frame(num_rows=num_rows)
     # set global initializr
     if other.get_initializer() is None:
-        other._warn_and_set_initializer()
-    newf._default_initializer = other._default_initializer
+        other._set_zero_default_initializer()
+    sync_frame_initializer(newf, other)
+    return newf
+
+def sync_frame_initializer(new_frame, reference_frame):
+    """Set the initializers of the new_frame to be the same as the reference_frame,
+    for both the default initializer and per-column initializers.
+
+    Parameters
+    ----------
+    new_frame : Frame
+        The frame to set initializers
+    reference_frame : Frame
+        The frame to copy initializers
+    """
+    new_frame._default_initializer = reference_frame._default_initializer
     # set per-col initializer
     # TODO(minjie): hack; cannot rely on keys as the _initializers
     #   now supports non-exist columns.
-    newf._initializers = other._initializers
-    return newf
+    new_frame._initializers = reference_frame._initializers

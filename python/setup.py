@@ -110,7 +110,7 @@ if include_libs:
     }
 
 setup(
-    name='dgl',
+    name='dgl' + os.getenv('DGL_PACKAGE_SUFFIX', ''),
     version=VERSION,
     description='Deep Graph Library',
     zip_safe=False,
