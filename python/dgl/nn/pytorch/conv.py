@@ -225,7 +225,6 @@ class _BaseRelGraphConv(nn.Module):
             g.edata['norm'] = norm
         if self.self_loop:
             loop_message = utils.matmul_maybe_select(g.ndata['h'], self.loop_weight)
-            loop_message = self.dropout(loop_message)
 
         # message passing
         g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
@@ -238,6 +237,7 @@ class _BaseRelGraphConv(nn.Module):
             node_repr = node_repr + loop_message
         if self.activation:
             node_repr = self.activation(node_repr)
+        node_repr = self.dropout(node_repr)
 
         return node_repr
 

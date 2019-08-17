@@ -80,7 +80,6 @@ def bmm_maybe_select(A, B, index):
     """
     if A.dtype == th.int64 and len(A.shape) == 1:
         # following is a faster version of B[index, A, :]
-        #return B[index, A, :]
         B = B.view(-1, B.shape[2])
         flatidx = index * B.shape[1] + A
         return B.index_select(0, flatidx)

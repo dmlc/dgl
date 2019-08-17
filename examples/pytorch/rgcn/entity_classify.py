@@ -29,25 +29,16 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        num_bases = None if self.num_bases < 0 else self.num_bases
-        return RelGraphConvBasis(self.num_nodes, self.h_dim, self.num_rels, num_bases,
-                         activation=F.relu, dropout=0.5)
-        #return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
-                         #activation=F.relu, is_input_layer=True)
+        return RelGraphConvBasis(self.num_nodes, self.h_dim, self.num_rels,
+                self.num_bases, activation=F.relu, dropout=self.dropout)
 
     def build_hidden_layer(self, idx):
-        num_bases = None if self.num_bases < 0 else self.num_bases
-        return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels, num_bases,
-                activation=F.relu, dropout=0.5)
-        #return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         #activation=F.relu)
+        return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels,
+                self.num_bases, activation=F.relu, dropout=self.dropout)
 
     def build_output_layer(self):
-        num_bases = None if self.num_bases < 0 else self.num_bases
-        return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels, num_bases,
-                activation=partial(F.softmax, dim=1))
-        #return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
-                         #activation=partial(F.softmax, dim=1))
+        return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels,
+                self.num_bases, activation=partial(F.softmax, dim=1))
 
 def main(args):
     # load graph data
