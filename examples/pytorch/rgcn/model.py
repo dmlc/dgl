@@ -16,9 +16,6 @@ class BaseRGCN(nn.Module):
         # create rgcn layers
         self.build_model()
 
-        # create initial features
-        self.features = self.create_features()
-
     def build_model(self):
         self.layers = nn.ModuleList()
         # i2h
@@ -47,10 +44,7 @@ class BaseRGCN(nn.Module):
     def build_output_layer(self):
         return None
 
-    def forward(self, g):
-        if self.features is not None:
-            g.ndata['id'] = self.features
+    def forward(self, g, h, r, norm):
         for layer in self.layers:
-            layer(g)
-        return g.ndata.pop('h')
-
+            h = layer(g, h, r, norm)
+        return h

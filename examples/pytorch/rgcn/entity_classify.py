@@ -29,20 +29,25 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu, is_input_layer=True)
+        num_bases = None if self.num_bases < 0 else self.num_bases
+        return RelGraphConvBasis(self.num_nodes, self.h_dim, self.num_rels, num_bases,
+                         activation=F.relu, dropout=0.5)
+        #return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
+                         #activation=F.relu, is_input_layer=True)
 
     def build_hidden_layer(self, idx):
-        #return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels, num_bases,
-                #activation=F.relu)
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu)
+        num_bases = None if self.num_bases < 0 else self.num_bases
+        return RelGraphConvBasis(self.h_dim, self.h_dim, self.num_rels, num_bases,
+                activation=F.relu, dropout=0.5)
+        #return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
+                         #activation=F.relu)
 
     def build_output_layer(self):
-        #return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels, num_bases,
-                #activation=partial(F.softmax, dim=1))
-        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
-                         activation=partial(F.softmax, dim=1))
+        num_bases = None if self.num_bases < 0 else self.num_bases
+        return RelGraphConvBasis(self.h_dim, self.out_dim, self.num_rels, num_bases,
+                activation=partial(F.softmax, dim=1))
+        #return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
+                         #activation=partial(F.softmax, dim=1))
 
 def main(args):
     # load graph data
@@ -61,6 +66,9 @@ def main(args):
     else:
         val_idx = train_idx
 
+    # since the nodes are featureless, the input feature is then the node id.
+    feats = torch.arange(num_nodes)
+
     # edge type and normalization factor
     edge_type = torch.from_numpy(data.edge_type)
     edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
@@ -70,6 +78,7 @@ def main(args):
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
     if use_cuda:
         torch.cuda.set_device(args.gpu)
+        feats = feats.cuda()
         edge_type = edge_type.cuda()
         edge_norm = edge_norm.cuda()
         labels = labels.cuda()
@@ -104,7 +113,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward(g)
+        logits = model.forward(g, feats, edge_type, edge_norm)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -123,7 +132,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(g)
+    logits = model.forward(g, feats, edge_type, edge_norm)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
@@ -164,4 +173,3 @@ if __name__ == '__main__':
     print(args)
     args.bfs_level = args.n_layers + 1 # pruning used nodes for memory
     main(args)
-
