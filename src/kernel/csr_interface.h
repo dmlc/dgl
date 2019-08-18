@@ -13,6 +13,13 @@
 namespace dgl {
 namespace kernel {
 
+/*!
+ * \brief Wrapper class that unifies ImmutableGraph and Bipartite, which do
+ * not share a base class.
+ *
+ * \note This is an ugly temporary solution, and shall be removed after
+ * refactoring ImmutableGraph and Bipartite to use the same data structure.
+ */
 class CSRWrapper {
  public:
   virtual aten::CSRMatrix GetInCSRMatrix() const = 0;
