@@ -1,7 +1,7 @@
 """Utilities for pytorch NN package"""
+#pylint: disable=no-member, invalid-name
 
 import torch as th
-from torch import nn
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.

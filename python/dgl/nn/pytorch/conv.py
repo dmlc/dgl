@@ -194,7 +194,7 @@ class _BaseRelGraphConv(nn.Module):
 
     def message_func(self, edges):
         """Message function that should be implemented by the subclass."""
-        raise NotImplemented()
+        raise NotImplementedError
 
     def forward(self, g, h, r, norm=None):
         """Forward computation
@@ -299,7 +299,7 @@ class RelGraphConvBasis(_BaseRelGraphConv):
             weight = self.weight.view(self.num_bases,
                                       self.in_feat * self.out_feat)
             weight = th.matmul(self.w_comp, weight).view(
-                    self.num_rels, self.in_feat, self.out_feat)
+                self.num_rels, self.in_feat, self.out_feat)
         else:
             weight = self.weight
 
@@ -342,8 +342,8 @@ class RelGraphConvBDD(_BaseRelGraphConv):
                  self_loop=False,
                  dropout=0.0):
         super(RelGraphConvBDD, self).__init__(in_feat, out_feat, bias,
-                                             activation, self_loop,
-                                             dropout)
+                                              activation, self_loop,
+                                              dropout)
         self.num_rels = num_rels
         self.num_bases = num_bases
         if self.num_bases is None or self.num_bases > self.num_rels:
@@ -364,7 +364,7 @@ class RelGraphConvBDD(_BaseRelGraphConv):
         if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
         weight = self.weight.index_select(0, edges.data['type']).view(
-                    -1, self.submat_in, self.submat_out)
+            -1, self.submat_in, self.submat_out)
         node = edges.src['h'].view(-1, 1, self.submat_in)
         msg = th.bmm(node, weight).view(-1, self.out_feat)
         if 'norm' in edges.data:
