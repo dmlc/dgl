@@ -1,9 +1,10 @@
 import mxnet as mx
 import networkx as nx
 import numpy as np
+import scipy as sp
 import dgl
 import dgl.nn.mxnet as nn
-from mxnet import autograd, gluon
+from mxnet import autograd, gluon, nd
 
 def check_close(a, b):
     assert np.allclose(a.asnumpy(), b.asnumpy(), rtol=1e-4, atol=1e-4)
@@ -178,9 +179,61 @@ def test_edge_softmax():
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
             1e-4, 1e-4)
 
+def test_rgcn():
+    ctx = mx.cpu(0)
+    etype = []
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    B = 2
+    I = 10
+    O = 8
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randn(100, I)
+    r = nd.array(etype)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd.initialize(ctx=ctx)
+    h = nd.random.randn(100, I)
+    r = nd.array(etype)
+    h_new = rgc_bdd(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    # with norm
+    norm = nd.zeros((g.number_of_edges(), 1))
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randn(100, I)
+    r = nd.array(etype)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd.initialize(ctx=ctx)
+    h = nd.random.randn(100, I)
+    r = nd.array(etype)
+    h_new = rgc_bdd(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    # id input
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randint(0, I, (100,))
+    r = nd.array(etype)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
+    test_rgcn()
