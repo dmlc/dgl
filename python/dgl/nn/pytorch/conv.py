@@ -204,7 +204,7 @@ class _BaseRelGraphConv(nn.Module):
         g : DGLGraph
             The graph.
         h : torch.Tensor
-            Input node features. Could be either:
+            Input node features. Could be either
               - (|V|, D) dense tensor
               - (|V|,) int64 vector, representing the categorical values of each
                 node. We then treat the input feature as an one-hot encoding feature.
@@ -333,7 +333,7 @@ class RelGraphConvBasis(_BaseRelGraphConv):
         return {'msg': msg}
 
 class RelGraphConvBDD(_BaseRelGraphConv):
-    r"""Relational Graph Convolution with block-diagonal-decomposition.
+    r"""Relational Graph Convolution with block-diagonal-decomposition regularization.
 
     Relational graph convolution is introduced in "`Modeling Relational Data with Graph
     Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
