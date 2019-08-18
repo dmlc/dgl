@@ -142,7 +142,8 @@ def main(args):
         g, node_id, edge_type, node_norm, data, labels = \
             utils.generate_sampled_graph_and_labels(
                 train_data, args.graph_batch_size, args.graph_split_size,
-                num_rels, adj_list, degrees, args.negative_sample)
+                num_rels, adj_list, degrees, args.negative_sample,
+                args.edge_sampler)
         print("Done edge sampling")
 
         # set node/edge feature
@@ -243,6 +244,8 @@ if __name__ == '__main__':
             help="number of negative samples per positive sample")
     parser.add_argument("--evaluate-every", type=int, default=500,
             help="perform evaluation every n epochs")
+    parser.add_argument("--edge-sampler", type=str, default="uniform",
+            help="type of edge sampler: 'uniform' or 'neighbor'")
 
     args = parser.parse_args()
     print(args)

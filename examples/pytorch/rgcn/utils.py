@@ -28,9 +28,11 @@ def get_adj_and_degrees(num_nodes, triplets):
     return adj_list, degrees
 
 def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
-    """ Edge neighborhood sampling to reduce training graph size
-    """
+    """Sample edges by neighborhool expansion.
 
+    This guarantees that the sampled edges form a connected graph, which
+    may help deeper GNNs that require information from more than one hop.
+    """
     edges = np.zeros((sample_size), dtype=np.int32)
 
     #initialize
@@ -69,16 +71,25 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
+def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
+    """Sample edges uniformly from all the edges."""
+    all_edges = np.arange(n_triplets)
+    return np.random.choice(all_edges, sample_size, replace=False)
+
 def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
                                       num_rels, adj_list, degrees,
-                                      negative_rate):
+                                      negative_rate, sampler="uniform"):
     """Get training graph and signals
     First perform edge neighborhood sampling on graph, then perform negative
     sampling to generate negative samples
     """
     # perform edge neighbor sampling
-    edges = sample_edge_neighborhood(adj_list, degrees, len(triplets),
-                                     sample_size)
+    if sampler == "uniform":
+        edges = sample_edge_uniform(adj_list, degrees, len(triplets), sample_size)
+    elif sampler == "neighbor":
+        edges = sample_edge_neighborhood(adj_list, degrees, len(triplets), sample_size)
+    else:
+        raise ValueError("Sampler type must be either 'uniform' or 'neighbor'.")
 
     # relabel nodes to have consecutive node ids
     edges = triplets[edges]
