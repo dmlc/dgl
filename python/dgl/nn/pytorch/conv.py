@@ -263,6 +263,7 @@ class RelGraphConv(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def basis_message_func(self, edges):
+        """Message function for basis regularizer"""
         if self.num_bases < self.num_rels:
             # generate all weights from bases
             weight = self.weight.view(self.num_bases,
@@ -278,6 +279,7 @@ class RelGraphConv(nn.Module):
         return {'msg': msg}
 
     def bdd_message_func(self, edges):
+        """Message function for block-diagonal-decomposition regularizer"""
         if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
         weight = self.weight.index_select(0, edges.data['type']).view(

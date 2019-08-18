@@ -249,16 +249,17 @@ class RelGraphConv(gluon.Block):
         # bias
         if self.bias:
             self.h_bias = self.params.get('bias', shape=(out_feat,),
-                init=mx.init.Zero())
+                                          init=mx.init.Zero())
 
         # weight for self loop
         if self.self_loop:
-            self.loop_weight = self.params.get('W_0', shape=(in_feat, out_feat),
-                init=mx.init.Xavier())
+            self.loop_weight = self.params.get(
+                'W_0', shape=(in_feat, out_feat), init=mx.init.Xavier())
 
         self.dropout = nn.Dropout(dropout)
 
     def basis_message_func(self, edges):
+        """Message function for basis regularizer"""
         ctx = edges.src['h'].context
         if self.num_bases < self.num_rels:
             # generate all weights from bases
@@ -275,10 +276,11 @@ class RelGraphConv(gluon.Block):
         return {'msg': msg}
 
     def bdd_message_func(self, edges):
+        """Message function for block-diagonal-decomposition regularizer"""
         ctx = edges.src['h'].context
         if edges.src['h'].dtype == np.int64 and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
-        weight = self.weight.data(ctx)[edges.data['type'],:].reshape(
+        weight = self.weight.data(ctx)[edges.data['type'], :].reshape(
             -1, self.submat_in, self.submat_out)
         node = edges.src['h'].reshape(-1, 1, self.submat_in)
         msg = nd.batch_dot(node, weight).reshape(-1, self.out_feat)
@@ -293,19 +295,19 @@ class RelGraphConv(gluon.Block):
         ----------
         g : DGLGraph
             The graph.
-        h : torch.Tensor
+        h : mx.ndarray.NDArray
             Input node features. Could be either
               - (|V|, D) dense tensor
               - (|V|,) int64 vector, representing the categorical values of each
                 node. We then treat the input feature as an one-hot encoding feature.
-        r : torch.Tensor
+        r : mx.ndarray.NDArray
             Edge type tensor. Shape: (|E|,)
-        norm : torch.Tensor
+        norm : mx.ndarray.NDArray
             Optional edge normalizer tensor. Shape: (|E|, 1)
 
         Returns
         -------
-        torch.Tensor
+        mx.ndarray.NDArray
             New node features.
         """
         g = g.local_var()

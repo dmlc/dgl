@@ -1,7 +1,6 @@
 """Utilities for pytorch NN package"""
 #pylint: disable=no-member, invalid-name
 
-import mxnet as mx
 from mxnet import nd
 import numpy as np
 
