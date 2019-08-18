@@ -206,13 +206,13 @@ def schedule_update_all(graph,
     apply_func: callable
         The apply node function
     """
-    if graph.number_of_edges() == 0:
+    if graph._number_of_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph._number_of_dst_nodes()))
             schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
-        eid = utils.toindex(slice(0, graph.number_of_edges())) # ALL
+        eid = utils.toindex(slice(0, graph._number_of_edges())) # ALL
         recv_nodes = utils.toindex(slice(0, graph._number_of_dst_nodes())) # ALL
         # create vars
         var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
@@ -944,7 +944,7 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
     var_eid = var.IDX(eid)
 
     if mfunc_is_list:
-        if eid.is_slice(0, graph.number_of_edges()):
+        if eid.is_slice(0, graph._number_of_edges()):
             # full graph case
             res = spmv.build_gidx_and_mapping_graph(graph)
         else:
