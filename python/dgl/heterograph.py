@@ -1751,10 +1751,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 v_ntype = utils.toindex(v[ntype])
             with ir.prog() as prog:
                 scheduler.schedule_apply_nodes(
-                        graph=self._create_view(self._ntypes_invmap[ntype], None),
-                        v=v_ntype,
-                        apply_func=nfunc,
-                        inplace=inplace)
+                    graph=self._create_view(self._ntypes_invmap[ntype], None),
+                    v=v_ntype,
+                    apply_func=nfunc,
+                    inplace=inplace)
                 Runtime.run(prog)
 
     def apply_edges(self, func, edges=ALL, inplace=False):
@@ -1802,12 +1802,12 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
             with ir.prog() as prog:
                 scheduler.schedule_apply_edges(
-                        graph=self._create_view(None, etype_idx),
-                        u=u,
-                        v=v,
-                        eid=eid,
-                        apply_func=efunc,
-                        inplace=inplace)
+                    graph=self._create_view(None, etype_idx),
+                    u=u,
+                    v=v,
+                    eid=eid,
+                    apply_func=efunc,
+                    inplace=inplace)
                 Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
@@ -1850,13 +1850,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
             with ir.prog() as prog:
                 scheduler.schedule_group_apply_edge(
-                        graph=self._create_view(None, etype_idx),
-                        u=u,
-                        v=v,
-                        eid=eid,
-                        apply_func=efunc,
-                        group_by=group_by,
-                        inplace=inplace)
+                    graph=self._create_view(None, etype_idx),
+                    u=u,
+                    v=v,
+                    eid=eid,
+                    apply_func=efunc,
+                    group_by=group_by,
+                    inplace=inplace)
                 Runtime.run(prog)
 
     def send(self, edges=ALL, message_func=None):
