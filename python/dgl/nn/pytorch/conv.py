@@ -290,19 +290,19 @@ class RelGraphConv(nn.Module):
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def forward(self, g, h, r, norm=None):
+    def forward(self, g, x, etypes, norm=None):
         """Forward computation
 
         Parameters
         ----------
         g : DGLGraph
             The graph.
-        h : torch.Tensor
+        x : torch.Tensor
             Input node features. Could be either
               - (|V|, D) dense tensor
               - (|V|,) int64 vector, representing the categorical values of each
                 node. We then treat the input feature as an one-hot encoding feature.
-        r : torch.Tensor
+        etypes : torch.Tensor
             Edge type tensor. Shape: (|E|,)
         norm : torch.Tensor
             Optional edge normalizer tensor. Shape: (|E|, 1)
@@ -313,12 +313,12 @@ class RelGraphConv(nn.Module):
             New node features.
         """
         g = g.local_var()
-        g.ndata['h'] = h
-        g.edata['type'] = r
+        g.ndata['h'] = x
+        g.edata['type'] = etypes
         if norm is not None:
             g.edata['norm'] = norm
         if self.self_loop:
-            loop_message = utils.matmul_maybe_select(g.ndata['h'], self.loop_weight)
+            loop_message = utils.matmul_maybe_select(x, self.loop_weight)
 
         # message passing
         g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
