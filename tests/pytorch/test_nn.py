@@ -255,13 +255,13 @@ def test_rgcn():
     I = 10
     O = 8
 
-    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
-    rgc_bdd = nn.RelGraphConvBDD(I, O, R, B)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_bdd(g, h, r)
@@ -270,20 +270,20 @@ def test_rgcn():
     # with norm
     norm = th.zeros((g.number_of_edges(), 1))
 
-    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_basis(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
-    rgc_bdd = nn.RelGraphConvBDD(I, O, R, B)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     h = th.randn((100, I))
     r = th.tensor(etype)
     h_new = rgc_bdd(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
     # id input
-    rgc_basis = nn.RelGraphConvBasis(I, O, R, B)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     h = th.randint(0, I, (100,))
     r = th.tensor(etype)
     h_new = rgc_basis(g, h, r)

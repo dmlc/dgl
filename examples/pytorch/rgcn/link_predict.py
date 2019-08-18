@@ -15,9 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import random
 from dgl.contrib.data import load_data
-from dgl.nn.pytorch import RelGraphConvBDD
+from dgl.nn.pytorch import RelGraphConv
 
-from layers import RGCNBlockLayer as RGCNLayer
 from model import BaseRGCN
 
 import utils
@@ -36,11 +35,9 @@ class RGCN(BaseRGCN):
 
     def build_hidden_layer(self, idx):
         act = F.relu if idx < self.num_hidden_layers - 1 else None
-        return RelGraphConvBDD(self.h_dim, self.h_dim, self.num_rels,
+        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "bdd",
                 self.num_bases, activation=act, self_loop=True,
                 dropout=self.dropout)
-        #return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         #activation=act, self_loop=True, dropout=self.dropout)
 
 class LinkPredict(nn.Module):
     def __init__(self, in_dim, h_dim, num_rels, num_bases=-1,
@@ -250,4 +247,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
     main(args)
-

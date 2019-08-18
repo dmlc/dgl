@@ -12,11 +12,7 @@ dgl.nn.pytorch.conv
     :members: weight, bias, forward, reset_parameters
     :show-inheritance:
 
-.. autoclass:: dgl.nn.pytorch.conv.RelGraphConvBasis
-    :members: forward
-    :show-inheritance:
-
-.. autoclass:: dgl.nn.pytorch.conv.RelGraphConvBDD
+.. autoclass:: dgl.nn.pytorch.conv.RelGraphConv
     :members: forward
     :show-inheritance:
 
