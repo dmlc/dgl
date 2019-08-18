@@ -71,7 +71,7 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
-def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
+def sample_edge_uniform(adj_list, degrees, n_triplets, sample_size):
     """Sample edges uniformly from all the edges."""
     all_edges = np.arange(n_triplets)
     return np.random.choice(all_edges, sample_size, replace=False)
