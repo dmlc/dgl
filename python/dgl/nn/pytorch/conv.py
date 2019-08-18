@@ -151,7 +151,7 @@ class GraphConv(nn.Module):
         return summary.format(**self.__dict__)
 
 class _BaseRelGraphConv(nn.Module):
-    """Base Relational graph convolution layer.
+    r"""Base Relational graph convolution layer.
 
     Parameters
     ----------
@@ -242,9 +242,15 @@ class _BaseRelGraphConv(nn.Module):
         return node_repr
 
 class RelGraphConvBasis(_BaseRelGraphConv):
-    """Relational Graph Convolution with basis regularization.
+    r"""Relational Graph Convolution with basis regularization.
 
-    TODO: docstring of math equation.
+    Relational graph convolution is introduced in `this paper<https://arxiv.org/abs/1703.06103>`__
+    and can be described as below:
+
+    .. math::
+
+      h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
+      \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
 
     Parameters
     ----------
@@ -309,7 +315,7 @@ class RelGraphConvBasis(_BaseRelGraphConv):
         return {'msg': msg}
 
 class RelGraphConvBDD(_BaseRelGraphConv):
-    """Relational Graph Convolution with block-diagonal-decomposition.
+    r"""Relational Graph Convolution with block-diagonal-decomposition.
 
     TODO: docstring of math equation.
 
