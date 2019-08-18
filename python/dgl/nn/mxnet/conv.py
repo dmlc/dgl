@@ -316,7 +316,7 @@ class RelGraphConv(gluon.Block):
         if norm is not None:
             g.edata['norm'] = norm
         if self.self_loop:
-            loop_message = utils.matmul_maybe_select(x, self.loop_weight.data(h.context))
+            loop_message = utils.matmul_maybe_select(x, self.loop_weight.data(x.context))
 
         # message passing
         g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
@@ -324,7 +324,7 @@ class RelGraphConv(gluon.Block):
         # apply bias and activation
         node_repr = g.ndata['h']
         if self.bias:
-            node_repr = node_repr + self.h_bias.data(h.context)
+            node_repr = node_repr + self.h_bias.data(x.context)
         if self.self_loop:
             node_repr = node_repr + loop_message
         if self.activation:
