@@ -1,3 +1,4 @@
+import datetime
 import dgl
 import numpy as np
 import os
@@ -42,9 +43,12 @@ class Meter(object):
         return total_score / n_tasks
 
 class EarlyStopping(object):
-    def __init__(self, patience=10, filename="es_checkpoint.pth"):
-        assert not os.path.exists(filename), \
-            'Filename {} is occupied. Either rename it or delete it.'.format(filename)
+    def __init__(self, patience=10, filename=None):
+        if filename is None:
+            dt = datetime.datetime.now()
+            filename = 'early_stop_{}_{:02d}-{:02d}-{:02d}.pth'.format(
+                dt.date(), dt.hour, dt.minute, dt.second)
+
         self.patience = patience
         self.counter = 0
         self.filename = filename
