@@ -267,7 +267,7 @@ class HeteroNodeTypeView(object):
         self._ntype = ntype
 
     def __len__(self):
-        return self._graph.number_of_nodes(self._ntype_idx_invmap[self._ntype])
+        return self._graph.number_of_nodes(self._graph._ntypes_invmap[self._ntype])
 
     def __getitem__(self, nodes):
         if isinstance(nodes, slice):
@@ -308,7 +308,7 @@ class HeteroNodeTypeDataView(MutableMapping):
                        ' of nodes. Please use `del G.ndata[key]` instead.')
 
     def __len__(self):
-        return len(self._graph._node_frames[self._ntype_idx_invmap[self._ntype]])
+        return len(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
 
     def __iter__(self):
         return iter(self._graph.get_n_repr(self._ntype, self._nodes))
@@ -316,7 +316,7 @@ class HeteroNodeTypeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_n_repr(self._ntype, self._nodes)
         return repr({key : data[key]
-                     for key in self._graph._node_frames[self._ntype_idx_invmap[self._ntype]]})
+                     for key in self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]]})
 
 class HeteroNodeDataView(object):
     """The data view class when G.ndata is called."""
@@ -346,15 +346,15 @@ class HeteroNodeDataTypeView(MutableMapping):
         self._graph.pop_n_repr(self._ntype, key)
 
     def __len__(self):
-        return len(self._graph._node_frames[self._ntype_idx_invmap[self._ntype]])
+        return len(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
 
     def __iter__(self):
-        return iter(self._graph._node_frames[self._ntype_idx_invmap[self._ntype]])
+        return iter(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
 
     def __repr__(self):
         data = self._graph.get_n_repr(self._ntype)
         return repr({key : data[key]
-                     for key in self._graph._node_frames[self._ntype_idx_invmap[self._ntype]]})
+                     for key in self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]]})
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -380,7 +380,7 @@ class HeteroEdgeTypeView(object):
         self._etype = etype
 
     def __len__(self):
-        return self._graph.number_of_edges(self._etype_idx_invmap[self._etype])
+        return self._graph.number_of_edges(self._graph._etypes_invmap[self._etype])
 
     def __getitem__(self, edges):
         if isinstance(edges, slice):
@@ -421,7 +421,7 @@ class HeteroEdgeTypeDataView(MutableMapping):
                        ' of edges. Please use `del G.edata[key]` instead.')
 
     def __len__(self):
-        return len(self._graph._edge_frames[self._etype_idx_invmap[self._etype]])
+        return len(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
 
     def __iter__(self):
         return iter(self._graph.get_e_repr(self._etype, self._edges))
@@ -429,7 +429,7 @@ class HeteroEdgeTypeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_e_repr(self._etype, self._edges)
         return repr({key : data[key]
-                     for key in self._graph._edge_frames[self._etype_idx_invmap[self._etype]]})
+                     for key in self._graph._edge_frames[self._graph._etypes_invmap[self._etype]]})
 
 class HeteroEdgeDataView(object):
     """The data view class when G.edata is called."""
@@ -459,12 +459,12 @@ class HeteroEdgeDataTypeView(MutableMapping):
         self._graph.pop_e_repr(self._etype, key)
 
     def __len__(self):
-        return len(self._graph._edge_frames[self._etype_idx_invmap[self._etype]])
+        return len(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
 
     def __iter__(self):
-        return iter(self._graph._edge_frames[self._etype_idx_invmap[self._etype]])
+        return iter(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
 
     def __repr__(self):
         data = self._graph.get_e_repr(self._etype)
         return repr({key : data[key]
-                     for key in self._graph._edge_frames[self._etype_idx_invmap[self._etype]]})
+                     for key in self._graph._edge_frames[self._graph._etypes_invmap[self._etype]]})
