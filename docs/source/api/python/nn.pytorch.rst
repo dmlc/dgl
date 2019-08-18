@@ -13,9 +13,11 @@ dgl.nn.pytorch.conv
     :show-inheritance:
 
 .. autoclass:: dgl.nn.pytorch.conv.RelGraphConvBasis
+    :members: forward
     :show-inheritance:
 
 .. autoclass:: dgl.nn.pytorch.conv.RelGraphConvBDD
+    :members: forward
     :show-inheritance:
 
 dgl.nn.pytorch.glob

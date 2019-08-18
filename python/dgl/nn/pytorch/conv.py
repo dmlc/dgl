@@ -244,13 +244,31 @@ class _BaseRelGraphConv(nn.Module):
 class RelGraphConvBasis(_BaseRelGraphConv):
     r"""Relational Graph Convolution with basis regularization.
 
-    Relational graph convolution is introduced in `this paper<https://arxiv.org/abs/1703.06103>`__
+    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
     and can be described as below:
 
     .. math::
 
       h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
       \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+
+    where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
+    :math:`r`. :math:`c_{i,r}` is the normalizer equal
+    to :math:`|\mathcal{N}^r(i)|`. :math:`\sigma` is an activation function. :math:`W_0`
+    is the self-loop weight.
+
+    The basis regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+      W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
+
+    where :math:`B` is the number of bases.
+
+    See Also
+    --------
+    RelGraphConvBDD
 
     Parameters
     ----------
@@ -317,7 +335,26 @@ class RelGraphConvBasis(_BaseRelGraphConv):
 class RelGraphConvBDD(_BaseRelGraphConv):
     r"""Relational Graph Convolution with block-diagonal-decomposition.
 
-    TODO: docstring of math equation.
+    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+    and can be described as below:
+
+    .. math::
+
+      h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
+      \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+
+    where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
+    :math:`r`. :math:`c_{i,r}` is the normalizer equal
+    to :math:`|\mathcal{N}^r(i)|`. :math:`\sigma` is an activation function. :math:`W_0`
+    is the self-loop weight.
+
+    The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
+    number of block diagonal matrices. We refer :math:`B` as the number of bases.
+
+    See Also
+    --------
+    RelGraphConvBasis
 
     Parameters
     ----------
