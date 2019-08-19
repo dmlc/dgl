@@ -8,7 +8,6 @@
 
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
-#include <dgl/immutable_graph.h>
 
 #include <algorithm>
 #include <string>
@@ -18,6 +17,7 @@
 #endif
 #include "./binary_reduce.h"
 #include "./binary_reduce_impl_decl.h"
+#include "./csr_interface.h"
 #include "./utils.h"
 
 namespace dgl {
@@ -58,7 +58,7 @@ template <int XPU>
 void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -88,7 +88,7 @@ void BinaryReduceImpl(
     LOG(FATAL) << "reduce mean is not supported.";
   }
   const DLDataType& dtype = out_data->dtype;
-  const auto bits = graph->NumBits();
+  const auto bits = graph.NumBits();
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
@@ -151,7 +151,7 @@ template <int XPU>
 void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
@@ -181,7 +181,7 @@ void BackwardBinaryReduceImpl(
   const DLDataType& dtype = out_data->dtype;
   const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
-  const auto bits = graph->NumBits();
+  const auto bits = graph.NumBits();
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -250,7 +250,7 @@ void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_data,
@@ -279,7 +279,7 @@ void BinaryReduceBcastImpl(
 
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
-  const auto bits = graph->NumBits();
+  const auto bits = graph.NumBits();
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -359,7 +359,7 @@ void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
@@ -386,7 +386,7 @@ void BackwardBinaryReduceBcastImpl(
   const int bcast_ndim = info.out_shape.size();
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
-  const auto bits = graph->NumBits();
+  const auto bits = graph.NumBits();
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
