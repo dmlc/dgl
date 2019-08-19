@@ -1,5 +1,6 @@
 """MXNet modules for graph convolutions."""
 # pylint: disable= no-member, arguments-differ
+import math
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn
@@ -221,12 +222,12 @@ class RelGraphConv(gluon.Block):
             # add basis weights
             self.weight = self.params.get(
                 'weight', shape=(self.num_bases, self.in_feat, self.out_feat),
-                init=mx.init.Xavier())
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             if self.num_bases < self.num_rels:
                 # linear combination coefficients
                 self.w_comp = self.params.get(
                     'w_comp', shape=(self.num_rels, self.num_bases),
-                    init=mx.init.Xavier())
+                    init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             # message func
             self.message_func = self.basis_message_func
         elif regularizer == "bdd":
@@ -240,7 +241,7 @@ class RelGraphConv(gluon.Block):
             self.weight = self.params.get(
                 'weight',
                 shape=(self.num_rels, self.num_bases * self.submat_in * self.submat_out),
-                init=mx.init.Xavier())
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             # message func
             self.message_func = self.bdd_message_func
         else:
@@ -254,7 +255,8 @@ class RelGraphConv(gluon.Block):
         # weight for self loop
         if self.self_loop:
             self.loop_weight = self.params.get(
-                'W_0', shape=(in_feat, out_feat), init=mx.init.Xavier())
+                'W_0', shape=(in_feat, out_feat),
+                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
 
         self.dropout = nn.Dropout(dropout)
 
@@ -278,7 +280,7 @@ class RelGraphConv(gluon.Block):
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
         ctx = edges.src['h'].context
-        if edges.src['h'].dtype == np.int64 and len(edges.src['h'].shape) == 1:
+        if edges.src['h'].dtype in (np.int32, np.int64) and len(edges.src['h'].shape) == 1:
             raise TypeError('Block decomposition does not allow integer ID feature.')
         weight = self.weight.data(ctx)[edges.data['type'], :].reshape(
             -1, self.submat_in, self.submat_out)

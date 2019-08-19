@@ -58,7 +58,7 @@ def main(args):
     # since the nodes are featureless, the input feature is then the node id.
     feats = mx.nd.arange(num_nodes, dtype='int32')
     # edge type and normalization factor
-    edge_type = mx.nd.array(data.edge_type)
+    edge_type = mx.nd.array(data.edge_type, dtype='int32')
     edge_norm = mx.nd.array(data.edge_norm).expand_dims(1)
     labels = mx.nd.array(labels).reshape((-1))
 
