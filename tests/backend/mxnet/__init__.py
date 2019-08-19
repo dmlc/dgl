@@ -25,6 +25,9 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return nd.random.randn(*shape)
 
+def rand(shape):
+    return nd.random.randint(0, 1, *shape)
+
 def attach_grad(x):
     x.attach_grad()
     return x

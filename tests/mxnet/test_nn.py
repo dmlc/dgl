@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 import dgl
 import dgl.nn.mxnet as nn
+import backend as F
 from mxnet import autograd, gluon
 
 def check_close(a, b):
@@ -163,16 +164,16 @@ def uniform_attention(g, shape):
 def test_edge_softmax():
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
-    edata = mx.nd.ones((g.number_of_edges(), 1))
-    a = nn.edge_softmax(g, edata)
+    edata = F.ones((g.number_of_edges(), 1))
+    a = F.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
             1e-4, 1e-4)
 
     # Test higher dimension case
-    edata = mx.nd.ones((g.number_of_edges(), 3, 1))
-    a = nn.edge_softmax(g, edata)
+    edata = F.ones((g.number_of_edges(), 3, 1))
+    a = F.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),

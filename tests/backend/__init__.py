@@ -1,4 +1,5 @@
 from dgl.backend import *
+from dgl.nn import *
 from . import backend_unittest
 import os
 import importlib
@@ -22,6 +23,7 @@ for api in backend_unittest.__dict__.keys():
 _zeros = zeros
 _ones = ones
 _randn = randn
+_rand = rand
 _tensor = tensor
 _arange = arange
 _full = full
@@ -42,6 +44,9 @@ def ones(shape, dtype=float32, ctx=_default_context):
 
 def randn(shape):
     return copy_to(_randn(shape), _default_context)
+
+def rand(shape):
+    return copy_to(_rand(shape), _default_context)
 
 def tensor(data, dtype=None):
     if dtype is None:

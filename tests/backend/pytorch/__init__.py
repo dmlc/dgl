@@ -18,6 +18,9 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
 def randn(shape):
     return th.randn(*shape)
 
+def rand(shape):
+    return th.rand(*shape)
+
 def attach_grad(x):
     if x.grad is not None:
         x.grad.zero_()

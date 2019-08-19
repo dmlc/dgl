@@ -4,7 +4,6 @@
 import socket
 
 from . import function
-from . import nn
 from . import contrib
 from . import container
 from . import random
@@ -22,3 +21,5 @@ from .traversal import *
 from .transform import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
+
+from . import nn
