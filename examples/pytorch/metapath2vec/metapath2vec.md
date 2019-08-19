@@ -41,15 +41,3 @@ Author Classfication Results for Metapath2vec:
 | ------ | -- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Macro-F1 | 0.9216 | 0.9262 | 0.9292 | 0.9303 | 0.9309 | 0.9314 | 0.9315 | 0.9316 | 0.9319 | 0.9320 |
 | Micro-F1 | 0.9279 | 0.9319 | 0.9346 | 0.9356 | 0.9361 | 0.9365 | 0.9365 | 0.9365 | 0.9367 | 0.9369 |
-
-Note that: 
-
-Testing files are available in "label 2" file;
-
-The above are results listed in the paper, in real experiments, exact numbers might be slightly different:
-
-1, For venue node classification results, when the size of the training dataset is small (e.g. 5%), the variance of the performance is large since the number of available labeled venues is small. 
-
-2, For author node classification results, the performance is stable since the number of available labeled authors is huge, so even 5% training data would be sufficient.
-
-3, In the test.py, you could change experiment times you want, especially it is very slow to test author classification so you could only do 1 or 2 times.
