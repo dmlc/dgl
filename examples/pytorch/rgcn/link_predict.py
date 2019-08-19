@@ -4,7 +4,12 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
 Difference compared to MichSchli/RelationPrediction
-* report raw metrics instead of filtered metrics
+* Report raw metrics instead of filtered metrics.
+* By default, we use uniform edge sampling instead of neighbor-based edge
+  sampling used in author's code. In practice, we find it achieves similar MRR
+  probably because the model only uses one GNN layer so messages are propagated
+  among immediate neighbors. User could specify "--edge-sampler=neighbor" to switch
+  to neighbor-based edge sampling.
 """
 
 import argparse
