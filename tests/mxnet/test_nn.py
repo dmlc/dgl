@@ -73,34 +73,38 @@ def test_graph_conv():
 
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
+    ctx = F.ctx()
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
+    s2s.initialize(ctx=ctx)
     print(s2s)
 
     # test#1: basic
-    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = s2s(h0, g)
     assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g])
-    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = s2s(h0, bg)
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
     g = dgl.DGLGraph(nx.path_graph(10))
+    ctx = F.ctx()
 
     gap = nn.GlobalAttentionPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
+    gap.initialize(ctx=ctx)
     print(gap)
     # test#1: basic
-    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = gap(h0, g)
     assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
-    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = gap(h0, bg)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
@@ -114,47 +118,46 @@ def test_simple_pool():
     print(sum_pool, avg_pool, max_pool, sort_pool)
 
     # test#1: basic
-    h0 = mx.nd.random.randn(g.number_of_nodes(), 5)
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = sum_pool(h0, g)
-    check_close(h1, mx.nd.sum(h0, 0))
+    check_close(h1, F.sum(h0, 0))
     h1 = avg_pool(h0, g)
-    check_close(h1, mx.nd.mean(h0, 0))
+    check_close(h1, F.mean(h0, 0))
     h1 = max_pool(h0, g)
-    check_close(h1, mx.nd.max(h0, 0))
+    check_close(h1, F.max(h0, 0))
     h1 = sort_pool(h0, g)
     assert h1.shape[0] == 10 * 5 and h1.ndim == 1
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
-    h0 = mx.nd.random.randn(bg.number_of_nodes(), 5)
+    h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = sum_pool(h0, bg)
-    truth = mx.nd.stack(mx.nd.sum(h0[:15], 0),
-                        mx.nd.sum(h0[15:20], 0),
-                        mx.nd.sum(h0[20:35], 0),
-                        mx.nd.sum(h0[35:40], 0),
-                        mx.nd.sum(h0[40:55], 0), axis=0)
+    truth = mx.nd.stack(F.sum(h0[:15], 0),
+                        F.sum(h0[15:20], 0),
+                        F.sum(h0[20:35], 0),
+                        F.sum(h0[35:40], 0),
+                        F.sum(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
     h1 = avg_pool(h0, bg)
-    truth = mx.nd.stack(mx.nd.mean(h0[:15], 0),
-                        mx.nd.mean(h0[15:20], 0),
-                        mx.nd.mean(h0[20:35], 0),
-                        mx.nd.mean(h0[35:40], 0),
-                        mx.nd.mean(h0[40:55], 0), axis=0)
+    truth = mx.nd.stack(F.mean(h0[:15], 0),
+                        F.mean(h0[15:20], 0),
+                        F.mean(h0[20:35], 0),
+                        F.mean(h0[35:40], 0),
+                        F.mean(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
     h1 = max_pool(h0, bg)
-    truth = mx.nd.stack(mx.nd.max(h0[:15], 0),
-                        mx.nd.max(h0[15:20], 0),
-                        mx.nd.max(h0[20:35], 0),
-                        mx.nd.max(h0[35:40], 0),
-                        mx.nd.max(h0[40:55], 0), axis=0)
+    truth = mx.nd.stack(F.max(h0[:15], 0),
+                        F.max(h0[15:20], 0),
+                        F.max(h0[20:35], 0),
+                        F.max(h0[35:40], 0),
+                        F.max(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
     h1 = sort_pool(h0, bg)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
-
 
 def uniform_attention(g, shape):
     a = mx.nd.ones(shape)
