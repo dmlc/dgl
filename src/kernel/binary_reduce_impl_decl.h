@@ -11,6 +11,7 @@
 #include <string>
 
 #include "./binary_reduce_common.h"
+#include "./csr_interface.h"
 
 namespace minigun {
 namespace advance {
@@ -20,9 +21,6 @@ struct RuntimeConfig;
 }  // namespace minigun
 
 namespace dgl {
-
-// forward declaration
-class ImmutableGraph;
 
 namespace kernel {
 
@@ -81,7 +79,7 @@ template <int XPU, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     GData<Idx, DType>* gdata);
 
 /*!
@@ -107,7 +105,7 @@ template <int XPU>
 void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping);
@@ -168,7 +166,7 @@ template <int XPU, int Mode, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     BackwardGData<Idx, DType>* gdata);
 
 /*!
@@ -196,7 +194,7 @@ template <int XPU>
 void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
@@ -269,7 +267,7 @@ template <int XPU, int NDim, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     BcastGData<NDim, Idx, DType>* gdata);
 
 /*!
@@ -296,7 +294,7 @@ void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -370,7 +368,7 @@ template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata);
 
 /*!
@@ -399,7 +397,7 @@ void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,

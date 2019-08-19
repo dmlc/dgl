@@ -691,6 +691,28 @@ def test_local_var():
     assert 'hh' not in g.ndata
     assert 'ww' not in g.edata
 
+    # test initializer1
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edges([0, 1], [1, 1])
+    g.set_n_initializer(dgl.init.zero_initializer)
+    def foo(g):
+        g = g.local_var()
+        g.nodes[0].data['h'] = F.ones((1, 1))
+        assert F.allclose(g.ndata['h'], F.tensor([[1.], [0.]]))
+    foo(g)
+    # test initializer2
+    def foo_e_initializer(shape, dtype, ctx, id_range):
+        return F.ones(shape)
+    g.set_e_initializer(foo_e_initializer, field='h')
+    def foo(g):
+        g = g.local_var()
+        g.edges[0, 1].data['h'] = F.ones((1, 1))
+        assert F.allclose(g.edata['h'], F.ones((2, 1)))
+        g.edges[0, 1].data['w'] = F.ones((1, 1))
+        assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
+    foo(g)
+
 def test_local_scope():
     g = DGLGraph(nx.path_graph(5))
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
@@ -741,6 +763,28 @@ def test_local_scope():
     foo(g)
     assert 'hh' not in g.ndata
     assert 'ww' not in g.edata
+
+    # test initializer1
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edges([0, 1], [1, 1])
+    g.set_n_initializer(dgl.init.zero_initializer)
+    def foo(g):
+        with g.local_scope():
+            g.nodes[0].data['h'] = F.ones((1, 1))
+            assert F.allclose(g.ndata['h'], F.tensor([[1.], [0.]]))
+    foo(g)
+    # test initializer2
+    def foo_e_initializer(shape, dtype, ctx, id_range):
+        return F.ones(shape)
+    g.set_e_initializer(foo_e_initializer, field='h')
+    def foo(g):
+        with g.local_scope():
+            g.edges[0, 1].data['h'] = F.ones((1, 1))
+            assert F.allclose(g.edata['h'], F.ones((2, 1)))
+            g.edges[0, 1].data['w'] = F.ones((1, 1))
+            assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
+    foo(g)
 
 if __name__ == '__main__':
     test_nx_conversion()

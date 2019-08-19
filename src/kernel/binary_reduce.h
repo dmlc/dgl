@@ -7,12 +7,12 @@
 #define DGL_KERNEL_BINARY_REDUCE_H_
 
 #include <dgl/runtime/ndarray.h>
-#include <dgl/immutable_graph.h>
 
 #include <vector>
 #include <string>
 
 #include "./binary_reduce_common.h"
+#include "./csr_interface.h"
 
 namespace dgl {
 namespace kernel {
@@ -83,7 +83,7 @@ std::vector<int64_t> InferBinaryFeatureShape(
 void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -126,7 +126,7 @@ void BinaryOpReduce(
 void BackwardLhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
     runtime::NDArray rhs_mapping,
@@ -173,7 +173,7 @@ void BackwardLhsBinaryOpReduce(
 void BackwardRhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
     runtime::NDArray rhs_mapping,
@@ -213,7 +213,7 @@ void BackwardRhsBinaryOpReduce(
  */
 void CopyReduce(
     const std::string& reducer,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target target,
     runtime::NDArray in_data, runtime::NDArray out_data,
     runtime::NDArray in_mapping, runtime::NDArray out_mapping);
@@ -236,7 +236,7 @@ void CopyReduce(
  */
 void BackwardCopyReduce(
     const std::string& reducer,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target target,
     runtime::NDArray in_mapping,
     runtime::NDArray out_mapping,
