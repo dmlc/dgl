@@ -7,8 +7,6 @@ import importlib
 
 from . import backend
 
-_enabled_nn_modules = set()
-
 def _gen_missing_nn_module(module, mod_name):
     def _missing_nn_module(*args, **kwargs):
         raise ImportError('nn.Module "%s" is not supported by backend "%s".'
@@ -32,24 +30,8 @@ def load_backend(mod_name):
         else:
             # load functions and classes
             if nn_module in mod.__dict__:
-                _enabled_nn_modules.add(nn_module)
                 setattr(thismod, nn_module, mod.__dict__[nn_module])
             else:
                 setattr(thismod, nn_module, _gen_missing_nn_module(nn_module, mod_name))
 
 load_backend(os.environ.get('DGLBACKEND', 'pytorch').lower())
-
-def is_enabled(nn_module):
-    """Return true if the nn.module is enabled by the current backend.
-
-    Parameters
-    ----------
-    nn_module : str
-                The nn.module name.
-
-    Returns
-    -------
-    bool
-        True if the nn_module is enabled by the current backend.
-    """
-    return nn_module in _enabled_nn_modules
