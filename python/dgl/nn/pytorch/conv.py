@@ -10,7 +10,9 @@ from ...transform import laplacian_lambda_max
 from .softmax import edge_softmax
 
 __all__ = ['GraphConv', 'GraphAttention', 'GraphSAGE',
-           'SGConv', 'APPNP', 'GINConv']
+           'SGConv', 'APPNP', 'GINConv', 'GatedGraphConv',
+           'PointConv', 'SplineConv', 'EdgeConv', 'DynamicEdgeConv',
+           'AGNN', 'GMMConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -527,3 +529,24 @@ class APPNP(nn.Module):
                  k,
                  activation):
         pass
+
+
+class PointConv(nn.Module):
+    pass
+
+class GMMConv(nn.Module):
+    pass
+
+class SplineConv(nn.Module):
+    pass
+
+class EdgeConv(nn.Module):
+    pass
+
+class DynamicEdgeConv(nn.Module):
+    pass
+
+class AGNN(nn.Module):
+    pass
+
+
