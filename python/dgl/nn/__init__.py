@@ -17,7 +17,7 @@ def _gen_missing_nn_module(module, mod_name):
     return _missing_nn_module
 
 def load_backend(mod_name):
-    """load backend module according to mod_name 
+    """load backend module according to mod_name
     Parameters
     ----------
     mod_name : str
@@ -25,7 +25,7 @@ def load_backend(mod_name):
     """
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
-    for nn_module in backend.__dict__.keys():
+    for nn_module in backend.__dict__:
         if nn_module.startswith('__'):
             # ignore python builtin attributes
             continue

@@ -9,5 +9,17 @@ that returns whether the interface is supported by the framework or not.
 # Softmax module
 
 def edge_softmax(graph, logits):
-    """Compute edge softmax"""
+    """Compute edge softmax
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to perform edge softmax
+    logits : Tensor
+        The input edge feature
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+    """
     pass
