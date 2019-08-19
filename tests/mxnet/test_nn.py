@@ -16,19 +16,19 @@ def _AXWb(A, X, W, b):
 
 def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3))
-    adj = g.adjacency_matrix()
-    ctx = mx.cpu(0)
+    ctx = F.ctx()
+    adj = g.adjacency_matrix(ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm=False, bias=True)
     conv.initialize(ctx=ctx)
     # test#1: basic
-    h0 = mx.nd.ones((3, 5))
+    h0 = F.ones((3, 5))
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
-    h0 = mx.nd.ones((3, 5, 5))
+    h0 = F.ones((3, 5, 5))
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
@@ -38,12 +38,12 @@ def test_graph_conv():
     conv.initialize(ctx=ctx)
 
     # test#3: basic
-    h0 = mx.nd.ones((3, 5))
+    h0 = F.ones((3, 5))
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
-    h0 = mx.nd.ones((3, 5, 5))
+    h0 = F.ones((3, 5, 5))
     h1 = conv(h0, g)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
@@ -53,23 +53,23 @@ def test_graph_conv():
 
     with autograd.train_mode():
         # test#3: basic
-        h0 = mx.nd.ones((3, 5))
+        h0 = F.ones((3, 5))
         h1 = conv(h0, g)
         assert len(g.ndata) == 0
         assert len(g.edata) == 0
         # test#4: basic
-        h0 = mx.nd.ones((3, 5, 5))
+        h0 = F.ones((3, 5, 5))
         h1 = conv(h0, g)
         assert len(g.ndata) == 0
         assert len(g.edata) == 0
 
     # test not override features
-    g.ndata["h"] = 2 * mx.nd.ones((3, 1))
+    g.ndata["h"] = 2 * F.ones((3, 1))
     h1 = conv(h0, g)
     assert len(g.ndata) == 1
     assert len(g.edata) == 0
     assert "h" in g.ndata
-    check_close(g.ndata['h'], 2 * mx.nd.ones((3, 1)))
+    check_close(g.ndata['h'], 2 * F.ones((3, 1)))
 
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
@@ -165,7 +165,7 @@ def test_edge_softmax():
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
     edata = F.ones((g.number_of_edges(), 1))
-    a = F.edge_softmax(g, edata)
+    a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
@@ -173,7 +173,7 @@ def test_edge_softmax():
 
     # Test higher dimension case
     edata = F.ones((g.number_of_edges(), 3, 1))
-    a = F.edge_softmax(g, edata)
+    a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
