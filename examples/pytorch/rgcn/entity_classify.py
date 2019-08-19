@@ -89,6 +89,7 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
+                           use_self_loop=args.use_self_loop,
                            use_cuda=use_cuda)
 
     if use_cuda:
@@ -105,7 +106,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward(g, feats, edge_type, edge_norm)
+        logits = model(g, feats, edge_type, edge_norm)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
