@@ -181,6 +181,7 @@ class GlobalAttentionPooling(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         for p in self.gate_nn.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -259,6 +260,7 @@ class Set2Set(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         self.lstm.reset_parameters()
 
     def forward(self, feat, graph):
@@ -343,6 +345,7 @@ class MultiHeadAttention(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -442,6 +445,7 @@ class InducedSetAttentionBlock(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.inducing_points)
 
     def forward(self, feat, lengths):
@@ -493,6 +497,7 @@ class PMALayer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.seed_vectors)
 
     def forward(self, feat, lengths):
