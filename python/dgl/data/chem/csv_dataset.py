@@ -10,6 +10,12 @@ from dgl import DGLGraph
 from .utils import smile2graph
 
 
+try:
+    import pandas as pd
+    import rdkit
+except ImportError:
+    pass
+
 class CSVDataset(object):
     """CSVDataset
 
@@ -39,13 +45,19 @@ class CSVDataset(object):
     Path to store the preprocessed data
     """
 
-    def __init__(self, df, smile2graph=smile2graph, smile_column='smiles',
+    def __init__(self, csvfile_path, smile2graph=smile2graph, smile_column='smiles', id_column=None,
                  cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning(
                 "Please install RDKit (Recommended Version is 2018.09.3)")
-        self.df = df
+        if 'pandas' not in sys.modules:
+            from ...base import dgl_warning
+            dgl_warning("Please install pandas")
+        self.df = pd.read_csv(csvfile_path)
+        if id_column is not None:
+            self.id = self.df[id_column]
+            self.df = self.df.drop(columns=[id_column])
         self.smiles = self.df[smile_column].tolist()
         self.task_names = self.df.columns.drop([smile_column]).tolist()
         self.n_tasks = len(self.task_names)
@@ -90,8 +102,8 @@ class CSVDataset(object):
             Weights of the datapoint for all tasks
         """
         return self.smiles[item], self.graphs[item], \
-               F.zerocopy_from_numpy(self.labels[item]),  \
-               F.zerocopy_from_numpy(self.mask[item])
+            F.zerocopy_from_numpy(self.labels[item]),  \
+            F.zerocopy_from_numpy(self.mask[item])
 
     def __len__(self):
         """Length of Dataset

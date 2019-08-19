@@ -43,12 +43,7 @@ class Tox21(CSVDataset):
 
         data_path = get_download_dir() + '/tox21.csv.gz'
         download(_get_dgl_url(self._url), path=data_path)
-        df = pd.read_csv(data_path)
-        self.id = df['mol_id']
-
-        df = df.drop(columns=['mol_id'])
-
-        super().__init__(df, smile2graph, cache_file_path="tox21_dglgraph.pkl")
+        super().__init__(data_path, smile2graph, cache_file_path="tox21_dglgraph.pkl")
         self._weight_balancing()
 
     
