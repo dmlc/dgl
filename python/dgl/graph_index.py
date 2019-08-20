@@ -530,10 +530,7 @@ class GraphIndex(ObjectBase):
             The subgraph index.
         """
         v_array = v.todgltensor()
-        rst = _CAPI_DGLGraphVertexSubgraph(self, v_array)
-        induced_edges = utils.toindex(rst(2))
-        gidx = rst(0)
-        return SubgraphIndex(gidx, self, v, induced_edges)
+        return _CAPI_DGLGraphVertexSubgraph(self, v_array)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -571,10 +568,7 @@ class GraphIndex(ObjectBase):
             The subgraph index.
         """
         e_array = e.todgltensor()
-        rst = _CAPI_DGLGraphEdgeSubgraph(self, e_array, preserve_nodes)
-        induced_nodes = utils.toindex(rst(1))
-        gidx = rst(0)
-        return SubgraphIndex(gidx, self, induced_nodes, e)
+        return _CAPI_DGLGraphEdgeSubgraph(self, e_array, preserve_nodes)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=None):
@@ -917,33 +911,45 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLImmutableGraphAsNumBits(self, int(bits))
 
-class SubgraphIndex(object):
-    """Internal subgraph data structure.
+@register_object('graph.Subgraph')
+class SubgraphIndex(ObjectBase):
+    """Subgraph data structure"""
+    @property
+    def graph(self):
+        """The subgraph structure
 
-    Parameters
-    ----------
-    graph : GraphIndex
-        The graph structure of this subgraph.
-    parent : GraphIndex
-        The parent graph index.
-    induced_nodes : utils.Index
-        The parent node ids in this subgraph.
-    induced_edges : utils.Index
-        The parent edge ids in this subgraph.
-    """
-    def __init__(self, graph, parent, induced_nodes, induced_edges):
-        self.graph = graph
-        self.parent = parent
-        self.induced_nodes = induced_nodes
-        self.induced_edges = induced_edges
+        Returns
+        -------
+        GraphIndex
+            The subgraph
+        """
+        return _CAPI_DGLSubgraphGetGraph(self)
 
-    def __getstate__(self):
-        raise NotImplementedError(
-            "SubgraphIndex pickling is not supported yet.")
+    @property
+    def induced_nodes(self):
+        """Induced nodes for each node type. The return list
+        length should be equal to the number of node types.
 
-    def __setstate__(self, state):
-        raise NotImplementedError(
-            "SubgraphIndex unpickling is not supported yet.")
+        Returns
+        -------
+        list of utils.Index
+            Induced nodes
+        """
+        ret = _CAPI_DGLSubgraphGetInducedVertices(self)
+        return utils.toindex(ret)
+
+    @property
+    def induced_edges(self):
+        """Induced edges for each edge type. The return list
+        length should be equal to the number of edge types.
+
+        Returns
+        -------
+        list of utils.Index
+            Induced edges
+        """
+        ret = _CAPI_DGLSubgraphGetInducedEdges(self)
+        return utils.toindex(ret)
 
 
 ###############################################################
