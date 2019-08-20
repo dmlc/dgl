@@ -1103,8 +1103,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             bipartites = []
             num_nodes = defaultdict(int)
             # count the number of nodes for each type
-            for srctype, etype, dsttype in etypes:
-                edges = edges_by_type[etype]
+            for etype_triplet in etypes:
+                srctype, etype, dsttype = etype_triplet
+                edges = edges_by_type[etype_triplet]
                 if ssp.issparse(edges):
                     num_src, num_dst = edges.shape
                 elif isinstance(edges, list):
@@ -1116,8 +1117,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 num_nodes[srctype] = max(num_nodes[srctype], num_src)
                 num_nodes[dsttype] = max(num_nodes[dsttype], num_dst)
             # create actual objects
-            for srctype, etype, dsttype in etypes:
-                edges = edges_by_type[etype]
+            for etype_triplet in etypes:
+                srctype, etype, dsttype = etype_triplet
+                edges = edges_by_type[etype_triplet]
                 if ssp.issparse(edges):
                     bipartite = bipartite_from_scipy(edges)
                 elif isinstance(edges, list):

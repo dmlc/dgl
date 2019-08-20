@@ -18,10 +18,10 @@ def create_test_heterograph():
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     g = dgl.DGLHeteroGraph((mg, {
-        'follows': [(0, 1), (1, 2)],
-        'plays': plays_spmat,
-        'wishes': [(0, 1), (2, 0)],
-        'develops': [(0, 0), (1, 1)],
+        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+        ('user', 'plays', 'game'): plays_spmat,
+        ('user', 'wishes', 'game'): [(0, 1), (2, 0)],
+        ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
         }))
 
     return g
