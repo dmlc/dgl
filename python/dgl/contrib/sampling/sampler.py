@@ -534,15 +534,10 @@ class EdgeNeighborSampler(EdgeSampler):
             self,
             g,
             batch_size,
-            expand_factor=0,
-            num_hops=1,
-            neighbor_type='in',
-            node_prob=None,
             seed_edges=None,
             shuffle=False,
             num_workers=1,
             prefetch=False,
-            add_self_loop=False,
             negative_mode="",
             neg_sample_size=0,
             exclude_positive=False):
@@ -553,62 +548,32 @@ class EdgeNeighborSampler(EdgeSampler):
         assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
-        self._expand_factor = int(expand_factor)
-        self._num_hops = int(num_hops)
-        self._add_self_loop = add_self_loop
         self._num_workers = int(num_workers)
-        self._neighbor_type = neighbor_type
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
 
     def fetch(self, current_index):
-        handles = unwrap_to_ptr_list(_CAPI_UniformEdgeSampling(
+        subgs = _CAPI_UniformEdgeSampling(
             self.g.c_handle,
             self.seed_edges.todgltensor(),
             current_index, # start batch id
             self.batch_size,        # batch size
             self._num_workers,      # num batches
-            self._expand_factor,
-            self._num_hops,
-            self._neighbor_type,
-            self._add_self_loop,
             self._negative_mode,
             self._neg_sample_size,
-            self._exclude_positive))
-        nflows = []
-        for hdl in handles:
-            func = _CAPI_GetEdgeBatch(hdl)
-
-            pos_subg_hdl = func(2)
-            pos_subg_func = _CAPI_GetSubgraph(pos_subg_hdl)
-            pos_subg_idx = SubgraphIndex(GraphIndex(pos_subg_func(0)), self.g._graph,
-                                         utils.toindex(pos_subg_func(1)),
-                                         utils.toindex(pos_subg_func(2)))
-            pos_subg = subgraph.DGLSubGraph(self.g, pos_subg_idx)
-            _CAPI_FreeSubgraph(pos_subg_hdl)
-
-            if self._num_hops > 0 and self._expand_factor > 0:
-                nf1 = NodeFlow(self.g, func(0))
-                nf2 = NodeFlow(self.g, func(1))
-            else:
-                nf1 = None
-                nf2 = None
-
-            if self._negative_mode == "":
-                nflows.append((nf1, nf2, pos_subg))
-            else:
-                neg_subg_hdl = func(3)
-                neg_subg_func = _CAPI_GetSubgraph(neg_subg_hdl)
-                neg_subg_idx = SubgraphIndex(GraphIndex(neg_subg_func(0)), self.g._graph,
-                                             utils.toindex(neg_subg_func(1)),
-                                             utils.toindex(neg_subg_func(2)))
-                neg_subg = subgraph.DGLSubGraph(self.g, neg_subg_idx)
-                nflows.append((nf1, nf2, pos_subg, neg_subg))
-                _CAPI_FreeSubgraph(neg_subg_hdl)
-            _CAPI_FreeEdgeBatch(hdl)
-
-        return nflows
+            self._exclude_positive)
+        if self._negative_mode == "":
+            # If these are all subgraphs.
+            return subgs
+        else:
+            rets = []
+            assert self._num_workers * 2 == len(subgs)
+            for i in range(self._num_workers):
+                rets.append((subgs[i],                     # positive edges
+                             subgs[i + self._num_workers]  # negative edges
+                            ))
+            return rets
 
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):

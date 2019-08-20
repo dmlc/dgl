@@ -888,20 +888,6 @@ void BuildCoo(const ImmutableGraph &g) {
 }
 
 
-struct EdgeBatch {
-  NodeFlow *src_nf;
-  NodeFlow *dst_nf;
-  Subgraph *pos_subg;
-  Subgraph *neg_subg;
-
-  EdgeBatch() {
-    src_nf = nullptr;
-    dst_nf = nullptr;
-    pos_subg = nullptr;
-    neg_subg = nullptr;
-  }
-};
-
 class Global2LocalMap {
   std::unordered_map<dgl_id_t, dgl_id_t> map;
  public:
@@ -1017,21 +1003,16 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
-    const GraphHandle ghdl = args[0];
+    GraphRef g = args[0];
     IdArray seed_edges = args[1];
     const int64_t batch_start_id = args[2];
     const int64_t batch_size = args[3];
     const int64_t max_num_workers = args[4];
-    const int64_t expand_factor = args[5];
-    const int64_t num_hops = args[6];
-    const std::string neigh_type = args[7];
-    const bool add_self_loop = args[8];
-    const std::string neg_mode = args[9];
-    const int neg_sample_size = args[10];
-    const bool exclude_positive = args[11];
+    const std::string neg_mode = args[5];
+    const int neg_sample_size = args[6];
+    const bool exclude_positive = args[7];
     // process args
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_edges));
     BuildCsr(*gptr, neigh_type);
@@ -1040,8 +1021,9 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const int64_t num_seeds = seed_edges->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
-    // generate node flows
-    std::vector<EdgeBatch*> nflows(num_workers);
+    // generate subgraphs.
+    std::vector<Subgraph> positive_subgs(num_workers);
+    std::vector<Subgraph> negative_subgs(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       const int64_t start = (batch_start_id + i) * batch_size;
@@ -1055,75 +1037,18 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-      nflows[i] = new EdgeBatch();
 
-      if (expand_factor > 0 && num_hops > 0) {
-        nflows[i]->src_nf = new NodeFlow();
-        nflows[i]->dst_nf = new NodeFlow();
-        *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
-          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
-        *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
-          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
-      }
-      nflows[i]->pos_subg = new Subgraph();
-      *nflows[i]->pos_subg = gptr->EdgeSubgraph(worker_seeds, false);
+      positive_subgs[i] = gptr->EdgeSubgraph(worker_seeds, false);
       if (neg_mode.size() > 0) {
-        nflows[i]->neg_subg = new Subgraph();
-        *nflows[i]->neg_subg = NegEdgeSubgraph(gptr->NumVertices(), *nflows[i]->pos_subg,
-                                               neg_mode, neg_sample_size,
-                                               gptr->IsMultigraph(), exclude_positive);
+        negative_subgs[i] = NegEdgeSubgraph(gptr->NumVertices(), positive_subgs[i],
+                                            neg_mode, neg_sample_size,
+                                            gptr->IsMultigraph(), exclude_positive);
       }
     }
-    *rv = WrapVectorReturn(nflows);
+    if (neg_mode.size() > 0) {
+      positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
+    }
+    *rv = List<Subgraph>(positive_subgs);
   });
-
-PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg);
-
-// Convert EdgeBatch structure to PackedFunc.
-PackedFunc ConvertEdgeBatchToPackedFunc(const EdgeBatch& eb) {
-  auto body = [eb] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        *rv = eb.src_nf;
-      } else if (which == 1) {
-        *rv = eb.dst_nf;
-      } else if (which == 2) {
-        *rv = eb.pos_subg;
-      } else if (which == 3) {
-        *rv = eb.neg_subg;
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeBatch")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void *ptr = args[0];
-    const EdgeBatch *eb = static_cast<const EdgeBatch *>(ptr);
-    *rv = ConvertEdgeBatchToPackedFunc(*eb);
-});
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_FreeEdgeBatch")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void *ptr = args[0];
-    const EdgeBatch *eb = static_cast<const EdgeBatch *>(ptr);
-    delete eb;
-});
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_GetSubgraph")
- .set_body([] (DGLArgs args, DGLRetValue* rv) {
-     void *ptr = args[0];
-    const Subgraph *eb = static_cast<const Subgraph *>(ptr);
-    *rv = ConvertSubgraphToPackedFunc(*eb);
- });
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_FreeSubgraph")
- .set_body([] (DGLArgs args, DGLRetValue* rv) {
-     void *ptr = args[0];
-    const Subgraph *eb = static_cast<const Subgraph *>(ptr);
-    delete eb;
- });
 
 }  // namespace dgl
