@@ -220,39 +220,13 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
-def test_edge_sampler():
-    g = generate_rand_graph(100)
-    EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
-    for src_nf, dst_nf, edge_subg in EdgeNeighborSampler(g, 50, g.number_of_nodes(), num_hops=2):
-        eids = edge_subg.parent_eid
-        src, dst = g.find_edges(eids)
-        src1 = src_nf.layer_parent_nid(-1)
-        dst1 = dst_nf.layer_parent_nid(-1)
-        #verify_subgraph(g, src_nf, src1)
-        #verify_subgraph(g, dst_nf, dst1)
-
-        src1 = np.unique(F.asnumpy(src1))
-        dst1 = np.unique(F.asnumpy(dst1))
-        src = np.unique(F.asnumpy(src))
-        dst = np.unique(F.asnumpy(dst))
-        assert_array_equal(src, src1)
-        assert_array_equal(dst, dst1)
-
-        edges = []
-        for i in range(src_nf.num_blocks):
-            edges.append(F.asnumpy(src_nf.block_parent_eid(i)))
-        edges = np.concatenate(edges)
-        for eid in F.asnumpy(eids):
-            assert eid not in edges
-
 def test_negative_sampler():
     g = generate_rand_graph(100)
-    EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
-    for _, _, pos_edges, neg_edges in EdgeNeighborSampler(g, 50,
-                                                          num_hops=2,
-                                                          negative_mode="head",
-                                                          neg_sample_size=10,
-                                                          exclude_positive=True):
+    EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+    for pos_edges, neg_edges in EdgeSampler(g, 50,
+                                            negative_mode="head",
+                                            neg_sample_size=10,
+                                            exclude_positive=True):
         assert 10 * pos_edges.number_of_edges() == neg_edges.number_of_edges()
         pos_nid = pos_edges.parent_nid
         pos_eid = pos_edges.parent_eid
@@ -292,4 +266,3 @@ if __name__ == '__main__':
     test_nonuniform_neighbor_sampler()
     test_setseed()
     test_negative_sampler()
-    test_edge_sampler()

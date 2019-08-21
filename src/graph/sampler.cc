@@ -116,13 +116,14 @@ void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
 }
 
 void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
-                  std::vector<size_t>* out, unsigned int* seed) {
+                  std::vector<size_t>* out) {
   std::unordered_map<size_t, int> sampled_idxs;
   for (auto v : exclude) {
     sampled_idxs.insert(std::pair<size_t, int>(v, 0));
   }
   while (sampled_idxs.size() < num + exclude.size()) {
-    sampled_idxs.insert(std::pair<size_t, int>(rand_r(seed) % set_size, 1));
+    size_t rand = RandomEngine::ThreadLocal()->RandInt(set_size);
+    sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
   }
   out->clear();
   for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
@@ -888,11 +889,6 @@ void BuildCoo(const ImmutableGraph &g) {
 }
 
 
-class Global2LocalMap {
-  std::unordered_map<dgl_id_t, dgl_id_t> map;
- public:
-};
-
 dgl_id_t global2local_map(dgl_id_t global_id,
                           std::unordered_map<dgl_id_t, dgl_id_t> *map) {
   auto it = map->find(global_id);
@@ -909,7 +905,6 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
                          const std::string &neg_mode,
                          int neg_sample_size, bool is_multigraph,
                          bool exclude_positive) {
-  unsigned int seed = randseed();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
@@ -964,9 +959,9 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
         dgl_id_t local_vid = *it;
         exclude.push_back(induced_vid_data[local_vid]);
       }
-      RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids, &seed);
+      RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
     } else {
-      RandomSample(num_tot_nodes, neg_sample_size, &neg_vids, &seed);
+      RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
     }
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
@@ -1000,6 +995,10 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   return neg_subg;
 }
 
+inline SubgraphRef ConvertRef(const Subgraph &subg) {
+    return SubgraphRef(std::shared_ptr<Subgraph>(new Subgraph(subg)));
+}
+
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
@@ -1015,15 +1014,14 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(IsValidIdArray(seed_edges));
-    BuildCsr(*gptr, neigh_type);
     BuildCoo(*gptr);
 
     const int64_t num_seeds = seed_edges->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
     // generate subgraphs.
-    std::vector<Subgraph> positive_subgs(num_workers);
-    std::vector<Subgraph> negative_subgs(num_workers);
+    std::vector<SubgraphRef> positive_subgs(num_workers);
+    std::vector<SubgraphRef> negative_subgs(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       const int64_t start = (batch_start_id + i) * batch_size;
@@ -1031,24 +1029,26 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       const int64_t num_edges = end - start;
       IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
                                                    sizeof(dgl_id_t) * start);
-      GraphInterface::EdgeArray arr = gptr->FindEdges(worker_seeds);
+      EdgeArray arr = gptr->FindEdges(worker_seeds);
       const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
       const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
 
-      positive_subgs[i] = gptr->EdgeSubgraph(worker_seeds, false);
+      Subgraph subg = gptr->EdgeSubgraph(worker_seeds, false);
+      positive_subgs[i] = ConvertRef(subg);
       if (neg_mode.size() > 0) {
-        negative_subgs[i] = NegEdgeSubgraph(gptr->NumVertices(), positive_subgs[i],
+        Subgraph neg_subg = NegEdgeSubgraph(gptr->NumVertices(), subg,
                                             neg_mode, neg_sample_size,
                                             gptr->IsMultigraph(), exclude_positive);
+        negative_subgs[i] = ConvertRef(neg_subg);
       }
     }
     if (neg_mode.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
-    *rv = List<Subgraph>(positive_subgs);
+    *rv = List<SubgraphRef>(positive_subgs);
   });
 
 }  // namespace dgl

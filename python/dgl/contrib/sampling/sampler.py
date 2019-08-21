@@ -10,8 +10,6 @@ from ..._ffi.function import _init_api
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
-from ...utils import unwrap_to_ptr_list
-from ...graph_index import SubgraphIndex, GraphIndex
 from ... import subgraph
 
 try:
@@ -19,7 +17,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeNeighborSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler']
 
 class SamplerIter(object):
     def __init__(self, sampler):
@@ -441,10 +439,6 @@ class LayerSampler(NodeFlowSampler):
 class EdgeSampler(object):
     '''Edge sampler for link prediction.
 
-    For a mini-batch, it samples a set of edges. From the source and
-    destination vertices, it can potentially creates NodeFlows with
-    node-level sampler (e.g., NeighborSampler, Layer-wise sampler).
-
     Class properties
     ----------------
     immutable_only : bool
@@ -457,10 +451,13 @@ class EdgeSampler(object):
             self,
             g,
             batch_size,
-            seed_edges,
-            shuffle,
-            num_prefetch,
-            prefetching_wrapper_class):
+            seed_edges=None,
+            shuffle=False,
+            num_workers=1,
+            prefetch=False,
+            negative_mode="",
+            neg_sample_size=0,
+            exclude_positive=False):
         self._g = g
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
@@ -475,15 +472,20 @@ class EdgeSampler(object):
             self._seed_edges = F.rand_shuffle(self._seed_edges)
         self._seed_edges = utils.toindex(self._seed_edges)
 
-        if num_prefetch:
-            self._prefetching_wrapper_class = prefetching_wrapper_class
-        self._num_prefetch = num_prefetch
+        if prefetch:
+            self._prefetching_wrapper_class = ThreadPrefetchingWrapper
+        self._num_prefetch = num_workers * 2 if prefetch else 0
+
+        self._num_workers = int(num_workers)
+        self._negative_mode = negative_mode
+        self._neg_sample_size = neg_sample_size
+        self._exclude_positive = exclude_positive
 
     def fetch(self, current_index):
         '''
-        It returns the next "bunch" of NodeFlows.
-
-        Subclasses of EdgeSampler should override this method.
+        It returns a list of subgraphs if it only samples positive edges.
+        It returns a list of subgraph pairs if it samples both positive edges
+        and negative edges.
 
         Parameters
         ----------
@@ -492,10 +494,33 @@ class EdgeSampler(object):
 
         Returns
         -------
-        list[(NodeFlow, GraphIndex, NodeFlow)]
-            Next "bunch" of nodeflows to be processed.
+        list[GraphIndex] or list[(GraphIndex, GraphIndex)]
+            Next "bunch" of edges to be processed.
         '''
-        raise NotImplementedError
+        subgs = _CAPI_UniformEdgeSampling(
+            self.g._graph,
+            self.seed_edges.todgltensor(),
+            current_index, # start batch id
+            self.batch_size,        # batch size
+            self._num_workers,      # num batches
+            self._negative_mode,
+            self._neg_sample_size,
+            self._exclude_positive)
+
+        if len(subgs) == 0:
+            return []
+
+        if self._negative_mode == "":
+            # If these are all subgraphs.
+            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
+        else:
+            rets = []
+            assert self._num_workers * 2 == len(subgs)
+            for i in range(self._num_workers):
+                pos_subg = subgraph.DGLSubGraph(self.g, subgs[i])
+                neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + self._num_workers])
+                rets.append((pos_subg, neg_subg))
+            return rets
 
     def __iter__(self):
         it = SamplerIter(self)
@@ -515,65 +540,6 @@ class EdgeSampler(object):
     @property
     def batch_size(self):
         return self._batch_size
-
-
-class EdgeNeighborSampler(EdgeSampler):
-    '''Edge sampler that generates NodeFlows for link prediction.
-
-    For a mini-batch, it samples a set of edges. From the source and
-    destination vertices, it creates NodeFlows with node-level sampler
-    (e.g., NeighborSampler, Layer-wise sampler).
-
-    Class properties
-    ----------------
-    immutable_only : bool
-        Whether the sampler only works on immutable graphs.
-        Subclasses can override this property.
-    '''
-    def __init__(
-            self,
-            g,
-            batch_size,
-            seed_edges=None,
-            shuffle=False,
-            num_workers=1,
-            prefetch=False,
-            negative_mode="",
-            neg_sample_size=0,
-            exclude_positive=False):
-        super(EdgeNeighborSampler, self).__init__(
-                g, batch_size, seed_edges, shuffle, num_workers * 2 if prefetch else 0,
-                ThreadPrefetchingWrapper)
-
-        assert node_prob is None, 'non-uniform node probability not supported'
-        assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
-
-        self._num_workers = int(num_workers)
-        self._negative_mode = negative_mode
-        self._neg_sample_size = neg_sample_size
-        self._exclude_positive = exclude_positive
-
-    def fetch(self, current_index):
-        subgs = _CAPI_UniformEdgeSampling(
-            self.g.c_handle,
-            self.seed_edges.todgltensor(),
-            current_index, # start batch id
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
-            self._negative_mode,
-            self._neg_sample_size,
-            self._exclude_positive)
-        if self._negative_mode == "":
-            # If these are all subgraphs.
-            return subgs
-        else:
-            rets = []
-            assert self._num_workers * 2 == len(subgs)
-            for i in range(self._num_workers):
-                rets.append((subgs[i],                     # positive edges
-                             subgs[i + self._num_workers]  # negative edges
-                            ))
-            return rets
 
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):
