@@ -196,7 +196,11 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
   const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
   IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
   CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
-  return Subgraph{subcsr, vids, submat.data};
+  Subgraph subg;
+  subg.graph = subcsr;
+  subg.induced_vertices = vids;
+  subg.induced_edges = submat.data;
+  return subg;
 }
 
 CSRPtr CSR::Transpose() const {
@@ -313,20 +317,25 @@ EdgeArray COO::Edges(const std::string &order) const {
 
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array.";
+  COOPtr subcoo;
+  IdArray induced_nodes;
   if (!preserve_nodes) {
     IdArray new_src = aten::IndexSelect(adj_.row, eids);
     IdArray new_dst = aten::IndexSelect(adj_.col, eids);
-    IdArray induced_nodes = aten::Relabel_({new_src, new_dst});
+    induced_nodes = aten::Relabel_({new_src, new_dst});
     const auto new_nnodes = induced_nodes->shape[0];
-    COOPtr subcoo(new COO(new_nnodes, new_src, new_dst));
-    return Subgraph{subcoo, induced_nodes, eids};
+    subcoo = COOPtr(new COO(new_nnodes, new_src, new_dst));
   } else {
     IdArray new_src = aten::IndexSelect(adj_.row, eids);
     IdArray new_dst = aten::IndexSelect(adj_.col, eids);
-    IdArray induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
-    COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
-    return Subgraph{subcoo, induced_nodes, eids};
+    induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
+    subcoo = COOPtr(new COO(NumVertices(), new_src, new_dst));
   }
+  Subgraph subg;
+  subg.graph = subcoo;
+  subg.induced_vertices = induced_nodes;
+  subg.induced_edges = eids;
+  return subg;
 }
 
 CSRPtr COO::ToCSR() const {
@@ -444,15 +453,15 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
   // We prefer to generate a subgraph from out-csr.
   auto sg = GetOutCSR()->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
-  return Subgraph{GraphPtr(new ImmutableGraph(subcsr)),
-                  sg.induced_vertices, sg.induced_edges};
+  sg.graph = GraphPtr(new ImmutableGraph(subcsr));
+  return sg;
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
-  return Subgraph{GraphPtr(new ImmutableGraph(subcoo)),
-                  sg.induced_vertices, sg.induced_edges};
+  sg.graph = GraphPtr(new ImmutableGraph(subcoo));
+  return sg;
 }
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
