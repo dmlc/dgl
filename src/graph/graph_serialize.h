@@ -60,11 +60,52 @@ class GraphData : public runtime::ObjectRef {
   }
 };
 
-bool SaveDGLGraphs(std::string filename,
-                   List<GraphData> graph_data);
+class StorageMetaDataObject : public runtime::Object {
+ public:
+  dgl_id_t num_graph;
+  Value nodes_num_list;
+  Value edges_num_list;
+  Map<std::string, Value> labels_list;
+  List<GraphData> graph_data;
+  static constexpr const char *_type_key = "graph_serialize.StorageMetaData";
 
-std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
-                                     std::vector<dgl_id_t> idx_list);
+  void setMetaData(dgl_id_t num_graph,
+                   std::vector<int64_t> nodes_num_list,
+                   std::vector<int64_t> edges_num_list,
+                   std::vector<NamedTensor> labels_list);
+
+  void setGraphData(std::vector<GraphData> gdata);
+
+  void VisitAttrs(AttrVisitor *v) final {
+    v->Visit("num_graph", &num_graph);
+    v->Visit("nodes_num_list", &nodes_num_list);
+    v->Visit("edges_num_list", &edges_num_list);
+    v->Visit("labels", &labels_list);
+    v->Visit("graph_data", &graph_data);
+  }
+
+  DGL_DECLARE_OBJECT_TYPE_INFO(StorageMetaDataObject, runtime::Object);
+};
+
+
+class StorageMetaData : public runtime::ObjectRef {
+ public:
+  DGL_DEFINE_OBJECT_REF_METHODS(StorageMetaData, runtime::ObjectRef, StorageMetaDataObject);
+
+  /*! \brief create a new StorageMetaData reference */
+  static StorageMetaData Create() {
+    return StorageMetaData(std::make_shared<StorageMetaDataObject>());
+  }
+};
+
+
+bool SaveDGLGraphs(std::string filename,
+                   List<GraphData> graph_data,
+                   std::vector<NamedTensor> labels_list);
+
+StorageMetaData LoadDGLGraphs(const std::string &filename,
+                              std::vector<dgl_id_t> idx_list,
+                              bool onlyMeta = false);
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 

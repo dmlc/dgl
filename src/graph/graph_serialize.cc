@@ -83,18 +83,27 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<GraphData> graph_data = args[1];
-    SaveDGLGraphs(filename, graph_data);
+    Map<std::string, Value> labels = args[2];
+    std::vector<NamedTensor> labels_list;
+    for (auto kv: labels) {
+      std::string name = kv.first;
+      Value v = kv.second;
+      NDArray ndarray = static_cast<NDArray>(v->data);
+      labels_list.emplace_back(name, ndarray);
+    }
+    SaveDGLGraphs(filename, graph_data, labels_list);
 });
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<Value> idxs = args[1];
+    bool onlyMeta = args[2];
     std::vector<size_t> idx_list(idxs.size());
-    for (uint64_t i = 0; i < idxs.size(); ++i) {
+    for (uint64_t i = 0; i < idxs.size(); ++ i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }
-    *rv = List<GraphData>(LoadDGLGraphs(filename, idx_list));
+    *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
 });
 
 DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataGraphHandle")
@@ -127,7 +136,8 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataEdgeTensors")
 constexpr uint64_t kDGLSerializeMagic = 0xDD2E4FF046B4A13F;
 
 bool SaveDGLGraphs(std::string filename,
-                   List<GraphData> graph_data) {
+                   List<GraphData> graph_data,
+                   std::vector<NamedTensor> labels_list) {
   auto *fs = dynamic_cast<SeekStream *>(SeekStream::Create(filename.c_str(), "w",
                                                            true));
   CHECK(fs) << "File name is not a valid local file name";
@@ -143,10 +153,10 @@ bool SaveDGLGraphs(std::string filename,
   dgl_id_t num_graph = graph_data.size();
 
   std::vector<dgl_id_t> graph_indices(num_graph);
-  std::vector<dgl_id_t> nodes_num_list(num_graph);
-  std::vector<dgl_id_t> edges_num_list(num_graph);
+  std::vector<int64_t> nodes_num_list(num_graph);
+  std::vector<int64_t> edges_num_list(num_graph);
 
-  for (uint64_t i = 0; i < num_graph; ++i) {
+  for (uint64_t i = 0; i < num_graph; ++ i) {
     nodes_num_list[i] = graph_data[i]->gptr->NumVertices();
     edges_num_list[i] = graph_data[i]->gptr->NumEdges();
   }
@@ -156,9 +166,10 @@ bool SaveDGLGraphs(std::string filename,
   fs->Write(graph_indices);
   fs->Write(nodes_num_list);
   fs->Write(edges_num_list);
+  fs->Write(labels_list);
 
   // Write GraphData
-  for (uint64_t i = 0; i < num_graph; ++i) {
+  for (uint64_t i = 0; i < num_graph; ++ i) {
     graph_indices[i] = fs->Tell();
     GraphDataObject gdata = *graph_data[i].as<GraphDataObject>();
     fs->Write(gdata);
@@ -176,9 +187,11 @@ bool SaveDGLGraphs(std::string filename,
 }
 
 
-std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
-                                     std::vector<dgl_id_t> idx_list) {
+StorageMetaData LoadDGLGraphs(const std::string &filename,
+                              std::vector<dgl_id_t> idx_list,
+                              bool onlyMeta) {
   SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
+  StorageMetaData metadata = StorageMetaData::Create();
   // Read DGL MetaData
   uint64_t magicNum, graphType, version;
   fs->Read(&magicNum);
@@ -194,19 +207,28 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
   dgl_id_t num_graph;
   CHECK(fs->Read(&num_graph)) << "Invalid num of graph";
   std::vector<dgl_id_t> graph_indices;
-  std::vector<dgl_id_t> nodes_num_list;
-  std::vector<dgl_id_t> edges_num_list;
+  std::vector<int64_t> nodes_num_list;
+  std::vector<int64_t> edges_num_list;
+  std::vector<NamedTensor> labels_list;
 
   CHECK(fs->Read(&graph_indices)) << "Invalid graph indices";
   CHECK(fs->Read(&nodes_num_list)) << "Invalid node num list";
   CHECK(fs->Read(&edges_num_list)) << "Invalid edge num list";
+  CHECK(fs->Read(&labels_list)) << "Invalid label list";
 
+  metadata->setMetaData(num_graph, nodes_num_list, edges_num_list, labels_list);
 
   std::vector<GraphData> gdata_refs;
+
+  // Early Return
+  if (onlyMeta) {
+    return metadata;
+  }
+
   if (idx_list.empty()) {
     // Read All Graphs
     gdata_refs.reserve(num_graph);
-    for (uint64_t i = 0; i < num_graph; ++i) {
+    for (uint64_t i = 0; i < num_graph; ++ i) {
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
               const_cast<GraphDataObject *>(gdata.as<GraphDataObject>());
@@ -218,7 +240,7 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     gdata_refs.reserve(idx_list.size());
     // Would be better if idx_list is sorted. However the returned the graphs should be the same
     // order as the idx_list
-    for (uint64_t i = 0; i < idx_list.size(); ++i) {
+    for (uint64_t i = 0; i < idx_list.size(); ++ i) {
       fs->Seek(graph_indices[idx_list[i]]);
       GraphData gdata = GraphData::Create();
       GraphDataObject *gdata_ptr =
@@ -228,8 +250,10 @@ std::vector<GraphData> LoadDGLGraphs(const std::string &filename,
     }
   }
 
+  metadata->setGraphData(gdata_refs);
+
   delete fs;
-  return gdata_refs;
+  return metadata;
 }
 
 void GraphDataObject::setData(ImmutableGraphPtr gptr,
@@ -281,8 +305,6 @@ ImmutableGraphPtr BatchLoadedGraphs(std::vector<GraphData> gdata_list) {
   }
   ImmutableGraphPtr imGPtr = std::dynamic_pointer_cast<ImmutableGraph>(
           GraphOp::DisjointUnion(gptrs));
-
-
   return imGPtr;
 }
 
@@ -300,6 +322,23 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
     return imgptr;
   }
 }
+
+void StorageMetaDataObject::setMetaData(dgl_id_t num_graph,
+                                        std::vector<int64_t> nodes_num_list,
+                                        std::vector<int64_t> edges_num_list,
+                                        std::vector<NamedTensor> labels_list) {
+  this->num_graph = num_graph;
+  this->nodes_num_list = Value(MakeValue(aten::VecToIdArray(nodes_num_list)));
+  this->edges_num_list = Value(MakeValue(aten::VecToIdArray(edges_num_list)));
+  for (auto kv: labels_list) {
+    this->labels_list.Set(kv.first, Value(MakeValue(kv.second)));
+  }
+}
+
+void StorageMetaDataObject::setGraphData(std::vector<GraphData> gdata) {
+  this->graph_data = List<GraphData>(gdata);
+}
+
 }  // namespace serialize
 }  // namespace dgl
 

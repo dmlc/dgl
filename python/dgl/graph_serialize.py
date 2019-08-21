@@ -10,6 +10,11 @@ from . import backend as F
 _init_api("dgl.graph_serialize")
 
 
+@register_object("graph_serialize.StorageMetaData")
+class MetaData(ObjectBase):
+    pass
+
+
 @register_object("graph_serialize.GraphData")
 class GraphData(ObjectBase):
     """GraphData Object"""
@@ -41,13 +46,13 @@ class GraphData(ObjectBase):
         node_tensors_items = _CAPI_GDataNodeTensors(self).items()
         edge_tensors_items = _CAPI_GDataEdgeTensors(self).items()
         for k, v in node_tensors_items:
-            g.ndata[k] = F.zerocopy_from_dgl_ndarray(_api_internal._ValueGet(v))
+            g.ndata[k] = F.zerocopy_from_dgl_ndarray(v.data)
         for k, v in edge_tensors_items:
-            g.edata[k] = F.zerocopy_from_dgl_ndarray(_api_internal._ValueGet(v))
+            g.edata[k] = F.zerocopy_from_dgl_ndarray(v.data)
         return g
 
 
-def save_graphs(filename, g_list):
+def save_graphs(filename, g_list, labels=None):
     """
     Save DGLGraphs to file
     :param filename: file to store DGLGraphs
@@ -56,8 +61,14 @@ def save_graphs(filename, g_list):
     """
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
+    if len(labels) != 0:
+        label_dict = dict()
+        for key, value in labels.items():
+            label_dict[key] = F.zerocopy_to_dgl_ndarray(value)
+    else:
+        label_dict = None
     gdata_list = [GraphData.create(g) for g in g_list]
-    _CAPI_DGLSaveGraphs(filename, gdata_list)
+    _CAPI_DGLSaveGraphs(filename, gdata_list, label_dict)
 
 
 def load_graphs(filename, idx_list=None):
@@ -71,5 +82,20 @@ def load_graphs(filename, idx_list=None):
     assert isinstance(idx_list, list)
     if idx_list is None:
         idx_list = []
-    gdata_list = _CAPI_DGLLoadGraphs(filename, idx_list)
-    return [gdata.get_graph() for gdata in gdata_list]
+    metadata = _CAPI_DGLLoadGraphs(filename, idx_list, False)
+    return [gdata.get_graph() for gdata in metadata.graph_data]
+
+
+def load_labels(filename):
+    """
+    Load DGLGraphs from file
+    :param filename: file to load DGLGraphs
+    :param idx_list: list of index of graph to be loaded. If not specified, will load all graphs
+    from file
+    :return: list of immutable DGLGraphs
+    """
+    metadata = _CAPI_DGLLoadGraphs(filename, idx_list, True)
+    label_dict = {}
+    for k, v in metadata.labels.items():
+        label_dict[k] = F.zerocopy_from_dgl_ndarray(v.data)
+    return label_dict
