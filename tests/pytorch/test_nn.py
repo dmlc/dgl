@@ -261,6 +261,7 @@ def test_edge_softmax():
     assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     
 def test_rgcn():
+    ctx = F.ctx()
     etype = []
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     # 5 etypes
@@ -271,37 +272,37 @@ def test_rgcn():
     I = 10
     O = 8
 
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
-    h = th.randn((100, I))
-    r = th.tensor(etype)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
-    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
-    h = th.randn((100, I))
-    r = th.tensor(etype)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r)
     assert list(h_new.shape) == [100, O]
 
     # with norm
-    norm = th.zeros((g.number_of_edges(), 1))
+    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
 
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
-    h = th.randn((100, I))
-    r = th.tensor(etype)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
-    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
-    h = th.randn((100, I))
-    r = th.tensor(etype)
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
     h_new = rgc_bdd(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
     # id input
-    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
-    h = th.randint(0, I, (100,))
-    r = th.tensor(etype)
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randint(0, I, (100,)).to(ctx)
+    r = th.tensor(etype).to(ctx)
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 

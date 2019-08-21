@@ -184,7 +184,7 @@ def test_edge_softmax():
             1e-4, 1e-4)
 
 def test_rgcn():
-    ctx = mx.cpu(0)
+    ctx = F.ctx()
     etype = []
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     # 5 etypes
@@ -197,40 +197,40 @@ def test_rgcn():
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis.initialize(ctx=ctx)
-    h = nd.random.randn(100, I)
-    r = nd.array(etype)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     rgc_bdd.initialize(ctx=ctx)
-    h = nd.random.randn(100, I)
-    r = nd.array(etype)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
     h_new = rgc_bdd(g, h, r)
     assert list(h_new.shape) == [100, O]
 
     # with norm
-    norm = nd.zeros((g.number_of_edges(), 1))
+    norm = nd.zeros((g.number_of_edges(), 1), ctx=ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis.initialize(ctx=ctx)
-    h = nd.random.randn(100, I)
-    r = nd.array(etype)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
     h_new = rgc_basis(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
     rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
     rgc_bdd.initialize(ctx=ctx)
-    h = nd.random.randn(100, I)
-    r = nd.array(etype)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
     h_new = rgc_bdd(g, h, r, norm)
     assert list(h_new.shape) == [100, O]
 
     # id input
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis.initialize(ctx=ctx)
-    h = nd.random.randint(0, I, (100,))
-    r = nd.array(etype)
+    h = nd.random.randint(0, I, (100,), ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
