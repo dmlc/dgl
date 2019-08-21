@@ -4,6 +4,7 @@
  * \brief Binary reduce implementation on cuda.
  */
 #include "../binary_reduce_impl.h"
+#include "../csr_interface.h"
 
 using dgl::runtime::NDArray;
 
@@ -13,7 +14,7 @@ namespace kernel {
 template void BinaryReduceImpl<kDLGPU>(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -24,7 +25,7 @@ template void BinaryReduceBcastImpl<kDLGPU>(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_data,
@@ -34,7 +35,7 @@ template void BinaryReduceBcastImpl<kDLGPU>(
 template void BackwardBinaryReduceImpl<kDLGPU>(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_mapping, NDArray rhs_mapping, NDArray out_mapping,
     NDArray lhs_data, NDArray rhs_data, NDArray out_data,
@@ -45,7 +46,7 @@ template void BackwardBinaryReduceBcastImpl<kDLGPU>(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
