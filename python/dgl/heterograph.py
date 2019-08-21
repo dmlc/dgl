@@ -13,6 +13,8 @@ from .base import ALL, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph']
 
+# TODO: depending on the progress of unifying DGLGraph and Bipartite, we may or may not
+# need the code of heterogeneous graph views.
 # pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
