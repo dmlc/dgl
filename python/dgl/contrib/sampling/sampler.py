@@ -439,6 +439,41 @@ class LayerSampler(NodeFlowSampler):
 class EdgeSampler(object):
     '''Edge sampler for link prediction.
 
+    This samples edges from a given graph. The edges sampled for a batch are
+    placed in a subgraph before returning. In many link prediction tasks,
+    negative edges are required to train a model. A negative edge is constructed by
+    corrupting an existing edge in the graph. The current implementation
+    support two ways of corrupting an edge: corrupt the head node of
+    an edge (by randomly selecting a node as the head node), or corrupt
+    the tail node of an edge. When we corrupt the head node of an edge, we randomly
+    sample a node from the entire graph as the head node. It's possible the constructed
+    edge exists in the graph. By default, the implementation doesn't explicitly check
+    if the sampled negative edge exists in a graph. However, a user can exclude
+    positive edges from negative edges by specifying 'exclude_positive=True'.
+    When negative edges are created, a batch of negative edges are also placed
+    in a subgraph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The DGLGraph where we sample edges.
+    batch_size : int
+        The batch size (i.e, the number of edges from the graph)
+    seed_edges : tensor
+        A list of edges where we sample from.
+    shuffle : bool
+        whether randomly shuffle the list of edges where we sample from.
+    num_workers : int
+        The number of workers to sample edges in parallel.
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
+    negative_mode : string
+        The method used to construct negative edges.
+    neg_sample_size : int
+        The number of negative edges to sample for each edge.
+    exclude_positive : int
+        Whether to exclude positive edges from the negative edges.
+
     Class properties
     ----------------
     immutable_only : bool
