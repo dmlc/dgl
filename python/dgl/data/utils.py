@@ -1,11 +1,13 @@
 """Dataset utilities."""
 from __future__ import absolute_import
 
-import os, sys
+import os
+import sys
 import hashlib
 import warnings
 import zipfile
 import tarfile
+import numpy as np
 try:
     import requests
 except ImportError:
@@ -13,7 +15,9 @@ except ImportError:
         pass
     requests = requests_failed_to_import
 
-__all__ = ['download', 'check_sha1', 'extract_archive', 'get_download_dir']
+__all__ = ['download', 'check_sha1', 'extract_archive',
+           'get_download_dir', 'Subset', 'split_dataset']
+
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
@@ -22,6 +26,25 @@ def _get_dgl_url(file_url):
     if repo_url[-1] != '/':
         repo_url = repo_url + '/'
     return repo_url + file_url
+
+
+def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
+    from itertools import accumulate
+    if frac_list is None:
+        frac_list = [0.8, 0.1, 0.1]
+    frac_list = np.array(frac_list)
+    assert np.allclose(np.sum(frac_list), 1.), \
+        'Expect frac_list sum to 1, got {:.4f}'.format(
+            np.sum(frac_list))
+    num_data = len(dataset)
+    lengths = (num_data * frac_list).astype(int)
+    lengths[-1] = num_data - np.sum(lengths[:-1])
+    if shuffle:
+        indices = np.random.RandomState(
+            seed=random_state).permutation(num_data)
+    else:
+        indices = np.arange(num_data)
+    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(accumulate(lengths), lengths)]
 
 
 def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True):
@@ -77,18 +100,18 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
             # Disable pyling too broad Exception
             # pylint: disable=W0703
             try:
-                print('Downloading %s from %s...'%(fname, url))
+                print('Downloading %s from %s...' % (fname, url))
                 r = requests.get(url, stream=True, verify=verify_ssl)
                 if r.status_code != 200:
-                    raise RuntimeError("Failed downloading url %s"%url)
+                    raise RuntimeError("Failed downloading url %s" % url)
                 with open(fname, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=1024):
-                        if chunk: # filter out keep-alive new chunks
+                        if chunk:  # filter out keep-alive new chunks
                             f.write(chunk)
                 if sha1_hash and not check_sha1(fname, sha1_hash):
-                    raise UserWarning('File {} is downloaded but the content hash does not match.'\
-                                      ' The repo may be outdated or download may be incomplete. '\
-                                      'If the "repo_url" is overridden, consider switching to '\
+                    raise UserWarning('File {} is downloaded but the content hash does not match.'
+                                      ' The repo may be outdated or download may be incomplete. '
+                                      'If the "repo_url" is overridden, consider switching to '
                                       'the default repo.'.format(fname))
                 break
             except Exception as e:
@@ -100,6 +123,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
                           .format(retries, 's' if retries > 1 else ''))
 
     return fname
+
 
 def check_sha1(filename, sha1_hash):
     """Check whether the sha1 hash of the file content matches the expected hash.
@@ -128,6 +152,7 @@ def check_sha1(filename, sha1_hash):
 
     return sha1.hexdigest() == sha1_hash
 
+
 def extract_archive(file, target_dir):
     """Extract archive file.
 
@@ -150,6 +175,7 @@ def extract_archive(file, target_dir):
     archive.extractall(path=target_dir)
     archive.close()
 
+
 def get_download_dir():
     """Get the absolute path to the download directory.
 
@@ -163,3 +189,41 @@ def get_download_dir():
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname
+
+
+class Subset(object):
+    """Subset of a dataset at specified indices
+
+    Code adapted from PyTorch.
+
+    Parameters
+    ----------
+    dataset
+        dataset[i] should return the ith datapoint
+    indices : list
+        List of datapoint indices to construct the subset
+    """
+
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __getitem__(self, item):
+        """Get the datapoint indexed by item
+
+        Returns
+        -------
+        tuple
+            datapoint
+        """
+        return self.dataset[self.indices[item]]
+
+    def __len__(self):
+        """Get subset size
+
+        Returns
+        -------
+        int
+            Number of datapoints in the subset
+        """
+        return len(self.indices)
