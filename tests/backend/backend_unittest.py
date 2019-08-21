@@ -31,10 +31,6 @@ def randn(shape):
     """Generate a tensor with elements from standard normal distribution."""
     pass
 
-def rand(shape):
-    """Generate a tensor with elements from a discrete uniform distribution."""
-    pass
-
 def attach_grad(x):
     """Flag the tensor *in-place* to have its gradient computed in backward
     pass.

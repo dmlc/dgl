@@ -78,7 +78,7 @@ def test_set2set():
     print(s2s)
 
     # test#1: basic
-    h0 = F.rand((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = s2s(h0, g)
     assert h1.shape[0] == 10 and h1.dim() == 1
 
@@ -86,7 +86,7 @@ def test_set2set():
     g1 = dgl.DGLGraph(nx.path_graph(11))
     g2 = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g1, g2])
-    h0 = F.rand((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = s2s(h0, bg)
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
 
@@ -99,13 +99,13 @@ def test_glob_att_pool():
     print(gap)
 
     # test#1: basic
-    h0 = F.rand((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = gap(h0, g)
     assert h1.shape[0] == 10 and h1.dim() == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
-    h0 = F.rand((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.number_of_nodes(), 5))
     h1 = gap(h0, bg)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
 
@@ -119,7 +119,7 @@ def test_simple_pool():
     print(sum_pool, avg_pool, max_pool, sort_pool)
 
     # test#1: basic
-    h0 = F.rand((g.number_of_nodes(), 5))
+    h0 = F.randn((g.number_of_nodes(), 5))
     h1 = sum_pool(h0, g)
     assert F.allclose(h1, F.sum(h0, 0))
     h1 = avg_pool(h0, g)
@@ -132,7 +132,7 @@ def test_simple_pool():
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
-    h0 = F.rand((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.number_of_nodes(), 5))
 
     h1 = sum_pool(h0, bg)
     truth = th.stack([F.sum(h0[:15], 0),
@@ -174,7 +174,7 @@ def test_set_trans():
     print(st_enc_0, st_enc_1, st_dec)
 
     # test#1: basic
-    h0 = F.rand((g.number_of_nodes(), 50))
+    h0 = F.randn((g.number_of_nodes(), 50))
     h1 = st_enc_0(h0, g)
     assert h1.shape == h0.shape
     h1 = st_enc_1(h0, g)
@@ -186,7 +186,7 @@ def test_set_trans():
     g1 = dgl.DGLGraph(nx.path_graph(5))
     g2 = dgl.DGLGraph(nx.path_graph(10))
     bg = dgl.batch([g, g1, g2])
-    h0 = F.rand((bg.number_of_nodes(), 50))
+    h0 = F.randn((bg.number_of_nodes(), 50))
     h1 = st_enc_0(h0, bg)
     assert h1.shape == h0.shape
     h1 = st_enc_1(h0, bg)
@@ -224,9 +224,9 @@ def test_edge_softmax():
         for j in range(30):
             g.add_edge(i, j)
 
-    score = F.rand((900, 1))
+    score = F.randn((900, 1))
     score.requires_grad_()
-    grad = F.rand((900, 1))
+    grad = F.randn((900, 1))
     y = F.softmax(score.view(30, 30), dim=0).view(-1, 1)
     y.backward(grad)
     grad_score = score.grad
