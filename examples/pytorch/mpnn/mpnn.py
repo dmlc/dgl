@@ -65,15 +65,8 @@ class NNConvLayer(nn.Module):
             if isinstance(m, nn.Linear):
                 nn.init.xavier_normal_(m.weight.data, gain=1.414)
 
-    def message(self, edges):
-        return {
-            'm':
-            torch.matmul(edges.src['h'].unsqueeze(1),
-                         edges.data['w']).squeeze(1)
-        }
-
     def apply_node_func(self, nodes):
-        aggr_out = nodes.data['aggr_out']
+        aggr_out = nodes.data['aggr_out'].sum(dim=1)
         if self.root is not None:
             aggr_out = torch.mm(nodes.data['h'], self.root) + aggr_out
 
@@ -86,10 +79,10 @@ class NNConvLayer(nn.Module):
         h = h.unsqueeze(-1) if h.dim() == 1 else h
         e = e.unsqueeze(-1) if e.dim() == 1 else e
 
-        g.ndata['h'] = h
+        g.ndata['h'] = h.unsqueeze(-1)
         g.edata['w'] = self.edge_net(e).view(-1, self.in_channels,
                                              self.out_channels)
-        g.update_all(self.message, fn.sum("m", "aggr_out"),
+        g.update_all(fn.u_mul_e("h", "w", "m"), fn.sum("m", "aggr_out"),
                      self.apply_node_func)
         return g.ndata.pop('h')
 
