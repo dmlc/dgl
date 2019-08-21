@@ -235,11 +235,11 @@ class BipartiteCSRWrapper : public CSRWrapper {
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
-    return gptr_->GetInCSR()->adj();
+    return gptr_->GetInCSRMatrix();
   }
 
   aten::CSRMatrix GetOutCSRMatrix() const override {
-    return gptr_->GetOutCSR()->adj();
+    return gptr_->GetOutCSRMatrix();
   }
 
   DGLContext Context() const override {
