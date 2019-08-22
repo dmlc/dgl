@@ -883,6 +883,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     *rv = List<NodeFlow>(nflows);
   });
 
+namespace {
+
 void BuildCoo(const ImmutableGraph &g) {
   auto coo = g.GetCOO();
   assert(coo);
@@ -998,6 +1000,8 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
 inline SubgraphRef ConvertRef(const Subgraph &subg) {
     return SubgraphRef(std::shared_ptr<Subgraph>(new Subgraph(subg)));
 }
+
+}  // namespace
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
