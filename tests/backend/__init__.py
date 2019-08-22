@@ -1,4 +1,5 @@
 from dgl.backend import *
+from dgl.nn import *
 from . import backend_unittest
 import os
 import importlib
@@ -33,6 +34,12 @@ _context_dict = {
         'gpu': cuda(),
         }
 _default_context = _context_dict[_default_context_str]
+
+def ctx():
+    return _default_context
+
+def gpu_ctx():
+    return (_default_context_str == 'gpu')
 
 def zeros(shape, dtype=float32, ctx=_default_context):
     return _zeros(shape, dtype, ctx)
