@@ -61,7 +61,7 @@ def save_graphs(filename, g_list, labels=None):
     """
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
-    if len(labels) != 0:
+    if (labels is not None) and (len(labels) != 0):
         label_dict = dict()
         for key, value in labels.items():
             label_dict[key] = F.zerocopy_to_dgl_ndarray(value)
@@ -77,24 +77,27 @@ def load_graphs(filename, idx_list=None):
     :param filename: file to load DGLGraphs
     :param idx_list: list of index of graph to be loaded. If not specified, will load all graphs
     from file
-    :return: list of immutable DGLGraphs
+    :return: list of immutable DGLGraphs, and labels stored in files (empty dict returned if no
+    label stored)
     """
     assert isinstance(idx_list, list)
     if idx_list is None:
         idx_list = []
     metadata = _CAPI_DGLLoadGraphs(filename, idx_list, False)
-    return [gdata.get_graph() for gdata in metadata.graph_data]
+    label_dict = {}
+    for k, v in metadata.labels.items():
+        label_dict[k] = F.zerocopy_from_dgl_ndarray(v.data)
+
+    return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
 
 
 def load_labels(filename):
     """
-    Load DGLGraphs from file
+    Load labels from file
     :param filename: file to load DGLGraphs
-    :param idx_list: list of index of graph to be loaded. If not specified, will load all graphs
-    from file
-    :return: list of immutable DGLGraphs
+    :return: label_dict: dict of tensors
     """
-    metadata = _CAPI_DGLLoadGraphs(filename, idx_list, True)
+    metadata = _CAPI_DGLLoadGraphs(filename, [], True)
     label_dict = {}
     for k, v in metadata.labels.items():
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v.data)
