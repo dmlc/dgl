@@ -222,6 +222,7 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
 
   // Early Return
   if (onlyMeta) {
+    delete fs;
     return metadata;
   }
 
