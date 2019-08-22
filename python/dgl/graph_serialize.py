@@ -19,7 +19,6 @@ class MetaData(ObjectBase):
       labels [dict of backend tensors]: return dict of labels
       graph_data [list of GraphData]: return list of GraphData Object
     """
-    pass
 
 
 @register_object("graph_serialize.GraphData")
