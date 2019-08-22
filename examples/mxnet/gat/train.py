@@ -18,7 +18,7 @@ import numpy as np
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from gat import GAT
-
+from utils import EarlyStopping
 
 def elu(data):
     return mx.nd.LeakyReLU(data, act_type='elu')
@@ -75,6 +75,7 @@ def main(args):
                 args.alpha,
                 args.residual)
 
+    stopper = EarlyStopping(patience=100)
     model.initialize(ctx=ctx)
 
     # use optimizer
@@ -95,10 +96,11 @@ def main(args):
             dur.append(time.time() - t0)
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
-        if epoch % 100 == 0:
-            val_accuracy = evaluate(model, features, labels, val_mask)
-            print("Validation Accuracy {:.4f}".format(val_accuracy))
-
+        val_accuracy = evaluate(model, features, labels, val_mask)
+        print("Validation Accuracy {:.4f}".format(val_accuracy))
+        if stopper.step(val_accuracy, model): 
+            break
+    model.load_parameters('model.param')
     test_accuracy = evaluate(model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(test_accuracy))
 
