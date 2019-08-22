@@ -330,7 +330,7 @@ void StorageMetaDataObject::setMetaData(dgl_id_t num_graph,
   this->num_graph = num_graph;
   this->nodes_num_list = Value(MakeValue(aten::VecToIdArray(nodes_num_list)));
   this->edges_num_list = Value(MakeValue(aten::VecToIdArray(edges_num_list)));
-  for (auto kv: labels_list) {
+  for (auto kv : labels_list) {
     this->labels_list.Set(kv.first, Value(MakeValue(kv.second)));
   }
 }
