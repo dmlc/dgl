@@ -1,13 +1,14 @@
-# pylint: disable=C0111, C0103, C0200
+# pylint: disable=C0103, W0622, R1710
 """
 Learning Deep Generative Models of Graphs
 Paper: https://arxiv.org/pdf/1803.03324.pdf
 """
+from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-from functools import partial
 from torch.distributions import Categorical
 
 class GraphEmbed(nn.Module):
@@ -512,6 +513,7 @@ class DGMG(nn.Module):
         self.init_weights()
 
     def init_weights(self):
+        """Initialize model weights"""
         self.graph_embed.apply(weights_init)
         self.graph_prop.apply(weights_init)
         self.add_node_agent.apply(weights_init)
@@ -612,10 +614,10 @@ class DGMG(nn.Module):
               With the formulation of DGMG, j must be created before the decision.
         """
         stop_node = self.add_node_and_update(a=actions[self.action_step][1])
-        while (not stop_node):
+        while not stop_node:
             # A new atom was just added.
             stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
-            while (not stop_edge):
+            while not stop_edge:
                 # A new bond is to be added.
                 self.choose_dest_and_update(bond_type, a=actions[self.action_step][1])
                 stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
@@ -624,11 +626,11 @@ class DGMG(nn.Module):
     def rollout(self):
         """Sample a molecule from the distribution learned by DGMG."""
         stop_node = self.add_node_and_update()
-        while (not stop_node):
+        while not stop_node:
             stop_edge, bond_type = self.add_edge_or_not()
             if self.env.num_atoms() == 1:
                 stop_edge = True
-            while (not stop_edge):
+            while not stop_edge:
                 self.choose_dest_and_update(bond_type)
                 stop_edge, bond_type = self.add_edge_or_not()
             stop_node = self.add_node_and_update()
@@ -658,7 +660,7 @@ class DGMG(nn.Module):
         self.env.reset(rdkit_mol=rdkit_mol)
         self.prepare_log_prob(compute_log_prob)
 
-        if actions != None:
+        if actions is not None:
             # A sequence of decisions is given, use teacher forcing
             self.step_count = 0
             self.teacher_forcing(actions)
