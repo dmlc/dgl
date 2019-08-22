@@ -44,6 +44,24 @@ molecular graph topology, which may be viewed as a learned fingerprint [3].
 - **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
 networks and they can be easily extended for graph level prediction.
 
+## Generative Models
+
+We use generative models for two different purposes when it comes to molecules:
+- **Distribution Learning**: Given a collection of molecules, we want to model their distribution and generate new
+molecules with similar properties.
+- **Goal-directed Optimization**: Find molecules with desired properties.
+
+For this model zoo, we will only focused on generative models for molecular graphs. There are other generative models 
+working with alternative representations like SMILES. 
+
+Generative models are known to be difficult for evaluation. [GuacaMol](https://github.com/BenevolentAI/guacamol) and
+[MOSES](https://github.com/molecularsets/moses) have been two recent efforts to benchmark generative models. There
+are also two accompanying review papers that are well written [4], [5].
+
+### Models
+- **Deep Generative Models of Graphs (DGMG)**: A very general framework for graph distribution learning by progressively
+adding atoms and bonds.
+
 ## References
 
 [1] Chen et al. (2018) The rise of deep learning in drug discovery. *Drug Discov Today* 6, 1241-1250.
@@ -53,3 +71,8 @@ networks and they can be easily extended for graph level prediction.
 
 [3] Duvenaud et al. (2015) Convolutional networks on graphs for learning molecular fingerprints. *Advances in neural 
 information processing systems (NeurIPS)*, 2224-2232.
+
+[4] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
+1096-1108.
+
+[5] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
