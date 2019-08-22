@@ -1017,7 +1017,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     // process args
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
-    CHECK(IsValidIdArray(seed_edges));
+    CHECK(aten::IsValidIdArray(seed_edges));
     BuildCoo(*gptr);
 
     const int64_t num_seeds = seed_edges->shape[0];
