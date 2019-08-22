@@ -1,3 +1,4 @@
+# pylint: disable=C0111, C0103, C0200
 """
 Learning Deep Generative Models of Graphs
 Paper: https://arxiv.org/pdf/1803.03324.pdf

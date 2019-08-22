@@ -4,7 +4,7 @@ from .dgmg import DGMG
 from .gcn import GCNClassifier
 from ...data.utils import _get_dgl_url, download
 
-_checkpoint_url = {
+URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
     'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
@@ -48,7 +48,7 @@ def load_pretrained(model_name, **kwargs):
     -------
     model
     """
-    if model_name not in _checkpoint_url:
+    if model_name not in URL:
         return RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
     if model_name == 'GCN_Tox21':
@@ -65,4 +65,4 @@ def load_pretrained(model_name, **kwargs):
 
     print('Pretrained model loaded')
 
-    return download_and_load_checkpoint(model, _checkpoint_url[model_name])
+    return download_and_load_checkpoint(model, URL[model_name])
