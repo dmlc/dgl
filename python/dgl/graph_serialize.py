@@ -3,7 +3,6 @@ from __future__ import absolute_import
 from .graph import DGLGraph
 from ._ffi.object import ObjectBase, register_object
 # from ._ffi.base import c_array
-from . import _api_internal
 from ._ffi.function import _init_api
 from . import backend as F
 
@@ -12,6 +11,14 @@ _init_api("dgl.graph_serialize")
 
 @register_object("graph_serialize.StorageMetaData")
 class MetaData(ObjectBase):
+    """MetaData Object
+    attributes available:
+      num_graph [int]: return numbers of graphs
+      nodes_num_list [list of int]: return number of nodes for each graph
+      edges_num_list [list of int]: return number of edges for each graph
+      labels [dict of backend tensors]: return dict of labels
+      graph_data [list of GraphData]: return list of GraphData Object
+    """
     pass
 
 
