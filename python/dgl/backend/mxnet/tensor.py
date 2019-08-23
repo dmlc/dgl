@@ -9,6 +9,7 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
+from ... import utils
 
 MX_VERSION = LooseVersion(mx.__version__)
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -423,18 +424,35 @@ class CopyReduce(mx.autograd.Function):
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.graph, self.target, in_data_nd, out_data_nd,
             self.in_map[0], self.out_map[0])
+
+        if self.reducer == 'mean':
+            eps = 1e-8
+            v = utils.toindex(slice(0, self.graph.number_of_nodes()))            
+            degs = self.graph.in_degrees(v).tousertensor()
+            degs = degs.astype('float32').expand_dims(1).as_in_context(in_data.context)
+            out_data = out_data / (degs + eps)
+
         self.save_for_backward(in_data_nd, out_data_nd)
         return out_data
 
     def backward(self, grad_out):
         in_data_nd, out_data_nd = self.saved_tensors
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
                             dtype=grad_out.dtype)
+
+        if self.reducer == 'mean':
+            v = utils.toindex(slice(0, self.graph.number_of_nodes()))
+            degs = self.graph.in_degrees(v).tousertensor()
+            degs = degs.astype('float32').expand_dims(1).as_in_context(grad_out.context)
+            grad_out = grad_out * degs
+
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         K.backward_copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.graph, self.target, in_data_nd, out_data_nd,
             grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
             self.in_map[1], self.out_map[1])
         # clear saved tensors explicitly

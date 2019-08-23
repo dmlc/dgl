@@ -639,7 +639,7 @@ class GraphIndex(ObjectBase):
         -------
         GraphIndex
         """
-        return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
+        return self.to_immutable().asbits(64).copy_to(ctx)
 
     def get_csr_shuffle_order(self):
         """Return the edge shuffling order when a coo graph is converted to csr format

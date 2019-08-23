@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+import absolute_import
 
 from distutils.version import LooseVersion
 
@@ -8,6 +8,7 @@ from torch.utils import dlpack
 
 from ... import ndarray as nd
 from ... import kernel as K
+from ... import utils
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -333,8 +334,16 @@ class CopyReduce(th.autograd.Function):
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.copy_reduce(
-            reducer, graph, target, in_data_nd, out_data_nd, in_map[0],
-            out_map[0])
+            reducer if reducer != 'mean' else 'sum', 
+            graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
+
+        if reducer == 'mean':
+            eps = 1e-8
+            v = utils.toindex(slice(0, graph.number_of_nodes()))
+            degs = graph.in_degrees(v).tousertensor()
+            degs = degs.float().unsqueeze(-1).to(in_data.device)
+            out_data = out_data / (degs + eps)
+
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, graph, target, in_map, out_map,
                               in_data_nd, out_data_nd)
@@ -346,11 +355,19 @@ class CopyReduce(th.autograd.Function):
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_in = None
+
+        if reducer == 'mean':
+            v = utils.toindex(slice(0, graph.number_of_nodes()))
+            degs = graph.in_degrees(v).tousertensor()
+            degs = degs.float().unsqueeze(-1).to(grad_out.device)
+            grad_out = grad_out * degs
+
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
             grad_in = grad_out.new_empty(in_data_nd.shape)
             K.backward_copy_reduce(
-                reducer, graph, target, in_data_nd, out_data_nd, grad_out_nd,
+                reducer if reducer != 'mean' else 'sum', 
+                graph, target, in_data_nd, out_data_nd, grad_out_nd, 
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
         return None, None, None, grad_in, None, None, None
 
