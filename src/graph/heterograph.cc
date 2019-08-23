@@ -114,17 +114,33 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must be a bipartite graph.";
   }
   // create num verts per type
-  num_verts_per_type_.resize(meta_graph_->NumVertices(), -1);
-  for (dgl_type_t vtype = 0; vtype < meta_graph_->NumVertices(); ++vtype) {
-    for (dgl_type_t etype : meta_graph->OutEdgeVec(vtype)) {
-      const auto nv = rel_graphs[etype]->NumVertices(Bipartite::kSrcVType);
-      if (num_verts_per_type_[vtype] < 0) {
-        num_verts_per_type_[vtype] = nv;
-      } else {
-        CHECK_EQ(num_verts_per_type_[vtype], nv)
-          << "Mismatch number of vertices for vertex type " << vtype;
-      }
-    }
+  num_verts_per_type_.resize(meta_graph->NumVertices(), -1);
+
+  EdgeArray etype_array = meta_graph->Edges();
+  dgl_type_t *srctypes = static_cast<dgl_type_t *>(etype_array.src->data);
+  dgl_type_t *dsttypes = static_cast<dgl_type_t *>(etype_array.dst->data);
+  dgl_type_t *etypes = static_cast<dgl_type_t *>(etype_array.id->data);
+
+  for (size_t i = 0; i < meta_graph->NumEdges(); ++i) {
+    dgl_type_t srctype = srctypes[i];
+    dgl_type_t dsttype = dsttypes[i];
+    dgl_type_t etype = etypes[i];
+    size_t nv;
+
+    // # nodes of source type
+    nv = rel_graphs[etype]->NumVertices(Bipartite::kSrcVType);
+    if (num_verts_per_type_[srctype] < 0)
+      num_verts_per_type_[srctype] = nv;
+    else
+      CHECK_EQ(num_verts_per_type_[srctype], nv)
+        << "Mismatch number of vertices for vertex type " << srctype;
+    // # nodes of destination type
+    nv = rel_graphs[etype]->NumVertices(Bipartite::kDstVType);
+    if (num_verts_per_type_[dsttype] < 0)
+      num_verts_per_type_[dsttype] = nv;
+    else
+      CHECK_EQ(num_verts_per_type_[dsttype], nv)
+        << "Mismatch number of vertices for vertex type " << dsttype;
   }
 }
 
@@ -140,7 +156,7 @@ bool HeteroGraph::IsMultigraph() const {
 }
 
 BoolArray HeteroGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices(vtype));
 }
 
@@ -192,7 +208,7 @@ HeteroGraphPtr CreateHeteroGraph(
 
 ///////////////////////// C APIs /////////////////////////
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCOO")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateBipartiteFromCOO")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     int64_t num_src = args[0];
     int64_t num_dst = args[1];
@@ -202,7 +218,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCOO")
     *rv = HeteroGraphRef(hgptr);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCSR")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateBipartiteFromCSR")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     int64_t num_src = args[0];
     int64_t num_dst = args[1];
@@ -213,7 +229,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateBipartiteFromCSR")
     *rv = HeteroGraphRef(hgptr);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateHeteroGraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> rel_graphs = args[1];
@@ -226,20 +242,20 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroCreateHeteroGraph")
     *rv = HeteroGraphRef(hgptr);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetMetaGraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetMetaGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = GraphRef(hg->meta_graph());
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetRelationGraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddVertices")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAddVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t vtype = args[1];
@@ -247,7 +263,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddVertices")
     hg->AddVertices(vtype, num);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdge")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAddEdge")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -256,7 +272,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdge")
     hg->AddEdge(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdges")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAddEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -265,51 +281,51 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroAddEdges")
     hg->AddEdges(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroClear")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroClear")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     hg->Clear();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroContext")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = hg->Context();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumBits")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = hg->NumBits();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroIsMultigraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsMultigraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = hg->IsMultigraph();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroIsReadonly")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroIsReadonly")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     *rv = hg->IsReadonly();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumVertices")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroNumVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t vtype = args[1];
     *rv = static_cast<int64_t>(hg->NumVertices(vtype));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroNumEdges")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroNumEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     *rv = static_cast<int64_t>(hg->NumEdges(etype));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertex")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroHasVertex")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t vtype = args[1];
@@ -317,7 +333,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertex")
     *rv = hg->HasVertex(vtype, vid);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertices")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroHasVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t vtype = args[1];
@@ -325,7 +341,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasVertices")
     *rv = hg->HasVertices(vtype, vids);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgeBetween")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroHasEdgeBetween")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -334,7 +350,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgeBetween")
     *rv = hg->HasEdgeBetween(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgesBetween")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroHasEdgesBetween")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -343,7 +359,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroHasEdgesBetween")
     *rv = hg->HasEdgesBetween(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroPredecessors")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPredecessors")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -351,7 +367,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroPredecessors")
     *rv = hg->Predecessors(etype, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSuccessors")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSuccessors")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -359,7 +375,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSuccessors")
     *rv = hg->Successors(etype, src);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeId")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -368,7 +384,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeId")
     *rv = hg->EdgeId(etype, src, dst);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeIds")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeIds")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -378,7 +394,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeIds")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroFindEdges")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroFindEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -387,7 +403,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroFindEdges")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_1")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInEdges_1")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -396,7 +412,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_1")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_2")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -405,7 +421,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInEdges_2")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_1")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutEdges_1")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -414,7 +430,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_1")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_2")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -423,7 +439,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutEdges_2")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdges")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -432,7 +448,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdges")
     *rv = ConvertEdgeArrayToPackedFunc(ret);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegree")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -440,7 +456,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegree")
     *rv = static_cast<int64_t>(hg->InDegree(etype, vid));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegrees")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroInDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -448,7 +464,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroInDegrees")
     *rv = hg->InDegrees(etype, vids);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegree")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -456,7 +472,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegree")
     *rv = static_cast<int64_t>(hg->OutDegree(etype, vid));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegrees")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroOutDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -464,7 +480,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroOutDegrees")
     *rv = hg->OutDegrees(etype, vids);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetAdj")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
@@ -474,7 +490,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroGetAdj")
         hg->GetAdj(etype, transpose, fmt));
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroVertexSubgraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> vids = args[1];
@@ -488,7 +504,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroVertexSubgraph")
     *rv = HeteroSubgraphRef(subg);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeSubgraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     List<Value> eids = args[1];
@@ -505,13 +521,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroEdgeSubgraph")
 
 // HeteroSubgraph C APIs
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetGraph")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSubgraphGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroSubgraphRef subg = args[0];
     *rv = HeteroGraphRef(subg->graph);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedVertices")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSubgraphGetInducedVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroSubgraphRef subg = args[0];
     List<Value> induced_verts;
@@ -521,7 +537,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedVertices")
     *rv = induced_verts;
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedEdges")
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroSubgraphGetInducedEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroSubgraphRef subg = args[0];
     List<Value> induced_edges;
@@ -529,6 +545,26 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLHeteroSubgraphGetInducedEdges")
       induced_edges.push_back(Value(MakeValue(arr)));
     }
     *rv = induced_edges;
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int bits = args[1];
+    HeteroGraphPtr hg_new = Bipartite::AsNumBits(hg.sptr(), bits);
+    *rv = HeteroGraphRef(hg_new);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    int device_type = args[1];
+    int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    HeteroGraphPtr hg_new = Bipartite::CopyTo(hg.sptr(), ctx);
+    *rv = HeteroGraphRef(hg_new);
   });
 
 }  // namespace dgl
