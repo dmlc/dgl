@@ -1,10 +1,11 @@
 import numpy as np
+from torch.utils.data import Dataset
 
 class ModelNet(object):
-    def __init__(self, path, batch_size):
+    def __init__(self, path, num_points):
         import h5py
         self.f = h5py.File(path)
-        self.batch_size = batch_size
+        self.num_points = num_points
 
         self.n_train = self.f['train/data'].shape[0]
         self.n_valid = int(self.n_train / 5)
@@ -12,25 +13,34 @@ class ModelNet(object):
         self.n_test = self.f['test/data'].shape[0]
 
     def train(self):
-        self.data = self.f['train/data'][:self.n_train]
-        self.label = self.f['train/label'][:self.n_train]
+        return ModelNetDataset(self, 'train')
 
     def valid(self):
-        self.data = self.f['train/data'][self.n_train:]
-        self.label = self.f['train/label'][self.n_train:]
+        return ModelNetDataset(self, 'valid')
 
     def test(self):
-        self.data = self.f['test/data'].value
-        self.label = self.f['test/label'].value
+        return ModelNetDataset(self, 'test')
+
+class ModelNetDataset(Dataset):
+    def __init__(self, modelnet, mode):
+        super(ModelNetDataset, self).__init__()
+        self.num_points = modelnet.num_points
+
+        if mode == 'train':
+            self.data = modelnet.f['train/data'][:modelnet.n_train]
+            self.label = modelnet.f['train/label'][:modelnet.n_train]
+        elif mode == 'valid':
+            self.data = modelnet.f['train/data'][modelnet.n_train:]
+            self.label = modelnet.f['train/label'][modelnet.n_train:]
+        elif mode == 'test':
+            self.data = modelnet.f['test/data'].value
+            self.label = modelnet.f['test/label'].value
 
     def __len__(self):
         return self.data.shape[0]
 
-    def __iter__(self):
-        perm = np.random.permutation(data.shape[0])
-
-        for i in range(0, len(perm), self.batch_size):
-            samples = perm[i:i+self.batch_size]
-            x = self.data[samples]
-            y = self.label[samples]
-            yield x, y
+    def __getitem__(self, i):
+        x = self.data[i][:self.num_points]
+        y = self.label[i]
+        np.random.shuffle(x)
+        return x, y
