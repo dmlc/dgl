@@ -3,6 +3,7 @@ import dgl
 import math
 import numpy as np
 import os
+import pickle
 import random
 import torch
 import torch.distributed as dist
@@ -139,6 +140,22 @@ def set_random_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
+def setup_dataset(args):
+    """Dataset setup
+
+    For unsupported dataset, we need to perform data preprocessing.
+
+    Parameters
+    ----------
+    args : dict
+        Configuration
+    """
+    if args['dataset'] in ['ChEMBL', 'ZINC']:
+        print('Built-in support for dataset {} exists.'.format(args['dataset']))
+    else:
+        print('Configure for new dataset {}...'.format(args['dataset']))
+        configure_new_dataset(args['dataset'], args['train_file'], args['val_file'])
+
 def setup(args, train=True):
     """Setup
 
@@ -161,10 +178,51 @@ def setup(args, train=True):
     save_arg_dict(args)
 
     if train:
+        setup_dataset(args)
         args['checkpoint_dir'] = os.path.join(log_dir, 'checkpoint.pth')
         pprint(args)
 
     return args
+
+########################################################################################################################
+#                                                   multi-process                                                      #
+########################################################################################################################
+
+def synchronize(num_processes):
+    """Synchronize all processes.
+
+    Parameters
+    ----------
+    num_processes : int
+        Number of subprocesses used
+    """
+    if num_processes > 1:
+        dist.barrier()
+
+def launch_a_process(rank, args, target, minutes=720):
+    """Launch a subprocess for training.
+
+    Parameters
+    ----------
+    rank : int
+        Subprocess id
+    args : dict
+        Configuration
+    target : callable
+        Target function for the subprocess
+    minutes : int
+        Timeout minutes for operations executed against the process group
+    """
+    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+        master_ip=args['master_ip'], master_port=args['master_port'])
+    dist.init_process_group(backend='gloo',
+                            init_method=dist_init_method,
+                            # If you have a larger dataset, you will need to increase it.
+                            timeout=timedelta(minutes=minutes),
+                            world_size=args['num_processes'],
+                            rank=rank)
+    assert torch.distributed.get_rank() == rank
+    target(rank, args)
 
 ########################################################################################################################
 #                                                  optimization                                                        #
@@ -663,7 +721,10 @@ def preprocess_dataset(atom_types, bond_types, smiles, max_num_atoms=23):
 
         raw_s = s.strip()
         mol = smiles_to_standard_mol(raw_s)
-        if (mol is None) or (mol.GetNumAtoms() > max_num_atoms):
+        if mol is None:
+            continue
+
+        if (max_num_atoms is not None) and (mol.GetNumAtoms() > max_num_atoms):
             continue
 
         canonical_s, random_s = get_DGMG_smile(env, mol)
@@ -678,16 +739,96 @@ def preprocess_dataset(atom_types, bond_types, smiles, max_num_atoms=23):
     valid_smiles = list(set(valid_smiles))
     return valid_smiles
 
-def download_data(fname):
-    """Download dataset
+def download_data(dataset, fname):
+    """Download dataset if built-in support exists
 
     Parameters
     ----------
+    dataset : str
+        Dataset name
     fname : str
         Name of dataset file
     """
-    data_path = os.path.join(get_download_dir(), fname)
+    if dataset not in ['ChEMBL', 'ZINC']:
+        # For dataset without built-in support, they should be locally processed.
+        return
+
+    data_path = fname
     download(_get_dgl_url(os.path.join('dataset', fname)), path=data_path)
+
+def load_smiles_from_file(f_name):
+    """Load dataset into a list of SMILES
+
+    Parameters
+    ----------
+    f_name : str
+        Path to a file of molecules, where each line of the file
+        is a molecule in SMILES format.
+
+    Returns
+    -------
+    smiles : list of str
+        List of molecules as SMILES
+    """
+    with open(f_name, 'r') as f:
+        smiles = f.read().splitlines()
+    return smiles
+
+def write_smiles_to_file(f_name, smiles):
+    """Write dataset to a file.
+
+    Parameters
+    ----------
+    f_name : str
+        Path to create a file of molecules, where each line of the file
+        is a molecule in SMILES format.
+    smiles : list of str
+        List of SMILES
+    """
+    with open(f_name, 'w') as f:
+        for s in smiles:
+            f.write(s + '\n')
+
+def configure_new_dataset(dataset, train_file, val_file):
+    """Configure for a new dataset.
+
+    Parameters
+    ----------
+    dataset : str
+        Dataset name
+    train_file : str
+        Path to a file with one SMILES a line for training data
+    val_file : str
+        Path to a file with one SMILES a line for validation data
+    """
+    assert train_file is not None, 'Expect a file of SMILES for training, got None.'
+    assert val_file is not None, 'Expect a file of SMILES for validation, got None.'
+    train_smiles = load_smiles_from_file(train_file)
+    val_smiles = load_smiles_from_file(val_file)
+    all_smiles = train_smiles + val_smiles
+
+    # Get all atom and bond types in the dataset
+    path_to_atom_and_bond_types = '_'.join([dataset, 'atom_and_bond_types.pkl'])
+    if not os.path.exists(path_to_atom_and_bond_types):
+        atom_types, bond_types = get_atom_and_bond_types(all_smiles)
+        with open(path_to_atom_and_bond_types, 'wb') as f:
+            pickle.dump({'atom_types': atom_types, 'bond_types': bond_types}, f)
+    else:
+        with open(path_to_atom_and_bond_types, 'rb') as f:
+            type_info = pickle.load(f)
+            atom_types = type_info['atom_types']
+            bond_types = type_info['bond_types']
+
+    # Standardize training data
+    path_to_processed_train_data = '_'.join([dataset, 'DGMG', 'train.txt'])
+    if not os.path.exists(path_to_processed_train_data):
+        processed_train_smiles = preprocess_dataset(atom_types, bond_types, train_smiles, None)
+        write_smiles_to_file(path_to_processed_train_data, processed_train_smiles)
+
+    path_to_processed_val_data = '_'.join([dataset, 'DGMG', 'val.txt'])
+    if not os.path.exists(path_to_processed_val_data):
+        processed_val_smiles = preprocess_dataset(atom_types, bond_types, val_smiles, None)
+        write_smiles_to_file(path_to_processed_val_data, processed_val_smiles)
 
 class MoleculeDataset(object):
     """Initialize and split the dataset.
@@ -716,7 +857,6 @@ class MoleculeDataset(object):
             assert order is not None, 'An order should be specified for extracting ' \
                                       'decision sequences.'
 
-        assert dataset in ['ChEMBL', 'ZINC'], "Unexpected dataset"
         assert order in ['random', 'canonical', None], \
             "Unexpected order option to get sequences of graph generation decisions"
         assert len(set(modes) - {'train', 'val'}) == 0, \
@@ -778,19 +918,24 @@ class MoleculeDataset(object):
                                    [Chem.rdchem.BondType.SINGLE,
                                     Chem.rdchem.BondType.DOUBLE,
                                     Chem.rdchem.BondType.TRIPLE])
+        else:
+            path_to_atom_and_bond_types = '_'.join([self.dataset, 'atom_and_bond_types.pkl'])
+            with open(path_to_atom_and_bond_types, 'rb') as f:
+                type_info = pickle.load(f)
+            self.env = MoleculeEnv(type_info['atom_types'], type_info['bond_types'])
 
         dataset_prefix = self._dataset_prefix()
 
         if 'train' in self.modes:
             fname = '_'.join([dataset_prefix, 'train.txt'])
-            download_data(fname)
-            smiles = self._load_smiles_from_file(fname)
+            download_data(self.dataset, fname)
+            smiles = load_smiles_from_file(fname)
             self.train_set = self._create_a_subset(smiles)
 
         if 'val' in self.modes:
             fname = '_'.join([dataset_prefix, 'val.txt'])
-            download_data(fname)
-            smiles = self._load_smiles_from_file(fname)
+            download_data(self.dataset, fname)
+            smiles = load_smiles_from_file(fname)
             # We evenly divide the smiles into multiple susbets with multiprocess
             self.val_set = self._create_a_subset(smiles)
 
@@ -802,28 +947,7 @@ class MoleculeDataset(object):
         str
             Prefix for dataset file name
         """
-        if self.dataset == 'ChEMBL':
-            return 'ChEMBL_DGMG'
-        elif self.dataset == 'ZINC':
-            return 'ZINC_DGMG'
-
-    def _load_smiles_from_file(self, f_name):
-        """Load dataset into a list of SMILES
-
-        Parameters
-        ----------
-        f_name : str
-            Path to a file of molecules, where each line of the file
-            is a molecule in SMILES format.
-
-        Returns
-        -------
-        smiles : list of str
-            List of molecules as SMILES
-        """
-        with open(f_name, 'r') as f:
-            smiles = f.read().splitlines()
-        return smiles
+        return '_'.join([self.dataset, 'DGMG'])
 
 class Subset(Dataset):
     """A set of molecules which can be used for training, validation, test.
@@ -883,46 +1007,6 @@ class Subset(Dataset):
             nodes = list(range(m.GetNumAtoms()))
             random.shuffle(nodes)
             return self.env.get_decision_sequence(m, nodes)
-
-########################################################################################################################
-#                                                   multi-process                                                      #
-########################################################################################################################
-
-def synchronize(num_processes):
-    """Synchronize all processes.
-
-    Parameters
-    ----------
-    num_processes : int
-        Number of subprocesses used
-    """
-    if num_processes > 1:
-        dist.barrier()
-
-def launch_a_process(rank, args, target, minutes=720):
-    """Launch a subprocess for training.
-
-    Parameters
-    ----------
-    rank : int
-        Subprocess id
-    args : dict
-        Configuration
-    target : callable
-        Target function for the subprocess
-    minutes : int
-        Timeout minutes for operations executed against the process group
-    """
-    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-        master_ip=args['master_ip'], master_port=args['master_port'])
-    dist.init_process_group(backend='gloo',
-                            init_method=dist_init_method,
-                            # If you have a larger dataset, you will need to increase it.
-                            timeout=timedelta(minutes=minutes),
-                            world_size=args['num_processes'],
-                            rank=rank)
-    assert torch.distributed.get_rank() == rank
-    target(rank, args)
 
 ########################################################################################################################
 #                                                  progress tracking                                                   #

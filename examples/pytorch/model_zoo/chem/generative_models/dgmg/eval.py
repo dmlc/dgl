@@ -122,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
 
     # dataset and setting
-    parser.add_argument('-d', '--dataset', choices=['ChEMBL', 'ZINC'], default='ChEMBL',
+    parser.add_argument('-d', '--dataset',
                         help='dataset to use')
     parser.add_argument('-o', '--order', choices=['random', 'canonical'],
                         help='order to generate graphs, used for naming evaluation directory')

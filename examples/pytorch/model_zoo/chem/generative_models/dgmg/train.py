@@ -148,10 +148,16 @@ if __name__ == '__main__':
                         help='Number of epochs where no lr decay is performed.')
 
     # dataset and setting
-    parser.add_argument('-d', '--dataset', choices=['ChEMBL', 'ZINC'], default='ChEMBL',
+    parser.add_argument('-d', '--dataset',
                         help='dataset to use')
     parser.add_argument('-o', '--order', choices=['random', 'canonical'],
                         help='order to generate graphs')
+    parser.add_argument('-tf', '--train-file', type=str, default=None,
+                        help='Path to a file with one SMILES a line for training data. '
+                             'This is only necessary if you want to use a new dataset.')
+    parser.add_argument('-vf', '--val-file', type=str, default=None,
+                        help='Path to a file with one SMILES a line for validation data. '
+                             'This is only necessary if you want to use a new dataset.')
 
     # log
     parser.add_argument('-l', '--log-dir', default='./training_results',
