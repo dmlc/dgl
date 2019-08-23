@@ -158,7 +158,7 @@ class TGConv(nn.Module):
 
     where :math:`\mathbf{A}` denotes the adjacency matrix and
     :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix.
-    
+
     Parameters
     ----------
     in_feats : int
@@ -179,21 +179,22 @@ class TGConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 K=2,
+                 k=2,
                  bias=True,
                  activation=None):
         super(TGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self._K = K
+        self._k = k
 
-        self.lin = nn.Linear(in_feats * (self._K + 1), out_feats, bias=bias)
+        self.lin = nn.Linear(in_feats * (self._k + 1), out_feats, bias=bias)
 
         self.reset_parameters()
 
         self._activation = activation
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         self.lin.reset_parameters()
 
     def forward(self, feat, graph):
@@ -218,21 +219,21 @@ class TGConv(nn.Module):
         norm = th.reshape(norm, shp).to(feat.device)
 
         #D-1/2 A D -1/2 X
-        xs = [feat]
-        for k in range(self._K):
+        fstack = [feat]
+        for _ in range(self._k):
 
-            rst = xs[-1] * norm
+            rst = fstack[-1] * norm
             graph.ndata['h'] = rst
 
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
             rst = graph.ndata['h']
             rst = rst * norm
-            xs.append(rst)
+            fstack.append(rst)
 
-        rst = self.lin(th.cat(xs, dim=-1))
+        rst = self.lin(th.cat(fstack, dim=-1))
 
         if self._activation is not None:
             rst = self._activation(rst)
-        
+
         return rst
