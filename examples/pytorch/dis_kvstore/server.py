@@ -16,8 +16,7 @@ def start_server(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='kvstore')
-    parser.add_argument("--id", type=int, default=0,
-            help="node ID")
+    parser.add_argument("--id", type=int, default=0, help="node ID")
     args = parser.parse_args()
 
     start_server(args)

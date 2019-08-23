@@ -8,6 +8,7 @@ from ..network import KVMsgType, KVStoreMsg
 
 import math
 import dgl.backend as F
+import numpy as np
 
 def ReadNetworkConfigure(filename):
     """Read networking configuration from file.
@@ -323,7 +324,7 @@ class KVClient(object):
             _send_kv_msg(self._sender, msg, server_id)
         
     def push(self, name, ID, data):
-        """Push message to KVServer
+        """Push sparse message to KVServer
 
         The push() API will partition message into different 
         KVServer nodes automatically.
@@ -363,8 +364,24 @@ class KVClient(object):
                 data=range_data)
             _send_kv_msg(self._sender, msg, idx)
 
+    def push_all(self, name, data):
+        """Push the whole data to KVServer
+
+        The push() API will partition message into different
+        KVServer nodes automatically.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        data : tensor (mx.ndarray or torch.tensor)
+            data matrix
+        """
+        ID = F.zerocopy_from_numpy(np.arange(F.shape(data)[0]))
+        self.push(name, ID, data)
+
     def pull(self, name, ID):
-        """Pull message from KVServer
+        """Pull sparse message from KVServer
 
         Parameters
         ----------
@@ -411,12 +428,27 @@ class KVClient(object):
             msg_list.append(msg)
 
         return self._merge_msg(msg_list)
+
+    def pull_all(self, name):
+        """Pull the whole data from KVServer
+
+        Parameters
+        ----------
+        name : str
+            data name
+
+        Return
+        ------
+        tensor
+            target data matrix
+        """
+        ID = F.zerocopy_from_numpy(np.arange(self._data_size[name]))
+        return self.pull(name, ID)
     
     def barrier(self):
         """Barrier for all client nodes
         """
         pass
-
 
     def shut_down(self):
         """Shutdown all KVServer nodes

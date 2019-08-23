@@ -20,30 +20,41 @@ def start_client(args):
     client.init_data(name='embed_0', shape=[10, 3], init_type='zero')
     client.init_data(name='embed_1', shape=[11, 3], init_type='uniform', low=0.0, high=0.0)
 
+    time.sleep(1)
+
     tensor_id = torch.tensor([0, 1, 2])
     tensor_data = torch.tensor([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
 
-    # Push data
     for i in range(5):
         client.push('embed_0', tensor_id, tensor_data)
         client.push('embed_1', tensor_id, tensor_data)
+
+    time.sleep(1)
 
     tensor_id = torch.tensor([6, 7, 8])
     for i in range(5):
         client.push('embed_0', tensor_id, tensor_data)
         client.push('embed_1', tensor_id, tensor_data)
 
-    time.sleep(1) # wait all Push done
+    time.sleep(1)
 
-    # Pull data
     if client.get_id() == 0:
-        tensor_id = torch.tensor([0, 1, 2, 6, 7, 8])
+        tensor_id = torch.tensor([0,1,2,3,4,5,6,7,8,9])
         new_tensor_0 = client.pull('embed_0', tensor_id)
+        tensor_id = torch.tensor([0,1,2,3,4,5,6,7,8,9,10])
         new_tensor_1 = client.pull('embed_1', tensor_id)
-        print("Tensor_0:")
-        print(new_tensor_0)
-        print("Tensor_1")
-        print(new_tensor_1)
+
+        client.push_all('embed_0', new_tensor_0)
+        client.push_all('embed_1', new_tensor_1)
+
+        time.sleep(1)
+
+        new_tensor_2 = client.pull_all('embed_0')
+        new_tensor_3 = client.pull_all('embed_1')
+        print("embed_0:")
+        print(new_tensor_2)
+        print("embed_1:")
+        print(new_tensor_3)
 
     # Shut-down all the servers
     if client.get_id() == 0:

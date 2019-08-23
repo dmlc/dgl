@@ -455,7 +455,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[6];
       }
     }
-    int64_t kv_size = 6;
+    int64_t kv_size = 0;
     char* kv_data = kv_msg.Serialize(&kv_size);
     // Send kv_data
     Message send_kv_msg;
