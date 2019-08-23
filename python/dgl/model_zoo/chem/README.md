@@ -40,10 +40,16 @@ mostly developed based on molecule fingerprints.
 Graph neural networks make it possible for a data-driven representation of molecules out of the atoms, bonds and 
 molecular graph topology, which may be viewed as a learned fingerprint [3]. 
 
-### Models
-- **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
-networks and they can be easily extended for graph level prediction.
+### Models  
 
+- **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
+networks and they can be easily extended for graph level prediction.  
+- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
+the continuous-filter convolutional layers [4].   
+- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
+hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
+by the multilevel interactions [5].    
+- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us  Set2Set to output prediction [6].
 ## References
 
 [1] Chen et al. (2018) The rise of deep learning in drug discovery. *Drug Discov Today* 6, 1241-1250.
@@ -53,3 +59,14 @@ networks and they can be easily extended for graph level prediction.
 
 [3] Duvenaud et al. (2015) Convolutional networks on graphs for learning molecular fingerprints. *Advances in neural 
 information processing systems (NeurIPS)*, 2224-2232.
+
+[4] Schütt et al. (2017) SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. 
+*Advances in Neural Information Processing Systems (NeurIPS)*, 992-1002.
+
+[5] Lu et al. Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
+*The 33rd AAAI Conference on Artificial Intelligence*. 
+
+
+[6] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference on 
+Machine Learning* JMLR. 1263-1272.
+
