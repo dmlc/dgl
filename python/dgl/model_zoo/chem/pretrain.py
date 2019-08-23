@@ -56,7 +56,7 @@ def load_pretrained(model_name, **kwargs):
                               gcn_hidden_feats=[64, 64],
                               n_tasks=12,
                               classifier_hidden_feats=64)
-    elif model_name[:4] == 'DGMG':
+    elif model_name.startswith('DGMG'):
         env = kwargs.get('env')
         model = DGMG(env=env,
                      node_hidden_size=128,
