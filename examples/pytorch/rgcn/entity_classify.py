@@ -14,11 +14,10 @@ import time
 import torch
 import torch.nn.functional as F
 from dgl import DGLGraph
+from dgl.nn.pytorch import RelGraphConv
 from dgl.contrib.data import load_data
-import dgl.function as fn
 from functools import partial
 
-from layers import RGCNBasisLayer as RGCNLayer
 from model import BaseRGCN
 
 class EntityClassify(BaseRGCN):
@@ -29,16 +28,19 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu, is_input_layer=True)
+        return RelGraphConv(self.num_nodes, self.h_dim, self.num_rels, "basis",
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_hidden_layer(self, idx):
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu)
+        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "basis",
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_output_layer(self):
-        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
-                         activation=partial(F.softmax, dim=1))
+        return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
+                self.num_bases, activation=partial(F.softmax, dim=1),
+                self_loop=self.use_self_loop)
 
 def main(args):
     # load graph data
@@ -57,6 +59,9 @@ def main(args):
     else:
         val_idx = train_idx
 
+    # since the nodes are featureless, the input feature is then the node id.
+    feats = torch.arange(num_nodes)
+
     # edge type and normalization factor
     edge_type = torch.from_numpy(data.edge_type)
     edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
@@ -66,6 +71,7 @@ def main(args):
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
     if use_cuda:
         torch.cuda.set_device(args.gpu)
+        feats = feats.cuda()
         edge_type = edge_type.cuda()
         edge_norm = edge_norm.cuda()
         labels = labels.cuda()
@@ -74,7 +80,6 @@ def main(args):
     g = DGLGraph()
     g.add_nodes(num_nodes)
     g.add_edges(data.edge_src, data.edge_dst)
-    g.edata.update({'type': edge_type, 'norm': edge_norm})
 
     # create model
     model = EntityClassify(len(g),
@@ -84,6 +89,7 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
+                           use_self_loop=args.use_self_loop,
                            use_cuda=use_cuda)
 
     if use_cuda:
@@ -100,7 +106,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward(g)
+        logits = model(g, feats, edge_type, edge_norm)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -119,7 +125,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(g)
+    logits = model.forward(g, feats, edge_type, edge_norm)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
@@ -151,6 +157,8 @@ if __name__ == '__main__':
             help="l2 norm coef")
     parser.add_argument("--relabel", default=False, action='store_true',
             help="remove untouched nodes and relabel")
+    parser.add_argument("--use-self-loop", default=False, action='store_true',
+            help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
@@ -160,4 +168,3 @@ if __name__ == '__main__':
     print(args)
     args.bfs_level = args.n_layers + 1 # pruning used nodes for memory
     main(args)
-
