@@ -7,7 +7,7 @@ References:
 """
 import torch
 import torch.nn as nn
-from dgl.nn.pytorch import TGConv
+from dgl.nn.pytorch.conv import TGConv
 
 class TAGCN(nn.Module):
     def __init__(self,

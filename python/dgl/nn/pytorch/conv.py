@@ -219,7 +219,7 @@ class TGConv(nn.Module):
 
         #D-1/2 A D -1/2 X
         xs = [feat]
-        for k in range(self.K):
+        for k in range(self._K):
 
             rst = xs[-1] * norm
             graph.ndata['h'] = rst
@@ -230,7 +230,7 @@ class TGConv(nn.Module):
             rst = rst * norm
             xs.append(rst)
 
-        rst = self.lin(torch.cat(xs, dim=-1))
+        rst = self.lin(th.cat(xs, dim=-1))
 
         if self._activation is not None:
             rst = self._activation(rst)

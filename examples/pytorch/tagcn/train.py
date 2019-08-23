@@ -65,7 +65,7 @@ def main(args):
     n_edges = g.number_of_edges()
 
     # create GCN model
-    model = TGConv(g,
+    model = TAGCN(g,
                 in_feats,
                 args.n_hidden,
                 n_classes,
