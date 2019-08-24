@@ -116,6 +116,11 @@ IdArray IndexSelect(IdArray array, IdArray index);
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+/*!\brief Return whether the array is a valid 1D int array*/
+inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
+  return arr->ndim == 1 && arr->dtype.code == kDLInt;
+}
+
 //////////////////////////////////////////////////////////////////////
 // Sparse matrix
 //////////////////////////////////////////////////////////////////////
