@@ -308,6 +308,51 @@ def test_edge_softmax():
     assert len(g.edata) == 2
     assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     
+def test_rgcn():
+    ctx = F.ctx()
+    etype = []
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    B = 2
+    I = 10
+    O = 8
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_bdd(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    # with norm
+    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_bdd(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    # id input
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randint(0, I, (100,)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
 
 if __name__ == '__main__':
     test_graph_conv()
@@ -316,3 +361,4 @@ if __name__ == '__main__':
     test_glob_att_pool()
     test_simple_pool()
     test_set_trans()
+    test_rgcn()

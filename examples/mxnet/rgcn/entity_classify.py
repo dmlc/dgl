@@ -15,32 +15,27 @@ import mxnet as mx
 from mxnet import gluon
 import mxnet.ndarray as F
 from dgl import DGLGraph
+from dgl.nn.mxnet import RelGraphConv
 from dgl.contrib.data import load_data
 from functools import partial
 
 from model import BaseRGCN
-from layers import RGCNBasisLayer as RGCNLayer
-
 
 class EntityClassify(BaseRGCN):
-    def create_features(self):
-        features = mx.nd.arange(self.num_nodes)
-        if self.gpu_id >= 0:
-            features = features.as_in_context(mx.gpu(self.gpu_id))
-        return features
-
     def build_input_layer(self):
-        return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu, is_input_layer=True)
+        return RelGraphConv(self.num_nodes, self.h_dim, self.num_rels, "basis",
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_hidden_layer(self, idx):
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=F.relu)
+        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "basis",
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
+                dropout=self.dropout)
 
     def build_output_layer(self):
-        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
-                         activation=partial(F.softmax, axis=1))
-
+        return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
+                self.num_bases, activation=partial(F.softmax, axis=1),
+                self_loop=self.use_self_loop)
 
 def main(args):
     # load graph data
@@ -60,8 +55,10 @@ def main(args):
         val_idx = train_idx
 
     train_idx = mx.nd.array(train_idx)
+    # since the nodes are featureless, the input feature is then the node id.
+    feats = mx.nd.arange(num_nodes, dtype='int32')
     # edge type and normalization factor
-    edge_type = mx.nd.array(data.edge_type)
+    edge_type = mx.nd.array(data.edge_type, dtype='int32')
     edge_norm = mx.nd.array(data.edge_norm).expand_dims(1)
     labels = mx.nd.array(labels).reshape((-1))
 
@@ -69,6 +66,7 @@ def main(args):
     use_cuda = args.gpu >= 0
     if use_cuda:
         ctx = mx.gpu(args.gpu)
+        feats = feats.as_in_context(ctx)
         edge_type = edge_type.as_in_context(ctx)
         edge_norm = edge_norm.as_in_context(ctx)
         labels = labels.as_in_context(ctx)
@@ -80,7 +78,6 @@ def main(args):
     g = DGLGraph()
     g.add_nodes(num_nodes)
     g.add_edges(data.edge_src, data.edge_dst)
-    g.edata.update({'type': edge_type, 'norm': edge_norm})
 
     # create model
     model = EntityClassify(len(g),
@@ -90,6 +87,7 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
+                           use_self_loop=args.use_self_loop,
                            gpu_id=args.gpu)
     model.initialize(ctx=ctx)
 
@@ -104,7 +102,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         t0 = time.time()
         with mx.autograd.record():
-            pred = model(g)
+            pred = model(g, feats, edge_type, edge_norm)
             loss = loss_fcn(pred[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -120,7 +118,7 @@ def main(args):
         print("Train Accuracy: {:.4f} | Validation Accuracy: {:.4f}".format(train_acc, val_acc))
     print()
 
-    logits = model(g)
+    logits = model.forward(g, feats, edge_type, edge_norm)
     test_acc = F.sum(logits[test_idx].argmax(axis=1) == labels[test_idx]).asscalar() / len(test_idx)
     print("Test Accuracy: {:.4f}".format(test_acc))
     print()
@@ -151,6 +149,8 @@ if __name__ == '__main__':
             help="l2 norm coef")
     parser.add_argument("--relabel", default=False, action='store_true',
             help="remove untouched nodes and relabel")
+    parser.add_argument("--use-self-loop", default=False, action='store_true',
+            help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
