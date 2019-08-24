@@ -378,8 +378,7 @@ class BinaryReduce(mx.autograd.Function):
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            # -1: dst node
-            if self.lhs != 1:
+            if self.lhs != 1: # 1: target code of dst node
                 in_ones = nd.ones((lhs_data.shape[0],),
                                   ctx=lhs_data.context, dtype=lhs_data.dtype)
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
