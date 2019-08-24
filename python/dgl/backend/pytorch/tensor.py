@@ -294,23 +294,22 @@ class BinaryReduce(th.autograd.Function):
             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
         # normalize if mean reducer
         if reducer == 'mean':
-            degs = lhs_data.new_empty((out_data.shape[0], 1))
+            degs = lhs_data.new_empty((out_data.shape[0],))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             # -1: dst node
             if lhs != 1:
-                in_ones = lhs_data.new_ones((lhs_data.shape[0], 1))
+                in_ones = lhs_data.new_ones((lhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
                     'sum', graph, lhs, in_ones_nd, degs_nd, lhs_map[0], lhs_map[0]) 
-            elif rhs != 1:
-                in_ones = lhs_data.new_ones((lhs_data.shape[0], 1))
+            else: # rhs != 1
+                in_ones = rhs_data.new_ones((rhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
                     'sum', graph, rhs, in_ones_nd, degs_nd, rhs_map[0], rhs_map[0])
-            else:
-                raise RuntimeError("We do not support the combination"
-                                   "of u_op_v or v_op_u with mean reducer.")
-            out_data = out_data / degs.clamp(min=1)
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
+            out_data = out_data / degs
         else:
             degs = None
         # save_for_backward can only save variables
@@ -327,9 +326,8 @@ class BinaryReduce(th.autograd.Function):
         ctx.backward_cache = None
         grad_lhs = None
         grad_rhs = None
-        # multiply normalization term if reducer is mean
         if reducer == 'mean':
-            grad_out = grad_out * degs
+            grad_out = grad_out / degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[5]:
             grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
@@ -364,13 +362,15 @@ class CopyReduce(th.autograd.Function):
             graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
         # normalize if mean reducer
         if reducer == 'mean':
-            in_ones = in_data.new_ones((in_data.shape[0], 1))
-            degs = in_data.new_empty((out_data.shape[0], 1))
+            in_ones = in_data.new_ones((in_data.shape[0],))
+            degs = in_data.new_empty((out_data.shape[0],))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
                 'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0]) 
-            out_data = out_data / degs.clamp(min=1)
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
+            out_data = out_data / degs
         else:
             degs = None
         # save_for_backward can only save variables
@@ -386,7 +386,7 @@ class CopyReduce(th.autograd.Function):
         grad_in = None
 
         if reducer == 'mean':
-            grad_out = grad_out * degs
+            grad_out = grad_out / degs
 
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:

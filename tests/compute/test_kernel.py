@@ -14,6 +14,8 @@ def udf_copy_src(edges):
 def udf_copy_edge(edges):
     return {'m': edges.data['e']}
 
+def udf_mean(nodes):
+    return {'r2': nodes.mailbox['m'].mean(1)}
 
 def udf_sum(nodes):
     return {'r2': nodes.mailbox['m'].sum(1)}
@@ -26,8 +28,8 @@ def udf_max(nodes):
 D1 = 5
 D2 = 3
 D3 = 4
-builtin = {'sum': fn.sum, 'max': fn.max}
-udf_reduce = {'sum': udf_sum, 'max': udf_max}
+builtin = {'sum': fn.sum, 'max': fn.max, 'mean': fn.mean}
+udf_reduce = {'sum': udf_sum, 'max': udf_max, 'mean': udf_mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 
 
@@ -88,6 +90,7 @@ def test_copy_src_reduce():
 
     _test('sum')
     _test('max')
+    _test('mean')
 
 
 def test_copy_edge_reduce():
@@ -121,6 +124,7 @@ def test_copy_edge_reduce():
 
     _test('sum')
     _test('max')
+    _test('mean')
 
 
 def test_all_binary_builtins():
@@ -191,7 +195,7 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} {}".
                   format(lhs, binary_op, rhs, reducer, broadcast))
-            print(a, b)
+            #print(a, b)
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
@@ -226,7 +230,7 @@ def test_all_binary_builtins():
         if lhs == rhs:
             continue
         for binary_op in ["add", "sub", "mul", "div"]:
-            for reducer in ["sum", "max", "min", "prod"]:
+            for reducer in ["sum", "max", "min", "prod", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
                     _test(g, lhs, rhs, binary_op, reducer)
 
