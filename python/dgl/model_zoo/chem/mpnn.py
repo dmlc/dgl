@@ -1,26 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
+# pylint: disable=C0103, C0111, E1101, W0612
+"""Implementation of MPNN model."""
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
-from torch.utils.data import dataloader
 import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as dgl_nn
 
-import os
-from os import listdir
-from os.path import isfile, join
-import networkx as nx
-import numpy as np
-import pickle
-
 
 class NNConvLayer(nn.Module):
     """
-    MPNN Conv Layer from Section.5 in the paper "Neural Message Passing for Quantum Chemistry"
+    MPNN Conv Layer from Section.5 in the paper "Neural Message Passing for Quantum Chemistry."
     """
 
     def __init__(self,
@@ -83,6 +77,7 @@ class NNConvLayer(nn.Module):
         return {'h': aggr_out}
 
     def forward(self, g, h, e):
+        """MPNN Conv layer forward."""
         h = h.unsqueeze(-1) if h.dim() == 1 else h
         e = e.unsqueeze(-1) if e.dim() == 1 else e
 
@@ -97,8 +92,8 @@ class NNConvLayer(nn.Module):
 class MPNNModel(nn.Module):
     """
     MPNN model from:
-        Gilmer, Justin, et al. 
-        Neural message passing for quantum chemistry. 
+        Gilmer, Justin, et al.
+        Neural message passing for quantum chemistry.
     """
 
     def __init__(self,

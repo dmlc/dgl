@@ -50,19 +50,13 @@ Regression tasks require assigning continuous labels to a molecule, e.g. molecul
 - **Alchemy**. The [Alchemy Dataset](https://alchemy.tencent.com/) is introduced by Tencent Quantum Lab to facilitate the development of new machine learning models useful for chemistry and materials science. 
 The dataset lists 12 quantum mechanical properties of 130,000+ organic molecules comprising up to 12 heavy atoms (C, N, O, S, F and Cl), sampled from the [GDBMedChem](http://gdb.unibe.ch/downloads/) database. 
 These properties have been calculated using the open-source computational chemistry program Python-based Simulation of Chemistry Framework ([PySCF](https://github.com/pyscf/pyscf)). 
-The Alchemy dataset expands on the volume and diversity of existing molecular datasets such as QM9.
-
-
+The Alchemy dataset expands on the volume and diversity of existing molecular datasets such as QM9.  
 
 ### Models  
 
-- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
-the continuous-filter convolutional layers [3].   
-- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
-hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
-by the multilevel interactions [4].    
-- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us  Set2Set to output prediction [5].
-
+- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize the continuous-filter convolutional layers [3].   
+- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed hierarchical graph neural network directly extracts features from the conformation and spatial information followed by the multilevel interactions [4].    
+- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us Set2Set to output prediction [5].
 
 ### Usage
 
@@ -73,8 +67,8 @@ The model option must be one of 'sch', 'mgcn' or 'mpnn'.
 
 ### Performance    
 
+#### Alchemy   
 
-#### Alchemy  
 |Model        |Mean Absolute Error (MAE)|  
 |-------------|-------------------------|
 |SchNet[3]    |0.065|
@@ -90,10 +84,9 @@ The model option must be one of 'sch', 'mgcn' or 'mpnn'.
 [3] Schütt et al. (2017) SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. 
 *Advances in Neural Information Processing Systems (NeurIPS)*, 992-1002.
 
-[4] Lu et al. Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
+[4] Lu et al. (2019) Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
 *The 33rd AAAI Conference on Artificial Intelligence*. 
 
-
 [5] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference on 
-Machine Learning* JMLR. 1263-1272.
+Machine Learning*, JMLR. 1263-1272.
 

@@ -65,10 +65,14 @@ if __name__ == "__main__":
     parser.add_argument("-M",
                         "--model",
                         help="model name (sch, mgcn, mpnn)",
+                        choices=['sch', 'mgcn', 'mpnn'],
                         default="sch")
-    parser.add_argument("--epochs", help="number of epochs", default=250)
+    parser.add_argument("--epochs",
+                        help="number of epochs",
+                        default=250,
+                        type=int)
     device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
     args = parser.parse_args()
     assert args.model in ['sch', 'mgcn',
                           'mpnn'], "model name must be sch, mgcn or mpnn"
-    train(args.model, int(args.epochs), device)
+    train(args.model, args.epochs, device)

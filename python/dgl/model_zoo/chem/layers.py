@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=C0103, E1101
+"""
+The implementation of neural network layers used in SchNet and MGCN.
+"""
+
 import torch as th
-import numpy as np
 import torch.nn as nn
-import dgl.function as fn
 from torch.nn import Softplus
+import numpy as np
+import dgl.function as fn
 
 
 class AtomEmbedding(nn.Module):
     """
     Convert the atom(node) list to atom embeddings.
-    The atom with the same element share the same initial embeddding.
+    The atoms with the same element share the same initial embeddding.
     """
 
     def __init__(self, dim=128, type_num=100, pre_train=None):
@@ -66,7 +71,7 @@ class EdgeEmbedding(nn.Module):
         To map a pair of nodes to one number, we use an unordered pairing function here
         See more detail in this disscussion:
         https://math.stackexchange.com/questions/23503/create-unique-number-from-2-numbers
-        Note that, the edge_num should larger than the square of maximum atomic number
+        Note that, the edge_num should be larger than the square of maximum atomic number
         in the dataset.
         """
         atom_type_x = edges.src["node_type"]
@@ -95,8 +100,8 @@ class ShiftSoftplus(Softplus):
         self.shift = shift
         self.softplus = Softplus(beta, threshold)
 
-    def forward(self, input):
-        return self.softplus(input) - np.log(float(self.shift))
+    def forward(self, x):
+        return self.softplus(x) - np.log(float(self.shift))
 
 
 class RBFLayer(nn.Module):
@@ -124,6 +129,7 @@ class RBFLayer(nn.Module):
         self._gap = centers[1] - centers[0]
 
     def dis2rbf(self, edges):
+        """Convert distance matrix to RBF tensor."""
         dist = edges.data["distance"]
         radial = dist - self.centers
         coef = -1 / self._gap
@@ -163,6 +169,7 @@ class CFConv(nn.Module):
             self.activation = act
 
     def update_edge(self, edges):
+        """Update the edge features with two FC layers."""
         rbf = edges.data["rbf"]
         h = self.linear_layer1(rbf)
         h = self.activation(h)
@@ -170,6 +177,7 @@ class CFConv(nn.Module):
         return {"h": h}
 
     def forward(self, g):
+        """Forward CFConv"""
         g.apply_edges(self.update_edge)
         g.update_all(message_func=fn.u_mul_e('new_node', 'h', 'neighbor_info'),
                      reduce_func=fn.sum('neighbor_info', 'new_node'))
@@ -191,7 +199,7 @@ class Interaction(nn.Module):
         self.node_layer3 = nn.Linear(dim, dim)
 
     def forward(self, g):
-
+        """Interaction layer forward."""
         g.ndata["new_node"] = self.node_layer1(g.ndata["node"])
         cf_node = self.cfconv(g)
         cf_node_1 = self.node_layer2(cf_node)
@@ -203,8 +211,8 @@ class Interaction(nn.Module):
 
 class VEConv(nn.Module):
     """
-    The Vertex-Edge convolution layer in MGCN which take edge & vertex features
-    in consideratoin at the same time.
+    The Vertex-Edge convolution layer in MGCN which takes edge & vertex features
+    in consideration at the same time.
     """
 
     def __init__(self, rbf_dim, dim=64, update_edge=True):
@@ -226,6 +234,7 @@ class VEConv(nn.Module):
         self.activation = nn.Softplus(beta=0.5, threshold=14)
 
     def update_rbf(self, edges):
+        """Update the RBF features."""
         rbf = edges.data["rbf"]
         h = self.linear_layer1(rbf)
         h = self.activation(h)
@@ -233,22 +242,25 @@ class VEConv(nn.Module):
         return {"h": h}
 
     def update_edge(self, edges):
+        """Update the edge features."""
         edge_f = edges.data["edge_f"]
         h = self.linear_layer3(edge_f)
         return {"edge_f": h}
 
     def forward(self, g):
+        """VEConv layer forward"""
         g.apply_edges(self.update_rbf)
         if self._update_edge:
             g.apply_edges(self.update_edge)
 
-        g.update_all(
-            message_func=[
-                fn.u_mul_e("new_node", "h", "m_0"),
-                fn.copy_e("edge_f", "m_1")],
-            reduce_func=[
-                fn.sum("m_0", "new_node_0"),
-                fn.sum("m_1", "new_node_1")])
+        g.update_all(message_func=[
+            fn.u_mul_e("new_node", "h", "m_0"),
+            fn.copy_e("edge_f", "m_1")
+        ],
+                     reduce_func=[
+                         fn.sum("m_0", "new_node_0"),
+                         fn.sum("m_1", "new_node_1")
+                     ])
         g.ndata["new_node"] = g.ndata.pop("new_node_0") + g.ndata.pop(
             "new_node_1")
 
@@ -274,6 +286,13 @@ class MultiLevelInteraction(nn.Module):
         self.node_layer3 = nn.Linear(dim, dim)
 
     def forward(self, g, level=1):
+        """
+        MultiLevel Interaction Layer forward.  
+        Args:
+            g: DGLGraph
+            level: current level of this layer
+        """
+
         g.ndata["new_node"] = self.node_layer1(g.ndata["node_%s" %
                                                        (level - 1)])
         node = self.conv_layer(g)

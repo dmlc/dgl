@@ -2,23 +2,27 @@
 """Example dataloader of Tencent Alchemy Dataset
 https://alchemy.tencent.com/
 """
+
 import os
-import zipfile
 import os.path as osp
-from rdkit import Chem
-from rdkit.Chem import ChemicalFeatures
-from rdkit import RDConfig
+import zipfile
 import dgl
 from dgl.data.utils import download
-import torch
 import pickle
+import torch
 from collections import defaultdict
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import pathlib
-import pandas as pd
 import numpy as np
+import pathlib
 from ..utils import get_download_dir, download, _get_dgl_url
+try:
+    import pandas as pd
+    from rdkit import Chem
+    from rdkit.Chem import ChemicalFeatures
+    from rdkit import RDConfig
+except ImportError:
+    pass
 _urls = {'Alchemy': 'https://alchemy.tencent.com/data/dgl/'}
 
 
@@ -159,9 +163,9 @@ class TencentAlchemyDataset(Dataset):
 
     def mol_to_dgl(self, mol, self_loop=False):
         """
-        Read sdf file and convert to dgl_graph
+        Convert RDKit molecule object to DGLGraph
         Args:
-            mol: molecule obj read from sdf
+            mol: Chem.rdchem.Mol read from sdf
             self_loop: Whetaher to add self loop
         Returns:
             g: DGLGraph
@@ -175,13 +179,6 @@ class TencentAlchemyDataset(Dataset):
         atom_feats = self.alchemy_nodes(mol)
         g.add_nodes(num=num_atoms, data=atom_feats)
 
-        # add edges
-        # The model we were interested assumes a complete graph.
-        # If this is not the case, do the code below instead
-        #
-        # for bond in mol.GetBonds():
-        #     u = bond.GetBeginAtomIdx()
-        #     v = bond.GetEndAtomIdx()
         if self_loop:
             g.add_edges(
                 [i for i in range(num_atoms) for j in range(num_atoms)],
@@ -204,7 +201,7 @@ class TencentAlchemyDataset(Dataset):
         self.mode = mode
         self.transform = transform
 
-        # Construct the dgl graph from raw data or Use the preprossed data directly
+        # Construct the dgl graph from raw data or use the preprocessed data directly
         self.from_raw = from_raw
         file_dir = osp.join(get_download_dir(), './Alchemy_data')
 
@@ -227,10 +224,12 @@ class TencentAlchemyDataset(Dataset):
     def _load(self):
         if self.mode == 'dev':
             if not self.from_raw:
-                self.graphs = pickle.load(
-                    open(osp.join(self.file_dir, "dev_graphs.pkl"), "rb"))
-                self.labels = pickle.load(
-                    open(osp.join(self.file_dir, "dev_labels.pkl"), "rb"))
+                with open(osp.join(self.file_dir, "dev_graphs.pkl"),
+                          "rb") as f:
+                    self.graphs = pickle.load(f)
+                with open(osp.join(self.file_dir, "dev_labels.pkl"),
+                          "rb") as f:
+                    self.labels = pickle.load(f)
 
             else:
 
@@ -253,8 +252,6 @@ class TencentAlchemyDataset(Dataset):
                 for sdf, label in zip(supp, self.target.iterrows()):
                     graph = self.mol_to_dgl(sdf)
                     cnt += 1
-                    if graph is None:
-                        continue
                     self.graphs.append(graph)
                     label = torch.FloatTensor(label[1].tolist())
                     self.labels.append(label)
@@ -279,25 +276,3 @@ class TencentAlchemyDataset(Dataset):
         if self.transform:
             g = self.transform(g)
         return g, l
-
-
-if __name__ == '__main__':
-    alchemy_dataset = TencentAlchemyDataset()
-    device = torch.device('cpu')
-    # To speed up the training with multi-process data loader,
-    # the num_workers could be set to > 1 to
-    alchemy_loader = DataLoader(dataset=alchemy_dataset,
-                                batch_size=20,
-                                collate_fn=batcher(),
-                                shuffle=False,
-                                num_workers=0)
-
-    for step, batch in enumerate(alchemy_loader):
-        print("bs =", batch.graph.batch_size)
-        print('feature size =', batch.graph.ndata['n_feat'].size())
-        print('pos size =', batch.graph.ndata['pos'].size())
-        print('edge feature size =', batch.graph.edata['e_feat'].size())
-        print('edge distance size =', batch.graph.edata['distance'].size())
-        print('label size=', batch.label.size())
-        print(dgl.sum_nodes(batch.graph, 'n_feat').size())
-        break
