@@ -197,7 +197,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
     GraphRef g = args[0];
     const IdArray source = args[1];
     const bool reversed = args[2];
-    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
+    CHECK(aten::IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
     const int64_t* src_data = static_cast<int64_t*>(source->data);
     std::vector<std::vector<dgl_id_t>> edges(len);
@@ -219,7 +219,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
     const bool has_nontree_edge = args[4];
     const bool return_labels = args[5];
 
-    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
+    CHECK(aten::IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
     const int64_t* src_data = static_cast<int64_t*>(source->data);
 
