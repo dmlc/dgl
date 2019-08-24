@@ -293,6 +293,7 @@ class BinaryReduce(th.autograd.Function):
             binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
         # normalize if mean reducer
+        # note(zihao): this is a temporal hack and we should have better solution in the future.
         if reducer == 'mean':
             degs = lhs_data.new_empty((out_data.shape[0],))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
@@ -361,6 +362,7 @@ class CopyReduce(th.autograd.Function):
             reducer if reducer != 'mean' else 'sum', 
             graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
         # normalize if mean reducer
+        # note(zihao): this is a temporal hack and we should have better solution in the future.
         if reducer == 'mean':
             in_ones = in_data.new_ones((in_data.shape[0],))
             degs = in_data.new_empty((out_data.shape[0],))
@@ -384,10 +386,8 @@ class CopyReduce(th.autograd.Function):
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_in = None
-
         if reducer == 'mean':
             grad_out = grad_out / degs
-
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
             grad_in = grad_out.new_empty(in_data_nd.shape)

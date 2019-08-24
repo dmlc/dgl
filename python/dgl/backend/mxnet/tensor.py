@@ -373,6 +373,7 @@ class BinaryReduce(mx.autograd.Function):
             lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
             self.rhs_map[0], self.out_map[0])
         # normalize if mean reducer
+        # note(zihao): this is a temporal hack and we should have better solution in the future.
         if self.reducer == 'mean':
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
@@ -392,6 +393,7 @@ class BinaryReduce(mx.autograd.Function):
                 K.copy_reduce(
                     'sum', self.graph, self.rhs, in_ones_nd, degs_nd, 
                     self.rhs_map[0], self.rhs_map[0])
+            # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
             out_data = out_data / degs
         else:
@@ -456,6 +458,7 @@ class CopyReduce(mx.autograd.Function):
             self.graph, self.target, in_data_nd, out_data_nd,
             self.in_map[0], self.out_map[0])
         # normalize if mean reducer
+        # note(zihao): this is a temporal hack and we should have better solution in the future.
         if self.reducer == 'mean':
             in_ones = nd.ones((in_data.shape[0],),
                               ctx=in_data.context, dtype=in_data.dtype)
@@ -466,6 +469,7 @@ class CopyReduce(mx.autograd.Function):
             K.copy_reduce(
                 'sum', self.graph, self.target, in_ones_nd, degs_nd, 
                 self.in_map[0], self.out_map[0])
+            # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
             out_data = out_data / degs
         else:
@@ -477,10 +481,8 @@ class CopyReduce(mx.autograd.Function):
         in_data_nd, out_data_nd, degs = self.saved_tensors
         grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
                             dtype=grad_out.dtype)
-
         if self.reducer == 'mean':
             grad_out = grad_out / degs
-
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         K.backward_copy_reduce(
             self.reducer if self.reducer != 'mean' else 'sum',
