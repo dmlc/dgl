@@ -8,7 +8,6 @@ from torch.utils import dlpack
 
 from ... import ndarray as nd
 from ... import kernel as K
-from ... import utils
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -338,28 +337,30 @@ class CopyReduce(th.autograd.Function):
             graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
 
         if reducer == 'mean':
-            eps = 1e-8
-            v = utils.toindex(slice(0, graph.number_of_nodes()))
-            degs = graph.in_degrees(v).tousertensor()
-            degs = degs.float().unsqueeze(-1).to(in_data.device)
-            out_data = out_data / (degs + eps)
+            # normalization for mean reducer
+            in_ones = in_data.new_ones((in_data.shape[0], 1))
+            degs = in_data.new_empty((in_data.shape[0], 1))
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0]) 
+            out_data = out_data / degs.clamp(min=1)
+        else:
+            degs = None
 
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, out_data_nd)
+                              in_data_nd, out_data_nd, degs)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd \
+        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd, degs \
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_in = None
 
         if reducer == 'mean':
-            v = utils.toindex(slice(0, graph.number_of_nodes()))
-            degs = graph.in_degrees(v).tousertensor()
-            degs = degs.float().unsqueeze(-1).to(grad_out.device)
             grad_out = grad_out * degs
 
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)

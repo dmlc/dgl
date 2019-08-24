@@ -9,7 +9,6 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
-from ... import utils
 
 MX_VERSION = LooseVersion(mx.__version__)
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -429,24 +428,29 @@ class CopyReduce(mx.autograd.Function):
             self.in_map[0], self.out_map[0])
 
         if self.reducer == 'mean':
-            eps = 1e-8
-            v = utils.toindex(slice(0, self.graph.number_of_nodes()))            
-            degs = self.graph.in_degrees(v).tousertensor()
-            degs = degs.astype('float32').expand_dims(1).as_in_context(in_data.context)
-            out_data = out_data / (degs + eps)
+            # normalization for mean reducer
+            in_ones = nd.ones((in_data.shape[0], 1),
+                              ctx=in_data.context, dtype=in_data.dtype)
+            degs = nd.empty((in_data.shape[0], 1),
+                            ctx=in_data.context, dtype=in_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
+                self.in_map[0], self.out_map[0])
+            out_data = out_data / degs.clip(1, float('inf')) 
+        else:
+            degs = None
 
-        self.save_for_backward(in_data_nd, out_data_nd)
+        self.save_for_backward(in_data_nd, out_data_nd, degs)
         return out_data
 
     def backward(self, grad_out):
-        in_data_nd, out_data_nd = self.saved_tensors
+        in_data_nd, out_data_nd, degs = self.saved_tensors
         grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
                             dtype=grad_out.dtype)
 
         if self.reducer == 'mean':
-            v = utils.toindex(slice(0, self.graph.number_of_nodes()))
-            degs = self.graph.in_degrees(v).tousertensor()
-            degs = degs.astype('float32').expand_dims(1).as_in_context(grad_out.context)
             grad_out = grad_out * degs
 
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
