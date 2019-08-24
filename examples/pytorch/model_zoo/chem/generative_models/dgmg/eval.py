@@ -9,20 +9,17 @@ from dgl import model_zoo
 from utils import synchronize, launch_a_process, MoleculeDataset, set_random_seed, \
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles
 
-def generate_and_save(rank, log_dir, num_samples, model):
-    smiles = []
+def generate_and_save(num_processes, rank, log_dir, num_samples, model):
     with open(os.path.join(log_dir, 'generated_smiles.txt'), 'w') as f:
         for i in range(num_samples):
-            if rank == 0:
+            if rank == num_processes - 1:
                 print('Generating the {:d}/{:d}th smile'.format(i + 1, num_samples))
             with torch.no_grad():
                 s = model(rdkit_mol=True)
-            smiles.append(s)
             f.write(s + '\n')
-    return smiles
 
 def prepare_for_evaluation(rank, args):
-    if rank == 0:
+    if rank == args['num_processes'] - 1:
         t1 = time.time()
 
     worker_seed = args['seed'] + rank * 10000
@@ -34,7 +31,7 @@ def prepare_for_evaluation(rank, args):
     env = dataset.env
 
     # Initialize model
-    if rank == 0:
+    if rank == args['num_processes'] - 1:
         print('Loading the trained model...')
 
     if not args['pretrained']:
@@ -51,9 +48,11 @@ def prepare_for_evaluation(rank, args):
 
     worker_log_dir = os.path.join(args['log_dir'], str(rank))
     mkdir_p(worker_log_dir, log=False)
-    generate_and_save(rank, worker_log_dir, worker_num_samples, model)
+    synchronize(args['num_processes'])
+    generate_and_save(args['num_processes'], rank, worker_log_dir, worker_num_samples, model)
+    synchronize(args['num_processes'])
 
-    if rank == 0:
+    if rank == args['num_processes'] - 1:
         t2 = time.time()
         print('It took {} to generate {:d} molecules.'.format(
             datetime.timedelta(seconds=t2 - t1), args['num_samples']))
