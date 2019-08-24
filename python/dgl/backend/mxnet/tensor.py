@@ -368,20 +368,48 @@ class BinaryReduce(mx.autograd.Function):
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
             self.rhs_map[0], self.out_map[0])
+        # normalize if mean reducer
+        if self.reducer == 'mean':
+            degs = nd.empty((out_data.shape[0], 1),
+                            ctx=out_data.context, dtype=out_data.dtype)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            # target 0: src node
+            if self.lhs != 1:
+                in_ones = nd.ones((lhs_data.shape[0], 1),
+                                  ctx=lhs_data.context, dtype=lhs_data.dtype)
+                in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+                K.copy_reduce(
+                    'sum', self.graph, self.lhs, in_ones_nd, degs_nd, 
+                    self.lhs_map[0], self.lhs_map[0])
+            elif self.rhs != 1:
+                in_ones = nd.ones((rhs_data.shape[0], 1),
+                                  ctx=rhs_data.context, dtype=rhs_data.dtype)
+                in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+                K.copy_reduce(
+                    'sum', self.graph, self.rhs, in_ones_nd, degs_nd, 
+                    self.rhs_map[0], self.rhs_map[0])
+            out_data = out_data / degs.clip(1, float('inf')) 
+        else:
+            degs = None
         self.save_for_backward(lhs_data_nd, rhs_data_nd, out_data_nd,
-                               feat_shape)
+                               feat_shape, degs)
         return out_data
 
     def backward(self, grad_out):
-        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape = self.saved_tensors
+        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape, degs = self.saved_tensors
+        # multiply normalization term if reducer is mean
+        if self.reducer == 'mean':
+            grad_out = grad_out * degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_lhs = nd.empty((lhs_data_nd.shape[0],) + feat_shape,
                             ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_lhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_lhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
@@ -389,7 +417,8 @@ class BinaryReduce(mx.autograd.Function):
         grad_rhs = nd.empty((rhs_data_nd.shape[0],) + feat_shape,
                              ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_rhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
@@ -426,22 +455,20 @@ class CopyReduce(mx.autograd.Function):
             self.reducer if self.reducer != 'mean' else 'sum',
             self.graph, self.target, in_data_nd, out_data_nd,
             self.in_map[0], self.out_map[0])
-
+        # normalize if mean reducer
         if self.reducer == 'mean':
-            # normalization for mean reducer
             in_ones = nd.ones((in_data.shape[0], 1),
                               ctx=in_data.context, dtype=in_data.dtype)
-            degs = nd.empty((in_data.shape[0], 1),
-                            ctx=in_data.context, dtype=in_data.dtype)
+            degs = nd.empty((out_data.shape[0], 1),
+                            ctx=out_data.context, dtype=out_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
+                'sum', self.graph, target, in_ones_nd, degs_nd, 
                 self.in_map[0], self.out_map[0])
             out_data = out_data / degs.clip(1, float('inf')) 
         else:
             degs = None
-
         self.save_for_backward(in_data_nd, out_data_nd, degs)
         return out_data
 
