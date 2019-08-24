@@ -296,7 +296,7 @@ class BinaryReduce(th.autograd.Function):
         if reducer == 'mean':
             degs = lhs_data.new_empty((out_data.shape[0], 1))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            # target 0: select src node.
+            # -1: dst node
             if lhs != 1:
                 in_ones = lhs_data.new_ones((lhs_data.shape[0], 1))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
