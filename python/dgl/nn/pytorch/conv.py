@@ -207,7 +207,7 @@ class TGConv(nn.Module):
             The input feature
         graph : DGLGraph
             The graph.
-            
+
         Returns
         -------
         torch.Tensor
