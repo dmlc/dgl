@@ -195,7 +195,7 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} {}".
                   format(lhs, binary_op, rhs, reducer, broadcast))
-            #print(a, b)
+            print(a, b)
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
