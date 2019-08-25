@@ -706,7 +706,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step()
+        self.count_step()
         return self.add_node_agent(a)
 
     def add_edge_or_not(self, a=None):
@@ -719,7 +719,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step()
+        self.count_step()
         return self.add_edge_agent(a)
 
     def choose_dest_and_update(self, bond_type, a=None):
@@ -735,7 +735,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step()
+        self.count_step()
         self.choose_dest_agent(bond_type, a)
 
     def get_log_prob(self):
