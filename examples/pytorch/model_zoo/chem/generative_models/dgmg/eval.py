@@ -1,27 +1,20 @@
-import datetime
 import os
 import pickle
 import shutil
-import time
 import torch
 from dgl import model_zoo
 
-from utils import synchronize, launch_a_process, MoleculeDataset, set_random_seed, \
+from utils import MoleculeDataset, set_random_seed, \
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles
 
-def generate_and_save(num_processes, rank, log_dir, num_samples, model):
+def generate_and_save(log_dir, num_samples, max_num_atoms, model):
     with open(os.path.join(log_dir, 'generated_smiles.txt'), 'w') as f:
         for i in range(num_samples):
-            if rank == num_processes - 1:
-                print('Generating the {:d}/{:d}th smile'.format(i + 1, num_samples))
             with torch.no_grad():
-                s = model(rdkit_mol=True)
+                s = model(rdkit_mol=True, max_num_atoms=max_num_atoms)
             f.write(s + '\n')
 
 def prepare_for_evaluation(rank, args):
-    if rank == args['num_processes'] - 1:
-        t1 = time.time()
-
     worker_seed = args['seed'] + rank * 10000
     set_random_seed(worker_seed)
     torch.set_num_threads(1)
@@ -31,9 +24,6 @@ def prepare_for_evaluation(rank, args):
     env = dataset.env
 
     # Initialize model
-    if rank == args['num_processes'] - 1:
-        print('Loading the trained model...')
-
     if not args['pretrained']:
         model = model_zoo.chem.DGMG(env=env, node_hidden_size=args['node_hidden_size'],
                                     num_prop_rounds=args['num_propagation_rounds'], dropout=args['dropout'])
@@ -48,16 +38,7 @@ def prepare_for_evaluation(rank, args):
 
     worker_log_dir = os.path.join(args['log_dir'], str(rank))
     mkdir_p(worker_log_dir, log=False)
-    synchronize(args['num_processes'])
-    generate_and_save(args['num_processes'], rank, worker_log_dir, worker_num_samples, model)
-    synchronize(args['num_processes'])
-
-    if rank == args['num_processes'] - 1:
-        t2 = time.time()
-        print('It took {} to generate {:d} molecules.'.format(
-            datetime.timedelta(seconds=t2 - t1), args['num_samples']))
-
-    synchronize(args['num_processes'])
+    generate_and_save(worker_log_dir, worker_num_samples, args['max_num_atoms'], model)
 
 def remove_worker_tmp_dir(args):
     for rank in range(args['num_processes']):
@@ -91,7 +72,7 @@ def aggregate_and_evaluate(args):
         pickle.dump(train_summary, f)
 
     # Summarize generated molecules
-    print('Summarizing validation molecules...')
+    print('Summarizing generated molecules...')
     generation_summary = summarize_molecules(smiles, args['num_processes'])
     with open(os.path.join(args['log_dir'], 'generation_summary.pickle'), 'wb') as f:
         pickle.dump(generation_summary, f)
@@ -103,6 +84,7 @@ def aggregate_and_evaluate(args):
     unique_train_smiles = get_unique_smiles(train_summary['smile'])
     novel_generated_smiles = get_novel_smiles(unique_generated_smiles, unique_train_smiles)
     with open(os.path.join(args['log_dir'], 'generation_stats.txt'), 'w') as f:
+        f.write('Total number of generated molecules: {:d}\n'.format(len(smiles)))
         f.write('Validity among all: {:.4f}\n'.format(
             len(valid_generated_smiles) / len(smiles)))
         f.write('Uniqueness among valid ones: {:.4f}\n'.format(
@@ -112,6 +94,9 @@ def aggregate_and_evaluate(args):
 
 if __name__ == '__main__':
     import argparse
+    import datetime
+    import time
+    from rdkit import rdBase
 
     from utils import setup
 
@@ -136,26 +121,43 @@ if __name__ == '__main__':
                         help='Whether to use a pre-trained model')
     parser.add_argument('-ns', '--num-samples', type=int, default=100000,
                         help='Number of molecules to generate')
+    parser.add_argument('-mn', '--max-num-atoms', type=int, default=25,
+                        help='Max number of atoms allowed in generated molecules')
 
     # multi-process
-    parser.add_argument('-np', '--num-processes', type=int, default=64,
+    parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='number of processes to use')
-    parser.add_argument('-mi', '--master-ip', type=str, default='127.0.0.1')
-    parser.add_argument('-mp', '--master-port', type=str, default='12345')
+    parser.add_argument('-gt', '--generation-time', type=int, default=600,
+                        help='max time (seconds) allowed for generation with multiprocess')
 
     args = parser.parse_args()
     args = setup(args, train=False)
+    rdBase.DisableLog('rdApp.error')
 
+    t1 = time.time()
     if args['num_processes'] == 1:
         prepare_for_evaluation(0, args)
     else:
-        mp = torch.multiprocessing.get_context('spawn')
+        import multiprocessing as mp
+
         procs = []
         for rank in range(args['num_processes']):
-            procs.append(mp.Process(target=launch_a_process,
-                                    args=(rank, args, prepare_for_evaluation), daemon=True))
-            procs[-1].start()
-        for p in procs:
-            p.join()
+            p = mp.Process(target=prepare_for_evaluation, args=(rank, args,))
+            procs.append(p)
+            p.start()
 
+        while time.time() - t1 <= args['generation_time']:
+            if any(p.is_alive() for p in procs):
+                time.sleep(5)
+            else:
+                break
+        else:
+            print('Timeout, killing all processes.')
+            for p in procs:
+                p.terminate()
+                p.join()
+
+    t2 = time.time()
+    print('It took {} for generation.'.format(
+        datetime.timedelta(seconds=t2 - t1)))
     aggregate_and_evaluate(args)

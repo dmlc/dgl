@@ -690,6 +690,7 @@ def get_DGMG_smile(env, mol):
     random.shuffle(order)
     random_decisions = env.get_decision_sequence(mol, order)
     random_smile = eval_decisions(env, random_decisions)
+
     return canonical_smile, random_smile
 
 def preprocess_dataset(atom_types, bond_types, smiles, max_num_atoms=23):
@@ -1113,6 +1114,7 @@ def summarize_a_molecule(smile, checklist=None):
             'smile': Chem.MolToSmiles(mol),
             'valid': True
         })
+        Chem.SanitizeMol(mol)
         for k, f in checklist.items():
             summary[k] = f(mol)
 

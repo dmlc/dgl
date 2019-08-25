@@ -623,7 +623,7 @@ class DGMG(nn.Module):
                 stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
             stop_node = self.add_node_and_update(a=actions[self.action_step][1])
 
-    def rollout(self):
+    def rollout(self, max_num_atoms):
         """Sample a molecule from the distribution learned by DGMG."""
         stop_node = self.add_node_and_update()
         while not stop_node:
@@ -635,7 +635,10 @@ class DGMG(nn.Module):
                 stop_edge, bond_type = self.add_edge_or_not()
             stop_node = self.add_node_and_update()
 
-    def forward(self, actions=None, rdkit_mol=False, compute_log_prob=False):
+            if self.env.num_atoms() > max_num_atoms:
+                break
+
+    def forward(self, actions=None, rdkit_mol=False, compute_log_prob=False, max_num_atoms=25):
         """
         Parameters
         ----------
@@ -648,6 +651,9 @@ class DGMG(nn.Module):
             learning the generated molecule.
         compute_log_prob : bool
             Whether to compute log likelihood
+        max_num_atoms : int
+            Maximum number of atoms allowed. This only comes into effect
+            during inference and prevents the model from not stopping.
 
         Returns
         -------
@@ -666,7 +672,7 @@ class DGMG(nn.Module):
             self.teacher_forcing(actions)
         else:
             # Sample a molecule from the distribution learned by DGMG
-            self.rollout()
+            self.rollout(max_num_atoms)
 
         if compute_log_prob and rdkit_mol:
             return self.get_log_prob(), self.env.get_current_smiles()

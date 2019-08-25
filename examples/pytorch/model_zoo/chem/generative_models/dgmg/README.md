@@ -77,7 +77,7 @@ To evaluate your own model, do `python eval.py -d X -o Y -p Z -np N`, where:
 - `Y` is the order for generating decision sequences, which can be either `canonical`, or `random`. 
 For evaluation, this is only used to name directory.
 - `Z` is the path to model. By default, this should be a `checkpoint.pth` under directory `training_results`.
-- `N` is the number of processes to use. We use `64`.
+- `N` is the number of processes to use. We use `32`.
 
 To use a pretrained model, replace `-p Z` with `-pr`.
 
@@ -99,6 +99,6 @@ as we now have `N^2` data points with `N` molecules.
 | Pre-trained model  | % valid | % unique among valid | % novel among unique |
 | ------------------ | ------- | -------------------- | -------------------- |
 | `ChEMBL_canonical` | 78.18   | 99.13              | 98.64                |            
-| `ChEMBL_random`    | 27.19   | 99.73              | 100.00               |
-| `ZINC_canonical`   | 74.20   | 99.86              | 99.90                |
-| `ZINC_random`      | 17.85   | 99.34              | 100.00               |
+| `ChEMBL_random`    | 28.75   | 99.80              | 100.00               |
+| `ZINC_canonical`   | 78.12   | 99.84              | 99.86                |
+| `ZINC_random`      | 24.64   | 99.70              | 100.00               |
