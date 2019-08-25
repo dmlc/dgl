@@ -24,23 +24,19 @@ from __future__ import print_function
 
 import math
 import os
-import os.path as op
 
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 from rdkit.six.moves import cPickle
 from rdkit.six import iteritems
 
-from dgl.data.utils import download, _get_dgl_url
+from dgl.data.utils import download, _get_dgl_url, get_download_dir
 
 _fscores = None
 
 def readFragmentScores(name='fpscores'):
     import gzip
     global _fscores
-    # generate the full path filename:
-    if name == "fpscores":
-        name = op.join(op.dirname(__file__), name)
     fname = '{}.pkl.gz'.format(name)
     download(_get_dgl_url(os.path.join('dataset', fname)), path=fname)
     _fscores = cPickle.load(gzip.open(fname))
