@@ -104,7 +104,7 @@ as we now have `N^2` data points with `N` molecules.
 
 | Pre-trained model  | % valid | % unique among valid | % novel among unique |
 | ------------------ | ------- | -------------------- | -------------------- |
-| `ChEMBL_canonical` | 78.18   | 99.13              | 98.64                |            
-| `ChEMBL_random`    | 28.75   | 99.80              | 100.00               |
-| `ZINC_canonical`   | 78.12   | 99.84              | 99.86                |
-| `ZINC_random`      | 24.64   | 99.70              | 100.00               |
+| `ChEMBL_canonical` | 78.80   | 99.19                | 98.60                |            
+| `ChEMBL_random`    | 28.75   | 99.80                | 100.00               |
+| `ZINC_canonical`   | 78.12   | 99.84                | 99.86                |
+| `ZINC_random`      | 24.64   | 99.70                | 100.00               |

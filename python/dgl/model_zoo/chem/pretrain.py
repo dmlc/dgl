@@ -18,7 +18,8 @@ except ImportError:
     pass
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
-                                 local_pretrained_path='pre_trained.pth'):
+                                 local_pretrained_path='pre_trained.pth',
+                                 log=True):
     """Download pretrained model checkpoint
 
     Parameters
@@ -31,6 +32,8 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
         Postfix for pretrained model checkpoint
     local_pretrained_path : str
         Local name for the downloaded model checkpoint
+    log : bool
+        Whether to print progress for model loading
 
     Returns
     -------
@@ -39,18 +42,20 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
     """
     url_to_pretrained = _get_dgl_url(model_postfix)
     local_pretrained_path = '_'.join([model_name, local_pretrained_path])
-    download(url_to_pretrained, path=local_pretrained_path)
+    download(url_to_pretrained, path=local_pretrained_path, log=log)
     checkpoint = torch.load(local_pretrained_path)
     model.load_state_dict(checkpoint['model_state_dict'])
 
     return model
 
-def load_pretrained(model_name):
+def load_pretrained(model_name, log=True):
     """Load a pretrained model
 
     Parameters
     ----------
     model_name : str
+    log : bool
+        Whether to print progress for model loading
 
     Returns
     -------
@@ -79,6 +84,7 @@ def load_pretrained(model_name):
                      num_prop_rounds=2,
                      dropout=0.2)
 
-    print('Pretrained model loaded')
+    if log:
+        print('Pretrained model loaded')
 
     return download_and_load_checkpoint(model_name, model, URL[model_name])

@@ -30,7 +30,7 @@ def prepare_for_evaluation(rank, args):
                                     num_prop_rounds=args['num_propagation_rounds'], dropout=args['dropout'])
         model.load_state_dict(torch.load(args['model_path']))
     else:
-        model = model_zoo.chem.load_pretrained('_'.join(['DGMG', args['dataset'], args['order']]))
+        model = model_zoo.chem.load_pretrained('_'.join(['DGMG', args['dataset'], args['order']]), log=False)
     model.eval()
 
     worker_num_samples = args['num_samples'] // args['num_processes']
