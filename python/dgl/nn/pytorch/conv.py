@@ -176,6 +176,8 @@ class TGConv(nn.Module):
 
     Attributes
     ----------
+    lin : torch.Module
+        The learnable linear module.
     """
     def __init__(self,
                  in_feats,
@@ -187,12 +189,10 @@ class TGConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._k = k
-
+        self._activation = activation
         self.lin = nn.Linear(in_feats * (self._k + 1), out_feats, bias=bias)
 
         self.reset_parameters()
-
-        self._activation = activation
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""

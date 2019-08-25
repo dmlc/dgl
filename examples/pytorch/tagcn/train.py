@@ -8,10 +8,6 @@ from dgl.data import register_data_args, load_data
 
 from tagcn import TAGCN
 
-#from gcn import GCN
-#from gcn_mp import GCN
-#from gcn_spmv import GCN
-
 def evaluate(model, features, labels, mask):
     model.eval()
     with torch.no_grad():
@@ -64,7 +60,7 @@ def main(args):
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
 
-    # create GCN model
+    # create TAGCN model
     model = TAGCN(g,
                 in_feats,
                 args.n_hidden,
@@ -110,7 +106,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='TAGCN')
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
