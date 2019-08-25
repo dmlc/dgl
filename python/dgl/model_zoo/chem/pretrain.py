@@ -18,8 +18,7 @@ except ImportError:
     pass
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
-                                 local_pretrained_path='pre_trained.pth',
-                                 log=True):
+                                 local_pretrained_path='pre_trained.pth', log=True):
     """Download pretrained model checkpoint
 
     Parameters
@@ -87,4 +86,4 @@ def load_pretrained(model_name, log=True):
     if log:
         print('Pretrained model loaded')
 
-    return download_and_load_checkpoint(model_name, model, URL[model_name])
+    return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)
