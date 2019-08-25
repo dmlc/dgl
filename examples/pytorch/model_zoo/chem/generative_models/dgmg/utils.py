@@ -303,11 +303,9 @@ class MultiProcessOptimizer(Optimizer):
         loss : torch.tensor consisting of a float only
         """
         loss.backward()
-        self.count += 1
-        if self.count == self.accum_times:
-            self._sync_gradient()
-            self.optimizer.step()
-            self._reset()
+        self._sync_gradient()
+        self.optimizer.step()
+        self._reset()
 
 ########################################################################################################################
 #                                                         data                                                         #
