@@ -678,19 +678,9 @@ class DGMG(nn.Module):
 
         self.graph_prop.message_funcs.apply(dgmg_message_weight_init)
 
-    @property
-    def action_step(self):
-        """Get current action step and increment it by 1.
-
-        Returns
-        -------
-        old_step_count : int
-            Current action step
-        """
-        old_step_count = self.step_count
+    def count_step(self):
+        """Increment the step by 1."""
         self.step_count += 1
-
-        return old_step_count
 
     def prepare_log_prob(self, compute_log_prob):
         """Setup for returning log likelihood
@@ -716,7 +706,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step
+        self.action_step()
         return self.add_node_agent(a)
 
     def add_edge_or_not(self, a=None):
@@ -729,7 +719,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step
+        self.action_step()
         return self.add_edge_agent(a)
 
     def choose_dest_and_update(self, bond_type, a=None):
@@ -745,7 +735,7 @@ class DGMG(nn.Module):
             teacher forcing will be used to enforce the decision of the
             corresponding action.
         """
-        self.action_step
+        self.action_step()
         self.choose_dest_agent(bond_type, a)
 
     def get_log_prob(self):
@@ -772,15 +762,15 @@ class DGMG(nn.Module):
             - If i = 2, j specifies the destination atom id for the bond to add.
               With the formulation of DGMG, j must be created before the decision.
         """
-        stop_node = self.add_node_and_update(a=actions[self.action_step][1])
+        stop_node = self.add_node_and_update(a=actions[self.step_count][1])
         while not stop_node:
             # A new atom was just added.
-            stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
+            stop_edge, bond_type = self.add_edge_or_not(a=actions[self.step_count][1])
             while not stop_edge:
                 # A new bond is to be added.
-                self.choose_dest_and_update(bond_type, a=actions[self.action_step][1])
-                stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
-            stop_node = self.add_node_and_update(a=actions[self.action_step][1])
+                self.choose_dest_and_update(bond_type, a=actions[self.step_count][1])
+                stop_edge, bond_type = self.add_edge_or_not(a=actions[self.step_count][1])
+            stop_node = self.add_node_and_update(a=actions[self.step_count][1])
 
     def rollout(self, max_num_steps):
         """Sample a molecule from the distribution learned by DGMG."""
