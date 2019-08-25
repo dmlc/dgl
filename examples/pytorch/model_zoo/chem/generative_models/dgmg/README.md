@@ -46,23 +46,38 @@ Training auto-regressive generative models tends to be very slow. According to t
 speed up training and gpu does not give much speed advantage. We follow their approach and perform multiprocess cpu
 training.
 
-To start training, do `python train.py -np X -d Y -o Z`, where:
-- `X` is the number of processes to use. We use `32`. 
-- `Y` is the dataset to use. We currently support `ChEMBL` and `ZINC`. 
-- `Z` is the order for generating decision sequences, which can be either `canonical`, or `random`.
+To start training, use `train.py` with required arguments
+```
+-d DATASET, dataset to use (default: None), built-in support exists for ChEMBL, ZINC
+-o {random,canonical}, order to generate graphs (default: None)
+```
+
+and optional arguments
+```
+-s SEED,  random seed (default: 0)
+-np NUM_PROCESSES, number of processes to use (default: 32)
+```
 
 Even though multiprocess yields a significant speedup comparing to a single process, the training can still take a long 
-time (several days). An epoch of training and validation can take up to one hour and a half on our machine. If not necessary, we 
-recommend users use our pre-trained models. 
+time (several days). An epoch of training and validation can take up to one hour and a half on our machine. If not 
+necessary, we recommend users use our pre-trained models. 
 
 Meanwhile, we make a checkpoint of our model whenever there is a performance improvement on the validation set so you 
 do not need to wait until the training terminates.
 
+All training results can be found in `training_results`.
+
 #### Dataset configuration
 
-You can also use your own dataset with `python train.py -np X -d Y -o Z -tf A -vf B`, where:
-- `A` is the path to a file for the training data with one SMILES a line
-- `B` is the path to a file for the validation data with one SMILES a line
+You can also use your own dataset with additional arguments
+```
+-tf TRAIN_FILE, Path to a file with one SMILES a line for training
+                data. This is only necessary if you want to use a new
+                dataset. (default: None)
+-vf VAL_FILE, Path to a file with one SMILES a line for validation
+              data. This is only necessary if you want to use a new
+              dataset. (default: None)
+```
 
 #### Monitoring
 
@@ -75,17 +90,26 @@ To use tensorboard, you need to install [tensorboardX](https://github.com/lanpa/
 
 ### Evaluation
 
-To evaluate your own model, do `python eval.py -d X -o Y -p Z -np A -mn B -gt C`, where:
-- `X` is the dataset to use, such as `ChEMBL` and `ZINC`
-- `Y` is the order for generating decision sequences, which can be either `canonical`, or `random`. 
-For evaluation, this is only used to name directory.
-- `Z` is the path to model. By default, this should be a `checkpoint.pth` under directory `training_results`.
-- `A` is the number of processes to use. We use `32`.
-- `B` is the maximum number of atoms allowed in a molecule to prevent the model from not stopping. 
-By default we use `25`.
-- `C` is the max time (in seconds) allowed for molecule generation. By default we use `600` (10 minutes).
+To start evaluation, use `eval.py` with required arguments
+```
+-d DATASET, dataset to use (default: None), built-in support exists for ChEMBL, ZINC
+-o {random,canonical}, order to generate graphs, used for naming evaluation directory (default: None)
+-p MODEL_PATH, path to saved model (default: None). This is not needed if you want to use pretrained models.
+-pr, Whether to use a pre-trained model (default: False)
+```
 
-To use a pretrained model, replace `-p Z` with `-pr`.
+and optional arguments
+```
+-s SEED, random seed (default: 0)
+-ns NUM_SAMPLES, Number of molecules to generate (default: 100000)
+-mn MAX_NUM_STEPS, Max number of steps allowed in generated molecules to
+                   ensure termination (default: 400)
+-np NUM_PROCESSES, number of processes to use (default: 32)
+-gt GENERATION_TIME, max time (seconds) allowed for generation with
+                     multiprocess (default: 600)
+```
+
+All evaluation results can be found in `eval_results`.
 
 After the evaluation, 100000 molecules will be generated and stored in `generated_smiles.txt` under `eval_results`
 directory, with three statistics logged in `generation_stats.txt` under `eval_results`:
@@ -106,5 +130,5 @@ as we now have `N^2` data points with `N` molecules.
 | ------------------ | ------- | -------------------- | -------------------- |
 | `ChEMBL_canonical` | 78.80   | 99.19                | 98.60                |            
 | `ChEMBL_random`    | 29.09   | 99.87                | 100.00               |
-| `ZINC_canonical`   | 78.12   | 99.84                | 99.86                |
-| `ZINC_random`      | 24.64   | 99.70                | 100.00               |
+| `ZINC_canonical`   | 74.60   | 99.87                | 99.87                |
+| `ZINC_random`      | 12.37   | 99.38                | 100.00               |

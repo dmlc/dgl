@@ -64,8 +64,8 @@ def main(rank, args):
         val_printer = None
 
     # Initialize model
-    model = model_zoo.chem.DGMG(atom_types=env.atom_types,
-                                bond_types=env.bond_types,
+    model = model_zoo.chem.DGMG(atom_types=dataset.atom_types,
+                                bond_types=dataset.bond_types,
                                 node_hidden_size=args['node_hidden_size'],
                                 num_prop_rounds=args['num_propagation_rounds'],
                                 dropout=args['dropout'])
@@ -166,7 +166,7 @@ if __name__ == '__main__':
                         help='folder to save info like experiment configuration')
 
     # multi-process
-    parser.add_argument('-np', '--num-processes', type=int, default=1,
+    parser.add_argument('-np', '--num-processes', type=int, default=32,
                         help='number of processes to use')
     parser.add_argument('-mi', '--master-ip', type=str, default='127.0.0.1')
     parser.add_argument('-mp', '--master-port', type=str, default='12345')
