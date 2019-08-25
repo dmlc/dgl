@@ -9,6 +9,7 @@ import numbers
 import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
+from ...function.base import TargetCode 
 
 MX_VERSION = LooseVersion(mx.__version__)
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -378,14 +379,14 @@ class BinaryReduce(mx.autograd.Function):
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            if self.lhs != 1: # 1: target code of dst node
+            if self.lhs != TargetCode.DST: # copy_reduce does not accept dst node as input target.
                 in_ones = nd.ones((lhs_data.shape[0],),
                                   ctx=lhs_data.context, dtype=lhs_data.dtype)
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
                     'sum', self.graph, self.lhs, in_ones_nd, degs_nd, 
                     self.lhs_map[0], self.lhs_map[0])
-            else: # self.rhs != 1
+            else: # self.rhs != TargetCode.DST
                 in_ones = nd.ones((rhs_data.shape[0],),
                                   ctx=rhs_data.context, dtype=rhs_data.dtype)
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)

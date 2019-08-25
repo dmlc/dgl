@@ -8,6 +8,7 @@ from torch.utils import dlpack
 
 from ... import ndarray as nd
 from ... import kernel as K
+from ...function.base import TargetCode
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -297,12 +298,12 @@ class BinaryReduce(th.autograd.Function):
         if reducer == 'mean':
             degs = lhs_data.new_empty((out_data.shape[0],))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            if lhs != 1: # 1: target code of dst node
+            if lhs != TargetCode.DST: # copy_reduce does not accept dst node as input target.
                 in_ones = lhs_data.new_ones((lhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
                     'sum', graph, lhs, in_ones_nd, degs_nd, lhs_map[0], lhs_map[0]) 
-            else: # rhs != 1
+            else: # rhs != TargetCode.DST
                 in_ones = rhs_data.new_ones((rhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
