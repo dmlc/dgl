@@ -659,11 +659,11 @@ class DGMG(nn.Module):
 
         # Actions
         self.add_node_agent = AddNode(
-            env, self.graph_embed, node_hidden_size, dropout)
+            self.env, self.graph_embed, node_hidden_size, dropout)
         self.add_edge_agent = AddEdge(
-            env, self.graph_embed, node_hidden_size, dropout)
+            self.env, self.graph_embed, node_hidden_size, dropout)
         self.choose_dest_agent = ChooseDestAndUpdate(
-            env, self.graph_prop, node_hidden_size, dropout)
+            self.env, self.graph_prop, node_hidden_size, dropout)
 
         # Weight initialization
         self.init_weights()
