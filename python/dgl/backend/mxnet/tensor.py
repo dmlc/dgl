@@ -373,7 +373,7 @@ class BinaryReduce(mx.autograd.Function):
             lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
             self.rhs_map[0], self.out_map[0])
         # normalize if mean reducer
-        # note(zihao): this is a temporal hack and we should have better solution in the future.
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if self.reducer == 'mean':
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
@@ -457,7 +457,7 @@ class CopyReduce(mx.autograd.Function):
             self.graph, self.target, in_data_nd, out_data_nd,
             self.in_map[0], self.out_map[0])
         # normalize if mean reducer
-        # note(zihao): this is a temporal hack and we should have better solution in the future.
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if self.reducer == 'mean':
             in_ones = nd.ones((in_data.shape[0],),
                               ctx=in_data.context, dtype=in_data.dtype)
