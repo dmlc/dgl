@@ -72,12 +72,15 @@ To use tensorboard, you need to install [tensorboardX](https://github.com/lanpa/
 
 ### Evaluation
 
-To evaluate your own model, do `python eval.py -d X -o Y -p Z -np N`, where:
+To evaluate your own model, do `python eval.py -d X -o Y -p Z -np A -mn B -gt C`, where:
 - `X` is the dataset to use, such as `ChEMBL` and `ZINC`
 - `Y` is the order for generating decision sequences, which can be either `canonical`, or `random`. 
 For evaluation, this is only used to name directory.
 - `Z` is the path to model. By default, this should be a `checkpoint.pth` under directory `training_results`.
-- `N` is the number of processes to use. We use `32`.
+- `A` is the number of processes to use. We use `32`.
+- `B` is the maximum number of atoms allowed in a molecule to prevent the model from not stopping. 
+By default we use `25`.
+- `C` is the max time (in seconds) allowed for molecule generation. By default we use `600` (10 minutes).
 
 To use a pretrained model, replace `-p Z` with `-pr`.
 
