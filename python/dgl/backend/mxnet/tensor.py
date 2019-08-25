@@ -452,14 +452,14 @@ class CopyReduce(mx.autograd.Function):
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if self.reducer == 'mean':
-            n = in_data.shape[0]
-            in_ones = nd.ones((n,), ctx=in_data.context, dtype=in_data.dtype)
+            in_ones = nd.ones((in_data.shape[0],),
+                              ctx=in_data.context, dtype=in_data.dtype)
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', self.graph, TargetCode.SRC, in_ones_nd, degs_nd, 
+                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
                 None, self.out_map[0])
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 

@@ -359,13 +359,12 @@ class CopyReduce(th.autograd.Function):
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if reducer == 'mean':
-            n = in_data.shape[0]
-            in_ones = in_data.new_ones((n,))
+            in_ones = in_data.new_ones((in_data.shape[0],))
             degs = in_data.new_empty((out_data.shape[0],))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', graph, TargetCode.SRC, in_ones_nd, degs_nd, None, out_map[0]) 
+                'sum', graph, target, in_ones_nd, degs_nd, None, out_map[0]) 
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
             out_data = out_data / degs
