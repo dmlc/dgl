@@ -72,6 +72,21 @@ __device__ __forceinline__ int64_t Ravel(
   return out;
 }
 
+__device__ __forceinline__ void Ravel2(
+    const int64_t* idx, int ndim, const int64_t* lhs_shape, const int64_t* lhs_stride,
+    const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t &lhs_out, int64_t &rhs_out) {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t i = idx[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t rhs_sh = rhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
+      int64_t rhs_st = rhs_stride[d];
+
+      lhs_out += min(i, lhs_sh) * lhs_st;
+      rhs_out += min(i, rhs_sh) * rhs_st;
+    }
+}
+
 // Minigun UDF to compute binary reduce with broadcasting.
 template <int NDim, typename Idx, typename DType, typename Functors>
 struct BinaryReduceBcast {
@@ -101,10 +116,18 @@ struct BinaryReduceBcast {
     int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
       Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      Ravel2(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, lhs_add, rhs_add);
+      DType lhs = Functors::Read(lhsoff + lhs_add);
+      DType rhs = Functors::Read(rhsoff + rhs_add);
+      /*
       DType lhs = Functors::Read(lhsoff +
           Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
       DType rhs = Functors::Read(rhsoff +
           Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
+      */
       DType out = Functors::Op(lhs, rhs);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
