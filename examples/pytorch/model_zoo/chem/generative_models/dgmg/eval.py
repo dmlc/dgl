@@ -4,7 +4,7 @@ import shutil
 import torch
 from dgl import model_zoo
 
-from utils import MoleculeDataset, set_random_seed, \
+from utils import MoleculeDataset, set_random_seed, download_data,
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles
 
 def generate_and_save(log_dir, num_samples, max_num_atoms, model):
@@ -65,7 +65,10 @@ def aggregate_and_evaluate(args):
 
     # Summarize training molecules
     print('Summarizing training molecules...')
-    with open('_'.join([args['dataset'], 'DGMG_train.txt']), 'r') as f:
+    train_file = '_'.join([args['dataset'], 'DGMG_train.txt'])
+    if not os.path.exists(train_file):
+        download_data(args['dataset'], train_file)
+    with open(train_file, 'r') as f:
         train_smiles = f.read().splitlines()
     train_summary = summarize_molecules(train_smiles, args['num_processes'])
     with open(os.path.join(args['log_dir'], 'train_summary.pickle'), 'wb') as f:

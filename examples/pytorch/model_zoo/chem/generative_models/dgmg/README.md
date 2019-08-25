@@ -49,7 +49,7 @@ To start training, do `python train.py -np X -d Y -o Z`, where:
 - `Z` is the order for generating decision sequences, which can be either `canonical`, or `random`.
 
 Even though multiprocess yields a significant speedup comparing to a single process, the training can still take a long 
-time. An epoch of training and validation can take up to one hour and a half on our machine. If not necessary, we 
+time (several days). An epoch of training and validation can take up to one hour and a half on our machine. If not necessary, we 
 recommend users use our pre-trained models. 
 
 Meanwhile, we make a checkpoint of our model whenever there is a performance improvement on the validation set so you 
