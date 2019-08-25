@@ -298,7 +298,8 @@ class BinaryReduce(th.autograd.Function):
         if reducer == 'mean':
             degs = lhs_data.new_empty((out_data.shape[0],))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            in_ones = lhs_data.new_ones((graph._number_of_src_nodes(),))
+            n = lhs_data.shape[0] if lhs != TargetCode.EDGE else rhs_data.shape[0]
+            in_ones = lhs_data.new_ones((n,))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
                 'sum', graph, TargetCode.SRC, in_ones_nd, degs_nd, None, out_map[0]) 

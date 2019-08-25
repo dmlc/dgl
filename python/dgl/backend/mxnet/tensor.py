@@ -379,8 +379,8 @@ class BinaryReduce(mx.autograd.Function):
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            in_ones = nd.ones((self.graph._number_of_src_nodes(),),
-                              ctx=lhs_data.context, dtype=lhs_data.dtype)
+            n = lhs_data.shape[0] if lhs != TargetCode.EDGE else rhs_data.shape[0]
+            in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
                 'sum', self.graph, TargetCode.SRC, in_ones_nd, degs_nd, 
