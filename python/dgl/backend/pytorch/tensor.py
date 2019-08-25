@@ -359,7 +359,8 @@ class CopyReduce(th.autograd.Function):
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if reducer == 'mean':
-            in_ones = in_data.new_ones((graph._number_of_src_nodes(),))
+            n = in_data.shape[0]
+            in_ones = in_data.new_ones((n,))
             degs = in_data.new_empty((out_data.shape[0],))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)

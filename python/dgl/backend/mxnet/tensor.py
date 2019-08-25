@@ -379,7 +379,7 @@ class BinaryReduce(mx.autograd.Function):
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            n = lhs_data.shape[0] if lhs != TargetCode.EDGE else rhs_data.shape[0]
+            n = lhs_data.shape[0] if self.lhs != TargetCode.EDGE else rhs_data.shape[0]
             in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
@@ -452,8 +452,8 @@ class CopyReduce(mx.autograd.Function):
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if self.reducer == 'mean':
-            in_ones = nd.ones((self.graph._number_of_src_nodes(),),
-                              ctx=in_data.context, dtype=in_data.dtype)
+            n = in_data.shape[0]
+            in_ones = nd.ones((n,), ctx=in_data.context, dtype=in_data.dtype)
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
