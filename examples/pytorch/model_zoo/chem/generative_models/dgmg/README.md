@@ -8,6 +8,9 @@ DGMG generates graphs by progressively adding nodes and edges as below:
 
 For molecules, the nodes are atoms and the edges are bonds.
 
+**Goal**: Given a set of real molecules, we want to learn the distribution of them and get new molecules
+with similar properties.
+
 ## Dataset
 
 ### Preprocessing

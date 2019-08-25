@@ -779,22 +779,19 @@ class DGMG(nn.Module):
                 stop_edge, bond_type = self.add_edge_or_not(a=actions[self.action_step][1])
             stop_node = self.add_node_and_update(a=actions[self.action_step][1])
 
-    def rollout(self, max_num_atoms):
+    def rollout(self, max_num_steps):
         """Sample a molecule from the distribution learned by DGMG."""
         stop_node = self.add_node_and_update()
-        while not stop_node:
+        while (not stop_node) and (self.step_count <= max_num_steps):
             stop_edge, bond_type = self.add_edge_or_not()
             if self.env.num_atoms() == 1:
                 stop_edge = True
-            while not stop_edge:
+            while (not stop_edge) and (self.step_count <= max_num_steps):
                 self.choose_dest_and_update(bond_type)
                 stop_edge, bond_type = self.add_edge_or_not()
             stop_node = self.add_node_and_update()
 
-            if self.env.num_atoms() > max_num_atoms:
-                break
-
-    def forward(self, actions=None, rdkit_mol=False, compute_log_prob=False, max_num_atoms=25):
+    def forward(self, actions=None, rdkit_mol=False, compute_log_prob=False, max_num_steps=400):
         """
         Parameters
         ----------
@@ -807,8 +804,8 @@ class DGMG(nn.Module):
             learning the generated molecule.
         compute_log_prob : bool
             Whether to compute log likelihood
-        max_num_atoms : int
-            Maximum number of atoms allowed. This only comes into effect
+        max_num_steps : int
+            Maximum number of steps allowed. This only comes into effect
             during inference and prevents the model from not stopping.
 
         Returns
@@ -828,7 +825,7 @@ class DGMG(nn.Module):
             self.teacher_forcing(actions)
         else:
             # Sample a molecule from the distribution learned by DGMG
-            self.rollout(max_num_atoms)
+            self.rollout(max_num_steps)
 
         if compute_log_prob and rdkit_mol:
             return self.get_log_prob(), self.env.get_current_smiles()

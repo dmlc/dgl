@@ -112,7 +112,7 @@ def main(rank, args):
         val_log_prob = val_log_prob.item()
         if val_prob >= best_val_prob:
             if rank == 0:
-                torch.save(model.state_dict(), args['checkpoint_dir'])
+                torch.save({'model_state_dict': model.state_dict()}, args['checkpoint_dir'])
                 print('Old val prob {:.10f} | new val prob {:.10f} | model saved'.format(best_val_prob, val_prob))
             best_val_prob = val_prob
         elif epoch >= args['warmup_epochs']:

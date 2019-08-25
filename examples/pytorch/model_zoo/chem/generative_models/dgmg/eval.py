@@ -7,11 +7,11 @@ from dgl import model_zoo
 from utils import MoleculeDataset, set_random_seed, download_data,\
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles
 
-def generate_and_save(log_dir, num_samples, max_num_atoms, model):
+def generate_and_save(log_dir, num_samples, max_num_steps, model):
     with open(os.path.join(log_dir, 'generated_smiles.txt'), 'w') as f:
         for i in range(num_samples):
             with torch.no_grad():
-                s = model(rdkit_mol=True, max_num_atoms=max_num_atoms)
+                s = model(rdkit_mol=True, max_num_steps=max_num_steps)
             f.write(s + '\n')
 
 def prepare_for_evaluation(rank, args):
@@ -39,7 +39,7 @@ def prepare_for_evaluation(rank, args):
 
     worker_log_dir = os.path.join(args['log_dir'], str(rank))
     mkdir_p(worker_log_dir, log=False)
-    generate_and_save(worker_log_dir, worker_num_samples, args['max_num_atoms'], model)
+    generate_and_save(worker_log_dir, worker_num_samples, args['max_num_steps'], model)
 
 def remove_worker_tmp_dir(args):
     for rank in range(args['num_processes']):
@@ -125,8 +125,8 @@ if __name__ == '__main__':
                         help='Whether to use a pre-trained model')
     parser.add_argument('-ns', '--num-samples', type=int, default=100000,
                         help='Number of molecules to generate')
-    parser.add_argument('-mn', '--max-num-atoms', type=int, default=25,
-                        help='Max number of atoms allowed in generated molecules')
+    parser.add_argument('-mn', '--max-num-steps', type=int, default=400,
+                        help='Max number of steps allowed in generated molecules to ensure termination')
 
     # multi-process
     parser.add_argument('-np', '--num-processes', type=int, default=32,
