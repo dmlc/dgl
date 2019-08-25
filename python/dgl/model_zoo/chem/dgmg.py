@@ -11,6 +11,159 @@ import torch.nn.functional as F
 import torch.nn.init as init
 from torch.distributions import Categorical
 
+import dgl
+from dgl import DGLGraph
+
+try:
+    from rdkit import Chem
+except ImportError:
+    pass
+
+class MoleculeEnv(object):
+    """MDP environment for generating molecules.
+
+    Parameters
+    ----------
+    atom_types : list
+        E.g. ['C', 'N']
+    bond_types : list
+        E.g. [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+        Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
+    """
+    def __init__(self, atom_types, bond_types):
+        super(MoleculeEnv, self).__init__()
+
+        self.atom_types = atom_types
+        self.bond_types = bond_types
+
+        self.atom_type_to_id = dict()
+        self.bond_type_to_id = dict()
+
+        for id, a_type in enumerate(atom_types):
+            self.atom_type_to_id[a_type] = id
+
+        for id, b_type in enumerate(bond_types):
+            self.bond_type_to_id[b_type] = id
+
+    def get_decision_sequence(self, mol, atom_order):
+        """Extract a decision sequence with which DGMG can generate the
+        molecule with a specified atom order.
+
+        Parameters
+        ----------
+        mol : Chem.rdchem.Mol
+        atom_order : list
+            Specifies a mapping between the original atom
+            indices and the new atom indices. In particular,
+            atom_order[i] is re-labeled as i.
+
+        Returns
+        -------
+        decisions : list
+            decisions[i] is a 2-tuple (i, j)
+            - If i = 0, j specifies either the type of the atom to add
+              self.atom_types[j] or termination with j = len(self.atom_types)
+            - If i = 1, j specifies either the type of the bond to add
+              self.bond_types[j] or termination with j = len(self.bond_types)
+            - If i = 2, j specifies the destination atom id for the bond to add.
+              With the formulation of DGMG, j must be created before the decision.
+        """
+        decisions = []
+        old2new = dict()
+
+        for new_id, old_id in enumerate(atom_order):
+            atom = mol.GetAtomWithIdx(old_id)
+            a_type = atom.GetSymbol()
+            decisions.append((0, self.atom_type_to_id[a_type]))
+            for bond in atom.GetBonds():
+                u = bond.GetBeginAtomIdx()
+                v = bond.GetEndAtomIdx()
+                if v == old_id:
+                    u, v = v, u
+                if v in old2new:
+                    decisions.append((1, self.bond_type_to_id[bond.GetBondType()]))
+                    decisions.append((2, old2new[v]))
+            decisions.append((1, len(self.bond_types)))
+            old2new[old_id] = new_id
+        decisions.append((0, len(self.atom_types)))
+        return decisions
+
+    def reset(self, rdkit_mol=False):
+        """Setup for generating a new molecule
+
+        Parameters
+        ----------
+        rdkit_mol : bool
+            Whether to keep a Chem.rdchem.Mol object so
+            that we know what molecule is being generated
+        """
+        self.dgl_graph = DGLGraph()
+        # If there are some features for nodes and edges,
+        # zero tensors will be set for those of new nodes and edges.
+        self.dgl_graph.set_n_initializer(dgl.frame.zero_initializer)
+        self.dgl_graph.set_e_initializer(dgl.frame.zero_initializer)
+
+        self.mol = None
+        if rdkit_mol:
+            # RWMol is a molecule class that is intended to be edited.
+            self.mol = Chem.RWMol(Chem.MolFromSmiles(''))
+
+    def num_atoms(self):
+        """Get the number of atoms for the current molecule.
+
+        Returns
+        -------
+        int
+        """
+        return self.dgl_graph.number_of_nodes()
+
+    def add_atom(self, type):
+        """Add an atom of the specified type.
+
+        Parameters
+        ----------
+        type : int
+            Should be in the range of [0, len(self.atom_types) - 1]
+        """
+        self.dgl_graph.add_nodes(1)
+        if self.mol is not None:
+            self.mol.AddAtom(Chem.Atom(self.atom_types[type]))
+
+    def add_bond(self, u, v, type, bi_direction=True):
+        """Add a bond of the specified type between atom u and v.
+
+        Parameters
+        ----------
+        u : int
+            Index for the first atom
+        v : int
+            Index for the second atom
+        type : int
+            Index for the bond type
+        bi_direction : bool
+            Whether to add edges for both directions in the DGLGraph.
+            If not, we will only add the edge (u, v).
+        """
+        if bi_direction:
+            self.dgl_graph.add_edges([u, v], [v, u])
+        else:
+            self.dgl_graph.add_edge(u, v)
+
+        if self.mol is not None:
+            self.mol.AddBond(u, v, self.bond_types[type])
+
+    def get_current_smiles(self):
+        """Get the generated molecule in SMILES
+
+        Returns
+        -------
+        s : str
+            SMILES
+        """
+        assert self.mol is not None, 'Expect a Chem.rdchem.Mol object initialized.'
+        s = Chem.MolToSmiles(self.mol)
+        return s
+
 class GraphEmbed(nn.Module):
     """Compute a molecule representations out of atom representations.
 
@@ -480,8 +633,11 @@ class DGMG(nn.Module):
 
     Parameters
     ----------
-    env : MoleculeEnv
-        Environment for generating molecules
+    atom_types : list
+        E.g. ['C', 'N']
+    bond_types : list
+        E.g. [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+        Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
     node_hidden_size : int
         Size of atom representation
     num_prop_rounds : int
@@ -489,10 +645,10 @@ class DGMG(nn.Module):
     dropout : float
         Probability for dropout
     """
-    def __init__(self, env, node_hidden_size, num_prop_rounds, dropout):
+    def __init__(self, atom_types, bond_types, node_hidden_size, num_prop_rounds, dropout):
         super(DGMG, self).__init__()
 
-        self.env = env
+        self.env = MoleculeEnv(atom_types, bond_types)
 
         # Graph embedding module
         self.graph_embed = GraphEmbed(node_hidden_size)
