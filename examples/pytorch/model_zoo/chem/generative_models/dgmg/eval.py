@@ -28,7 +28,7 @@ def prepare_for_evaluation(rank, args):
                                     bond_types=dataset.bond_types,
                                     node_hidden_size=args['node_hidden_size'],
                                     num_prop_rounds=args['num_propagation_rounds'], dropout=args['dropout'])
-        model.load_state_dict(torch.load(args['model_path']))
+        model.load_state_dict(torch.load(args['model_path'])['model_state_dict'])
     else:
         model = model_zoo.chem.load_pretrained('_'.join(['DGMG', args['dataset'], args['order']]), log=False)
     model.eval()

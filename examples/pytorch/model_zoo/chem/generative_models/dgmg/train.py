@@ -102,7 +102,8 @@ def main(rank, args):
 
         # Validation
         val_log_prob = evaluate(epoch, model, val_loader, val_printer)
-        dist.all_reduce(val_log_prob, op=dist.ReduceOp.SUM)
+        if args['num_processes'] > 1:
+            dist.all_reduce(val_log_prob, op=dist.ReduceOp.SUM)
         val_log_prob /= args['num_processes']
         # Strictly speaking, the computation of probability here is different from what is
         # performed on the training set as we first take an average of log likelihood and then
