@@ -4,7 +4,7 @@ import shutil
 import torch
 from dgl import model_zoo
 
-from utils import MoleculeDataset, set_random_seed, download_data,
+from utils import MoleculeDataset, set_random_seed, download_data,\
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles
 
 def generate_and_save(log_dir, num_samples, max_num_atoms, model):
