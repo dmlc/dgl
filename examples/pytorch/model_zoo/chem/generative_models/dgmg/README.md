@@ -9,7 +9,7 @@ DGMG generates graphs by progressively adding nodes and edges as below:
 For molecules, the nodes are atoms and the edges are bonds.
 
 **Goal**: Given a set of real molecules, we want to learn the distribution of them and get new molecules
-with similar properties.
+with similar properties. See the `Evaluation` section for more details.
 
 ## Dataset
 
@@ -105,6 +105,6 @@ as we now have `N^2` data points with `N` molecules.
 | Pre-trained model  | % valid | % unique among valid | % novel among unique |
 | ------------------ | ------- | -------------------- | -------------------- |
 | `ChEMBL_canonical` | 78.80   | 99.19                | 98.60                |            
-| `ChEMBL_random`    | 28.75   | 99.80                | 100.00               |
+| `ChEMBL_random`    | 29.09   | 99.87                | 100.00               |
 | `ZINC_canonical`   | 78.12   | 99.84                | 99.86                |
 | `ZINC_random`      | 24.64   | 99.70                | 100.00               |

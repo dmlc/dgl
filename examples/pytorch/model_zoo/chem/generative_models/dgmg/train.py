@@ -141,7 +141,8 @@ if __name__ == '__main__':
 
     from utils import setup
 
-    parser = argparse.ArgumentParser(description='Training DGMG for molecule generation')
+    parser = argparse.ArgumentParser(description='Training DGMG for molecule generation',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # configure
     parser.add_argument('-s', '--seed', type=int, default=0, help='random seed')
