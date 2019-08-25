@@ -379,20 +379,12 @@ class BinaryReduce(mx.autograd.Function):
             degs = nd.empty((out_data.shape[0],),
                             ctx=out_data.context, dtype=out_data.dtype)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            if self.lhs != TargetCode.DST: # copy_reduce does not accept dst node as input target.
-                in_ones = nd.ones((lhs_data.shape[0],),
-                                  ctx=lhs_data.context, dtype=lhs_data.dtype)
-                in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-                K.copy_reduce(
-                    'sum', self.graph, self.lhs, in_ones_nd, degs_nd, 
-                    self.lhs_map[0], self.out_map[0])
-            else: # self.rhs != TargetCode.DST
-                in_ones = nd.ones((rhs_data.shape[0],),
-                                  ctx=rhs_data.context, dtype=rhs_data.dtype)
-                in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-                K.copy_reduce(
-                    'sum', self.graph, self.rhs, in_ones_nd, degs_nd, 
-                    self.rhs_map[0], self.out_map[0])
+            in_ones = nd.ones((lhs_data.shape[0],),
+                              ctx=lhs_data.context, dtype=lhs_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', self.graph, TargetCode.SRC, in_ones_nd, degs_nd, 
+                None, self.out_map[0])
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
             out_data = out_data / degs
