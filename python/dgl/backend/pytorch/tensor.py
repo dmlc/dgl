@@ -302,12 +302,12 @@ class BinaryReduce(th.autograd.Function):
                 in_ones = lhs_data.new_ones((lhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
-                    'sum', graph, lhs, in_ones_nd, degs_nd, lhs_map[0], lhs_map[0]) 
+                    'sum', graph, lhs, in_ones_nd, degs_nd, lhs_map[0], out_map[0]) 
             else: # rhs != TargetCode.DST
                 in_ones = rhs_data.new_ones((rhs_data.shape[0],))
                 in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                 K.copy_reduce(
-                    'sum', graph, rhs, in_ones_nd, degs_nd, rhs_map[0], rhs_map[0])
+                    'sum', graph, rhs, in_ones_nd, degs_nd, rhs_map[0], out_map[0])
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
             out_data = out_data / degs
