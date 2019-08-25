@@ -766,20 +766,24 @@ class MoleculeDataset(object):
         if self.dataset == 'ChEMBL':
             # For new datasets, get_atom_and_bond_types can be used to
             # identify the atom and bond types in them.
-            self.env = MoleculeEnv(['O', 'Cl', 'C', 'S', 'F', 'Br', 'N'],
-                                   [Chem.rdchem.BondType.SINGLE,
-                                    Chem.rdchem.BondType.DOUBLE,
-                                    Chem.rdchem.BondType.TRIPLE])
+            self.atom_types = ['O', 'Cl', 'C', 'S', 'F', 'Br', 'N']
+            self.bond_types = [Chem.rdchem.BondType.SINGLE,
+                               Chem.rdchem.BondType.DOUBLE,
+                               Chem.rdchem.BondType.TRIPLE]
+
         elif self.dataset == 'ZINC':
-            self.env = MoleculeEnv(['Br', 'S', 'C', 'P', 'N', 'O', 'F', 'Cl', 'I'],
-                                   [Chem.rdchem.BondType.SINGLE,
-                                    Chem.rdchem.BondType.DOUBLE,
-                                    Chem.rdchem.BondType.TRIPLE])
+            self.atom_types = ['Br', 'S', 'C', 'P', 'N', 'O', 'F', 'Cl', 'I']
+            self.bond_types = [Chem.rdchem.BondType.SINGLE,
+                               Chem.rdchem.BondType.DOUBLE,
+                               Chem.rdchem.BondType.TRIPLE]
+
         else:
             path_to_atom_and_bond_types = '_'.join([self.dataset, 'atom_and_bond_types.pkl'])
             with open(path_to_atom_and_bond_types, 'rb') as f:
                 type_info = pickle.load(f)
-            self.env = MoleculeEnv(type_info['atom_types'], type_info['bond_types'])
+            self.atom_types = type_info['atom_types']
+            self.bond_types = type_info['bond_types']
+        self.env = MoleculeEnv(self.atom_types, self.bond_types)
 
         dataset_prefix = self._dataset_prefix()
 

@@ -12,6 +12,11 @@ URL = {
     'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth'
 }
 
+try:
+    from rdkit import Chem
+except ImportError:
+    pass
+
 def download_and_load_checkpoint(model, model_postfix,
                                  local_pretrained_path='pre_trained.pth'):
     """Download pretrained model checkpoint
@@ -37,7 +42,7 @@ def download_and_load_checkpoint(model, model_postfix,
 
     return model
 
-def load_pretrained(model_name, **kwargs):
+def load_pretrained(model_name):
     """Load a pretrained model
 
     Parameters
@@ -57,8 +62,16 @@ def load_pretrained(model_name, **kwargs):
                               n_tasks=12,
                               classifier_hidden_feats=64)
     elif model_name.startswith('DGMG'):
-        env = kwargs.get('env')
-        model = DGMG(env=env,
+        if model_name.startswith('DGMG_ChEMBL'):
+            atom_types = ['O', 'Cl', 'C', 'S', 'F', 'Br', 'N']
+        elif model_name.startswith('DGMG_ZINC'):
+            atom_types = ['Br', 'S', 'C', 'P', 'N', 'O', 'F', 'Cl', 'I']
+        bond_types = [Chem.rdchem.BondType.SINGLE,
+                      Chem.rdchem.BondType.DOUBLE,
+                      Chem.rdchem.BondType.TRIPLE]
+
+        model = DGMG(atom_types=atom_types,
+                     bond_types=bond_types,
                      node_hidden_size=128,
                      num_prop_rounds=2,
                      dropout=0.2)

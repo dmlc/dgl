@@ -21,15 +21,16 @@ def prepare_for_evaluation(rank, args):
 
     # Setup dataset and data loader
     dataset = MoleculeDataset(args['dataset'], subset_id=rank, n_subsets=args['num_processes'])
-    env = dataset.env
 
     # Initialize model
     if not args['pretrained']:
-        model = model_zoo.chem.DGMG(env=env, node_hidden_size=args['node_hidden_size'],
+        model = model_zoo.chem.DGMG(atom_types=dataset.atom_types,
+                                    bond_types=dataset.bond_types,
+                                    node_hidden_size=args['node_hidden_size'],
                                     num_prop_rounds=args['num_propagation_rounds'], dropout=args['dropout'])
         model.load_state_dict(torch.load(args['model_path']))
     else:
-        model = model_zoo.chem.load_pretrained('_'.join(['DGMG', args['dataset'], args['order']]), env=env)
+        model = model_zoo.chem.load_pretrained('_'.join(['DGMG', args['dataset'], args['order']]))
     model.eval()
 
     worker_num_samples = args['num_samples'] // args['num_processes']

@@ -44,7 +44,6 @@ def main(rank, args):
     # Setup dataset and data loader
     dataset = MoleculeDataset(args['dataset'], args['order'], ['train', 'val'],
                               subset_id=rank, n_subsets=args['num_processes'])
-    env = dataset.env
 
     # Note that currently the batch size for the loaders should only be 1.
     train_loader = DataLoader(dataset.train_set, batch_size=args['batch_size'],
@@ -65,7 +64,9 @@ def main(rank, args):
         val_printer = None
 
     # Initialize model
-    model = model_zoo.chem.DGMG(env=env, node_hidden_size=args['node_hidden_size'],
+    model = model_zoo.chem.DGMG(atom_types=env.atom_types,
+                                bond_types=env.bond_types,
+                                node_hidden_size=args['node_hidden_size'],
                                 num_prop_rounds=args['num_propagation_rounds'],
                                 dropout=args['dropout'])
 
