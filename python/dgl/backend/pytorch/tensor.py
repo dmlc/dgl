@@ -298,7 +298,7 @@ class BinaryReduce(th.autograd.Function):
         if reducer == 'mean':
             degs = lhs_data.new_empty((out_data.shape[0],))
             degs_nd = zerocopy_to_dgl_ndarray(degs)
-            in_ones = lhs_data.new_ones((lhs_data.shape[0],))
+            in_ones = lhs_data.new_ones((graph.number_of_nodes(),))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
                 'sum', graph, TargetCode.SRC, in_ones_nd, degs_nd, None, out_map[0]) 
@@ -358,12 +358,12 @@ class CopyReduce(th.autograd.Function):
         # normalize if mean reducer
         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
         if reducer == 'mean':
-            in_ones = in_data.new_ones((in_data.shape[0],))
+            in_ones = in_data.new_ones((graph.number_of_nodes(),))
             degs = in_data.new_empty((out_data.shape[0],))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             degs_nd = zerocopy_to_dgl_ndarray(degs)
             K.copy_reduce(
-                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0]) 
+                'sum', graph, TargetCode.SRC, in_ones_nd, degs_nd, None, out_map[0]) 
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
             out_data = out_data / degs
