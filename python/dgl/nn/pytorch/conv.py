@@ -237,9 +237,9 @@ class GATConv(nn.Module):
     in_feats : int
     out_feats : int
     num_heads : int
-    feat_drop : float
-    attn_drop : float
-    alpha : float
+    feat_drop : float, optional
+    attn_drop : float, optional
+    alpha : float, optional
     residual : bool, optional
     activation : callable activation function/layer or None, optional.
     """
@@ -247,9 +247,9 @@ class GATConv(nn.Module):
                  in_feats,
                  out_feats,
                  num_heads,
-                 feat_drop,
-                 attn_drop,
-                 alpha,
+                 feat_drop=0.,
+                 attn_drop=0.,
+                 alpha=0.2,
                  residual=False,
                  activation=None):
         super(GATConv, self).__init__()
@@ -259,8 +259,8 @@ class GATConv(nn.Module):
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
-        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else Identity()
-        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else Identity()
+        self.feat_drop = nn.Dropout(feat_drop) if feat_drop > 0 else Identity()
+        self.attn_drop = nn.Dropout(attn_drop) if attn_drop > 0 else Identity()
         self.leaky_relu = nn.LeakyReLU(alpha)
         self._residual = residual
         if residual:
@@ -304,7 +304,7 @@ class GATConv(nn.Module):
 
         # residual
         if self._residual:
-            resval = self.res_fc(h).view(feat.shape[0], -1, self._out_feats)
+            resval = self.res_fc(h).view(h.shape[0], -1, self._out_feats)
             rst = rst + resval
 
         # activation
@@ -607,8 +607,8 @@ class SAGEConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 feat_drop,
                  aggregator_type,
+                 feat_drop=0.,
                  bias=True,
                  norm=None,
                  activation=None):
@@ -1198,13 +1198,13 @@ class DenseSAGEConv(nn.Module):
     We recommend user to use this module when inducing GraphSAGE
     operations on dense graphs / k-hop graphs.
 
-    Note that we only support mean aggregator in DenseSAGEConv.
+    Note that we only support gcn aggregator in DenseSAGEConv.
 
     Parameters
     ----------
     in_feats : int
     out_feats : int
-    feat_drop : float
+    feat_drop : float, optional
     norm : bool
     bias : bool
     activation : callable activation function/layer or None, optional
@@ -1212,7 +1212,7 @@ class DenseSAGEConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 feat_drop,
+                 feat_drop=0.,
                  bias=True,
                  norm=None,
                  activation=None):
@@ -1222,8 +1222,7 @@ class DenseSAGEConv(nn.Module):
         self._norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
-        self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
-        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
+        self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -1232,11 +1231,9 @@ class DenseSAGEConv(nn.Module):
     def forward(self, feat, adj):
         adj = adj.float().to(feat.device)
         feat = self.feat_drop(feat)
-        h_self = feat
-        if self._aggre_type == 'mean':
-            in_degrees = adj.sum(dim=1).unsqueeze(-1)
-            h_neigh = (adj @ feat) / in_degrees.clamp(min=1)
-        rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+        in_degrees = adj.sum(dim=1).unsqueeze(-1)
+        h_neigh = (adj @ feat + feat) / (in_degrees + 1)
+        rst = self.fc(h_neigh)
         # activation
         if self.activation is not None:
             rst = self.activation(rst)
