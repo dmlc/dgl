@@ -41,10 +41,17 @@ Graph neural networks make it possible for a data-driven representation of molec
 molecular graph topology, which may be viewed as a learned fingerprint [3]. 
 
 ### Models
-- **Graph Convolutional Networks** [3], [6]: Graph Convolutional Networks (GCN) have been one of the most popular graph 
+- **Graph Convolutional Networks** [3], [9]: Graph Convolutional Networks (GCN) have been one of the most popular graph 
 neural networks and they can be easily extended for graph level prediction.
-- **Graph Attention Networks** [8]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
+- **Graph Attention Networks** [10]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
 explicitly modeling the interactions between adjacent atoms.
+- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
+the continuous-filter convolutional layers [4].   
+- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
+hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
+by the multilevel interactions [5].    
+- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) 
+as front end and Set2Set for output prediction [6].
 
 ## Generative Models
 
@@ -58,10 +65,10 @@ working with alternative representations like SMILES.
 
 Generative models are known to be difficult for evaluation. [GuacaMol](https://github.com/BenevolentAI/guacamol) and
 [MOSES](https://github.com/molecularsets/moses) have been two recent efforts to benchmark generative models. There
-are also two accompanying review papers that are well written [4], [5].
+are also two accompanying review papers that are well written [7], [8].
 
 ### Models
-- **Deep Generative Models of Graphs (DGMG)** [7]: A very general framework for graph distribution learning by 
+- **Deep Generative Models of Graphs (DGMG)** [11]: A very general framework for graph distribution learning by 
 progressively adding atoms and bonds.
 
 ## References
@@ -74,15 +81,25 @@ progressively adding atoms and bonds.
 [3] Duvenaud et al. (2015) Convolutional networks on graphs for learning molecular fingerprints. *Advances in neural 
 information processing systems (NeurIPS)*, 2224-2232.
 
-[4] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
+[4] Schütt et al. (2017) SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. 
+*Advances in Neural Information Processing Systems (NeurIPS)*, 992-1002.
+
+[5] Lu et al. Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
+*The 33rd AAAI Conference on Artificial Intelligence*. 
+
+[6] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference on 
+Machine Learning* JMLR. 1263-1272.
+
+[7] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
 1096-1108.
 
-[5] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*.
+[8] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
 
-[6] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
+[9] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
 *The International Conference on Learning Representations (ICLR)*. 
 
-[7] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
-
-[8] Veličković et al. (2018) Graph Attention Networks. 
+[10] Veličković et al. (2018) Graph Attention Networks. 
 *The International Conference on Learning Representations (ICLR)*. 
+
+[11] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
+
