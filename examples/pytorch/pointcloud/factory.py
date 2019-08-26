@@ -8,7 +8,7 @@ import scipy.sparse as ssp
 def pairwise_squared_distance(x):
     '''
     x : (n_samples, n_points, dims)
-    - : (n_samples, n_points, n_points)
+    return : (n_samples, n_points, n_points)
     '''
     x2s = (x * x).sum(-1, keepdim=True)
     return x2s + x2s.transpose(-1, -2) - 2 * x @ x.transpose(-1, -2)
@@ -21,8 +21,7 @@ class NearestNeighborGraph(nn.Module):
     def forward(self, h):
         '''
         h : (n_samples, n_points, dims)
-        segs : (n_samples,) LongTensor, sum to n_total_points
-        - : DGLGraph, 'x' contains the coordinates
+        return : DGLGraph, 'x' contains the coordinates
         '''
         n_samples, n_points, n_dims = h.shape
         gs = []
