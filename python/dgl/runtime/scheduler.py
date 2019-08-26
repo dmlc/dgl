@@ -106,7 +106,7 @@ def schedule_recv(graph,
         #   1) all recv nodes are 0-degree nodes
         #   2) no send has been called
         if apply_func is not None:
-            schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
+            schedule_apply_nodes(recv_nodes, apply_func, graph._node_frame, inplace)
     else:
         var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         # sort and unique the argument
@@ -210,7 +210,7 @@ def schedule_update_all(graph,
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph._number_of_dst_nodes()))
-            schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
+            schedule_apply_nodes(nodes, apply_func, graph._node_frame, inplace=False)
     else:
         eid = utils.toindex(slice(0, graph._number_of_edges())) # ALL
         recv_nodes = utils.toindex(slice(0, graph._number_of_dst_nodes())) # ALL
@@ -240,20 +240,20 @@ def schedule_update_all(graph,
                                        reduced_feat, apply_func)
         ir.WRITE_DICT_(var_dst_nf, final_feat)
 
-def schedule_apply_nodes(graph,
-                         v,
+def schedule_apply_nodes(v,
                          apply_func,
+                         node_frame,
                          inplace):
     """get apply nodes schedule
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
     v : utils.Index
         Nodes to apply
-    apply_func: callable
+    apply_func : callable
         The apply node function
+    node_frame : FrameRef
+        Node feature frame.
     inplace: bool
         If True, the update will be done in place
 
@@ -262,10 +262,10 @@ def schedule_apply_nodes(graph,
     A list of executors for DGL Runtime
     """
     var_v = var.IDX(v)
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_nf = var.FEAT_DICT(node_frame, name='nf')
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
-        nbatch = NodeBatch(graph, v, node_data)
+        nbatch = NodeBatch(v, node_data)
         return apply_func(nbatch)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
@@ -302,7 +302,7 @@ def schedule_nodeflow_apply_nodes(graph,
     var_v = var.IDX(v)
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
-        nbatch = NodeBatch(graph, v, node_data)
+        nbatch = NodeBatch(v, node_data)
         return apply_func(nbatch)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
@@ -315,8 +315,9 @@ def schedule_nodeflow_apply_nodes(graph,
 def schedule_apply_edges(graph,
                          u, v, eid,
                          apply_func,
+                         uframe, vframe, eframe,
                          inplace):
-    """get apply edges schedule
+    """Get apply edges schedule
 
     Parameters
     ----------
@@ -330,6 +331,12 @@ def schedule_apply_edges(graph,
         Ids of sending edges
     apply_func: callable
         The apply edge function
+    uframe : FrameRef
+        Feature data of u.
+    vframe : FrameRef
+        Feature data of v.
+    eframe : FrameRef
+        Feature data of e.
     inplace: bool
         If True, the update will be done in place
 
@@ -338,13 +345,12 @@ def schedule_apply_edges(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_src_nf = var.FEAT_DICT(graph._src_frame)
-    var_dst_nf = var.FEAT_DICT(graph._dst_frame)
-    var_ef = var.FEAT_DICT(graph._edge_frame)
+    var_src_nf = var.FEAT_DICT(uframe, 'uframe')
+    var_dst_nf = var.FEAT_DICT(vframe, 'vframe')
+    var_ef = var.FEAT_DICT(eframe, 'eframe')
     var_out = _gen_send(graph=graph, u=u, v=v, eid=eid, mfunc=apply_func,
                         var_src_nf=var_src_nf, var_dst_nf=var_dst_nf,
                         var_ef=var_ef)
-    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_eid = var.IDX(eid)
     # schedule apply edges
     if inplace:
@@ -452,7 +458,7 @@ def schedule_pull(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
+            schedule_apply_nodes(pull_nodes, apply_func, graph._node_frame, inplace)
     else:
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
@@ -702,7 +708,7 @@ def _apply_with_accum(graph, var_nodes, var_nf, var_accum, apply_func):
         v_nf = ir.UPDATE_DICT(v_nf, var_accum)
 
         def _afunc_wrapper(node_data):
-            nbatch = NodeBatch(graph, var_nodes.data, node_data)
+            nbatch = NodeBatch(var_nodes.data, node_data)
             return apply_func(nbatch)
         afunc = var.FUNC(_afunc_wrapper)
         applied_feat = ir.NODE_UDF(afunc, v_nf)
@@ -927,7 +933,7 @@ def _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc):
     fddst = ir.READ_ROW(var_dst_nf, v)
     fdedge = ir.READ_ROW(var_ef, eid)
     def _mfunc_wrapper(src_data, edge_data, dst_data):
-        ebatch = EdgeBatch(graph, (u.data, v.data, eid.data),
+        ebatch = EdgeBatch((u.data, v.data, eid.data),
                            src_data, edge_data, dst_data)
         return mfunc(ebatch)
     _mfunc_wrapper = var.FUNC(_mfunc_wrapper)
@@ -1003,6 +1009,5 @@ def _build_idx_map(idx, nbits):
     old_to_new = utils.to_nbits_int(old_to_new, nbits)
     old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
     return utils.CtxCachedObject(lambda ctx: nd.array(old_to_new, ctx=ctx))
-
 
 _init_api("dgl.runtime.scheduler")

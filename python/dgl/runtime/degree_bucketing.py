@@ -152,7 +152,7 @@ def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
             new_shape = (len(vbkt), deg) + F.shape(msg)[1:]
             return F.reshape(msg, new_shape)
         reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
-        nbatch = NodeBatch(graph, vbkt, node_data, reshaped_mail_data)
+        nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data)
         return reduce_udf(nbatch)
     return _rfunc_wrapper
 
@@ -302,7 +302,7 @@ def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
                                             edge_data.keys())
         reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data),
                                            dst_data.keys())
-        ebatch = EdgeBatch(graph, (u, v, eid), reshaped_src_data,
+        ebatch = EdgeBatch((u, v, eid), reshaped_src_data,
                            reshaped_edge_data, reshaped_dst_data)
         return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
     return _efunc_wrapper

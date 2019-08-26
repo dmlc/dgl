@@ -6,6 +6,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
+#from .graph import DGLGraph
 
 @register_object('graph.HeteroGraph')
 class HeteroGraphIndex(ObjectBase):
@@ -823,7 +824,7 @@ def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
         int(num_src), int(num_dst),
         indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
 
-def create_heterograph(metagraph, rel_graphs):
+def create_heterograph_from_relations(metagraph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
@@ -838,5 +839,43 @@ def create_heterograph(metagraph, rel_graphs):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+
+def create_heterograph_from_homo(graph):
+    """Create a heterograph from a homograph.
+
+    Node and edge types are stored as features. Each feature must be an integer
+    representing the type id.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        Input homogeneous graph.
+
+    Returns
+    -------
+    HeteroGraphIndex
+    """
+    # TODO
+    pass
+
+def create_heterograph(graph_data):
+    """Entry point of creating heterograph index from various type of
+    graph data.
+
+    Parameters
+    ----------
+    graph_data : graph data
+        Data to initialize graph structure.
+
+    Returns
+    -------
+    HeteroGraphIndex
+    """
+    if isinstance(graph_data, HeteroGraphIndex):
+        return graph_data
+    elif isinstance(graph_data, DGLGraph):
+        return create_heterograph_from_homo(graph_data)
+    else:
+        raise DGLError("Unsupported graph data type:", type(graph_data))
 
 _init_api("dgl.heterograph_index")

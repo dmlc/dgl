@@ -2089,9 +2089,9 @@ class DGLGraph(DGLBaseGraph):
         else:
             v = utils.toindex(v)
         with ir.prog() as prog:
-            scheduler.schedule_apply_nodes(graph=self,
-                                           v=v,
+            scheduler.schedule_apply_nodes(v=v,
                                            apply_func=func,
+                                           node_frame=self._node_frame,
                                            inplace=inplace)
             Runtime.run(prog)
 
@@ -2159,12 +2159,9 @@ class DGLGraph(DGLBaseGraph):
             u, v, _ = self._graph.find_edges(eid)
 
         with ir.prog() as prog:
-            scheduler.schedule_apply_edges(graph=self,
-                                           u=u,
-                                           v=v,
-                                           eid=eid,
-                                           apply_func=func,
-                                           inplace=inplace)
+            scheduler.schedule_apply_edges(self, u, v, eid, func,
+                                           self._node_frame, self._node_frame, self._edge_frame,
+                                           inplace)
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
@@ -3219,7 +3216,7 @@ class DGLGraph(DGLBaseGraph):
             v = utils.toindex(nodes)
 
         n_repr = self.get_n_repr(v)
-        nbatch = NodeBatch(self, v, n_repr)
+        nbatch = NodeBatch(v, n_repr)
         n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
@@ -3292,7 +3289,7 @@ class DGLGraph(DGLBaseGraph):
         src_data = self.get_n_repr(u)
         edge_data = self.get_e_repr(eid)
         dst_data = self.get_n_repr(v)
-        ebatch = EdgeBatch(self, (u, v, eid), src_data, edge_data, dst_data)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
         e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
