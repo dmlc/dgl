@@ -5,7 +5,7 @@
 import argparse
 import torch as th
 import torch.nn as nn
-from dgl.data import alchemy
+from dgl.data.chem import alchemy
 from dgl import model_zoo
 from torch.utils.data import DataLoader
 # from Alchemy_dataset import TencentAlchemyDataset, batcher
