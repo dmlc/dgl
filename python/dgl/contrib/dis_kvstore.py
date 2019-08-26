@@ -51,6 +51,8 @@ class KVServer(object):
 
     For KVServer, user can re-wriite UDF function for _push_handler and _pull_handler.
 
+    DO NOT use KVServer in multiple threads!
+
     Parameters
     ----------
     server_id : int
@@ -73,6 +75,7 @@ class KVServer(object):
         assert len(server_addr.split(':')) == 2, 'Incorrect IP format.'
         self._is_init = set()  # Contains tensor name
         self._data_store = {}  # Key is name string and value is tensor
+        self._barrier_count = 0;
         self._server_id = server_id
         self._client_namebook = client_namebook
         self._client_count = len(client_namebook)
@@ -127,6 +130,18 @@ class KVServer(object):
                     id=msg.id,
                     data=res_tensor)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
+            elif msg.type == KVMsgType.BARRIER:
+                self._barrier_count += 1
+                if self._barrier_count == self._client_count:
+                    back_msg = KVStoreMsg(
+                        type=KVMsgType.BARRIER,
+                        rank=self._server_id,
+                        name=None,
+                        id=None,
+                        data=None)
+                    for i in range(self._client_count):
+                        _send_kv_msg(self._sender, back_msg, i)
+                    self._barrier_count = 0
             elif msg.type == KVMsgType.FINAL:
                 print("Exit KVStore service, server ID: %d" % self.get_id())
                 break # exit loop
@@ -238,6 +253,8 @@ class KVClient(object):
       * push(name, id, data): push data to KVServer
       * pull(name, id): pull data from KVServer
       * shut_down(): shut down all KVServer nodes
+
+    DO NOT use KVClient in multiple threads!
 
     Parameters
     ----------
@@ -367,7 +384,7 @@ class KVClient(object):
     def push_all(self, name, data):
         """Push the whole data to KVServer
 
-        The push() API will partition message into different
+        The push_all() API will partition message into different
         KVServer nodes automatically.
 
         Parameters
@@ -447,8 +464,19 @@ class KVClient(object):
     
     def barrier(self):
         """Barrier for all client nodes
+
+        This API will be blocked untill all the clients call this API.
         """
-        pass
+        msg = KVStoreMsg( 
+            type=KVMsgType.BARRIER,
+            rank=self._client_id,
+            name=None,
+            id=None,
+            data=None)
+        # send message to server 0
+        _send_kv_msg(self._sender, msg, 0)
+        back_msg = _recv_kv_msg(self._receiver)
+        assert back_msg.type == KVMsgType.BARRIER, 'Recv kv msg error.'
 
     def shut_down(self):
         """Shutdown all KVServer nodes

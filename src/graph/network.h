@@ -46,21 +46,25 @@ enum MessageType {
    */
   kEndMsg = 1,
   /*!
-   * \brief Initialize KVServer
+   * \brief Initialize KVStore
    */
   kInitMsg = 2,
   /*!
-   * \brief Push msg to KVServer
+   * \brief Push msg to KVStore
    */
   kPushMsg = 3,
   /*!
-   * \brief Pull msg from KVServer
+   * \brief Pull msg from KVStore
    */
   kPullMsg = 4,
   /*!
-   * \brief PullBack msg from KVServer
+   * \brief PullBack msg from KVStore
    */
-  kPullBackMsg = 5
+  kPullBackMsg = 5,
+  /*!
+   * \brief Barrier msg for KVStore
+   */
+  kBarrierMsg = 6
 };
 
 /*!

@@ -187,6 +187,7 @@ class KVMsgType(Enum):
     PUSH = 3
     PULL = 4
     PULL_BACK = 5
+    BARRIER = 6
 
 KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
 """Message of DGL kvstore
@@ -226,7 +227,7 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id)
-    elif msg.type == KVMsgType.FINAL:
+    elif msg.type == KVMsgType.FINAL or msg.type == KVMsgType.BARRIER:
         _CAPI_SenderSendKVMsg(
             sender,
             int(recv_id),
@@ -270,7 +271,7 @@ def _recv_kv_msg(receiver):
             id=tensor_id,
             data=None)
         return msg
-    elif msg_type == KVMsgType.FINAL:
+    elif msg_type == KVMsgType.FINAL or msg_type == KVMsgType.BARRIER:
         msg = KVStoreMsg(
             type=msg_type,
             rank=rank,
