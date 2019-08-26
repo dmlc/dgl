@@ -17,6 +17,8 @@ __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
 
 class Identity(nn.Module):
     """A placeholder identity operator that is argument-insensitive.
+    (Identity has already been supported by PyTorch 1.2, we will directly
+    import torch.nn.Identity in the future)
 
     Args:
         args: any argument (unused)
@@ -185,7 +187,7 @@ class GraphConv(nn.Module):
         """
         graph = graph.local_var()
         if self._norm:
-            norm = th.pow(graph.in_degrees().float(), -0.5)
+            norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp).to(feat.device)
             feat = feat * norm
@@ -381,7 +383,7 @@ class TAGConv(nn.Module):
         """
         graph = graph.local_var()
 
-        norm = th.pow(graph.in_degrees().float(), -0.5)
+        norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
         shp = norm.shape + (1,) * (feat.dim() - 1)
         norm = th.reshape(norm, shp).to(feat.device)
 
@@ -589,7 +591,8 @@ class RelGraphConv(nn.Module):
 
 
 class SAGEConv(nn.Module):
-    r""" GraphSAGE layer from paper "".
+    r""" GraphSAGE layer from paper "Inductive Representation Learning on
+    Large Graphs".
 
     Parameters
     ----------
@@ -796,7 +799,7 @@ class GMMConv(nn.Module):
             self.register_buffer('bias', None)
 
     def reset_parameters(self):
-        # TODO(zihao) pay attention to the initialization of mu and sigma
+        # TODO(zihao) pay attention to the initialization of mu and inv_sigma
         pass
 
     def forward(self, feat, pseudo, graph):
@@ -820,22 +823,23 @@ class GMMConv(nn.Module):
 
 
 class GINConv(nn.Module):
-    """Graph Isomorphism Network layer from paper "How Powerful are Graph Neural Networks?"
+    """Graph Isomorphism Network layer from paper "How Powerful are Graph
+    Neural Networks?"
 
     Parameters
     ----------
-    nn : torch.nn.Module
+    apply_func : callable activation function/layer or None, optional
     aggregator_type : str
-    init_eps : float
-    learn_eps : bool
+    init_eps : float, optional
+    learn_eps : bool, optional
     """
     def __init__(self,
-                 nn,
+                 apply_func,
                  aggregator_type,
                  init_eps=0,
                  learn_eps=False):
         super(GINConv, self).__init__()
-        self.nn = nn
+        self.apply_func = apply_func
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'max':
@@ -854,12 +858,13 @@ class GINConv(nn.Module):
         graph = graph.local_var()
         graph.ndata['h'] = feat
         graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-        rst = self.nn((1 + self.eps) * feat + graph.ndata['neigh'])
+        rst = self.apply_func((1 + self.eps) * feat + graph.ndata['neigh'])
         return rst
 
 
 class ChebConv(nn.Module):
-    """Chebyshev Spectral Ggraph Convolution layer.
+    """Chebyshev Spectral Graph Convolution layer from paper "Convolutional
+    Neural Networks on Graphs with Fast Localized Spectral Filtering"
 
     Parameters
     ----------
@@ -898,7 +903,8 @@ class ChebConv(nn.Module):
         graph : DGLGraph or BatchedDGLGraph
         """
         with graph.local_scope():
-            norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
+            norm = th.pow(
+                graph.in_degrees().float().clamp(min=1), -0.5).unsqueeze(-1).to(feat.device)
             if lambda_max is None:
                 lambda_max = laplacian_lambda_max(graph)
             if isinstance(lambda_max, list):
@@ -932,7 +938,8 @@ class ChebConv(nn.Module):
 
 
 class SGConv(nn.Module):
-    """Simplifying Grpah Convolution layer.
+    """Simplifying Grpah Convolution layer from paper "Simplifying Graph
+     Convolutional Networks"
 
     Parameters
     ----------
@@ -966,7 +973,7 @@ class SGConv(nn.Module):
             feat = self._cached_h
         else:
             # compute normalization
-            degs = graph.in_degrees().float()
+            degs = graph.in_degrees().float().clamp(min=1)
             norm = th.pow(degs, -0.5)
             norm[th.isinf(norm)] = 0
             norm = norm.to(feat.device).unsqueeze(1)
@@ -985,13 +992,14 @@ class SGConv(nn.Module):
 
 
 class NNConv(nn.Module):
-    """Graph Convolution layer introduced in "Neural Message Passing for Quantum Chemistry".
+    """Graph Convolution layer introduced in "Neural Message Passing
+    for Quantum Chemistry".
 
     Parameters
     ----------
     in_feats : int
     out_feats : int
-    edge_nn : torch.nn.Module
+    edge_func : callable activation function/layer or None, optional
     aggregator_type : str
     residual : bool
     bias : bool, optional
@@ -999,14 +1007,14 @@ class NNConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 edge_nn,
+                 edge_func,
                  aggregator_type,
                  residual,
                  bias=True):
         super(NNConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.edge_nn = edge_nn
+        self.edge_nn = edge_func
         if aggregator_type == 'sum':
             self.reducer = fn.sum
         elif aggregator_type == 'mean':
@@ -1035,9 +1043,12 @@ class NNConv(nn.Module):
 
     def forward(self, feat, efeat, graph):
         graph = graph.local_var()
-        graph.ndata['h'] = feat.unsqueeze(-1) # (n, d_in, 1)
-        graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats) # (n, d_in, d_out)
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh')) # (n, d_in, d_out)
+        # (n, d_in, 1)
+        graph.ndata['h'] = feat.unsqueeze(-1)
+        # (n, d_in, d_out)
+        graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats)
+        # (n, d_in, d_out)
+        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
         rst = graph.ndata.pop('neigh').sum(dim=1) # (n, d_out)
         # residual connection
         if self.res_fc is not None:
@@ -1054,34 +1065,33 @@ class APPNPConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
-    out_feats : int
-    alpha : float
     k : int
+    alpha : float
     activation : callable activation function/layer or None, optional
     """
     def __init__(self,
-                 in_feats,
-                 out_feats,
-                 alpha,
                  k,
+                 alpha,
+                 edge_drop=0.,
                  activation=None):
-        # TODO(zihao): add edge dropout.
-        self._in_feats = in_feats
-        self._out_feats = out_feats
-        self._alpha = alpha
+        super(APPNPConv, self).__init__()
         self._k = k
+        self._alpha = alpha
         self._activation = activation
+        self.edge_drop = nn.Dropout(edge_drop) if edge_drop > 0 else Identity()
 
     def forward(self, feat, graph):
         graph = graph.local_var()
-        norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
+        norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+        norm = norm.unsqueeze(-1).to(feat.device)
         feat_0 = feat
         for _ in range(self._k):
             # normalization by src
             feat = feat * norm
             graph.ndata['h'] = feat
-            graph.update_all(fn.copy_src('h', 'm'),
+            graph.edata['w'] = self.edge_drop(
+                th.ones(graph.number_of_edges(), 1).to(feat.device))
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                              fn.sum('m', 'h'))
             feat = graph.ndata.pop('h')
             # normalization by dst
