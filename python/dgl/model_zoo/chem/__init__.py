@@ -2,6 +2,9 @@
 """Model Zoo Package"""
 
 from .gcn import GCNClassifier
+from .sch import SchNetModel
+from .mgcn import MGCNModel
+from .mpnn import MPNNModel
 from .dgmg import DGMG
 from .jtnn.jtnn import DGLJTNNVAE
 from .pretrain import load_pretrained
