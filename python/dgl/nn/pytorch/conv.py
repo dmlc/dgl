@@ -7,7 +7,7 @@ from torch.nn import init
 from . import utils
 from ... import function as fn
 
-__all__ = ['GraphConv', 'RelGraphConv']
+__all__ = ['GraphConv', 'TGConv', 'RelGraphConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -149,6 +149,95 @@ class GraphConv(nn.Module):
         if '_activation' in self.__dict__:
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
+
+class TGConv(nn.Module):
+    r"""Apply Topology Adaptive Graph Convolutional Network
+
+    .. math::
+        \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
+        \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
+
+    where :math:`\mathbf{A}` denotes the adjacency matrix and
+    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix.
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    out_feats : int
+        Number of output features.
+    k: int, optional
+        Number of hops :math: `k`. (default: 3)
+    bias: bool, optional
+        If True, adds a learnable bias to the output. Default: ``True``.
+    activation: callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
+
+    Attributes
+    ----------
+    lin : torch.Module
+        The learnable linear module.
+    """
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 k=2,
+                 bias=True,
+                 activation=None):
+        super(TGConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._k = k
+        self._activation = activation
+        self.lin = nn.Linear(in_feats * (self._k + 1), out_feats, bias=bias)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        self.lin.reset_parameters()
+
+    def forward(self, feat, graph):
+        r"""Compute graph convolution
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
+        graph = graph.local_var()
+
+        norm = th.pow(graph.in_degrees().float(), -0.5)
+        shp = norm.shape + (1,) * (feat.dim() - 1)
+        norm = th.reshape(norm, shp).to(feat.device)
+
+        #D-1/2 A D -1/2 X
+        fstack = [feat]
+        for _ in range(self._k):
+
+            rst = fstack[-1] * norm
+            graph.ndata['h'] = rst
+
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata['h']
+            rst = rst * norm
+            fstack.append(rst)
+
+        rst = self.lin(th.cat(fstack, dim=-1))
+
+        if self._activation is not None:
+            rst = self._activation(rst)
+
+        return rst
 
 class RelGraphConv(nn.Module):
     r"""Relational graph convolution layer.
