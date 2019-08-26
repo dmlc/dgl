@@ -222,7 +222,4 @@ class GATLayer(nn.Module):
         if self.activation is not None:
             new_feats = self.activation(new_feats)
 
-        if self.bn:
-            new_feats = self.bn_layer(new_feats)
-
         return new_feats
