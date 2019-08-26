@@ -89,15 +89,17 @@ class BaseGNNClassifier(nn.Module):
             Soft prediction for all tasks on the batch of molecules
         """
         # Update atom features with GNNs
-        bg = bg.local_var()
         for gnn in self.gnn_layers:
             feats = gnn(feats, bg)
 
         # Compute molecule features from atom features
-        bg.ndata['h'] = feats
         h_g_sum = self.weighted_sum_readout(feats, bg)
+        bg.ndata['h'] = feats
         h_g_max = dgl.max_nodes(bg, 'h')
         h_g = torch.cat([h_g_sum, h_g_max], dim=1)
+
+        # Todo (Mufei): replace the line below with a local var for BatchedDGLGraph
+        bg.ndata.pop('h')
 
         # Multi-task prediction
         return self.soft_classifier(h_g)

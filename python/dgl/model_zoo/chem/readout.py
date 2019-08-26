@@ -33,9 +33,12 @@ class WeightAndSum(nn.Module):
         FloatTensor of shape (B, self.in_feats)
             Representations for B molecules
         """
-        bg = bg.local_var()
         bg.ndata['h'] = feats
         bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
         h_g_sum = dgl.sum_nodes(bg, 'h', 'w')
+
+        # Todo (Mufei): replace the two lines below with a local var for BatchedDGLGraph
+        bg.ndata.pop('h')
+        bg.ndata.pop('w')
 
         return h_g_sum
