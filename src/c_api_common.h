@@ -55,11 +55,6 @@ enum BoolFlag {
 dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
     const std::vector<dgl::runtime::NDArray>& vec);
 
-/*!\brief Return whether the array is a valid 1D int array*/
-inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ndim == 1 && arr->dtype.code == kDLInt;
-}
-
 /*!
  * \brief Copy a vector to an int64_t NDArray.
  *

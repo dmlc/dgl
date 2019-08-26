@@ -69,6 +69,54 @@ def test_graph_conv():
     new_weight = conv.weight.data
     assert not F.allclose(old_weight, new_weight)
 
+def _S2AXWb(A, N, X, W, b):
+    X1 = X * N
+    X1 = th.matmul(A, X1.view(X1.shape[0], -1))
+    X1 = X1 * N
+    X2 = X1 * N
+    X2 = th.matmul(A, X2.view(X2.shape[0], -1))
+    X2 = X2 * N
+    X = th.cat([X, X1, X2], dim=-1)
+    Y = th.matmul(X, W.rot90())
+
+    return Y + b
+
+def test_tgconv():
+    g = dgl.DGLGraph(nx.path_graph(3))
+    ctx = F.ctx()
+    adj = g.adjacency_matrix(ctx=ctx)
+    norm = th.pow(g.in_degrees().float(), -0.5)
+
+    conv = nn.TGConv(5, 2, bias=True)
+    if F.gpu_ctx():
+        conv.cuda()
+    print(conv)
+
+    # test#1: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    shp = norm.shape + (1,) * (h0.dim() - 1)
+    norm = th.reshape(norm, shp).to(ctx)
+
+    assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.weight, conv.lin.bias))
+
+    conv = nn.TGConv(5, 2)
+    if F.gpu_ctx():
+        conv.cuda()
+    # test#2: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+
+    # test rest_parameters
+    old_weight = deepcopy(conv.lin.weight.data)
+    conv.reset_parameters()
+    new_weight = conv.lin.weight.data
+    assert not F.allclose(old_weight, new_weight)
+
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
 
@@ -260,6 +308,51 @@ def test_edge_softmax():
     assert len(g.edata) == 2
     assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
     
+def test_rgcn():
+    ctx = F.ctx()
+    etype = []
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    B = 2
+    I = 10
+    O = 8
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_bdd(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    # with norm
+    norm = th.zeros((g.number_of_edges(), 1)).to(ctx)
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B).to(ctx)
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_bdd(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    # id input
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B).to(ctx)
+    h = th.randint(0, I, (100,)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
 
 if __name__ == '__main__':
     test_graph_conv()
@@ -268,3 +361,4 @@ if __name__ == '__main__':
     test_glob_att_pool()
     test_simple_pool()
     test_set_trans()
+    test_rgcn()

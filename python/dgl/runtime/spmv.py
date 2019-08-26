@@ -1,11 +1,13 @@
 """Module for SPMV rules."""
 from __future__ import absolute_import
+from functools import partial
 
 from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import from_coo
+from ..graph_index import GraphIndex
+from ..heterograph_index import HeteroGraphIndex, create_bipartite_from_coo
 
 from . import ir
 from .ir import var
@@ -127,8 +129,8 @@ def build_gidx_and_mapping_graph(graph):
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph
+    graph : DGLGraph or DGLHeteroGraph
+        The homogeneous graph, or a bipartite view of the heterogeneous graph.
 
     Returns
     -------
@@ -141,10 +143,17 @@ def build_gidx_and_mapping_graph(graph):
         Number of ints needed to represent the graph
     """
     gidx = graph._graph
-    return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    if isinstance(gidx, GraphIndex):
+        return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    elif isinstance(gidx, HeteroGraphIndex):
+        return (partial(gidx.get_bipartite, graph._current_etype_idx),
+                None,
+                gidx.bits_needed(graph._current_etype_idx))
+    else:
+        raise TypeError('unknown graph index type %s' % type(gidx))
 
 
-def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
+def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
     """Build immutable graph index and mapping using the given (u, v) edges
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
@@ -155,8 +164,8 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
     ---------
     edge_tuples : tuple of three utils.Index
         A tuple of (u, v, eid)
-    num_nodes : int
-        The number of nodes.
+    num_src, num_dst : int
+        The number of source and destination nodes.
 
     Returns
     -------
@@ -169,10 +178,10 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
         Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
-    gidx = from_coo(num_nodes, u, v, None, True)
-    forward, backward = gidx.get_csr_shuffle_order()
+    gidx = create_bipartite_from_coo(num_src, num_dst, u, v)
+    forward, backward = gidx.get_csr_shuffle_order(0)
     eid = eid.tousertensor()
-    nbits = gidx.bits_needed()
+    nbits = gidx.bits_needed(0)
     forward_map = utils.to_nbits_int(eid[forward.tousertensor()], nbits)
     backward_map = utils.to_nbits_int(eid[backward.tousertensor()], nbits)
     forward_map = F.zerocopy_to_dgl_ndarray(forward_map)
@@ -180,7 +189,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
     edge_map = utils.CtxCachedObject(
         lambda ctx: (nd.array(forward_map, ctx=ctx),
                      nd.array(backward_map, ctx=ctx)))
-    return gidx.get_immutable_gidx, edge_map, nbits
+    return partial(gidx.get_bipartite, None), edge_map, nbits
 
 
 def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
@@ -212,6 +221,6 @@ def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
         eid = utils.toindex(eid)
     else:
         u, v, eid = edge_tuples
-    num_nodes = max(graph.layer_size(block_id), graph.layer_size(block_id + 1))
-    gidx, edge_map, nbits = build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+    num_src, num_dst = graph.layer_size(block_id), graph.layer_size(block_id + 1)
+    gidx, edge_map, nbits = build_gidx_and_mapping_uv((u, v, eid), num_src, num_dst)
     return gidx, edge_map, nbits
