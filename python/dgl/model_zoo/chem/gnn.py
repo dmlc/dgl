@@ -1,3 +1,5 @@
+# pylint: disable=C0103, E1101
+"""GNN layers for updating atom representations"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -70,7 +72,10 @@ class GCNLayer(nn.Module):
         return new_feats
 
 class GATConv(nn.Module):
-    """Apply multi-head graph attention over an input signal.
+    """
+    Apply multi-head graph attention over an input signal.
+
+    # Todo (Zihao): make this class part of nn module.
 
     Parameters
     ----------
@@ -100,8 +105,8 @@ class GATConv(nn.Module):
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(torch.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(torch.FloatTensor(size=(1, num_heads, out_feats)))
-        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else lambda x : x
-        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else lambda x : x
+        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else lambda x: x
+        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else lambda x: x
         self.leaky_relu = nn.LeakyReLU(alpha)
         self._residual = residual
         if residual:
@@ -200,8 +205,9 @@ class GATLayer(nn.Module):
     def __init__(self, in_feats, out_feats, num_heads, feat_drop, attn_drop,
                  alpha=0.2, residual=True, agg_mode='flatten', activation=None):
         super(GATLayer, self).__init__()
-        self.gnn = GATConv(in_feats=in_feats, out_feats=out_feats, num_heads=num_heads, feat_drop=feat_drop,
-                           attn_drop=attn_drop, alpha=alpha, residual=residual)
+        self.gnn = GATConv(in_feats=in_feats, out_feats=out_feats, num_heads=num_heads,
+                           feat_drop=feat_drop, attn_drop=attn_drop,
+                           alpha=alpha, residual=residual)
         assert agg_mode in ['flatten', 'mean']
         self.agg_mode = agg_mode
         self.activation = activation

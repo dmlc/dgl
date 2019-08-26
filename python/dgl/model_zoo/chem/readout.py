@@ -1,3 +1,5 @@
+# pylint: disable=C0103
+"""Modules for computing molecule representations out of atom representations"""
 import torch.nn as nn
 import dgl
 
