@@ -16,7 +16,8 @@ class Model(nn.Module):
         for i in range(self.num_layers):
             self.conv.append(EdgeConv(
                 feature_dims[i - 1] if i > 0 else input_dims,
-                feature_dims[i]))
+                feature_dims[i],
+                batch_norm=True))
 
         self.proj = nn.Linear(sum(feature_dims), emb_dims[0])
 
@@ -42,24 +43,6 @@ class Model(nn.Module):
 
         for i in range(self.num_layers):
             g = self.nng(h)
-            # Although the official implementation includes batch norm
-            # within EdgeConv, I choose to omit it for a number of reasons:
-            #
-            # (1) When the point clouds within each batch do not have the
-            #     same number of points, batch norm would not work.
-            #
-            # (2) Even if the point clouds always have the same number of
-            #     points, the points may as well be shuffled even with the
-            #     same (type of) object (and the official implementation
-            #     *does* shuffle the points of the same example for each
-            #     epoch).
-            #
-            #     For example, the first point of a point cloud of an
-            #     airplane does not always necessarily reside at its nose.
-            #
-            #     In this case, the learned statistics of each position
-            #     by batch norm is not as meaningful as those learned from
-            #     images.
             h = self.conv[i](g, h)
             h = F.leaky_relu(h, 0.2)
             hs.append(h.view(batch_size, n_points, -1))

@@ -25,6 +25,7 @@ class ModelNetDataset(Dataset):
     def __init__(self, modelnet, mode):
         super(ModelNetDataset, self).__init__()
         self.num_points = modelnet.num_points
+        self.mode = mode
 
         if mode == 'train':
             self.data = modelnet.f['train/data'][:modelnet.n_train]
@@ -36,11 +37,19 @@ class ModelNetDataset(Dataset):
             self.data = modelnet.f['test/data'].value
             self.label = modelnet.f['test/label'].value
 
+    def translate(self, x, scale=(2/3, 3/2), shift=(-0.2, 0.2)):
+        xyz1 = np.random.uniform(low=scale[0], high=scale[1], size=[3])
+        xyz2 = np.random.uniform(low=shift[0], high=shift[1], size=[3])
+        x = np.add(np.multiply(x, xyz1), xyz2).astype('float32')
+        return x
+
     def __len__(self):
         return self.data.shape[0]
 
     def __getitem__(self, i):
         x = self.data[i][:self.num_points]
         y = self.label[i]
-        np.random.shuffle(x)
+        if self.mode == 'train':
+            x = self.translate(x)
+            np.random.shuffle(x)
         return x, y

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 import dgl.function as fn
+import scipy.sparse as ssp
 
 def pairwise_squared_distance(x):
     '''
@@ -21,7 +22,7 @@ class NearestNeighborGraph(nn.Module):
         '''
         h : (n_samples, n_points, dims)
         segs : (n_samples,) LongTensor, sum to n_total_points
-        - : BatchedDGLGraph, 'x' contains the coordinates
+        - : DGLGraph, 'x' contains the coordinates
         '''
         n_samples, n_points, n_dims = h.shape
         gs = []
@@ -29,17 +30,17 @@ class NearestNeighborGraph(nn.Module):
         with torch.no_grad():
             d = pairwise_squared_distance(h)
             _, k_indices = d.topk(self.K, dim=2, largest=False)
-            k_indices = k_indices.cpu()
+            dst = k_indices.cpu()
 
-        src = (torch.zeros_like(k_indices[0]) + torch.arange(n_points)[:, None]).flatten()
+        src = torch.zeros_like(dst) + torch.arange(n_points)[None, :, None]
 
-        for i in range(n_samples):
-            dst = k_indices[i].flatten()
-            g = dgl.DGLGraph()
-            g.add_nodes(h.shape[1])
-            g.add_edges(dst, src)   # node receive message from nearest neighbors
-            g.readonly()
-            gs.append(g)
+        per_sample_offset = (torch.arange(n_samples) * n_points)[:, None, None]
+        dst += per_sample_offset
+        src += per_sample_offset
+        dst = dst.flatten()
+        src = src.flatten()
+        adj = ssp.csr_matrix((torch.ones_like(dst).numpy(), (dst.numpy(), src.numpy())))
 
-        gs = dgl.batch(gs)
-        return gs
+        g = dgl.DGLGraph(adj, readonly=True)
+
+        return g
