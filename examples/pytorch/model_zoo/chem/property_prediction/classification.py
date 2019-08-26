@@ -77,13 +77,15 @@ def main(args):
     model.to(args['device'])
 
     for epoch in range(args['num_epochs']):
+        # Train
         run_a_train_epoch(args, epoch, model, train_loader, loss_criterion, optimizer)
-        val_roc_auc = run_an_eval_epoch(args, model, val_loader)
 
+        # Validation and early stop
+        val_roc_auc = run_an_eval_epoch(args, model, val_loader)
+        early_stop = stopper.step(val_roc_auc, model)
         print('epoch {:d}/{:d}, validation roc-auc score {:.4f}, best validation roc-auc score {:.4f}'.format(
             epoch + 1, args['num_epochs'], val_roc_auc, stopper.best_score))
-
-        if stopper.step(val_roc_auc, model):
+        if early_stop:
             break
 
     test_roc_auc = run_an_eval_epoch(args, model, test_loader)
