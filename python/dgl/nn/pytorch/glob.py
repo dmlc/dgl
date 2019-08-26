@@ -249,6 +249,7 @@ class Set2Set(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         self.lstm.reset_parameters()
 
     def forward(self, feat, graph):

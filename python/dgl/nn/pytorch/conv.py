@@ -1,5 +1,5 @@
 """Torch modules for graph convolutions."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, C0103
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -20,12 +20,12 @@ class Identity(nn.Module):
     (Identity has already been supported by PyTorch 1.2, we will directly
     import torch.nn.Identity in the future)
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         super(Identity, self).__init__()
 
-    def forward(self, input):
+    def forward(self, x):
         """Return input"""
-        return input
+        return x
 
 
 class GraphConv(nn.Module):
@@ -171,7 +171,8 @@ class GraphConv(nn.Module):
 
 
 class GATConv(nn.Module):
-    r"""Apply graph attention over an input signal.
+    r"""Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
+    over an input signal.
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
@@ -180,9 +181,9 @@ class GATConv(nn.Module):
     node :math:`j`:
 
     .. math::
-        \alpha_{ij}^{l} = \mathrm{softmax_i} (e_{ij}^{l})
+        \alpha_{ij}^{l} & = \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h^{I} \| W h^{j}]\right)
+        e_{ij}^{l} & = \mathrm{LeakyReLU}\left(\vec{a}^T [W h^{I} \| W h^{j}]\right)
 
     Parameters
     ----------
@@ -272,7 +273,7 @@ class GATConv(nn.Module):
         graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
         # message passing
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
-                     fn.sum('m', 'ft'))
+                         fn.sum('m', 'ft'))
         rst = graph.ndata['ft']
         # residual
         if self.res_fc is not None:
@@ -285,11 +286,11 @@ class GATConv(nn.Module):
 
 
 class TAGConv(nn.Module):
-    r"""Apply Topology Adaptive Graph Convolutional Network
+    r"""Topology Adaptive Graph Convolutional layer from paper `Topology
+    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
         \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
-
         \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
 
     where :math:`\mathbf{A}` denotes the adjacency matrix and
@@ -526,9 +527,9 @@ class RelGraphConv(nn.Module):
             The graph.
         x : torch.Tensor
             Input node features. Could be either
-              - :math:`(|V|, D)` dense tensor
-              - :math:`(|V|,)` int64 vector, representing the categorical values of each
-                node. We then treat the input feature as an one-hot encoding feature.
+                * :math:`(|V|, D)` dense tensor
+                * :math:`(|V|,)` int64 vector, representing the categorical values of each
+                  node. We then treat the input feature as an one-hot encoding feature.
         etypes : torch.Tensor
             Edge type tensor. Shape: :math:`(|E|,)`
         norm : torch.Tensor
@@ -561,15 +562,17 @@ class RelGraphConv(nn.Module):
 
 
 class SAGEConv(nn.Module):
-    r"""GraphSAGE layer from paper "Inductive Representation Learning on
-    Large Graphs".
+    r"""GraphSAGE layer from paper `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
 
     .. math::
-        h_{\mathcal{N}(i)}^{(l+1)} = textsc{aggregate}\left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
+        h_{\mathcal{N}(i)}^{(l+1)} & = \mathrm{aggregate}
+        \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
 
-        h_{i}^{(l+1)} = \sigma \left(W \cdot \textsc{concat} (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1} + b) \right)
+        h_{i}^{(l+1)} & = \sigma \left(W \cdot \mathrm{concat}
+        (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1} + b) \right)
 
-        h_{i}^{(l+1)} = \textsc{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} & = \mathrm{norm}(h_{i}^{l})
 
     Parameters
     ----------
@@ -691,14 +694,15 @@ class SAGEConv(nn.Module):
 
 
 class GatedGraphConv(nn.Module):
-    """Gated Graph Convolution layer from paper ""
+    r"""Gated Graph Convolution layer from paper `Gated Graph Sequence
+    Neural Networks <https://arxiv.org/pdf/1511.05493.pdf>`__.
 
     .. math::
-        h_{i}^{0} = [ x_i \| \mathbf{0} ]
+        h_{i}^{0} & = [ x_i \| \mathbf{0} ]
 
-        a_{i}^{t} = \sum_{j\in\mathcal{N}(i)} W_{e_{ij}} h_{j}^{t}
+        a_{i}^{t} & = \sum_{j\in\mathcal{N}(i)} W_{e_{ij}} h_{j}^{t}
 
-        h_{i}^{t+1} = \textrm{GRU}(a_{i}^{t}, h_{i}^{t})
+        h_{i}^{t+1} & = \mathrm{GRU}(a_{i}^{t}, h_{i}^{t})
 
     Parameters
     ----------
@@ -770,13 +774,15 @@ class GatedGraphConv(nn.Module):
 
 
 class GMMConv(nn.Module):
-    """The Gaussian Mixture Model Convolution layer from "Geometric Deep
-    Learning on Graphs and Manifolds using Mixture Model CNNs”
+    r"""The Gaussian Mixture Model Convolution layer from `Geometric Deep
+    Learning on Graphs and Manifolds using Mixture Model CNNs
+    <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
 
     .. math::
-        h_i^{l+1} = \textsc{aggregate}\left(\left\{\frac{1}{K} \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
+        h_i^{l+1} & = \mathrm{aggregate}\left(\left\{\frac{1}{K}
+         \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
 
-        w_k(u) = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
+        w_k(u) & = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
 
     Parameters
     ----------
@@ -885,11 +891,13 @@ class GMMConv(nn.Module):
 
 
 class GINConv(nn.Module):
-    """Graph Isomorphism Network layer from paper "How Powerful are Graph
-    Neural Networks?"
+    r"""Graph Isomorphism Network layer from paper `How Powerful are Graph
+    Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__.
 
     .. math::
-        h_i^{(l+1)} = f_\Theta \left( (1 + \epsilon) h_i^{l} + \textsc{aggregate}\left(\left\{h_j^{l}, j\in\mathcal{N}(i)\right\}\right)\right)
+        h_i^{(l+1)} = f_\Theta \left((1 + \epsilon) h_i^{l} +
+        \mathrm{aggregate}\left(\left\{h_j^{l}, j\in\mathcal{N}(i)
+        \right\}\right)\right)
 
     Parameters
     ----------
@@ -955,19 +963,20 @@ class GINConv(nn.Module):
 
 
 class ChebConv(nn.Module):
-    """Chebyshev Spectral Graph Convolution layer from paper "Convolutional
-    Neural Networks on Graphs with Fast Localized Spectral Filtering"
+    r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    Neural Networks on Graphs with Fast Localized Spectral Filtering
+    <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
     .. math::
-        h_i^{l+1} = \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
+        h_i^{l+1} & = \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
 
-        Z^{0, l} = H^{l}
+        Z^{0, l} & = H^{l}
 
-        Z^{1, l} = \hat{L} \cdot H^{l}
+        Z^{1, l} & = \hat{L} \cdot H^{l}
 
-        Z^{k, l} = 2 \hat{L} Z^{k-1, l} - Z^{k-2, l}
+        Z^{k, l} & = 2 \hat{L} Z^{k-1, l} - Z^{k-2, l}
 
-        \hat{L} = 2(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})/\lambda_{max} - I
+        \hat{L} & = 2(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})/\lambda_{max} - I
 
     Parameters
     ----------
@@ -1067,11 +1076,11 @@ class ChebConv(nn.Module):
 
 
 class SGConv(nn.Module):
-    """Simplifying Grpah Convolution layer from paper "Simplifying Graph
-     Convolutional Networks"
+    r"""Simplifying Graph Convolution layer from paper `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
 
     .. math::
-        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} W^{l}
+        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} \Theta^{l}
 
     Parameters
     ----------
@@ -1083,7 +1092,10 @@ class SGConv(nn.Module):
         Number of hops :math:`K`. Defaults:``1``.
     cached : bool
         If True, the module would cache
-        :math:`(\hat{D}^{-\frac{1}{2}\hat{A}\hat{D}^{-\frac{1}{2}})^K x`
+
+        .. math::
+            (\hat{D}^{-\frac{1}{2}}\hat{A}\hat{D}^{-\frac{1}{2}})^K X\Theta
+
         at the first forward call. This parameter should only be set to
         ``True`` in Transductive Learning setting.
     bias : bool
@@ -1147,11 +1159,12 @@ class SGConv(nn.Module):
 
 
 class NNConv(nn.Module):
-    """Graph Convolution layer introduced in "Neural Message Passing
-    for Quantum Chemistry".
+    r"""Graph Convolution layer introduced in `Neural Message Passing
+    for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__.
 
     .. math::
-        h_{i}^{l+1} = h_{i}^{l} + \textsc{aggregate}\left(\left\{f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i)\right\}\right)
+        h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
+        f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i) \right\}\right)
 
     Parameters
     ----------
@@ -1250,13 +1263,15 @@ class NNConv(nn.Module):
 
 
 class APPNPConv(nn.Module):
-    """Approximate Personalized Propagation of Neural Predictions layer from
-    paper "Predict then Propagate: Graph Neural Networks meet Personalized PageRank".
+    r"""Approximate Personalized Propagation of Neural Predictions
+    layer from paper `Predict then Propagate: Graph Neural Networks
+    meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
 
     .. math::
-        H^{0} = X
+        H^{0} & = X
 
-        H^{t+1} = (1-\alpha)\left(\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2} H^{t} + \alpha H^{0}\right)
+        H^{t+1} & = (1-\alpha)\left(\hat{D}^{-1/2}
+        \hat{A} \hat{D}^{-1/2} H^{t} + \alpha H^{0}\right)
 
     Parameters
     ----------
@@ -1314,8 +1329,9 @@ class APPNPConv(nn.Module):
 
 
 class AGNNConv(nn.Module):
-    """Attention-based Graph Neural Network layer from paper "Attention-based
-     Graph Neural Network for Semi-Supervised Learning"
+    r"""Attention-based Graph Neural Network layer from paper `Attention-based
+    Graph Neural Network for Semi-Supervised Learning
+    <https://arxiv.org/abs/1803.03735>`__.
 
     .. math::
         H^{l+1} = P H^{l}
@@ -1323,7 +1339,7 @@ class AGNNConv(nn.Module):
     where :math:`P` is computed as:
 
     .. math::
-        P_{ij} = \textrm{softmax}_i (\beta \cdot \cos(h_i^l, h_j^l))
+        P_{ij} = \mathrm{softmax}_i ( \beta \cdot \cos(h_i^l, h_j^l))
 
     Parameters
     ----------
