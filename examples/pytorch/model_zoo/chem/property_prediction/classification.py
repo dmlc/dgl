@@ -90,7 +90,8 @@ def main(args):
         if early_stop:
             break
 
-    stopper.load_checkpoint(model)
+    if not args['pre_trained']:
+        stopper.load_checkpoint(model)
     test_roc_auc = run_an_eval_epoch(args, model, test_loader)
     print('test roc-auc score {:.4f}'.format(test_roc_auc))
 
