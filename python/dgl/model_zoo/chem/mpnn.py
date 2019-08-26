@@ -103,7 +103,7 @@ class MPNNModel(nn.Module):
                  edge_hidden_dim=128,
                  num_step_message_passing=6,
                  num_step_set2set=6,
-                 num_layer_set2set=1):
+                 num_layer_set2set=3):
         """model parameters setting
 
         Args:
