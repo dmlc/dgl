@@ -16,11 +16,10 @@ Run with the following procedures:
 
 2, Run the following command:
 ```bash
-python metapath2vec.py --input_file "aminer.txt" --output_file "your_output_file_path"
+python metapath2vec.py --download "where/you/want/to/download" --output_file "your_output_file_path"
 ```
-aminer.txt file is available here: [https://drive.google.com/drive/my-drive]
 
-Tips: Adapt num_workers based on your GPU instances; Running 3 or 4 epochs is actually enough. 
+Tips: Change num_workers based on your GPU instances; Running 3 or 4 epochs is actually enough. 
 
 Tricks included in the implementation:
 -------
