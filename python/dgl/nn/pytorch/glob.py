@@ -178,9 +178,10 @@ class GlobalAttentionPooling(nn.Module):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         for p in self.gate_nn.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -256,12 +257,11 @@ class Set2Set(nn.Module):
         self.n_iters = n_iters
         self.n_layers = n_layers
         self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
-        for p in self.lstm.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        self.lstm.reset_parameters()
 
     def forward(self, feat, graph):
         r"""Compute set2set pooling.
@@ -342,9 +342,10 @@ class MultiHeadAttention(nn.Module):
         self.dropa = nn.Dropout(dropouta)
         self.norm_in = nn.LayerNorm(d_model)
         self.norm_inter = nn.LayerNorm(d_model)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -441,9 +442,10 @@ class InducedSetAttentionBlock(nn.Module):
         self.mha = nn.ModuleList([
             MultiHeadAttention(d_model, num_heads, d_head, d_ff,
                                dropouth=dropouth, dropouta=dropouta) for _ in range(2)])
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.inducing_points)
 
     def forward(self, feat, lengths):
@@ -492,9 +494,10 @@ class PMALayer(nn.Module):
             nn.Dropout(dropouth),
             nn.Linear(d_ff, d_model)
         )
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.seed_vectors)
 
     def forward(self, feat, lengths):
