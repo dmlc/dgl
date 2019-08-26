@@ -1,6 +1,5 @@
 """MXNet modules for graph global pooling."""
 # pylint: disable= no-member, arguments-differ, C0103, W0235
-import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 
@@ -191,13 +190,6 @@ class GlobalAttentionPooling(nn.Block):
             self.gate_nn = gate_nn
             self.feat_nn = feat_nn
 
-        self._reset_parameters()
-
-    def _reset_parameters(self):
-        self.gate_nn.initialize(mx.init.Xavier())
-        if self.feat_nn:
-            self.feat_nn.initialize(mx.init.Xavier())
-
     def forward(self, feat, graph):
         r"""Compute global attention pooling.
 
@@ -265,10 +257,6 @@ class Set2Set(nn.Block):
         with self.name_scope():
             self.lstm = gluon.rnn.LSTM(
                 self.input_dim, num_layers=n_layers, input_size=self.output_dim)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        self.lstm.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):
         r"""Compute set2set pooling.

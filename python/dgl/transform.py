@@ -2,7 +2,7 @@
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .graph_index import from_coo
-from .batched_graph import BatchedDGLGraph
+from .batched_graph import BatchedDGLGraph, unbatch
 from .backend import asnumpy
 import numpy as np
 from scipy import sparse
@@ -32,13 +32,13 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-def _duplicate(arr, times):
-    """Duplicate arr[i]
+def _duplicate(arr, t):
+    """Duplicate arr[i] for t[i] times and append them to end of returned array.
 
     Parameters
     ----------
     arr : numpy.ndarray
-    times : numpy.ndarray
+    t : numpy.ndarray
 
     Returns
     -------
@@ -47,17 +47,24 @@ def _duplicate(arr, times):
     n = len(arr)
     lengths = 0
     for i in range(n):
-        lengths += times[i]
+        lengths += t[i]
     rst = np.empty(shape=(lengths), dtype=np.int64)
     cnt = 0
     for i in range(n):
-        for j in range(times[i]):
+        for j in range(t[i]):
             rst[cnt] = arr[i]
             cnt += 1
     return rst
 
 def khop_adj(g, k):
-    """"""
+    """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+    k : int
+        The :math:`k` in :math:`A^k`.
+    """
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
     return adj_k.todense()
 
@@ -231,13 +238,31 @@ def laplacian_lambda_max(g):
 
     Parameters
     ----------
-    g : DGLGraph
+    g : DGLGraph or BatchedDGLGraph
         The input graph.
+
+    Returns
+    -------
+    list :
+        If the input g is a DGLGraph, the returned value would be
+        a list with one element, indicating the largest eigenvalue of g.
+        If the input g is a BatchedDGLGraph, the returned value would
+        be a list, where the i-th item indicates the largest eigenvalue
+        of i-th graph in g.
     """
-    n = g.number_of_nodes()
-    adj = g.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
-    norm = sparse.diags(asnumpy(g.in_degrees()) ** -0.5, dtype=float)
-    laplacian = sparse.eye(n) - norm * adj * norm
-    return sparse.linalg.eigs(laplacian, 1, which='LM', return_eigenvectors=False)[0].real
+    if isinstance(g, BatchedDGLGraph):
+        g_arr = unbatch(g)
+    else:
+        g_arr = [g]
+
+    rst = []
+    for g_i in g_arr:
+        n = g_i.number_of_nodes()
+        adj = g_i.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
+        norm = sparse.diags(asnumpy(g_i.in_degrees()) ** -0.5, dtype=float)
+        laplacian = sparse.eye(n) - norm * adj * norm
+        rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
+                                      return_eigenvectors=False)[0].real)
+    return rst
 
 _init_api("dgl.transform")

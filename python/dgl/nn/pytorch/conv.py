@@ -5,14 +5,15 @@ from torch import nn
 from torch.nn import init
 import torch.nn.functional as F
 
+from . import utils
 from ... import function as fn
+from ...batched_graph import broadcast_nodes
 from ...transform import laplacian_lambda_max
 from .softmax import edge_softmax
 
-__all__ = ['GraphConv', 'GATConv', 'SAGEConv',
+__all__ = ['GraphConv', 'GATConv', 'TGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv',
-           'SplineConv', 'AGNNConv', 'GMMConv', 'NNConv',
-           'DenseGCNConv', 'DenseSAGEConv']
+           'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -202,7 +203,7 @@ class GraphConv(nn.Module):
         if '_activation' in self.__dict__:
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
-    
+
 
 class GATConv(nn.Module):
     r"""Apply graph attention over an input signal.
@@ -284,6 +285,280 @@ class GATConv(nn.Module):
     def extra_repr(self):
         pass
 
+
+class TGConv(nn.Module):
+    r"""Apply Topology Adaptive Graph Convolutional Network
+
+    .. math::
+        \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
+        \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
+
+    where :math:`\mathbf{A}` denotes the adjacency matrix and
+    :math:`D_{ii} = \sum_{j=0} A_{ij}` its diagonal degree matrix.
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    out_feats : int
+        Number of output features.
+    k: int, optional
+        Number of hops :math: `k`. (default: 3)
+    bias: bool, optional
+        If True, adds a learnable bias to the output. Default: ``True``.
+    activation: callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
+
+    Attributes
+    ----------
+    lin : torch.Module
+        The learnable linear module.
+    """
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 k=2,
+                 bias=True,
+                 activation=None):
+        super(TGConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._k = k
+        self._activation = activation
+        self.lin = nn.Linear(in_feats * (self._k + 1), out_feats, bias=bias)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        self.lin.reset_parameters()
+
+    def forward(self, feat, graph):
+        r"""Compute graph convolution
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature
+        """
+        graph = graph.local_var()
+
+        norm = th.pow(graph.in_degrees().float(), -0.5)
+        shp = norm.shape + (1,) * (feat.dim() - 1)
+        norm = th.reshape(norm, shp).to(feat.device)
+
+        #D-1/2 A D -1/2 X
+        fstack = [feat]
+        for _ in range(self._k):
+
+            rst = fstack[-1] * norm
+            graph.ndata['h'] = rst
+
+            graph.update_all(fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'))
+            rst = graph.ndata['h']
+            rst = rst * norm
+            fstack.append(rst)
+
+        rst = self.lin(th.cat(fstack, dim=-1))
+
+        if self._activation is not None:
+            rst = self._activation(rst)
+
+        return rst
+
+class RelGraphConv(nn.Module):
+    r"""Relational graph convolution layer.
+
+    Relational graph convolution is introduced in "`Modeling Relational Data with Graph
+    Convolutional Networks <https://arxiv.org/abs/1703.06103>`__"
+    and can be described as below:
+
+    .. math::
+
+      h_i^{(l+1)} = \sigma(\sum_{r\in\mathcal{R}}
+      \sum_{j\in\mathcal{N}^r(i)}\frac{1}{c_{i,r}}W_r^{(l)}h_j^{(l)}+W_0^{(l)}h_i^{(l)})
+
+    where :math:`\mathcal{N}^r(i)` is the neighbor set of node :math:`i` w.r.t. relation
+    :math:`r`. :math:`c_{i,r}` is the normalizer equal
+    to :math:`|\mathcal{N}^r(i)|`. :math:`\sigma` is an activation function. :math:`W_0`
+    is the self-loop weight.
+
+    The basis regularization decomposes :math:`W_r` by:
+
+    .. math::
+
+      W_r^{(l)} = \sum_{b=1}^B a_{rb}^{(l)}V_b^{(l)}
+
+    where :math:`B` is the number of bases.
+
+    The block-diagonal-decomposition regularization decomposes :math:`W_r` into :math:`B`
+    number of block diagonal matrices. We refer :math:`B` as the number of bases.
+
+    Parameters
+    ----------
+    in_feat : int
+        Input feature size.
+    out_feat : int
+        Output feature size.
+    num_rels : int
+        Number of relations.
+    regularizer : str
+        Which weight regularizer to use "basis" or "bdd"
+    num_bases : int, optional
+        Number of bases. If is none, use number of relations. Default: None.
+    bias : bool, optional
+        True if bias is added. Default: True
+    activation : callable, optional
+        Activation function. Default: None
+    self_loop : bool, optional
+        True to include self loop message. Default: False
+    dropout : float, optional
+        Dropout rate. Default: 0.0
+    """
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 num_rels,
+                 regularizer="basis",
+                 num_bases=None,
+                 bias=True,
+                 activation=None,
+                 self_loop=False,
+                 dropout=0.0):
+        super(RelGraphConv, self).__init__()
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.num_rels = num_rels
+        self.regularizer = regularizer
+        self.num_bases = num_bases
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases < 0:
+            self.num_bases = self.num_rels
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+
+        if regularizer == "basis":
+            # add basis weights
+            self.weight = nn.Parameter(th.Tensor(self.num_bases, self.in_feat, self.out_feat))
+            if self.num_bases < self.num_rels:
+                # linear combination coefficients
+                self.w_comp = nn.Parameter(th.Tensor(self.num_rels, self.num_bases))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            if self.num_bases < self.num_rels:
+                nn.init.xavier_uniform_(self.w_comp,
+                                        gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.basis_message_func
+        elif regularizer == "bdd":
+            if in_feat % num_bases != 0 or out_feat % num_bases != 0:
+                raise ValueError('Feature size must be a multiplier of num_bases.')
+            # add block diagonal weights
+            self.submat_in = in_feat // self.num_bases
+            self.submat_out = out_feat // self.num_bases
+
+            # assuming in_feat and out_feat are both divisible by num_bases
+            self.weight = nn.Parameter(th.Tensor(
+                self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+            # message func
+            self.message_func = self.bdd_message_func
+        else:
+            raise ValueError("Regularizer must be either 'basis' or 'bdd'")
+
+        # bias
+        if self.bias:
+            self.h_bias = nn.Parameter(th.Tensor(out_feat))
+            nn.init.zeros_(self.h_bias)
+
+        # weight for self loop
+        if self.self_loop:
+            self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
+            nn.init.xavier_uniform_(self.loop_weight,
+                                    gain=nn.init.calculate_gain('relu'))
+
+        self.dropout = nn.Dropout(dropout)
+
+    def basis_message_func(self, edges):
+        """Message function for basis regularizer"""
+        if self.num_bases < self.num_rels:
+            # generate all weights from bases
+            weight = self.weight.view(self.num_bases,
+                                      self.in_feat * self.out_feat)
+            weight = th.matmul(self.w_comp, weight).view(
+                self.num_rels, self.in_feat, self.out_feat)
+        else:
+            weight = self.weight
+
+        msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
+        if 'norm' in edges.data:
+            msg = msg * edges.data['norm']
+        return {'msg': msg}
+
+    def bdd_message_func(self, edges):
+        """Message function for block-diagonal-decomposition regularizer"""
+        if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
+            raise TypeError('Block decomposition does not allow integer ID feature.')
+        weight = self.weight.index_select(0, edges.data['type']).view(
+            -1, self.submat_in, self.submat_out)
+        node = edges.src['h'].view(-1, 1, self.submat_in)
+        msg = th.bmm(node, weight).view(-1, self.out_feat)
+        if 'norm' in edges.data:
+            msg = msg * edges.data['norm']
+        return {'msg': msg}
+
+    def forward(self, g, x, etypes, norm=None):
+        """Forward computation
+
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph.
+        x : torch.Tensor
+            Input node features. Could be either
+              - (|V|, D) dense tensor
+              - (|V|,) int64 vector, representing the categorical values of each
+                node. We then treat the input feature as an one-hot encoding feature.
+        etypes : torch.Tensor
+            Edge type tensor. Shape: (|E|,)
+        norm : torch.Tensor
+            Optional edge normalizer tensor. Shape: (|E|, 1)
+
+        Returns
+        -------
+        torch.Tensor
+            New node features.
+        """
+        g = g.local_var()
+        g.ndata['h'] = x
+        g.edata['type'] = etypes
+        if norm is not None:
+            g.edata['norm'] = norm
+        if self.self_loop:
+            loop_message = utils.matmul_maybe_select(x, self.loop_weight)
+
+        # message passing
+        g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
+
+        # apply bias and activation
+        node_repr = g.ndata['h']
+        if self.bias:
+            node_repr = node_repr + self.h_bias
+        if self.self_loop:
+            node_repr = node_repr + loop_message
+        if self.activation:
+            node_repr = self.activation(node_repr)
+        node_repr = self.dropout(node_repr)
+
+        return node_repr
 
 class SAGEConv(nn.Module):
     r"""Apply GraphSAGE layer over an input signal.
@@ -403,7 +678,7 @@ class GatedGraphConv(nn.Module):
         super(GatedGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.n_layers = n_layers
+        self._n_layers = n_layers
         self._aggre_type = aggregator_type
         self.fc = nn.ModuleList([nn.Linear(out_feats, out_feats, bias=False)])
         self.gru = nn.GRUCell(out_feats, out_feats, bias=bias)
@@ -413,12 +688,19 @@ class GatedGraphConv(nn.Module):
         self.gru.reset_parameters()
 
     def forward(self, feat, graph):
+        # TODO(zihao): add edge weight
         graph = graph.local_var()
         zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
         feat = th.cat([feat, zero_pad], -1)
 
-        for _ in range(self.n_layers):
-            pass
+        for i in range(self._n_layers):
+            graph.ndata['wx'] = self.fc[i](feat)
+            graph.update_all(fn.copy_u('wx', 'm'),
+                             fn.sum('m', 'm'))
+            m = graph.ndata.pop('m')
+            feat = self.gru(m, feat)
+
+        return feat
 
 
 class GINConv(nn.Module):
@@ -434,10 +716,6 @@ class GINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        pass # TODO
 
     def forward(self, feat, graph):
         graph = graph.local_var()
@@ -453,28 +731,66 @@ class GINConv(nn.Module):
         return rst
 
 
-class ChebNet(nn.Module):
+class ChebConv(nn.Module):
+    """Apply Chebyshev spectral graph convolution layer on the graph.
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
                  k,
                  bias=False):
-        super(ChebNet, self).__init__()
+        super(ChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self.fc = nn.ModuleList([
             nn.Linear(in_feats, out_feats, bias=False) for _ in range(k)
         ])
-        self.k = k
+        self._k = k
+        if bias:
+            self.bias = nn.Parameter(th.Tensor(out_feats))
+        else:
+            self.register_buffer('bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
         pass
 
     def forward(self, feat, graph, lambda_max=None):
+        """
+        graph : DGLGraph or BatchedDGLGraph
+        """
+        graph = graph.local_var()
+        norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
         if lambda_max is None:
             lambda_max = laplacian_lambda_max(graph)
+        if isinstance(lambda_max, list):
+            lambda_max = th.Tensor(lambda_max).to(feat.device)
+        if lambda_max.dim() < 1:
+            lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
 
+        # 2 / lambda_max, and broadcast from (B, 1) to (N, 1)
+        laplacian_norm = 2. / broadcast_nodes(graph, lambda_max)
+
+        Tx_0 = feat
+        rst = self.fc[0](Tx_0)
+
+        if self._k > 1:
+            graph.ndata['h'] = Tx_0 * norm
+            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            Tx_1 = (graph.ndata.pop('h') * norm) * laplacian_norm - Tx_0
+            rst = rst + self.fc[1](Tx_1)
+
+        for i in range(2, self._k):
+            graph.ndata['h'] = Tx_1 * norm
+            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            Tx_2 = 2 * ((graph.ndata.pop('h') * norm) * laplacian_norm - Tx_1) - Tx_0
+            rst = rst + self.fc[i](Tx_2)
+            Tx_1, Tx_0 = Tx_2, Tx_1
+
+        if self.bias:
+            rst = rst + self.bias
+
+        return rst
 
 
 class SGConv(nn.Module):
@@ -488,7 +804,7 @@ class SGConv(nn.Module):
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
         self._cached_h = None
-        self.k = k
+        self._k = k
         # TODO(zihao): add normalization
 
     def forward(self, feat, graph):
@@ -502,7 +818,7 @@ class SGConv(nn.Module):
             norm[th.isinf(norm)] = 0
             norm = norm.to(feat.device).unsqueeze(1)
             # compute (D^-1 A D) X
-            for _ in range(self.k):
+            for _ in range(self._k):
                 feat = feat * norm
                 graph.ndata['h'] = feat
                 graph.update_all(fn.copy_u('h', 'm'),
@@ -542,6 +858,7 @@ class NNConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        # TODO(zihao): initialize root and bias
         pass
 
     def forward(self, feat, efeat, graph):
@@ -561,34 +878,32 @@ class APPNPConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 feat_drop,
-                 edge_drop,
                  alpha,
                  k,
-                 activation,
-                 bias=True):
+                 activation=None):
+        # TODO(zihao): add edge dropout.
         self._in_feats = in_feats
         self._out_feats = out_feats
+        self._alpha = alpha
         self._k = k
         self._activation = activation
 
     def forward(self, feat, graph):
-        pass
+        graph = graph.local_var()
+        norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
+        feat_0 = feat
+        for _ in range(self._k):
+            # normalization by src
+            feat = feat * norm
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_src('h', 'm'),
+                             fn.sum('m', 'h'))
+            feat = graph.ndata.pop('h')
+            # normalization by dst
+            feat = feat * norm
+            feat = (1 - self._alpha) * feat + self._alpha * feat_0
+        return feat
 
-
-class GMMConv(nn.Module):
-    def __init__(self):
-        pass
-
-    def forward(self, feat, graph):
-        pass
-
-class SplineConv(nn.Module):
-    def __init__(self):
-        pass
-
-    def forward(self, feat, graph):
-        pass
 
 class AGNNConv(nn.Module):
     def __init__(self,
