@@ -45,7 +45,9 @@ a real difference.
 
 #### GAT on Tox21
 
-
+| Source           | Averaged ROC-AUC Score |
+| ---------------- | ---------------------- |
+| Pretrained model | 0.827                  |
 
 ## Dataset Customization
 
