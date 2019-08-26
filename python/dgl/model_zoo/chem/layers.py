@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=C0103, E1101
+# pylint: disable=C0103, E1101, C0111
 """
 The implementation of neural network layers used in SchNet and MGCN.
 """
@@ -287,7 +287,7 @@ class MultiLevelInteraction(nn.Module):
 
     def forward(self, g, level=1):
         """
-        MultiLevel Interaction Layer forward.  
+        MultiLevel Interaction Layer forward.
         Args:
             g: DGLGraph
             level: current level of this layer
