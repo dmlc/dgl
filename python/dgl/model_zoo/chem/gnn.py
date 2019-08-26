@@ -186,23 +186,15 @@ class GATLayer(nn.Module):
         all head results
     activation : activation function or None
         Activation function applied to aggregated multi-head results. Default to be None.
-    batchnorm : bool
-        Whether to use batch normalization on the output,
-        default to be True
     """
     def __init__(self, in_feats, out_feats, num_heads, feat_drop, attn_drop,
-                 alpha=0.2, residual=True, agg_mode='flatten', activation=None, batchnorm=True):
+                 alpha=0.2, residual=True, agg_mode='flatten', activation=None):
         super(GATLayer, self).__init__()
         self.gnn = GATConv(in_feats=in_feats, out_feats=out_feats, num_heads=num_heads, feat_drop=feat_drop,
                            attn_drop=attn_drop, alpha=alpha, residual=residual)
         assert agg_mode in ['flatten', 'mean']
         self.agg_mode = agg_mode
         self.activation = activation
-        self.bn = batchnorm
-        if batchnorm:
-            if agg_mode == 'flatten':
-                out_feats = out_feats * num_heads
-            self.bn_layer = nn.BatchNorm1d(out_feats)
 
     def forward(self, feats, bg):
         """Update atom representations
