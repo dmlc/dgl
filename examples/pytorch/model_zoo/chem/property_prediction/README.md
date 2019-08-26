@@ -73,7 +73,7 @@ The model option must be one of 'sch', 'mgcn' or 'mpnn'.
 |-------------|-------------------------|
 |SchNet[3]    |0.065|
 |MGCN[4]      |0.050|
-|MPNN[5]      |0.090|
+|MPNN[5]      |0.056|
 
 ## References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.
