@@ -11,9 +11,31 @@ from ...batched_graph import broadcast_nodes
 from ...transform import laplacian_lambda_max
 from .softmax import edge_softmax
 
-__all__ = ['GraphConv', 'GATConv', 'TGConv', 'RelGraphConv', 'SAGEConv',
+__all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
+
+class Identity(nn.Module):
+    """A placeholder identity operator that is argument-insensitive.
+
+    Args:
+        args: any argument (unused)
+        kwargs: any keyword argument (unused)
+
+    Examples::
+
+        >>> m = nn.Identity(54, unused_argument1=0.1, unused_argument2=False)
+        >>> input = torch.randn(128, 20)
+        >>> output = m(input)
+        >>> print(output.size())
+        torch.Size([128, 20])
+    """
+    def __init__(self, *args, **kwargs):
+        super(Identity, self).__init__()
+
+    def forward(self, input):
+        return input
+
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -226,25 +248,26 @@ class GATConv(nn.Module):
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
-        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else lambda x : x
-        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else lambda x : x
+        self.feat_drop = nn.Dropout(feat_drop) if feat_drop else Identity()
+        self.attn_drop = nn.Dropout(attn_drop) if attn_drop else Identity()
         self.leaky_relu = nn.LeakyReLU(alpha)
         self._residual = residual
         if residual:
             if in_feats != out_feats:
                 self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
             else:
-                self.register_buffer('res_fc', None)
+                self.res_fc = Identity()
         self._reset_parameters()
 
         self.activation = activation
 
     def _reset_parameters(self):
-        nn.init.xavier_normal_(self.fc.weight, gain=1.414)
-        nn.init.xavier_normal_(self.attn_l, gain=1.414)
-        nn.init.xavier_normal_(self.attn_r, gain=1.414)
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.fc.weight, gain=gain)
+        nn.init.xavier_normal_(self.attn_l, gain=gain)
+        nn.init.xavier_normal_(self.attn_r, gain=gain)
         if self._residual and self.res_fc is not None:
-            nn.init.xavier_normal_(self.res_fc.weight, gain=1.414)
+            nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
     def forward(self, feat, graph):
         r"""Compute graph attention
@@ -270,10 +293,7 @@ class GATConv(nn.Module):
 
         # residual
         if self._residual:
-            if self.res_fc is not None:
-                resval = self.res_fc(h).view(-1, self._num_heads, self._out_feats)
-            else:
-                resval = h.unsqueeze(1)
+            resval = self.res_fc(h).view(feat.shape[0], -1, self._out_feats)
             rst = rst + resval
 
         # activation
@@ -286,7 +306,7 @@ class GATConv(nn.Module):
         pass
 
 
-class TGConv(nn.Module):
+class TAGConv(nn.Module):
     r"""Apply Topology Adaptive Graph Convolutional Network
 
     .. math::
@@ -321,7 +341,7 @@ class TGConv(nn.Module):
                  k=2,
                  bias=True,
                  activation=None):
-        super(TGConv, self).__init__()
+        super(TAGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._k = k
@@ -332,7 +352,8 @@ class TGConv(nn.Module):
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
-        self.lin.reset_parameters()
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
     def forward(self, feat, graph):
         r"""Compute graph convolution
@@ -559,7 +580,7 @@ class RelGraphConv(nn.Module):
 
 
 class SAGEConv(nn.Module):
-    r"""Apply GraphSAGE layer over an input signal.
+    r""" GraphSAGE layer.
 
     TODO(zihao): docstring
     """
@@ -673,13 +694,13 @@ class GatedGraphConv(nn.Module):
         self.gru.reset_parameters()
         # TODO(zihao): initialize weight
 
-    def forward(self, feat, edge_type, graph):
+    def forward(self, feat, etypes, graph):
         graph = graph.local_var()
         zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
         feat = th.cat([feat, zero_pad], -1)
         # NOTE(zihao): there is still room to optimize, we may do kernel fusion
         # for such operations in the future.
-        graph.edata['w'] = self.weight(edge_type).view(-1, self._out_feats, self._out_feats) # (E, D, D)
+        graph.edata['w'] = self.weight(etypes).view(-1, self._out_feats, self._out_feats) # (E, D, D)
         for i in range(self._n_steps):
             graph.ndata['h'] = feat.unsqueeze(-1) # (N, D, 1)
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
@@ -690,6 +711,25 @@ class GatedGraphConv(nn.Module):
 
 
 class GMMConv(nn.Module):
+    """The Gaussian Mixture Model Convolution layer from "Geometric Deep
+     Learning on Graphs and Manifolds using Mixture Model CNNs”
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    out_feats : int
+        Number of output features.
+    dim : int
+        Dimension of pseudo-coordinte.
+    n_kernels : int
+        Number of kernels :math:`K`.
+    aggregator_type : str
+        Aggregator type (``sum``, ``mean``, ``max``).
+    residual : bool
+        If True, the layer
+    bias : bool
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -714,7 +754,10 @@ class GMMConv(nn.Module):
         self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
         self.fc = nn.Linear(in_feats, n_kernels * out_feats, bias=False)
         if residual:
-            self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            if in_feats != out_feats:
+                self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            else:
+                self.res_fc = Identity()
         else:
             self.register_buffer('res_fc', None)
 
@@ -748,6 +791,15 @@ class GMMConv(nn.Module):
 
 
 class GINConv(nn.Module):
+    """Graph Isomorphism Network layer from paper "How Powerful are Graph Neural Networks?"
+
+    Parameters
+    ----------
+    nn : torch.nn.Module
+    aggregator_type : str
+    init_eps : float
+    learn_eps : bool
+    """
     def __init__(self,
                  nn,
                  aggregator_type,
@@ -778,13 +830,24 @@ class GINConv(nn.Module):
 
 
 class ChebConv(nn.Module):
-    """Apply Chebyshev spectral graph convolution layer on the graph.
+    """Chebyshev Spectral Ggraph Convolution layer.
+
+    Parameters
+    ----------
+    in_feats: int
+        Number of input features.
+    out_feats: int
+        Number of output features.
+    k : int
+        Chebyshev filter size.
+    bias : bool, optional
+        If True, adds a learnable bias to the output. Default: ``True``.
     """
     def __init__(self,
                  in_feats,
                  out_feats,
                  k,
-                 bias=False):
+                 bias=True):
         super(ChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -805,47 +868,62 @@ class ChebConv(nn.Module):
         """
         graph : DGLGraph or BatchedDGLGraph
         """
-        graph = graph.local_var()
-        norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
-        if lambda_max is None:
-            lambda_max = laplacian_lambda_max(graph)
-        if isinstance(lambda_max, list):
-            lambda_max = th.Tensor(lambda_max).to(feat.device)
-        if lambda_max.dim() < 1:
-            lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
-        # 2 / lambda_max, and broadcast from (B, 1) to (N, 1)
-        laplacian_norm = 2. / broadcast_nodes(graph, lambda_max)
-        # T0(X)
-        Tx_0 = feat
-        rst = self.fc[0](Tx_0)
-        # T1(X)
-        if self._k > 1:
-            graph.ndata['h'] = Tx_0 * norm
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-            #Λ = 2 * L / lambda_max - I
-            Tx_1 = (graph.ndata.pop('h') * norm) * laplacian_norm - Tx_0
-            rst = rst + self.fc[1](Tx_1)
-        # Ti(x), i = 2...k
-        for i in range(2, self._k):
-            graph.ndata['h'] = Tx_1 * norm
-            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-            # Λ = 2 * L / lambda_max - I, Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
-            Tx_2 = 2 * ((graph.ndata.pop('h') * norm) * laplacian_norm - Tx_1) - Tx_0
-            rst = rst + self.fc[i](Tx_2)
-            Tx_1, Tx_0 = Tx_2, Tx_1
-        # add bias
-        if self.bias:
-            rst = rst + self.bias
-        return rst
+        with graph.local_scope():
+            norm = th.pow(graph.in_degrees().float(), -0.5).unsqueeze(-1).to(feat.device)
+            if lambda_max is None:
+                lambda_max = laplacian_lambda_max(graph)
+            if isinstance(lambda_max, list):
+                lambda_max = th.Tensor(lambda_max).to(feat.device)
+            if lambda_max.dim() < 1:
+                lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
+            # 2 / lambda_max, and broadcast from (B, 1) to (N, 1)
+            laplacian_norm = 2. / broadcast_nodes(graph, lambda_max)
+            # T0(X)
+            Tx_0 = feat
+            rst = self.fc[0](Tx_0)
+            # T1(X)
+            if self._k > 1:
+                graph.ndata['h'] = Tx_0 * norm
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                #Λ = 2 * L / lambda_max - I
+                Tx_1 = (graph.ndata.pop('h') * norm) * laplacian_norm - Tx_0
+                rst = rst + self.fc[1](Tx_1)
+            # Ti(x), i = 2...k
+            for i in range(2, self._k):
+                graph.ndata['h'] = Tx_1 * norm
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+                # Λ = 2 * L / lambda_max - I, Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
+                Tx_2 = 2 * ((graph.ndata.pop('h') * norm) * laplacian_norm - Tx_1) - Tx_0
+                rst = rst + self.fc[i](Tx_2)
+                Tx_1, Tx_0 = Tx_2, Tx_1
+            # add bias
+            if self.bias:
+                rst = rst + self.bias
+            return rst
 
 
 class SGConv(nn.Module):
+    """Simplifying Grpah Convolution layer.
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    out_feats : int
+        Number of output features.
+    k : int
+        Number of hops :math:`K`. Defaults:``1``.
+    cached : bool
+        TODO(zihao)
+    bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
                  k=1,
                  cached=False,
-                 bias=False):
+                 bias=True):
         super(SGConv, self).__init__()
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
@@ -899,7 +977,10 @@ class NNConv(nn.Module):
             raise KeyError('Aggregator type not recognized: ' + aggregator_type)
         self._aggre_type = aggregator_type
         if residual:
-            self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            if in_feats != out_feats:
+                self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+            else:
+                self.res_fc = Identity()
         else:
             self.register_buffer('res_fc', None)
         if bias:
@@ -916,15 +997,15 @@ class NNConv(nn.Module):
         graph = graph.local_var()
         graph.ndata['h'] = feat.unsqueeze(-1) # (n, d_in, 1)
         graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats) # (n, d_in, d_out)
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'aggr_out')) # (n, d_in, d_out)
-        aggr_out = graph.ndata.pop('aggr_out').sum(dim=1) # (n, d_out)
+        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh')) # (n, d_in, d_out)
+        rst = graph.ndata.pop('neigh').sum(dim=1) # (n, d_out)
         # residual connection
         if self.res_fc is not None:
-            aggr_out = aggr_out + self.res_fc(feat)
+            rst = rst + self.res_fc(feat)
         # bias
         if self.bias is not None:
-            aggr_out = aggr_out + self.bias
-        return aggr_out
+            rst = rst + self.bias
+        return rst
 
 
 class APPNPConv(nn.Module):
@@ -981,6 +1062,9 @@ class AGNNConv(nn.Module):
 
 
 class DenseGCNConv(nn.Module):
+    """ GraphSAGE layer, where the input
+    The input for DenseGCNConv is of type
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -1004,30 +1088,27 @@ class DenseGCNConv(nn.Module):
 
 
 class DenseSAGEConv(nn.Module):
+    """ GraphSAGE layer designed for dense graph.
+
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
                  feat_drop,
-                 aggregator_type,
                  bias=True,
                  norm=None,
                  activation=None):
         super(DenseSAGEConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self._aggre_type = aggregator_type
         self._norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
-        # aggregator type: mean/pool/lstm/gcn
-        if aggregator_type == 'pool':
-            self.fc_pool = nn.Linear(in_feats, in_feats)
-        if aggregator_type == 'lstm':
-            self.lstm = nn.LSTM(in_feats, in_feats, batch_first=True)
-        if aggregator_type != 'gcn':
-            self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
+        self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
         self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
         self.reset_parameters()
+
+    def reset_parameters(self):
         pass
 
     def forward(self, feat, adj):
