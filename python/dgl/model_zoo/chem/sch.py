@@ -1,9 +1,11 @@
 # -*- coding:utf-8 -*-
+# pylint: disable=C0103, C0111, W0621
+"""Implementation of SchNet model."""
 
 import dgl
 import torch as th
 import torch.nn as nn
-from layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
 
 
 class SchNetModel(nn.Module):
@@ -62,8 +64,7 @@ class SchNetModel(nn.Module):
         self.std_per_atom = th.tensor(std, device=device)
 
     def forward(self, g):
-        """g is the DGL.graph"""
-
+        """g is the DGLGraph"""
         self.embedding_layer(g)
         if self.atom_ref is not None:
             self.e0(g, "e0")
@@ -84,13 +85,3 @@ class SchNetModel(nn.Module):
                 "res"] * self.std_per_atom + self.mean_per_atom
         res = dgl.sum_nodes(g, "res")
         return res
-
-
-if __name__ == "__main__":
-    g = dgl.DGLGraph()
-    g.add_nodes(2)
-    g.add_edges([0, 0, 1, 1], [1, 0, 1, 0])
-    g.edata["distance"] = th.tensor([1.0, 3.0, 2.0, 4.0]).reshape(-1, 1)
-    g.ndata["node_type"] = th.LongTensor([1, 2])
-    model = SchNetModel(dim=2)
-    atom = model(g)
