@@ -12,7 +12,7 @@ from ...transform import laplacian_lambda_max
 from .softmax import edge_softmax
 
 __all__ = ['GraphConv', 'GATConv', 'TGConv', 'RelGraphConv', 'SAGEConv',
-           'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv',
+           'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
 
 class GraphConv(nn.Module):
@@ -694,13 +694,72 @@ class GatedGraphConv(nn.Module):
         feat = th.cat([feat, zero_pad], -1)
 
         for i in range(self._n_layers):
-            graph.ndata['wx'] = self.fc[i](feat)
-            graph.update_all(fn.copy_u('wx', 'm'),
+            graph.ndata['h'] = self.fc[i](feat)
+            graph.update_all(fn.copy_u('h', 'm'),
                              fn.sum('m', 'm'))
             m = graph.ndata.pop('m')
             feat = self.gru(m, feat)
 
         return feat
+
+
+class GMMConv(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 dim,
+                 n_kernels,
+                 aggregator_type,
+                 residual=True,
+                 bias=True):
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._dim = dim
+        self._n_kernels = n_kernels
+        self._aggre_type = aggregator_type
+        self.mu = nn.Parameter(th.Tensor(n_kernels, dim))
+        self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
+        self.fc = nn.Linear(in_feats, n_kernels * out_feats, bias=False)
+
+        if residual:
+            self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+        else:
+            self.register_buffer('res_fc', None)
+
+        if bias:
+            self.bias = nn.Parameter(th.Tensor(out_feats))
+        else:
+            self.register_buffer('bias', None)
+
+    def reset_parameters(self):
+        # TODO(zihao) pay attention to the initialization of mu and sigma
+        pass
+
+    def forward(self, feat, pseudo, graph):
+        graph = graph.local_var()
+        graph.ndata['h'] = self.fc(feat).view(-1, self._n_kernels, self._out_feats)
+        E = graph.number_of_edges()
+        # compute gaussian weight
+        gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) - self.mu.view(1, self._n_kernels, self._dim)) ** 2)
+        gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._out_feats) ** 2)
+        gaussian = th.exp(gaussian.sum(dim=-1, keepdims=True)) # (E, K, 1)
+        graph.edata['w'] = gaussian
+        if self._aggre_type == 'sum':
+            reducer = fn.sum
+        elif self._aggre_type == 'mean':
+            reducer = fn.mean
+        elif self._aggre_type == 'max':
+            reducer = fn.max
+        graph.update_all(fn.u_mul_e('h', 'w', 'm'), reducer('m', 'h'))
+        rst = graph.ndata['h'].sum(1)
+
+        if self.res_fc is not None:
+            rst = rst + self.res_fc(feat)
+
+        if self.bias is not None:
+            rst = rst + self.bias
+
+        return rst
 
 
 class GINConv(nn.Module):
@@ -838,7 +897,7 @@ class NNConv(nn.Module):
                  out_feats,
                  edge_nn,
                  aggregator_type,
-                 root_weight,
+                 residual,
                  bias=True):
         super(NNConv, self).__init__()
         self._in_feats = in_feats
@@ -853,8 +912,14 @@ class NNConv(nn.Module):
         else:
             raise KeyError('Aggregator type not recognized: ' + aggregator_type)
         self._aggre_type = aggregator_type
-        self.root = nn.Parameter(th.Tensor(in_feats, out_feats)) if root_weight else None
-        self.bias = nn.Parameter(th.Tensor(out_feats)) if bias else None
+        if residual:
+            self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
+        else:
+            self.register_buffer('res_fc', None)
+        if bias:
+            self.bias = nn.Parameter(th.Tensor(out_feats))
+        else:
+            self.register_buffer('bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -867,8 +932,8 @@ class NNConv(nn.Module):
         graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats) # (n, d_in, d_out)
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'aggr_out')) # (n, d_in, d_out)
         aggr_out = graph.ndata.pop('aggr_out').sum(dim=1) # (n, d_out)
-        if self.root is not None:
-            aggr_out = aggr_out + feat @ self.root
+        if self.res_fc is not None:
+            aggr_out = aggr_out + self.res_fc(feat)
         if self.bias is not None:
             aggr_out = aggr_out + self.bias
         return aggr_out
@@ -926,6 +991,7 @@ class AGNNConv(nn.Module):
         graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
         return graph.ndata.pop('h')
 
+
 class DenseGCNConv(nn.Module):
     def __init__(self,
                  in_feats,
@@ -947,6 +1013,7 @@ class DenseGCNConv(nn.Module):
 
     def forward(self, feat, adj):
         pass
+
 
 class DenseSAGEConv(nn.Module):
     def __init__(self,
