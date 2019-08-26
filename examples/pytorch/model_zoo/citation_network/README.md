@@ -19,7 +19,7 @@ citation network datasets.
 - TAGCN: [Topology Adaptive Graph Convolutional Networks](https://arxiv.org/abs/1710.10370)
 - SGC: [Simplifying Graph Convolutional Networks](https://arxiv.org/abs/1902.07153)
 - AGNN: [Attention-based Graph Neural Network for Semi-supervised Learning](https://arxiv.org/pdf/1803.03735.pdf)
-
+- ChebNet: [Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering](https://arxiv.org/abs/1606.09375)
 
 ## Usage
 

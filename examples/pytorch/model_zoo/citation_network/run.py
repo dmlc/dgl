@@ -27,6 +27,8 @@ def get_model_and_config(name):
         return SGC, SGC_CONFIG
     elif name == 'gin':
         return GIN, GIN_CONFIG
+    elif name == 'chebnet':
+        return ChebNet, CHEBNET_CONFIG
 
 def evaluate(model, features, labels, mask):
     model.eval()

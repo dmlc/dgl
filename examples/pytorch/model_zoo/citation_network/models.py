@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv, GATConv, SAGEConv, GINConv,\
-    APPNPConv, TAGConv, SGConv, AGNNConv
+    APPNPConv, TAGConv, SGConv, AGNNConv, ChebConv
 
 
 class GCN(nn.Module):
@@ -281,6 +281,36 @@ class GIN(nn.Module):
                 init_eps,
                 learn_eps
             )
+        )
+
+    def forward(self, features):
+        h = features
+        for layer in self.layers:
+            h = layer(h, self.g)
+        return h
+
+class ChebNet(nn.Module):
+    def __init__(self,
+                 g,
+                 in_feats,
+                 n_classes,
+                 n_hidden,
+                 n_layers,
+                 k,
+                 bias):
+        super(ChebNet, self).__init__()
+        self.g = g
+        self.layers = nn.ModuleList()
+        self.layers.append(
+            ChebConv(in_feats, n_hidden, k, bias)
+        )
+        for _ in range(n_layers - 1):
+            self.layers.append(
+                ChebConv(n_hidden, n_hidden, k, bias)
+            )
+
+        self.layers.append(
+            ChebConv(n_hidden, n_classes, k, bias)
         )
 
     def forward(self, features):

@@ -13,7 +13,7 @@ from .softmax import edge_softmax
 
 __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
-           'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
+           'ChebConv', 'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
 
 class Identity(nn.Module):
     """A placeholder identity operator that is argument-insensitive.
@@ -896,7 +896,13 @@ class ChebConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        if self.bias is not None:
+            init.zeros_(self.bias)
+        for module in self.fc.modules():
+            if isinstance(module, nn.Linear):
+                init.xavier_normal_(module.weight, init.calculate_gain('relu'))
+                if module.bias is not None:
+                    init.zeros_(module.bias)
 
     def forward(self, feat, graph, lambda_max=None):
         """
@@ -920,19 +926,25 @@ class ChebConv(nn.Module):
             if self._k > 1:
                 graph.ndata['h'] = Tx_0 * norm
                 graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                #Λ = 2 * L / lambda_max - I
-                Tx_1 = (graph.ndata.pop('h') * norm) * laplacian_norm - Tx_0
+                h = graph.ndata.pop('h') * norm
+                # Λ = 2 * (I - D ^ -1/2 A D ^ -1/2) / lambda_max - I
+                #   = - 2(D ^ -1/2 A D ^ -1/2) / lambda_max + (2 / lambda_max - 1) I
+                Tx_1 = -2. * h * laplacian_norm + Tx_0 * (2. / lambda_max - 1)
                 rst = rst + self.fc[1](Tx_1)
             # Ti(x), i = 2...k
             for i in range(2, self._k):
                 graph.ndata['h'] = Tx_1 * norm
                 graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                # Λ = 2 * L / lambda_max - I, Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
-                Tx_2 = 2 * ((graph.ndata.pop('h') * norm) * laplacian_norm - Tx_1) - Tx_0
+                h = graph.ndata.pop('h') * norm
+                # Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
+                #      = - 4(D ^ -1/2 A D ^ -1/2) / lambda_max Tx_(k-1) +
+                #        (4 / lambda_max - 2) Tx_(k-1) -
+                #        Tx_(k-2)
+                Tx_2 = -4. * h * laplacian_norm + Tx_1 * (4. / lambda_max - 2) - Tx_0
                 rst = rst + self.fc[i](Tx_2)
                 Tx_1, Tx_0 = Tx_2, Tx_1
             # add bias
-            if self.bias:
+            if self.bias is not None:
                 rst = rst + self.bias
             return rst
 
