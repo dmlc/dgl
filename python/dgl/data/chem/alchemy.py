@@ -276,3 +276,33 @@ class TencentAlchemyDataset(Dataset):
         if self.transform:
             g = self.transform(g)
         return g, l
+
+    def split(self, train_size=0.8):
+        """
+        Split the dataset into two AlchemySubset for train&test.
+        """
+
+        assert 0 < train_size < 1
+        train_num = int(len(self.graphs) * train_size)
+        train_set = AlchemySubset(self.graphs[:train_num],
+                                  self.labels[:train_num], self.mean, self.std,
+                                  self.transform)
+        test_set = AlchemySubset(self.graphs[train_num:],
+                                 self.labels[train_num:], self.mean, self.std,
+                                 self.transform)
+        return train_set, test_set
+
+
+class AlchemySubset(TencentAlchemyDataset):
+    """
+    Sub-dataset split from TencentAlchemyDataset.
+    Used to construct the training & test set.
+    """
+
+    def __init__(self, graphs, labels, mean=0, std=1, transform=None):
+
+        self.graphs = graphs
+        self.labels = labels
+        self.mean = mean
+        self.std = std
+        self.transform = transform

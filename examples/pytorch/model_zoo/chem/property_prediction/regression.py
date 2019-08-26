@@ -11,14 +11,23 @@ from torch.utils.data import DataLoader
 # from Alchemy_dataset import TencentAlchemyDataset, batcher
 
 
-def train(model="sch", epochs=80, device=th.device("cpu")):
+def train(model="sch",
+          epochs=80,
+          device=th.device("cpu"),
+          training_set_size=0.8):
     print("start")
     alchemy_dataset = alchemy.TencentAlchemyDataset()
-    alchemy_loader = DataLoader(dataset=alchemy_dataset,
-                                batch_size=20,
-                                collate_fn=alchemy.batcher(),
-                                shuffle=False,
-                                num_workers=0)
+    train_set, test_set = alchemy_dataset.split(train_size=0.8)
+    train_loader = DataLoader(dataset=train_set,
+                              batch_size=20,
+                              collate_fn=alchemy.batcher(),
+                              shuffle=False,
+                              num_workers=0)
+    test_loader = DataLoader(dataset=test_set,
+                             batch_size=20,
+                             collate_fn=alchemy.batcher(),
+                             shuffle=False,
+                             num_workers=0)
 
     if model == "sch":
         model = model_zoo.chem.SchNetModel(norm=True, output_dim=12)
@@ -40,7 +49,7 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
         w_loss, w_mae = 0, 0
         model.train()
 
-        for idx, batch in enumerate(alchemy_loader):
+        for idx, batch in enumerate(train_loader):
             batch.graph.to(device)
             batch.label = batch.label.to(device)
 
@@ -56,8 +65,23 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
             w_loss += loss.detach().item()
         w_mae /= idx + 1
 
-        print("Epoch {:2d}, loss: {:.7f}, mae: {:.7f}".format(
+        print("Epoch {:2d}, loss: {:.7f}, MAE: {:.7f}".format(
             epoch, w_loss, w_mae))
+
+    w_loss, w_mae = 0, 0
+    model.eval()
+
+    for idx, batch in enumerate(test_loader):
+        batch.graph.to(device)
+        batch.label = batch.label.to(device)
+
+        res = model(batch.graph)
+        mae = MAE_fn(res, batch.label)
+
+        w_mae += mae.detach().item()
+        w_loss += loss.detach().item()
+    w_mae /= idx + 1
+    print("MAE (test set): {:.7f}".format(w_mae))
 
 
 if __name__ == "__main__":
