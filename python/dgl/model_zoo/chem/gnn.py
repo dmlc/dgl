@@ -111,6 +111,16 @@ class GATConv(nn.Module):
                 self.register_buffer('res_fc', None)
 
         self.activation = activation
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        """Parameter initialization"""
+        nn.init.xavier_normal_(self.fc.weight, gain=1.414)
+        nn.init.xavier_normal_(self.attn_l, gain=1.414)
+        nn.init.xavier_normal_(self.attn_r, gain=1.414)
+        if self._residual and self.res_fc is not None:
+            nn.init.xavier_normal_(self.res_fc.weight, gain=1.414)
+
 
     def forward(self, feat, graph):
         """Compute multi-head atom representations
