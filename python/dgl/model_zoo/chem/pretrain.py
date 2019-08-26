@@ -11,7 +11,7 @@ URL = {
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
-    'JTNN_ZINC':'pre_trained/jtnn_zinc.pth'
+    'JTNN_ZINC':'pre_trained/JTNN_ZINC.pth'
 }
 
 from rdkit import Chem

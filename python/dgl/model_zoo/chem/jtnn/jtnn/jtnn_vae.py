@@ -41,11 +41,11 @@ class DGLJTNNVAE(nn.Module):
         self.latent_size = latent_size
         self.depth = depth
 
-        self.embedding = nn.Embedding(vocab.size(), hidden_size)
+        self.embedding = nn.Embedding(self.vocab.size(), hidden_size)
         self.mpn = DGLMPN(hidden_size, depth)
-        self.jtnn = DGLJTNNEncoder(vocab, hidden_size, self.embedding)
+        self.jtnn = DGLJTNNEncoder(self.vocab, hidden_size, self.embedding)
         self.decoder = DGLJTNNDecoder(
-            vocab, hidden_size, latent_size // 2, self.embedding)
+            self.vocab, hidden_size, latent_size // 2, self.embedding)
         self.jtmpn = DGLJTMPN(hidden_size, depth)
 
         self.T_mean = nn.Linear(hidden_size, latent_size // 2)
