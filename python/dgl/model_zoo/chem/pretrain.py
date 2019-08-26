@@ -1,7 +1,7 @@
 """Utilities for using pretrained models."""
 import torch
 from .dgmg import DGMG
-from .gcn import GCNClassifier
+from .classifiers import GCNClassifier
 from ...data.utils import _get_dgl_url, download
 
 URL = {

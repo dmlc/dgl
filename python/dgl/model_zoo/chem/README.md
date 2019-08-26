@@ -41,8 +41,10 @@ Graph neural networks make it possible for a data-driven representation of molec
 molecular graph topology, which may be viewed as a learned fingerprint [3]. 
 
 ### Models
-- **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
-networks and they can be easily extended for graph level prediction.
+- **Graph Convolutional Networks** [3], [6]: Graph Convolutional Networks (GCN) have been one of the most popular graph 
+neural networks and they can be easily extended for graph level prediction.
+- **Graph Attention Networks** [8]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
+explicitly modeling the interactions between adjacent atoms.
 
 ## Generative Models
 
@@ -59,8 +61,8 @@ Generative models are known to be difficult for evaluation. [GuacaMol](https://g
 are also two accompanying review papers that are well written [4], [5].
 
 ### Models
-- **Deep Generative Models of Graphs (DGMG)**: A very general framework for graph distribution learning by progressively
-adding atoms and bonds.
+- **Deep Generative Models of Graphs (DGMG)** [7]: A very general framework for graph distribution learning by 
+progressively adding atoms and bonds.
 
 ## References
 
@@ -75,4 +77,12 @@ information processing systems (NeurIPS)*, 2224-2232.
 [4] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
 1096-1108.
 
-[5] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
+[5] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*.
+
+[6] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
+*The International Conference on Learning Representations (ICLR)*. 
+
+[7] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
+
+[8] Veličković et al. (2018) Graph Attention Networks. 
+*The International Conference on Learning Representations (ICLR)*. 

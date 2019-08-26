@@ -12,9 +12,11 @@ stress response pathways. Each target yields a binary prediction problem. Molecu
 into training, validation and test set with a 80/10/10 ratio. By default we follow their split method.
 
 ### Models
-- **Graph Convolutional Network** [2]. Graph Convolutional Networks (GCN) have been one of the most popular graph neural
+- **Graph Convolutional Network** [2], [3]. Graph Convolutional Networks (GCN) have been one of the most popular graph neural
 networks and they can be easily extended for graph level prediction. MoleculeNet [1] reports baseline results of graph
 convolutions over multiple datasets.
+- **Graph Attention Networks** [4]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
+explicitly modeling the interactions between adjacent atoms.
 
 ### Usage
 
@@ -44,5 +46,11 @@ To customize your own dataset, see the instructions
 ### References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.
 
-[2] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
+[2] Duvenaud et al. (2015) Convolutional networks on graphs for learning molecular fingerprints. *Advances in neural 
+information processing systems (NeurIPS)*, 2224-2232.
+
+[3] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
 *The International Conference on Learning Representations (ICLR)*.
+
+[4] Veličković et al. (2018) Graph Attention Networks. 
+*The International Conference on Learning Representations (ICLR)*. 
