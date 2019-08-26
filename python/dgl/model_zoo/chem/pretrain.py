@@ -2,20 +2,19 @@
 import torch
 from .dgmg import DGMG
 from .gcn import GCNClassifier
-from ...data.utils import _get_dgl_url, download
+from . import DGLJTNNVAE
+from ...data.utils import _get_dgl_url, download, get_download_dir
 
 URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
     'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
-    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth'
+    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
+    'JTNN_ZINC':'pre_trained/jtnn_zinc.pth'
 }
 
-try:
-    from rdkit import Chem
-except ImportError:
-    pass
+from rdkit import Chem
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
                                  local_pretrained_path='pre_trained.pth', log=True):
@@ -61,7 +60,7 @@ def load_pretrained(model_name, log=True):
     model
     """
     if model_name not in URL:
-        return RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
+        raise RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
     if model_name == 'GCN_Tox21':
         model = GCNClassifier(in_feats=74,
@@ -82,6 +81,14 @@ def load_pretrained(model_name, log=True):
                      node_hidden_size=128,
                      num_prop_rounds=2,
                      dropout=0.2)
+
+    elif model_name == "JTNN_ZINC":
+        vocab_file = '{}/jtnn/{}.txt'.format(get_download_dir(), 'vocab')
+        model = DGLJTNNVAE(vocab_file=vocab_file,
+                           depth=3,
+                           hidden_size=450,
+                           latent_size=56)
+
 
     if log:
         print('Pretrained model loaded')

@@ -14,10 +14,10 @@ from torch.distributions import Categorical
 import dgl
 from dgl import DGLGraph
 
-try:
-    from rdkit import Chem
-except ImportError:
-    pass
+# try:
+from rdkit import Chem
+# except ImportError:
+#     pass
 
 class MoleculeEnv(object):
     """MDP environment for generating molecules.
