@@ -1,9 +1,9 @@
 package:
-  name: dgl
-  version: "0.2"
+  name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
+  version: "0.4"
 
 source:
-  git_rev: 0.2.x
+  git_rev: 0.3.x
   git_url: https://github.com/dmlc/dgl.git
 
 requirements:
@@ -18,6 +18,10 @@ requirements:
     - numpy
     - scipy
     - networkx
+
+build:
+  script_env:
+    - USE_CUDA
 
 about:
   home: https://github.com/dmlc/dgl.git

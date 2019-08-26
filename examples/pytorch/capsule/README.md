@@ -17,7 +17,7 @@ Training & Evaluation
 ----------------------
 ```bash
 # Run with default config
-python main.py
+python3 main.py
 # Run with train and test batch size 128, and for 50 epochs
-python main.py --batch-size 128 --test-batch-size 128 --epochs 50
+python3 main.py --batch-size 128 --test-batch-size 128 --epochs 50
 ```

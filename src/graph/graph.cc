@@ -14,33 +14,28 @@
 
 namespace dgl {
 
-Graph::Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+Graph::Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes,
     bool multigraph): is_multigraph_(multigraph) {
-  CHECK(IsValidIdArray(src_ids));
-  CHECK(IsValidIdArray(dst_ids));
-  CHECK(IsValidIdArray(edge_ids));
+  CHECK(aten::IsValidIdArray(src_ids));
+  CHECK(aten::IsValidIdArray(dst_ids));
   this->AddVertices(num_nodes);
   num_edges_ = src_ids->shape[0];
   CHECK(static_cast<int64_t>(num_edges_) == dst_ids->shape[0])
     << "vectors in COO must have the same length";
-  CHECK(static_cast<int64_t>(num_edges_) == edge_ids->shape[0])
-    << "vectors in COO must have the same length";
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
   all_edges_src_.reserve(num_edges_);
   all_edges_dst_.reserve(num_edges_);
   for (uint64_t i = 0; i < num_edges_; i++) {
     auto src = src_data[i];
     auto dst = dst_data[i];
-    auto eid = edge_data[i];
     CHECK(HasVertex(src) && HasVertex(dst))
       << "Invalid vertices: src=" << src << " dst=" << dst;
 
     adjlist_[src].succ.push_back(dst);
-    adjlist_[src].edge_id.push_back(eid);
+    adjlist_[src].edge_id.push_back(i);
     reverse_adjlist_[dst].succ.push_back(src);
-    reverse_adjlist_[dst].edge_id.push_back(eid);
+    reverse_adjlist_[dst].edge_id.push_back(i);
 
     all_edges_src_.push_back(src);
     all_edges_dst_.push_back(dst);
@@ -71,8 +66,8 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
 
 void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
+  CHECK(aten::IsValidIdArray(src_ids)) << "Invalid src id array.";
+  CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
   const auto dstlen = dst_ids->shape[0];
   const int64_t* src_data = static_cast<int64_t*>(src_ids->data);
@@ -97,14 +92,14 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
 }
 
 BoolArray Graph::HasVertices(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
   const int64_t nverts = NumVertices();
   for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
+    rst_data[i] = (vid_data[i] < nverts && vid_data[i] >= 0)? 1 : 0;
   }
   return rst;
 }
@@ -118,8 +113,8 @@ bool Graph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
 
 // O(E*k) pretty slow
 BoolArray Graph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
+  CHECK(aten::IsValidIdArray(src_ids)) << "Invalid src id array.";
+  CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
   const auto dstlen = dst_ids->shape[0];
   const auto rstlen = std::max(srclen, dstlen);
@@ -205,9 +200,9 @@ IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
 }
 
 // O(E*k) pretty slow
-Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
+EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+  CHECK(aten::IsValidIdArray(src_ids)) << "Invalid src id array.";
+  CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
   const auto dstlen = dst_ids->shape[0];
   int64_t i, j;
@@ -251,8 +246,8 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   return EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
-Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+EdgeArray Graph::FindEdges(IdArray eids) const {
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
   int64_t len = eids->shape[0];
 
   IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
@@ -277,7 +272,7 @@ Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
+EdgeArray Graph::InEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = reverse_adjlist_[vid].succ.size();
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -295,8 +290,8 @@ Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::InEdges(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+EdgeArray Graph::InEdges(IdArray vids) const {
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   int64_t rstlen = 0;
@@ -323,7 +318,7 @@ Graph::EdgeArray Graph::InEdges(IdArray vids) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::OutEdges(dgl_id_t vid) const {
+EdgeArray Graph::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t len = adjlist_[vid].succ.size();
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -341,8 +336,8 @@ Graph::EdgeArray Graph::OutEdges(dgl_id_t vid) const {
 }
 
 // O(E)
-Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+EdgeArray Graph::OutEdges(IdArray vids) const {
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   int64_t rstlen = 0;
@@ -369,7 +364,7 @@ Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-Graph::EdgeArray Graph::Edges(const std::string &order) const {
+EdgeArray Graph::Edges(const std::string &order) const {
   const int64_t len = num_edges_;
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -414,7 +409,7 @@ Graph::EdgeArray Graph::Edges(const std::string &order) const {
 
 // O(V)
 DegreeArray Graph::InDegrees(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   DegreeArray rst = DegreeArray::Empty({len}, vids->dtype, vids->ctx);
@@ -429,7 +424,7 @@ DegreeArray Graph::InDegrees(IdArray vids) const {
 
 // O(V)
 DegreeArray Graph::OutDegrees(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   DegreeArray rst = DegreeArray::Empty({len}, vids->dtype, vids->ctx);
@@ -443,7 +438,7 @@ DegreeArray Graph::OutDegrees(IdArray vids) const {
 }
 
 Subgraph Graph::VertexSubgraph(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
   std::vector<dgl_id_t> edges;
@@ -472,37 +467,56 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
   return rst;
 }
 
-Subgraph Graph::EdgeSubgraph(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
-
+Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array.";
   const auto len = eids->shape[0];
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
   std::vector<dgl_id_t> nodes;
   const int64_t* eid_data = static_cast<int64_t*>(eids->data);
 
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t src_id = all_edges_src_[eid_data[i]];
-    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
-      nodes.push_back(src_id);
-    if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
-      nodes.push_back(dst_id);
-  }
-
   Subgraph rst;
-  rst.graph = std::make_shared<Graph>(IsMultigraph());
-  rst.induced_edges = eids;
-  rst.graph->AddVertices(nodes.size());
+  if (!preserve_nodes) {
+    std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t src_id = all_edges_src_[eid_data[i]];
-    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    for (int64_t i = 0; i < len; ++i) {
+      const dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      const dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
+        nodes.push_back(src_id);
+      if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
+        nodes.push_back(dst_id);
+    }
+
+    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.induced_edges = eids;
+    rst.graph->AddVertices(nodes.size());
+
+    for (int64_t i = 0; i < len; ++i) {
+      const dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      const dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    }
+
+    rst.induced_vertices = IdArray::Empty(
+        {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
+  } else {
+    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.induced_edges = eids;
+    rst.graph->AddVertices(NumVertices());
+
+    for (int64_t i = 0; i < len; ++i) {
+      dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      rst.graph->AddEdge(src_id, dst_id);
+    }
+
+    for (int64_t i = 0; i < NumVertices(); ++i)
+      nodes.push_back(i);
+
+    rst.induced_vertices = IdArray::Empty(
+        {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
   }
-
-  rst.induced_vertices = IdArray::Empty(
-      {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
-  std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
 
   return rst;
 }
@@ -569,11 +583,6 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
     LOG(FATAL) << "unsupported format";
     return std::vector<IdArray>();
   }
-}
-
-GraphPtr Graph::Reverse() const {
-  LOG(FATAL) << "not implemented";
-  return nullptr;
 }
 
 }  // namespace dgl

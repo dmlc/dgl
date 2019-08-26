@@ -10,33 +10,33 @@ from ..._ffi.function import _init_api
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
-from ...utils import unwrap_to_ptr_list
+from ... import subgraph
 
 try:
     import Queue as queue
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler']
 
-class NodeFlowSamplerIter(object):
+class SamplerIter(object):
     def __init__(self, sampler):
-        super(NodeFlowSamplerIter, self).__init__()
+        super(SamplerIter, self).__init__()
         self._sampler = sampler
-        self._nflows = []
-        self._nflow_idx = 0
+        self._batches = []
+        self._batch_idx = 0
 
     def prefetch(self):
-        nflows = self._sampler.fetch(self._nflow_idx)
-        self._nflows.extend(nflows)
-        self._nflow_idx += len(nflows)
+        batches = self._sampler.fetch(self._batch_idx)
+        self._batches.extend(batches)
+        self._batch_idx += len(batches)
 
     def __next__(self):
-        if len(self._nflows) == 0:
+        if len(self._batches) == 0:
             self.prefetch()
-        if len(self._nflows) == 0:
+        if len(self._batches) == 0:
             raise StopIteration
-        return self._nflows.pop(0)
+        return self._batches.pop(0)
 
 class PrefetchingWrapper(object):
     """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
@@ -130,8 +130,7 @@ class ThreadPrefetchingWrapper(PrefetchingWrapper, threading.Thread):
 
 
 class NodeFlowSampler(object):
-    '''
-    Base class that generates NodeFlows from a graph.
+    '''Base class that generates NodeFlows from a graph.
 
     Class properties
     ----------------
@@ -153,7 +152,7 @@ class NodeFlowSampler(object):
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
 
-        self._batch_size = batch_size
+        self._batch_size = int(batch_size)
 
         if seed_nodes is None:
             self._seed_nodes = F.arange(0, g.number_of_nodes())
@@ -188,7 +187,7 @@ class NodeFlowSampler(object):
         raise NotImplementedError
 
     def __iter__(self):
-        it = NodeFlowSamplerIter(self)
+        it = SamplerIter(self)
         if self._num_prefetch:
             return self._prefetching_wrapper_class(it, self._num_prefetch)
         else:
@@ -207,7 +206,7 @@ class NodeFlowSampler(object):
         return self._batch_size
 
 class NeighborSampler(NodeFlowSampler):
-    '''Create a sampler that samples neighborhood.
+    r'''Create a sampler that samples neighborhood.
 
     It returns a generator of :class:`~dgl.NodeFlow`. This can be viewed as
     an analogy of *mini-batch training* on graph data -- the given graph represents
@@ -230,6 +229,8 @@ class NeighborSampler(NodeFlowSampler):
     The number of nodeflow objects (the number of batches) is calculated by
     ``len(seed_nodes) // batch_size`` (if ``seed_nodes`` is None, then it is equal
     to the set of all nodes in the graph).
+
+    Note: NeighborSampler currently only supprts immutable graphs.
 
     Parameters
     ----------
@@ -256,13 +257,32 @@ class NeighborSampler(NodeFlowSampler):
 
         * "in": the neighbors on the in-edges.
         * "out": the neighbors on the out-edges.
-        * "both": the neighbors on both types of edges.
 
         Default: "in"
-    node_prob : Tensor, optional
-        A 1D tensor for the probability that a neighbor node is sampled.
-        None means uniform sampling. Otherwise, the number of elements
-        should be equal to the number of vertices in the graph.
+    transition_prob : str, optional
+        A 1D tensor containing the (unnormalized) transition probability.
+
+        The probability of a node v being sampled from a neighbor u is proportional to
+        the edge weight, normalized by the sum over edge weights grouping by the
+        destination node.
+
+        In other words, given a node v, the probability of node u and edge (u, v)
+        included in the NodeFlow layer preceding that of v is given by:
+
+        .. math::
+
+           p(u, v) = \frac{w_{u, v}}{\sum_{u', (u', v) \in E} w_{u', v}}
+
+        If neighbor type is "out", then the probability is instead normalized by the sum
+        grouping by source node:
+
+        .. math::
+
+           p(v, u) = \frac{w_{v, u}}{\sum_{u', (v, u') \in E} w_{v, u'}}
+
+        If a str is given, the edge weight will be loaded from the edge feature column with
+        the same name.  The feature column must be a scalar column in this case.
+
         Default: None
     seed_nodes : Tensor, optional
         A 1D tensor  list of nodes where we sample NodeFlows from.
@@ -288,7 +308,7 @@ class NeighborSampler(NodeFlowSampler):
             expand_factor=None,
             num_hops=1,
             neighbor_type='in',
-            node_prob=None,
+            transition_prob=None,
             seed_nodes=None,
             shuffle=False,
             num_workers=1,
@@ -298,18 +318,27 @@ class NeighborSampler(NodeFlowSampler):
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
-        assert node_prob is None, 'non-uniform node probability not supported'
+        assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
-        self._expand_factor = expand_factor
-        self._num_hops = num_hops
+        self._expand_factor = int(expand_factor)
+        self._num_hops = int(num_hops)
         self._add_self_loop = add_self_loop
-        self._num_workers = num_workers
+        self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
+        self._transition_prob = transition_prob
 
     def fetch(self, current_nodeflow_index):
-        handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
-            self.g.c_handle,
+        if self._transition_prob is None:
+            prob = F.tensor([], F.float32)
+        elif isinstance(self._transition_prob, str):
+            prob = self.g.edata[self._transition_prob]
+        else:
+            prob = self._transition_prob
+
+        nfobjs = _CAPI_NeighborSampling(
+            self.g._graph,
             self.seed_nodes.todgltensor(),
             current_nodeflow_index, # start batch id
             self.batch_size,        # batch size
@@ -317,8 +346,10 @@ class NeighborSampler(NodeFlowSampler):
             self._expand_factor,
             self._num_hops,
             self._neighbor_type,
-            self._add_self_loop))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+            self._add_self_loop,
+            F.zerocopy_to_dgl_ndarray(prob))
+
+        nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
 
@@ -332,19 +363,39 @@ class LayerSampler(NodeFlowSampler):
     The NodeFlow loader returns a list of NodeFlows.
     The size of the NodeFlow list is the number of workers.
 
+    Note: LayerSampler currently only supprts immutable graphs.
+
     Parameters
     ----------
-    g: the DGLGraph where we sample NodeFlows.
-    batch_size: The number of NodeFlows in a batch.
-    layer_size: A list of layer sizes.
-    node_prob: the probability that a neighbor node is sampled.
-        Not implemented.
-    seed_nodes: a list of nodes where we sample NodeFlows from.
-        If it's None, the seed vertices are all vertices in the graph.
-    shuffle: indicates the sampled NodeFlows are shuffled.
-    num_workers: the number of worker threads that sample NodeFlows in parallel.
-    prefetch : bool, default False
-        Whether to prefetch the samples in the next batch.
+    g : DGLGraph
+        The DGLGraph where we sample NodeFlows.
+    batch_size : int
+        The batch size (i.e, the number of nodes in the last layer)
+    layer_size: int
+        A list of layer sizes.
+    neighbor_type: str, optional
+        Indicates the neighbors on different types of edges.
+
+        * "in": the neighbors on the in-edges.
+        * "out": the neighbors on the out-edges.
+
+        Default: "in"
+    node_prob : Tensor, optional
+        A 1D tensor for the probability that a neighbor node is sampled.
+        None means uniform sampling. Otherwise, the number of elements
+        should be equal to the number of vertices in the graph.
+        It's not implemented.
+        Default: None
+    seed_nodes : Tensor, optional
+        A 1D tensor  list of nodes where we sample NodeFlows from.
+        If None, the seed vertices are all the vertices in the graph.
+        Default: None
+    shuffle : bool, optional
+        Indicates the sampled NodeFlows are shuffled. Default: False
+    num_workers : int, optional
+        The number of worker threads that sample NodeFlows in parallel. Default: 1
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
     '''
 
     immutable_only = True
@@ -364,23 +415,171 @@ class LayerSampler(NodeFlowSampler):
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
+        assert g.is_readonly, "LayerSampler doesn't support mutable graphs. " + \
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
 
-        self._num_workers = num_workers
+        self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
         self._layer_sizes = utils.toindex(layer_sizes)
 
     def fetch(self, current_nodeflow_index):
-        handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
-            self.g.c_handle,
+        nfobjs = _CAPI_LayerSampling(
+            self.g._graph,
             self.seed_nodes.todgltensor(),
             current_nodeflow_index,  # start batch id
             self.batch_size,         # batch size
             self._num_workers,       # num batches
             self._layer_sizes.todgltensor(),
-            self._neighbor_type))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+            self._neighbor_type)
+        nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
+
+
+class EdgeSampler(object):
+    '''Edge sampler for link prediction.
+
+    This samples edges from a given graph. The edges sampled for a batch are
+    placed in a subgraph before returning. In many link prediction tasks,
+    negative edges are required to train a model. A negative edge is constructed by
+    corrupting an existing edge in the graph. The current implementation
+    support two ways of corrupting an edge: corrupt the head node of
+    an edge (by randomly selecting a node as the head node), or corrupt
+    the tail node of an edge. When we corrupt the head node of an edge, we randomly
+    sample a node from the entire graph as the head node. It's possible the constructed
+    edge exists in the graph. By default, the implementation doesn't explicitly check
+    if the sampled negative edge exists in a graph. However, a user can exclude
+    positive edges from negative edges by specifying 'exclude_positive=True'.
+    When negative edges are created, a batch of negative edges are also placed
+    in a subgraph.
+
+    Currently, negative_mode only supports only 'head' and 'tail'.
+    If negative_mode=='head', the negative edges are generated by corrupting
+    head nodes; otherwise, the tail nodes are corrupted.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The DGLGraph where we sample edges.
+    batch_size : int
+        The batch size (i.e, the number of edges from the graph)
+    seed_edges : tensor
+        A list of edges where we sample from.
+    shuffle : bool
+        whether randomly shuffle the list of edges where we sample from.
+    num_workers : int
+        The number of workers to sample edges in parallel.
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
+    negative_mode : string
+        The method used to construct negative edges. Possible values are 'head', 'tail'.
+    neg_sample_size : int
+        The number of negative edges to sample for each edge.
+    exclude_positive : int
+        Whether to exclude positive edges from the negative edges.
+
+    Class properties
+    ----------------
+    immutable_only : bool
+        Whether the sampler only works on immutable graphs.
+        Subclasses can override this property.
+    '''
+    immutable_only = False
+
+    def __init__(
+            self,
+            g,
+            batch_size,
+            seed_edges=None,
+            shuffle=False,
+            num_workers=1,
+            prefetch=False,
+            negative_mode="",
+            neg_sample_size=0,
+            exclude_positive=False):
+        self._g = g
+        if self.immutable_only and not g._graph.is_readonly():
+            raise NotImplementedError("This loader only support read-only graphs.")
+
+        self._batch_size = int(batch_size)
+
+        if seed_edges is None:
+            self._seed_edges = F.arange(0, g.number_of_edges())
+        else:
+            self._seed_edges = seed_edges
+        if shuffle:
+            self._seed_edges = F.rand_shuffle(self._seed_edges)
+        self._seed_edges = utils.toindex(self._seed_edges)
+
+        if prefetch:
+            self._prefetching_wrapper_class = ThreadPrefetchingWrapper
+        self._num_prefetch = num_workers * 2 if prefetch else 0
+
+        self._num_workers = int(num_workers)
+        self._negative_mode = negative_mode
+        self._neg_sample_size = neg_sample_size
+        self._exclude_positive = exclude_positive
+
+    def fetch(self, current_index):
+        '''
+        It returns a list of subgraphs if it only samples positive edges.
+        It returns a list of subgraph pairs if it samples both positive edges
+        and negative edges.
+
+        Parameters
+        ----------
+        current_index : int
+            How many batches the sampler has generated so far.
+
+        Returns
+        -------
+        list[GraphIndex] or list[(GraphIndex, GraphIndex)]
+            Next "bunch" of edges to be processed.
+        '''
+        subgs = _CAPI_UniformEdgeSampling(
+            self.g._graph,
+            self.seed_edges.todgltensor(),
+            current_index, # start batch id
+            self.batch_size,        # batch size
+            self._num_workers,      # num batches
+            self._negative_mode,
+            self._neg_sample_size,
+            self._exclude_positive)
+
+        if len(subgs) == 0:
+            return []
+
+        if self._negative_mode == "":
+            # If no negative subgraphs.
+            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
+        else:
+            rets = []
+            assert self._num_workers * 2 == len(subgs)
+            for i in range(self._num_workers):
+                pos_subg = subgraph.DGLSubGraph(self.g, subgs[i])
+                neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + self._num_workers])
+                rets.append((pos_subg, neg_subg))
+            return rets
+
+    def __iter__(self):
+        it = SamplerIter(self)
+        if self._num_prefetch:
+            return self._prefetching_wrapper_class(it, self._num_prefetch)
+        else:
+            return it
+
+    @property
+    def g(self):
+        return self._g
+
+    @property
+    def seed_edges(self):
+        return self._seed_edges
+
+    @property
+    def batch_size(self):
+        return self._batch_size
+
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.

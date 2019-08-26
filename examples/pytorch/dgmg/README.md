@@ -10,8 +10,8 @@ Yujia Li, Oriol Vinyals, Chris Dyer, Razvan Pascanu, Peter Battaglia.
 
 ## Usage
 
-- Train with batch size 1: `python main.py`
-- Train with batch size larger than 1: `python main_batch.py`.
+- Train with batch size 1: `python3 main.py`
+- Train with batch size larger than 1: `python3 main_batch.py`.
 
 ## Performance
 

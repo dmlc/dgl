@@ -113,7 +113,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert F.array_equal(f._index.tousertensor(), F.tensor(new_idx, dtype=F.int64))
+    assert F.array_equal(f._index.tousertensor(), F.copy_to(F.tensor(new_idx, dtype=F.int64), F.cpu()))
     assert data.num_rows == 4 * N
 
 def test_append3():
@@ -144,13 +144,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
+        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
     # test duplicate keys
     rowid = Index(F.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
+        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
 
     # setter
     rowid = Index(F.tensor([0, 2, 4]))
@@ -282,7 +282,7 @@ def test_slicing():
             'a3': F.zeros([2, D]),
             }
     assert F.allclose(f2['a1'], f2_a1)
-    
+
     f1[Index(F.tensor([2, 3]))] = {
             'a1': F.ones([2, D]),
             'a2': F.ones([2, D]),

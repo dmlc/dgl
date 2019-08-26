@@ -113,6 +113,43 @@ def empty(shape, dtype="float32", ctx=context(1, 0)):
     return _make_array(handle, False)
 
 
+def empty_shared_mem(name, is_create, shape, dtype="float32"):
+    """Create an empty array with shared memory given shape and dtype
+
+    Parameters
+    ----------
+    name : string
+        The name of the shared memory. It's a file name in Unix.
+
+    is_create : bool
+        Whether to create the shared memory or use the one created by somewhere else.
+
+    shape : tuple of int
+        The shape of the array
+
+    dtype : type or str
+        The data type of the array.
+
+    Returns
+    -------
+    arr : dgl.nd.NDArray
+        The array dgl supported.
+    """
+    name = ctypes.c_char_p(name.encode('utf-8'))
+    shape = c_array(dgl_shape_index_t, shape)
+    ndim = ctypes.c_int(len(shape))
+    handle = DGLArrayHandle()
+    dtype = DGLType(dtype)
+    check_call(_LIB.DGLArrayAllocSharedMem(
+        name, shape, ndim,
+        ctypes.c_int(dtype.type_code),
+        ctypes.c_int(dtype.bits),
+        ctypes.c_int(dtype.lanes),
+        is_create,
+        ctypes.byref(handle)))
+    return _make_array(handle, False)
+
+
 def from_dlpack(dltensor):
     """Produce an array from a DLPack tensor without memory copy.
     Retrieves the underlying DLPack tensor's pointer to create an array from the

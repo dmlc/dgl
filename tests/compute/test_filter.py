@@ -1,4 +1,3 @@
-import torch as th
 from dgl.graph import DGLGraph
 import backend as F
 

@@ -1,14 +1,13 @@
 """Torch modules for graph related softmax."""
 # pylint: disable= no-member, arguments-differ
 import torch as th
-from torch import nn
 
 from ... import function as fn
-from ...utils import get_ndata_name
 
-__all__ = ['EdgeSoftmax']
+__all__ = ['edge_softmax']
 
-class EdgeSoftmax(nn.Module):
+
+class EdgeSoftmax(th.autograd.Function):
     r"""Apply softmax over signals of incoming edges.
 
     For a node :math:`i`, edgesoftmax is an operation of computing
@@ -24,72 +23,127 @@ class EdgeSoftmax(nn.Module):
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
     the attention weights are computed with such an edgesoftmax operation.
     """
-    def __init__(self):
-        super(EdgeSoftmax, self).__init__()
-        # compute the softmax
-        self._logits_name = "_logits"
-        self._max_logits_name = "_max_logits"
-        self._normalizer_name = "_norm"
 
-    def forward(self, logits, graph):
-        r"""Compute edge softmax.
+    @staticmethod
+    def forward(ctx, g, score):
+        """Forward function.
 
-        Parameters
-        ----------
-        logits : torch.Tensor
-            The input edge feature
-        graph : DGLGraph
-            The graph.
+        Pseudo-code:
 
-        Returns
-        -------
-        Unnormalized scores : torch.Tensor
-            This part gives :math:`\exp(z_{ij})`'s
-        Normalizer : torch.Tensor
-            This part gives :math:`\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})`
+        .. code:: python
 
-        Notes
-        -----
-            * Input shape: :math:`(N, *, 1)` where * means any number of additional
-              dimensions, :math:`N` is the number of edges.
-            * Unnormalized scores shape: :math:`(N, *, 1)` where all but the last
-              dimension are the same shape as the input.
-            * Normalizer shape: :math:`(M, *, 1)` where :math:`M` is the number of
-              nodes and all but the first and the last dimensions are the same as
-              the input.
-
-        Note that this computation is still one step away from getting real softmax
-        results. The last step can be proceeded as follows:
-
-        >>> import dgl.function as fn
-        >>>
-        >>> scores, normalizer = EdgeSoftmax(...).forward(logits, graph)
-        >>> graph.edata['a'] = scores
-        >>> graph.ndata['normalizer'] = normalizer
-        >>> graph.apply_edges(lambda edges : {'a' : edges.data['a'] / edges.dst['normalizer']})
-
-        We left this last step to users as depending on the particular use case,
-        this step can be combined with other computation at once.
+            score = dgl.EData(g, score)
+            score_max = score.dst_max()  # of type dgl.NData
+            score = score - score_max  # edge_sub_dst, ret dgl.EData
+            score_sum = score.dst_sum()  # of type dgl.NData
+            out = score / score_sum    # edge_div_dst, ret dgl.EData
+            return out.data
         """
-        self._logits_name = get_ndata_name(graph, self._logits_name)
-        self._max_logits_name = get_ndata_name(graph, self._max_logits_name)
-        self._normalizer_name = get_ndata_name(graph, self._normalizer_name)
+        # remember to save the graph to backward cache before making it
+        # a local variable
+        ctx.backward_cache = g
+        g = g.local_var()
+        g.edata['s'] = score
+        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        g.edata['out'] = th.exp(g.edata['out'])
+        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = g.edata['out']
+        ctx.save_for_backward(out)
+        return out
 
-        graph.edata[self._logits_name] = logits
+    @staticmethod
+    def backward(ctx, grad_out):
+        """Backward function.
 
-        # compute the softmax
-        graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
-                         fn.max(self._logits_name, self._max_logits_name))
-        # minus the max and exp
-        graph.apply_edges(
-            lambda edges: {self._logits_name : th.exp(edges.data[self._logits_name] -
-                                                      edges.dst[self._max_logits_name])})
-        # pop out temporary feature _max_logits, otherwise get_ndata_name could have huge overhead
-        graph.ndata.pop(self._max_logits_name)
-        # compute normalizer
-        graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
-                         fn.sum(self._logits_name, self._normalizer_name))
-        return graph.edata.pop(self._logits_name), graph.ndata.pop(self._normalizer_name)
+        Pseudo-code:
 
-    def __repr__(self):
-        return 'EdgeSoftmax()'
+        .. code:: python
+
+            g, out = ctx.backward_cache
+            grad_out = dgl.EData(g, grad_out)
+            out = dgl.EData(g, out)
+            sds = out * grad_out  # type dgl.EData
+            sds_sum = sds.dst_sum()  # type dgl.NData
+            grad_score = sds - sds * sds_sum  # multiple expressions
+            return grad_score.data
+        """
+        g = ctx.backward_cache
+        g = g.local_var()
+        out, = ctx.saved_tensors
+        # clear backward cache explicitly
+        ctx.backward_cache = None
+        g.edata['out'] = out
+        g.edata['grad_s'] = out * grad_out
+        g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        grad_score = g.edata['grad_s'] - g.edata['out']
+        return None, grad_score
+
+
+def edge_softmax(graph, logits):
+    r"""Compute edge softmax.
+
+    For a node :math:`i`, edge softmax is an operation of computing
+
+    .. math::
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
+
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
+    the set of nodes that have an edge to :math:`i`.
+
+    An example of using edge softmax is in
+    `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
+    the attention weights are computed with such an edge softmax operation.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph to perform edge softmax
+    logits : torch.Tensor
+        The input edge feature
+
+    Returns
+    -------
+    Tensor
+        Softmax value
+
+    Notes
+    -----
+        * Input shape: :math:`(N, *, 1)` where * means any number of
+          additional dimensions, :math:`N` is the number of edges.
+        * Return shape: :math:`(N, *, 1)`
+
+    Examples
+    --------
+    >>> from dgl.nn.pytorch.softmax import edge_softmax
+    >>> import dgl
+    >>> import torch as th
+
+    Create a :code:`DGLGraph` object and initialize its edge features.
+
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(3)
+    >>> g.add_edges([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2])
+    >>> edata = th.ones(6, 1).float()
+    >>> edata
+    tensor([[1.],
+            [1.],
+            [1.],
+            [1.],
+            [1.],
+            [1.]])
+
+    Apply edge softmax on g:
+
+    >>> edge_softmax(g, edata)
+    tensor([[1.0000],
+        [0.5000],
+        [0.3333],
+        [0.5000],
+        [0.3333],
+        [0.3333]])
+    """
+    return EdgeSoftmax.apply(graph, logits)

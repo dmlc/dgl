@@ -4,658 +4,655 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
-
-#ifdef _MSC_VER
-#define _CRT_RAND_S
-#endif
+#include <string.h>
+#include <bitset>
+#include <numeric>
+#include <tuple>
 
 #include "../c_api_common.h"
 
+using namespace dgl::runtime;
+
 namespace dgl {
-
-template<class ForwardIt, class T>
-bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
-  first = std::lower_bound(first, last, value);
-  return (!(first == last) && !(value < *first));
+namespace {
+inline std::string GetSharedMemName(const std::string &name, const std::string &edge_dir) {
+  return name + "_" + edge_dir;
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
+std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
+  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
+#ifndef _WIN32
+  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
+
+  IdArray sm_array = IdArray::EmptyShared(
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, is_create);
+  // Create views from the shared memory array. Note that we don't need to save
+  //   the sm_array because the refcount is maintained by the view arrays.
+  IdArray indptr = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
+  IdArray indices = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1) * sizeof(dgl_id_t));
+  IdArray edge_ids = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
+  return std::make_tuple(indptr, indices, edge_ids);
+#else
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
+  return {};
+#endif  // _WIN32
+}
+}  // namespace
+
+//////////////////////////////////////////////////////////
+//
+// CSR graph implementation
+//
+//////////////////////////////////////////////////////////
+
+CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
+  CHECK(!(num_vertices == 0 && num_edges != 0));
+  adj_ = aten::CSRMatrix{num_vertices, num_vertices,
+                         aten::NewIdArray(num_vertices + 1),
+                         aten::NewIdArray(num_edges),
+                         aten::NewIdArray(num_edges)};
+}
+
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t N = indptr->shape[0] - 1;
+  adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+}
+
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t N = indptr->shape[0] - 1;
+  adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+}
+
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+         const std::string &shared_mem_name): shared_mem_name_(shared_mem_name) {
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t num_verts = indptr->shape[0] - 1;
+  const int64_t num_edges = indices->shape[0];
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges, true);
+  // copy the given data into the shared memory arrays
+  adj_.indptr.CopyFrom(indptr);
+  adj_.indices.CopyFrom(indices);
+  adj_.data.CopyFrom(edge_ids);
+}
+
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
+         const std::string &shared_mem_name): is_multigraph_(is_multigraph),
+         shared_mem_name_(shared_mem_name) {
+  CHECK(aten::IsValidIdArray(indptr));
+  CHECK(aten::IsValidIdArray(indices));
+  CHECK(aten::IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t num_verts = indptr->shape[0] - 1;
+  const int64_t num_edges = indices->shape[0];
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges, true);
+  // copy the given data into the shared memory arrays
+  adj_.indptr.CopyFrom(indptr);
+  adj_.indices.CopyFrom(indices);
+  adj_.data.CopyFrom(edge_ids);
+}
+
+CSR::CSR(const std::string &shared_mem_name,
+         int64_t num_verts, int64_t num_edges, bool is_multigraph)
+  : is_multigraph_(is_multigraph), shared_mem_name_(shared_mem_name) {
+  CHECK(!(num_verts == 0 && num_edges != 0));
+  adj_.num_rows = num_verts;
+  adj_.num_cols = num_verts;
+  std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges, false);
+}
+
+bool CSR::IsMultigraph() const {
+  // The lambda will be called the first time to initialize the is_multigraph flag.
+  return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
+      return aten::CSRHasDuplicate(adj_);
+    });
+}
+
+EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  const int64_t off = this->indptr[vid];
-  const int64_t len = this->GetDegree(vid);
-  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* src_data = static_cast<dgl_id_t*>(src->data);
-  dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eid->data);
-  for (int64_t i = 0; i < len; ++i) {
-    src_data[i] = this->indices[off + i];
-    eid_data[i] = this->edge_ids[off + i];
-  }
-  std::fill(dst_data, dst_data + len, vid);
-  return ImmutableGraph::EdgeArray{src, dst, eid};
+  IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
+  IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
+  IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+  return EdgeArray{ret_src, ret_dst, ret_eid};
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  const auto len = vids->shape[0];
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  int64_t rstlen = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t vid = vid_data[i];
-    CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rstlen += this->GetDegree(vid);
-  }
-  IdArray src = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
-  IdArray dst = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
-  IdArray eid = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
-  dgl_id_t* src_ptr = static_cast<dgl_id_t*>(src->data);
-  dgl_id_t* dst_ptr = static_cast<dgl_id_t*>(dst->data);
-  dgl_id_t* eid_ptr = static_cast<dgl_id_t*>(eid->data);
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t vid = vid_data[i];
-    int64_t off = this->indptr[vid];
-    const int64_t len = this->GetDegree(vid);
-    const auto *pred = &this->indices[off];
-    const auto *eids = &this->edge_ids[off];
-    for (int64_t j = 0; j < len; ++j) {
-      *(src_ptr++) = pred[j];
-      *(dst_ptr++) = vid;
-      *(eid_ptr++) = eids[j];
-    }
-  }
-  return ImmutableGraph::EdgeArray{src, dst, eid};
+EdgeArray CSR::OutEdges(IdArray vids) const {
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+  auto csrsubmat = aten::CSRSliceRows(adj_, vids);
+  auto coosubmat = aten::CSRToCOO(csrsubmat, false);
+  // Note that the row id in the csr submat is relabled, so
+  // we need to recover it using an index select.
+  auto row = aten::IndexSelect(vids, coosubmat.row);
+  return EdgeArray{row, coosubmat.col, coosubmat.data};
 }
 
-DegreeArray ImmutableGraph::CSR::GetDegrees(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  const auto len = vids->shape[0];
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  DegreeArray rst = DegreeArray::Empty({len}, vids->dtype, vids->ctx);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  for (int64_t i = 0; i < len; ++i) {
-    const auto vid = vid_data[i];
-    CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rst_data[i] = this->GetDegree(vid);
-  }
-  return rst;
+DegreeArray CSR::OutDegrees(IdArray vids) const {
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+  return aten::CSRGetRowNNZ(adj_, vids);
 }
 
-class Bitmap {
-  const size_t size = 1024 * 1024 * 4;
-  const size_t mask = size - 1;
-  std::vector<bool> map;
-
-  size_t hash(dgl_id_t id) const {
-    return id & mask;
-  }
- public:
-  Bitmap(const dgl_id_t *vid_data, int64_t len): map(size) {
-    for (int64_t i = 0; i < len; ++i) {
-      map[hash(vid_data[i])] = 1;
-    }
-  }
-
-  bool test(dgl_id_t id) const {
-    return map[hash(id)];
-  }
-};
-
-/*
- * This uses a hashtable to check if a node is in the given node list.
- */
-class HashTableChecker {
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
-  // This bitmap is used as a bloom filter to remove some lookups.
-  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
-  Bitmap map;
-
-  /*
-   * This is to test if a vertex is in the induced subgraph.
-   * If it is, the edge on this vertex and the source vertex will be collected.
-   * `old_id` is the vertex we test, `old_eid` is the edge Id between the `old_id`
-   * and the source vertex. `col_idx` and `orig_eids` store the collected edges.
-   */
-  void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
-               std::vector<dgl_id_t> *col_idx,
-               std::vector<dgl_id_t> *orig_eids) {
-    if (!map.test(old_id))
-      return;
-
-    auto it = oldv2newv.find(old_id);
-    if (it != oldv2newv.end()) {
-      const dgl_id_t new_id = it->second;
-      col_idx->push_back(new_id);
-      if (orig_eids)
-        orig_eids->push_back(old_eid);
-    }
-  }
-
- public:
-  HashTableChecker(const dgl_id_t *vid_data, int64_t len): map(vid_data, len) {
-    oldv2newv.reserve(len);
-    for (int64_t i = 0; i < len; ++i) {
-      oldv2newv[vid_data[i]] = i;
-    }
-  }
-
-  /*
-   * This is to collect edges from the neighborhood of a vertex.
-   * `neigh_idx`, `eids` and `row_len` indicates the neighbor list of the vertex.
-   * The collected edges are stored in `new_neigh_idx` and `orig_eids`.
-   */
-  void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
-                    std::vector<dgl_id_t> *new_neigh_idx,
-                    std::vector<dgl_id_t> *orig_eids) {
-    // TODO(zhengda) I need to make sure the column index in each row is sorted.
-    for (size_t j = 0; j < row_len; ++j) {
-      const dgl_id_t oldsucc = neigh_idx[j];
-      const dgl_id_t eid = eids[j];
-      Collect(oldsucc, eid, new_neigh_idx, orig_eids);
-    }
-  }
-};
-
-ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    const std::vector<int64_t>& indptr,
-    const std::vector<dgl_id_t>& indices,
-    const std::vector<dgl_id_t>& edge_ids,
-    bool in_csr) {
-  const auto n = indptr.size() - 1;
-  const auto len = edge_ids.size();
-  auto t = std::make_shared<EdgeList>(len, n);
-  for (size_t i = 0; i < indptr.size() - 1; i++) {
-    for (int64_t j = indptr[i]; j < indptr[i + 1]; j++) {
-      dgl_id_t row = i, col = indices[j];
-      if (in_csr)
-        std::swap(row, col);
-      t->register_edge(edge_ids[j], row, col);
-    }
-  }
-  return t;
+bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
+  CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
+  CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
+  return aten::CSRIsNonZero(adj_, src, dst);
 }
 
-std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph(
-    IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  const int64_t len = vids->shape[0];
-
-  HashTableChecker def_check(vid_data, len);
-  // check if vid_data is sorted.
-  CHECK(std::is_sorted(vid_data, vid_data + len)) << "The input vertex list has to be sorted";
-
-  // Collect the non-zero entries in from the original graph.
-  std::vector<dgl_id_t> orig_edge_ids;
-  orig_edge_ids.reserve(len);
-  auto sub_csr = std::make_shared<CSR>(len, len);
-  sub_csr->indptr[0] = 0;
-  for (int64_t i = 0; i < len; ++i) {
-    const dgl_id_t oldvid = vid_data[i];
-    CHECK_LT(oldvid, NumVertices()) << "Vertex Id " << oldvid << " isn't in a graph of "
-        << NumVertices() << " vertices";
-    size_t row_start = indptr[oldvid];
-    size_t row_len = indptr[oldvid + 1] - indptr[oldvid];
-    def_check.CollectOnRow(&indices[row_start], &edge_ids[row_start], row_len,
-                           &sub_csr->indices, &orig_edge_ids);
-    sub_csr->indptr[i + 1] = sub_csr->indices.size();
-  }
-
-  // Store the non-zeros in a subgraph with edge attributes of new edge ids.
-  sub_csr->edge_ids.resize(sub_csr->indices.size());
-  for (size_t i = 0; i < sub_csr->edge_ids.size(); i++)
-    sub_csr->edge_ids[i] = i;
-
-  IdArray rst_eids = IdArray::Empty({static_cast<int64_t>(orig_edge_ids.size())},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(rst_eids->data);
-  std::copy(orig_edge_ids.begin(), orig_edge_ids.end(), eid_data);
-
-  return std::pair<ImmutableGraph::CSR::Ptr, IdArray>(sub_csr, rst_eids);
+BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
+  CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+  CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+  return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
 }
 
-std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
-    IdArray eids, EdgeList::Ptr edge_list) const {
-  // Return sub_csr and vids array.
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  const int64_t len = eids->shape[0];
-  std::vector<dgl_id_t> nodes;
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
-  std::vector<Edge> edges;
-
-  for (int64_t i = 0; i < len; i++) {
-    dgl_id_t src_id = edge_list->src_points[eid_data[i]];
-    dgl_id_t dst_id = edge_list->dst_points[eid_data[i]];
-
-    // pair<iterator, bool>, the second indicates whether the insertion is successful or not.
-    auto src_pair = oldv2newv.insert(std::make_pair(src_id, oldv2newv.size()));
-    auto dst_pair = oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size()));
-    if (src_pair.second)
-      nodes.push_back(src_id);
-    if (dst_pair.second)
-      nodes.push_back(dst_id);
-    edges.push_back(Edge{src_pair.first->second, dst_pair.first->second, static_cast<dgl_id_t>(i)});
-  }
-
-  const size_t n = oldv2newv.size();
-  auto sub_csr = CSR::FromEdges(&edges, 0, n);
-
-  IdArray rst_vids = IdArray::Empty({static_cast<int64_t>(nodes.size())},
-      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* vid_data = static_cast<dgl_id_t*>(rst_vids->data);
-  std::copy(nodes.begin(), nodes.end(), vid_data);
-
-  return std::make_pair(sub_csr, rst_vids);
+IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
+  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  CHECK(radius == 1) << "invalid radius: " << radius;
+  return aten::CSRGetRowColumnIndices(adj_, vid);
 }
 
-
-ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
-                                                        int sort_on, uint64_t num_nodes) {
-  CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
-  int other_end = sort_on == 1 ? 0 : 1;
-  // TODO(zhengda) we should sort in parallel.
-  std::sort(edges->begin(), edges->end(), [sort_on, other_end](const Edge &e1, const Edge &e2) {
-    if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
-      return e1.end_points[other_end] < e2.end_points[other_end];
-    } else {
-      return e1.end_points[sort_on] < e2.end_points[sort_on];
-    }
-  });
-  auto t = std::make_shared<CSR>(0, 0);
-  t->indices.resize(edges->size());
-  t->edge_ids.resize(edges->size());
-  for (size_t i = 0; i < edges->size(); i++) {
-    t->indices[i] = edges->at(i).end_points[other_end];
-    CHECK(t->indices[i] < num_nodes);
-    t->edge_ids[i] = edges->at(i).edge_id;
-    dgl_id_t vid = edges->at(i).end_points[sort_on];
-    CHECK(vid < num_nodes);
-    while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid)) {
-      t->indptr.push_back(i);
-    }
-    CHECK(t->indptr.size() == vid + 1);
-  }
-  while (t->indptr.size() < num_nodes + 1) {
-    t->indptr.push_back(edges->size());
-  }
-  CHECK(t->indptr.size() == num_nodes + 1);
-  return t;
+IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
+  CHECK(HasVertex(src)) << "invalid vertex: " << src;
+  CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
+  return aten::CSRGetData(adj_, src, dst);
 }
 
-void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
-  edges->resize(NumEdges());
-  for (size_t i = 0; i < NumVertices(); i++) {
-    const dgl_id_t *indices_begin = &indices[indptr[i]];
-    const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
-    for (size_t j = 0; j < GetDegree(i); j++) {
-      Edge e;
-      e.end_points[0] = i;
-      e.end_points[1] = indices_begin[j];
-      e.edge_id = eid_begin[j];
-      (*edges)[indptr[i] + j] = e;
-    }
+EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+  const auto& arrs = aten::CSRGetDataAndIndices(adj_, src_ids, dst_ids);
+  return EdgeArray{arrs[0], arrs[1], arrs[2]};
+}
+
+EdgeArray CSR::Edges(const std::string &order) const {
+  CHECK(order.empty() || order == std::string("srcdst"))
+    << "CSR only support Edges of order \"srcdst\","
+    << " but got \"" << order << "\".";
+  const auto& coo = aten::CSRToCOO(adj_, false);
+  return EdgeArray{coo.row, coo.col, coo.data};
+}
+
+Subgraph CSR::VertexSubgraph(IdArray vids) const {
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+  const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
+  IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+  CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
+  Subgraph subg;
+  subg.graph = subcsr;
+  subg.induced_vertices = vids;
+  subg.induced_edges = submat.data;
+  return subg;
+}
+
+CSRPtr CSR::Transpose() const {
+  const auto& trans = aten::CSRTranspose(adj_);
+  return CSRPtr(new CSR(trans.indptr, trans.indices, trans.data));
+}
+
+COOPtr CSR::ToCOO() const {
+  const auto& coo = aten::CSRToCOO(adj_, true);
+  return COOPtr(new COO(NumVertices(), coo.row, coo.col));
+}
+
+CSR CSR::CopyTo(const DLContext& ctx) const {
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    CSR ret(adj_.indptr.CopyTo(ctx),
+            adj_.indices.CopyTo(ctx),
+            adj_.data.CopyTo(ctx));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
   }
 }
 
-ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
-  std::vector<Edge> edges;
-  ReadAllEdges(&edges);
-  return FromEdges(&edges, 1, NumVertices());
+CSR CSR::CopyToSharedMem(const std::string &name) const {
+  if (IsSharedMem()) {
+    CHECK(name == shared_mem_name_);
+    return *this;
+  } else {
+    return CSR(adj_.indptr, adj_.indices, adj_.data, name);
+  }
 }
 
-ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                               bool multigraph) : is_multigraph_(multigraph) {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-  CHECK(IsValidIdArray(edge_ids)) << "Invalid vertex id array.";
-  const int64_t len = src_ids->shape[0];
-  CHECK(len == dst_ids->shape[0]);
-  CHECK(len == edge_ids->shape[0]);
-  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
-  std::vector<Edge> edges(len);
-  for (size_t i = 0; i < edges.size(); i++) {
-    Edge e;
-    e.end_points[0] = src_data[i];
-    e.end_points[1] = dst_data[i];
-    e.edge_id = edge_data[i];
-    edges[i] = e;
+CSR CSR::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    CSR ret(aten::AsNumBits(adj_.indptr, bits),
+            aten::AsNumBits(adj_.indices, bits),
+            aten::AsNumBits(adj_.data, bits));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
   }
-  in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
-  out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
 }
+
+DGLIdIters CSR::SuccVec(dgl_id_t vid) const {
+  // TODO(minjie): This still assumes the data type and device context
+  //   of this graph. Should fix later.
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
+  const dgl_id_t start = indptr_data[vid];
+  const dgl_id_t end = indptr_data[vid + 1];
+  return DGLIdIters(indices_data + start, indices_data + end);
+}
+
+DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
+  // TODO(minjie): This still assumes the data type and device context
+  //   of this graph. Should fix later.
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(adj_.data->data);
+  const dgl_id_t start = indptr_data[vid];
+  const dgl_id_t end = indptr_data[vid + 1];
+  return DGLIdIters(eid_data + start, eid_data + end);
+}
+
+//////////////////////////////////////////////////////////
+//
+// COO graph implementation
+//
+//////////////////////////////////////////////////////////
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
+  CHECK(aten::IsValidIdArray(src));
+  CHECK(aten::IsValidIdArray(dst));
+  CHECK_EQ(src->shape[0], dst->shape[0]);
+  adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
+}
+
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
+  CHECK(aten::IsValidIdArray(src));
+  CHECK(aten::IsValidIdArray(dst));
+  CHECK_EQ(src->shape[0], dst->shape[0]);
+  adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
+}
+
+bool COO::IsMultigraph() const {
+  // The lambda will be called the first time to initialize the is_multigraph flag.
+  return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
+      return aten::COOHasDuplicate(adj_);
+    });
+}
+
+std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
+  CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
+  const auto src = aten::IndexSelect(adj_.row, eid);
+  const auto dst = aten::IndexSelect(adj_.col, eid);
+  return std::pair<dgl_id_t, dgl_id_t>(src, dst);
+}
+
+EdgeArray COO::FindEdges(IdArray eids) const {
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
+  return EdgeArray{aten::IndexSelect(adj_.row, eids),
+                   aten::IndexSelect(adj_.col, eids),
+                   eids};
+}
+
+EdgeArray COO::Edges(const std::string &order) const {
+  CHECK(order.empty() || order == std::string("eid"))
+    << "COO only support Edges of order \"eid\", but got \""
+    << order << "\".";
+  IdArray rst_eid = aten::Range(0, NumEdges(), NumBits(), Context());
+  return EdgeArray{adj_.row, adj_.col, rst_eid};
+}
+
+Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array.";
+  COOPtr subcoo;
+  IdArray induced_nodes;
+  if (!preserve_nodes) {
+    IdArray new_src = aten::IndexSelect(adj_.row, eids);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids);
+    induced_nodes = aten::Relabel_({new_src, new_dst});
+    const auto new_nnodes = induced_nodes->shape[0];
+    subcoo = COOPtr(new COO(new_nnodes, new_src, new_dst, this->IsMultigraph()));
+  } else {
+    IdArray new_src = aten::IndexSelect(adj_.row, eids);
+    IdArray new_dst = aten::IndexSelect(adj_.col, eids);
+    induced_nodes = aten::Range(0, NumVertices(), NumBits(), Context());
+    subcoo = COOPtr(new COO(NumVertices(), new_src, new_dst, this->IsMultigraph()));
+  }
+  Subgraph subg;
+  subg.graph = subcoo;
+  subg.induced_vertices = induced_nodes;
+  subg.induced_edges = eids;
+  return subg;
+}
+
+CSRPtr COO::ToCSR() const {
+  const auto& csr = aten::COOToCSR(adj_);
+  return CSRPtr(new CSR(csr.indptr, csr.indices, csr.data));
+}
+
+COO COO::CopyTo(const DLContext& ctx) const {
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    COO ret(NumVertices(),
+            adj_.row.CopyTo(ctx),
+            adj_.col.CopyTo(ctx));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+COO COO::CopyToSharedMem(const std::string &name) const {
+  LOG(FATAL) << "COO doesn't supprt shared memory yet";
+  return COO();
+}
+
+COO COO::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    COO ret(NumVertices(),
+            aten::AsNumBits(adj_.row, bits),
+            aten::AsNumBits(adj_.col, bits));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+//////////////////////////////////////////////////////////
+//
+// immutable graph implementation
+//
+//////////////////////////////////////////////////////////
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  const auto len = vids->shape[0];
-  BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  const uint64_t nverts = NumVertices();
-  for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
-  }
-  return rst;
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
+  return aten::LT(vids, NumVertices());
 }
 
-bool ImmutableGraph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
-  if (!HasVertex(src) || !HasVertex(dst)) return false;
-  if (this->in_csr_) {
-    auto pred = this->in_csr_->GetIndexRef(dst);
-    return dgl::binary_search(pred.begin(), pred.end(), src);
+CSRPtr ImmutableGraph::GetInCSR() const {
+  if (!in_csr_) {
+    if (out_csr_) {
+      const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
+      if (out_csr_->IsSharedMem())
+        LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
+                     << "It may dramatically increase memory consumption.";
+    } else {
+      CHECK(coo_) << "None of CSR, COO exist";
+      const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
+    }
+  }
+  return in_csr_;
+}
+
+/* !\brief Return out csr. If not exist, transpose the other one.*/
+CSRPtr ImmutableGraph::GetOutCSR() const {
+  if (!out_csr_) {
+    if (in_csr_) {
+      const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
+      if (in_csr_->IsSharedMem())
+        LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
+                     << "It may dramatically increase memory consumption.";
+    } else {
+      CHECK(coo_) << "None of CSR, COO exist";
+      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
+    }
+  }
+  return out_csr_;
+}
+
+/* !\brief Return coo. If not exist, create from csr.*/
+COOPtr ImmutableGraph::GetCOO() const {
+  if (!coo_) {
+    if (in_csr_) {
+      const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
+    } else {
+      CHECK(out_csr_) << "Both CSR are missing.";
+      const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
+    }
+  }
+  return coo_;
+}
+
+EdgeArray ImmutableGraph::Edges(const std::string &order) const {
+  if (order.empty()) {
+    // arbitrary order
+    if (in_csr_) {
+      // transpose
+      const auto& edges = in_csr_->Edges(order);
+      return EdgeArray{edges.dst, edges.src, edges.id};
+    } else {
+      return AnyGraph()->Edges(order);
+    }
+  } else if (order == std::string("srcdst")) {
+    // TODO(minjie): CSR only guarantees "src" to be sorted.
+    //   Maybe we should relax this requirement?
+    return GetOutCSR()->Edges(order);
+  } else if (order == std::string("eid")) {
+    return GetCOO()->Edges(order);
   } else {
-    CHECK(this->out_csr_) << "one of the CSRs must exist";
-    auto succ = this->out_csr_->GetIndexRef(src);
-    return dgl::binary_search(succ.begin(), succ.end(), dst);
+    LOG(FATAL) << "Unsupported order request: " << order;
   }
-}
-
-BoolArray ImmutableGraph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-  const auto rstlen = std::max(srclen, dstlen);
-  BoolArray rst = BoolArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  if (srclen == 1) {
-    // one-many
-    for (int64_t i = 0; i < dstlen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
-    }
-  } else if (dstlen == 1) {
-    // many-one
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
-    }
-  } else {
-    // many-many
-    CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
-    }
-  }
-  return rst;
-}
-
-IdArray ImmutableGraph::Predecessors(dgl_id_t vid, uint64_t radius) const {
-  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  CHECK(radius >= 1) << "invalid radius: " << radius;
-
-  auto pred = this->GetInCSR()->GetIndexRef(vid);
-  const int64_t len = pred.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-
-  std::copy(pred.begin(), pred.end(), rst_data);
-  return rst;
-}
-
-IdArray ImmutableGraph::Successors(dgl_id_t vid, uint64_t radius) const {
-  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  CHECK(radius >= 1) << "invalid radius: " << radius;
-
-  auto succ = this->GetOutCSR()->GetIndexRef(vid);
-  const int64_t len = succ.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-
-  std::copy(succ.begin(), succ.end(), rst_data);
-  return rst;
-}
-
-DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(this->in_csr_);
-  auto pred = this->in_csr_->GetIndexRef(dst);
-  auto it = std::lower_bound(pred.begin(), pred.end(), src);
-  // If there doesn't exist edges between the two nodes.
-  if (it == pred.end() || *it != src) {
-    return DGLIdIters(it, it);
-  }
-
-  size_t off = it - in_csr_->indices.begin();
-  CHECK(off < in_csr_->indices.size());
-  auto start = in_csr_->edge_ids.begin() + off;
-  int64_t len = 0;
-  // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != pred.end() && *it1 == src; it1++, len++) {}
-  return DGLIdIters(start, start + len);
-}
-
-DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(this->out_csr_);
-  auto succ = this->out_csr_->GetIndexRef(src);
-  auto it = std::lower_bound(succ.begin(), succ.end(), dst);
-  // If there doesn't exist edges between the two nodes.
-  if (it == succ.end() || *it != dst) {
-    return DGLIdIters(it, it);
-  }
-
-  size_t off = it - out_csr_->indices.begin();
-  CHECK(off < out_csr_->indices.size());
-  auto start = out_csr_->edge_ids.begin() + off;
-  int64_t len = 0;
-  // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != succ.end() && *it1 == dst; it1++, len++) {}
-  return DGLIdIters(start, start + len);
-}
-
-IdArray ImmutableGraph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
-
-  auto edge_ids = in_csr_ ? GetInEdgeIdRef(src, dst) : GetOutEdgeIdRef(src, dst);
-  int64_t len = edge_ids.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  if (len > 0) {
-    std::copy(edge_ids.begin(), edge_ids.end(), rst_data);
-  }
-
-  return rst;
-}
-
-ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-
-  CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
-    << "Invalid src and dst id array.";
-
-  const int src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
-  const int dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-
-  std::vector<dgl_id_t> src, dst, eid;
-
-  for (int64_t i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
-    const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
-    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
-        "invalid edge: " << src_id << " -> " << dst_id;
-
-    auto edges = this->in_csr_ ? GetInEdgeIdRef(src_id, dst_id) : GetOutEdgeIdRef(src_id, dst_id);
-    for (size_t k = 0; k < edges.size(); k++) {
-        src.push_back(src_id);
-        dst.push_back(dst_id);
-        eid.push_back(edges[k]);
-    }
-  }
-
-  const int64_t rstlen = src.size();
-  IdArray rst_src = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  IdArray rst_dst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  IdArray rst_eid = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-
-  std::copy(src.begin(), src.end(), rst_src_data);
-  std::copy(dst.begin(), dst.end(), rst_dst_data);
-  std::copy(eid.begin(), eid.end(), rst_eid_data);
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
-}
-
-std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
-  dgl_id_t row = 0, col = 0;
-  auto edge_list = GetEdgeList();
-  CHECK(eid < NumEdges()) << "Invalid edge id " << eid;
-  row = edge_list->src_points[eid];
-  col = edge_list->dst_points[eid];
-  CHECK(row < NumVertices() && col < NumVertices()) << "Invalid edge id " << eid;
-  return std::pair<dgl_id_t, dgl_id_t>(row, col);
-}
-
-ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  int64_t len = eids->shape[0];
-  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-
-  for (int64_t i = 0; i < len; i++) {
-    auto edge = ImmutableGraph::FindEdge(eid_data[i]);
-    rst_src_data[i] = edge.first;
-    rst_dst_data[i] = edge.second;
-  }
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, eids};
-}
-
-ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
-  int64_t rstlen = NumEdges();
-  IdArray rst_src = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray rst_dst = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray rst_eid = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-
-  if (order == "srcdst") {
-    auto out_csr = GetOutCSR();
-    // If sorted, the returned edges are sorted by the source Id and dest Id.
-    for (size_t i = 0; i < out_csr->indptr.size() - 1; i++) {
-      std::fill(rst_src_data + out_csr->indptr[i], rst_src_data + out_csr->indptr[i + 1],
-          static_cast<dgl_id_t>(i));
-    }
-    std::copy(out_csr->indices.begin(), out_csr->indices.end(), rst_dst_data);
-    std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), rst_eid_data);
-  } else if (order.empty() || order == "eid") {
-    std::vector<Edge> edges;
-    auto out_csr = GetOutCSR();
-    out_csr->ReadAllEdges(&edges);
-    std::sort(edges.begin(), edges.end(), [](const Edge &e1, const Edge &e2) {
-      return e1.edge_id < e2.edge_id;
-    });
-    for (size_t i = 0; i < edges.size(); i++) {
-      rst_src_data[i] = edges[i].end_points[0];
-      rst_dst_data[i] = edges[i].end_points[1];
-      rst_eid_data[i] = edges[i].edge_id;
-    }
-  } else {
-    LOG(FATAL) << "unsupported order " << order;
-  }
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
+  return {};
 }
 
 Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
-  Subgraph subg;
-  std::pair<CSR::Ptr, IdArray> ret;
-  // We prefer to generate a subgraph for out-csr first.
-  if (out_csr_) {
-    ret = out_csr_->VertexSubgraph(vids);
-    subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
-  } else {
-    CHECK(in_csr_);
-    ret = in_csr_->VertexSubgraph(vids);
-    // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
-    // We don't need to generate both.
-    subg.graph = GraphPtr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
-  }
-  subg.induced_vertices = vids;
-  subg.induced_edges = ret.second;
-  return subg;
+  // We prefer to generate a subgraph from out-csr.
+  auto sg = GetOutCSR()->VertexSubgraph(vids);
+  CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
+  sg.graph = GraphPtr(new ImmutableGraph(subcsr));
+  return sg;
 }
 
-Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  Subgraph subg;
-  std::pair<CSR::Ptr, IdArray> ret;
-  auto edge_list = GetEdgeList();
-  if (out_csr_) {
-    ret = out_csr_->EdgeSubgraph(eids, edge_list);
-    subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
-  } else {
-    ret = in_csr_->EdgeSubgraph(eids, edge_list);
-    subg.graph = GraphPtr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
-  }
-  subg.induced_edges = eids;
-  subg.induced_vertices = ret.second;
-  return subg;
-}
-
-ImmutableGraph::CSRArray GetCSRArray(ImmutableGraph::CSR::Ptr csr, size_t start, size_t end) {
-  size_t num_rows = end - start;
-  size_t nnz = csr->indptr[end] - csr->indptr[start];
-  IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_rows + 1)},
-                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray indices = IdArray::Empty({static_cast<int64_t>(nnz)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eids = IdArray::Empty({static_cast<int64_t>(nnz)},
-                                DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  for (size_t i = start; i < end + 1; i++)
-    indptr_data[i - start] = csr->indptr[i] - csr->indptr[start];
-  std::copy(csr->indices.begin() + csr->indptr[start],
-            csr->indices.begin() + csr->indptr[end], indices_data);
-  std::copy(csr->edge_ids.begin() + csr->indptr[start],
-            csr->edge_ids.begin() + csr->indptr[end], eid_data);
-  return ImmutableGraph::CSRArray{indptr, indices, eids};
-}
-
-ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray(size_t start, size_t end) const {
-  return GetCSRArray(GetInCSR(), start, end);
-}
-
-ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray(size_t start, size_t end) const {
-  return GetCSRArray(GetOutCSR(), start, end);
+Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
+  COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
+  sg.graph = GraphPtr(new ImmutableGraph(subcoo));
+  return sg;
 }
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
-  if (fmt == "csr") {
-    CSRArray arrs = transpose ? this->GetOutCSRArray(0, NumVertices())
-        : this->GetInCSRArray(0, NumVertices());
-    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
-  } else if (fmt == "coo") {
-    int64_t num_edges = this->NumEdges();
-    IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    CSR::Ptr csr = transpose ? GetOutCSR() : GetInCSR();
-    int64_t *idx_data = static_cast<int64_t*>(idx->data);
-    dgl_id_t *eid_data = static_cast<dgl_id_t*>(eid->data);
-    for (size_t i = 0; i < csr->indptr.size() - 1; i++) {
-      for (int64_t j = csr->indptr[i]; j < csr->indptr[i + 1]; j++)
-        idx_data[j] = i;
-    }
-    std::copy(csr->indices.begin(), csr->indices.end(), idx_data + num_edges);
-    std::copy(csr->edge_ids.begin(), csr->edge_ids.end(), eid_data);
-    return std::vector<IdArray>{idx, eid};
+  // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
+  //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
+  //   is equal to in edge CSR.
+  //   We have this behavior because previously we use framework's SPMM and we don't cache
+  //   reverse adj. This is not intuitive and also not consistent with networkx's
+  //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
+  //   behavior and make row for src and col for dst.
+  if (fmt == std::string("csr")) {
+    return transpose? GetOutCSR()->GetAdj(false, "csr") : GetInCSR()->GetAdj(false, "csr");
+  } else if (fmt == std::string("coo")) {
+    return GetCOO()->GetAdj(!transpose, fmt);
   } else {
-    LOG(FATAL) << "unsupported adjacency matrix format";
-    return std::vector<IdArray>();
+    LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
+    return {};
   }
 }
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids));
+  if (edge_dir == "in") {
+    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphPtr();
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    bool multigraph, const std::string &edge_dir) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
+  if (edge_dir == "in") {
+    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphPtr();
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    const std::string &edge_dir,
+    const std::string &shared_mem_name) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
+  if (edge_dir == "in") {
+    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphPtr();
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    bool multigraph, const std::string &edge_dir,
+    const std::string &shared_mem_name) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
+                     GetSharedMemName(shared_mem_name, edge_dir)));
+  if (edge_dir == "in") {
+    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphPtr();
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
+    const std::string &shared_mem_name, size_t num_vertices,
+    size_t num_edges, bool multigraph,
+    const std::string &edge_dir) {
+  CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
+                     multigraph));
+  if (edge_dir == "in") {
+    return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
+  } else if (edge_dir == "out") {
+    return ImmutableGraphPtr(new ImmutableGraph(nullptr, csr, shared_mem_name));
+  } else {
+    LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+    return ImmutableGraphPtr();
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
+    int64_t num_vertices, IdArray src, IdArray dst) {
+  COOPtr coo(new COO(num_vertices, src, dst));
+  return std::make_shared<ImmutableGraph>(coo);
+}
+
+ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
+    int64_t num_vertices, IdArray src, IdArray dst, bool multigraph) {
+  COOPtr coo(new COO(num_vertices, src, dst, multigraph));
+  return std::make_shared<ImmutableGraph>(coo);
+}
+
+ImmutableGraphPtr ImmutableGraph::ToImmutable(GraphPtr graph) {
+  ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(graph);
+  if (ig) {
+    return ig;
+  } else {
+    const auto& adj = graph->GetAdj(true, "csr");
+    CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
+    return ImmutableGraph::CreateFromCSR(adj[0], adj[1], adj[2], "out");
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::CopyTo(ImmutableGraphPtr g, const DLContext& ctx) {
+  if (ctx == g->Context()) {
+    return g;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  CSRPtr new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyTo(ctx)));
+  return ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr));
+}
+
+ImmutableGraphPtr ImmutableGraph::CopyToSharedMem(ImmutableGraphPtr g,
+    const std::string &edge_dir, const std::string &name) {
+  CSRPtr new_incsr, new_outcsr;
+  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
+  if (edge_dir == std::string("in"))
+    new_incsr = CSRPtr(new CSR(g->GetInCSR()->CopyToSharedMem(shared_mem_name)));
+  else if (edge_dir == std::string("out"))
+    new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+  return ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr, name));
+}
+
+ImmutableGraphPtr ImmutableGraph::AsNumBits(ImmutableGraphPtr g, uint8_t bits) {
+  if (g->NumBits() == bits) {
+    return g;
+  } else {
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    CSRPtr new_incsr = CSRPtr(new CSR(g->GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(g->GetOutCSR()->AsNumBits(bits)));
+    return ImmutableGraphPtr(new ImmutableGraph(new_incsr, new_outcsr));
+  }
+}
+
+ImmutableGraphPtr ImmutableGraph::Reverse() const {
+  if (coo_) {
+    return ImmutableGraphPtr(new ImmutableGraph(
+          out_csr_, in_csr_, coo_->Transpose()));
+  } else {
+    return ImmutableGraphPtr(new ImmutableGraph(out_csr_, in_csr_));
+  }
+}
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    const int device_type = args[1];
+    const int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::CopyTo(ig, ctx);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    std::string edge_dir = args[1];
+    std::string name = args[2];
+    ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::CopyToSharedMem(ig, edge_dir, name);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    int bits = args[1];
+    ImmutableGraphPtr ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    *rv = ImmutableGraph::AsNumBits(ig, bits);
+  });
 
 }  // namespace dgl

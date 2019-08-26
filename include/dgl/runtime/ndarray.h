@@ -6,11 +6,13 @@
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
 
+#include <string>
 #include <atomic>
 #include <vector>
 #include <utility>
 #include "c_runtime_api.h"
 #include "serializer.h"
+#include "shared_mem.h"
 
 namespace dgl {
 namespace runtime {
@@ -90,6 +92,8 @@ class NDArray {
   inline int use_count() const;
   /*! \return Pointer to content of DLTensor */
   inline const DLTensor* operator->() const;
+  /*! \return True if the ndarray is contiguous. */
+  bool IsContiguous() const;
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
@@ -127,10 +131,11 @@ class NDArray {
    * \brief Create a NDArray that shares the data memory with the current one.
    * \param shape The shape of the new array.
    * \param dtype The data type of the new array.
+   * \param offset The offset (in bytes) of the starting pointer.
    * \note The memory size of new array must be smaller than the current one.
    */
   DGL_DLL NDArray CreateView(
-      std::vector<int64_t> shape, DLDataType dtype);
+      std::vector<int64_t> shape, DLDataType dtype, int64_t offset = 0);
   /*!
    * \brief Create a reference view of NDArray that
    *  represents as DLManagedTensor.
@@ -147,6 +152,24 @@ class NDArray {
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
                                DLContext ctx);
+  /*!
+   * \brief Create an empty NDArray with shared memory.
+   * \param name The name of shared memory.
+   * \param shape The shape of the new array.
+   * \param dtype The data type of the new array.
+   * \param ctx The context of the Array.
+   * \param is_create whether to create shared memory.
+   * \return The created Array
+   */
+  DGL_DLL static NDArray EmptyShared(const std::string &name,
+                                     std::vector<int64_t> shape,
+                                     DLDataType dtype,
+                                     DLContext ctx,
+                                     bool is_create);
+  /*!
+   * \brief Get the size of the array in the number of bytes.
+   */
+  size_t GetSize() const;
   /*!
    * \brief Create a NDArray backed by a dlpack tensor.
    *
@@ -207,6 +230,10 @@ struct NDArray::Container {
    *  The head ptr of this struct can be viewed as DLTensor*.
    */
   DLTensor dl_tensor;
+
+#ifndef _WIN32
+  std::shared_ptr<SharedMemory> mem;
+#endif  // _WIN32
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here
@@ -265,16 +292,18 @@ struct NDArray::Container {
 // the usages of functions are documented in place.
 inline NDArray::NDArray(Container* data)
   : data_(data) {
-  data_->IncRef();
+  if (data_)
+    data_->IncRef();
 }
 
 inline NDArray::NDArray(const NDArray& other)
   : data_(other.data_) {
-  data_->IncRef();
+  if (data_)
+    data_->IncRef();
 }
 
 inline void NDArray::reset() {
-  if (data_ != nullptr) {
+  if (data_) {
     data_->DecRef();
     data_ = nullptr;
   }

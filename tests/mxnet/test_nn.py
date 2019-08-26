@@ -1,13 +1,14 @@
 import mxnet as mx
 import networkx as nx
 import numpy as np
+import scipy as sp
 import dgl
 import dgl.nn.mxnet as nn
-from mxnet import autograd
+import backend as F
+from mxnet import autograd, gluon, nd
 
-def check_eq(a, b):
-    assert a.shape == b.shape
-    assert mx.nd.sum(a == b).asnumpy() == int(np.prod(list(a.shape)))
+def check_close(a, b):
+    assert np.allclose(a.asnumpy(), b.asnumpy(), rtol=1e-4, atol=1e-4)
 
 def _AXWb(A, X, W, b):
     X = mx.nd.dot(X, W.data(X.context))
@@ -16,45 +17,227 @@ def _AXWb(A, X, W, b):
 
 def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3))
-    adj = g.adjacency_matrix()
-    ctx = mx.cpu(0)
+    ctx = F.ctx()
+    adj = g.adjacency_matrix(ctx=ctx)
 
     conv = nn.GraphConv(5, 2, norm=False, bias=True)
     conv.initialize(ctx=ctx)
     # test#1: basic
-    h0 = mx.nd.ones((3, 5))
+    h0 = F.ones((3, 5))
     h1 = conv(h0, g)
-    check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
-    h0 = mx.nd.ones((3, 5, 5))
+    h0 = F.ones((3, 5, 5))
     h1 = conv(h0, g)
-    check_eq(h1, _AXWb(adj, h0, conv.weight, conv.bias))
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
 
     conv = nn.GraphConv(5, 2)
     conv.initialize(ctx=ctx)
 
     # test#3: basic
-    h0 = mx.nd.ones((3, 5))
+    h0 = F.ones((3, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
     # test#4: basic
-    h0 = mx.nd.ones((3, 5, 5))
+    h0 = F.ones((3, 5, 5))
     h1 = conv(h0, g)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
 
     conv = nn.GraphConv(5, 2)
     conv.initialize(ctx=ctx)
 
     with autograd.train_mode():
         # test#3: basic
-        h0 = mx.nd.ones((3, 5))
+        h0 = F.ones((3, 5))
         h1 = conv(h0, g)
+        assert len(g.ndata) == 0
+        assert len(g.edata) == 0
         # test#4: basic
-        h0 = mx.nd.ones((3, 5, 5))
+        h0 = F.ones((3, 5, 5))
         h1 = conv(h0, g)
+        assert len(g.ndata) == 0
+        assert len(g.edata) == 0
 
-    # test repeated features
-    g.ndata["_gconv_feat"] = 2 * mx.nd.ones((3, 1))
+    # test not override features
+    g.ndata["h"] = 2 * F.ones((3, 1))
     h1 = conv(h0, g)
-    assert "_gconv_feat" in g.ndata
+    assert len(g.ndata) == 1
+    assert len(g.edata) == 0
+    assert "h" in g.ndata
+    check_close(g.ndata['h'], 2 * F.ones((3, 1)))
+
+def test_set2set():
+    g = dgl.DGLGraph(nx.path_graph(10))
+    ctx = F.ctx()
+
+    s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
+    s2s.initialize(ctx=ctx)
+    print(s2s)
+
+    # test#1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = s2s(h0, g)
+    assert h1.shape[0] == 10 and h1.ndim == 1
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g])
+    h0 = F.randn((bg.number_of_nodes(), 5))
+    h1 = s2s(h0, bg)
+    assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
+
+def test_glob_att_pool():
+    g = dgl.DGLGraph(nx.path_graph(10))
+    ctx = F.ctx()
+
+    gap = nn.GlobalAttentionPooling(gluon.nn.Dense(1), gluon.nn.Dense(10))
+    gap.initialize(ctx=ctx)
+    print(gap)
+    # test#1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = gap(h0, g)
+    assert h1.shape[0] == 10 and h1.ndim == 1
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g, g])
+    h0 = F.randn((bg.number_of_nodes(), 5))
+    h1 = gap(h0, bg)
+    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
+
+def test_simple_pool():
+    g = dgl.DGLGraph(nx.path_graph(15))
+
+    sum_pool = nn.SumPooling()
+    avg_pool = nn.AvgPooling()
+    max_pool = nn.MaxPooling()
+    sort_pool = nn.SortPooling(10) # k = 10
+    print(sum_pool, avg_pool, max_pool, sort_pool)
+
+    # test#1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = sum_pool(h0, g)
+    check_close(h1, F.sum(h0, 0))
+    h1 = avg_pool(h0, g)
+    check_close(h1, F.mean(h0, 0))
+    h1 = max_pool(h0, g)
+    check_close(h1, F.max(h0, 0))
+    h1 = sort_pool(h0, g)
+    assert h1.shape[0] == 10 * 5 and h1.ndim == 1
+
+    # test#2: batched graph
+    g_ = dgl.DGLGraph(nx.path_graph(5))
+    bg = dgl.batch([g, g_, g, g_, g])
+    h0 = F.randn((bg.number_of_nodes(), 5))
+    h1 = sum_pool(h0, bg)
+    truth = mx.nd.stack(F.sum(h0[:15], 0),
+                        F.sum(h0[15:20], 0),
+                        F.sum(h0[20:35], 0),
+                        F.sum(h0[35:40], 0),
+                        F.sum(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
+    h1 = avg_pool(h0, bg)
+    truth = mx.nd.stack(F.mean(h0[:15], 0),
+                        F.mean(h0[15:20], 0),
+                        F.mean(h0[20:35], 0),
+                        F.mean(h0[35:40], 0),
+                        F.mean(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
+    h1 = max_pool(h0, bg)
+    truth = mx.nd.stack(F.max(h0[:15], 0),
+                        F.max(h0[15:20], 0),
+                        F.max(h0[20:35], 0),
+                        F.max(h0[35:40], 0),
+                        F.max(h0[40:55], 0), axis=0)
+    check_close(h1, truth)
+
+    h1 = sort_pool(h0, bg)
+    assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
+
+def uniform_attention(g, shape):
+    a = mx.nd.ones(shape)
+    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
+    return a / g.in_degrees(g.edges()[1]).reshape(target_shape).astype('float32')
+
+def test_edge_softmax():
+    # Basic
+    g = dgl.DGLGraph(nx.path_graph(3))
+    edata = F.ones((g.number_of_edges(), 1))
+    a = nn.edge_softmax(g, edata)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
+            1e-4, 1e-4)
+
+    # Test higher dimension case
+    edata = F.ones((g.number_of_edges(), 3, 1))
+    a = nn.edge_softmax(g, edata)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
+            1e-4, 1e-4)
+
+def test_rgcn():
+    ctx = F.ctx()
+    etype = []
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    B = 2
+    I = 10
+    O = 8
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd.initialize(ctx=ctx)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
+    h_new = rgc_bdd(g, h, r)
+    assert list(h_new.shape) == [100, O]
+
+    # with norm
+    norm = nd.zeros((g.number_of_edges(), 1), ctx=ctx)
+
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
+    h_new = rgc_basis(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    rgc_bdd = nn.RelGraphConv(I, O, R, "bdd", B)
+    rgc_bdd.initialize(ctx=ctx)
+    h = nd.random.randn(100, I, ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
+    h_new = rgc_bdd(g, h, r, norm)
+    assert list(h_new.shape) == [100, O]
+
+    # id input
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
+    rgc_basis.initialize(ctx=ctx)
+    h = nd.random.randint(0, I, (100,), ctx=ctx)
+    r = nd.array(etype, ctx=ctx)
+    h_new = rgc_basis(g, h, r)
+    assert list(h_new.shape) == [100, O]
 
 if __name__ == '__main__':
     test_graph_conv()
+    test_edge_softmax()
+    test_set2set()
+    test_glob_att_pool()
+    test_simple_pool()
+    test_rgcn()

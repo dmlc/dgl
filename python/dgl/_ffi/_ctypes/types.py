@@ -4,14 +4,16 @@ from __future__ import absolute_import as _abs
 
 import ctypes
 from ..base import py_str, check_call, _LIB
-from ..runtime_ctypes import DGLByteArray, TypeCode
+from ..runtime_ctypes import DGLByteArray, TypeCode, DGLType, DGLContext
 
 class DGLValue(ctypes.Union):
     """DGLValue in C API"""
     _fields_ = [("v_int64", ctypes.c_int64),
                 ("v_float64", ctypes.c_double),
                 ("v_handle", ctypes.c_void_p),
-                ("v_str", ctypes.c_char_p)]
+                ("v_str", ctypes.c_char_p),
+                ("v_type", DGLType),
+                ("v_ctx", DGLContext)]
 
 
 DGLPackedCFunc = ctypes.CFUNCTYPE(
@@ -61,7 +63,8 @@ RETURN_SWITCH = {
     TypeCode.HANDLE: _return_handle,
     TypeCode.NULL: lambda x: None,
     TypeCode.STR: lambda x: py_str(x.v_str),
-    TypeCode.BYTES: _return_bytes
+    TypeCode.BYTES: _return_bytes,
+    TypeCode.DGL_CONTEXT: lambda x: DGLContext(x.v_ctx.device_type, x.v_ctx.device_id),
 }
 
 C_TO_PY_ARG_SWITCH = {
@@ -70,5 +73,6 @@ C_TO_PY_ARG_SWITCH = {
     TypeCode.HANDLE: _return_handle,
     TypeCode.NULL: lambda x: None,
     TypeCode.STR: lambda x: py_str(x.v_str),
-    TypeCode.BYTES: _return_bytes
+    TypeCode.BYTES: _return_bytes,
+    TypeCode.DGL_CONTEXT: lambda x: DGLContext(x.v_ctx.device_type, x.v_ctx.device_id),
 }

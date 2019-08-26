@@ -1,7 +1,9 @@
+import os
 import backend as F
 import networkx as nx
 import numpy as np
 import scipy as sp
+from scipy import sparse as spsp
 import dgl
 from dgl.graph_index import map_to_subgraph_nid, GraphIndex, create_graph_index
 from dgl import utils
@@ -10,20 +12,20 @@ def generate_from_networkx():
     edges = [[2, 3], [2, 5], [3, 0], [1, 0], [4, 3], [4, 5]]
     nx_graph = nx.DiGraph()
     nx_graph.add_edges_from(edges)
-    g = create_graph_index(nx_graph)
-    ig = create_graph_index(nx_graph, readonly=True)
+    g = create_graph_index(nx_graph, multigraph=False, readonly=False)
+    ig = create_graph_index(nx_graph, multigraph=False, readonly=True)
     return g, ig
 
 def generate_from_edgelist():
     edges = [[2, 3], [2, 5], [3, 0], [6, 10], [10, 3], [10, 15]]
-    g = create_graph_index(edges)
-    ig = create_graph_index(edges, readonly=True)
+    g = create_graph_index(edges, multigraph=False, readonly=False)
+    ig = create_graph_index(edges, multigraph=False, readonly=True)
     return g, ig
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    g = create_graph_index(arr)
-    ig = create_graph_index(arr, readonly=True)
+    g = create_graph_index(arr, multigraph=False, readonly=False)
+    ig = create_graph_index(arr, multigraph=False, readonly=True)
     return g, ig
 
 def check_graph_equal(g1, g2):
@@ -120,8 +122,8 @@ def test_node_subgraph():
     randv = np.unique(randv1)
     subg = g.node_subgraph(utils.toindex(randv))
     subig = ig.node_subgraph(utils.toindex(randv))
-    check_basics(subg, subig)
-    check_graph_equal(subg, subig)
+    check_basics(subg.graph, subig.graph)
+    check_graph_equal(subg.graph, subig.graph)
     assert F.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
             == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor(), 0) == 10
 
@@ -134,8 +136,8 @@ def test_node_subgraph():
         subgs.append(g.node_subgraph(utils.toindex(randv)))
     subigs= ig.node_subgraphs(randvs)
     for i in range(4):
-        check_basics(subg, subig)
-        check_graph_equal(subgs[i], subigs[i])
+        check_basics(subg.graph, subig.graph)
+        check_graph_equal(subgs[i].graph, subigs[i].graph)
 
 def test_create_graph():
     elist = [(1, 2), (0, 1), (0, 2)]
@@ -153,8 +155,51 @@ def test_create_graph():
     for edge in elist:
         assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
 
+def test_load_csr():
+    n = 100
+    csr = (sp.sparse.random(n, n, density=0.1, format='csr') != 0).astype(np.int64)
+
+    # Load CSR normally.
+    idx = dgl.graph_index.from_csr(
+            utils.toindex(csr.indptr), utils.toindex(csr.indices), False, 'out')
+    assert idx.number_of_nodes() == n
+    assert idx.number_of_edges() == csr.nnz
+    src, dst, eid = idx.edges()
+    src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+    coo = csr.tocoo()
+    assert np.all(F.asnumpy(src) == coo.row)
+    assert np.all(F.asnumpy(dst) == coo.col)
+
+    # Load CSR to shared memory.
+    # Shared memory isn't supported in Windows.
+    if os.name is not 'nt':
+        idx = dgl.graph_index.from_csr(
+                utils.toindex(csr.indptr), utils.toindex(csr.indices),
+                False, 'out', '/test_graph_struct')
+        assert idx.number_of_nodes() == n
+        assert idx.number_of_edges() == csr.nnz
+        src, dst, eid = idx.edges()
+        src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        coo = csr.tocoo()
+        assert np.all(F.asnumpy(src) == coo.row)
+        assert np.all(F.asnumpy(dst) == coo.col)
+
+def test_edge_ids():
+    np.random.seed(0)
+    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
+    #csr = csr.transpose()
+    g = dgl.DGLGraph(csr, readonly=True)
+    num_nodes = g.number_of_nodes()
+    in_edges = g._graph.in_edges(v=dgl.utils.toindex([2]))
+    src, dst, eids = g._graph.edge_ids(dgl.utils.toindex(in_edges[0]),
+                                       dgl.utils.toindex(in_edges[1]))
+    assert np.all(in_edges[0].tonumpy() == src.tonumpy())
+    assert np.all(in_edges[1].tonumpy() == dst.tonumpy())
+
 if __name__ == '__main__':
     test_basics()
+    test_edge_ids()
     test_graph_gen()
     test_node_subgraph()
     test_create_graph()
+    test_load_csr()

@@ -24,13 +24,14 @@
 #endif
 
 namespace dgl {
-// Forward declare NodeRef and Node for extensions.
-// This header works fine without depend on NodeRef
-// as long as it is not used.
-class Node;
-class NodeRef;
-
 namespace runtime {
+
+// Forward declare ObjectRef and Object for extensions.
+// This header works fine without depend on ObjectRef
+// as long as it is not used.
+class Object;
+class ObjectRef;
+
 // forward declarations
 class DGLArgs;
 class DGLArgValue;
@@ -520,19 +521,25 @@ class DGLArgValue : public DGLPODValue_ {
   const DGLValue& value() const {
     return value_;
   }
+
   // Deferred extension handler.
-  template<typename TNodeRef>
-  inline TNodeRef AsNodeRef() const;
+  template<typename TObjectRef>
+  inline TObjectRef AsObjectRef() const;
+
+  // Convert this value to arbitrary class type
   template<typename T,
            typename = typename std::enable_if<
              std::is_class<T>::value>::type>
   inline operator T() const;
-  template<typename TNodeRef,
+
+  // Return true if the value is of TObjectRef type
+  template<typename TObjectRef,
            typename = typename std::enable_if<
-             std::is_class<TNodeRef>::value>::type>
-  inline bool IsNodeType() const;
+             std::is_class<TObjectRef>::value>::type>
+  inline bool IsObjectType() const;
+
   // get internal node ptr, if it is node
-  inline std::shared_ptr<Node>& node_sptr();
+  inline std::shared_ptr<Object>& obj_sptr();
 };
 
 /*!
@@ -642,6 +649,11 @@ class DGLRetValue : public DGLPODValue_ {
     value_.v_type = t;
     return *this;
   }
+  DGLRetValue& operator=(DGLContext ctx) {
+    this->SwitchToPOD(kDGLContext);
+    value_.v_ctx = ctx;
+    return *this;
+  }
   DGLRetValue& operator=(bool value) {
     this->SwitchToPOD(kDLInt);
     value_.v_int64 = value;
@@ -709,21 +721,21 @@ class DGLRetValue : public DGLPODValue_ {
   }
   /*! \return The value field, if the data is POD */
   const DGLValue& value() const {
-    CHECK(type_code_ != kNodeHandle &&
+    CHECK(type_code_ != kObjectHandle &&
           type_code_ != kFuncHandle &&
           type_code_ != kModuleHandle &&
           type_code_ != kStr) << "DGLRetValue.value can only be used for POD data";
     return value_;
   }
-  // NodeRef related extenstions: in dgl/packed_func_ext.h
+  // ObjectRef related extenstions: in dgl/packed_func_ext.h
   template<typename T,
            typename = typename std::enable_if<
              std::is_class<T>::value>::type>
   inline operator T() const;
-  template<typename TNodeRef>
-  inline TNodeRef AsNodeRef() const;
-  inline DGLRetValue& operator=(const NodeRef& other);
-  inline DGLRetValue& operator=(const std::shared_ptr<Node>& other);
+  template<typename TObjectRef>
+  inline TObjectRef AsObjectRef() const;
+  inline DGLRetValue& operator=(const ObjectRef& other);
+  inline DGLRetValue& operator=(const std::shared_ptr<Object>& other);
 
  private:
   template<typename T>
@@ -749,9 +761,9 @@ class DGLRetValue : public DGLPODValue_ {
         *this = other.operator NDArray();
         break;
       }
-      case kNodeHandle: {
-        SwitchToClass<std::shared_ptr<Node> >(
-            kNodeHandle, *other.template ptr<std::shared_ptr<Node> >());
+      case kObjectHandle: {
+        SwitchToClass<std::shared_ptr<Object> >(
+            kObjectHandle, *other.template ptr<std::shared_ptr<Object> >());
         break;
       }
       default: {
@@ -796,7 +808,7 @@ class DGLRetValue : public DGLPODValue_ {
       case kStr: delete ptr<std::string>(); break;
       case kFuncHandle: delete ptr<PackedFunc>(); break;
       case kModuleHandle: delete ptr<Module>(); break;
-      case kNodeHandle: delete ptr<std::shared_ptr<Node> >(); break;
+      case kObjectHandle: delete ptr<std::shared_ptr<Object> >(); break;
       case kNDArrayContainer: {
         static_cast<NDArray::Container*>(value_.v_handle)->DecRef();
         break;
@@ -823,7 +835,7 @@ inline const char* TypeCode2Str(int type_code) {
     case kBytes: return "bytes";
     case kHandle: return "handle";
     case kNull: return "NULL";
-    case kNodeHandle: return "NodeHandle";
+    case kObjectHandle: return "ObjectHandle";
     case kArrayHandle: return "ArrayHandle";
     case kDGLType: return "DGLType";
     case kDGLContext: return "DGLContext";
@@ -1031,8 +1043,8 @@ class DGLArgsSetter {
            typename = typename std::enable_if<
              extension_class_info<T>::code != 0>::type>
   inline void operator()(size_t i, const T& value) const;
-  // NodeRef related extenstions: in dgl/packed_func_ext.h
-  inline void operator()(size_t i, const NodeRef& other) const;  // NOLINT(*)
+  // ObjectRef related extenstions: in dgl/packed_func_ext.h
+  inline void operator()(size_t i, const ObjectRef& other) const;  // NOLINT(*)
 
  private:
   /*! \brief The values fields */
@@ -1141,7 +1153,7 @@ namespace detail {
 template<typename T, typename TSrc, bool is_ext>
 struct DGLValueCast {
   static T Apply(const TSrc* self) {
-    return self->template AsNodeRef<T>();
+    return self->template AsObjectRef<T>();
   }
 };
 

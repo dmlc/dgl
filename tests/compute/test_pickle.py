@@ -9,8 +9,6 @@ import dgl.function as fn
 import pickle
 import io
 
-import torch
-
 def _assert_is_identical(g, g2):
     assert g.is_multigraph == g2.is_multigraph
     assert g.is_readonly == g2.is_readonly
@@ -82,7 +80,7 @@ def test_pickling_index():
     _assert_is_identical_index(i, i2)
 
 def test_pickling_graph_index():
-    gi = create_graph_index()
+    gi = create_graph_index(None, False, False)
     gi.add_nodes(3)
     src_idx = toindex([0, 0])
     dst_idx = toindex([1, 2])
@@ -150,7 +148,6 @@ def test_pickling_graph():
     assert new_g._message_func == _global_message_func
     assert isinstance(new_g._reduce_func, type(reduce_func))
     assert new_g._reduce_func._name == 'sum'
-    assert new_g._reduce_func.reduce_op == F.sum
     assert new_g._reduce_func.msg_field == 'x'
     assert new_g._reduce_func.out_field == 'x'
 

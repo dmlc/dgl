@@ -19,7 +19,7 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-python graphsage.py --dataset cora --gpu 0
+python3 graphsage.py --dataset cora --gpu 0
 ```
 
 * cora: ~0.8470 

@@ -1,8 +1,9 @@
 """Module for graph transformation methods."""
+from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .batched_graph import BatchedDGLGraph
 
-__all__ = ['line_graph', 'reverse']
+__all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
 
 
 def line_graph(g, backtracking=True, shared=False):
@@ -103,3 +104,69 @@ def reverse(g, share_ndata=False, share_edata=False):
     if share_edata:
         g_reversed._edge_frame = g._edge_frame
     return g_reversed
+
+def to_simple_graph(g):
+    """Convert the graph to a simple graph with no multi-edge.
+
+    The function generates a new *readonly* graph with no node/edge feature.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+
+    Returns
+    -------
+    DGLGraph
+        A simple graph.
+    """
+    gidx = _CAPI_DGLToSimpleGraph(g._graph)
+    return DGLGraph(gidx, readonly=True)
+
+def to_bidirected(g, readonly=True):
+    """Convert the graph to a bidirected graph.
+
+    The function generates a new graph with no node/edge feature.
+    If g has m edges for i->j and n edges for j->i, then the
+    returned graph will have max(m, n) edges for both i->j and j->i.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Whether the returned bidirected graph is readonly or not.
+
+    Returns
+    -------
+    DGLGraph
+
+    Examples
+    --------
+    The following two examples use PyTorch backend, one for non-multi graph
+    and one for multi-graph.
+
+    >>> # non-multi graph
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(2)
+    >>> g.add_edges([0, 0], [0, 1])
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 0]), tensor([0, 0, 1]))
+
+    >>> # multi-graph
+    >>> g.add_edges([0, 1], [1, 0])
+    >>> g.edges()
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 1, 0]))
+
+    >>> bg2 = dgl.to_bidirected(g)
+    >>> bg2.edges()
+    (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
+    """
+    if readonly:
+        newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
+    else:
+        newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
+    return DGLGraph(newgidx)
+
+_init_api("dgl.transform")

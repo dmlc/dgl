@@ -22,15 +22,15 @@ Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 ### Entity Classification
 AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 ```
-DGLBACKEND=mxnet python entity_classify.py -d aifb --testing --gpu 0
+DGLBACKEND=mxnet python3 entity_classify.py -d aifb --testing --gpu 0
 ```
 
-MUTAG: accuracy 76.47% (DGL), 73.23% (paper)
+MUTAG: accuracy 73.53% (DGL), 73.23% (paper)
 ```
-DGLBACKEND=mxnet python entity_classify.py -d mutag --l2norm 5e-4 --n-bases 40 --testing --gpu 0
+DGLBACKEND=mxnet python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
-BGS: accuracy 79.31% (DGL, n-basese=20, OOM when >20), 83.10% (paper)
+BGS: accuracy 75.86% (DGL, n-basese=20, OOM when >20), 83.10% (paper)
 ```
-DGLBACKEND=mxnet python entity_classify.py -d bgs --l2norm 5e-4 --n-bases 20 --testing --gpu 0 --relabel
+DGLBACKEND=mxnet python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 20 --testing --gpu 0 --relabel
 ```

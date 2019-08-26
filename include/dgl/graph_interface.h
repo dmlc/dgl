@@ -9,19 +9,12 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "runtime/ndarray.h"
+#include <algorithm>
+
+#include "./runtime/object.h"
+#include "array.h"
 
 namespace dgl {
-
-typedef uint64_t dgl_id_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-typedef dgl::runtime::NDArray FloatArray;
-
-struct Subgraph;
-struct NodeFlow;
 
 const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
 
@@ -32,17 +25,18 @@ const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
  * but it doesn't own data itself. instead, it only references data in std::vector.
  */
 class DGLIdIters {
-  std::vector<dgl_id_t>::const_iterator begin_, end_;
  public:
-  DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
-             std::vector<dgl_id_t>::const_iterator end) {
+  /* !\brief default constructor to create an empty range */
+  DGLIdIters() {}
+  /* !\brief constructor with given begin and end */
+  DGLIdIters(const dgl_id_t *begin, const dgl_id_t *end) {
     this->begin_ = begin;
     this->end_ = end;
   }
-  std::vector<dgl_id_t>::const_iterator begin() const {
+  const dgl_id_t *begin() const {
     return this->begin_;
   }
-  std::vector<dgl_id_t>::const_iterator end() const {
+  const dgl_id_t *end() const {
     return this->end_;
   }
   dgl_id_t operator[](int64_t i) const {
@@ -51,8 +45,19 @@ class DGLIdIters {
   size_t size() const {
     return this->end_ - this->begin_;
   }
+ private:
+  const dgl_id_t *begin_{nullptr}, *end_{nullptr};
 };
 
+/* \brief structure used to represent a list of edges */
+typedef struct {
+  /* \brief the two endpoints and the id of the edge */
+  IdArray src, dst, id;
+} EdgeArray;
+
+// forward declaration
+struct Subgraph;
+class GraphRef;
 class GraphInterface;
 typedef std::shared_ptr<GraphInterface> GraphPtr;
 
@@ -60,15 +65,15 @@ typedef std::shared_ptr<GraphInterface> GraphPtr;
  * \brief dgl graph index interface.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero.
+ *
+ * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
+ * the input edges are represented by two id arrays for source and destination
+ * vertex ids. In the general case, the two arrays should have the same length.
+ * If the length of src id array is one, it represents one-many connections.
+ * If the length of dst id array is one, it represents many-one connections.
  */
-class GraphInterface {
+class GraphInterface : public runtime::Object {
  public:
-  /* \brief structure used to represent a list of edges */
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   virtual ~GraphInterface() = default;
 
   /*!
@@ -99,7 +104,16 @@ class GraphInterface {
   virtual void Clear() = 0;
 
   /*!
-   * \note not const since we have caches
+   * \brief Get the device context of this graph.
+   */
+  virtual DLContext Context() const = 0;
+
+  /*!
+   * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
+   */
+  virtual uint8_t NumBits() const = 0;
+
+  /*!
    * \return whether the graph is a multigraph
    */
   virtual bool IsMultigraph() const = 0;
@@ -116,7 +130,9 @@ class GraphInterface {
   virtual uint64_t NumEdges() const = 0;
 
   /*! \return true if the given vertex is in the graph.*/
-  virtual bool HasVertex(dgl_id_t vid) const = 0;
+  virtual bool HasVertex(dgl_id_t vid) const {
+    return vid < NumVertices();
+  }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
   virtual BoolArray HasVertices(IdArray vids) const = 0;
@@ -278,18 +294,11 @@ class GraphInterface {
    * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
+   * \param preserve_nodes If true, the vertices will not be relabeled, so some vertices
+   *                       may have no incident edges.
    * \return the induced edge subgraph
    */
-  virtual Subgraph EdgeSubgraph(IdArray eids) const = 0;
-
-  /*!
-   * \brief Return a new graph with all the edges reversed.
-   *
-   * The returned graph preserves the vertex and edge index in the original graph.
-   *
-   * \return the reversed graph
-   */
-  virtual GraphPtr Reverse() const = 0;
+  virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
 
   /*!
    * \brief Return the successor vector
@@ -320,25 +329,32 @@ class GraphInterface {
   virtual DGLIdIters InEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
-   * \brief Reset the data in the graph and move its data to the returned graph object.
-   * \return a raw pointer to the graph object.
-   */
-  virtual GraphInterface *Reset() = 0;
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
+   *
+   * If the fmt is 'csr', the function should return three arrays, representing
+   *  indptr, indices and edge ids
+   *
+   * If the fmt is 'coo', the function should return one array of shape (2, nnz),
+   * representing a horitonzal stack of row and col indices.
+   *
    * \param transpose A flag to transpose the returned adjacency matrix.
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
+
+  static constexpr const char* _type_key = "graph.Graph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
 
+// Define GraphRef
+DGL_DEFINE_OBJECT_REF(GraphRef, GraphInterface);
+
 /*! \brief Subgraph data structure */
-struct Subgraph {
+struct Subgraph : public runtime::Object {
   /*! \brief The graph. */
   GraphPtr graph;
   /*!
@@ -351,7 +367,13 @@ struct Subgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
+
+  static constexpr const char* _type_key = "graph.Subgraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(Subgraph, runtime::Object);
 };
+
+// Define SubgraphRef
+DGL_DEFINE_OBJECT_REF(SubgraphRef, Subgraph);
 
 }  // namespace dgl
 

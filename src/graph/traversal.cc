@@ -3,16 +3,13 @@
  * \file graph/traversal.cc
  * \brief Graph traversal implementation
  */
+#include <dgl/packed_func_ext.h>
 #include <algorithm>
 #include <queue>
 #include "./traversal.h"
 #include "../c_api_common.h"
 
-using dgl::runtime::DGLArgs;
-using dgl::runtime::DGLArgValue;
-using dgl::runtime::DGLRetValue;
-using dgl::runtime::PackedFunc;
-using dgl::runtime::NDArray;
+using namespace dgl::runtime;
 
 namespace dgl {
 namespace traverse {
@@ -115,7 +112,7 @@ struct Frontiers {
   std::vector<int64_t> sections;
 };
 
-Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
+Frontiers BFSNodesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
   Frontiers front;
   VectorQueueWrapper<dgl_id_t> queue(&front.ids);
   auto visit = [&] (const dgl_id_t v) { };
@@ -131,17 +128,16 @@ Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
 
 DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    GraphRef g = args[0];
+    const IdArray src = args[1];
     bool reversed = args[2];
-    const auto& front = BFSNodesFrontiers(*gptr, src, reversed);
+    const auto& front = BFSNodesFrontiers(*(g.sptr()), src, reversed);
     IdArray node_ids = CopyVectorToNDArray(front.ids);
     IdArray sections = CopyVectorToNDArray(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
-Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
+Frontiers BFSEdgesFrontiers(const GraphInterface& graph, IdArray source, bool reversed) {
   Frontiers front;
   // NOTE: std::queue has no top() method.
   std::vector<dgl_id_t> nodes;
@@ -162,17 +158,16 @@ Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
 
 DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    GraphRef g = args[0];
+    const IdArray src = args[1];
     bool reversed = args[2];
-    const auto& front = BFSEdgesFrontiers(*gptr, src, reversed);
+    const auto& front = BFSEdgesFrontiers(*(g.sptr()), src, reversed);
     IdArray edge_ids = CopyVectorToNDArray(front.ids);
     IdArray sections = CopyVectorToNDArray(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({edge_ids, sections});
   });
 
-Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
+Frontiers TopologicalNodesFrontiers(const GraphInterface& graph, bool reversed) {
   Frontiers front;
   VectorQueueWrapper<dgl_id_t> queue(&front.ids);
   auto visit = [&] (const dgl_id_t v) { };
@@ -188,10 +183,9 @@ Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
 
 DGL_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
+    GraphRef g = args[0];
     bool reversed = args[1];
-    const auto& front = TopologicalNodesFrontiers(*gptr, reversed);
+    const auto& front = TopologicalNodesFrontiers(*g.sptr(), reversed);
     IdArray node_ids = CopyVectorToNDArray(front.ids);
     IdArray sections = CopyVectorToNDArray(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
@@ -200,17 +194,16 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
 
 DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray source = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    GraphRef g = args[0];
+    const IdArray source = args[1];
     const bool reversed = args[2];
-    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
+    CHECK(aten::IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
     const int64_t* src_data = static_cast<int64_t*>(source->data);
     std::vector<std::vector<dgl_id_t>> edges(len);
     for (int64_t i = 0; i < len; ++i) {
       auto visit = [&] (dgl_id_t e, int tag) { edges[i].push_back(e); };
-      DFSLabeledEdges(*gptr, src_data[i], reversed, false, false, visit);
+      DFSLabeledEdges(*g.sptr(), src_data[i], reversed, false, false, visit);
     }
     IdArray ids = MergeMultipleTraversals(edges);
     IdArray sections = ComputeMergedSections(edges);
@@ -219,15 +212,14 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
 
 DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray source = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    GraphRef g = args[0];
+    const IdArray source = args[1];
     const bool reversed = args[2];
     const bool has_reverse_edge = args[3];
     const bool has_nontree_edge = args[4];
     const bool return_labels = args[5];
 
-    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
+    CHECK(aten::IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
     const int64_t* src_data = static_cast<int64_t*>(source->data);
 
@@ -243,7 +235,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
           tags[i].push_back(tag);
         }
       };
-      DFSLabeledEdges(*gptr, src_data[i], reversed,
+      DFSLabeledEdges(*g.sptr(), src_data[i], reversed,
           has_reverse_edge, has_nontree_edge, visit);
     }
 

@@ -118,7 +118,8 @@ class TreeLSTM(gluon.nn.Block):
         g.register_apply_node_func(self.cell.apply_node_func)
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
-        g.ndata['iou'] = self.cell.W_iou(self.dropout(embeds)) * batch.mask.expand_dims(-1)
+        wiou = self.cell.W_iou(self.dropout(embeds))
+        g.ndata['iou'] = wiou * batch.mask.expand_dims(-1).astype(wiou.dtype)
         g.ndata['h'] = h
         g.ndata['c'] = c
         # propagate

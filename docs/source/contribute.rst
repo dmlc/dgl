@@ -115,6 +115,7 @@ To achieve this, export following environment variables:
 If you are working on performance critical part, you may want to turn on Cython build:
 
 .. code-block:: bash
+
    cd python
    python setup.py build_ext --inplace
 

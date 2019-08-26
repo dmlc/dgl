@@ -3,7 +3,7 @@
  * \file dgl/runtime/c_runtime_api.h
  * \brief DGL runtime library.
  *
- * This runtime is adapted from TVM project
+ * This runtime is adapted from TVM project (commit: 2ce5277)
  */
 #ifndef DGL_RUNTIME_C_RUNTIME_API_H_
 #define DGL_RUNTIME_C_RUNTIME_API_H_
@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.2"
+#define DGL_VERSION "0.4"
 
 
 // DGL Runtime is DLPack compatible.
@@ -72,7 +72,7 @@ typedef enum {
   kDGLType = 5U,
   kDGLContext = 6U,
   kArrayHandle = 7U,
-  kNodeHandle = 8U,
+  kObjectHandle = 8U,
   kModuleHandle = 9U,
   kFuncHandle = 10U,
   kStr = 11U,
@@ -393,6 +393,29 @@ DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
                           int device_type,
                           int device_id,
                           DGLArrayHandle* out);
+
+/*!
+ * \brief Allocate a nd-array's with shared memory,
+ *  including space of shape, of given spec.
+ *
+ * \param the name of the shared memory
+ * \param shape The shape of the array, the data content will be copied to out
+ * \param ndim The number of dimension of the array.
+ * \param dtype_code The type code of the dtype
+ * \param dtype_bits The number of bits of dtype
+ * \param dtype_lanes The number of lanes in the dtype.
+ * \param is_create whether the shared memory is created
+ * \param out The output handle.
+ * \return 0 when success, -1 when failure happens
+ */
+int DGLArrayAllocSharedMem(const char *mem_name,
+                           const dgl_index_t *shape,
+                           int ndim,
+                           int dtype_code,
+                           int dtype_bits,
+                           int dtype_lanes,
+                           bool is_create,
+                           DGLArrayHandle* out);
 
 /*!
  * \brief Free the DGL Array.

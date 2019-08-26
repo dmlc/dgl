@@ -10,3 +10,5 @@ Transform -- Graph Transformation
 
     line_graph
     reverse
+    to_simple_graph
+    to_bidirected

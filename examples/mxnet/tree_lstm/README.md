@@ -21,7 +21,7 @@ The script will download the [SST dataset] (http://nlp.stanford.edu/sentiment/in
 
 ## Usage
 ```
-python train.py --gpu 0
+DGLBACKEND=mxnet python3 train.py --gpu 0
 ```
 
 ## Speed Test
