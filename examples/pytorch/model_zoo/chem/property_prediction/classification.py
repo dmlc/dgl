@@ -63,11 +63,13 @@ def main(args):
         if args['model'] == 'GCN':
             model = model_zoo.chem.GCNClassifier(in_feats=args['in_feats'],
                                                  gcn_hidden_feats=args['gcn_hidden_feats'],
+                                                 classifier_hidden_feats=args['classifier_hidden_feats'],
                                                  n_tasks=dataset.n_tasks)
         elif args['model'] == 'GAT':
             model = model_zoo.chem.GATClassifier(in_feats=args['in_feats'],
                                                  gat_hidden_feats=args['gat_hidden_feats'],
                                                  num_heads=args['num_heads'],
+                                                 classifier_hidden_feats=args['classifier_hidden_feats'],
                                                  n_tasks=dataset.n_tasks)
 
         loss_criterion = BCEWithLogitsLoss(pos_weight=torch.tensor(
