@@ -1,11 +1,12 @@
 """Utilities for using pretrained models."""
 import torch
 from .dgmg import DGMG
-from .classifiers import GCNClassifier
+from .classifiers import GCNClassifier, GATClassifier
 from ...data.utils import _get_dgl_url, download
 
 URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
+    'GAT_Tox21' : 'pre_trained/gat_tox21.pth',
     'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
@@ -66,8 +67,14 @@ def load_pretrained(model_name, log=True):
     if model_name == 'GCN_Tox21':
         model = GCNClassifier(in_feats=74,
                               gcn_hidden_feats=[64, 64],
-                              n_tasks=12,
-                              classifier_hidden_feats=64)
+                              classifier_hidden_feats=64,
+                              n_tasks=12)
+    elif model_name == 'GAT_Tox21':
+        model = GATClassifier(in_feats=74,
+                              gat_hidden_feats=[32, 32],
+                              num_heads=[4, 4],
+                              classifier_hidden_feats=64,
+                              n_tasks=12)
     elif model_name.startswith('DGMG'):
         if model_name.startswith('DGMG_ChEMBL'):
             atom_types = ['O', 'Cl', 'C', 'S', 'F', 'Br', 'N']
