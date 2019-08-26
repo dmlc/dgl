@@ -50,7 +50,7 @@ def main(args):
         from dgl.data import Tox21
         dataset = Tox21()
 
-    trainset, valset, testset = split_dataset(dataset, [args['train_val_test_split']])
+    trainset, valset, testset = split_dataset(dataset, args['train_val_test_split'])
     train_loader = DataLoader(trainset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
     val_loader = DataLoader(valset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
     test_loader = DataLoader(testset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
