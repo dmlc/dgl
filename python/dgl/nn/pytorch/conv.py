@@ -19,23 +19,12 @@ class Identity(nn.Module):
     """A placeholder identity operator that is argument-insensitive.
     (Identity has already been supported by PyTorch 1.2, we will directly
     import torch.nn.Identity in the future)
-
-    Args:
-        args: any argument (unused)
-        kwargs: any keyword argument (unused)
-
-    Examples::
-
-        >>> m = nn.Identity(54, unused_argument1=0.1, unused_argument2=False)
-        >>> input = torch.randn(128, 20)
-        >>> output = m(input)
-        >>> print(output.size())
-        torch.Size([128, 20])
     """
     def __init__(self, *args, **kwargs):
         super(Identity, self).__init__()
 
     def forward(self, input):
+        """Return input"""
         return input
 
 
@@ -71,9 +60,9 @@ class GraphConv(nn.Module):
     Parameters
     ----------
     in_feats : int
-        Number of input features.
+        Input feature size.
     out_feats : int
-        Number of output features.
+        Output feature size.
     norm : bool, optional
         If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
     bias : bool, optional
@@ -120,58 +109,10 @@ class GraphConv(nn.Module):
 
         Notes
         -----
-            * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
-              dimensions, :math:`N` is the number of nodes.
-            * Output shaApply graph convolution over an input signal.
-
-    Graph convolution is introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and can be described as below:
-
-    .. math::
-      h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}h_j^{(l)}W^{(l)})
-
-    where :math:`\mathcal{N}(i)` is the neighbor set of node :math:`i`. :math:`c_{ij}` is equal
-    to the product of the square root of node degrees:
-    :math:`\sqrt{|\mathcal{N}(i)|}\sqrt{|\mathcal{N}(j)|}`. :math:`\sigma` is an activation
-    function.
-
-    The model parameters are initialized as in the
-    `original implementation <https://github.com/tkipf/gcn/blob/master/gcn/layers.py>`__ where
-    the weight :math:`W^{(l)}` is initialized using Glorot uniform initialization
-    and the bias is initialized to be zero.
-
-    Notes
-    -----
-    Zero in degree nodes could lead to invalid normalizer. A common practice
-    to avoid this is to add a self-loop for each node in the graph, which
-    can be achieved by:
-
-    >>> g = ... # some DGLGraph
-    >>> g.add_edges(g.nodes(), g.nodes())
-
-
-    Parameters
-    ----------
-    in_feats : int
-        Number of input features.
-    out_feats : int
-        Number of output features.
-    norm : bool, optional
-        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
-    bias : bool, optional
-        If True, adds a learnable bias to the output. Default: ``True``.
-    activation: callable activation function/layer or None, optional
-        If not None, applies an activation function to the updated node features.
-        Default: ``None``.
-
-    Attributes
-    ----------
-    weight : torch.Tensor
-        The learnable weight tensor.
-    bias : torch.Tensor
-        The learnable bias tensor.
-    pe: :math:`(N, *, \text{out_feats})` where all but the last dimension are
-              the same shape as the input.
+        * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
+          dimensions, :math:`N` is the number of nodes.
+        * Output shape: :math:`(N, *, \text{out_feats})` where all but the last dimension are
+          the same shape as the input.
 
         Parameters
         ----------
@@ -235,13 +176,22 @@ class GATConv(nn.Module):
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
+        Output feature size.
     num_heads : int
+        Number of heads in Multi-Head Attention.
     feat_drop : float, optional
+        Dropout rate on feature, defaults: ``0``.
     attn_drop : float, optional
-    alpha : float, optional
+        Dropout rate on attention weight, defaults: ``0``.
+    negative_slope : float, optional
+        LeakyReLU angle of negative slope.
     residual : bool, optional
+        If True, use residual connection.
     activation : callable activation function/layer or None, optional.
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
     """
     def __init__(self,
                  in_feats,
@@ -249,7 +199,7 @@ class GATConv(nn.Module):
                  num_heads,
                  feat_drop=0.,
                  attn_drop=0.,
-                 alpha=0.2,
+                 negative_slope=0.2,
                  residual=False,
                  activation=None):
         super(GATConv, self).__init__()
@@ -261,29 +211,42 @@ class GATConv(nn.Module):
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.feat_drop = nn.Dropout(feat_drop) if feat_drop > 0 else Identity()
         self.attn_drop = nn.Dropout(attn_drop) if attn_drop > 0 else Identity()
-        self.leaky_relu = nn.LeakyReLU(alpha)
-        self._residual = residual
+        self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
             if in_feats != out_feats:
                 self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
             else:
                 self.res_fc = Identity()
-        self._reset_parameters()
-
+        else:
+            self.register_buffer('res_fc', None)
+        self.reset_parameters()
         self.activation = activation
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.fc.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if self._residual and self.res_fc is not None:
+        if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
     def forward(self, feat, graph):
-        r"""Compute graph attention
+        r"""Compute graph attention network layer.
 
-        TODO(zihao): docstring
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, H, D_{out})` where :math:`H`
+            is the number of heads, and :math:`D_{out}` is size of output feature.
         """
         graph = graph.local_var()
         h = self.feat_drop(feat)
@@ -291,7 +254,6 @@ class GATConv(nn.Module):
         el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
         er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
         graph.ndata.update({'ft': feat, 'el': el, 'er': er})
-
         # compute edge attention
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
         e = self.leaky_relu(graph.edata.pop('e'))
@@ -301,20 +263,14 @@ class GATConv(nn.Module):
         graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
                      fn.sum('m', 'ft'))
         rst = graph.ndata['ft']
-
         # residual
-        if self._residual:
+        if self.res_fc is not None:
             resval = self.res_fc(h).view(h.shape[0], -1, self._out_feats)
             rst = rst + resval
-
         # activation
         if self.activation:
             rst = self.activation(rst)
-
         return rst
-
-    def extra_repr(self):
-        pass
 
 
 class TAGConv(nn.Module):
@@ -330,9 +286,9 @@ class TAGConv(nn.Module):
     Parameters
     ----------
     in_feats : int
-        Number of input features.
+        Input feature size.
     out_feats : int
-        Number of output features.
+        Output feature size.
     k: int, optional
         Number of hops :math: `k`. (default: 3)
     bias: bool, optional
@@ -367,19 +323,21 @@ class TAGConv(nn.Module):
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
     def forward(self, feat, graph):
-        r"""Compute graph convolution
+        r"""Compute topology adaptive graph convolution.
 
         Parameters
         ----------
         feat : torch.Tensor
-            The input feature
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
         graph : DGLGraph
             The graph.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
         """
         graph = graph.local_var()
 
@@ -548,7 +506,7 @@ class RelGraphConv(nn.Module):
         return {'msg': msg}
 
     def forward(self, g, x, etypes, norm=None):
-        """Forward computation
+        """ Forward computation
 
         Parameters
         ----------
@@ -556,13 +514,13 @@ class RelGraphConv(nn.Module):
             The graph.
         x : torch.Tensor
             Input node features. Could be either
-              - (|V|, D) dense tensor
-              - (|V|,) int64 vector, representing the categorical values of each
+              - :math:`(|V|, D)` dense tensor
+              - :math:`(|V|,)` int64 vector, representing the categorical values of each
                 node. We then treat the input feature as an one-hot encoding feature.
         etypes : torch.Tensor
-            Edge type tensor. Shape: (|E|,)
+            Edge type tensor. Shape: :math:`(|E|,)`
         norm : torch.Tensor
-            Optional edge normalizer tensor. Shape: (|E|, 1)
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
 
         Returns
         -------
@@ -591,18 +549,26 @@ class RelGraphConv(nn.Module):
 
 
 class SAGEConv(nn.Module):
-    r""" GraphSAGE layer from paper "Inductive Representation Learning on
+    r"""GraphSAGE layer from paper "Inductive Representation Learning on
     Large Graphs".
 
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
+        Output feature size.
     feat_drop : float
+        Dropout rate on features, default: ``0``.
     aggregator_type : str
+        Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
     bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
+        If not None, applies normalization oto the updated node features.
     activation : callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
     """
     def __init__(self,
                  in_feats,
@@ -630,6 +596,7 @@ class SAGEConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         gain = nn.init.calculate_gain('relu')
         if self._aggre_type == 'pool':
             nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
@@ -640,8 +607,10 @@ class SAGEConv(nn.Module):
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
     def _lstm_reducer(self, nodes):
-        # note(zihao): lstm reducer with default schedule (degree bucketing)
-        # is slow, we could accelerate this with degree padding in the future.
+        """LSTM reducer
+        NOTE(zihao): lstm reducer with default schedule (degree bucketing)
+        is slow, we could accelerate this with degree padding in the future.
+        """
         input = nodes.mailbox['m'] # (B, L, D)
         batch_size = input.shape[0]
         h = (input.new_zeros((1, batch_size, self._in_feats)),
@@ -650,9 +619,21 @@ class SAGEConv(nn.Module):
         return {'neigh': rst.squeeze(0)}
 
     def forward(self, feat, graph):
-        r"""Compute the output of a GraphSAGE layer.
+        r"""Compute GraphSAGE layer.
 
-        TODO(zihao): docstring
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
         """
         graph = graph.local_var()
         feat = self.feat_drop(feat)
@@ -689,9 +670,6 @@ class SAGEConv(nn.Module):
             rst = self._norm(rst)
         return rst
 
-    def extra_repr(self):
-        pass
-
 
 class GatedGraphConv(nn.Module):
     """Gated Graph Convolution layer from paper ""
@@ -699,39 +677,63 @@ class GatedGraphConv(nn.Module):
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
+        Output feature size.
     n_steps : int
+        Number of recurrent steps.
     n_etyps : int
-    aggregator_type : str
+        Number of edge types.
     bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
     """
     def __init__(self,
                  in_feats,
                  out_feats,
                  n_steps,
                  n_etypes,
-                 aggregator_type,
                  bias=True):
         super(GatedGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._n_steps = n_steps
-        self._aggre_type = aggregator_type
-        self.weight = nn.Embedding(n_etypes, out_feats * out_feats)
+        self.edge_embed = nn.Embedding(n_etypes, out_feats * out_feats)
         self.gru = nn.GRUCell(out_feats, out_feats, bias=bias)
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        gain = init.calculate_gain('relu')
         self.gru.reset_parameters()
-        # TODO(zihao): initialize weight
+        init.xavier_normal_(self.edge_embed.weight, gain=gain)
 
     def forward(self, feat, etypes, graph):
+        """Compute Gated Graph Convolution layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`N`
+            is the number of nodes of the graph and :math:`D_{in}` is the
+            input feature size.
+        etypes : torch.LongTensor
+            The edge type tensor of shape :math:`(E,)` where :math:`E` is
+            the number of edges of the graph.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is the output feature size.
+        """
         graph = graph.local_var()
         zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
         feat = th.cat([feat, zero_pad], -1)
         # NOTE(zihao): there is still room to optimize, we may do kernel fusion
         # for such operations in the future.
-        graph.edata['w'] = self.weight(etypes).view(-1, self._out_feats, self._out_feats) # (E, D, D)
+        graph.edata['w'] = self.edge_embed(etypes).view(-1, self._out_feats, self._out_feats)
         for i in range(self._n_steps):
             graph.ndata['h'] = feat.unsqueeze(-1) # (N, D, 1)
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
@@ -752,7 +754,7 @@ class GMMConv(nn.Module):
     out_feats : int
         Number of output features.
     dim : int
-        Dimension of pseudo-coordinte.
+        Dimensionality of pseudo-coordinte.
     n_kernels : int
         Number of kernels :math:`K`.
     aggregator_type : str
@@ -799,15 +801,44 @@ class GMMConv(nn.Module):
             self.register_buffer('bias', None)
 
     def reset_parameters(self):
-        # TODO(zihao) pay attention to the initialization of mu and inv_sigma
-        pass
+        """Reinitialize learnable parameters."""
+        gain = init.calculate_gain('relu')
+        init.xavier_normal_(self.fc.weight, gain=gain)
+        if isinstance(self.res_fc, nn.Linear):
+            init.xavier_normal_(self.res_fc, gain=gain)
+        init.normal_(self.mu.data, 0, 0.1)
+        init.normal_(self.inv_sigma.data, 1, 0.1)
+        if self.bias is not None:
+            init.zeros_(self.bias.data)
 
     def forward(self, feat, pseudo, graph):
+        """Compute Gaussian Mixture Model Convolution layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`N`
+            is the number of nodes of the graph and :math:`D_{in}` is the
+            input feature size.
+        pseudo : torch.Tensor
+            The pseudo coordinate tensor of shape :math:`(E, D_{u})` where
+            :math:`E` is the number of edges of the graph and :math:`D_{u}`
+            is the dimensionality of pseudo coordinate.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is the output feature size.
+        """
         graph = graph.local_var()
         graph.ndata['h'] = self.fc(feat).view(-1, self._n_kernels, self._out_feats)
         E = graph.number_of_edges()
         # compute gaussian weight
-        gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) - self.mu.view(1, self._n_kernels, self._dim)) ** 2)
+        gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
+                            self.mu.view(1, self._n_kernels, self._dim)) ** 2)
         gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
         gaussian = th.exp(gaussian.sum(dim=-1, keepdims=True)) # (E, K, 1)
         graph.edata['w'] = gaussian
@@ -828,10 +859,14 @@ class GINConv(nn.Module):
 
     Parameters
     ----------
-    apply_func : callable activation function/layer or None, optional
+    apply_func : callable activation function/layer or None
+        If not None, apply this function to the updated node feature.
     aggregator_type : str
+        Aggregator type to use (``sum``, ``max`` or ``mean``).
     init_eps : float, optional
+        Initial :math:`\epsilon` value, default: ``0``.
     learn_eps : bool, optional
+        If True, :math:`\epsilon` will be a learnable parameter.
     """
     def __init__(self,
                  apply_func,
@@ -855,10 +890,32 @@ class GINConv(nn.Module):
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
     def forward(self, feat, graph):
+        r"""Compute Graph Isomorphism Network layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D)` where :math:`D`
+            could be any positive integer, :math:`N` is the number
+            of nodes. If ``apply_func`` is not None, :math:`D` should
+            fit the input dimensionality requirement of ``apply_func``.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where
+            :math:`D_{out}` is the output dimensionality of ``apply_func``.
+            If ``apply_func`` is None, :math:`D_{out}` should be the same
+            as input dimensionality.
+        """
         graph = graph.local_var()
         graph.ndata['h'] = feat
         graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
-        rst = self.apply_func((1 + self.eps) * feat + graph.ndata['neigh'])
+        rst = (1 + self.eps) * feat + graph.ndata['neigh']
+        if self.apply_func is not None:
+            rst = self.apply_func(rst)
         return rst
 
 
@@ -896,6 +953,7 @@ class ChebConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         if self.bias is not None:
             init.zeros_(self.bias)
         for module in self.fc.modules():
@@ -905,8 +963,21 @@ class ChebConv(nn.Module):
                     init.zeros_(module.bias)
 
     def forward(self, feat, graph, lambda_max=None):
-        """
-        graph : DGLGraph or BatchedDGLGraph
+        r"""Compute ChebNet layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
         """
         with graph.local_scope():
             norm = th.pow(
@@ -962,7 +1033,10 @@ class SGConv(nn.Module):
     k : int
         Number of hops :math:`K`. Defaults:``1``.
     cached : bool
-        TODO(zihao)
+        If True, the module would cache
+        :math:`(\hat{D}^{-\frac{1}{2}\hat{A}\hat{D}^{-\frac{1}{2}})^K x`
+        at the first forward call. This parameter should only be set to
+        ``True`` in Transductive Learning setting.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     """
@@ -977,9 +1051,29 @@ class SGConv(nn.Module):
         self._cached = cached
         self._cached_h = None
         self._k = k
-        # TODO(zihao): add normalization
 
     def forward(self, feat, graph):
+        r"""Compute Simplifying Graph Convolution layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
+
+        Notes
+        -----
+        If ``cache`` is se to True, ``feat`` and ``graph`` should not change during
+        training, or you will get wrong results.
+        """
         graph = graph.local_var()
         if self._cached_h is not None:
             feat = self._cached_h
@@ -1010,18 +1104,25 @@ class NNConv(nn.Module):
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
-    edge_func : callable activation function/layer or None, optional
+        Output feature size.
+    edge_func : callable activation function/layer
+        Maps each edge feature to a tensor of shape
+        ``(in_feats, out_feats)`` for computing messages.
     aggregator_type : str
-    residual : bool
+        Aggregator type to use (``sum``, ``mean`` or ``max``).
+    residual : bool, optional
+        If True, use residual connection. Default: ``False``.
     bias : bool, optional
+        If True, adds a learnable bias to the output. Default: ``True``.
     """
     def __init__(self,
                  in_feats,
                  out_feats,
                  edge_func,
                  aggregator_type,
-                 residual,
+                 residual=False,
                  bias=True):
         super(NNConv, self).__init__()
         self._in_feats = in_feats
@@ -1050,10 +1151,34 @@ class NNConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        # TODO(zihao): initialize root and bias
-        pass
+        """Reinitialize learnable parameters."""
+        gain = init.calculate_gain('relu')
+        if self.bias is not None:
+            nn.init.zeros_(self.bias)
+        if isinstance(self.res_fc, nn.Linear):
+            nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
     def forward(self, feat, efeat, graph):
+        r"""Compute MPNN Graph Convolution layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`N`
+            is the number of nodes of the graph and :math:`D_{in}` is the
+            input feature size.
+        efeat : torch.Tensor
+            The edge feature of shape :math:`(N, *)`, should fit the input
+            shape requirement of ``edge_nn``.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is the output feature size.
+        """
         graph = graph.local_var()
         # (n, d_in, 1)
         graph.ndata['h'] = feat.unsqueeze(-1)
@@ -1078,21 +1203,39 @@ class APPNPConv(nn.Module):
     Parameters
     ----------
     k : int
+        Number of iterations :math:`K`.
     alpha : float
-    activation : callable activation function/layer or None, optional
+        The teleport probability :math:`\alpha`.
+    edge_drop : float, optional
+        Dropout rate on edges that controls the
+        messages received by each node. Default: ``0``.
     """
     def __init__(self,
                  k,
                  alpha,
-                 edge_drop=0.,
-                 activation=None):
+                 edge_drop=0.):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
-        self._activation = activation
         self.edge_drop = nn.Dropout(edge_drop) if edge_drop > 0 else Identity()
 
     def forward(self, feat, graph):
+        r"""Compute APPNP layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, *)` :math:`N` is the
+            number of nodes, and :math:`*` could be of any shape.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, *)` where :math:`*`
+            should be the same as input shape.
+        """
         graph = graph.local_var()
         norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
         norm = norm.unsqueeze(-1).to(feat.device)
@@ -1119,7 +1262,9 @@ class AGNNConv(nn.Module):
     Parameters
     ----------
     init_beta : float, optional
+        The :math:`\beta` in the formula.
     learn_beta : bool, optional
+        If True, :math:`\beta` will be learnable parameter.
     """
     def __init__(self,
                  init_beta=1.,
@@ -1131,6 +1276,22 @@ class AGNNConv(nn.Module):
             self.register_buffer('beta', th.Tensor([init_beta]))
 
     def forward(self, feat, graph):
+        r"""Compute AGNN layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, *)` :math:`N` is the
+            number of nodes, and :math:`*` could be of any shape.
+        graph : DGLGraph
+            The graph.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, *)` where :math:`*`
+            should be the same as input shape.
+        """
         graph = graph.local_var()
         graph.ndata['h'] = feat
         graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
@@ -1152,10 +1313,16 @@ class DenseGCNConv(nn.Module):
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
+        Output feature size.
     norm : bool
+        If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
     bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
     activation : callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
     """
     def __init__(self,
                  in_feats,
@@ -1175,7 +1342,31 @@ class DenseGCNConv(nn.Module):
         self.reset_parameters()
         self._activation = activation
 
+    def register_parameter(self):
+        """Reinitialize learnable parameters."""
+        init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            init.zeros_(self.bias)
+
     def forward(self, feat, adj):
+        r"""Compute (Dense) Graph Convolution layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        adj : torch.Tensor
+            The adjacency matrix of the graph to apply Graph Convolution on,
+            should be of shape :math:`(N, N)`, where a row represents the destination
+            and a column represents the source.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
+        """
         adj = adj.float().to(feat.device)
         if self._norm:
             in_degrees = adj.sum(dim=1)
@@ -1216,11 +1407,18 @@ class DenseSAGEConv(nn.Module):
     Parameters
     ----------
     in_feats : int
+        Input feature size.
     out_feats : int
+        Output feature size.
     feat_drop : float, optional
-    norm : bool
+        Dropout rate on features. Default: 0.
     bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
+    norm : callable activation function/layer or None, optional
+        If not None, applies normalization oto the updated node features.
     activation : callable activation function/layer or None, optional
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
     """
     def __init__(self,
                  in_feats,
@@ -1239,9 +1437,29 @@ class DenseSAGEConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        """Reinitialize learnable parameters."""
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
     def forward(self, feat, adj):
+        r"""Compute (Dense) Graph SAGE layer.
+
+        Parameters
+        ----------
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        adj : torch.Tensor
+            The adjacency matrix of the graph to apply Graph Convolution on,
+            should be of shape :math:`(N, N)`, where a row represents the destination
+            and a column represents the source.
+
+        Returns
+        -------
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
+        """
         adj = adj.float().to(feat.device)
         feat = self.feat_drop(feat)
         in_degrees = adj.sum(dim=1).unsqueeze(-1)
@@ -1253,3 +1471,5 @@ class DenseSAGEConv(nn.Module):
         # normalization
         if self._norm is not None:
             rst = self._norm(rst)
+
+        return rst

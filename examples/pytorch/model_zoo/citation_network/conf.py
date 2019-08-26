@@ -32,7 +32,7 @@ TAGCN_CONFIG = {
 }
 
 AGNN_CONFIG = {
-    'extra_args': [16, 2, 1.0, True, 0.5],
+    'extra_args': [32, 2, 1.0, True, 0.5],
     'lr': 1e-2,
     'weight_decay': 5e-4,
 }
