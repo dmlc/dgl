@@ -6,8 +6,7 @@ from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import GraphIndex
-from ..heterograph_index import HeteroGraphIndex, create_bipartite_from_coo
+from ..heterograph_index import create_bipartite_from_coo
 
 from . import ir
 from .ir import var
@@ -129,8 +128,8 @@ def build_gidx_and_mapping_graph(graph):
 
     Parameters
     ----------
-    graph : DGLGraph or DGLHeteroGraph
-        The homogeneous graph, or a bipartite view of the heterogeneous graph.
+    graph : GraphAdapter
+        Graph
 
     Returns
     -------
@@ -142,30 +141,31 @@ def build_gidx_and_mapping_graph(graph):
     nbits : int
         Number of ints needed to represent the graph
     """
-    gidx = graph._graph
-    if isinstance(gidx, GraphIndex):
-        return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    gidx = graph.gidx
+    return gidx.get_immutable_gidx, None, gidx.bits_needed()
+    '''
     elif isinstance(gidx, HeteroGraphIndex):
         return (partial(gidx.get_bipartite, graph._current_etype_idx),
                 None,
                 gidx.bits_needed(graph._current_etype_idx))
     else:
         raise TypeError('unknown graph index type %s' % type(gidx))
+    '''
 
 
 def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
     """Build immutable graph index and mapping using the given (u, v) edges
 
-    The matrix is of shape (len(reduce_nodes), n), where n is the number of
-    nodes in the graph. Therefore, when doing SPMV, the src node data should be
-    all the node features.
+    The matrix is of shape (num_src, num_dst).
 
     Parameters
     ---------
     edge_tuples : tuple of three utils.Index
         A tuple of (u, v, eid)
-    num_src, num_dst : int
-        The number of source and destination nodes.
+    num_src : int
+        Number of source nodes.
+    num_dst : int
+        Number of destination nodes.
 
     Returns
     -------
@@ -190,7 +190,6 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
         lambda ctx: (nd.array(forward_map, ctx=ctx),
                      nd.array(backward_map, ctx=ctx)))
     return partial(gidx.get_bipartite, None), edge_map, nbits
-
 
 def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
     """Build immutable graph index and mapping for node flow

@@ -202,12 +202,11 @@ class DGLHeteroGraph(object):
         self._etypes = etypes
         self._canonical_etypes = make_canonical_etypes(etypes, ntypes, self._graph.metagraph)
         # An internal map from etype to canonical etype tuple.
-        # If two etypes have the same name, a None value is stored instead to indicte
-        #   ambiguity.
+        # If two etypes have the same name, an empty tuple is stored instead to indicte ambiguity.
         self._etype2canonical = {}
         for i, ety in enumerate(etypes):
             if ety in self._etype2canonical:
-                self._etype2canonical[ety] = None
+                self._etype2canonical[ety] = tuple()
             else:
                 self._etype2canonical[ety] = self._canonical_etypes[i]
         self._ntypes_invmap = {t : i for i, t in enumerate(ntypes)}
@@ -382,8 +381,10 @@ class DGLHeteroGraph(object):
         if isinstance(etype, tuple):
             return etype
         else:
-            ret = self._etype2canonical[etype]
+            ret = self._etype2canonical.get(etype, None)
             if ret is None:
+                raise DGLError('Edge type "{}" does not exist.'.format(etype))
+            if len(ret) == 0:
                 raise DGLError('Edge type "%s" is ambiguous. Please use canonical etype '
                                'type in the form of (srctype, etype, dsttype)' % etype)
             return ret
@@ -408,7 +409,10 @@ class DGLHeteroGraph(object):
                 raise DGLError('Node type name must be specified if there are more than one '
                                'node types.')
             return 0
-        return self._ntypes_invmap[ntype]
+        ntid = self._ntypes_invmap.get(ntype, None)
+        if ntid is None:
+            raise DGLError('Node type "{}" does not exist.'.format(ntype))
+        return ntid
 
     def get_etype_id(self, etype):
         """Return the id of the given edge type.
@@ -430,7 +434,10 @@ class DGLHeteroGraph(object):
                 raise DGLError('Node type name must be specified if there are more than one '
                                'node types.')
             return 0
-        return self._etypes_invmap[self.to_canonical_etype(etype)]
+        etid = self._etypes_invmap.get(self.to_canonical_etype(etype), None)
+        if etid is None:
+            raise DGLError('Edge type "{}" does not exist.'.format(etype))
+        return etid
 
     #################################################################
     # View
@@ -1187,7 +1194,7 @@ class DGLHeteroGraph(object):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(stid)))
         else:
             v = utils.toindex(v)
-        return self._graph.out_degrees(etype_idx, v).tousertensor()
+        return self._graph.out_degrees(etid, v).tousertensor()
 
     #################################################################
     # Features
@@ -1465,10 +1472,10 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        func : dict[str, callable] or None
+        func : callable
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-        v : dict[str, int or iterable of int or tensor], optional
+        v : int or iterable of int or tensor, optional
             The (type-specific) node (ids) on which to apply ``func``.
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
@@ -1478,27 +1485,24 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g.ndata['user']['h'] = torch.ones(3, 5)
-        >>> g.apply_nodes({'user': lambda nodes: {'h': nodes.data['h'] * 2}})
-        >>> g.ndata['user']['h']
+        >>> g.ndata['h', 'user'] = torch.ones(3, 5)
+        >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
+        >>> g.ndata['h', 'user']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
         """
-        for ntype, nfunc in func.items():
-            if is_all(v):
-                v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)))
-            else:
-                v_ntype = utils.toindex(v[ntype])
-            with ir.prog() as prog:
-                scheduler.schedule_apply_nodes(
-                    graph=self._create_view(self._ntypes_invmap[ntype], None),
-                    v=v_ntype,
-                    apply_func=nfunc,
-                    inplace=inplace)
-                Runtime.run(prog)
+        ntid = self.get_ntype_id(ntype)
+        if is_all(v):
+            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntid)))
+        else:
+            v_ntype = utils.toindex(v)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_nodes(v_ntype, nfunc, self._node_frames[ntid],
+                                           inplace=inplace)
+            Runtime.run(prog)
 
-    def apply_edges(self, func, edges=ALL, inplace=False):
+    def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
         """Apply the function on the edges with the same type to update their
         features.
 
@@ -1506,52 +1510,53 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        func : dict[(str, str, str), callable] or None
+        func : callable or None
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        edges : dict[(str, str, str), any valid edge specification], optional
+        edges : edges data, optional
             Edges on which to apply ``func``. See :func:`send` for valid
             edge specification.
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
         Examples
         --------
-        >>> g.edata['user', 'plays', 'game']['h'] = torch.ones(4, 5)
-        >>> g.apply_edges(
-        ...     {('user', 'plays', 'game'): lambda edges: {'h': edges.data['h'] * 2}})
-        >>> g.edata['user', 'plays', 'game']['h']
+        >>> g.edata['h', ('user', 'plays', 'game')] = torch.ones(4, 5)
+        >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
+        >>> g.edata['h', ('user', 'plays', 'game')]
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
         """
-        for etype, efunc in func.items():
-            etype_idx = self.get_etype_id(etype)
-            if is_all(edges):
-                u, v, _ = self._graph.edges(etype_idx, 'eid')
-                eid = utils.toindex(slice(0, self.number_of_edges(etype)))
-            elif isinstance(edges, tuple):
-                u, v = edges
-                u = utils.toindex(u)
-                v = utils.toindex(v)
-                # Rewrite u, v to handle edge broadcasting and multigraph.
-                u, v, eid = self._graph.edge_ids(etype_idx, u, v)
-            else:
-                eid = utils.toindex(edges)
-                u, v, _ = self._graph.find_edges(etype_idx, eid)
+        etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
+        if is_all(edges):
+            u, v, _ = self._graph.edges(etid, 'eid')
+            eid = utils.toindex(slice(0, self.number_of_edges(etype)))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(etid, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(etid, eid)
 
-            with ir.prog() as prog:
-                scheduler.schedule_apply_edges(
-                    graph=self._create_view(None, etype_idx),
-                    u=u,
-                    v=v,
-                    eid=eid,
-                    apply_func=efunc,
-                    inplace=inplace)
-                Runtime.run(prog)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_edges(
+                self._graph.get_relation_graph(etid),
+                u, v, eid,
+                efunc,
+                self._node_frames[stid], self._node_frames[dtid], self._edge_frames[etid],
+                inplace=inplace)
+            Runtime.run(prog)
 
-    def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
+    def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
         """Group the edges by nodes and apply the function of the grouped
         edges to update their features.  The edges are of the same edge type
         (hence having the same source and destination node type).
@@ -1560,47 +1565,48 @@ class DGLHeteroGraph(object):
         ----------
         group_by : str
             Specify how to group edges. Expected to be either 'src' or 'dst'
-        func : dict[(str, str, str), callable]
+        func : callable
             Apply function on the edge.  The function should be
             an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
             be (bucket_size, degrees, *feature_shape), and
             return the dict with values of the same shapes.
-        edges : dict[(str, str, str), valid edges type], optional
+        edges : edges data, optional
             Edges on which to group and apply ``func``. See :func:`send` for valid
             edges type. Default is all the edges.
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
         if group_by not in ('src', 'dst'):
             raise DGLError("Group_by should be either src or dst")
 
-        for etype, efunc in func.items():
-            etype_idx = self.get_etype_id(etype)
-            if is_all(edges):
-                u, v, _ = self._graph.edges(etype_idx)
-                eid = utils.toindex(slice(0, self.number_of_edges(etype)))
-            elif isinstance(edges, tuple):
-                u, v = edges
-                u = utils.toindex(u)
-                v = utils.toindex(v)
-                # Rewrite u, v to handle edge broadcasting and multigraph.
-                u, v, eid = self._graph.edge_ids(etype_idx, u, v)
-            else:
-                eid = utils.toindex(edges)
-                u, v, _ = self._graph.find_edges(etype_idx, eid)
+        etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
+        if is_all(edges):
+            u, v, _ = self._graph.edges(etid)
+            eid = utils.toindex(slice(0, self.number_of_edges(etype)))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(etid, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(etid, eid)
 
-            with ir.prog() as prog:
-                scheduler.schedule_group_apply_edge(
-                    graph=self._create_view(None, etype_idx),
-                    u=u,
-                    v=v,
-                    eid=eid,
-                    apply_func=efunc,
-                    group_by=group_by,
-                    inplace=inplace)
-                Runtime.run(prog)
+        with ir.prog() as prog:
+            scheduler.schedule_group_apply_edge(
+                self._graph.get_relation_graph(etid),
+                u, v, eid,
+                efunc, group_by,
+                self._node_frames[stid], self._node_frames[dtid], self._edge_frames[etid],
+                inplace=inplace)
+            Runtime.run(prog)
 
-    def send(self, edges=ALL, message_func=None):
+    def send(self, edges, message_func, etype=None):
         """Send messages along the given edges with the same edge type.
 
         ``edges`` can be any of the following types:
@@ -1640,22 +1646,22 @@ class DGLHeteroGraph(object):
         On multigraphs, if :math:`u` and :math:`v` are specified, then the messages will be sent
         along all edges between :math:`u` and :math:`v`.
         """
-        assert not utils.is_dict_like(message_func), \
-            "multiple-type message passing is not implemented"
         assert message_func is not None
+        etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if is_all(edges):
-            eid = utils.toindex(slice(0, self._graph.number_of_edges(self._current_etype_idx)))
-            u, v, _ = self._graph.edges(self._current_etype_idx)
+            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
+            u, v, _ = self._graph.edges(etid)
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+            u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
             eid = utils.toindex(edges)
-            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+            u, v, _ = self._graph.find_edges(etid, eid)
 
         if len(eid) == 0:
             # no edge to be triggered
