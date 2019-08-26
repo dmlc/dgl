@@ -10,7 +10,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 import torch
 import torch.nn as nn
 import dgl.function as fn
-from dgl.nn.pytorch import edge_softmax, GraphAttention
+from dgl.nn.pytorch import edge_softmax, GATConv
 
 
 class GAT(nn.Module):
@@ -32,17 +32,17 @@ class GAT(nn.Module):
         self.gat_layers = nn.ModuleList()
         self.activation = activation
         # input projection (no residual)
-        self.gat_layers.append(GraphAttention(
+        self.gat_layers.append(GATConv(
             in_dim, num_hidden, heads[0],
             feat_drop, attn_drop, alpha, False, self.activation))
         # hidden layers
         for l in range(1, num_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
-            self.gat_layers.append(GraphAttention(
+            self.gat_layers.append(GATConv(
                 num_hidden * heads[l-1], num_hidden, heads[l],
                 feat_drop, attn_drop, alpha, residual, self.activation))
         # output projection
-        self.gat_layers.append(GraphAttention(
+        self.gat_layers.append(GATConv(
             num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, alpha, residual, None))
 

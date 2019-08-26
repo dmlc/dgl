@@ -22,6 +22,6 @@ Run with following (available dataset: "cora", "citeseer", "pubmed")
 python3 graphsage.py --dataset cora --gpu 0
 ```
 
-* cora: ~0.8420 
-* citeseer: ~0.7020
-* pubmed: ~0.7810
+* cora: ~0.8330 
+* citeseer: ~0.7110
+* pubmed: ~0.7830

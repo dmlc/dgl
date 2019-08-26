@@ -265,9 +265,9 @@ class Set2Set(nn.Block):
         with self.name_scope():
             self.lstm = gluon.rnn.LSTM(
                 self.input_dim, num_layers=n_layers, input_size=self.output_dim)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
         self.lstm.initialize(mx.init.Xavier())
 
     def forward(self, feat, graph):

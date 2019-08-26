@@ -178,16 +178,6 @@ class GlobalAttentionPooling(nn.Module):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
-        self._reset_parameters()
-
-    def _reset_parameters(self):
-        for p in self.gate_nn.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-        if self.feat_nn:
-            for p in self.feat_nn.parameters():
-                if p.dim() > 1:
-                    nn.init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         r"""Compute global attention pooling.
@@ -256,9 +246,9 @@ class Set2Set(nn.Module):
         self.n_iters = n_iters
         self.n_layers = n_layers
         self.lstm = th.nn.LSTM(self.output_dim, self.input_dim, n_layers)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
         for p in self.lstm.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -342,9 +332,9 @@ class MultiHeadAttention(nn.Module):
         self.dropa = nn.Dropout(dropouta)
         self.norm_in = nn.LayerNorm(d_model)
         self.norm_inter = nn.LayerNorm(d_model)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)

@@ -9,10 +9,10 @@ from ... import function as fn
 from ...transform import laplacian_lambda_max
 from .softmax import edge_softmax
 
-__all__ = ['GraphConv', 'GraphAttention', 'GraphSAGE',
-           'SGConv', 'APPNP', 'GINConv', 'GatedGraphConv',
-           'PointConv', 'SplineConv', 'EdgeConv', 'DynamicEdgeConv',
-           'AGNN', 'GMMConv']
+__all__ = ['GraphConv', 'GATConv', 'SAGEConv',
+           'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv',
+           'SplineConv', 'AGNNConv', 'GMMConv', 'NNConv',
+           'DenseGCNConv', 'DenseSAGEConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -204,7 +204,7 @@ class GraphConv(nn.Module):
         return summary.format(**self.__dict__)
     
 
-class GraphAttention(nn.Module):
+class GATConv(nn.Module):
     r"""Apply graph attention over an input signal.
 
     TODO(zihao): docstring
@@ -218,7 +218,7 @@ class GraphAttention(nn.Module):
                  alpha,
                  residual=False,
                  activation=None):
-        super(GraphAttention, self).__init__()
+        super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -233,7 +233,7 @@ class GraphAttention(nn.Module):
             if in_feats != out_feats:
                 self.res_fc = nn.Linear(in_feats, num_heads * out_feats, bias=False)
             else:
-                self.res_fc = None
+                self.register_buffer('res_fc', None)
         self._reset_parameters()
 
         self.activation = activation
@@ -285,7 +285,7 @@ class GraphAttention(nn.Module):
         pass
 
 
-class GraphSAGE(nn.Module):
+class SAGEConv(nn.Module):
     r"""Apply GraphSAGE layer over an input signal.
 
     TODO(zihao): docstring
@@ -295,10 +295,10 @@ class GraphSAGE(nn.Module):
                  out_feats,
                  feat_drop,
                  aggregator_type,
-                 bias=False,
+                 bias=True,
                  norm=None,
                  activation=None):
-        super(GraphSAGE, self).__init__()
+        super(SAGEConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
@@ -308,27 +308,26 @@ class GraphSAGE(nn.Module):
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(in_feats, in_feats)
-        else: # lstm
+        if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(in_feats, in_feats, batch_first=True)
-
         if aggregator_type != 'gcn':
             self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
         self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
         gain = nn.init.calculate_gain('relu')
         if self._aggre_type == 'pool':
             nn.init.xavier_uniform_(self.fc_pool.weight, gain=gain)
-        else: # lstm
-            pass
-
+        if self._aggre_type == 'lstm':
+            self.lstm.reset_parameters()
         if self._aggre_type != 'gcn':
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
     def _lstm_reducer(self, nodes):
-        # TODO(zihao): this implementation is slow.
+        # note(zihao): lstm reducer with default schedule (degree bucketing)
+        # is slow, we could accelerate this with degree padding in the future.
         input = nodes.mailbox['m'] # (B, L, D)
         batch_size = input.shape[0]
         h = (input.new_zeros((1, batch_size, self._in_feats)),
@@ -346,16 +345,9 @@ class GraphSAGE(nn.Module):
         h_self = feat
         if self._aggre_type == 'mean':
             graph.ndata['h'] = feat
-            degs = graph.in_degrees().float()
-            degs = degs.to(feat.device)
-            eps = 1e-8
-            graph.ndata['deg'] = degs.unsqueeze(-1)
             graph.update_all(
                 fn.copy_src('h', 'm'),
-                fn.sum('m', 'neigh'),
-                lambda nodes: {
-                    'neigh': (nodes.data['neigh'] + eps) / (nodes.data['deg'] + eps)
-                }
+                fn.mean('m', 'neigh'),
             )
             # divide in_degrees
             h_neigh = graph.ndata['neigh']
@@ -402,30 +394,49 @@ class GraphSAGE(nn.Module):
 
 
 class GatedGraphConv(nn.Module):
-    def __init__(self):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 n_layers,
+                 aggregator_type,
+                 bias=True):
         super(GatedGraphConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self.n_layers = n_layers
+        self._aggre_type = aggregator_type
+        self.fc = nn.ModuleList([nn.Linear(out_feats, out_feats, bias=False)])
+        self.gru = nn.GRUCell(out_feats, out_feats, bias=bias)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.gru.reset_parameters()
 
     def forward(self, feat, graph):
-        pass
+        graph = graph.local_var()
+        zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
+        feat = th.cat([feat, zero_pad], -1)
+
+        for _ in range(self.n_layers):
+            pass
 
 
 class GINConv(nn.Module):
     def __init__(self,
                  nn,
                  aggregator_type,
-                 eps=0,
+                 init_eps=0,
                  learn_eps=False):
         super(GINConv, self).__init__()
         self.nn = nn
         self._aggre_type = aggregator_type
         if learn_eps:
-            self.eps = th.nn.Parameter(th.FloatTensor([eps]))
+            self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
-            self.register_buffer('eps', th.FloatTensor([eps]))
+            self.register_buffer('eps', th.FloatTensor([init_eps]))
+        self.reset_parameters()
 
-        self._reset_parameters()
-
-    def _reset_parameters(self):
+    def reset_parameters(self):
         pass # TODO
 
     def forward(self, feat, graph):
@@ -433,28 +444,13 @@ class GINConv(nn.Module):
         graph.ndata['h'] = feat
         if self._aggre_type == 'sum':
             reducer = fn.sum('m', 'neigh')
-            apply_func = 'default'
         elif self._aggre_type == 'max':
             reducer = fn.max('m', 'neigh')
-            apply_func = 'default'
         elif self._aggre_type == 'mean':
-            reducer = fn.sum('m', 'neigh')
-            degs = graph.in_degrees().float()
-            degs = degs.to(feat.device)
-            eps = 1e-8
-            graph.ndata['deg'] = degs.unsqueeze(-1)
-            apply_func = lambda nodes: {
-                'neigh': (nodes.data['neigh'] + eps) / (nodes.data['deg'] + eps)
-            }
-
-        graph.update_all(fn.copy_u('h', 'm'),
-                         reducer,
-                         apply_func)
-
+            reducer = fn.mean('m', 'neigh')
+        graph.update_all(fn.copy_u('h', 'm'), reducer)
         rst = self.nn((1 + self.eps) * feat + graph.ndata['neigh'])
-
         return rst
-
 
 
 class ChebNet(nn.Module):
@@ -470,9 +466,9 @@ class ChebNet(nn.Module):
             nn.Linear(in_feats, out_feats, bias=False) for _ in range(k)
         ])
         self.k = k
-        self._reset_parameters()
+        self.reset_parameters()
 
-    def _reset_parameters(self):
+    def reset_parameters(self):
         pass
 
     def forward(self, feat, graph, lambda_max=None):
@@ -493,6 +489,7 @@ class SGConv(nn.Module):
         self._cached = cached
         self._cached_h = None
         self.k = k
+        # TODO(zihao): add normalization
 
     def forward(self, feat, graph):
         graph = graph.local_var()
@@ -519,7 +516,48 @@ class SGConv(nn.Module):
         return self.fc(feat)
 
 
-class APPNP(nn.Module):
+class NNConv(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 edge_nn,
+                 aggregator_type,
+                 root_weight,
+                 bias=True):
+        super(NNConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self.edge_nn = edge_nn
+        if aggregator_type == 'sum':
+            self.reducer = fn.sum
+        elif aggregator_type == 'mean':
+            self.reducer = fn.mean
+        elif aggregator_type == 'max':
+            self.reducer = fn.max
+        else:
+            raise KeyError('Aggregator type not recognized: ' + aggregator_type)
+        self._aggre_type = aggregator_type
+        self.root = nn.Parameter(th.Tensor(in_feats, out_feats)) if root_weight else None
+        self.bias = nn.Parameter(th.Tensor(out_feats)) if bias else None
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        pass
+
+    def forward(self, feat, efeat, graph):
+        graph = graph.local_var()
+        graph.ndata['h'] = feat.unsqueeze(-1) # (n, d_in, 1)
+        graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats) # (n, d_in, d_out)
+        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'aggr_out')) # (n, d_in, d_out)
+        aggr_out = graph.ndata.pop('aggr_out').sum(dim=1) # (n, d_out)
+        if self.root is not None:
+            aggr_out = aggr_out + feat @ self.root
+        if self.bias is not None:
+            aggr_out = aggr_out + self.bias
+        return aggr_out
+
+
+class APPNPConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -527,26 +565,100 @@ class APPNP(nn.Module):
                  edge_drop,
                  alpha,
                  k,
-                 activation):
+                 activation,
+                 bias=True):
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._k = k
+        self._activation = activation
+
+    def forward(self, feat, graph):
         pass
 
 
-class PointConv(nn.Module):
-    pass
-
 class GMMConv(nn.Module):
-    pass
+    def __init__(self):
+        pass
+
+    def forward(self, feat, graph):
+        pass
 
 class SplineConv(nn.Module):
-    pass
+    def __init__(self):
+        pass
 
-class EdgeConv(nn.Module):
-    pass
+    def forward(self, feat, graph):
+        pass
 
-class DynamicEdgeConv(nn.Module):
-    pass
+class AGNNConv(nn.Module):
+    def __init__(self,
+                 init_beta=1,
+                 learn_beta=True):
+        super(AGNNConv, self).__init__()
+        if learn_beta:
+            self.beta = nn.Parameter(th.Tensor(init_beta))
+        else:
+            self.register_buffer('beta', th.Tensor(init_beta))
 
-class AGNN(nn.Module):
-    pass
+    def forward(self, feat, graph):
+        graph = graph.local_var()
+        graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
+        # compute cosine distance
+        graph.apply_edges(fn.u_mul_v('norm_h', 'norm_h', 'cos'))
+        cos = graph.edata.pop('cos').sum(-1)
+        e = self.beta * cos
+        graph.edata['p'] = edge_softmax(graph, e)
+        graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
+        return graph.ndata.pop('h')
 
+class DenseGCNConv(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 norm=True,
+                 bias=True,
+                 activation=None):
+        super(DenseGCNConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._norm = norm
+        self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
+        if bias:
+            self.bias = nn.Parameter(th.Tensor(out_feats))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+        self._activation = activation
 
+    def forward(self, feat, adj):
+        pass
+
+class DenseSAGEConv(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 feat_drop,
+                 aggregator_type,
+                 bias=True,
+                 norm=None,
+                 activation=None):
+        super(DenseSAGEConv, self).__init__()
+        self._in_feats = in_feats
+        self._out_feats = out_feats
+        self._aggre_type = aggregator_type
+        self._norm = norm
+        self.feat_drop = nn.Dropout(feat_drop)
+        self.activation = activation
+        # aggregator type: mean/pool/lstm/gcn
+        if aggregator_type == 'pool':
+            self.fc_pool = nn.Linear(in_feats, in_feats)
+        if aggregator_type == 'lstm':
+            self.lstm = nn.LSTM(in_feats, in_feats, batch_first=True)
+        if aggregator_type != 'gcn':
+            self.fc_self = nn.Linear(in_feats, out_feats, bias=bias)
+        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
+        self.reset_parameters()
+        pass
+
+    def forward(self, feat, adj):
+        pass

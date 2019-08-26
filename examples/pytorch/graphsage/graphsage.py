@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-import dgl.nn.pytorch.conv as conv
+from dgl.nn.pytorch.conv import SAGEConv
 
 
 class GraphSAGE(nn.Module):
@@ -31,12 +31,12 @@ class GraphSAGE(nn.Module):
         self.g = g
 
         # input layer
-        self.layers.append(conv.GraphSAGE(in_feats, n_hidden, dropout, aggregator_type, activation=activation))
+        self.layers.append(SAGEConv(in_feats, n_hidden, dropout, aggregator_type, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(conv.GraphSAGE(n_hidden, n_hidden, dropout, aggregator_type, activation=activation))
+            self.layers.append(SAGEConv(n_hidden, n_hidden, dropout, aggregator_type, activation=activation))
         # output layer
-        self.layers.append(conv.GraphSAGE(n_hidden, n_classes, dropout, aggregator_type, activation=None)) # activation None
+        self.layers.append(SAGEConv(n_hidden, n_classes, dropout, aggregator_type, activation=None)) # activation None
 
     def forward(self, features):
         h = features

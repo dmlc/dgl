@@ -8,7 +8,7 @@ import numpy as np
 from scipy import sparse
 
 
-__all__ = ['line_graph', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
+__all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
            'laplacian_lambda_max']
 
 
@@ -32,13 +32,22 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-# Add jit here
-def duplicate(arr, times):
+def _duplicate(arr, times):
+    """Duplicate arr[i]
+
+    Parameters
+    ----------
+    arr : numpy.ndarray
+    times : numpy.ndarray
+
+    Returns
+    -------
+    numpy.ndarray
+    """
     n = len(arr)
     lengths = 0
     for i in range(n):
         lengths += times[i]
-
     rst = np.empty(shape=(lengths), dtype=np.int64)
     cnt = 0
     for i in range(n):
@@ -46,6 +55,11 @@ def duplicate(arr, times):
             rst[cnt] = arr[i]
             cnt += 1
     return rst
+
+def khop_adj(g, k):
+    """"""
+    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    return adj_k.todense()
 
 def khop_graph(g, k):
     """Return the graph that includes all :math:`k`-hop neighbors of the given graph as edges.
@@ -59,11 +73,11 @@ def khop_graph(g, k):
         The :math:`k` in `k`-hop graph.
     """
     n = g.number_of_nodes()
-    adj_new = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
-    adj_new = adj_new.tocoo()
-    multiplicity = adj_new.data
-    row = duplicate(adj_new.row, multiplicity)
-    col = duplicate(adj_new.col, multiplicity)
+    adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
+    adj_k = adj_k.tocoo()
+    multiplicity = adj_k.data
+    row = _duplicate(adj_k.row, multiplicity)
+    col = _duplicate(adj_k.col, multiplicity)
     return DGLGraph(from_coo(n, row, col, True, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
