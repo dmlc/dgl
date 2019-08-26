@@ -1110,16 +1110,17 @@ class AGNNConv(nn.Module):
     learn_beta : bool, optional
     """
     def __init__(self,
-                 init_beta=1,
+                 init_beta=1.,
                  learn_beta=True):
         super(AGNNConv, self).__init__()
         if learn_beta:
-            self.beta = nn.Parameter(th.Tensor(init_beta))
+            self.beta = nn.Parameter(th.Tensor([init_beta]))
         else:
-            self.register_buffer('beta', th.Tensor(init_beta))
+            self.register_buffer('beta', th.Tensor([init_beta]))
 
     def forward(self, feat, graph):
         graph = graph.local_var()
+        graph.ndata['h'] = feat
         graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
         # compute cosine distance
         graph.apply_edges(fn.u_mul_v('norm_h', 'norm_h', 'cos'))

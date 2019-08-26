@@ -1,25 +1,38 @@
-"""
-This code was modified from the GCN implementation in DGL examples.
-Simplifying Graph Convolutional Networks
-Paper: https://arxiv.org/abs/1902.07153
-Code: https://github.com/Tiiiger/SGC
-SGC implementation in DGL.
-"""
-import argparse, time, math
+import argparse, time
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.nn.pytorch.conv import SGConv
+from models import *
+from conf import *
 
 
-def evaluate(model, g, features, labels, mask):
+def get_model_and_config(name):
+    name = name.lower()
+    if name == 'gcn':
+        return GCN, GCN_CONFIG
+    elif name == 'gat':
+        return GAT, GAT_CONFIG
+    elif name == 'graphsage':
+        return GraphSAGE, GRAPHSAGE_CONFIG
+    elif name == 'appnp':
+        return APPNP, APPNP_CONFIG
+    elif name == 'tagcn':
+        return TAGCN, TAGCN_CONFIG
+    elif name == 'agnn':
+        return AGNN, AGNN_CONFIG
+    elif name == 'sgc':
+        return SGC, SGC_CONFIG
+    elif name == 'gin':
+        return GIN, GIN_CONFIG
+
+def evaluate(model, features, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(features, g)[mask] # only compute the evaluation set
+        logits = model(features)
+        logits = logits[mask]
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
@@ -59,34 +72,48 @@ def main(args):
         test_mask = test_mask.cuda()
 
     # graph preprocess and calculate normalization factor
-    g = DGLGraph(data.graph)
-    n_edges = g.number_of_edges()
+    g = data.graph
     # add self loop
-    g.add_edges(g.nodes(), g.nodes())
+    if args.self_loop:
+        g.remove_edges_from(g.selfloop_edges())
+        g.add_edges_from(zip(g.nodes(), g.nodes()))
+    g = DGLGraph(g)
+    n_edges = g.number_of_edges()
+    # normalization
+    degs = g.in_degrees().float()
+    norm = torch.pow(degs, -0.5)
+    norm[torch.isinf(norm)] = 0
+    if cuda:
+        norm = norm.cuda()
+    g.ndata['norm'] = norm.unsqueeze(1)
 
-    # create SGC model
-    model = SGConv(in_feats,
-                   n_classes,
-                   k=2,
-                   cached=True,
-                   bias=args.bias)
+    # create GCN model
+    GNN, config = get_model_and_config(args.model)
+    model = GNN(g,
+                in_feats,
+                n_classes,
+                *config['extra_args'])
 
-    if cuda: model.cuda()
+    if cuda:
+        model.cuda()
+
+    print(model)
+
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=args.lr,
-                                 weight_decay=args.weight_decay)
+                                 lr=config['lr'],
+                                 weight_decay=config['weight_decay'])
 
     # initialize graph
     dur = []
-    for epoch in range(args.n_epochs):
+    for epoch in range(200):
         model.train()
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, g) # only compute the train set
+        logits = model(features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -96,30 +123,26 @@ def main(args):
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, g, features, labels, val_mask)
+        acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
               "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
                                              acc, n_edges / np.mean(dur) / 1000))
 
     print()
-    acc = evaluate(model, g, features, labels, test_mask)
+    acc = evaluate(model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='SGC')
+    parser = argparse.ArgumentParser(description='Node classification on citation networks.')
     register_data_args(parser)
+    parser.add_argument("--model", type=str, default='gcn',
+                        help='model to use, available models are gcn, gat, graphsage, gin,'
+                             'appnp, tagcn, sgc, agnn')
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=0.2,
-            help="learning rate")
-    parser.add_argument("--bias", action='store_true', default=False,
-            help="flag to use bias")
-    parser.add_argument("--n-epochs", type=int, default=100,
-            help="number of training epochs")
-    parser.add_argument("--weight-decay", type=float, default=5e-6,
-            help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true',
+            help="graph self-loop (default=False)")
     args = parser.parse_args()
     print(args)
-
     main(args)
