@@ -230,7 +230,16 @@ class GraphConv(nn.Module):
 class GATConv(nn.Module):
     r"""Apply graph attention over an input signal.
 
-    TODO(zihao): docstring
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    num_heads : int
+    feat_drop : float
+    attn_drop : float
+    alpha : float
+    residual : bool, optional
+    activation : callable activation function/layer or None, optional.
     """
     def __init__(self,
                  in_feats,
@@ -580,9 +589,17 @@ class RelGraphConv(nn.Module):
 
 
 class SAGEConv(nn.Module):
-    r""" GraphSAGE layer.
+    r""" GraphSAGE layer from paper "".
 
-    TODO(zihao): docstring
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    feat_drop : float
+    aggregator_type : str
+    bias : bool
+    norm : callable activation function/layer or None, optional
+    activation : callable activation function/layer or None, optional
     """
     def __init__(self,
                  in_feats,
@@ -674,6 +691,17 @@ class SAGEConv(nn.Module):
 
 
 class GatedGraphConv(nn.Module):
+    """Gated Graph Convolution layer from paper ""
+
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    n_steps : int
+    n_etyps : int
+    aggregator_type : str
+    bias : bool
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -727,8 +755,9 @@ class GMMConv(nn.Module):
     aggregator_type : str
         Aggregator type (``sum``, ``mean``, ``max``).
     residual : bool
-        If True, the layer
+        If True, use residual connection inside this layer.
     bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
     """
     def __init__(self,
                  in_feats,
@@ -956,6 +985,17 @@ class SGConv(nn.Module):
 
 
 class NNConv(nn.Module):
+    """Graph Convolution layer introduced in "Neural Message Passing for Quantum Chemistry".
+
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    edge_nn : torch.nn.Module
+    aggregator_type : str
+    residual : bool
+    bias : bool, optional
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -974,7 +1014,7 @@ class NNConv(nn.Module):
         elif aggregator_type == 'max':
             self.reducer = fn.max
         else:
-            raise KeyError('Aggregator type not recognized: ' + aggregator_type)
+            raise KeyError('Aggregator type {} not recognized: '.format(aggregator_type))
         self._aggre_type = aggregator_type
         if residual:
             if in_feats != out_feats:
@@ -1009,6 +1049,17 @@ class NNConv(nn.Module):
 
 
 class APPNPConv(nn.Module):
+    """Approximate Personalized Propagation of Neural Predictions layer from
+    paper "Predict then Propagate: Graph Neural Networks meet Personalized PageRank".
+
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    alpha : float
+    k : int
+    activation : callable activation function/layer or None, optional
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -1040,6 +1091,14 @@ class APPNPConv(nn.Module):
 
 
 class AGNNConv(nn.Module):
+    """Attention-based Graph Neural Network layer from paper "Attention-based
+     Graph Neural Network for Semi-Supervised Learning"
+
+    Parameters
+    ----------
+    init_beta : float, optional
+    learn_beta : bool, optional
+    """
     def __init__(self,
                  init_beta=1,
                  learn_beta=True):
@@ -1062,8 +1121,18 @@ class AGNNConv(nn.Module):
 
 
 class DenseGCNConv(nn.Module):
-    """ GraphSAGE layer, where the input
-    The input for DenseGCNConv is of type
+    """Graph Convolutional Network layer where the graph structure
+    is given by an adjacency matrix.
+    We recommend user to use this module when inducing graph convolution
+    on dense graphs / k-hop graphs.
+
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    norm : bool
+    bias : bool
+    activation : callable activation function/layer or None, optional
     """
     def __init__(self,
                  in_feats,
@@ -1084,12 +1153,51 @@ class DenseGCNConv(nn.Module):
         self._activation = activation
 
     def forward(self, feat, adj):
-        pass
+        adj = adj.float().to(feat.device)
+        if self._norm:
+            in_degrees = adj.sum(dim=1)
+            norm = th.pow(in_degrees, -0.5)
+            shp = norm.shape + (1,) * (feat.dim() - 1)
+            norm = th.reshape(norm, shp).to(feat.device)
+            feat = feat * norm
+
+        if self._in_feats > self._out_feats:
+            # mult W first to reduce the feature size for aggregation.
+            feat = th.matmul(feat, self.weight)
+            rst = adj @ feat
+        else:
+            # aggregate first then mult W
+            rst = adj @ feat
+            rst = th.matmul(rst, self.weight)
+
+        if self._norm:
+            rst = rst * norm
+
+        if self.bias is not None:
+            rst = rst + self.bias
+
+        if self._activation is not None:
+            rst = self._activation(rst)
+
+        return rst
 
 
 class DenseSAGEConv(nn.Module):
-    """ GraphSAGE layer designed for dense graph.
+    """GraphSAGE layer where the graph structure is given by an
+    adjacency matrix.
+    We recommend user to use this module when inducing GraphSAGE
+    operations on dense graphs / k-hop graphs.
 
+    Note that we only support mean aggregator in DenseSAGEConv.
+
+    Parameters
+    ----------
+    in_feats : int
+    out_feats : int
+    feat_drop : float
+    norm : bool
+    bias : bool
+    activation : callable activation function/layer or None, optional
     """
     def __init__(self,
                  in_feats,
@@ -1112,4 +1220,16 @@ class DenseSAGEConv(nn.Module):
         pass
 
     def forward(self, feat, adj):
-        pass
+        adj = adj.float().to(feat.device)
+        feat = self.feat_drop(feat)
+        h_self = feat
+        if self._aggre_type == 'mean':
+            in_degrees = adj.sum(dim=1).unsqueeze(-1)
+            h_neigh = (adj @ feat) / in_degrees.clamp(min=1)
+        rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+        # activation
+        if self.activation is not None:
+            rst = self.activation(rst)
+        # normalization
+        if self._norm is not None:
+            rst = self._norm(rst)
