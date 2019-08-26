@@ -20,8 +20,13 @@ explicitly modeling the interactions between adjacent atoms.
 
 ### Usage
 
-To train a model from scratch, simply call `python classification.py`. To skip training and use the pre-trained model,
-call `python classification.py -p`.
+Use `classification.py` with arguments
+```
+-m {GCN, GAT}, MODEL, model to use
+-d {Tox21}, DATASET, dataset to use
+```
+
+If you want to use the pre-trained model, simply add `-p`.
 
 We use GPU whenever it is available.
 
@@ -33,10 +38,14 @@ We use GPU whenever it is available.
 | ---------------- | ---------------------- |
 | MoleculeNet [1]  | 0.829                  |
 | [DeepChem example](https://github.com/deepchem/deepchem/blob/master/examples/tox21/tox21_tensorgraph_graph_conv.py) | 0.813                  |
-| Pretrained model | 0.827                  |
+| Pretrained model | 0.826                  |
 
-Note that due to some possible randomness you may get different numbers for DeepChem example and our model. To get
-match exact results for this model, please use the pre-trained model as in the usage section.
+Note that the dataset is randomly split so these numbers are only for reference and they do not necessarily suggest
+a real difference.
+
+#### GAT on Tox21
+
+
 
 ## Dataset Customization
 
