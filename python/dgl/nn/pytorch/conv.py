@@ -544,10 +544,8 @@ class RelGraphConv(nn.Module):
             g.edata['norm'] = norm
         if self.self_loop:
             loop_message = utils.matmul_maybe_select(x, self.loop_weight)
-
         # message passing
         g.update_all(self.message_func, fn.sum(msg='msg', out='h'))
-
         # apply bias and activation
         node_repr = g.ndata['h']
         if self.bias:
@@ -557,8 +555,8 @@ class RelGraphConv(nn.Module):
         if self.activation:
             node_repr = self.activation(node_repr)
         node_repr = self.dropout(node_repr)
-
         return node_repr
+
 
 class SAGEConv(nn.Module):
     r"""Apply GraphSAGE layer over an input signal.
@@ -620,48 +618,34 @@ class SAGEConv(nn.Module):
         h_self = feat
         if self._aggre_type == 'mean':
             graph.ndata['h'] = feat
-            graph.update_all(
-                fn.copy_src('h', 'm'),
-                fn.mean('m', 'neigh'),
-            )
-            # divide in_degrees
+            graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
             h_neigh = graph.ndata['neigh']
         elif self._aggre_type == 'gcn':
             graph.ndata['h'] = feat
-            graph.update_all(
-                fn.copy_src('h', 'm'),
-                fn.sum('m', 'neigh')
-            )
+            graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
             # divide in_degrees
             degs = graph.in_degrees().float()
             degs = degs.to(feat.device)
             h_neigh = (graph.ndata['neigh'] + graph.ndata['h']) / (degs.unsqueeze(-1) + 1)
         elif self._aggre_type == 'pool':
             graph.ndata['h'] = F.relu(self.fc_pool(feat))
-            graph.update_all(
-                fn.copy_src('h', 'm'),
-                fn.max('m', 'neigh')
-            )
+            graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
             h_neigh = graph.ndata['neigh']
         else: # lstm:
             graph.ndata['h'] = feat
-            graph.update_all(
-                fn.copy_src('h', 'm'),
-                self._lstm_reducer,
-            )
+            graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
             h_neigh = graph.ndata['neigh']
-
+        # GraphSAGE GCN does not require fc_self.
         if self._aggre_type == 'gcn':
             rst = self.fc_neigh(h_neigh)
         else:
             rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
-
+        # activation
         if self.activation is not None:
             rst = self.activation(rst)
-
+        # normalization
         if self._norm is not None:
             rst = self._norm(rst)
-
         return rst
 
     def extra_repr(self):
@@ -672,34 +656,36 @@ class GatedGraphConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
-                 n_layers,
+                 n_steps,
+                 n_etypes,
                  aggregator_type,
                  bias=True):
         super(GatedGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self._n_layers = n_layers
+        self._n_steps = n_steps
         self._aggre_type = aggregator_type
-        self.fc = nn.ModuleList([nn.Linear(out_feats, out_feats, bias=False)])
+        self.weight = nn.Embedding(n_etypes, out_feats * out_feats)
         self.gru = nn.GRUCell(out_feats, out_feats, bias=bias)
         self.reset_parameters()
 
     def reset_parameters(self):
         self.gru.reset_parameters()
+        # TODO(zihao): initialize weight
 
-    def forward(self, feat, graph):
-        # TODO(zihao): add edge weight
+    def forward(self, feat, edge_type, graph):
         graph = graph.local_var()
         zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
         feat = th.cat([feat, zero_pad], -1)
-
-        for i in range(self._n_layers):
-            graph.ndata['h'] = self.fc[i](feat)
-            graph.update_all(fn.copy_u('h', 'm'),
-                             fn.sum('m', 'm'))
-            m = graph.ndata.pop('m')
-            feat = self.gru(m, feat)
-
+        # NOTE(zihao): there is still room to optimize, we may do kernel fusion
+        # for such operations in the future.
+        graph.edata['w'] = self.weight(edge_type).view(-1, self._out_feats, self._out_feats) # (E, D, D)
+        for i in range(self._n_steps):
+            graph.ndata['h'] = feat.unsqueeze(-1) # (N, D, 1)
+            graph.update_all(fn.u_mul_e('h', 'w', 'm'),
+                             fn.sum('m', 'a'))
+            a = graph.ndata.pop('a').sum(dim=1) # (N, D)
+            feat = self.gru(a, feat)
         return feat
 
 
@@ -716,11 +702,17 @@ class GMMConv(nn.Module):
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
-        self._aggre_type = aggregator_type
+        if aggregator_type == 'sum':
+            self._reducer = fn.sum
+        elif aggregator_type == 'mean':
+            self._reducer == fn.mean
+        elif aggregator_type == 'max':
+            self._reducer == fn.max
+        else:
+            raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
         self.mu = nn.Parameter(th.Tensor(n_kernels, dim))
         self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
         self.fc = nn.Linear(in_feats, n_kernels * out_feats, bias=False)
-
         if residual:
             self.res_fc = nn.Linear(in_feats, out_feats, bias=False)
         else:
@@ -741,24 +733,17 @@ class GMMConv(nn.Module):
         E = graph.number_of_edges()
         # compute gaussian weight
         gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) - self.mu.view(1, self._n_kernels, self._dim)) ** 2)
-        gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._out_feats) ** 2)
+        gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
         gaussian = th.exp(gaussian.sum(dim=-1, keepdims=True)) # (E, K, 1)
         graph.edata['w'] = gaussian
-        if self._aggre_type == 'sum':
-            reducer = fn.sum
-        elif self._aggre_type == 'mean':
-            reducer = fn.mean
-        elif self._aggre_type == 'max':
-            reducer = fn.max
-        graph.update_all(fn.u_mul_e('h', 'w', 'm'), reducer('m', 'h'))
+        graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
         rst = graph.ndata['h'].sum(1)
-
+        # residual connection
         if self.res_fc is not None:
             rst = rst + self.res_fc(feat)
-
+        # bias
         if self.bias is not None:
             rst = rst + self.bias
-
         return rst
 
 
@@ -770,7 +755,15 @@ class GINConv(nn.Module):
                  learn_eps=False):
         super(GINConv, self).__init__()
         self.nn = nn
-        self._aggre_type = aggregator_type
+        if aggregator_type == 'sum':
+            self._reducer = fn.sum
+        elif aggregator_type == 'max':
+            self._reducer = fn.max
+        elif aggregator_type == 'mean':
+            self._reducer = fn.mean
+        else:
+            raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
+        # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
@@ -779,13 +772,7 @@ class GINConv(nn.Module):
     def forward(self, feat, graph):
         graph = graph.local_var()
         graph.ndata['h'] = feat
-        if self._aggre_type == 'sum':
-            reducer = fn.sum('m', 'neigh')
-        elif self._aggre_type == 'max':
-            reducer = fn.max('m', 'neigh')
-        elif self._aggre_type == 'mean':
-            reducer = fn.mean('m', 'neigh')
-        graph.update_all(fn.copy_u('h', 'm'), reducer)
+        graph.update_all(fn.copy_u('h', 'm'), self._reducer('m', 'neigh'))
         rst = self.nn((1 + self.eps) * feat + graph.ndata['neigh'])
         return rst
 
@@ -826,29 +813,29 @@ class ChebConv(nn.Module):
             lambda_max = th.Tensor(lambda_max).to(feat.device)
         if lambda_max.dim() < 1:
             lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
-
         # 2 / lambda_max, and broadcast from (B, 1) to (N, 1)
         laplacian_norm = 2. / broadcast_nodes(graph, lambda_max)
-
+        # T0(X)
         Tx_0 = feat
         rst = self.fc[0](Tx_0)
-
+        # T1(X)
         if self._k > 1:
             graph.ndata['h'] = Tx_0 * norm
             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            #Λ = 2 * L / lambda_max - I
             Tx_1 = (graph.ndata.pop('h') * norm) * laplacian_norm - Tx_0
             rst = rst + self.fc[1](Tx_1)
-
+        # Ti(x), i = 2...k
         for i in range(2, self._k):
             graph.ndata['h'] = Tx_1 * norm
             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+            # Λ = 2 * L / lambda_max - I, Tx_k = 2 * Λ * Tx_(k-1) - Tx_(k-2)
             Tx_2 = 2 * ((graph.ndata.pop('h') * norm) * laplacian_norm - Tx_1) - Tx_0
             rst = rst + self.fc[i](Tx_2)
             Tx_1, Tx_0 = Tx_2, Tx_1
-
+        # add bias
         if self.bias:
             rst = rst + self.bias
-
         return rst
 
 
@@ -884,10 +871,9 @@ class SGConv(nn.Module):
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')
                 feat = feat * norm
-
+            # cache feature
             if self._cached:
                 self._cached_h = feat
-
         return self.fc(feat)
 
 
@@ -932,8 +918,10 @@ class NNConv(nn.Module):
         graph.edata['w'] = self.edge_nn(efeat).view(-1, self._in_feats, self._out_feats) # (n, d_in, d_out)
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'aggr_out')) # (n, d_in, d_out)
         aggr_out = graph.ndata.pop('aggr_out').sum(dim=1) # (n, d_out)
+        # residual connection
         if self.res_fc is not None:
             aggr_out = aggr_out + self.res_fc(feat)
+        # bias
         if self.bias is not None:
             aggr_out = aggr_out + self.bias
         return aggr_out
