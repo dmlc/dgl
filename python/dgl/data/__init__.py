@@ -11,13 +11,19 @@ from .reddit import RedditDataset
 from .ppi import PPIDataset
 from .tu import TUDataset
 from .gindt import GINDataset
-from .chem import Tox21
+# from .chem import Tox21, alchemy
 
 
 def register_data_args(parser):
-    parser.add_argument("--dataset", type=str, required=False,
-            help="The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        required=False,
+        help=
+        "The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit"
+    )
     citegrh.register_args(parser)
+
 
 def load_data(args):
     if args.dataset == 'cora':
