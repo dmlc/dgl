@@ -50,6 +50,25 @@ the continuous-filter convolutional layers [4].
 hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
 by the multilevel interactions [5].    
 - **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us  Set2Set to output prediction [6].
+
+## Generative Models
+
+We use generative models for two different purposes when it comes to molecules:
+- **Distribution Learning**: Given a collection of molecules, we want to model their distribution and generate new
+molecules with similar properties.
+- **Goal-directed Optimization**: Find molecules with desired properties.
+
+For this model zoo, we will only focused on generative models for molecular graphs. There are other generative models 
+working with alternative representations like SMILES. 
+
+Generative models are known to be difficult for evaluation. [GuacaMol](https://github.com/BenevolentAI/guacamol) and
+[MOSES](https://github.com/molecularsets/moses) have been two recent efforts to benchmark generative models. There
+are also two accompanying review papers that are well written [7], [8].
+
+### Models
+- **Deep Generative Models of Graphs (DGMG)**: A very general framework for graph distribution learning by progressively
+adding atoms and bonds.
+
 ## References
 
 [1] Chen et al. (2018) The rise of deep learning in drug discovery. *Drug Discov Today* 6, 1241-1250.
@@ -66,7 +85,10 @@ information processing systems (NeurIPS)*, 2224-2232.
 [5] Lu et al. Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
 *The 33rd AAAI Conference on Artificial Intelligence*. 
 
-
 [6] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference on 
 Machine Learning* JMLR. 1263-1272.
 
+[7] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
+1096-1108.
+
+[8] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
