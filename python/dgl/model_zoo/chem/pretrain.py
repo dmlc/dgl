@@ -1,5 +1,7 @@
 """Utilities for using pretrained models."""
 import torch
+from rdkit import Chem
+
 from .dgmg import DGMG
 from .gcn import GCNClassifier
 from . import DGLJTNNVAE
@@ -13,8 +15,6 @@ URL = {
     'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
     'JTNN_ZINC':'pre_trained/JTNN_ZINC.pth'
 }
-
-from rdkit import Chem
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
                                  local_pretrained_path='pre_trained.pth', log=True):
