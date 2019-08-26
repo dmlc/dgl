@@ -173,6 +173,17 @@ class GraphConv(nn.Module):
 class GATConv(nn.Module):
     r"""Apply graph attention over an input signal.
 
+    .. math::
+        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
+
+    where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and
+    node :math:`j`:
+
+    .. math::
+        \alpha_{ij}^{l} = \mathrm{softmax_i} (e_{ij}^{l})
+
+        e_{ij}^{l} = \mathrm{LeakyReLU}\left(\vec{a}^T [W h^{I} \| W h^{j}]\right)
+
     Parameters
     ----------
     in_feats : int
@@ -278,6 +289,7 @@ class TAGConv(nn.Module):
 
     .. math::
         \mathbf{X}^{\prime} = \sum_{k=0}^K \mathbf{D}^{-1/2} \mathbf{A}
+
         \mathbf{D}^{-1/2}\mathbf{X} \mathbf{\Theta}_{k},
 
     where :math:`\mathbf{A}` denotes the adjacency matrix and
@@ -552,6 +564,13 @@ class SAGEConv(nn.Module):
     r"""GraphSAGE layer from paper "Inductive Representation Learning on
     Large Graphs".
 
+    .. math::
+        h_{\mathcal{N}(i)}^{(l+1)} = textsc{aggregate}\left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
+
+        h_{i}^{(l+1)} = \sigma \left(W \cdot \textsc{concat} (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1} + b) \right)
+
+        h_{i}^{(l+1)} = \textsc{norm}(h_{i}^{l})
+
     Parameters
     ----------
     in_feats : int
@@ -674,6 +693,13 @@ class SAGEConv(nn.Module):
 class GatedGraphConv(nn.Module):
     """Gated Graph Convolution layer from paper ""
 
+    .. math::
+        h_{i}^{0} = [ x_i \| \mathbf{0} ]
+
+        a_{i}^{t} = \sum_{j\in\mathcal{N}(i)} W_{e_{ij}} h_{j}^{t}
+
+        h_{i}^{t+1} = \textrm{GRU}(a_{i}^{t}, h_{i}^{t})
+
     Parameters
     ----------
     in_feats : int
@@ -682,7 +708,7 @@ class GatedGraphConv(nn.Module):
         Output feature size.
     n_steps : int
         Number of recurrent steps.
-    n_etyps : int
+    n_etypes : int
         Number of edge types.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
@@ -745,7 +771,12 @@ class GatedGraphConv(nn.Module):
 
 class GMMConv(nn.Module):
     """The Gaussian Mixture Model Convolution layer from "Geometric Deep
-     Learning on Graphs and Manifolds using Mixture Model CNNs”
+    Learning on Graphs and Manifolds using Mixture Model CNNs”
+
+    .. math::
+        h_i^{l+1} = \textsc{aggregate}\left(\left\{\frac{1}{K} \sum_{k}^{K} w_k(u_{ij}), \forall j\in \mathcal{N}(i)\right\}\right)
+
+        w_k(u) = \exp\left(-\frac{1}{2}(u-\mu_k)^T \Sigma_k^{-1} (u - \mu_k)\right)
 
     Parameters
     ----------
@@ -857,10 +888,14 @@ class GINConv(nn.Module):
     """Graph Isomorphism Network layer from paper "How Powerful are Graph
     Neural Networks?"
 
+    .. math::
+        h_i^{(l+1)} = f_\Theta \left( (1 + \epsilon) h_i^{l} + \textsc{aggregate}\left(\left\{h_j^{l}, j\in\mathcal{N}(i)\right\}\right)\right)
+
     Parameters
     ----------
     apply_func : callable activation function/layer or None
-        If not None, apply this function to the updated node feature.
+        If not None, apply this function to the updated node feature,
+        the :math:`f_\Theta` in the formula.
     aggregator_type : str
         Aggregator type to use (``sum``, ``max`` or ``mean``).
     init_eps : float, optional
@@ -922,6 +957,17 @@ class GINConv(nn.Module):
 class ChebConv(nn.Module):
     """Chebyshev Spectral Graph Convolution layer from paper "Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering"
+
+    .. math::
+        h_i^{l+1} = \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
+
+        Z^{0, l} = H^{l}
+
+        Z^{1, l} = \hat{L} \cdot H^{l}
+
+        Z^{k, l} = 2 \hat{L} Z^{k-1, l} - Z^{k-2, l}
+
+        \hat{L} = 2(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})/\lambda_{max} - I
 
     Parameters
     ----------
@@ -1024,6 +1070,9 @@ class SGConv(nn.Module):
     """Simplifying Grpah Convolution layer from paper "Simplifying Graph
      Convolutional Networks"
 
+    .. math::
+        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} W^{l}
+
     Parameters
     ----------
     in_feats : int
@@ -1101,6 +1150,9 @@ class NNConv(nn.Module):
     """Graph Convolution layer introduced in "Neural Message Passing
     for Quantum Chemistry".
 
+    .. math::
+        h_{i}^{l+1} = h_{i}^{l} + \textsc{aggregate}\left(\left\{f_\Theta (e_{ij}) \cdot h_j^{l}, j\in \mathcal{N}(i)\right\}\right)
+
     Parameters
     ----------
     in_feats : int
@@ -1110,6 +1162,7 @@ class NNConv(nn.Module):
     edge_func : callable activation function/layer
         Maps each edge feature to a tensor of shape
         ``(in_feats, out_feats)`` for computing messages.
+        The :math:`f_\Theta` in the formula.
     aggregator_type : str
         Aggregator type to use (``sum``, ``mean`` or ``max``).
     residual : bool, optional
@@ -1200,6 +1253,11 @@ class APPNPConv(nn.Module):
     """Approximate Personalized Propagation of Neural Predictions layer from
     paper "Predict then Propagate: Graph Neural Networks meet Personalized PageRank".
 
+    .. math::
+        H^{0} = X
+
+        H^{t+1} = (1-\alpha)\left(\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2} H^{t} + \alpha H^{0}\right)
+
     Parameters
     ----------
     k : int
@@ -1258,6 +1316,14 @@ class APPNPConv(nn.Module):
 class AGNNConv(nn.Module):
     """Attention-based Graph Neural Network layer from paper "Attention-based
      Graph Neural Network for Semi-Supervised Learning"
+
+    .. math::
+        H^{l+1} = P H^{l}
+
+    where :math:`P` is computed as:
+
+    .. math::
+        P_{ij} = \textrm{softmax}_i (\beta \cdot \cos(h_i^l, h_j^l))
 
     Parameters
     ----------
