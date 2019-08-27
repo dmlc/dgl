@@ -134,7 +134,7 @@ class TencentAlchemyDataset(object):
 
         return atom_feats_dict
 
-    def alchemy_edges(self, mol, self_loop=True):
+    def alchemy_edges(self, mol, self_loop=False):
         """Featurization for all bonds in a molecule. The bond indices
         will be preserved.
 
