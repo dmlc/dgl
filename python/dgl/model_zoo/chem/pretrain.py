@@ -26,6 +26,8 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
                                  local_pretrained_path='pre_trained.pth', log=True):
     """Download pretrained model checkpoint
 
+    The model will be loaded to CPU.
+
     Parameters
     ----------
     model_name : str
