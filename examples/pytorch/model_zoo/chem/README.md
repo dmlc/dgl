@@ -102,4 +102,3 @@ Machine Learning* JMLR. 1263-1272.
 *The International Conference on Learning Representations (ICLR)*. 
 
 [11] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
-
