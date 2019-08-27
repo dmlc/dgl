@@ -56,10 +56,6 @@ def main(args):
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     degs = g.in_degrees().astype('float32')
-    norm = mx.nd.power(degs, -0.5)
-    if cuda:
-        norm = norm.as_in_context(ctx)
-    g.ndata['norm'] = mx.nd.expand_dims(norm, 1)
 
     # create TAGCN model
     model = TAGCN(g,

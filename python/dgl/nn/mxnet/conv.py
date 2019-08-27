@@ -189,6 +189,7 @@ class TGConv(gluon.Block):
         self._activation = activation
 
         in_feats = in_feats * (self._k + 1)
+        print(in_feats)
         with self.name_scope():
             self.lin = self.params.get('weight', shape=(in_feats, out_feats),
                                         init=mx.init.Xavier())
@@ -219,22 +220,20 @@ class TGConv(gluon.Block):
         norm = mx.nd.power(degs, -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = norm.reshape(shp).as_in_context(feat.context)
-        norm = mx.nd.expand_dims(norm, 1)
-
         #D-1/2 A D -1/2 X
-        fstack = [feat]
+
+        rst = feat
         for _ in range(self._k):
-            rst = fstack[-1] * norm
+            rst = rst * norm
             graph.ndata['h'] = rst
 
             graph.update_all(fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'))
             rst = graph.ndata['h']
             rst = rst * norm
-            fstack.append(rst)
+            feat = mx.nd.concat(feat, rst, dim=-1)
 
-        rst = mx.nd.dot(mx.nd.concat(fstack, dim=-1), self.weight.data(feat.context))
-
+        rst = mx.nd.dot(feat, self.lin.data(feat.context))
         if self.bias is not None:
             rst = rst + self.bias.data(rst.context)
 
