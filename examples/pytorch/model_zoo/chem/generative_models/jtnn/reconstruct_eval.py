@@ -102,6 +102,10 @@ def reconstruct():
         except Exception as e:
             print("Failed to encode: {}".format(gt_smiles))
             print(e)
+
+        if it % 20 == 1:
+            print("Progress {}/{}; Current Reconstruction Accuracy: {:.4f}".format(it,
+                                                                                   len(dataloader), acc / tot))
     return acc / tot
 
 
