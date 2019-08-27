@@ -106,3 +106,7 @@ Here we draw some "neighbor" of a given molecule, by adding noises on the interm
 ![image](https://user-images.githubusercontent.com/8686776/63773593-0d37da00-c90e-11e9-8933-0abca4b430db.png)
 #### Neighbor Molecules
 ![image](https://user-images.githubusercontent.com/8686776/63773602-1163f780-c90e-11e9-8341-5122dc0d0c82.png)
+
+### Warnings from PyTorch 1.2
+If you are using PyTorch 1.2, there might be warning saying 
+`UserWarning: indexing with dtype torch.uint8 is now deprecated, please use a dtype torch.bool instead.`. This is due to the new feature in PyTorch 1.2. Please kindly ignore it.
