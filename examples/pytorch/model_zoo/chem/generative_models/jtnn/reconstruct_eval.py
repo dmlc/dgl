@@ -53,6 +53,7 @@ else:
     model = model_zoo.chem.load_pretrained("JTNN_ZINC")
 
 model = cuda(model)
+model.eval()
 print("Model #Params: %dK" %
       (sum([x.nelement() for x in model.parameters()]) / 1000,))
 
@@ -75,37 +76,37 @@ def reconstruct():
     # tree and molecule vectors.
     acc = 0.0
     tot = 0
-    print(len(dataset))
-    for it, batch in enumerate(dataloader):
-        gt_smiles = batch['mol_trees'][0].smiles
-        # print(gt_smiles)
-        model.move_to_cuda(batch)
-        try:
-            _, tree_vec, mol_vec = model.encode(batch)
+    with torch.no_grad():
+        for it, batch in enumerate(dataloader):
+            gt_smiles = batch['mol_trees'][0].smiles
+            # print(gt_smiles)
+            model.move_to_cuda(batch)
+            try:
+                _, tree_vec, mol_vec = model.encode(batch)
 
-            tree_mean = model.T_mean(tree_vec)
-            # Following Mueller et al.
-            tree_log_var = -torch.abs(model.T_var(tree_vec))
-            mol_mean = model.G_mean(mol_vec)
-            # Following Mueller et al.
-            mol_log_var = -torch.abs(model.G_var(mol_vec))
+                tree_mean = model.T_mean(tree_vec)
+                # Following Mueller et al.
+                tree_log_var = -torch.abs(model.T_var(tree_vec))
+                mol_mean = model.G_mean(mol_vec)
+                # Following Mueller et al.
+                mol_log_var = -torch.abs(model.G_var(mol_vec))
 
-            epsilon = torch.randn(1, model.latent_size // 2).cuda()
-            tree_vec = tree_mean + torch.exp(tree_log_var // 2) * epsilon
-            epsilon = torch.randn(1, model.latent_size // 2).cuda()
-            mol_vec = mol_mean + torch.exp(mol_log_var // 2) * epsilon
-            dec_smiles = model.decode(tree_vec, mol_vec)
+                epsilon = torch.randn(1, model.latent_size // 2).cuda()
+                tree_vec = tree_mean + torch.exp(tree_log_var // 2) * epsilon
+                epsilon = torch.randn(1, model.latent_size // 2).cuda()
+                mol_vec = mol_mean + torch.exp(mol_log_var // 2) * epsilon
+                dec_smiles = model.decode(tree_vec, mol_vec)
 
-            if dec_smiles == gt_smiles:
-                acc += 1
-            tot += 1
-        except Exception as e:
-            print("Failed to encode: {}".format(gt_smiles))
-            print(e)
+                if dec_smiles == gt_smiles:
+                    acc += 1
+                tot += 1
+            except Exception as e:
+                print("Failed to encode: {}".format(gt_smiles))
+                print(e)
 
-        if it % 20 == 1:
-            print("Progress {}/{}; Current Reconstruction Accuracy: {:.4f}".format(it,
-                                                                                   len(dataloader), acc / tot))
+            if it % 20 == 1:
+                print("Progress {}/{}; Current Reconstruction Accuracy: {:.4f}".format(it,
+                                                                                       len(dataloader), acc / tot))
     return acc / tot
 
 
