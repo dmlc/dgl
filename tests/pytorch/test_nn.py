@@ -108,16 +108,16 @@ def test_tagconv():
     # test#2: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
+    assert h1.shape[-1] == 2
 
-    # test rest_parameters
+    # test reset_parameters
     old_weight = deepcopy(conv.lin.weight.data)
     conv.reset_parameters()
     new_weight = conv.lin.weight.data
     assert not F.allclose(old_weight, new_weight)
 
 def test_set2set():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
@@ -139,6 +139,7 @@ def test_set2set():
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_glob_att_pool():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
 
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
@@ -158,6 +159,7 @@ def test_glob_att_pool():
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_simple_pool():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
 
     sum_pool = nn.SumPooling()
@@ -168,6 +170,12 @@ def test_simple_pool():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
+    if F.gpu_ctx():
+        sum_pool = sum_pool.to(ctx)
+        avg_pool = avg_pool.to(ctx)
+        max_pool = max_pool.to(ctx)
+        sort_pool = sort_pool.to(ctx)
+        h0 = h0.to(ctx)
     h1 = sum_pool(h0, g)
     assert F.allclose(h1, F.sum(h0, 0))
     h1 = avg_pool(h0, g)
@@ -181,6 +189,8 @@ def test_simple_pool():
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
+    if F.gpu_ctx():
+        h0 = h0.to(ctx)
 
     h1 = sum_pool(h0, bg)
     truth = th.stack([F.sum(h0[:15], 0),
@@ -210,6 +220,7 @@ def test_simple_pool():
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
 def test_set_trans():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
 
     st_enc_0 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'sab')
