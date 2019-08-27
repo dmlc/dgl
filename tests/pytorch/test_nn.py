@@ -20,7 +20,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2, norm=False, bias=True)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     print(conv)
     # test#1: basic
     h0 = F.ones((3, 5))
@@ -37,7 +37,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
@@ -51,7 +51,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
@@ -81,15 +81,15 @@ def _S2AXWb(A, N, X, W, b):
 
     return Y + b
 
-def test_tgconv():
+def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
-    conv = nn.TGConv(5, 2, bias=True)
+    conv = nn.TAGConv(5, 2, bias=True)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     print(conv)
 
     # test#1: basic
@@ -102,27 +102,27 @@ def test_tgconv():
 
     assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.weight, conv.lin.bias))
 
-    conv = nn.TGConv(5, 2)
+    conv = nn.TAGConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#2: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
+    assert h1.shape[-1] == 2
 
-    # test rest_parameters
+    # test reset_parameters
     old_weight = deepcopy(conv.lin.weight.data)
     conv.reset_parameters()
     new_weight = conv.lin.weight.data
     assert not F.allclose(old_weight, new_weight)
 
 def test_set2set():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
     if F.gpu_ctx():
-        s2s.cuda()
+        s2s = s2s.to(ctx)
     print(s2s)
 
     # test#1: basic
@@ -139,11 +139,12 @@ def test_set2set():
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_glob_att_pool():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(10))
 
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     if F.gpu_ctx():
-        gap.cuda()
+        gap = gap.to(ctx)
     print(gap)
 
     # test#1: basic
@@ -158,6 +159,7 @@ def test_glob_att_pool():
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_simple_pool():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
 
     sum_pool = nn.SumPooling()
@@ -168,6 +170,12 @@ def test_simple_pool():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
+    if F.gpu_ctx():
+        sum_pool = sum_pool.to(ctx)
+        avg_pool = avg_pool.to(ctx)
+        max_pool = max_pool.to(ctx)
+        sort_pool = sort_pool.to(ctx)
+        h0 = h0.to(ctx)
     h1 = sum_pool(h0, g)
     assert F.allclose(h1, F.sum(h0, 0))
     h1 = avg_pool(h0, g)
@@ -181,6 +189,8 @@ def test_simple_pool():
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
+    if F.gpu_ctx():
+        h0 = h0.to(ctx)
 
     h1 = sum_pool(h0, bg)
     truth = th.stack([F.sum(h0[:15], 0),
@@ -210,15 +220,16 @@ def test_simple_pool():
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
 def test_set_trans():
+    ctx = F.ctx()
     g = dgl.DGLGraph(nx.path_graph(15))
 
     st_enc_0 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'sab')
     st_enc_1 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'isab', 3)
     st_dec = nn.SetTransformerDecoder(50, 5, 10, 100, 2, 4)
     if F.gpu_ctx():
-        st_enc_0.cuda()
-        st_enc_1.cuda()
-        st_dec.cuda()
+        st_enc_0 = st_enc_0.to(ctx)
+        st_enc_1 = st_enc_1.to(ctx)
+        st_dec = st_dec.to(ctx)
     print(st_enc_0, st_enc_1, st_dec)
 
     # test#1: basic
@@ -354,6 +365,207 @@ def test_rgcn():
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
+def test_gat_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gat = nn.GATConv(5, 2, 4)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        gat = gat.to(ctx)
+        feat = feat.to(ctx)
+
+    h = gat(feat, g)
+    assert h.shape[-1] == 2 and h.shape[-2] == 4
+
+def test_sage_conv():
+    for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+
+        if F.gpu_ctx():
+            sage = sage.to(ctx)
+            feat = feat.to(ctx)
+
+        h = sage(feat, g)
+        assert h.shape[-1] == 10
+
+def test_sgc_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # not cached
+    sgc = nn.SGConv(5, 10, 3)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        sgc = sgc.to(ctx)
+        feat = feat.to(ctx)
+
+    h = sgc(feat, g)
+    assert h.shape[-1] == 10
+
+    # cached
+    sgc = nn.SGConv(5, 10, 3, True)
+
+    if F.gpu_ctx():
+        sgc = sgc.to(ctx)
+
+    h_0 = sgc(feat, g)
+    h_1 = sgc(feat + 1, g)
+    assert F.allclose(h_0, h_1)
+    assert h_0.shape[-1] == 10
+
+def test_appnp_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        appnp = appnp.to(ctx)
+        feat = feat.to(ctx)
+
+    h = appnp(feat, g)
+    assert h.shape[-1] == 5
+
+def test_gin_conv():
+    for aggregator_type in ['mean', 'max', 'sum']:
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        gin = nn.GINConv(
+            th.nn.Linear(5, 12),
+            aggregator_type
+        )
+        feat = F.randn((100, 5))
+
+        if F.gpu_ctx():
+            gin = gin.to(ctx)
+            feat = feat.to(ctx)
+
+        h = gin(feat, g)
+        assert h.shape[-1] == 12
+
+def test_agnn_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    agnn = nn.AGNNConv(1)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        agnn = agnn.to(ctx)
+        feat = feat.to(ctx)
+
+    h = agnn(feat, g)
+    assert h.shape[-1] == 5
+
+def test_gated_graph_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    ggconv = nn.GatedGraphConv(5, 10, 5, 3)
+    etypes = th.arange(g.number_of_edges()) % 3
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        ggconv = ggconv.to(ctx)
+        feat = feat.to(ctx)
+        etypes = etypes.to(ctx)
+
+    h = ggconv(feat, etypes, g)
+    # current we only do shape check
+    assert h.shape[-1] == 10
+
+def test_nn_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    edge_func = th.nn.Linear(4, 5 * 10)
+    nnconv = nn.NNConv(5, 10, edge_func, 'mean')
+    feat = F.randn((100, 5))
+    efeat = F.randn((g.number_of_edges(), 4))
+
+    if F.gpu_ctx():
+        nnconv = nnconv.to(ctx)
+        feat = feat.to(ctx)
+        efeat = efeat.to(ctx)
+
+    h = nnconv(feat, efeat, g)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
+def test_gmm_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gmmconv = nn.GMMConv(5, 10, 3, 4, 'mean')
+    feat = F.randn((100, 5))
+    pseudo = F.randn((g.number_of_edges(), 3))
+
+    if F.gpu_ctx():
+        gmmconv = gmmconv.to(ctx)
+        feat = feat.to(ctx)
+        pseudo = pseudo.to(ctx)
+
+    h = gmmconv(feat, pseudo, g)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
+
+def test_dense_graph_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
+    dense_conv.weight.data = conv.weight.data
+    dense_conv.bias.data = conv.bias.data
+    feat = F.randn((100, 5))
+    if F.gpu_ctx():
+        conv = conv.to(ctx)
+        dense_conv = dense_conv.to(ctx)
+        feat = feat.to(ctx)
+
+    out_conv = conv(feat, g)
+    out_dense_conv = dense_conv(feat, adj)
+    assert F.allclose(out_conv, out_dense_conv)
+
+def test_dense_sage_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    sage = nn.SAGEConv(5, 2, 'gcn',)
+    dense_sage = nn.DenseSAGEConv(5, 2)
+    dense_sage.fc.weight.data = sage.fc_neigh.weight.data
+    dense_sage.fc.bias.data = sage.fc_neigh.bias.data
+    feat = F.randn((100, 5))
+    if F.gpu_ctx():
+        sage = sage.to(ctx)
+        dense_sage = dense_sage.to(ctx)
+        feat = feat.to(ctx)
+
+    out_sage = sage(feat, g)
+    out_dense_sage = dense_sage(feat, adj)
+    assert F.allclose(out_sage, out_dense_sage)
+
+def test_dense_cheb_conv():
+    for k in range(1, 4):
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        cheb = nn.ChebConv(5, 2, k)
+        dense_cheb = nn.DenseChebConv(5, 2, k)
+        for i in range(len(cheb.fc)):
+            dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
+        if cheb.bias is not None:
+            dense_cheb.bias.data = cheb.bias.data
+        feat = F.randn((100, 5))
+        if F.gpu_ctx():
+            cheb = cheb.to(ctx)
+            dense_cheb = dense_cheb.to(ctx)
+            feat = feat.to(ctx)
+
+        out_cheb = cheb(feat, g)
+        out_dense_cheb = dense_cheb(feat, adj)
+        assert F.allclose(out_cheb, out_dense_cheb)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
@@ -362,3 +574,17 @@ if __name__ == '__main__':
     test_simple_pool()
     test_set_trans()
     test_rgcn()
+    test_tagconv()
+    test_gat_conv()
+    test_sage_conv()
+    test_sgc_conv()
+    test_appnp_conv()
+    test_gin_conv()
+    test_agnn_conv()
+    test_gated_graph_conv()
+    test_nn_conv()
+    test_gmm_conv()
+    test_dense_graph_conv()
+    test_dense_sage_conv()
+    test_dense_cheb_conv()
+
