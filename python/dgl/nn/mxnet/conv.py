@@ -164,7 +164,7 @@ class TGConv(gluon.Block):
     out_feats : int
         Number of output features.
     k: int, optional
-        Number of hops :math: `k`. (default: 3)
+        Number of hops :math: `k`. (default: 2)
     bias: bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
@@ -241,7 +241,6 @@ class TGConv(gluon.Block):
             rst = self._activation(rst)
 
         return rst
-
 
 class RelGraphConv(gluon.Block):
     r"""Relational graph convolution layer.

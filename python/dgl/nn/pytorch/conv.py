@@ -167,7 +167,7 @@ class TGConv(nn.Module):
     out_feats : int
         Number of output features.
     k: int, optional
-        Number of hops :math: `k`. (default: 3)
+        Number of hops :math: `k`. (default: 2)
     bias: bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
