@@ -200,7 +200,7 @@ class GATLayer(nn.Module):
         'flatten' for concatenating all head results or 'mean' for averaging
         all head results
     activation : activation function or None
-        Activation function applied to aggregated multi-head results. Default to be None.
+        Activation function applied to aggregated multi-head results, default to be None.
     """
     def __init__(self, in_feats, out_feats, num_heads, feat_drop, attn_drop,
                  alpha=0.2, residual=True, agg_mode='flatten', activation=None):
