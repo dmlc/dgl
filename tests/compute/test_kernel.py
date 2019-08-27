@@ -39,21 +39,21 @@ def generate_feature(g, broadcast='none'):
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
     if broadcast == 'e':
-        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
-        e = F.tensor(np.random.randn(ne, D2, 1) - 1)
-        v = F.tensor(np.random.randn(nv, D1, D2, D3))
+        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1)))
+        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
     elif broadcast == 'u':
-        u = F.tensor(np.random.randn(nv, D2, 1) + 1)
-        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
-        v = F.tensor(np.random.randn(nv, D1, D2, D3))
+        u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
+        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
     elif broadcast == 'v':
-        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
-        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
-        v = F.tensor(np.random.randn(nv, D2, 1))
+        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+        v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
     else:
-        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
-        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
-        v = F.tensor(np.random.randn(nv, D1, D2, D3))
+        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
     return u, v, e
 
 
@@ -160,7 +160,29 @@ def test_copy_edge_reduce():
 
 def test_all_binary_builtins():
     def _test(g, lhs, rhs, binary_op, reducer, partial, nid, broadcast='none'):
+        # initialize node/edge features with uniform(-1, 1)
         hu, hv, he = generate_feature(g, broadcast)
+        if binary_op == 'div':
+            # op = div
+            # lhs range: [-1, 1]
+            # rhs range: [1, 2]
+            # result range: [-1, 1]
+            if rhs == 'u':
+                hu = (hu + 3) / 2
+            elif rhs == 'v':
+                hv = (hv + 3) / 2
+            elif rhs == 'e':
+                he = (he + 3) / 2
+
+        if binary_op == 'add' or binary_op == 'sub':
+            # op = add, sub
+            # lhs range: [-1/2, 1/2]
+            # rhs range: [-1/2, 1/2]
+            # result range: [-1, 1]
+            hu = hu / 2
+            hv = hv / 2
+            he = he / 2
+
         g.ndata['u'] = F.attach_grad(F.clone(hu))
         g.ndata['v'] = F.attach_grad(F.clone(hv))
         g.edata['e'] = F.attach_grad(F.clone(he))
