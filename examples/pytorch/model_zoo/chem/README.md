@@ -15,15 +15,11 @@ the chemistry community and the deep learning community to further their researc
 Before you proceed, make sure you have installed the dependencies below:
 - PyTorch 1.2
     - Check the [official website](https://pytorch.org/) for installation guide
-- pandas 0.24.2
-    - Install with either `conda install pandas` or `pip install pandas`
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
-- requests 2.22.0
-    - Install with `pip install requests`
-- scikit-learn 0.21.2
-    - Install with `pip install -U scikit-learn` or `conda install scikit-learn`
+    
+The rest dependencies can be installed with `pip install -r requirements.txt`.
 
 ## Property Prediction
 
