@@ -5,10 +5,30 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+from models import *
+from conf import *
 
-from gcn import GCN
-#from gcn_mp import GCN
-#from gcn_spmv import GCN
+
+def get_model_and_config(name):
+    name = name.lower()
+    if name == 'gcn':
+        return GCN, GCN_CONFIG
+    elif name == 'gat':
+        return GAT, GAT_CONFIG
+    elif name == 'graphsage':
+        return GraphSAGE, GRAPHSAGE_CONFIG
+    elif name == 'appnp':
+        return APPNP, APPNP_CONFIG
+    elif name == 'tagcn':
+        return TAGCN, TAGCN_CONFIG
+    elif name == 'agnn':
+        return AGNN, AGNN_CONFIG
+    elif name == 'sgc':
+        return SGC, SGC_CONFIG
+    elif name == 'gin':
+        return GIN, GIN_CONFIG
+    elif name == 'chebnet':
+        return ChebNet, CHEBNET_CONFIG
 
 def evaluate(model, features, labels, mask):
     model.eval()
@@ -70,26 +90,27 @@ def main(args):
     g.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g,
+    GNN, config = get_model_and_config(args.model)
+    model = GNN(g,
                 in_feats,
-                args.n_hidden,
                 n_classes,
-                args.n_layers,
-                F.relu,
-                args.dropout)
+                *config['extra_args'])
 
     if cuda:
         model.cuda()
+
+    print(model)
+
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=args.lr,
-                                 weight_decay=args.weight_decay)
+                                 lr=config['lr'],
+                                 weight_decay=config['weight_decay'])
 
     # initialize graph
     dur = []
-    for epoch in range(args.n_epochs):
+    for epoch in range(200):
         model.train()
         if epoch >= 3:
             t0 = time.time()
@@ -115,26 +136,15 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='Node classification on citation networks.')
     register_data_args(parser)
-    parser.add_argument("--dropout", type=float, default=0.5,
-            help="dropout probability")
+    parser.add_argument("--model", type=str, default='gcn',
+                        help='model to use, available models are gcn, gat, graphsage, gin,'
+                             'appnp, tagcn, sgc, agnn')
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
-            help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=200,
-            help="number of training epochs")
-    parser.add_argument("--n-hidden", type=int, default=16,
-            help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=1,
-            help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay", type=float, default=5e-4,
-            help="Weight for L2 loss")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
-    parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
-
     main(args)

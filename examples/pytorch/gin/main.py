@@ -148,7 +148,7 @@ def main(args):
 
         lrbar.set_description(
             "the learning eps with learn_eps={} is: {}".format(
-                args.learn_eps, model.eps.data))
+                args.learn_eps, [layer.eps.data for layer in model.ginlayers]))
 
     tbar.close()
     vbar.close()

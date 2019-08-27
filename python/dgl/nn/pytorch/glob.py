@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103, W0235
+# pylint: disable= no-member, arguments-differ, invalid-name, W0235
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -178,17 +178,6 @@ class GlobalAttentionPooling(nn.Module):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        for p in self.gate_nn.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-        if self.feat_nn:
-            for p in self.feat_nn.parameters():
-                if p.dim() > 1:
-                    nn.init.xavier_uniform_(p)
 
     def forward(self, feat, graph):
         r"""Compute global attention pooling.

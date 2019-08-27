@@ -479,7 +479,7 @@ class GraphIndex(ObjectBase):
 
         Returns
         -------
-        int
+        tensor
             The in degree array.
         """
         v_array = v.todgltensor()
@@ -510,7 +510,7 @@ class GraphIndex(ObjectBase):
 
         Returns
         -------
-        int
+        tensor
             The out degree array.
         """
         v_array = v.todgltensor()
