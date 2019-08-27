@@ -1,4 +1,4 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612, W0703, C0200
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, W0703, C0200, R1710
 from collections import defaultdict
 
 import rdkit
@@ -297,7 +297,7 @@ def enum_assemble_nx(node, neighbors, prev_nodes=None, prev_amap=None):
     if prev_nodes is None:
         prev_nodes = []
     if prev_amap is None:
-        prev_amap = []    
+        prev_amap = []
     all_attach_confs = []
     singletons = [nei_node['nid'] for nei_node in neighbors +
                   prev_nodes if nei_node['mol'].GetNumAtoms() == 1]

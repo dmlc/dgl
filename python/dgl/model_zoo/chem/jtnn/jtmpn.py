@@ -44,10 +44,10 @@ def atom_features(atom):
 def bond_features(bond):
     bt = bond.GetBondType()
     return torch.Tensor([bt == Chem.rdchem.BondType.SINGLE,
-                          bt == Chem.rdchem.BondType.DOUBLE,
-                          bt == Chem.rdchem.BondType.TRIPLE,
-                          bt == Chem.rdchem.BondType.AROMATIC,
-                          bond.IsInRing()])
+                         bt == Chem.rdchem.BondType.DOUBLE,
+                         bt == Chem.rdchem.BondType.TRIPLE,
+                         bt == Chem.rdchem.BondType.AROMATIC,
+                         bond.IsInRing()])
 
 
 def mol2dgl_single(cand_batch):

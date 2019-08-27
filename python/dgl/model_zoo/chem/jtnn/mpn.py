@@ -1,4 +1,4 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612
+# pylint: disable=C0111, C0103, E1101, W0611, W0612,
 from functools import partial
 
 import numpy as np
@@ -43,7 +43,7 @@ def bond_features(bond):
     fbond = [bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt ==
              Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]
     fstereo = onek_encoding_unk(stereo, [0, 1, 2, 3, 4, 5])
-    return (torch.Tensor(fbond + fstereo))
+    return torch.Tensor(fbond + fstereo)
 
 
 def mol2dgl_single(smiles):
