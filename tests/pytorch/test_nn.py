@@ -87,7 +87,7 @@ def test_tgconv():
     adj = g.adjacency_matrix(ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
-    conv = nn.TGConv(5, 2, bias=True)
+    conv = nn.TAGConv(5, 2, bias=True)
     if F.gpu_ctx():
         conv.cuda()
     print(conv)
@@ -102,7 +102,7 @@ def test_tgconv():
 
     assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.weight, conv.lin.bias))
 
-    conv = nn.TGConv(5, 2)
+    conv = nn.TAGConv(5, 2)
     if F.gpu_ctx():
         conv.cuda()
     # test#2: basic

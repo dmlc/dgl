@@ -112,6 +112,15 @@ def test_bidirected_graph():
     _test(False, True)
     _test(False, False)
 
+def test_khop_graph():
+    pass
+
+def test_khop_adj():
+    pass
+
+def test_laplacian_lambda_max():
+    pass
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
@@ -119,3 +128,6 @@ if __name__ == '__main__':
     test_reverse_shared_frames()
     test_simple_graph()
     test_bidirected_graph()
+    test_khop_adj()
+    test_khop_graph()
+    test_laplacian_lambda_max()
