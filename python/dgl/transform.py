@@ -1,12 +1,12 @@
 """Module for graph transformation utilities."""
 
 import numpy as np
+from scipy import sparse
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
 from .backend import asnumpy
-from scipy import sparse
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',

@@ -1422,7 +1422,7 @@ class DenseGCNConv(nn.Module):
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_parameter('bias', None)
+            self.register_buffer('bias', None)
 
         self.reset_parameters()
         self._activation = activation
