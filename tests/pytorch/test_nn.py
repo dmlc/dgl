@@ -8,6 +8,8 @@ from copy import deepcopy
 import numpy as np
 import scipy as sp
 
+np.random.seed(42)
+
 def _AXWb(A, X, W, b):
     X = th.matmul(X, W)
     Y = th.matmul(A, X.view(X.shape[0], -1)).view_as(X)
