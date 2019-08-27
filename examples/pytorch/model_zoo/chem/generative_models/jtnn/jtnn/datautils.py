@@ -1,16 +1,20 @@
 import torch
 from torch.utils.data import Dataset
-import numpy as np
-
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
-from .mol_tree_nx import DGLMolTree
-from .mol_tree import Vocab
+import os
 
-from .mpn import mol2dgl_single as mol2dgl_enc
-from .jtmpn import mol2dgl_single as mol2dgl_dec
-from .jtmpn import ATOM_FDIM as ATOM_FDIM_DEC
-from .jtmpn import BOND_FDIM as BOND_FDIM_DEC
+from .mol_tree import Vocab, DGLMolTree
+from .chemutils import mol2dgl_dec, mol2dgl_enc
+
+ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+
+ATOM_FDIM_DEC = len(ELEM_LIST) + 6 + 5 + 1
+BOND_FDIM_DEC = 5
+MAX_NB = 10
+
+PAPER = os.getenv('PAPER', False)
+
 
 _url = 'https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip'
 
