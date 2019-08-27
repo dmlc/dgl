@@ -8,3 +8,4 @@ from .mpnn import MPNNModel
 from .dgmg import DGMG
 from .jtnn.jtnn import DGLJTNNVAE
 from .pretrain import load_pretrained
+import cxk
