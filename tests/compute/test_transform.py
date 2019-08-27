@@ -113,13 +113,54 @@ def test_bidirected_graph():
     _test(False, False)
 
 def test_khop_graph():
-    pass
+    N = 20
+    feat = F.randn((N, 5))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    for k in range(4):
+        g_k = dgl.khop_graph(g, k)
+        # use original graph to do message passing for k times.
+        g.ndata['h'] = feat
+        for _ in range(k):
+            g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+        h_0 = g.ndata.pop('h')
+        # use k-hop graph to do message passing for one time.
+        g_k.ndata['h'] = feat
+        g_k.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+        h_1 = g_k.ndata.pop('h')
+        assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
 def test_khop_adj():
-    pass
+    N = 20
+    feat = F.randn((N, 5))
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    for k in range(3):
+        adj = F.tensor(dgl.khop_adj(g, k))
+        # use original graph to do message passing for k times.
+        g.ndata['h'] = feat
+        for _ in range(k):
+            g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
+        h_0 = g.ndata.pop('h')
+        # use k-hop adj to do message passing for one time.
+        h_1 = adj @ feat
+        assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
 def test_laplacian_lambda_max():
-    pass
+    N = 20
+    eps = 1e-2
+    # test DGLGraph
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    l_max = dgl.laplacian_lambda_max(g)
+    assert (l_max[0] < 2 + eps)
+    # test BatchedDGLGraph
+    N_arr = [20, 30, 10, 12]
+    bg = dgl.batch([
+        dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+        for N in N_arr
+    ])
+    l_max_arr = dgl.laplacian_lambda_max(bg)
+    assert len(l_max_arr) == len(N_arr)
+    for l_max in l_max_arr:
+        assert l_max < 2 + eps
 
 if __name__ == '__main__':
     test_line_graph()

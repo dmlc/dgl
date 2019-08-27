@@ -6,7 +6,7 @@ from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
-from .backend import asnumpy
+from .backend import asnumpy, tensor
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
@@ -65,9 +65,14 @@ def khop_adj(g, k):
     g : dgl.DGLGraph
     k : int
         The :math:`k` in :math:`A^k`.
+
+    Returns
+    -------
+    tensor
+        The returned tensor, dtype is ``np.float32``.
     """
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
-    return adj_k.todense()
+    return tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k):
     """Return the graph that includes all :math:`k`-hop neighbors of the given graph as edges.
@@ -79,6 +84,11 @@ def khop_graph(g, k):
     g : dgl.DGLGraph
     k : int
         The :math:`k` in `k`-hop graph.
+
+    Returns
+    -------
+    dgl.DGLGraph
+        The returned ``DGLGraph``.
     """
     n = g.number_of_nodes()
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
@@ -260,7 +270,7 @@ def laplacian_lambda_max(g):
     for g_i in g_arr:
         n = g_i.number_of_nodes()
         adj = g_i.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
-        norm = sparse.diags(asnumpy(g_i.in_degrees()) ** -0.5, dtype=float)
+        norm = sparse.diags(asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
                                       return_eigenvectors=False)[0].real)
