@@ -34,11 +34,41 @@ def time_builtin(G):
             dur.append(time.time() - t0)
     return np.average(dur)
 
+G.ndata['h'] = torch.randn((N, 16, 1))
+G.edata['w'] = torch.randn((M, 16, 32))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
 G.ndata['h'] = torch.randn((N, 64, 1))
 G.edata['w'] = torch.randn((M, 64, 64))
 G.to(torch.device('cuda:0'))
 print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
 print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G.ndata['h'] = torch.randn((N, 64, 64))
+G.edata['w'] = torch.randn((M, 64, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G.ndata['h'] = torch.randn((N, 64, 1, 4))
+G.edata['w'] = torch.randn((M, 64, 64, 4))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
 
 G.ndata['h'] = torch.randn((N, 64, 64))
 G.edata['w'] = torch.randn((M, 64, 64))

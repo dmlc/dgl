@@ -72,19 +72,33 @@ __device__ __forceinline__ int64_t Ravel(
   return out;
 }
 
-__device__ __forceinline__ void Ravel2(
-    const int64_t* idx, int ndim, const int64_t* lhs_shape, const int64_t* lhs_stride,
+__device__ __forceinline__ void URRavel(
+    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride,
+    const int64_t* lhs_shape, const int64_t* lhs_stride,
     const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t &lhs_out, int64_t &rhs_out) {
+  if (stride[0] == lhs_stride[0]) {
     for (int d = 0; d < ndim; ++d) {
-      int64_t i = idx[d];
-      int64_t lhs_sh = lhs_shape[d];
+      int64_t o_sh = shape[d];
+      int64_t o_st = stride[d];
       int64_t rhs_sh = rhs_shape[d];
-      int64_t lhs_st = lhs_stride[d];
       int64_t rhs_st = rhs_stride[d];
 
-      lhs_out += min(i, lhs_sh) * lhs_st;
-      rhs_out += min(i, rhs_sh) * rhs_st;
+      int64_t i = (idx / o_st) % o_sh;
+      rhs_out += min(i, rhs_sh - 1) * rhs_st;
+    } 
+    lhs_out = idx;
+  } else {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = shape[d];
+      int64_t o_st = stride[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
+
+      int64_t i = (idx / o_st) % o_sh;
+      lhs_out += min(i, lhs_sh - 1) * lhs_st;
     }
+    rhs_out = idx;
+  }
 }
 
 // Minigun UDF to compute binary reduce with broadcasting.
@@ -113,12 +127,13 @@ struct BinaryReduceBcast {
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
+    //int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      //Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
       int64_t lhs_add = 0;
       int64_t rhs_add = 0;
-      Ravel2(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride,
+      URRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
           gdata->rhs_shape, gdata->rhs_stride, lhs_add, rhs_add);
       DType lhs = Functors::Read(lhsoff + lhs_add);
       DType rhs = Functors::Read(rhsoff + rhs_add);
