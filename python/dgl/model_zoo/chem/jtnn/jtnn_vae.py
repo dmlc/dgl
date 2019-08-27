@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .....data.utils import get_download_dir
+from dgl.data.utils import get_download_dir
 from .mol_tree import Vocab
 from .nnutils import create_var, cuda, move_dgl_to_cuda
 from .chemutils import set_atommap, copy_edit_mol, enum_assemble_nx, \
