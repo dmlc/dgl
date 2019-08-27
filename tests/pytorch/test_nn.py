@@ -550,8 +550,8 @@ def test_dense_cheb_conv():
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         adj = g.adjacency_matrix(ctx=ctx).to_dense()
-        cheb = nn.ChebConv(5, 2, 4)
-        dense_cheb = nn.DenseChebConv(5, 2, 4)
+        cheb = nn.ChebConv(5, 2, k)
+        dense_cheb = nn.DenseChebConv(5, 2, k)
         for i in range(len(cheb.fc)):
             dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
         if cheb.bias is not None:
