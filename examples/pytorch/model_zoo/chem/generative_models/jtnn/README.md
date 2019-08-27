@@ -4,15 +4,14 @@ Wengong Jin, Regina Barzilay, Tommi Jaakkola.
 Junction Tree Variational Autoencoder for Molecular Graph Generation. 
 *arXiv preprint arXiv:1802.04364*, 2018.
 
-JTNN uses algorithm called junction tree algorithm to form a tree from the molecule graph. 
+JTNN uses algorithm called junction tree algorithm to form a tree from the molecular graph. 
 Then the model will encode the tree and graph into two separate vectors `z_G` and `z_T`. Details can
 be found in original paper. The brief process is as below (from original paper): 
 
 ![image](https://user-images.githubusercontent.com/8686776/63677300-3fb6d980-c81f-11e9-8a65-57c8b03aaf52.png)
 
-
-**Goal**: JTNN is an auto-encoder model, aiming to learn hidden representation for molecule graphs. 
-These representations can be used for downstream task, such as property prediction, or molecule optimizations.
+**Goal**: JTNN is an auto-encoder model, aiming to learn hidden representation for molecular graphs. 
+These representations can be used for downstream tasks, such as property prediction, or molecule optimizations.
 
 ## Dataset
 
@@ -21,12 +20,12 @@ These representations can be used for downstream task, such as property predicti
 > The ZINC database is a curated collection of commercially available chemical compounds 
 prepared especially for virtual screening. (introduction from Wikipedia)
 
-Generally speaking, molecules in ZINC dataset are more drug-like molecules. we uses ~220,000 
+Generally speaking, molecules in the ZINC dataset are more drug-like. We uses ~220,000 
 molecules for training and 5000 molecules for validation. 
 
 ### Preprocessing
 
-Class `JTNNDataset` will process a smile into a dict, including the junction tree, graph with 
+Class `JTNNDataset` will process a SMILES into a dict, including the junction tree, graph with 
 encoded nodes(atoms) and edges(bonds), and other information for model to use.
 
 ## Usage
@@ -34,7 +33,7 @@ encoded nodes(atoms) and edges(bonds), and other information for model to use.
 ### Training
 
 To start training, use `python train.py`. By default, the script will use ZINC dataset
- with preprocessed vocabulary, and saving model checkpoint at the current working directory. 
+ with preprocessed vocabulary, and save model checkpoint at the current working directory. 
 ```
   -s SAVE_PATH, --save_dir SAVE_PATH
                         Path to save checkpoint models, default to be current
