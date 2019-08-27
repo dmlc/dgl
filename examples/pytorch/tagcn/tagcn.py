@@ -21,12 +21,12 @@ class TAGCN(nn.Module):
         self.g = g
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(TGConv(in_feats, n_hidden, activation=activation))
+        self.layers.append(TAGConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(TGConv(n_hidden, n_hidden, activation=activation))
+            self.layers.append(TAGConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.append(TGConv(n_hidden, n_classes)) #activation=None
+        self.layers.append(TAGConv(n_hidden, n_classes)) #activation=None
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, features):

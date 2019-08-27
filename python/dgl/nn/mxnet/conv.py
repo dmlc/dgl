@@ -147,7 +147,7 @@ class GraphConv(gluon.Block):
         summary += '\n)'
         return summary
 
-class TGConv(gluon.Block):
+class TAGConv(gluon.Block):
     r"""Apply Topology Adaptive Graph Convolutional Network
 
     .. math::
@@ -182,7 +182,7 @@ class TGConv(gluon.Block):
                  k=2,
                  bias=True,
                  activation=None):
-        super(TGConv, self).__init__()
+        super(TAGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._k = k
@@ -199,20 +199,22 @@ class TGConv(gluon.Block):
             else:
                 self.bias = None
 
-    def forward(self, feat, graph, norm=None):
+    def forward(self, graph, feat):
         r"""Compute graph convolution
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature
         graph : DGLGraph
             The graph.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
         """
         graph = graph.local_var()
 

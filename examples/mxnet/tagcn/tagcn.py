@@ -22,12 +22,12 @@ class TAGCN(gluon.Block):
         self.g = g
         self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.add(TGConv(in_feats, n_hidden, activation=activation))
+        self.layers.add(TAGConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.add(TGConv(n_hidden, n_hidden, activation=activation))
+            self.layers.add(TAGConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.add(TGConv(n_hidden, n_classes)) #activation=None
+        self.layers.add(TAGConv(n_hidden, n_classes)) #activation=None
         self.dropout = gluon.nn.Dropout(rate=dropout)
 
     def forward(self, features):

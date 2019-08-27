@@ -150,7 +150,7 @@ class GraphConv(nn.Module):
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
 
-class TGConv(nn.Module):
+class TAGConv(nn.Module):
     r"""Apply Topology Adaptive Graph Convolutional Network
 
     .. math::
@@ -185,7 +185,7 @@ class TGConv(nn.Module):
                  k=2,
                  bias=True,
                  activation=None):
-        super(TGConv, self).__init__()
+        super(TAGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._k = k
@@ -198,24 +198,26 @@ class TGConv(nn.Module):
         """Reinitialize learnable parameters."""
         self.lin.reset_parameters()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute graph convolution
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature
         graph : DGLGraph
             The graph.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
         torch.Tensor
-            The output feature
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            is size of output feature.
         """
         graph = graph.local_var()
 
-        norm = th.pow(graph.in_degrees().float(), -0.5)
+        norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
         shp = norm.shape + (1,) * (feat.dim() - 1)
         norm = th.reshape(norm, shp).to(feat.device)
 

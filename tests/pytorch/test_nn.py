@@ -81,20 +81,20 @@ def _S2AXWb(A, N, X, W, b):
 
     return Y + b
 
-def test_tgconv():
+def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
-    conv = nn.TGConv(5, 2, bias=True)
+    conv = nn.TAGConv(5, 2, bias=True)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     print(conv)
 
     # test#1: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     shp = norm.shape + (1,) * (h0.dim() - 1)
@@ -102,14 +102,13 @@ def test_tgconv():
 
     assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.weight, conv.lin.bias))
 
-    conv = nn.TGConv(5, 2)
+    conv = nn.TAGConv(5, 2)
     if F.gpu_ctx():
         conv.cuda()
     # test#2: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
-    assert len(g.ndata) == 0
-    assert len(g.edata) == 0
+    h1 = conv(g, h0)
+    assert h1.shape[-1] == 2
 
     # test rest_parameters
     old_weight = deepcopy(conv.lin.weight.data)
