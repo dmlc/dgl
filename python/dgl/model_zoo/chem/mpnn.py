@@ -145,7 +145,7 @@ class MPNNModel(nn.Module):
             out, h = self.gru(m.unsqueeze(0), h)
             out = out.squeeze(0)
 
-        out = self.set2set(out, g)
+        out = self.set2set(g, out)
         out = F.relu(self.lin1(out))
         out = self.lin2(out)
         return out
