@@ -98,9 +98,9 @@ class BaseGNNClassifier(nn.Module):
         bg.ndata['h'] = feats
         h_g_max = dgl.max_nodes(bg, 'h')
         if not isinstance(bg, BatchedDGLGraph):
-            h_g = torch.stack([h_g_sum, h_g_max], dim=1)
-        else:
-            h_g = torch.cat([h_g_sum, h_g_max], dim=1)
+            h_g_sum = h_g_sum.unsqueeze(0)
+            h_g_max = h_g_max.unsqueeze(0)
+        h_g = torch.cat([h_g_sum, h_g_max], dim=1)
 
         # Todo (Mufei): replace the line below with a local var for BatchedDGLGraph
         bg.ndata.pop('h')
