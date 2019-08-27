@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103, W0235
+# pylint: disable= no-member, arguments-differ, invalid-name, W0235
 import torch as th
 import torch.nn as nn
 import numpy as np

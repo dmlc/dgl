@@ -19,6 +19,7 @@ def line_graph(g, backtracking=True, shared=False):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     backtracking : bool, optional
         Whether the returned line graph is backtracking.
     shared : bool, optional
@@ -33,36 +34,14 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-def _duplicate(arr, multiplicity):
-    """Duplicate arr[i] for t[i] times and append them to end of returned array.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-    multiplicity : numpy.ndarray
-
-    Returns
-    -------
-    numpy.ndarray
-    """
-    n = len(arr)
-    lengths = 0
-    for i in range(n):
-        lengths += multiplicity[i]
-    rst = np.empty(shape=(lengths), dtype=np.int64)
-    cnt = 0
-    for i in range(n):
-        for _ in range(multiplicity[i]):
-            rst[cnt] = arr[i]
-            cnt += 1
-    return rst
-
 def khop_adj(g, k):
-    """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`.
+    """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
+    where a row represents the destination and a column represents the source.
 
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     k : int
         The :math:`k` in :math:`A^k`.
 
@@ -70,6 +49,26 @@ def khop_adj(g, k):
     -------
     tensor
         The returned tensor, dtype is ``np.float32``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.khop_adj(g, 1)
+    tensor([[1., 0., 0., 0., 1.],
+            [1., 1., 0., 0., 0.],
+            [0., 1., 1., 0., 0.],
+            [0., 0., 1., 1., 0.],
+            [0., 0., 0., 1., 1.]])
+    >>> dgl.khop_adj(g, 3)
+    tensor([[1., 0., 1., 3., 3.],
+            [3., 1., 0., 1., 3.],
+            [3., 3., 1., 0., 1.],
+            [1., 3., 3., 1., 0.],
+            [0., 1., 3., 3., 1.]])
     """
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
     return tensor(adj_k.todense().astype(np.float32))
@@ -82,6 +81,7 @@ def khop_graph(g, k):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     k : int
         The :math:`k` in `k`-hop graph.
 
@@ -89,13 +89,31 @@ def khop_graph(g, k):
     -------
     dgl.DGLGraph
         The returned ``DGLGraph``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.khop_graph(g, 1)
+    DGLGraph(num_nodes=5, num_edges=10,
+             ndata_schemes={}
+             edata_schemes={})
+    >>> dgl.khop_graph(g, 3)
+    DGLGraph(num_nodes=5, num_edges=40,
+             ndata_schemes={}
+             edata_schemes={})
     """
     n = g.number_of_nodes()
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
-    row = _duplicate(adj_k.row, multiplicity)
-    col = _duplicate(adj_k.col, multiplicity)
+    row = np.repeat(adj_k.row, multiplicity)
+    col = np.repeat(adj_k.col, multiplicity)
+    # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
+    # in the future.
     return DGLGraph(from_coo(n, row, col, True, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
@@ -118,6 +136,7 @@ def reverse(g, share_ndata=False, share_edata=False):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     share_ndata: bool, optional
         If True, the original graph and the reversed graph share memory for node attributes.
         Otherwise the reversed graph will not be initialized with node attributes.
@@ -250,16 +269,26 @@ def laplacian_lambda_max(g):
     Parameters
     ----------
     g : DGLGraph or BatchedDGLGraph
-        The input graph.
+        The input graph, it should be an undirected graph.
 
     Returns
     -------
     list :
-        If the input g is a DGLGraph, the returned value would be
-        a list with one element, indicating the largest eigenvalue of g.
-        If the input g is a BatchedDGLGraph, the returned value would
-        be a list, where the i-th item indicates the largest eigenvalue
-        of i-th graph in g.
+        * If the input g is a DGLGraph, the returned value would be
+          a list with one element, indicating the largest eigenvalue of g.
+        * If the input g is a BatchedDGLGraph, the returned value would
+          be a list, where the i-th item indicates the largest eigenvalue
+          of i-th graph in g.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.laplacian_lambda_max(g)
+    [0.9045084971874737]
     """
     if isinstance(g, BatchedDGLGraph):
         g_arr = unbatch(g)

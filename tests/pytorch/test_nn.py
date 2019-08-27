@@ -365,6 +365,99 @@ def test_rgcn():
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
+def test_gat_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gat = nn.GATConv(5, 2, 4)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        gat = gat.to(ctx)
+        feat = feat.to(ctx)
+
+    h = gat(feat, g)
+    assert h.shape[-1] == 2 and h.shape[-2] == 4
+
+def test_sage_conv():
+    for aggre_type in ['mean', 'pool', 'gcn', 'lstm']:
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        sage = nn.SAGEConv(5, 10, aggre_type)
+        feat = F.randn((100, 5))
+
+        if F.gpu_ctx():
+            sage = sage.to(ctx)
+            feat = feat.to(ctx)
+
+        h = sage(feat, g)
+        assert h.shape[-1] == 10
+
+def test_sgc_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    # not cached
+    sgc = nn.SGConv(5, 10, 3)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        sgc = sgc.to(ctx)
+        feat = feat.to(ctx)
+
+    # cached
+    sgc = nn.SGConv(5, 10, 3, True)
+    h = sgc(feat, g)
+    assert h.shape[-1] == 10
+
+    if F.gpu_ctx():
+        sgc = sgc.to(ctx)
+    h_0 = sgc(feat, g)
+    h_1 = sgc(feat + 1, g)
+    assert F.allclose(h_0, h_1)
+    assert h_0.shape[-1] == 10
+
+def test_appnp_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        appnp = appnp.to(ctx)
+        feat = feat.to(ctx)
+
+    h = appnp(feat, g)
+    assert h.shape[-1] == 5
+
+def test_gin_conv():
+    for aggregator_type in ['mean', 'max', 'sum']:
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        gin = nn.GINConv(
+            th.nn.Linear(5, 12),
+            aggregator_type
+        )
+        feat = F.randn((100, 5))
+
+        if F.gpu_ctx():
+            gin = gin.to(ctx)
+            feat = feat.to(ctx)
+
+        h = gin(feat, g)
+        assert h.shape[-1] == 12
+
+def test_agnn_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    agnn = nn.AGNNConv(1)
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        agnn = agnn.to(ctx)
+        feat = feat.to(ctx)
+
+    h = agnn(feat, g)
+    assert h.shape[-1] == 5
+
 def test_gated_graph_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
@@ -479,6 +572,12 @@ if __name__ == '__main__':
     test_set_trans()
     test_rgcn()
     test_tagconv()
+    test_gat_conv()
+    test_sage_conv()
+    test_sgc_conv()
+    test_appnp_conv()
+    test_gin_conv()
+    test_agnn_conv()
     test_gated_graph_conv()
     test_nn_conv()
     test_gmm_conv()
