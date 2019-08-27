@@ -450,6 +450,26 @@ def test_dense_sage_conv():
     out_dense_sage = dense_sage(feat, adj)
     assert F.allclose(out_sage, out_dense_sage)
 
+def test_dense_cheb_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    cheb = nn.ChebConv(5, 2, 3)
+    dense_cheb = nn.DenseChebConv(5, 2, 3)
+    for i in range(len(cheb.fc)):
+        dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
+    if cheb.bias is not None:
+        dense_cheb.bias.data = cheb.bias.data
+    feat = F.randn((100, 5))
+    if F.gpu_ctx():
+        cheb = cheb.to(ctx)
+        dense_cheb = dense_cheb.to(ctx)
+        feat = feat.to(ctx)
+
+    out_cheb = cheb(feat, g)
+    out_dense_cheb = dense_cheb(feat, adj)
+    assert F.allclose(out_cheb, out_dense_cheb)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
@@ -464,4 +484,5 @@ if __name__ == '__main__':
     test_gmm_conv()
     test_dense_graph_conv()
     test_dense_sage_conv()
+    test_dense_cheb_conv()
 
