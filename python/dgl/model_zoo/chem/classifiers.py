@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
 from .readout import WeightAndSum
@@ -97,6 +98,8 @@ class BaseGNNClassifier(nn.Module):
         bg.ndata['h'] = feats
         h_g_max = dgl.max_nodes(bg, 'h')
         h_g = torch.cat([h_g_sum, h_g_max], dim=1)
+        if not isinstance(bg, BatchedDGLGraph):
+            h_g = h_g.unsqueeze(0)
 
         # Todo (Mufei): replace the line below with a local var for BatchedDGLGraph
         bg.ndata.pop('h')
