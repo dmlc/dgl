@@ -2,12 +2,13 @@
 import copy
 import itertools
 
-import dgl.function as DGLF
 import networkx as nx
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import dgl.function as DGLF
 from dgl import batch, dfs_labeled_edges_generator
 
 from .chemutils import enum_assemble_nx, get_mol
@@ -86,7 +87,9 @@ def can_assemble(mol_tree, u, v_node_dict):
     return len(cands) > 0
 
 
-def create_node_dict(smiles, clique=[]):
+def create_node_dict(smiles, clique=None):
+    if clique is None:
+        clique = []
     return dict(
         smiles=smiles,
         mol=get_mol(smiles),

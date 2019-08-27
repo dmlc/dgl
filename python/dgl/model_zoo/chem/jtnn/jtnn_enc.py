@@ -2,11 +2,12 @@
 import itertools
 from collections import deque
 
-import dgl.function as DGLF
 import networkx as nx
 import numpy as np
 import torch
 import torch.nn as nn
+
+import dgl.function as DGLF
 from dgl import batch, bfs_edges_generator, unbatch
 
 from .mol_tree import Vocab

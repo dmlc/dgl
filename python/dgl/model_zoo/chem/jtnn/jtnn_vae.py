@@ -1,16 +1,18 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, C0200
 import copy
 import math
 
-import rdkit
-import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl import batch, unbatch
-from dgl.data.utils import get_download_dir
+
+import rdkit
+import rdkit.Chem as Chem
 from rdkit import DataStructs
 from rdkit.Chem import AllChem
+
+from dgl import batch, unbatch
+from dgl.data.utils import get_download_dir
 
 from .chemutils import (attach_mols_nx, copy_edit_mol, decode_stereo,
                         enum_assemble_nx, set_atommap)

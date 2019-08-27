@@ -1,10 +1,11 @@
-# pylint: disable=C0111, C0103, E1101, W0611, W0612
+# pylint: disable=C0111, C0103, E1101, W0611, W0612, W1508
 import os
 
-import dgl.function as DGLF
 import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
+
+import dgl.function as DGLF
 from dgl import DGLGraph, mean_nodes
 
 from .chemutils import get_mol
@@ -42,7 +43,11 @@ def atom_features(atom):
 
 def bond_features(bond):
     bt = bond.GetBondType()
-    return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
+    return torch.Tensor([bt == Chem.rdchem.BondType.SINGLE,
+                          bt == Chem.rdchem.BondType.DOUBLE,
+                          bt == Chem.rdchem.BondType.TRIPLE,
+                          bt == Chem.rdchem.BondType.AROMATIC,
+                          bond.IsInRing()])
 
 
 def mol2dgl_single(cand_batch):
