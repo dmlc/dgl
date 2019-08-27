@@ -13,38 +13,15 @@ import torch.nn.functional as F
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+from dgl.nn.pytorch.conv import SGConv
 
-class SGCLayer(nn.Module):
-    def __init__(self,g,h,in_feats,out_feats,K=2):
-        super(SGCLayer, self).__init__()
-        self.g = g
-        self.weight = nn.Linear(in_feats, out_feats, bias=True)
-        self.K = K
-        # precomputing message passing
-        start = time.perf_counter()
-        for _ in range(self.K):
-            # normalization by square root of src degree
-            h = h * self.g.ndata['norm']
-            self.g.ndata['h'] = h
-            self.g.update_all(fn.copy_src(src='h', out='m'),
-                            fn.sum(msg='m', out='h'))
-            h = self.g.ndata.pop('h')
-            # normalization by square root of dst degree
-            h = h * self.g.ndata['norm']
-        h = (h-h.mean(0))/h.std(0)
-        precompute_elapse = time.perf_counter()-start
-        print("Precompute Time(s): {:.4f}".format(precompute_elapse))
-        # store precomputed result into a cached variable
-        self.cached_h = h
+def normalize(h):
+    return (h-h.mean(0))/h.std(0)
 
-    def forward(self, mask):
-        h = self.weight(self.cached_h[mask])
-        return h
-
-def evaluate(model, features, labels, mask):
+def evaluate(model, features, graph, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(mask) # only compute the evaluation set
+        logits = model(graph, features)[mask] # only compute the evaluation set
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
@@ -85,7 +62,6 @@ def main(args):
         test_mask = test_mask.cuda()
 
     # graph preprocess and calculate normalization factor
-    start = time.perf_counter()
     g = DGLGraph(data.graph)
     n_edges = g.number_of_edges()
     # normalization
@@ -94,14 +70,11 @@ def main(args):
     norm[torch.isinf(norm)] = 0
     if cuda: norm = norm.cuda()
     g.ndata['norm'] = norm.unsqueeze(1)
-    preprocess_elapse = time.perf_counter()-start
-    print("Preprocessing Time: {:.4f}".format(preprocess_elapse))
 
     # create SGC model
-    model = SGCLayer(g,features,in_feats,n_classes,K=2)
-
-    if cuda: model.cuda()
-    loss_fcn = torch.nn.CrossEntropyLoss()
+    model = SGConv(in_feats, n_classes, k=2, cached=True, bias=True, norm=normalize)
+    if args.gpu >= 0:
+        model = model.cuda()
 
     # use optimizer
     optimizer = torch.optim.LBFGS(model.parameters())
@@ -109,22 +82,17 @@ def main(args):
     # define loss closure
     def closure():
         optimizer.zero_grad()
-        output = model(train_mask)
+        output = model(g, features)[train_mask]
         loss_train = F.cross_entropy(output, labels[train_mask])
         loss_train.backward()
         return loss_train
 
     # initialize graph
-    dur = []
-    start = time.perf_counter()
     for epoch in range(args.n_epochs):
         model.train()
-        logits = model(train_mask) # only compute the train set
-        loss = optimizer.step(closure)
+        optimizer.step(closure)
 
-    train_elapse = time.perf_counter()-start
-    print("Train epoch {} | Train Time(s) {:.4f}".format(epoch, train_elapse))
-    acc = evaluate(model, features, labels, test_mask)
+    acc = evaluate(model, features, g, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
 

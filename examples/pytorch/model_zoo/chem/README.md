@@ -2,7 +2,10 @@
 
 With atoms being nodes and bonds being edges, molecular graphs are among the core objects for study in drug discovery. 
 As drug discovery is known to be costly and time consuming, deep learning on graphs can be potentially beneficial for 
-improving the efficiency of drug discovery [1], [2].
+improving the efficiency of drug discovery [1], [2], [9].
+
+To make it easy for domain scientists, the DGL team releases a model zoo for Chemistry, focusing on two particular cases 
+-- property prediction and target generation/optimization. 
 
 With pre-trained models and training scripts, we hope this model zoo will be helpful for both
 the chemistry community and the deep learning community to further their research.
@@ -12,15 +15,11 @@ the chemistry community and the deep learning community to further their researc
 Before you proceed, make sure you have installed the dependencies below:
 - PyTorch 1.2
     - Check the [official website](https://pytorch.org/) for installation guide
-- pandas 0.24.2
-    - Install with either `conda install pandas` or `pip install pandas`
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
-- requests 2.22.0
-    - Install with `pip install requests`
-- scikit-learn 0.21.2
-    - Install with `pip install -U scikit-learn` or `conda install scikit-learn`
+
+The rest dependencies can be installed with `pip install -r requirements.txt`.
 
 ## Property Prediction
 
@@ -46,10 +45,11 @@ molecular graph topology, which may be viewed as a learned fingerprint [3].
 networks and they can be easily extended for graph level prediction.  
 - **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
 the continuous-filter convolutional layers [4].   
-- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
-hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
-by the multilevel interactions [5].    
-- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us  Set2Set to output prediction [6].
+- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a 
+well-designed hierarchical graph neural network directly extracts features from the conformation and spatial information 
+followed by the multilevel interactions [5].    
+- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network 
+(enn) as front end and uses Set2Set to output prediction [6].
 
 ## Generative Models
 
@@ -85,10 +85,12 @@ information processing systems (NeurIPS)*, 2224-2232.
 [5] Lu et al. Molecular Property Prediction: A Multilevel Quantum Interactions Modeling Perspective. 
 *The 33rd AAAI Conference on Artificial Intelligence*. 
 
-[6] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference on 
-Machine Learning* JMLR. 1263-1272.
+[6] Gilmer et al. (2017) Neural Message Passing for Quantum Chemistry. *Proceedings of the 34th International Conference 
+on Machine Learning* JMLR. 1263-1272.
 
 [7] Brown et al. (2019) GuacaMol: Benchmarking Models for de Novo Molecular Design. *J. Chem. Inf. Model*, 2019, 59, 3, 
 1096-1108.
 
 [8] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
+
+[9] Goh et al. (2017) Deep learning for computational chemistry. *Journal of Computational Chemistry* 16, 1291-1307.
