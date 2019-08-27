@@ -1,12 +1,12 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation  of MGCN model"""
-
-import dgl
 import torch as th
 import torch.nn as nn
+
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
+from ...batched_graph import sum_nodes
 
 
 class MGCNModel(nn.Module):
@@ -104,5 +104,5 @@ class MGCNModel(nn.Module):
         if self.norm:
             g.ndata["res"] = g.ndata[
                 "res"] * self.std_per_node + self.mean_per_node
-        res = dgl.sum_nodes(g, "res")
+        res = sum_nodes(g, "res")
         return res

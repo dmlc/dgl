@@ -2,13 +2,13 @@
 # coding: utf-8
 # pylint: disable=C0103, C0111, E1101, W0612
 """Implementation of MPNN model."""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
-import dgl.function as fn
-import dgl.nn.pytorch as dgl_nn
+
+from ... import function as fn
+from ...nn.pytorch import Set2Set
 
 
 class NNConvLayer(nn.Module):
@@ -130,8 +130,7 @@ class MPNNModel(nn.Module):
                                 root_weight=False)
         self.gru = nn.GRU(node_hidden_dim, node_hidden_dim)
 
-        self.set2set = dgl_nn.glob.Set2Set(node_hidden_dim, num_step_set2set,
-                                           num_layer_set2set)
+        self.set2set = Set2Set(node_hidden_dim, num_step_set2set, num_layer_set2set)
         self.lin1 = nn.Linear(2 * node_hidden_dim, node_hidden_dim)
         self.lin2 = nn.Linear(node_hidden_dim, output_dim)
 

@@ -3,28 +3,29 @@
 """
 The implementation of neural network layers used in SchNet and MGCN.
 """
-
 import torch as th
 import torch.nn as nn
 from torch.nn import Softplus
 import numpy as np
-import dgl.function as fn
+
+from ... import function as fn
 
 
 class AtomEmbedding(nn.Module):
     """
     Convert the atom(node) list to atom embeddings.
-    The atoms with the same element share the same initial embeddding.
-    """
+    The atoms with the same element share the same initial embedding.
 
+    Parameters
+    ----------
+    dim : int
+        Dim of embeddings, default to be 128.
+    type_num : int
+        The largest atomic number of atoms in the dataset, default to be 100.
+    pre_train : None or pre-trained embeddings
+        Pre-trained embeddings, default to be None.
+    """
     def __init__(self, dim=128, type_num=100, pre_train=None):
-        """
-        Randomly init the element embeddings.
-        Args:
-            dim: the dim of embeddings
-            type_num: the largest atomic number of atoms in the dataset
-            pre_train: the pre_trained embeddings
-        """
         super().__init__()
         self._dim = dim
         self._type_num = type_num
@@ -35,7 +36,14 @@ class AtomEmbedding(nn.Module):
             self.embedding = nn.Embedding(type_num, dim, padding_idx=0)
 
     def forward(self, g, p_name="node"):
-        """Input type is dgl graph"""
+        """
+        Parameters
+        ----------
+        g : DGLGraph
+            Input DGLGraph(s)
+        p_name : str
+            Name for storing atom embeddings
+        """
         atom_list = g.ndata["node_type"]
         g.ndata[p_name] = self.embedding(atom_list)
         return g.ndata[p_name]
@@ -46,7 +54,6 @@ class EdgeEmbedding(nn.Module):
     Convert the edge to embedding.
     The edge links same pair of atoms share the same initial embedding.
     """
-
     def __init__(self, dim=128, edge_num=3000, pre_train=None):
         """
         Randomly init the edge embeddings.

@@ -6,7 +6,7 @@ import dgl
 from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
-from .readout import WeightAndSum
+from ...nn.pytorch import WeightAndSum
 
 class MLPBinaryClassifier(nn.Module):
     """MLP for soft binary classification over multiple tasks from molecule representations.
@@ -74,15 +74,15 @@ class BaseGNNClassifier(nn.Module):
         self.soft_classifier = MLPBinaryClassifier(
             self.g_feats, classifier_hidden_feats, n_tasks, dropout)
 
-    def forward(self, feats, bg):
+    def forward(self, bg, feats):
         """Multi-task prediction for a batch of molecules
 
         Parameters
         ----------
-        feats : FloatTensor of shape (N, M0)
-            Initial features for all atoms in the batch of molecules
         bg : BatchedDGLGraph
             B Batched DGLGraphs for processing multiple molecules in parallel
+        feats : FloatTensor of shape (N, M0)
+            Initial features for all atoms in the batch of molecules
 
         Returns
         -------
@@ -91,19 +91,19 @@ class BaseGNNClassifier(nn.Module):
         """
         # Update atom features with GNNs
         for gnn in self.gnn_layers:
-            feats = gnn(feats, bg)
+            feats = gnn(bg, feats)
 
         # Compute molecule features from atom features
-        h_g_sum = self.weighted_sum_readout(feats, bg)
-        bg.ndata['h'] = feats
-        h_g_max = dgl.max_nodes(bg, 'h')
+        h_g_sum = self.weighted_sum_readout(bg, feats)
+
+        with bg.local_scope():
+            bg.ndata['h'] = feats
+            h_g_max = dgl.max_nodes(bg, 'h')
+
         if not isinstance(bg, BatchedDGLGraph):
             h_g_sum = h_g_sum.unsqueeze(0)
             h_g_max = h_g_max.unsqueeze(0)
         h_g = torch.cat([h_g_sum, h_g_max], dim=1)
-
-        # Todo (Mufei): replace the line below with a local var for BatchedDGLGraph
-        bg.ndata.pop('h')
 
         # Multi-task prediction
         return self.soft_classifier(h_g)

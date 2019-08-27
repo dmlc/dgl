@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation of SchNet model."""
-
-import dgl
 import torch as th
 import torch.nn as nn
+
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+from ...batched_graph import sum_nodes
 
 
 class SchNetModel(nn.Module):
@@ -83,5 +83,5 @@ class SchNetModel(nn.Module):
         if self.norm:
             g.ndata["res"] = g.ndata[
                 "res"] * self.std_per_atom + self.mean_per_atom
-        res = dgl.sum_nodes(g, "res")
+        res = sum_nodes(g, "res")
         return res

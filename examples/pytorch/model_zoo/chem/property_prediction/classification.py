@@ -16,7 +16,7 @@ def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer
         atom_feats, labels, mask = atom_feats.to(args['device']), \
                                    labels.to(args['device']), \
                                    mask.to(args['device'])
-        logits = model(atom_feats, bg)
+        logits = model(bg, atom_feats)
         # Mask non-existing labels
         loss = (loss_criterion(logits, labels) * (mask != 0).float()).mean()
         optimizer.zero_grad()
@@ -37,7 +37,7 @@ def run_an_eval_epoch(args, model, data_loader):
             smiles, bg, labels, mask = batch_data
             atom_feats = bg.ndata.pop(args['atom_data_field'])
             atom_feats, labels = atom_feats.to(args['device']), labels.to(args['device'])
-            logits = model(atom_feats, bg)
+            logits = model(bg, atom_feats)
             eval_meter.update(logits, labels, mask)
     return eval_meter.roc_auc_averaged_over_tasks()
 
@@ -47,7 +47,7 @@ def main(args):
 
     # Interchangeable with other Dataset
     if args['dataset'] == 'Tox21':
-        from dgl.data import Tox21
+        from dgl.data.chem import Tox21
         dataset = Tox21()
 
     trainset, valset, testset = split_dataset(dataset, args['train_val_test_split'])
