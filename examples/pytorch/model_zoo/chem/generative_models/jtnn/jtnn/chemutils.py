@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from dgl import DGLGraph
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
@@ -340,23 +341,24 @@ def dfs_assemble_nx(graph, cur_mol, global_amap, fa_amap, cur_node_id, fa_node_i
         if not nei_node['is_leaf']:
             dfs_assemble_nx(graph, cur_mol, global_amap, label_amap, nei_node_id, cur_node_id)
 
-# Note that during graph decoding they don't predict stereochemistry-related
-# characteristics (i.e. Chiral Atoms, E-Z, Cis-Trans).  Instead, they decode
-# the 2-D graph first, then enumerate all possible 3-D forms and find the
-# one with highest score.
-
-def atom_features(atom):
-    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
-            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5])
-            + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
-            + [atom.GetIsAromatic()]))
-
-
-def bond_features(bond):
-    bt = bond.GetBondType()
-    return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
-
 def mol2dgl_dec(cand_batch):
+    # Note that during graph decoding they don't predict stereochemistry-related
+    # characteristics (i.e. Chiral Atoms, E-Z, Cis-Trans).  Instead, they decode
+    # the 2-D graph first, then enumerate all possible 3-D forms and find the
+    # one with highest score.
+    def atom_features(atom):
+        return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
+                            + onek_encoding_unk(atom.GetDegree(),
+                                                [0, 1, 2, 3, 4, 5])
+                            + onek_encoding_unk(atom.GetFormalCharge(),
+                                                [-1, -2, 1, 2, 0])
+                            + [atom.GetIsAromatic()]))
+
+
+    def bond_features(bond):
+        bt = bond.GetBondType()
+        return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
+
     cand_graphs = []
     tree_mess_source_edges = [] # map these edges from trees to...
     tree_mess_target_edges = [] # these edges on candidate graphs
@@ -420,6 +422,19 @@ def mol2dgl_dec(cand_batch):
             torch.LongTensor(tree_mess_target_nodes)
 
 def mol2dgl_enc(smiles):
+    def atom_features(atom):
+        return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
+                + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
+                + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
+                + onek_encoding_unk(int(atom.GetChiralTag()), [0,1,2,3])
+                + [atom.GetIsAromatic()]))
+
+    def bond_features(bond):
+        bt = bond.GetBondType()
+        stereo = int(bond.GetStereo())
+        fbond = [bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]
+        fstereo = onek_encoding_unk(stereo, [0,1,2,3,4,5])
+        return (torch.Tensor(fbond + fstereo))
     n_edges = 0
 
     atom_x = []

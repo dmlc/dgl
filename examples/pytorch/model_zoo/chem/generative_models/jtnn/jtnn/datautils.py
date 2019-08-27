@@ -15,7 +15,6 @@ MAX_NB = 10
 
 PAPER = os.getenv('PAPER', False)
 
-
 _url = 'https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip'
 
 def _unpack_field(examples, field):
