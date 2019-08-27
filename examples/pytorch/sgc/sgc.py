@@ -19,7 +19,7 @@ from dgl.nn.pytorch.conv import SGConv
 def evaluate(model, g, features, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(features, g)[mask] # only compute the evaluation set
+        logits = model(g, features)[mask] # only compute the evaluation set
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
@@ -86,7 +86,7 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, g) # only compute the train set
+        logits = model(g, features) # only compute the train set
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
