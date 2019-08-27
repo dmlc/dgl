@@ -86,7 +86,7 @@ def main(args):
                 F.elu,
                 args.in_drop,
                 args.attn_drop,
-                args.alpha,
+                args.negative_slope,
                 args.residual)
     print(model)
     stopper = EarlyStopping(patience=100)
@@ -161,8 +161,8 @@ if __name__ == '__main__':
                         help="learning rate")
     parser.add_argument('--weight-decay', type=float, default=5e-4,
                         help="weight decay")
-    parser.add_argument('--alpha', type=float, default=0.2,
-                        help="the negative slop of leaky relu")
+    parser.add_argument('--negative-slope', type=float, default=0.2,
+                        help="the negative slope of leaky relu")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
     args = parser.parse_args()
