@@ -1,5 +1,5 @@
 """MXNet modules for graph convolutions."""
-# pylint: disable= no-member, arguments-differ
+# pylint: disable= no-member, arguments-differ, invalid-name
 import math
 import mxnet as mx
 from mxnet import gluon, nd

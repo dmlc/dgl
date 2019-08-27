@@ -146,7 +146,7 @@ def test_khop_adj():
 
 def test_laplacian_lambda_max():
     N = 20
-    eps = 1e-2
+    eps = 1e-6
     # test DGLGraph
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     l_max = dgl.laplacian_lambda_max(g)

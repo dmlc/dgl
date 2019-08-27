@@ -34,30 +34,6 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-def _duplicate(arr, multiplicity):
-    """Duplicate arr[i] for t[i] times and append them to end of returned array.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-    multiplicity : numpy.ndarray
-
-    Returns
-    -------
-    numpy.ndarray
-    """
-    n = len(arr)
-    lengths = 0
-    for i in range(n):
-        lengths += multiplicity[i]
-    rst = np.empty(shape=(lengths), dtype=np.int64)
-    cnt = 0
-    for i in range(n):
-        for _ in range(multiplicity[i]):
-            rst[cnt] = arr[i]
-            cnt += 1
-    return rst
-
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
     where a row represents the destination and a column represents the source.
@@ -134,8 +110,10 @@ def khop_graph(g, k):
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
-    row = _duplicate(adj_k.row, multiplicity)
-    col = _duplicate(adj_k.col, multiplicity)
+    row = np.repeat(adj_k.row, multiplicity)
+    col = np.repeat(adj_k.col, multiplicity)
+    # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
+    # in the future.
     return DGLGraph(from_coo(n, row, col, True, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
@@ -158,6 +136,7 @@ def reverse(g, share_ndata=False, share_edata=False):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     share_ndata: bool, optional
         If True, the original graph and the reversed graph share memory for node attributes.
         Otherwise the reversed graph will not be initialized with node attributes.
@@ -290,7 +269,7 @@ def laplacian_lambda_max(g):
     Parameters
     ----------
     g : DGLGraph or BatchedDGLGraph
-        The input graph.
+        The input graph, it should be an undirected graph.
 
     Returns
     -------

@@ -1,5 +1,5 @@
 """Torch modules for graph convolutions."""
-# pylint: disable= no-member, arguments-differ, C0103
+# pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -29,6 +29,7 @@ class Identity(nn.Module):
         return x
 
 
+# pylint: enable=W0235
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
 
@@ -222,8 +223,8 @@ class GATConv(nn.Module):
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_l = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
         self.attn_r = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_feats)))
-        self.feat_drop = nn.Dropout(feat_drop) if feat_drop > 0 else Identity()
-        self.attn_drop = nn.Dropout(attn_drop) if attn_drop > 0 else Identity()
+        self.feat_drop = nn.Dropout(feat_drop)
+        self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
         if residual:
             if in_feats != out_feats:
