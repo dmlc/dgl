@@ -315,6 +315,3 @@ class AlchemySubset(TencentAlchemyDataset):
         self.mean = mean
         self.std = std
         self.transform = transform
-
-if __name__ == '__main__':
-    TencentAlchemyDataset(from_raw=True)
