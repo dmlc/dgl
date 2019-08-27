@@ -1,5 +1,4 @@
 """Utilities for using pretrained models."""
-import numpy as np
 import torch
 from .dgmg import DGMG
 from .gcn import GCNClassifier
