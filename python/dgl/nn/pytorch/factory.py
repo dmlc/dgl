@@ -1,9 +1,6 @@
 """Modules that transforms between graphs and between graph and tensors."""
-import torch as th
 import torch.nn as nn
-import scipy.sparse as ssp
 from ...transform import nearest_neighbor_graph, segmented_nearest_neighbor_graph
-from ...graph import DGLGraph
 
 def pairwise_squared_distance(x):
     '''
@@ -29,24 +26,27 @@ class NearestNeighborGraph(nn.Module):
     ----------
     k : int
         The number of neighbors
-
-    Inputs
-    ------
-    input : Tensor
-        :math:`(M, D)` or :math:`(N, M, D)` where :math:`N` means the
-        number of point sets, :math:`M` means the number of points in
-        each point set, and :math:`D` means the size of features.
-
-    Outputs
-    -------
-    - A DGLGraph with no features.
     """
     def __init__(self, k):
         super(NearestNeighborGraph, self).__init__()
         self.k = k
 
-    def forward(self, input):
-        return nearest_neighbor_graph(input, self.k)
+    #pylint: disable=invalid-name
+    def forward(self, x):
+        """Forward computation.
+
+        Parameters
+        ----------
+        x : Tensor
+            :math:`(M, D)` or :math:`(N, M, D)` where :math:`N` means the
+            number of point sets, :math:`M` means the number of points in
+            each point set, and :math:`D` means the size of features.
+
+        Returns
+        -------
+        A DGLGraph with no features.
+        """
+        return nearest_neighbor_graph(x, self.k)
 
 
 class SegmentedNearestNeighborGraph(nn.Module):
@@ -68,7 +68,7 @@ class SegmentedNearestNeighborGraph(nn.Module):
 
     Inputs
     ------
-    input : Tensor
+    x : Tensor
         :math:`(M, D)` where :math:`M` means the total number of points
         in all point sets.
     segs : Tensor
@@ -83,5 +83,21 @@ class SegmentedNearestNeighborGraph(nn.Module):
         super(SegmentedNearestNeighborGraph, self).__init__()
         self.k = k
 
-    def forward(self, input, segs):
-        return segmented_nearest_neighbor_graph(input, self.k, segs)
+    #pylint: disable=invalid-name
+    def forward(self, x, segs):
+        """Forward computation.
+
+        Parameters
+        ----------
+        x : Tensor
+            :math:`(M, D)` where :math:`M` means the total number of points
+            in all point sets.
+        segs : iterable of int
+            :math:`(N)` integers where :math:`N` means the number of point
+            sets.  The elements must sum up to :math:`M`.
+
+        Returns
+        -------
+        A DGLGraph with no features.
+        """
+        return segmented_nearest_neighbor_graph(x, self.k, segs)

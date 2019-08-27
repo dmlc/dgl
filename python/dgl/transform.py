@@ -22,16 +22,21 @@ def pairwise_squared_distance(x):
     # assuming that __matmul__ is always implemented (true for PyTorch, MXNet and Chainer)
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
-def nearest_neighbor_graph(input, k):
-    """Transforms the given point coordinate matrix to a directed graph, where
-    the predecessors of each point are its k-nearest neighbors.
+#pylint: disable=invalid-name
+def nearest_neighbor_graph(x, k):
+    """Transforms the given point set to a directed graph, whose coordinates
+    are given as a matrix. The predecessors of each point are its k-nearest
+    neighbors.
+
+    If a 3D tensor is given instead, then each row would be transformed into
+    a separate graph.  The graphs will be unioned.
 
     Parameters
     ----------
-    input : Tensor
+    x : Tensor
         The input tensor.
 
-        If 2D, each row of ``input`` corresponds to a node.
+        If 2D, each row of ``x`` corresponds to a node.
 
         If 3D, a k-NN graph would be constructed for each row.  Then
         the graphs are unioned.
@@ -41,13 +46,13 @@ def nearest_neighbor_graph(input, k):
     Returns
     -------
     DGLGraph
-        The graph.  The node IDs are in the same order as ``input``.
+        The graph.  The node IDs are in the same order as ``x``.
     """
-    if F.ndim(input) == 2:
-        input = F.unsqueeze(input, 0)
-    n_samples, n_points, _ = F.shape(input)
+    if F.ndim(x) == 2:
+        x = F.unsqueeze(x, 0)
+    n_samples, n_points, _ = F.shape(x)
 
-    dist = pairwise_squared_distance(input)
+    dist = pairwise_squared_distance(x)
     k_indices = F.argtopk(dist, k, 2, descending=False)
     dst = F.copy_to(k_indices, F.cpu())
 
@@ -63,11 +68,35 @@ def nearest_neighbor_graph(input, k):
     g = DGLGraph(adj, readonly=True)
     return g
 
-def segmented_nearest_neighbor_graph(input, k, segs):
-    n_total_points, _ = F.shape(input)
+#pylint: disable=invalid-name
+def segmented_nearest_neighbor_graph(x, k, segs):
+    """Transforms the given point set to a directed graph, whose coordinates
+    are given as a matrix.  The predecessors of each point are its k-nearest
+    neighbors.
+
+    The matrices are concatenated along the first axis, and are segmented by
+    ``segs``.  Each block would be transformed into a separate graph.  The
+    graphs will be unioned.
+
+    Parameters
+    ----------
+    x : Tensor
+        The input tensor.
+    k : int
+        The number of neighbors
+    segs : iterable of int
+        Number of points of each point set.
+        Must sum up to the number of rows in ``x``.
+
+    Returns
+    -------
+    DGLGraph
+        The graph.  The node IDs are in the same order as ``x``.
+    """
+    n_total_points, _ = F.shape(x)
     offset = np.insert(np.cumsum(segs), 0, 0)
 
-    h_list = F.split(input, segs, 0)
+    h_list = F.split(x, segs, 0)
     dst = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
         offset[i]

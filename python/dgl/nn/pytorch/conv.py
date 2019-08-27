@@ -602,16 +602,16 @@ class EdgeConv(nn.Module):
         phi_x = self.phi(edges.src['x'])
         return {'e': theta_x + phi_x}
 
-    def forward(self, h, g):
+    def forward(self, g, h):
         """Forward computation
 
         Parameters
         ----------
+        g : DGLGraph
+            The graph.
         h : Tensor
             :math:`(N, D)` where :math:`N` is the number of nodes and
             :math:`D` is the number of feature dimensions.
-        g : DGLGraph
-            The graph.
         Returns
         -------
         torch.Tensor
