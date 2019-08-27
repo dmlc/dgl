@@ -19,6 +19,7 @@ def line_graph(g, backtracking=True, shared=False):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     backtracking : bool, optional
         Whether the returned line graph is backtracking.
     shared : bool, optional
@@ -58,11 +59,13 @@ def _duplicate(arr, multiplicity):
     return rst
 
 def khop_adj(g, k):
-    """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`.
+    """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of :math:`g`,
+    where a row represents the destination and a column represents the source.
 
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     k : int
         The :math:`k` in :math:`A^k`.
 
@@ -70,6 +73,26 @@ def khop_adj(g, k):
     -------
     tensor
         The returned tensor, dtype is ``np.float32``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.khop_adj(g, 1)
+    tensor([[1., 0., 0., 0., 1.],
+            [1., 1., 0., 0., 0.],
+            [0., 1., 1., 0., 0.],
+            [0., 0., 1., 1., 0.],
+            [0., 0., 0., 1., 1.]])
+    >>> dgl.khop_adj(g, 3)
+    tensor([[1., 0., 1., 3., 3.],
+            [3., 1., 0., 1., 3.],
+            [3., 3., 1., 0., 1.],
+            [1., 3., 3., 1., 0.],
+            [0., 1., 3., 3., 1.]])
     """
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
     return tensor(adj_k.todense().astype(np.float32))
@@ -82,6 +105,7 @@ def khop_graph(g, k):
     Parameters
     ----------
     g : dgl.DGLGraph
+        The input graph.
     k : int
         The :math:`k` in `k`-hop graph.
 
@@ -89,6 +113,22 @@ def khop_graph(g, k):
     -------
     dgl.DGLGraph
         The returned ``DGLGraph``.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.khop_graph(g, 1)
+    DGLGraph(num_nodes=5, num_edges=10,
+             ndata_schemes={}
+             edata_schemes={})
+    >>> dgl.khop_graph(g, 3)
+    DGLGraph(num_nodes=5, num_edges=40,
+             ndata_schemes={}
+             edata_schemes={})
     """
     n = g.number_of_nodes()
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
@@ -255,11 +295,21 @@ def laplacian_lambda_max(g):
     Returns
     -------
     list :
-        If the input g is a DGLGraph, the returned value would be
-        a list with one element, indicating the largest eigenvalue of g.
-        If the input g is a BatchedDGLGraph, the returned value would
-        be a list, where the i-th item indicates the largest eigenvalue
-        of i-th graph in g.
+        * If the input g is a DGLGraph, the returned value would be
+          a list with one element, indicating the largest eigenvalue of g.
+        * If the input g is a BatchedDGLGraph, the returned value would
+          be a list, where the i-th item indicates the largest eigenvalue
+          of i-th graph in g.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> dgl.laplacian_lambda_max(g)
+    [0.9045084971874737]
     """
     if isinstance(g, BatchedDGLGraph):
         g_arr = unbatch(g)
