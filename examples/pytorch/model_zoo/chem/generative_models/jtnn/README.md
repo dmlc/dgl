@@ -59,8 +59,8 @@ All training checkpoint will be stored at `SAVE_PATH`, passed by command line or
 
 #### Dataset configuration
 
-If you want to use your own dataset, please create a file contains one SMILES a line.
- And pass the file path to the `-t` or `--train` option.
+If you want to use your own dataset, please create a file contains one SMILES a line, 
+ and pass the file path to the `-t` or `--train` option.
 ```
   -t TRAIN, --train TRAIN
                         Training file name (default: train)

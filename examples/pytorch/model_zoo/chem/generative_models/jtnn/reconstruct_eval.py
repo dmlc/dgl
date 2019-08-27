@@ -78,7 +78,7 @@ def reconstruct():
     print(len(dataset))
     for it, batch in enumerate(dataloader):
         gt_smiles = batch['mol_trees'][0].smiles
-        print(gt_smiles)
+        # print(gt_smiles)
         model.move_to_cuda(batch)
         try:
             _, tree_vec, mol_vec = model.encode(batch)
@@ -90,9 +90,9 @@ def reconstruct():
             # Following Mueller et al.
             mol_log_var = -torch.abs(model.G_var(mol_vec))
 
-            epsilon = create_var(torch.randn(1, model.latent_size // 2), False).cuda()
+            epsilon = torch.randn(1, model.latent_size // 2).cuda()
             tree_vec = tree_mean + torch.exp(tree_log_var // 2) * epsilon
-            epsilon = create_var(torch.randn(1, model.latent_size // 2), False).cuda()
+            epsilon = torch.randn(1, model.latent_size // 2).cuda()
             mol_vec = mol_mean + torch.exp(mol_log_var // 2) * epsilon
             dec_smiles = model.decode(tree_vec, mol_vec)
 
