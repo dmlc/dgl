@@ -2,20 +2,20 @@
 """Example dataloader of Tencent Alchemy Dataset
 https://alchemy.tencent.com/
 """
-
+import numpy as np
 import os
 import os.path as osp
-import zipfile
-import dgl
-from dgl.data.utils import download
-import pickle
-import torch
-from collections import defaultdict
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
-import numpy as np
 import pathlib
-from ..utils import get_download_dir, download, _get_dgl_url
+import pickle
+import zipfile
+from collections import defaultdict
+
+import dgl
+import dgl.backend as F
+from dgl.data.utils import download, get_download_dir
+
+from .utils import mol_to_complete_graph
+
 try:
     import pandas as pd
     from rdkit import Chem
@@ -23,27 +23,44 @@ try:
     from rdkit import RDConfig
 except ImportError:
     pass
+
 _urls = {'Alchemy': 'https://alchemy.tencent.com/data/dgl/'}
 
+class AlchemyBatcher(object):
+    """Data structure for holding a batch of data.
 
-class AlchemyBatcher:
+    Parameters
+    ----------
+    graph : dgl.BatchedDGLGraph
+        A batch of DGLGraphs for B molecules
+    labels : tensor
+        Labels for B molecules
+    """
     def __init__(self, graph=None, label=None):
         self.graph = graph
         self.label = label
 
+def batcher_dev(batch):
+    """Batch datapoints
 
-def batcher():
-    def batcher_dev(batch):
-        graphs, labels = zip(*batch)
-        batch_graphs = dgl.batch(graphs)
-        labels = torch.stack(labels, 0)
-        return AlchemyBatcher(graph=batch_graphs, label=labels)
+    Parameters
+    ----------
+    batch : list
+        batch[i][0] gives the DGLGraph for the ith datapoint,
+        and batch[i][1] gives the label for the ith datapoint.
 
-    return batcher_dev
+    Returns
+    -------
+    AlchemyBatcher
+        An object holding the batch of data
+    """
+    graphs, labels = zip(*batch)
+    batch_graphs = dgl.batch(graphs)
+    labels = F.stack(labels, 0)
 
+    return AlchemyBatcher(graph=batch_graphs, label=labels)
 
-class TencentAlchemyDataset(Dataset):
-
+class TencentAlchemyDataset(object):
     fdef_name = osp.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     chem_feature_factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
 
@@ -51,12 +68,15 @@ class TencentAlchemyDataset(Dataset):
         """Featurization for all atoms in a molecule. The atom indices
         will be preserved.
 
-        Args:
-            mol : rdkit.Chem.rdchem.Mol
-              RDKit molecule object
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            RDKit molecule object
+
         Returns
-            atom_feats_dict : dict
-              Dictionary for atom features
+        -------
+        atom_feats_dict : dict
+            Dictionary for atom features
         """
         atom_feats_dict = defaultdict(list)
         is_donor = defaultdict(int)
@@ -87,7 +107,7 @@ class TencentAlchemyDataset(Dataset):
             aromatic = atom.GetIsAromatic()
             hybridization = atom.GetHybridization()
             num_h = atom.GetTotalNumHs()
-            atom_feats_dict['pos'].append(torch.FloatTensor(geom[u]))
+            atom_feats_dict['pos'].append(F.tensor(geom[u].astype(np.float32)))
             atom_feats_dict['node_type'].append(atom_type)
 
             h_u = []
@@ -105,27 +125,28 @@ class TencentAlchemyDataset(Dataset):
                           Chem.rdchem.HybridizationType.SP3)
             ]
             h_u.append(num_h)
-            atom_feats_dict['n_feat'].append(torch.FloatTensor(h_u))
+            atom_feats_dict['n_feat'].append(F.tensor(np.array(h_u).astype(np.float32)))
 
-        atom_feats_dict['n_feat'] = torch.stack(atom_feats_dict['n_feat'],
-                                                dim=0)
-        atom_feats_dict['pos'] = torch.stack(atom_feats_dict['pos'], dim=0)
-        atom_feats_dict['node_type'] = torch.LongTensor(
-            atom_feats_dict['node_type'])
+        atom_feats_dict['n_feat'] = F.stack(atom_feats_dict['n_feat'], dim=0)
+        atom_feats_dict['pos'] = F.stack(atom_feats_dict['pos'], dim=0)
+        atom_feats_dict['node_type'] = F.tensor(np.array(
+            atom_feats_dict['node_type']).astype(np.int64))
 
         return atom_feats_dict
 
-    def alchemy_edges(self, mol, self_loop=True):
+    def alchemy_edges(self, mol, self_loop=False):
         """Featurization for all bonds in a molecule. The bond indices
         will be preserved.
 
-        Args:
-          mol : rdkit.Chem.rdchem.Mol
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
             RDKit molecule object
 
         Returns
-          bond_feats_dict : dict
-              Dictionary for bond features
+        -------
+        bond_feats_dict : dict
+            Dictionary for bond features
         """
         bond_feats_dict = defaultdict(list)
 
@@ -154,50 +175,15 @@ class TencentAlchemyDataset(Dataset):
                 bond_feats_dict['distance'].append(
                     np.linalg.norm(geom[u] - geom[v]))
 
-        bond_feats_dict['e_feat'] = torch.FloatTensor(
-            bond_feats_dict['e_feat'])
-        bond_feats_dict['distance'] = torch.FloatTensor(
-            bond_feats_dict['distance']).reshape(-1, 1)
+        bond_feats_dict['e_feat'] = F.tensor(
+            np.array(bond_feats_dict['e_feat']).astype(np.float32))
+        bond_feats_dict['distance'] = F.tensor(
+            np.array(bond_feats_dict['distance']).astype(np.float32)).reshape(-1 , 1)
 
         return bond_feats_dict
 
-    def mol_to_dgl(self, mol, self_loop=False):
-        """
-        Convert RDKit molecule object to DGLGraph
-        Args:
-            mol: Chem.rdchem.Mol read from sdf
-            self_loop: Whetaher to add self loop
-        Returns:
-            g: DGLGraph
-            l: related labels
-        """
-
-        g = dgl.DGLGraph()
-
-        # add nodes
-        num_atoms = mol.GetNumAtoms()
-        atom_feats = self.alchemy_nodes(mol)
-        g.add_nodes(num=num_atoms, data=atom_feats)
-
-        if self_loop:
-            g.add_edges(
-                [i for i in range(num_atoms) for j in range(num_atoms)],
-                [j for i in range(num_atoms) for j in range(num_atoms)])
-        else:
-            g.add_edges(
-                [i for i in range(num_atoms) for j in range(num_atoms - 1)], [
-                    j for i in range(num_atoms)
-                    for j in range(num_atoms) if i != j
-                ])
-
-        bond_feats = self.alchemy_edges(mol, self_loop)
-        g.edata.update(bond_feats)
-
-        return g
-
     def __init__(self, mode='dev', transform=None, from_raw=False):
-        assert mode in ['dev', 'valid',
-                        'test'], "mode should be dev/valid/test"
+        assert mode in ['dev', 'valid', 'test'], "mode should be dev/valid/test"
         self.mode = mode
         self.transform = transform
 
@@ -224,15 +210,11 @@ class TencentAlchemyDataset(Dataset):
     def _load(self):
         if self.mode == 'dev':
             if not self.from_raw:
-                with open(osp.join(self.file_dir, "dev_graphs.pkl"),
-                          "rb") as f:
+                with open(osp.join(self.file_dir, "dev_graphs.pkl"), "rb") as f:
                     self.graphs = pickle.load(f)
-                with open(osp.join(self.file_dir, "dev_labels.pkl"),
-                          "rb") as f:
+                with open(osp.join(self.file_dir, "dev_labels.pkl"), "rb") as f:
                     self.labels = pickle.load(f)
-
             else:
-
                 target_file = pathlib.Path(self.file_dir, "dev_target.csv")
                 self.target = pd.read_csv(
                     target_file,
@@ -245,15 +227,15 @@ class TencentAlchemyDataset(Dataset):
                 ]]
                 self.graphs, self.labels = [], []
 
-                sdf_dir = pathlib.Path(self.file_dir, "sdf")
                 supp = Chem.SDMolSupplier(
                     osp.join(self.file_dir, self.mode + ".sdf"))
                 cnt = 0
                 for sdf, label in zip(supp, self.target.iterrows()):
-                    graph = self.mol_to_dgl(sdf)
+                    graph = mol_to_complete_graph(sdf, atom_featurizer=self.alchemy_nodes,
+                                                  bond_featurizer=self.alchemy_edges)
                     cnt += 1
                     self.graphs.append(graph)
-                    label = torch.FloatTensor(label[1].tolist())
+                    label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
                     self.labels.append(label)
 
         self.normalize()
@@ -278,10 +260,7 @@ class TencentAlchemyDataset(Dataset):
         return g, l
 
     def split(self, train_size=0.8):
-        """
-        Split the dataset into two AlchemySubset for train&test.
-        """
-
+        """Split the dataset into two AlchemySubset for train&test."""
         assert 0 < train_size < 1
         train_num = int(len(self.graphs) * train_size)
         train_set = AlchemySubset(self.graphs[:train_num],
@@ -292,15 +271,13 @@ class TencentAlchemyDataset(Dataset):
                                  self.transform)
         return train_set, test_set
 
-
 class AlchemySubset(TencentAlchemyDataset):
     """
     Sub-dataset split from TencentAlchemyDataset.
     Used to construct the training & test set.
     """
-
     def __init__(self, graphs, labels, mean=0, std=1, transform=None):
-
+        super(AlchemySubset, self).__init__()
         self.graphs = graphs
         self.labels = labels
         self.mean = mean
