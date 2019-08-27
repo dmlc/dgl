@@ -810,6 +810,7 @@ class GMMConv(nn.Module):
                  aggregator_type,
                  residual=True,
                  bias=True):
+        super(GMMConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._dim = dim
@@ -838,13 +839,14 @@ class GMMConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_buffer('bias', None)
+        self.reset_parameters()
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
         gain = init.calculate_gain('relu')
         init.xavier_normal_(self.fc.weight, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
-            init.xavier_normal_(self.res_fc, gain=gain)
+            init.xavier_normal_(self.res_fc.weight, gain=gain)
         init.normal_(self.mu.data, 0, 0.1)
         init.normal_(self.inv_sigma.data, 1, 0.1)
         if self.bias is not None:
@@ -879,7 +881,7 @@ class GMMConv(nn.Module):
         gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
                             self.mu.view(1, self._n_kernels, self._dim)) ** 2)
         gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
-        gaussian = th.exp(gaussian.sum(dim=-1, keepdims=True)) # (E, K, 1)
+        gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True)) # (E, K, 1)
         graph.edata['w'] = gaussian
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
         rst = graph.ndata['h'].sum(1)
@@ -1175,9 +1177,10 @@ class NNConv(nn.Module):
     out_feats : int
         Output feature size.
     edge_func : callable activation function/layer
-        Maps each edge feature to a tensor of shape
-        ``(in_feats, out_feats)`` for computing messages.
-        The :math:`f_\Theta` in the formula.
+        Maps each edge feature to a vector of shape
+        ``(in_feats * out_feats)`` as weight to compute
+        messages.
+        Also is the :math:`f_\Theta` in the formula.
     aggregator_type : str
         Aggregator type to use (``sum``, ``mean`` or ``max``).
     residual : bool, optional

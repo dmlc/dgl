@@ -20,7 +20,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2, norm=False, bias=True)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     print(conv)
     # test#1: basic
     h0 = F.ones((3, 5))
@@ -37,7 +37,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
@@ -51,7 +51,7 @@ def test_graph_conv():
 
     conv = nn.GraphConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
@@ -89,7 +89,7 @@ def test_tagconv():
 
     conv = nn.TAGConv(5, 2, bias=True)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     print(conv)
 
     # test#1: basic
@@ -104,7 +104,7 @@ def test_tagconv():
 
     conv = nn.TAGConv(5, 2)
     if F.gpu_ctx():
-        conv.cuda()
+        conv = conv.to(ctx)
     # test#2: basic
     h0 = F.ones((3, 5))
     h1 = conv(h0, g)
@@ -122,7 +122,7 @@ def test_set2set():
 
     s2s = nn.Set2Set(5, 3, 3) # hidden size 5, 3 iters, 3 layers
     if F.gpu_ctx():
-        s2s.cuda()
+        s2s = s2s.to(ctx)
     print(s2s)
 
     # test#1: basic
@@ -143,7 +143,7 @@ def test_glob_att_pool():
 
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     if F.gpu_ctx():
-        gap.cuda()
+        gap = gap.to(ctx)
     print(gap)
 
     # test#1: basic
@@ -216,9 +216,9 @@ def test_set_trans():
     st_enc_1 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, 'isab', 3)
     st_dec = nn.SetTransformerDecoder(50, 5, 10, 100, 2, 4)
     if F.gpu_ctx():
-        st_enc_0.cuda()
-        st_enc_1.cuda()
-        st_dec.cuda()
+        st_enc_0 = st_enc_0.to(ctx)
+        st_enc_1 = st_enc_1.to(ctx)
+        st_dec = st_dec.to(ctx)
     print(st_enc_0, st_enc_1, st_dec)
 
     # test#1: basic
@@ -355,13 +355,53 @@ def test_rgcn():
     assert list(h_new.shape) == [100, O]
 
 def test_gated_graph_conv():
-    pass
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    ggconv = nn.GatedGraphConv(5, 10, 5, 3)
+    etypes = th.arange(g.number_of_edges()) % 3
+    feat = F.randn((100, 5))
+
+    if F.gpu_ctx():
+        ggconv = ggconv.to(ctx)
+        feat = feat.to(ctx)
+        etypes = etypes.to(ctx)
+
+    h = ggconv(feat, etypes, g)
+    # current we only do shape check
+    assert h.shape[-1] == 10
 
 def test_nn_conv():
-    pass
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    edge_func = th.nn.Linear(4, 5 * 10)
+    nnconv = nn.NNConv(5, 10, edge_func, 'mean')
+    feat = F.randn((100, 5))
+    efeat = F.randn((g.number_of_edges(), 4))
+
+    if F.gpu_ctx():
+        nnconv = nnconv.to(ctx)
+        feat = feat.to(ctx)
+        efeat = efeat.to(ctx)
+
+    h = nnconv(feat, efeat, g)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
 
 def test_gmm_conv():
-    pass
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    gmmconv = nn.GMMConv(5, 10, 3, 4, 'mean')
+    feat = F.randn((100, 5))
+    pseudo = F.randn((g.number_of_edges(), 3))
+
+    if F.gpu_ctx():
+        gmmconv = gmmconv.to(ctx)
+        feat = feat.to(ctx)
+        pseudo = pseudo.to(ctx)
+
+    h = gmmconv(feat, pseudo, g)
+    # currently we only do shape check
+    assert h.shape[-1] == 10
 
 def test_dense_graph_conv():
     ctx = F.ctx()
@@ -371,10 +411,12 @@ def test_dense_graph_conv():
     dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
     dense_conv.weight.data = conv.weight.data
     dense_conv.bias.data = conv.bias.data
-    if F.gpu_ctx():
-        conv = conv.cuda()
-        dense_conv = dense_conv.cuda()
     feat = F.randn((100, 5))
+    if F.gpu_ctx():
+        conv = conv.to(ctx)
+        dense_conv = dense_conv.to(ctx)
+        feat = feat.to(ctx)
+
     out_conv = conv(feat, g)
     out_dense_conv = dense_conv(feat, adj)
     assert F.allclose(out_conv, out_dense_conv)
@@ -387,11 +429,12 @@ def test_dense_sage_conv():
     dense_sage = nn.DenseSAGEConv(5, 2)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
     dense_sage.fc.bias.data = sage.fc_neigh.bias.data
-    if F.gpu_ctx():
-        sage = sage.cuda()
-        dense_sage = dense_sage.cuda()
-
     feat = F.randn((100, 5))
+    if F.gpu_ctx():
+        sage = sage.to(ctx)
+        dense_sage = dense_sage.to(ctx)
+        feat = feat.to(ctx)
+
     out_sage = sage(feat, g)
     out_dense_sage = dense_sage(feat, adj)
     assert F.allclose(out_sage, out_dense_sage)
