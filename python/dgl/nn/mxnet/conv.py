@@ -189,7 +189,6 @@ class TAGConv(gluon.Block):
         self._activation = activation
 
         in_feats = in_feats * (self._k + 1)
-        print(in_feats)
         with self.name_scope():
             self.lin = self.params.get('weight', shape=(in_feats, out_feats),
                                         init=mx.init.Xavier())
