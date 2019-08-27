@@ -64,8 +64,6 @@ If you want to use your own dataset, please create a file contains one SMILES a 
 ```
   -t TRAIN, --train TRAIN
                         Training file name (default: train)
-  -v VOCAB, --vocab VOCAB
-                        Vocab file name (default: vocab)
 ```
 
 ### Evaluation
@@ -74,8 +72,6 @@ To start evaluation, use `python reconstruct_eval.py`, and following arguments
 ```
   -t TRAIN, --train TRAIN
                         Training file name (default: test)
-  -v VOCAB, --vocab VOCAB
-                        Vocab file name (default: vocab)
   -m MODEL_PATH, --model MODEL_PATH
                         Pre-trained model to be loaded for evalutaion. If not
                         specified, would use pre-trained model from model zoo
