@@ -2,9 +2,101 @@
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .batched_graph import BatchedDGLGraph
+from scipy import sparse
 
-__all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
+__all__ = ['line_graph', 'reverse', 'nearest_neighbor_graph', 'to_simple_graph', 'to_bidirected']
 
+
+def pairwise_squared_distance(x):
+    """
+    x : (n_samples, n_points, dims)
+    return : (n_samples, n_points, n_points)
+    """
+    x2s = F.sum(x * x, -1, True)
+    # assuming that __matmul__ is always implemented (true for PyTorch, MXNet and Chainer)
+    return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
+
+def nearest_neighbor_graph(h, k):
+    """Transforms the given point coordinate matrix to a directed graph, where
+    the predecessors of each point are its k-nearest neighbors.
+
+    Parameters
+    ----------
+    h : Tensor
+        The input tensor.
+
+        If 2D, each row of ``h`` corresponds to a node.
+
+        If 3D, a k-NN graph would be constructed for each row.  Then
+        the graphs are unioned.
+    k : int
+        The number of neighbors
+
+    Returns
+    -------
+    DGLGraph
+        The graph.  The node IDs are in the same order as ``h``.
+    """
+    if F.ndim(h) == 2:
+        h = F.unsqueeze(h, 0)
+    n_samples, n_points, n_dims = F.shape(h)
+
+    d = pairwise_squared_distance(h)
+    k_indices = F.argtopk(d, k, 2, descending=False)
+    dst = F.copy_to(k_indices, F.cpu())
+
+    src = F.zeros_like(dst) + F.reshape(F.arange(n_points), (1, -1, 1))
+
+    per_sample_offset = F.reshape(F.arange(n_samples) * n_points, (-1, 1, 1))
+    dst += per_sample_offset
+    src += per_sample_offset
+    dst = F.reshape(dst, -1)
+    src = F.reshape(src, -1)
+    adj = sparse.csr_matrix((F.asnumpy(F.ones_like(dst)), (F.asnumpy(dst), F.asnumpy(src))))
+
+    g = dgl.DGLGraph(adj, readonly=True)
+    return g
+
+def segmented_nearest_neighbor_graph(h, k, segs):
+    """Transforms the given feature matrix to a directed graph, where
+    the predecessors of each node are its k-nearest neighbors.
+
+    Parameters
+    ----------
+    h : Tensor
+        The input tensor.
+
+        The points will be separated into segments defined by ``segs``.
+        Each segment will then generate its own k-NN graph, which will be
+        unioned when returned.
+    k : int
+        The number of neighbors
+    segs : LongTensor
+        The number of nodes for each point set segment.
+
+        The sum of the elements must be the same as the number of rows in
+        ``h``.
+
+    Returns
+    -------
+    DGLGraph
+        The graph.  The node IDs are in the same order as ``h``.
+    """
+    n_total_points, n_dims = h.shape
+
+    hs = h.split(segs)
+    dst = [
+        F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
+        segs[i - 1] if i > 0 else 0
+        for i, h_g in enumerate(hs)]
+    dst = torch.cat(dst, 0)
+    src = torch.arange(n_total_points).unsqueeze(1).expand(n_total_points, k)
+    dst = dst.flatten()
+    src = src.flatten()
+    adj = sparse.csr_matrix((F.asnumpy(F.ones_like(dst)), (F.asnumpy(dst), F.asnumpy(src))))
+
+    g = dgl.DGLGraph(adj, readonly=True)
+    return g
 
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
