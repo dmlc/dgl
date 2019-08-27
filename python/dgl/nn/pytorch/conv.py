@@ -1047,13 +1047,13 @@ class ChebConv(nn.Module):
                 graph.in_degrees().float().clamp(min=1), -0.5).unsqueeze(-1).to(feat.device)
             if lambda_max is None:
                 lambda_max = laplacian_lambda_max(graph)
-            if isinstance(lambda_max, list):
-                lambda_max = th.Tensor(lambda_max).to(feat.device)
+            lambda_max = th.Tensor(lambda_max).to(feat.device)
             if lambda_max.dim() < 1:
                 lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
-            # 2 / lambda_max, and broadcast from (B, 1) to (N, 1)
-            laplacian_norm = 2. / broadcast_nodes(graph, lambda_max)
+            # broadcast from (B, 1) to (N, 1)
+            lambda_max = broadcast_nodes(graph, lambda_max)
             # T0(X)
+
             Tx_0 = feat
             rst = self.fc[0](Tx_0)
             # T1(X)
@@ -1063,7 +1063,7 @@ class ChebConv(nn.Module):
                 h = graph.ndata.pop('h') * norm
                 # Λ = 2 * (I - D ^ -1/2 A D ^ -1/2) / lambda_max - I
                 #   = - 2(D ^ -1/2 A D ^ -1/2) / lambda_max + (2 / lambda_max - 1) I
-                Tx_1 = -2. * h * laplacian_norm + Tx_0 * (2. / lambda_max - 1)
+                Tx_1 = -2. * h / lambda_max + Tx_0 * (2. / lambda_max - 1)
                 rst = rst + self.fc[1](Tx_1)
             # Ti(x), i = 2...k
             for i in range(2, self._k):
@@ -1074,7 +1074,7 @@ class ChebConv(nn.Module):
                 #      = - 4(D ^ -1/2 A D ^ -1/2) / lambda_max Tx_(k-1) +
                 #        (4 / lambda_max - 2) Tx_(k-1) -
                 #        Tx_(k-2)
-                Tx_2 = -4. * h * laplacian_norm + Tx_1 * (4. / lambda_max - 2) - Tx_0
+                Tx_2 = -4. * h / lambda_max + Tx_1 * (4. / lambda_max - 2) - Tx_0
                 rst = rst + self.fc[i](Tx_2)
                 Tx_1, Tx_0 = Tx_2, Tx_1
             # add bias

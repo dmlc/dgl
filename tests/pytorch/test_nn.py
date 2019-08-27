@@ -403,13 +403,15 @@ def test_sgc_conv():
         sgc = sgc.to(ctx)
         feat = feat.to(ctx)
 
-    # cached
-    sgc = nn.SGConv(5, 10, 3, True)
     h = sgc(feat, g)
     assert h.shape[-1] == 10
 
+    # cached
+    sgc = nn.SGConv(5, 10, 3, True)
+
     if F.gpu_ctx():
         sgc = sgc.to(ctx)
+
     h_0 = sgc(feat, g)
     h_1 = sgc(feat + 1, g)
     assert F.allclose(h_0, h_1)
@@ -544,24 +546,25 @@ def test_dense_sage_conv():
     assert F.allclose(out_sage, out_dense_sage)
 
 def test_dense_cheb_conv():
-    ctx = F.ctx()
-    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
-    adj = g.adjacency_matrix(ctx=ctx).to_dense()
-    cheb = nn.ChebConv(5, 2, 3)
-    dense_cheb = nn.DenseChebConv(5, 2, 3)
-    for i in range(len(cheb.fc)):
-        dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
-    if cheb.bias is not None:
-        dense_cheb.bias.data = cheb.bias.data
-    feat = F.randn((100, 5))
-    if F.gpu_ctx():
-        cheb = cheb.to(ctx)
-        dense_cheb = dense_cheb.to(ctx)
-        feat = feat.to(ctx)
+    for k in range(1, 4):
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        adj = g.adjacency_matrix(ctx=ctx).to_dense()
+        cheb = nn.ChebConv(5, 2, 4)
+        dense_cheb = nn.DenseChebConv(5, 2, 4)
+        for i in range(len(cheb.fc)):
+            dense_cheb.W.data[i] = cheb.fc[i].weight.data.t()
+        if cheb.bias is not None:
+            dense_cheb.bias.data = cheb.bias.data
+        feat = F.randn((100, 5))
+        if F.gpu_ctx():
+            cheb = cheb.to(ctx)
+            dense_cheb = dense_cheb.to(ctx)
+            feat = feat.to(ctx)
 
-    out_cheb = cheb(feat, g)
-    out_dense_cheb = dense_cheb(feat, adj)
-    assert F.allclose(out_cheb, out_dense_cheb)
+        out_cheb = cheb(feat, g)
+        out_dense_cheb = dense_cheb(feat, adj)
+        assert F.allclose(out_cheb, out_dense_cheb)
 
 if __name__ == '__main__':
     test_graph_conv()
