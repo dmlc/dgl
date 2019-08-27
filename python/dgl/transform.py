@@ -1,10 +1,11 @@
 """Module for graph transformation utilities."""
+
+import numpy as np
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
 from .backend import asnumpy
-import numpy as np
 from scipy import sparse
 
 
@@ -32,13 +33,13 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-def _duplicate(arr, t):
+def _duplicate(arr, multiplicity):
     """Duplicate arr[i] for t[i] times and append them to end of returned array.
 
     Parameters
     ----------
     arr : numpy.ndarray
-    t : numpy.ndarray
+    multiplicity : numpy.ndarray
 
     Returns
     -------
@@ -47,11 +48,11 @@ def _duplicate(arr, t):
     n = len(arr)
     lengths = 0
     for i in range(n):
-        lengths += t[i]
+        lengths += multiplicity[i]
     rst = np.empty(shape=(lengths), dtype=np.int64)
     cnt = 0
     for i in range(n):
-        for j in range(t[i]):
+        for _ in range(multiplicity[i]):
             rst[cnt] = arr[i]
             cnt += 1
     return rst

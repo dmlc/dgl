@@ -15,6 +15,7 @@ __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'ChebConv', 'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
 
+# pylint: disable=W0235
 class Identity(nn.Module):
     """A placeholder identity operator that is argument-insensitive.
     (Identity has already been supported by PyTorch 1.2, we will directly
@@ -633,11 +634,11 @@ class SAGEConv(nn.Module):
         NOTE(zihao): lstm reducer with default schedule (degree bucketing)
         is slow, we could accelerate this with degree padding in the future.
         """
-        input = nodes.mailbox['m'] # (B, L, D)
-        batch_size = input.shape[0]
-        h = (input.new_zeros((1, batch_size, self._in_feats)),
-             input.new_zeros((1, batch_size, self._in_feats)))
-        _, (rst, _) = self.lstm(input, h)
+        m = nodes.mailbox['m'] # (B, L, D)
+        batch_size = m.shape[0]
+        h = (m.new_zeros((1, batch_size, self._in_feats)),
+             m.new_zeros((1, batch_size, self._in_feats)))
+        _, (rst, _) = self.lstm(m, h)
         return {'neigh': rst.squeeze(0)}
 
     def forward(self, feat, graph):
@@ -764,7 +765,7 @@ class GatedGraphConv(nn.Module):
         # NOTE(zihao): there is still room to optimize, we may do kernel fusion
         # for such operations in the future.
         graph.edata['w'] = self.edge_embed(etypes).view(-1, self._out_feats, self._out_feats)
-        for i in range(self._n_steps):
+        for _ in range(self._n_steps):
             graph.ndata['h'] = feat.unsqueeze(-1) # (N, D, 1)
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                              fn.sum('m', 'a'))
@@ -816,11 +817,12 @@ class GMMConv(nn.Module):
         if aggregator_type == 'sum':
             self._reducer = fn.sum
         elif aggregator_type == 'mean':
-            self._reducer == fn.mean
+            self._reducer = fn.mean
         elif aggregator_type == 'max':
-            self._reducer == fn.max
+            self._reducer = fn.max
         else:
             raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
+
         self.mu = nn.Parameter(th.Tensor(n_kernels, dim))
         self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
         self.fc = nn.Linear(in_feats, n_kernels * out_feats, bias=False)
@@ -1421,6 +1423,7 @@ class DenseGCNConv(nn.Module):
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
             self.register_parameter('bias', None)
+
         self.reset_parameters()
         self._activation = activation
 
