@@ -1,27 +1,26 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-from dgl.data.utils import get_download_dir
-from .mol_tree import Vocab
-from .nnutils import create_var, cuda, move_dgl_to_cuda
-from .chemutils import set_atommap, copy_edit_mol, enum_assemble_nx, \
-    attach_mols_nx, decode_stereo
-from .jtnn_enc import DGLJTNNEncoder
-from .jtnn_dec import DGLJTNNDecoder
-from .mpn import DGLMPN
-from .mpn import mol2dgl_single as mol2dgl_enc
-from .jtmpn import DGLJTMPN
-from .jtmpn import mol2dgl_single as mol2dgl_dec
-
+import copy
+import math
 
 import rdkit
 import rdkit.Chem as Chem
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from dgl import batch, unbatch
+from dgl.data.utils import get_download_dir
 from rdkit import DataStructs
 from rdkit.Chem import AllChem
-import copy, math
 
-from dgl import batch, unbatch
+from .chemutils import (attach_mols_nx, copy_edit_mol, decode_stereo,
+                        enum_assemble_nx, set_atommap)
+from .jtmpn import DGLJTMPN
+from .jtmpn import mol2dgl_single as mol2dgl_dec
+from .jtnn_dec import DGLJTNNDecoder
+from .jtnn_enc import DGLJTNNEncoder
+from .mol_tree import Vocab
+from .mpn import DGLMPN
+from .mpn import mol2dgl_single as mol2dgl_enc
+from .nnutils import create_var, cuda, move_dgl_to_cuda
 
 
 class DGLJTNNVAE(nn.Module):
@@ -30,10 +29,13 @@ class DGLJTNNVAE(nn.Module):
         super(DGLJTNNVAE, self).__init__()
         if vocab is None:
             if vocab_file is None:
-                vocab_file = '{}/jtnn/{}.txt'.format(get_download_dir(), 'vocab')
-                self.vocab = Vocab([x.strip("\r\n ") for x in open(vocab_file)])
+                vocab_file = '{}/jtnn/{}.txt'.format(
+                    get_download_dir(), 'vocab')
+                self.vocab = Vocab([x.strip("\r\n ")
+                                    for x in open(vocab_file)])
             else:
-                self.vocab = Vocab([x.strip("\r\n ") for x in open(vocab_file)])
+                self.vocab = Vocab([x.strip("\r\n ")
+                                    for x in open(vocab_file)])
         else:
             self.vocab = vocab
 
@@ -77,7 +79,8 @@ class DGLJTNNVAE(nn.Module):
 
         self.n_nodes_total += mol_graphs.number_of_nodes()
         self.n_edges_total += mol_graphs.number_of_edges()
-        self.n_tree_nodes_total += sum(t.number_of_nodes() for t in mol_batch['mol_trees'])
+        self.n_tree_nodes_total += sum(t.number_of_nodes()
+                                       for t in mol_batch['mol_trees'])
         self.n_passes += 1
 
         return mol_tree_batch, tree_vec, mol_vec
@@ -106,11 +109,13 @@ class DGLJTNNVAE(nn.Module):
 
         mol_tree_batch, tree_vec, mol_vec = self.encode(mol_batch)
 
-        tree_vec, mol_vec, z_mean, z_log_var = self.sample(tree_vec, mol_vec, e1, e2)
+        tree_vec, mol_vec, z_mean, z_log_var = self.sample(
+            tree_vec, mol_vec, e1, e2)
         kl_loss = -0.5 * torch.sum(
             1.0 + z_log_var - z_mean * z_mean - torch.exp(z_log_var)) / batch_size
 
-        word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_trees, tree_vec)
+        word_loss, topo_loss, word_acc, topo_acc = self.decoder(
+            mol_trees, tree_vec)
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 
@@ -209,9 +214,11 @@ class DGLJTNNVAE(nn.Module):
 
         cur_mol = copy_edit_mol(nodes_dict[0]['mol'])
         global_amap = [{}] + [{} for node in nodes_dict]
-        global_amap[1] = {atom.GetIdx(): atom.GetIdx() for atom in cur_mol.GetAtoms()}
+        global_amap[1] = {atom.GetIdx(): atom.GetIdx()
+                          for atom in cur_mol.GetAtoms()}
 
-        cur_mol = self.dfs_assemble(mol_tree_msg, mol_vec, cur_mol, global_amap, [], 0, None)
+        cur_mol = self.dfs_assemble(
+            mol_tree_msg, mol_vec, cur_mol, global_amap, [], 0, None)
         if cur_mol is None:
             return None
 
@@ -254,11 +261,13 @@ class DGLJTNNVAE(nn.Module):
                             if nodes_dict[v]['nid'] != fa_nid]
         children = [nodes_dict[v] for v in children_node_id]
         neighbors = [nei for nei in children if nei['mol'].GetNumAtoms() > 1]
-        neighbors = sorted(neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
+        neighbors = sorted(
+            neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
         singletons = [nei for nei in children if nei['mol'].GetNumAtoms() == 1]
         neighbors = singletons + neighbors
 
-        cur_amap = [(fa_nid, a2, a1) for nid, a1, a2 in fa_amap if nid == cur_node['nid']]
+        cur_amap = [(fa_nid, a2, a1)
+                    for nid, a1, a2 in fa_amap if nid == cur_node['nid']]
         cands = enum_assemble_nx(cur_node, neighbors, prev_nodes, cur_amap)
         if len(cands) == 0:
             return None
@@ -266,17 +275,19 @@ class DGLJTNNVAE(nn.Module):
 
         cands = [(candmol, mol_tree_msg, cur_node_id) for candmol in cand_mols]
         cand_graphs, atom_x, bond_x, tree_mess_src_edges, \
-        tree_mess_tgt_edges, tree_mess_tgt_nodes = mol2dgl_dec(
-            cands)
+            tree_mess_tgt_edges, tree_mess_tgt_nodes = mol2dgl_dec(
+                cands)
         cand_graphs = batch(cand_graphs)
         atom_x = cuda(atom_x)
         bond_x = cuda(bond_x)
         cand_graphs.ndata['x'] = atom_x
         cand_graphs.edata['x'] = bond_x
-        cand_graphs.edata['src_x'] = atom_x.new(bond_x.shape[0], atom_x.shape[1]).zero_()
+        cand_graphs.edata['src_x'] = atom_x.new(
+            bond_x.shape[0], atom_x.shape[1]).zero_()
 
         cand_vecs = self.jtmpn(
-            (cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes),
+            (cand_graphs, tree_mess_src_edges,
+             tree_mess_tgt_edges, tree_mess_tgt_nodes),
             mol_tree_msg,
         )
         cand_vecs = self.G_mean(cand_vecs)

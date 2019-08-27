@@ -1,22 +1,24 @@
+# pylint: disable=C103, C0111
+import os
+
+import dgl.function as DGLF
+import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
-from .nnutils import cuda
+from dgl import DGLGraph, mean_nodes
+
 from .chemutils import get_mol
-#from mpn import atom_features, bond_features, ATOM_FDIM, BOND_FDIM
-import rdkit.Chem as Chem
-from dgl import DGLGraph, batch, unbatch, mean_nodes
-import dgl.function as DGLF
+from .nnutils import cuda
 
-import os
-import numpy as np
-
-ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na',
+             'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
 ATOM_FDIM = len(ELEM_LIST) + 6 + 5 + 1
-BOND_FDIM = 5 
+BOND_FDIM = 5
 MAX_NB = 10
 
 PAPER = os.getenv('PAPER', False)
+
 
 def onek_encoding_unk(x, allowable_set):
     if x not in allowable_set:
@@ -27,20 +29,26 @@ def onek_encoding_unk(x, allowable_set):
 # characteristics (i.e. Chiral Atoms, E-Z, Cis-Trans).  Instead, they decode
 # the 2-D graph first, then enumerate all possible 3-D forms and find the
 # one with highest score.
+
+
 def atom_features(atom):
     return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
-            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5])
-            + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
-            + [atom.GetIsAromatic()]))
+                         + onek_encoding_unk(atom.GetDegree(),
+                                             [0, 1, 2, 3, 4, 5])
+                         + onek_encoding_unk(atom.GetFormalCharge(),
+                                             [-1, -2, 1, 2, 0])
+                         + [atom.GetIsAromatic()]))
+
 
 def bond_features(bond):
     bt = bond.GetBondType()
     return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
 
+
 def mol2dgl_single(cand_batch):
     cand_graphs = []
-    tree_mess_source_edges = [] # map these edges from trees to...
-    tree_mess_target_edges = [] # these edges on candidate graphs
+    tree_mess_source_edges = []  # map these edges from trees to...
+    tree_mess_target_edges = []  # these edges on candidate graphs
     tree_mess_target_nodes = []
     n_nodes = 0
     n_edges = 0
@@ -82,11 +90,13 @@ def mol2dgl_single(cand_batch):
             y_bid = mol_tree.nodes_dict[y_nid - 1]['idx'] if y_nid > 0 else -1
             if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid:
                 if mol_tree.has_edge_between(x_bid, y_bid):
-                    tree_mess_target_edges.append((begin_idx + n_nodes, end_idx + n_nodes))
+                    tree_mess_target_edges.append(
+                        (begin_idx + n_nodes, end_idx + n_nodes))
                     tree_mess_source_edges.append((x_bid, y_bid))
                     tree_mess_target_nodes.append(end_idx + n_nodes)
                 if mol_tree.has_edge_between(y_bid, x_bid):
-                    tree_mess_target_edges.append((end_idx + n_nodes, begin_idx + n_nodes))
+                    tree_mess_target_edges.append(
+                        (end_idx + n_nodes, begin_idx + n_nodes))
                     tree_mess_source_edges.append((y_bid, x_bid))
                     tree_mess_target_nodes.append(begin_idx + n_nodes)
 
@@ -95,10 +105,10 @@ def mol2dgl_single(cand_batch):
         cand_graphs.append(g)
 
     return cand_graphs, torch.stack(atom_x), \
-            torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
-            torch.LongTensor(tree_mess_source_edges), \
-            torch.LongTensor(tree_mess_target_edges), \
-            torch.LongTensor(tree_mess_target_nodes)
+        torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
+        torch.LongTensor(tree_mess_source_edges), \
+        torch.LongTensor(tree_mess_target_edges), \
+        torch.LongTensor(tree_mess_target_nodes)
 
 
 mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
@@ -177,14 +187,15 @@ class DGLJTMPN(nn.Module):
 
         n_samples = len(cand_graphs)
 
-        cand_line_graph = cand_graphs.line_graph(backtracking=False, shared=True)
+        cand_line_graph = cand_graphs.line_graph(
+            backtracking=False, shared=True)
 
         n_nodes = cand_graphs.number_of_nodes()
         n_edges = cand_graphs.number_of_edges()
 
         cand_graphs = self.run(
-                cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
-                tree_mess_tgt_nodes, mol_tree_batch)
+            cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
+            tree_mess_tgt_nodes, mol_tree_batch)
 
         g_repr = mean_nodes(cand_graphs, 'h')
 
@@ -219,7 +230,7 @@ class DGLJTMPN(nn.Module):
         })
 
         cand_graphs.edata['alpha'] = \
-                cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
+            cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
         cand_graphs.ndata['alpha'] = zero_node_state
         if tree_mess_src_edges.shape[0] > 0:
             if PAPER:

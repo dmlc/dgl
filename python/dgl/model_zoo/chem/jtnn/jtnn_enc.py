@@ -1,16 +1,18 @@
+import itertools
+from collections import deque
+
+import dgl.function as DGLF
+import networkx as nx
+import numpy as np
 import torch
 import torch.nn as nn
-from collections import deque
+from dgl import batch, bfs_edges_generator, unbatch
+
 from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
-import itertools
-import networkx as nx
-from dgl import batch, unbatch, bfs_edges_generator
-import dgl.function as DGLF
-
-import numpy as np
 
 MAX_NB = 8
+
 
 def level_order(forest, roots):
     edges = bfs_edges_generator(forest, roots)
@@ -19,10 +21,14 @@ def level_order(forest, roots):
     yield from reversed(edges_back)
     yield from edges
 
-enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
-enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
+
+enc_tree_msg = [DGLF.copy_src(src='m', out='m'),
+                DGLF.copy_src(src='rm', out='rm')]
+enc_tree_reduce = [DGLF.sum(msg='m', out='s'),
+                   DGLF.sum(msg='rm', out='accum_rm')]
 enc_tree_gather_msg = DGLF.copy_edge(edge='m', out='m')
 enc_tree_gather_reduce = DGLF.sum(msg='m', out='m')
+
 
 class EncoderGatherUpdate(nn.Module):
     def __init__(self, hidden_size):
@@ -45,7 +51,7 @@ class DGLJTNNEncoder(nn.Module):
         self.hidden_size = hidden_size
         self.vocab_size = vocab.size()
         self.vocab = vocab
-        
+
         if embedding is None:
             self.embedding = nn.Embedding(self.vocab_size, hidden_size)
         else:
@@ -56,9 +62,10 @@ class DGLJTNNEncoder(nn.Module):
 
     def forward(self, mol_trees):
         mol_tree_batch = batch(mol_trees)
-        
+
         # Build line graph to prepare for belief propagation
-        mol_tree_batch_lg = mol_tree_batch.line_graph(backtracking=False, shared=True)
+        mol_tree_batch_lg = mol_tree_batch.line_graph(
+            backtracking=False, shared=True)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg)
 
@@ -92,7 +99,8 @@ class DGLJTNNEncoder(nn.Module):
 
         # Send the source/destination node features to edges
         mol_tree_batch.apply_edges(
-            func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
+            func=lambda edges: {
+                'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # Message passing

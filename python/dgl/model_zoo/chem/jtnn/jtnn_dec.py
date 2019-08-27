@@ -1,17 +1,18 @@
+import copy
+import itertools
+
+import dgl.function as DGLF
+import networkx as nx
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl import batch, dfs_labeled_edges_generator
+
+from .chemutils import enum_assemble_nx, get_mol
 from .mol_tree import Vocab
 from .mol_tree_nx import DGLMolTree
-from .chemutils import enum_assemble_nx, get_mol
 from .nnutils import GRUUpdate, cuda
-import copy
-import itertools
-from dgl import batch, dfs_labeled_edges_generator
-import dgl.function as DGLF
-import networkx as nx
-
-import numpy as np
 
 MAX_NB = 8
 MAX_DECODE_LEN = 100
@@ -25,6 +26,7 @@ def dfs_order(forest, roots):
         # using find_edges().
         yield e ^ l, l
 
+
 dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
 dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
 
@@ -33,56 +35,62 @@ def dec_tree_node_update(nodes):
     return {'new': nodes.data['new'].clone().zero_()}
 
 
-dec_tree_edge_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
-dec_tree_edge_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
+dec_tree_edge_msg = [DGLF.copy_src(
+    src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
+dec_tree_edge_reduce = [
+    DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
 
 
 def have_slots(fa_slots, ch_slots):
     if len(fa_slots) > 2 and len(ch_slots) > 2:
         return True
     matches = []
-    for i,s1 in enumerate(fa_slots):
-        a1,c1,h1 = s1
-        for j,s2 in enumerate(ch_slots):
-            a2,c2,h2 = s2
+    for i, s1 in enumerate(fa_slots):
+        a1, c1, h1 = s1
+        for j, s2 in enumerate(ch_slots):
+            a2, c2, h2 = s2
             if a1 == a2 and c1 == c2 and (a1 != "C" or h1 + h2 >= 4):
-                matches.append( (i,j) )
+                matches.append((i, j))
 
-    if len(matches) == 0: return False
+    if len(matches) == 0:
+        return False
 
-    fa_match,ch_match = list(zip(*matches))
-    if len(set(fa_match)) == 1 and 1 < len(fa_slots) <= 2: #never remove atom from ring
+    fa_match, ch_match = list(zip(*matches))
+    if len(set(fa_match)) == 1 and 1 < len(fa_slots) <= 2:  # never remove atom from ring
         fa_slots.pop(fa_match[0])
-    if len(set(ch_match)) == 1 and 1 < len(ch_slots) <= 2: #never remove atom from ring
+    if len(set(ch_match)) == 1 and 1 < len(ch_slots) <= 2:  # never remove atom from ring
         ch_slots.pop(ch_match[0])
 
     return True
-    
+
+
 def can_assemble(mol_tree, u, v_node_dict):
     u_node_dict = mol_tree.nodes_dict[u]
     u_neighbors = mol_tree.successors(u)
     u_neighbors_node_dict = [
-            mol_tree.nodes_dict[_u]
-            for _u in u_neighbors
-            if _u in mol_tree.nodes_dict
-            ]
+        mol_tree.nodes_dict[_u]
+        for _u in u_neighbors
+        if _u in mol_tree.nodes_dict
+    ]
     neis = u_neighbors_node_dict + [v_node_dict]
-    for i,nei in enumerate(neis):
+    for i, nei in enumerate(neis):
         nei['nid'] = i
 
     neighbors = [nei for nei in neis if nei['mol'].GetNumAtoms() > 1]
-    neighbors = sorted(neighbors, key=lambda x:x['mol'].GetNumAtoms(), reverse=True)
+    neighbors = sorted(
+        neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
     singletons = [nei for nei in neis if nei['mol'].GetNumAtoms() == 1]
     neighbors = singletons + neighbors
     cands = enum_assemble_nx(u_node_dict, neighbors)
     return len(cands) > 0
 
+
 def create_node_dict(smiles, clique=[]):
     return dict(
-            smiles=smiles,
-            mol=get_mol(smiles),
-            clique=clique,
-            )
+        smiles=smiles,
+        mol=get_mol(smiles),
+        clique=clique,
+    )
 
 
 class DGLJTNNDecoder(nn.Module):
@@ -111,7 +119,8 @@ class DGLJTNNDecoder(nn.Module):
         ground truth tree
         '''
         mol_tree_batch = batch(mol_trees)
-        mol_tree_batch_lg = mol_tree_batch.line_graph(backtracking=False, shared=True)
+        mol_tree_batch_lg = mol_tree_batch.line_graph(
+            backtracking=False, shared=True)
         n_trees = len(mol_trees)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
@@ -125,7 +134,8 @@ class DGLJTNNDecoder(nn.Module):
         mol_tree_batch.ndata.update({
             'x': self.embedding(mol_tree_batch.ndata['wid']),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
-            'new': cuda(torch.ones(n_nodes).byte()),  # whether it's newly generated node
+            # whether it's newly generated node
+            'new': cuda(torch.ones(n_nodes).byte()),
         })
 
         mol_tree_batch.edata.update({
@@ -140,7 +150,8 @@ class DGLJTNNDecoder(nn.Module):
         })
 
         mol_tree_batch.apply_edges(
-            func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
+            func=lambda edges: {
+                'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # input tensors for stop prediction (p) and label prediction (q)
@@ -175,7 +186,8 @@ class DGLJTNNDecoder(nn.Module):
             p_targets.append(torch.tensor(p_target_list))
 
             root_out_degrees -= (root_out_degrees == 0).long()
-            root_out_degrees -= torch.tensor(np.isin(root_ids, v).astype('int64'))
+            root_out_degrees -= torch.tensor(np.isin(root_ids,
+                                                     v).astype('int64'))
 
             mol_tree_batch_lg.pull(
                 eid,
@@ -220,7 +232,8 @@ class DGLJTNNDecoder(nn.Module):
             p, p_targets.float(), size_average=False
         ) / n_trees
         q_loss = F.cross_entropy(q, q_targets, size_average=False) / n_trees
-        p_acc = ((p > 0).long() == p_targets).sum().float() / p_targets.shape[0]
+        p_acc = ((p > 0).long() == p_targets).sum().float() / \
+            p_targets.shape[0]
         q_acc = (q.max(1)[1] == q_targets).float().sum() / q_targets.shape[0]
 
         self.q_inputs = q_inputs
@@ -251,7 +264,7 @@ class DGLJTNNDecoder(nn.Module):
         mol_tree.nodes[0].data['h'] = init_hidden
         mol_tree.nodes[0].data['fail'] = cuda(torch.tensor([0]))
         mol_tree.nodes_dict[0] = root_node_dict = create_node_dict(
-                self.vocab.get_smiles(root_wid))
+            self.vocab.get_smiles(root_wid))
 
         stack, trace = [], []
         stack.append((0, self.vocab.get_slots(root_wid)))
@@ -283,7 +296,7 @@ class DGLJTNNDecoder(nn.Module):
                 mol_tree.add_edges(u, v)
                 uv = new_edge_id
                 new_edge_id += 1
-                
+
                 if first:
                     mol_tree.edata.update({
                         's': cuda(torch.zeros(1, self.hidden_size)),
@@ -301,7 +314,8 @@ class DGLJTNNDecoder(nn.Module):
                 # keeping dst_x 0 is fine as h on new edge doesn't depend on that.
 
                 # DGL doesn't dynamically maintain a line graph.
-                mol_tree_lg = mol_tree.line_graph(backtracking=False, shared=True)
+                mol_tree_lg = mol_tree.line_graph(
+                    backtracking=False, shared=True)
 
                 mol_tree_lg.pull(
                     uv,
@@ -318,14 +332,16 @@ class DGLJTNNDecoder(nn.Module):
                 vdata = mol_tree.nodes[v].data
                 h_v = vdata['h']
                 q_input = torch.cat([h_v, mol_vec], 1)
-                q_score = torch.softmax(self.W_o(torch.relu(self.W(q_input))), -1)
+                q_score = torch.softmax(
+                    self.W_o(torch.relu(self.W(q_input))), -1)
                 _, sort_wid = torch.sort(q_score, 1, descending=True)
                 sort_wid = sort_wid.squeeze()
 
                 next_wid = None
                 for wid in sort_wid.tolist()[:5]:
                     slots = self.vocab.get_slots(wid)
-                    cand_node_dict = create_node_dict(self.vocab.get_smiles(wid))
+                    cand_node_dict = create_node_dict(
+                        self.vocab.get_smiles(wid))
                     if (have_slots(u_slots, slots) and can_assemble(mol_tree, u, cand_node_dict)):
                         next_wid = wid
                         next_slots = slots
@@ -352,11 +368,12 @@ class DGLJTNNDecoder(nn.Module):
                     mol_tree.edges[vu].data['dst_x'] = mol_tree.nodes[u].data['x']
 
                     # DGL doesn't dynamically maintain a line graph.
-                    mol_tree_lg = mol_tree.line_graph(backtracking=False, shared=True)
+                    mol_tree_lg = mol_tree.line_graph(
+                        backtracking=False, shared=True)
                     mol_tree_lg.apply_nodes(
                         self.dec_tree_edge_update.update_r,
                         uv
-                        )
+                    )
 
             if backtrack:
                 if len(stack) == 1:
@@ -378,6 +395,7 @@ class DGLJTNNDecoder(nn.Module):
                 )
                 stack.pop()
 
-        effective_nodes = mol_tree.filter_nodes(lambda nodes: nodes.data['fail'] != 1)
+        effective_nodes = mol_tree.filter_nodes(
+            lambda nodes: nodes.data['fail'] != 1)
         effective_nodes, _ = torch.sort(effective_nodes)
         return mol_tree, all_nodes, effective_nodes

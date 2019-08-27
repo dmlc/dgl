@@ -1,8 +1,9 @@
-from dgl import DGLGraph
-import rdkit.Chem as Chem
-from .chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, \
-                       set_atommap, enum_assemble_nx, decode_stereo
 import numpy as np
+import rdkit.Chem as Chem
+from dgl import DGLGraph
+
+from .chemutils import (decode_stereo, enum_assemble_nx, get_clique_mol,
+                        get_mol, get_smiles, set_atommap, tree_decomp)
 
 
 class DGLMolTree(DGLGraph):
@@ -29,10 +30,10 @@ class DGLMolTree(DGLGraph):
             cmol = get_clique_mol(self.mol, c)
             csmiles = get_smiles(cmol)
             self.nodes_dict[i] = dict(
-                    smiles=csmiles,
-                    mol=get_mol(csmiles),
-                    clique=c,
-                    )
+                smiles=csmiles,
+                mol=get_mol(csmiles),
+                clique=c,
+            )
             if min(c) == 0:
                 root = i
         self.add_nodes(len(cliques))
@@ -41,7 +42,7 @@ class DGLMolTree(DGLGraph):
         if root > 0:
             for attr in self.nodes_dict[0]:
                 self.nodes_dict[0][attr], self.nodes_dict[root][attr] = \
-                        self.nodes_dict[root][attr], self.nodes_dict[0][attr]
+                    self.nodes_dict[root][attr], self.nodes_dict[0][attr]
 
         src = np.zeros((len(edges) * 2,), dtype='int')
         dst = np.zeros((len(edges) * 2,), dtype='int')
@@ -57,7 +58,8 @@ class DGLMolTree(DGLGraph):
         for i in self.nodes_dict:
             self.nodes_dict[i]['nid'] = i + 1
             if self.out_degree(i) > 1:    # Leaf node mol is not marked
-                set_atommap(self.nodes_dict[i]['mol'], self.nodes_dict[i]['nid'])
+                set_atommap(self.nodes_dict[i]['mol'],
+                            self.nodes_dict[i]['nid'])
             self.nodes_dict[i]['is_leaf'] = (self.out_degree(i) == 1)
 
     def treesize(self):
@@ -75,7 +77,7 @@ class DGLMolTree(DGLGraph):
         for j in self.successors(i).numpy():
             nei_node = self.nodes_dict[j]
             clique.extend(nei_node['clique'])
-            if nei_node['is_leaf']: # Leaf node, no need to mark
+            if nei_node['is_leaf']:  # Leaf node, no need to mark
                 continue
             for cidx in nei_node['clique']:
                 # allow singleton node override the atom mapping
@@ -85,7 +87,8 @@ class DGLMolTree(DGLGraph):
 
         clique = list(set(clique))
         label_mol = get_clique_mol(original_mol, clique)
-        node['label'] = Chem.MolToSmiles(Chem.MolFromSmiles(get_smiles(label_mol)))
+        node['label'] = Chem.MolToSmiles(
+            Chem.MolFromSmiles(get_smiles(label_mol)))
         node['label_mol'] = get_mol(node['label'])
 
         for cidx in clique:
@@ -96,7 +99,8 @@ class DGLMolTree(DGLGraph):
     def _assemble_node(self, i):
         neighbors = [self.nodes_dict[j] for j in self.successors(i).numpy()
                      if self.nodes_dict[j]['mol'].GetNumAtoms() > 1]
-        neighbors = sorted(neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
+        neighbors = sorted(
+            neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
         singletons = [self.nodes_dict[j] for j in self.successors(i).numpy()
                       if self.nodes_dict[j]['mol'].GetNumAtoms() == 1]
         neighbors = singletons + neighbors
@@ -104,9 +108,11 @@ class DGLMolTree(DGLGraph):
         cands = enum_assemble_nx(self.nodes_dict[i], neighbors)
 
         if len(cands) > 0:
-            self.nodes_dict[i]['cands'], self.nodes_dict[i]['cand_mols'], _ = list(zip(*cands))
+            self.nodes_dict[i]['cands'], self.nodes_dict[i]['cand_mols'], _ = list(
+                zip(*cands))
             self.nodes_dict[i]['cands'] = list(self.nodes_dict[i]['cands'])
-            self.nodes_dict[i]['cand_mols'] = list(self.nodes_dict[i]['cand_mols'])
+            self.nodes_dict[i]['cand_mols'] = list(
+                self.nodes_dict[i]['cand_mols'])
         else:
             self.nodes_dict[i]['cands'] = []
             self.nodes_dict[i]['cand_mols'] = []
