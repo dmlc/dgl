@@ -1,3 +1,4 @@
+# pylint: disable=C0111, C0103, E1101, W0611, W0612
 from collections import defaultdict
 
 import rdkit
@@ -53,7 +54,7 @@ def sanitize(mol):
     try:
         smiles = get_smiles(mol)
         mol = get_mol(smiles)
-    except Exception as e:
+    except Exception:
         return None
     return mol
 

@@ -1,4 +1,4 @@
-# pylint: disable=C103, C0111
+# pylint: disable=C0111, C0103, E1101, W0611, W0612
 import os
 
 import dgl.function as DGLF

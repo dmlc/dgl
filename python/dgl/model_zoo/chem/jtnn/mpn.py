@@ -1,3 +1,4 @@
+# pylint: disable=C0111, C0103, E1101, W0611, W0612
 from functools import partial
 
 import dgl.function as DGLF
