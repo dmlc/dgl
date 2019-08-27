@@ -286,9 +286,9 @@ def laplacian_lambda_max(g):
     >>> import dgl
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(5)
-    >>> g.add_edges([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0])
+    >>> g.add_edges([0, 1, 2, 3, 4, 0, 1, 2, 3, 4], [1, 2, 3, 4, 0, 4, 0, 1, 2, 3])
     >>> dgl.laplacian_lambda_max(g)
-    [0.9045084971874737]
+    [1.809016994374948]
     """
     if isinstance(g, BatchedDGLGraph):
         g_arr = unbatch(g)
