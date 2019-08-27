@@ -21,7 +21,7 @@ def normalize(h):
 def evaluate(model, features, graph, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(features, graph)[mask] # only compute the evaluation set
+        logits = model(graph, features)[mask] # only compute the evaluation set
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
@@ -82,7 +82,7 @@ def main(args):
     # define loss closure
     def closure():
         optimizer.zero_grad()
-        output = model(features, g)[train_mask]
+        output = model(g, features)[train_mask]
         loss_train = F.cross_entropy(output, labels[train_mask])
         loss_train.backward()
         return loss_train

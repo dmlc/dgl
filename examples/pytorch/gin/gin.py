@@ -155,7 +155,7 @@ class GIN(nn.Module):
         hidden_rep = [h]
 
         for layer in range(self.num_layers - 1):
-            h = self.ginlayers[layer](h, g)
+            h = self.ginlayers[layer](g, h)
             hidden_rep.append(h)
 
         score_over_layer = 0

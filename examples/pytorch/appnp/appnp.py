@@ -53,5 +53,5 @@ class APPNP(nn.Module):
             h = self.activation(layer(h))
         h = self.layers[-1](self.feat_drop(h))
         # propagation step
-        h = self.propagate(h, self.g)
+        h = self.propagate(self.g, h)
         return h
