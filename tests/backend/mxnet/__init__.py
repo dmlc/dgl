@@ -83,6 +83,9 @@ def min(x, dim):
 def prod(x, dim):
     return x.prod(dim)
 
+def matmul(a, b):
+    return nd.dot(a, b)
+
 record_grad = autograd.record
 
 

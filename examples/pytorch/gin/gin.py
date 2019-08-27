@@ -9,72 +9,24 @@ Author's implementation: https://github.com/weihua916/powerful-gnns
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl.nn.pytorch.conv import GINConv
 
 import dgl
 import dgl.function as fn
 
 
-# Sends a message of node feature h.
-msg = fn.copy_src(src='h', out='m')
-reduce_sum = fn.sum(msg='m', out='h')
-reduce_max = fn.max(msg='m', out='h')
-
-
-def reduce_mean(nodes):
-    return {'h': torch.mean(nodes.mailbox['m'], dim=1)[0]}
-
-
-class ApplyNodes(nn.Module):
+class ApplyNodeFunc(nn.Module):
     """Update the node feature hv with MLP, BN and ReLU."""
-    def __init__(self, mlp, layer):
-        super(ApplyNodes, self).__init__()
+    def __init__(self, mlp):
+        super(ApplyNodeFunc, self).__init__()
         self.mlp = mlp
         self.bn = nn.BatchNorm1d(self.mlp.output_dim)
-        self.layer = layer
 
-    def forward(self, nodes):
-        h = self.mlp(nodes.data['h'])
+    def forward(self, h):
+        h = self.mlp(h)
         h = self.bn(h)
         h = F.relu(h)
-
-        return {'h': h}
-
-
-class GINLayer(nn.Module):
-    """Neighbor pooling and reweight nodes before send graph into MLP"""
-    def __init__(self, eps, layer, mlp, neighbor_pooling_type, learn_eps):
-        super(GINLayer, self).__init__()
-        self.bn = nn.BatchNorm1d(mlp.output_dim)
-        self.neighbor_pooling_type = neighbor_pooling_type
-        self.eps = eps
-        self.learn_eps = learn_eps
-        self.layer = layer
-        self.apply_mod = ApplyNodes(mlp, layer)
-
-    def forward(self, g, feature):
-        g.ndata['h'] = feature
-
-        if self.neighbor_pooling_type == 'sum':
-            reduce_func = reduce_sum
-        elif self.neighbor_pooling_type == 'mean':
-            reduce_func = reduce_mean
-        elif self.neighbor_pooling_type == 'max':
-            reduce_func = reduce_max
-        else:
-            raise NotImplementedError()
-
-        h = feature  # h0
-        g.update_all(msg, reduce_func)
-        pooled = g.ndata['h']
-
-        # reweight the center node when aggregating it with its neighbors
-        if self.learn_eps:
-            pooled = pooled + (1 + self.eps[self.layer])*h
-
-        g.ndata['h'] = pooled
-        g.apply_nodes(func=self.apply_mod)
-
-        return g.ndata.pop('h')
+        return h
 
 
 class MLP(nn.Module):
@@ -168,7 +120,6 @@ class GIN(nn.Module):
         self.num_layers = num_layers
         self.graph_pooling_type = graph_pooling_type
         self.learn_eps = learn_eps
-        self.eps = nn.Parameter(torch.zeros(self.num_layers - 1))
 
         # List of MLPs
         self.ginlayers = torch.nn.ModuleList()
@@ -180,8 +131,8 @@ class GIN(nn.Module):
             else:
                 mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim)
 
-            self.ginlayers.append(GINLayer(
-                self.eps, layer, mlp, neighbor_pooling_type, self.learn_eps))
+            self.ginlayers.append(
+                GINConv(ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps))
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
         # Linear function for graph poolings of output of each layer

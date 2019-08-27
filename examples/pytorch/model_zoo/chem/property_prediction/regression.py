@@ -1,31 +1,25 @@
-# -*- coding:utf-8 -*-
-"""Sample training code
-"""
-
 import argparse
-import torch as th
+import torch
 import torch.nn as nn
 from dgl.data.chem import alchemy
 from dgl import model_zoo
 from torch.utils.data import DataLoader
-# from Alchemy_dataset import TencentAlchemyDataset, batcher
-
 
 def train(model="sch",
           epochs=80,
-          device=th.device("cpu"),
+          device=torch.device("cpu"),
           training_set_size=0.8):
     print("start")
     alchemy_dataset = alchemy.TencentAlchemyDataset()
-    train_set, test_set = alchemy_dataset.split(train_size=0.8)
+    train_set, test_set = alchemy_dataset.split(train_size=training_set_size)
     train_loader = DataLoader(dataset=train_set,
                               batch_size=20,
-                              collate_fn=alchemy.batcher(),
+                              collate_fn=alchemy.batcher_dev,
                               shuffle=False,
                               num_workers=0)
     test_loader = DataLoader(dataset=test_set,
                              batch_size=20,
-                             collate_fn=alchemy.batcher(),
+                             collate_fn=alchemy.batcher_dev,
                              shuffle=False,
                              num_workers=0)
 
@@ -42,7 +36,7 @@ def train(model="sch",
 
     loss_fn = nn.MSELoss()
     MAE_fn = nn.L1Loss()
-    optimizer = th.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     for epoch in range(epochs):
 
@@ -83,7 +77,6 @@ def train(model="sch",
     w_mae /= idx + 1
     print("MAE (test set): {:.7f}".format(w_mae))
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-M",
@@ -95,8 +88,6 @@ if __name__ == "__main__":
                         help="number of epochs",
                         default=250,
                         type=int)
-    device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     args = parser.parse_args()
-    assert args.model in ['sch', 'mgcn',
-                          'mpnn'], "model name must be sch, mgcn or mpnn"
     train(args.model, args.epochs, device)
