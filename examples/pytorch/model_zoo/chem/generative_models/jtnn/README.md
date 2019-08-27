@@ -101,3 +101,12 @@ Below gives the statistics of pre-trained `JTNN_ZINC` model.
 | Pre-trained model  | % Reconstruction Accuracy
 | ------------------ | -------
 | `JTNN_ZINC`        |  73.7             
+
+### Visualization
+
+Here we draw some "neighbor" of a given molecule, by adding noises on the intermediate representations. Detailed script can be found [here](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/jtnn/viz_neighbor_mol.ipynb).
+
+#### Given Molecule
+![image](https://user-images.githubusercontent.com/8686776/63773593-0d37da00-c90e-11e9-8933-0abca4b430db.png)
+#### Neighbor Molecules
+![image](https://user-images.githubusercontent.com/8686776/63773602-1163f780-c90e-11e9-8341-5122dc0d0c82.png)
