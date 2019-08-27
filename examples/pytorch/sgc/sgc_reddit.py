@@ -62,7 +62,6 @@ def main(args):
         test_mask = test_mask.cuda()
 
     # graph preprocess and calculate normalization factor
-    start = time.perf_counter()
     g = DGLGraph(data.graph)
     n_edges = g.number_of_edges()
     # normalization
@@ -71,11 +70,11 @@ def main(args):
     norm[torch.isinf(norm)] = 0
     if cuda: norm = norm.cuda()
     g.ndata['norm'] = norm.unsqueeze(1)
-    preprocess_elapse = time.perf_counter()-start
-    print("Preprocessing Time: {:.4f}".format(preprocess_elapse))
 
     # create SGC model
     model = SGConv(in_feats, n_classes, k=2, cached=True, bias=True, norm=normalize)
+    if args.gpu >= 0:
+        model = model.cuda()
 
     # use optimizer
     optimizer = torch.optim.LBFGS(model.parameters())
@@ -89,17 +88,10 @@ def main(args):
         return loss_train
 
     # initialize graph
-    start = time.perf_counter()
     for epoch in range(args.n_epochs):
-
         model.train()
-        if epoch == 0:
-            precompute_elapse = time.perf_counter() - start
-            print("Precompute Time(s): {:.4f}".format(precompute_elapse))
         optimizer.step(closure)
 
-    train_elapse = time.perf_counter()-start
-    print("Train {} epochs | Train Time(s) {:.4f}".format(epoch, train_elapse))
     acc = evaluate(model, features, g, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
