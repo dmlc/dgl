@@ -14,6 +14,8 @@ import dgl
 import dgl.backend as F
 from dgl.data.utils import download, get_download_dir
 
+from .utils import mol_to_complete_graph
+
 try:
     import pandas as pd
     from rdkit import Chem
@@ -180,39 +182,6 @@ class TencentAlchemyDataset(object):
 
         return bond_feats_dict
 
-    def mol_to_dgl(self, mol, self_loop=False):
-        """
-        Convert RDKit molecule object to DGLGraph
-        Args:
-            mol: Chem.rdchem.Mol read from sdf
-            self_loop: Whetaher to add self loop
-        Returns:
-            g: DGLGraph
-            l: related labels
-        """
-        g = dgl.DGLGraph()
-
-        # add nodes
-        num_atoms = mol.GetNumAtoms()
-        atom_feats = self.alchemy_nodes(mol)
-        g.add_nodes(num=num_atoms, data=atom_feats)
-
-        if self_loop:
-            g.add_edges(
-                [i for i in range(num_atoms) for j in range(num_atoms)],
-                [j for i in range(num_atoms) for j in range(num_atoms)])
-        else:
-            g.add_edges(
-                [i for i in range(num_atoms) for j in range(num_atoms - 1)], [
-                    j for i in range(num_atoms)
-                    for j in range(num_atoms) if i != j
-                ])
-
-        bond_feats = self.alchemy_edges(mol, self_loop)
-        g.edata.update(bond_feats)
-
-        return g
-
     def __init__(self, mode='dev', transform=None, from_raw=False):
         assert mode in ['dev', 'valid', 'test'], "mode should be dev/valid/test"
         self.mode = mode
@@ -241,11 +210,9 @@ class TencentAlchemyDataset(object):
     def _load(self):
         if self.mode == 'dev':
             if not self.from_raw:
-                with open(osp.join(self.file_dir, "dev_graphs.pkl"),
-                          "rb") as f:
+                with open(osp.join(self.file_dir, "dev_graphs.pkl"), "rb") as f:
                     self.graphs = pickle.load(f)
-                with open(osp.join(self.file_dir, "dev_labels.pkl"),
-                          "rb") as f:
+                with open(osp.join(self.file_dir, "dev_labels.pkl"), "rb") as f:
                     self.labels = pickle.load(f)
             else:
                 target_file = pathlib.Path(self.file_dir, "dev_target.csv")
@@ -264,7 +231,8 @@ class TencentAlchemyDataset(object):
                     osp.join(self.file_dir, self.mode + ".sdf"))
                 cnt = 0
                 for sdf, label in zip(supp, self.target.iterrows()):
-                    graph = self.mol_to_dgl(sdf)
+                    graph = mol_to_complete_graph(sdf, atom_featurizer=self.alchemy_nodes,
+                                                  bond_featurizer=self.alchemy_edges)
                     cnt += 1
                     self.graphs.append(graph)
                     label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
