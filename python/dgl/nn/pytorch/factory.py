@@ -1,4 +1,18 @@
 """Modules that transforms between graphs and between graph and tensors."""
+import torch as th
+import torch.nn as nn
+import scipy.sparse as ssp
+from ...transform import nearest_neighbor_graph, segmented_nearest_neighbor_graph
+from ...graph import DGLGraph
+
+def pairwise_squared_distance(x):
+    '''
+    x : (n_samples, n_points, dims)
+    return : (n_samples, n_points, n_points)
+    '''
+    x2s = (x * x).sum(-1, keepdim=True)
+    return x2s + x2s.transpose(-1, -2) - 2 * x @ x.transpose(-1, -2)
+
 
 class NearestNeighborGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
@@ -66,24 +80,8 @@ class SegmentedNearestNeighborGraph(nn.Module):
     - A DGLGraph with no features.
     """
     def __init__(self, K):
-        super(NearestNeighborGraph, self).__init__()
+        super(SegmentedNearestNeighborGraph, self).__init__()
         self.K = K
 
     def forward(self, h, segs):
-        n_total_points, n_dims = h.shape
-
-        with torch.no_grad():
-            hs = h.split(segs)
-            dst = [
-                pairwise_squared_distance(h_g).topk(self.K, dim=1, largest=False)[1] +
-                segs[i - 1] if i > 0 else 0
-                for i, h_g in enumerate(hs)]
-            dst = torch.cat(dst, 0)
-            src = torch.arange(n_total_points).unsqueeze(1).expand(n_total_points, self.K)
-
-            dst = dst.flatten()
-            src = src.flatten()
-            adj = ssp.csr_matrix((torch.ones_like(dst).numpy(), (dst.numpy(), src.numpy())))
-
-            g = dgl.DGLGraph(adj, readonly=True)
-            return g
+        return segmented_nearest_neighbor_graph(h, self.K, segs)

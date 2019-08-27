@@ -7,7 +7,7 @@ from torch.nn import init
 from . import utils
 from ... import function as fn
 
-__all__ = ['GraphConv', 'TGConv', 'RelGraphConv']
+__all__ = ['GraphConv', 'TGConv', 'RelGraphConv', 'EdgeConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.
@@ -451,11 +451,11 @@ class EdgeConv(nn.Module):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
 
-        self.theta = nn.Linear(in_features, out_features)
-        self.phi = nn.Linear(in_features, out_features)
+        self.theta = nn.Linear(in_feat, out_feat)
+        self.phi = nn.Linear(in_feat, out_feat)
 
         if batch_norm:
-            self.bn = nn.BatchNorm1d(out_features)
+            self.bn = nn.BatchNorm1d(out_feat)
 
     def apply_edges(self, edges):
         theta_x = self.theta(edges.dst['x'] - edges.src['x'])

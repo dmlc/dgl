@@ -1,10 +1,13 @@
 """Module for graph transformation methods."""
 from ._ffi.function import _init_api
 from .graph import DGLGraph
+from . import backend as F
 from .batched_graph import BatchedDGLGraph
 from scipy import sparse
+import numpy as np
 
-__all__ = ['line_graph', 'reverse', 'nearest_neighbor_graph', 'to_simple_graph', 'to_bidirected']
+__all__ = ['line_graph', 'reverse', 'nearest_neighbor_graph', 'segmented_nearest_neighbor_graph',
+           'to_simple_graph', 'to_bidirected']
 
 
 def pairwise_squared_distance(x):
@@ -45,57 +48,35 @@ def nearest_neighbor_graph(h, k):
     k_indices = F.argtopk(d, k, 2, descending=False)
     dst = F.copy_to(k_indices, F.cpu())
 
-    src = F.zeros_like(dst) + F.reshape(F.arange(n_points), (1, -1, 1))
+    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
 
-    per_sample_offset = F.reshape(F.arange(n_samples) * n_points, (-1, 1, 1))
+    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
     dst += per_sample_offset
     src += per_sample_offset
-    dst = F.reshape(dst, -1)
-    src = F.reshape(src, -1)
-    adj = sparse.csr_matrix((F.asnumpy(F.ones_like(dst)), (F.asnumpy(dst), F.asnumpy(src))))
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
 
-    g = dgl.DGLGraph(adj, readonly=True)
+    g = DGLGraph(adj, readonly=True)
     return g
 
 def segmented_nearest_neighbor_graph(h, k, segs):
-    """Transforms the given feature matrix to a directed graph, where
-    the predecessors of each node are its k-nearest neighbors.
+    n_total_points, n_dims = F.shape(h)
+    offset = np.insert(np.cumsum(segs), 0, 0)
 
-    Parameters
-    ----------
-    h : Tensor
-        The input tensor.
-
-        The points will be separated into segments defined by ``segs``.
-        Each segment will then generate its own k-NN graph, which will be
-        unioned when returned.
-    k : int
-        The number of neighbors
-    segs : LongTensor
-        The number of nodes for each point set segment.
-
-        The sum of the elements must be the same as the number of rows in
-        ``h``.
-
-    Returns
-    -------
-    DGLGraph
-        The graph.  The node IDs are in the same order as ``h``.
-    """
-    n_total_points, n_dims = h.shape
-
-    hs = h.split(segs)
+    hs = F.split(h, segs, 0)
     dst = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
-        segs[i - 1] if i > 0 else 0
+        offset[i]
         for i, h_g in enumerate(hs)]
-    dst = torch.cat(dst, 0)
-    src = torch.arange(n_total_points).unsqueeze(1).expand(n_total_points, k)
-    dst = dst.flatten()
-    src = src.flatten()
-    adj = sparse.csr_matrix((F.asnumpy(F.ones_like(dst)), (F.asnumpy(dst), F.asnumpy(src))))
+    dst = F.cat(dst, 0)
+    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
 
-    g = dgl.DGLGraph(adj, readonly=True)
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+
+    g = DGLGraph(adj, readonly=True)
     return g
 
 def line_graph(g, backtracking=True, shared=False):

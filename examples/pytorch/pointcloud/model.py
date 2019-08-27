@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn import NearestNeighborGraph, EdgeConv
+from dgl.nn.pytorch import NearestNeighborGraph, EdgeConv
 
 class Model(nn.Module):
     def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
@@ -45,7 +45,8 @@ class Model(nn.Module):
             h = h.view(batch_size * n_points, -1)
             h = self.conv[i](h, g)
             h = F.leaky_relu(h, 0.2)
-            hs.append(h.view(batch_size, n_points, -1))
+            h = h.view(batch_size, n_points, -1)
+            hs.append(h)
 
         h = torch.cat(hs, 2)
         h = self.proj(h)
