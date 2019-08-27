@@ -676,10 +676,12 @@ class SAGEConv(nn.Module):
             graph.ndata['h'] = F.relu(self.fc_pool(feat))
             graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
             h_neigh = graph.ndata['neigh']
-        else: # lstm:
+        elif self._aggre_type == 'lstm':
             graph.ndata['h'] = feat
             graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
             h_neigh = graph.ndata['neigh']
+        else:
+            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
         # GraphSAGE GCN does not require fc_self.
         if self._aggre_type == 'gcn':
             rst = self.fc_neigh(h_neigh)
