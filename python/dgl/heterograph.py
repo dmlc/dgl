@@ -6,7 +6,7 @@ from . import heterograph_index, graph_index
 from . import utils
 from . import backend as F
 from . import init
-from .runtime import ir, scheduler, Runtime
+from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, is_all, DGLError
@@ -1549,11 +1549,8 @@ class DGLHeteroGraph(object):
 
         with ir.prog() as prog:
             scheduler.schedule_apply_edges(
-                self._graph.get_relation_graph(etid),
-                u, v, eid,
-                efunc,
-                self._node_frames[stid], self._node_frames[dtid], self._edge_frames[etid],
-                inplace=inplace)
+                AdaptedHeteroGraph(self, stid, dtid, etid),
+                u, v, eid, efunc, inplace=inplace)
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
@@ -1599,10 +1596,9 @@ class DGLHeteroGraph(object):
 
         with ir.prog() as prog:
             scheduler.schedule_group_apply_edge(
-                self._graph.get_relation_graph(etid),
+                AdaptedHeteroGraph(self, stid, dtid, etid),
                 u, v, eid,
                 efunc, group_by,
-                self._node_frames[stid], self._node_frames[dtid], self._edge_frames[etid],
                 inplace=inplace)
             Runtime.run(prog)
 
@@ -1668,38 +1664,82 @@ class DGLHeteroGraph(object):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
-                                    message_func=message_func)
+            scheduler.schedule_send(
+                AdaptedHeteroGraph(self, stid, dtid, etid),
+                u, v, eid,
+                message_func)
             Runtime.run(prog)
 
     def recv(self,
-             v=ALL,
-             reduce_func=None,
+             nodes,
+             reduce_func,
+             cross_type_reducer=None,
              apply_node_func=None,
              inplace=False):
         """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
 
-        Optionally, apply a function to update the node features after receive.
+        Two kinds of computation are supported:
+
+        If there is only one edge type in the graph, ``G.recv(v, reduce_func, apply_func)``
+        calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\sum_{u\in\mathcal{N}(v)}m_{uv})
+
+        where :math:`\mathcal{N}(v)` defines the predecessors of node(s) ``v``, and
+        :math:`m_{uv}` is the message on edge (u,v). 
+
+        * ``reduce_func`` specifies :math:`\sum`.
+        * ``apply_func`` specifies :math:`\sigma`.
+        
+        If there are more than one edge types, ``G.recv(v, per_type_reducer,
+        cross_type_reducer, apply_func)`` calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N_t}(v)}m_{uv})
+
+        * ``per_type_reducer`` is a dictionary from edge type to reduce functions
+          :math:`\sum_{u\in\mathcal{N_t}(v)}` of each type.
+        * ``cross_type_reducer`` specifies :math:`\prod_{t\inT_e}`
+        * ``apply_func`` specifies :math:`\sigma`.
+
+        Other notes:
 
         * `reduce_func` will be skipped for nodes with no incoming message.
         * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
         * If some ``v`` have no incoming message, their new feature value will be calculated
           by the column initializer (see :func:`set_n_initializer`). The feature shapes and
           dtypes will be inferred.
+        * The node features will be updated by the result of the ``reduce_func``.
+        * Messages are consumed once received.
+        * The provided UDF maybe called multiple times so it is recommended to provide
+          function with no side effect.
+        * The cross-type reducer will check the output field of each per-type reducer
+          and aggregate those who write to the **same** fields. If None is provided,
+          the default behavior is overwrite.
 
-        The node features will be updated by the result of the ``reduce_func``.
+        Examples
+        --------
+        Only one type of nodes in the graph:
 
-        Messages are consumed once received.
+        >>> import dgl.function as fn
+        >>> G.recv(v, fn.sum('m', 'h'))
 
-        The provided UDF maybe called multiple times so it is recommended to provide
-        function with no side effect.
+        Specify reducer for each type and use cross-type reducer to accum results.
 
-        Only works if the graph has one edge type.  For multiple types,
-        use
+        >>> import dgl.function as fn
+        >>> G.recv(v,
+        >>> ...    {'plays' : fn.sum('m', 'h'), 'develops' : fn.max('m', 'h')},
+        >>> ...    'sum')
 
-        .. code::
+        Error will be thrown if per-type reducers cannot determine the node type of v.
 
-           g['edgetype'].recv(v, reduce_func, apply_node_func, inplace)
+        >>> import dgl.function as fn
+        >>> # ambiguous, v is of both 'user' and 'game' types
+        >>> G.recv(v,
+        >>> ...    {('user', 'follows', 'user') : fn.sum('m', 'h'),
+        >>> ...     ('user', 'plays', 'game') : fn.max('m', 'h')},
+        >>> ...    'sum')
 
         Parameters
         ----------
@@ -2304,7 +2344,9 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
         """
         pass
 
-# interal APIs
+############################################################
+# Internal APIs
+############################################################
 
 def make_canonical_etypes(etypes, ntypes, metagraph):
     """Internal function to convert etype name to (srctype, etype, dsttype)
@@ -2334,3 +2376,78 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     for s, d, e in zip(src, dst, eid):
         rst.append((ntypes[s], etypes[e], ntypes[d]))
     return rst
+
+class AdaptedHeteroGraph(GraphAdapter):
+    """Adapt DGLGraph to interface required by scheduler.
+
+    Parameters
+    ----------
+    graph : DGLHeteroGraph
+        Graph
+    stid : int
+        Source node type id
+    dtid : int
+        Destination node type id
+    etid : int
+        Edge type id
+    """
+    def __init__(self, graph, stid, dtid, etid):
+        self.graph = graph
+        self.stid = stid
+        self.dtid = dtid
+        self.etid = etid
+
+    @property
+    def gidx(self):
+        return self.graph._graph
+
+    def num_src(self):
+        """Number of source nodes."""
+        return self.graph.number_of_nodes(stid)
+
+    def num_dst(self):
+        """Number of destination nodes."""
+        return self.graph.number_of_nodes(dtid)
+
+    def num_edges(self):
+        """Number of edges."""
+        return self.graph.number_of_edges(etid)
+
+    @property
+    def srcframe(self):
+        """Frame to store source node features."""
+        return self.graph._node_frames[stid]
+
+    @property
+    def dstframe(self):
+        """Frame to store source node features."""
+        return self.graph._node_frames[dtid]
+
+    @property
+    def edgeframe(self):
+        """Frame to store edge features."""
+        return self.graph._edge_frames[etid]
+
+    @property
+    def msgframe(self):
+        """Frame to store messages."""
+        return self.graph._msg_frames[etid]
+
+    @property
+    def msgindicator(self):
+        """Message indicator tensor."""
+        return self.graph._get_msg_index()
+
+    @msgindicator.setter
+    def msgindicator(self, val):
+        """Set new message indicator tensor."""
+        self.graph._set_msg_index(val)
+
+    def in_edges(self, nodes):
+        return self.graph._graph.in_edges(etid, nodes)
+
+    def out_edges(self, nodes):
+        return self.graph._graph.out_edges(etid, nodes)
+
+    def edges(self, form):
+        return self.graph._graph.edges(etid, form)
