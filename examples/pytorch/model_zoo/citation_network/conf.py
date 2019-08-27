@@ -50,7 +50,7 @@ GIN_CONFIG = {
 }
 
 CHEBNET_CONFIG = {
-    'extra_args': [16, 1, 3, True],
+    'extra_args': [32, 1, 2, True],
     'lr': 1e-2,
     'weight_decay': 5e-4,
 }

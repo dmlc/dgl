@@ -24,13 +24,13 @@ def test_graph_conv():
     print(conv)
     # test#1: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert F.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
     h0 = F.ones((3, 5, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert F.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
@@ -40,12 +40,12 @@ def test_graph_conv():
         conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
     h0 = F.ones((3, 5, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
 
@@ -54,12 +54,12 @@ def test_graph_conv():
         conv = conv.to(ctx)
     # test#3: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
     h0 = F.ones((3, 5, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
 
@@ -94,7 +94,7 @@ def test_tagconv():
 
     # test#1: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     shp = norm.shape + (1,) * (h0.dim() - 1)
@@ -107,7 +107,7 @@ def test_tagconv():
         conv = conv.to(ctx)
     # test#2: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert h1.shape[-1] == 2
 
     # test reset_parameters
@@ -127,7 +127,7 @@ def test_set2set():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = s2s(h0, g)
+    h1 = s2s(g, h0)
     assert h1.shape[0] == 10 and h1.dim() == 1
 
     # test#2: batched graph
@@ -135,7 +135,7 @@ def test_set2set():
     g2 = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = s2s(h0, bg)
+    h1 = s2s(bg, h0)
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_glob_att_pool():
@@ -149,13 +149,13 @@ def test_glob_att_pool():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = gap(h0, g)
+    h1 = gap(g, h0)
     assert h1.shape[0] == 10 and h1.dim() == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = gap(h0, bg)
+    h1 = gap(bg, h0)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.dim() == 2
 
 def test_simple_pool():
@@ -176,13 +176,13 @@ def test_simple_pool():
         max_pool = max_pool.to(ctx)
         sort_pool = sort_pool.to(ctx)
         h0 = h0.to(ctx)
-    h1 = sum_pool(h0, g)
+    h1 = sum_pool(g, h0)
     assert F.allclose(h1, F.sum(h0, 0))
-    h1 = avg_pool(h0, g)
+    h1 = avg_pool(g, h0)
     assert F.allclose(h1, F.mean(h0, 0))
-    h1 = max_pool(h0, g)
+    h1 = max_pool(g, h0)
     assert F.allclose(h1, F.max(h0, 0))
-    h1 = sort_pool(h0, g)
+    h1 = sort_pool(g, h0)
     assert h1.shape[0] == 10 * 5 and h1.dim() == 1
 
     # test#2: batched graph
@@ -192,7 +192,7 @@ def test_simple_pool():
     if F.gpu_ctx():
         h0 = h0.to(ctx)
 
-    h1 = sum_pool(h0, bg)
+    h1 = sum_pool(bg, h0)
     truth = th.stack([F.sum(h0[:15], 0),
                       F.sum(h0[15:20], 0),
                       F.sum(h0[20:35], 0),
@@ -200,7 +200,7 @@ def test_simple_pool():
                       F.sum(h0[40:55], 0)], 0)
     assert F.allclose(h1, truth)
 
-    h1 = avg_pool(h0, bg)
+    h1 = avg_pool(bg, h0)
     truth = th.stack([F.mean(h0[:15], 0),
                       F.mean(h0[15:20], 0),
                       F.mean(h0[20:35], 0),
@@ -208,7 +208,7 @@ def test_simple_pool():
                       F.mean(h0[40:55], 0)], 0)
     assert F.allclose(h1, truth)
 
-    h1 = max_pool(h0, bg)
+    h1 = max_pool(bg, h0)
     truth = th.stack([F.max(h0[:15], 0),
                       F.max(h0[15:20], 0),
                       F.max(h0[20:35], 0),
@@ -216,7 +216,7 @@ def test_simple_pool():
                       F.max(h0[40:55], 0)], 0)
     assert F.allclose(h1, truth)
 
-    h1 = sort_pool(h0, bg)
+    h1 = sort_pool(bg, h0)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
 def test_set_trans():
@@ -234,11 +234,11 @@ def test_set_trans():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 50))
-    h1 = st_enc_0(h0, g)
+    h1 = st_enc_0(g, h0)
     assert h1.shape == h0.shape
-    h1 = st_enc_1(h0, g)
+    h1 = st_enc_1(g, h0)
     assert h1.shape == h0.shape
-    h2 = st_dec(h1, g)
+    h2 = st_dec(g, h1)
     assert h2.shape[0] == 200 and h2.dim() == 1
 
     # test#2: batched graph
@@ -246,12 +246,12 @@ def test_set_trans():
     g2 = dgl.DGLGraph(nx.path_graph(10))
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.number_of_nodes(), 50))
-    h1 = st_enc_0(h0, bg)
+    h1 = st_enc_0(bg, h0)
     assert h1.shape == h0.shape
-    h1 = st_enc_1(h0, bg)
+    h1 = st_enc_1(bg, h0)
     assert h1.shape == h0.shape
 
-    h2 = st_dec(h1, bg)
+    h2 = st_dec(bg, h1)
     assert h2.shape[0] == 3 and h2.shape[1] == 200 and h2.dim() == 2
 
 def uniform_attention(g, shape):
@@ -375,7 +375,7 @@ def test_gat_conv():
         gat = gat.to(ctx)
         feat = feat.to(ctx)
 
-    h = gat(feat, g)
+    h = gat(g, feat)
     assert h.shape[-1] == 2 and h.shape[-2] == 4
 
 def test_sage_conv():
@@ -389,7 +389,7 @@ def test_sage_conv():
             sage = sage.to(ctx)
             feat = feat.to(ctx)
 
-        h = sage(feat, g)
+        h = sage(g, feat)
         assert h.shape[-1] == 10
 
 def test_sgc_conv():
@@ -403,7 +403,7 @@ def test_sgc_conv():
         sgc = sgc.to(ctx)
         feat = feat.to(ctx)
 
-    h = sgc(feat, g)
+    h = sgc(g, feat)
     assert h.shape[-1] == 10
 
     # cached
@@ -412,8 +412,8 @@ def test_sgc_conv():
     if F.gpu_ctx():
         sgc = sgc.to(ctx)
 
-    h_0 = sgc(feat, g)
-    h_1 = sgc(feat + 1, g)
+    h_0 = sgc(g, feat)
+    h_1 = sgc(g, feat + 1)
     assert F.allclose(h_0, h_1)
     assert h_0.shape[-1] == 10
 
@@ -427,7 +427,7 @@ def test_appnp_conv():
         appnp = appnp.to(ctx)
         feat = feat.to(ctx)
 
-    h = appnp(feat, g)
+    h = appnp(g, feat)
     assert h.shape[-1] == 5
 
 def test_gin_conv():
@@ -444,7 +444,7 @@ def test_gin_conv():
             gin = gin.to(ctx)
             feat = feat.to(ctx)
 
-        h = gin(feat, g)
+        h = gin(g, feat)
         assert h.shape[-1] == 12
 
 def test_agnn_conv():
@@ -457,7 +457,7 @@ def test_agnn_conv():
         agnn = agnn.to(ctx)
         feat = feat.to(ctx)
 
-    h = agnn(feat, g)
+    h = agnn(g, feat)
     assert h.shape[-1] == 5
 
 def test_gated_graph_conv():
@@ -472,7 +472,7 @@ def test_gated_graph_conv():
         feat = feat.to(ctx)
         etypes = etypes.to(ctx)
 
-    h = ggconv(feat, etypes, g)
+    h = ggconv(g, feat, etypes)
     # current we only do shape check
     assert h.shape[-1] == 10
 
@@ -489,7 +489,7 @@ def test_nn_conv():
         feat = feat.to(ctx)
         efeat = efeat.to(ctx)
 
-    h = nnconv(feat, efeat, g)
+    h = nnconv(g, feat, efeat)
     # currently we only do shape check
     assert h.shape[-1] == 10
 
@@ -505,7 +505,7 @@ def test_gmm_conv():
         feat = feat.to(ctx)
         pseudo = pseudo.to(ctx)
 
-    h = gmmconv(feat, pseudo, g)
+    h = gmmconv(g, feat, pseudo)
     # currently we only do shape check
     assert h.shape[-1] == 10
 
@@ -523,8 +523,8 @@ def test_dense_graph_conv():
         dense_conv = dense_conv.to(ctx)
         feat = feat.to(ctx)
 
-    out_conv = conv(feat, g)
-    out_dense_conv = dense_conv(feat, adj)
+    out_conv = conv(g, feat)
+    out_dense_conv = dense_conv(adj, feat)
     assert F.allclose(out_conv, out_dense_conv)
 
 def test_dense_sage_conv():
@@ -541,8 +541,8 @@ def test_dense_sage_conv():
         dense_sage = dense_sage.to(ctx)
         feat = feat.to(ctx)
 
-    out_sage = sage(feat, g)
-    out_dense_sage = dense_sage(feat, adj)
+    out_sage = sage(g, feat)
+    out_dense_sage = dense_sage(adj, feat)
     assert F.allclose(out_sage, out_dense_sage)
 
 def test_dense_cheb_conv():
@@ -562,8 +562,8 @@ def test_dense_cheb_conv():
             dense_cheb = dense_cheb.to(ctx)
             feat = feat.to(ctx)
 
-        out_cheb = cheb(feat, g)
-        out_dense_cheb = dense_cheb(feat, adj)
+        out_cheb = cheb(g, feat, [2.0])
+        out_dense_cheb = dense_cheb(adj, feat, 2.0)
         assert F.allclose(out_cheb, out_dense_cheb)
 
 if __name__ == '__main__':

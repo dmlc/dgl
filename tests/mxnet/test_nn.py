@@ -24,13 +24,13 @@ def test_graph_conv():
     conv.initialize(ctx=ctx)
     # test#1: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
     h0 = F.ones((3, 5, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     check_close(h1, _AXWb(adj, h0, conv.weight, conv.bias))
@@ -40,12 +40,12 @@ def test_graph_conv():
 
     # test#3: basic
     h0 = F.ones((3, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
     h0 = F.ones((3, 5, 5))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
 
@@ -55,18 +55,18 @@ def test_graph_conv():
     with autograd.train_mode():
         # test#3: basic
         h0 = F.ones((3, 5))
-        h1 = conv(h0, g)
+        h1 = conv(g, h0)
         assert len(g.ndata) == 0
         assert len(g.edata) == 0
         # test#4: basic
         h0 = F.ones((3, 5, 5))
-        h1 = conv(h0, g)
+        h1 = conv(g, h0)
         assert len(g.ndata) == 0
         assert len(g.edata) == 0
 
     # test not override features
     g.ndata["h"] = 2 * F.ones((3, 1))
-    h1 = conv(h0, g)
+    h1 = conv(g, h0)
     assert len(g.ndata) == 1
     assert len(g.edata) == 0
     assert "h" in g.ndata
@@ -82,13 +82,13 @@ def test_set2set():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = s2s(h0, g)
+    h1 = s2s(g, h0)
     assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = s2s(h0, bg)
+    h1 = s2s(bg, h0)
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_glob_att_pool():
@@ -100,13 +100,13 @@ def test_glob_att_pool():
     print(gap)
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = gap(h0, g)
+    h1 = gap(g, h0)
     assert h1.shape[0] == 10 and h1.ndim == 1
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = gap(h0, bg)
+    h1 = gap(bg, h0)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
 def test_simple_pool():
@@ -120,20 +120,20 @@ def test_simple_pool():
 
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
-    h1 = sum_pool(h0, g)
+    h1 = sum_pool(g, h0)
     check_close(h1, F.sum(h0, 0))
-    h1 = avg_pool(h0, g)
+    h1 = avg_pool(g, h0)
     check_close(h1, F.mean(h0, 0))
-    h1 = max_pool(h0, g)
+    h1 = max_pool(g, h0)
     check_close(h1, F.max(h0, 0))
-    h1 = sort_pool(h0, g)
+    h1 = sort_pool(g, h0)
     assert h1.shape[0] == 10 * 5 and h1.ndim == 1
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h1 = sum_pool(h0, bg)
+    h1 = sum_pool(bg, h0)
     truth = mx.nd.stack(F.sum(h0[:15], 0),
                         F.sum(h0[15:20], 0),
                         F.sum(h0[20:35], 0),
@@ -141,7 +141,7 @@ def test_simple_pool():
                         F.sum(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
-    h1 = avg_pool(h0, bg)
+    h1 = avg_pool(bg, h0)
     truth = mx.nd.stack(F.mean(h0[:15], 0),
                         F.mean(h0[15:20], 0),
                         F.mean(h0[20:35], 0),
@@ -149,7 +149,7 @@ def test_simple_pool():
                         F.mean(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
-    h1 = max_pool(h0, bg)
+    h1 = max_pool(bg, h0)
     truth = mx.nd.stack(F.max(h0[:15], 0),
                         F.max(h0[15:20], 0),
                         F.max(h0[20:35], 0),
@@ -157,7 +157,7 @@ def test_simple_pool():
                         F.max(h0[40:55], 0), axis=0)
     check_close(h1, truth)
 
-    h1 = sort_pool(h0, bg)
+    h1 = sort_pool(bg, h0)
     assert h1.shape[0] == 5 and h1.shape[1] == 10 * 5 and h1.ndim == 2
 
 def uniform_attention(g, shape):

@@ -30,7 +30,7 @@ class GCN(nn.Module):
         for i, layer in enumerate(self.layers):
             if i != 0:
                 h = self.dropout(h)
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h
 
 
@@ -70,9 +70,9 @@ class GAT(nn.Module):
     def forward(self, inputs):
         h = inputs
         for l in range(self.num_layers):
-            h = self.gat_layers[l](h, self.g).flatten(1)
+            h = self.gat_layers[l](self.g, h).flatten(1)
         # output projection
-        logits = self.gat_layers[-1](h, self.g).mean(1)
+        logits = self.gat_layers[-1](self.g, h).mean(1)
         return logits
 
 
@@ -101,7 +101,7 @@ class GraphSAGE(nn.Module):
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h
 
 
@@ -148,7 +148,7 @@ class APPNP(nn.Module):
             h = self.activation(layer(h))
         h = self.layers[-1](self.feat_drop(h))
         # propagation step
-        h = self.propagate(h, self.g)
+        h = self.propagate(self.g, h)
         return h
 
 
@@ -178,7 +178,7 @@ class TAGCN(nn.Module):
         for i, layer in enumerate(self.layers):
             if i != 0:
                 h = self.dropout(h)
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h
 
 
@@ -210,7 +210,7 @@ class AGNN(nn.Module):
     def forward(self, features):
         h = self.proj(features)
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return self.cls(h)
 
 
@@ -231,7 +231,7 @@ class SGC(nn.Module):
                           bias=bias)
 
     def forward(self, features):
-        return self.net(features, self.g)
+        return self.net(self.g, features)
 
 
 class GIN(nn.Module):
@@ -286,7 +286,7 @@ class GIN(nn.Module):
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h
 
 class ChebNet(nn.Module):
@@ -316,5 +316,5 @@ class ChebNet(nn.Module):
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(self.g, h, [2])
         return h
