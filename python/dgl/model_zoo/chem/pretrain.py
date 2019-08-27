@@ -2,9 +2,9 @@
 import torch
 from rdkit import Chem
 
-from .dgmg import DGMG
-from .gcn import GCNClassifier
 from . import DGLJTNNVAE
+from .classifiers import GCNClassifier, GATClassifier
+from .dgmg import DGMG
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .sch import SchNetModel
@@ -12,6 +12,7 @@ from ...data.utils import _get_dgl_url, download, get_download_dir
 
 URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
+    'GAT_Tox21' : 'pre_trained/gat_tox21.pth',
     'MGCN_Alchemy': 'pre_trained/mgcn_alchemy.pth',
     'SCHNET_Alchemy': 'pre_trained/schnet_alchemy.pth',
     'MPNN_Alchemy': 'pre_trained/mpnn_alchemy.pth',
@@ -73,8 +74,15 @@ def load_pretrained(model_name, log=True):
     if model_name == 'GCN_Tox21':
         model = GCNClassifier(in_feats=74,
                               gcn_hidden_feats=[64, 64],
-                              n_tasks=12,
-                              classifier_hidden_feats=64)
+                              classifier_hidden_feats=64,
+                              n_tasks=12)
+
+    elif model_name == 'GAT_Tox21':
+        model = GATClassifier(in_feats=74,
+                              gat_hidden_feats=[32, 32],
+                              num_heads=[4, 4],
+                              classifier_hidden_feats=64,
+                              n_tasks=12)
 
     elif model_name.startswith('DGMG'):
         if model_name.startswith('DGMG_ChEMBL'):

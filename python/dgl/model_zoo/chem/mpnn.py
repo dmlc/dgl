@@ -2,36 +2,39 @@
 # coding: utf-8
 # pylint: disable=C0103, C0111, E1101, W0612
 """Implementation of MPNN model."""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
-import dgl.function as fn
-import dgl.nn.pytorch as dgl_nn
+
+from ... import function as fn
+from ...nn.pytorch import Set2Set
 
 
 class NNConvLayer(nn.Module):
     """
-    MPNN Conv Layer from Section.5 in the paper "Neural Message Passing for Quantum Chemistry."
-    """
+    MPNN Conv Layer from Section 5 of
+    `Neural Message Passing for Quantum Chemistry <https://arxiv.org/abs/1704.01212>`__
 
+    Parameters
+    ----------
+    in_channels : int
+        Number of input channels
+    out_channels : int
+        Number of output channels
+    edge_net : Module processing edge information
+    root_weight : bool
+        Whether to add the root node feature to output
+    bias : bool
+        Whether to add bias to the output
+    """
     def __init__(self,
                  in_channels,
                  out_channels,
                  edge_net,
                  root_weight=True,
                  bias=True):
-        """
-        Args:
-            in_channels: number of input channels
-            out_channels: number of output channels
-            edge_net: the network modules process the edge info
-            root_weight: whether add the root node feature to output
-            bias: whether add bias to the output
-        """
-
-        super().__init__()
+        super(NNConvLayer, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -50,6 +53,7 @@ class NNConvLayer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize model parameters"""
         if self.root is not None:
             nn.init.xavier_normal_(self.root.data, gain=1.414)
         if self.bias is not None:
@@ -59,6 +63,18 @@ class NNConvLayer(nn.Module):
                 nn.init.xavier_normal_(m.weight.data, gain=1.414)
 
     def message(self, edges):
+        """Function for computing messages from source nodes
+
+        Parameters
+        ----------
+        edges : EdgeBatch
+            Edges over which we want to send messages
+
+        Returns
+        -------
+        dict
+            Stores message in key 'm'
+        """
         return {
             'm':
             torch.matmul(edges.src['h'].unsqueeze(1),
@@ -66,6 +82,17 @@ class NNConvLayer(nn.Module):
         }
 
     def apply_node_func(self, nodes):
+        """Function for updating node features directly
+
+        Parameters
+        ----------
+        nodes : NodeBatch
+
+        Returns
+        -------
+        dict
+            Stores updated node features in 'h'
+        """
         aggr_out = nodes.data['aggr_out']
         if self.root is not None:
             aggr_out = torch.mm(nodes.data['h'], self.root) + aggr_out
@@ -76,7 +103,23 @@ class NNConvLayer(nn.Module):
         return {'h': aggr_out}
 
     def forward(self, g, h, e):
-        """MPNN Conv layer forward."""
+        """Propagate messages and aggregate results for updating
+        atom representations
+
+        Parameters
+        ----------
+        g : DGLGraph
+            DGLgraph(s) for molecules
+        h : tensor
+            Input atom representations
+        e : tensor
+            Input bond representations
+
+        Returns
+        -------
+        tensor
+            Aggregated atom information
+        """
         h = h.unsqueeze(-1) if h.dim() == 1 else h
         e = e.unsqueeze(-1) if e.dim() == 1 else e
 
@@ -90,11 +133,28 @@ class NNConvLayer(nn.Module):
 
 class MPNNModel(nn.Module):
     """
-    MPNN model from:
-        Gilmer, Justin, et al.
-        Neural message passing for quantum chemistry.
-    """
+    MPNN from
+    `Neural Message Passing for Quantum Chemistry <https://arxiv.org/abs/1704.01212>`__
 
+    Parameters
+    ----------
+    node_input_dim : int
+        Dimension of input node feature, default to be 15.
+    edge_input_dim : int
+        Dimension of input edge feature, default to be 15.
+    output_dim : int
+        Dimension of prediction, default to be 12.
+    node_hidden_dim : int
+        Dimension of node feature in hidden layers, default to be 64.
+    edge_hidden_dim : int
+        Dimension of edge feature in hidden layers, default to be 128.
+    num_step_message_passing : int
+        Number of message passing steps, default to be 6.
+    num_step_set2set : int
+        Number of set2set steps
+    num_layer_set2set : int
+        Number of set2set layers
+    """
     def __init__(self,
                  node_input_dim=15,
                  edge_input_dim=5,
@@ -104,20 +164,8 @@ class MPNNModel(nn.Module):
                  num_step_message_passing=6,
                  num_step_set2set=6,
                  num_layer_set2set=3):
-        """model parameters setting
+        super(MPNNModel, self).__init__()
 
-        Args:
-            node_input_dim: dimension of input node feature
-            edge_input_dim: dimension of input edge feature
-            output_dim: dimension of prediction
-            node_hidden_dim: dimension of node feature in hidden layers
-            edge_hidden_dim: dimension of edge feature in hidden layers
-            num_step_message_passing: number of message passing steps
-            num_step_set2set: number of set2set steps
-            num_layer_ste2set: number of set2set layers
-        """
-
-        super().__init__()
         self.name = "MPNN"
         self.num_step_message_passing = num_step_message_passing
         self.lin0 = nn.Linear(node_input_dim, node_hidden_dim)
@@ -130,12 +178,22 @@ class MPNNModel(nn.Module):
                                 root_weight=False)
         self.gru = nn.GRU(node_hidden_dim, node_hidden_dim)
 
-        self.set2set = dgl_nn.glob.Set2Set(node_hidden_dim, num_step_set2set,
-                                           num_layer_set2set)
+        self.set2set = Set2Set(node_hidden_dim, num_step_set2set, num_layer_set2set)
         self.lin1 = nn.Linear(2 * node_hidden_dim, node_hidden_dim)
         self.lin2 = nn.Linear(node_hidden_dim, output_dim)
 
     def forward(self, g):
+        """Predict molecule labels
+
+        Parameters
+        ----------
+        g : DGLGraph
+            Input DGLGraph for molecule(s)
+
+        Returns
+        -------
+        res : Predicted labels
+        """
         h = g.ndata['n_feat']
         out = F.relu(self.lin0(h))
         h = out.unsqueeze(0)
