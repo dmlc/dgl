@@ -6,7 +6,8 @@ Junction Tree Variational Autoencoder for Molecular Graph Generation.
 
 JTNN uses algorithm called junction tree algorithm to form a tree from the molecule graph. 
 Then the model will encode the tree and graph into two separate vectors `z_G` and `z_T`. Details can
-be found in original paper. The brief process is as below (from original paper):
+be found in original paper. The brief process is as below (from original paper): 
+
 ![image](https://user-images.githubusercontent.com/8686776/63677300-3fb6d980-c81f-11e9-8a65-57c8b03aaf52.png)
 
 
