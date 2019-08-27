@@ -1,11 +1,14 @@
 """Utilities for using pretrained models."""
 import torch
+from rdkit import Chem
+
 from .dgmg import DGMG
 from .gcn import GCNClassifier
+from . import DGLJTNNVAE
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .sch import SchNetModel
-from ...data.utils import _get_dgl_url, download
+from ...data.utils import _get_dgl_url, download, get_download_dir
 
 URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
@@ -15,17 +18,15 @@ URL = {
     'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
-    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth'
+    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
+    'JTNN_ZINC':'pre_trained/JTNN_ZINC.pth'
 }
-
-try:
-    from rdkit import Chem
-except ImportError:
-    pass
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
                                  local_pretrained_path='pre_trained.pth', log=True):
     """Download pretrained model checkpoint
+
+    The model will be loaded to CPU.
 
     Parameters
     ----------
@@ -48,7 +49,7 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
     url_to_pretrained = _get_dgl_url(model_postfix)
     local_pretrained_path = '_'.join([model_name, local_pretrained_path])
     download(url_to_pretrained, path=local_pretrained_path, log=log)
-    checkpoint = torch.load(local_pretrained_path)
+    checkpoint = torch.load(local_pretrained_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
 
     return model
@@ -67,13 +68,14 @@ def load_pretrained(model_name, log=True):
     model
     """
     if model_name not in URL:
-        return RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
+        raise RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
     if model_name == 'GCN_Tox21':
         model = GCNClassifier(in_feats=74,
                               gcn_hidden_feats=[64, 64],
                               n_tasks=12,
                               classifier_hidden_feats=64)
+
     elif model_name.startswith('DGMG'):
         if model_name.startswith('DGMG_ChEMBL'):
             atom_types = ['O', 'Cl', 'C', 'S', 'F', 'Br', 'N']
@@ -88,12 +90,22 @@ def load_pretrained(model_name, log=True):
                      node_hidden_size=128,
                      num_prop_rounds=2,
                      dropout=0.2)
+
     elif model_name == 'MGCN_Alchemy':
         model = MGCNModel(norm=True, output_dim=12)
+
     elif model_name == 'SCHNET_Alchemy':
         model = SchNetModel(norm=True, output_dim=12)
+
     elif model_name == 'MPNN_Alchemy':
         model = MPNNModel(output_dim=12)
+
+    elif model_name == "JTNN_ZINC":
+        vocab_file = '{}/jtnn/{}.txt'.format(get_download_dir(), 'vocab')
+        model = DGLJTNNVAE(vocab_file=vocab_file,
+                           depth=3,
+                           hidden_size=450,
+                           latent_size=56)
 
     if log:
         print('Pretrained model loaded')
