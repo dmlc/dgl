@@ -20,7 +20,6 @@ def udf_mean(nodes):
 def udf_sum(nodes):
     return {'r2': nodes.mailbox['m'].sum(1)}
 
-
 def udf_max(nodes):
     return {'r2': F.max(nodes.mailbox['m'], 1)}
 
@@ -61,6 +60,9 @@ def generate_feature(g, broadcast='none'):
 def test_copy_src_reduce():
     def _test(red, partial):
         g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
+        # NOTE(zihao): add self-loop to avoid zero-degree nodes.
+        # https://github.com/dmlc/dgl/issues/761
+        g.add_edges(g.nodes(), g.nodes())
         hu, hv, he = generate_feature(g, 'none')
         if partial:
             nid = F.tensor(list(range(0, 100, 2)))
@@ -110,6 +112,8 @@ def test_copy_src_reduce():
 def test_copy_edge_reduce():
     def _test(red, partial):
         g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
+        # NOTE(zihao): add self-loop to avoid zero-degree nodes.
+        g.add_edges(g.nodes(), g.nodes())
         hu, hv, he = generate_feature(g, 'none')
         if partial:
             nid = F.tensor(list(range(0, 100, 2)))
@@ -155,7 +159,7 @@ def test_copy_edge_reduce():
 
 
 def test_all_binary_builtins():
-    def _test(g, lhs, rhs, binary_op, reducer, paritial, nid, broadcast='none'):
+    def _test(g, lhs, rhs, binary_op, reducer, partial, nid, broadcast='none'):
         hu, hv, he = generate_feature(g, broadcast)
         g.ndata['u'] = F.attach_grad(F.clone(hu))
         g.ndata['v'] = F.attach_grad(F.clone(hv))
@@ -200,9 +204,15 @@ def test_all_binary_builtins():
 
         def mfunc(edges):
             op = getattr(F, binary_op)
-            lhs_data = target_switch(edges, lhs)
-            rhs_data = target_switch(edges, rhs)
-            return {"m": op(lhs_data[lhs], rhs_data[rhs])}
+            lhs_data = target_switch(edges, lhs)[lhs]
+            rhs_data = target_switch(edges, rhs)[rhs]
+            # NOTE(zihao): we need to do batched broadcast
+            # e.g. (68, 3, 1) op (68, 5, 3, 4)
+            while F.ndim(lhs_data) < F.ndim(rhs_data):
+                lhs_data = F.unsqueeze(lhs_data, 1)
+            while F.ndim(rhs_data) < F.ndim(lhs_data):
+                rhs_data = F.unsqueeze(rhs_data, 1)
+            return {"m": op(lhs_data, rhs_data)}
 
         def rfunc(nodes):
             op = getattr(F, reducer)
@@ -249,6 +259,8 @@ def test_all_binary_builtins():
 
     g = dgl.DGLGraph()
     g.add_nodes(20)
+    # NOTE(zihao): add self-loop to avoid zero-degree nodes.
+    g.add_edges(g.nodes(), g.nodes())
     for i in range(2, 18):
         g.add_edge(0, i)
         g.add_edge(1, i)
@@ -267,7 +279,8 @@ def test_all_binary_builtins():
             for reducer in ["sum", "max", "min", "prod", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
-                        _test(g, lhs, rhs, binary_op, reducer, partial, nid)
+                        _test(g, lhs, rhs, binary_op, reducer, partial, nid,
+                              broadcast=broadcast)
 
 if __name__ == '__main__':
     test_copy_src_reduce()
