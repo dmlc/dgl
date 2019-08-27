@@ -41,7 +41,7 @@ class GraphSAGE(nn.Module):
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h
 
 

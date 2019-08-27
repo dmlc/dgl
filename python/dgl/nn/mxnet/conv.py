@@ -83,7 +83,7 @@ class GraphConv(gluon.Block):
 
         self._activation = activation
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute graph convolution.
 
         Notes
@@ -95,10 +95,10 @@ class GraphConv(gluon.Block):
 
         Parameters
         ----------
-        feat : mxnet.NDArray
-            The input feature
         graph : DGLGraph
             The graph.
+        feat : mxnet.NDArray
+            The input feature
 
         Returns
         -------

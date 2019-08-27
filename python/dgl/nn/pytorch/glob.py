@@ -23,17 +23,17 @@ class SumPooling(nn.Module):
     def __init__(self):
         super(SumPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sum pooling.
 
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -57,16 +57,16 @@ class AvgPooling(nn.Module):
     def __init__(self):
         super(AvgPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute average pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -90,16 +90,16 @@ class MaxPooling(nn.Module):
     def __init__(self):
         super(MaxPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute max pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -127,16 +127,16 @@ class SortPooling(nn.Module):
         super(SortPooling, self).__init__()
         self.k = k
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sort pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -179,16 +179,16 @@ class GlobalAttentionPooling(nn.Module):
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute global attention pooling.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -252,16 +252,16 @@ class Set2Set(nn.Module):
         """Reinitialize learnable parameters."""
         self.lstm.reset_parameters()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute set2set pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -568,17 +568,17 @@ class SetTransformerEncoder(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         """
         Compute the Encoder part of Set Transformer.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -634,17 +634,17 @@ class SetTransformerDecoder(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         """
         Compute the decoder part of Set Transformer.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------

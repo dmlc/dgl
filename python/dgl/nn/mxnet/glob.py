@@ -19,16 +19,16 @@ class SumPooling(nn.Block):
     def __init__(self):
         super(SumPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sum pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -56,16 +56,16 @@ class AvgPooling(nn.Block):
     def __init__(self):
         super(AvgPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute average pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -93,16 +93,16 @@ class MaxPooling(nn.Block):
     def __init__(self):
         super(MaxPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute max pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -134,16 +134,16 @@ class SortPooling(nn.Block):
         super(SortPooling, self).__init__()
         self.k = k
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sort pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -190,16 +190,16 @@ class GlobalAttentionPooling(nn.Block):
             self.gate_nn = gate_nn
             self.feat_nn = feat_nn
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute global attention pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -258,16 +258,16 @@ class Set2Set(nn.Block):
             self.lstm = gluon.rnn.LSTM(
                 self.input_dim, num_layers=n_layers, input_size=self.output_dim)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute set2set pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------

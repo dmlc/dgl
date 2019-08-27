@@ -106,7 +106,7 @@ class GraphConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute graph convolution.
 
         Notes
@@ -118,10 +118,10 @@ class GraphConv(nn.Module):
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature
         graph : DGLGraph
             The graph.
+        feat : torch.Tensor
+            The input feature
 
         Returns
         -------
@@ -245,16 +245,16 @@ class GATConv(nn.Module):
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute graph attention network layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -337,16 +337,16 @@ class TAGConv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute topology adaptive graph convolution.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -726,16 +726,16 @@ class SAGEConv(nn.Module):
         _, (rst, _) = self.lstm(m, h)
         return {'neigh': rst.squeeze(0)}
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute GraphSAGE layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -825,11 +825,13 @@ class GatedGraphConv(nn.Module):
         self.gru.reset_parameters()
         init.xavier_normal_(self.edge_embed.weight, gain=gain)
 
-    def forward(self, feat, etypes, graph):
+    def forward(self, graph, feat, etypes):
         """Compute Gated Graph Convolution layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`N`
             is the number of nodes of the graph and :math:`D_{in}` is the
@@ -837,8 +839,6 @@ class GatedGraphConv(nn.Module):
         etypes : torch.LongTensor
             The edge type tensor of shape :math:`(E,)` where :math:`E` is
             the number of edges of the graph.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -939,11 +939,13 @@ class GMMConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias.data)
 
-    def forward(self, feat, pseudo, graph):
+    def forward(self, graph, feat, pseudo):
         """Compute Gaussian Mixture Model Convolution layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`N`
             is the number of nodes of the graph and :math:`D_{in}` is the
@@ -952,8 +954,6 @@ class GMMConv(nn.Module):
             The pseudo coordinate tensor of shape :math:`(E, D_{u})` where
             :math:`E` is the number of edges of the graph and :math:`D_{u}`
             is the dimensionality of pseudo coordinate.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1023,18 +1023,18 @@ class GINConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute Graph Isomorphism Network layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D)` where :math:`D`
             could be any positive integer, :math:`N` is the number
             of nodes. If ``apply_func`` is not None, :math:`D` should
             fit the input dimensionality requirement of ``apply_func``.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1108,16 +1108,22 @@ class ChebConv(nn.Module):
                 if module.bias is not None:
                     init.zeros_(module.bias)
 
-    def forward(self, feat, graph, lambda_max=None):
+    def forward(self, graph, feat, lambda_max=None):
         r"""Compute ChebNet layer.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        graph : DGLGraph
-            The graph.
+        lambda_max : list or tensor or None, optional.
+            A list(tensor) with length :math:`B`, stores the largest eigenvalue
+            of the normalized laplacian of each individual graph in ``graph``,
+            where :math:`B` is the batch size of the input graph. Default: None.
+            If None, this method would compute the list by calling
+            ``dgl.laplacian_lambda_max``.
 
         Returns
         -------
@@ -1130,13 +1136,13 @@ class ChebConv(nn.Module):
                 graph.in_degrees().float().clamp(min=1), -0.5).unsqueeze(-1).to(feat.device)
             if lambda_max is None:
                 lambda_max = laplacian_lambda_max(graph)
-            lambda_max = th.Tensor(lambda_max).to(feat.device)
+            if isinstance(lambda_max, list):
+                lambda_max = th.Tensor(lambda_max).to(feat.device)
             if lambda_max.dim() < 1:
                 lambda_max = lambda_max.unsqueeze(-1) # (B,) to (B, 1)
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
             # T0(X)
-
             Tx_0 = feat
             rst = self.fc[0](Tx_0)
             # T1(X)
@@ -1208,16 +1214,16 @@ class SGConv(nn.Module):
         self._k = k
         self.norm = norm
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute Simplifying Graph Convolution layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1324,11 +1330,13 @@ class NNConv(nn.Module):
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
-    def forward(self, feat, efeat, graph):
+    def forward(self, graph, feat, efeat):
         r"""Compute MPNN Graph Convolution layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`N`
             is the number of nodes of the graph and :math:`D_{in}` is the
@@ -1336,8 +1344,6 @@ class NNConv(nn.Module):
         efeat : torch.Tensor
             The edge feature of shape :math:`(N, *)`, should fit the input
             shape requirement of ``edge_nn``.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1392,16 +1398,16 @@ class APPNPConv(nn.Module):
         self._alpha = alpha
         self.edge_drop = nn.Dropout(edge_drop) if edge_drop > 0 else Identity()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute APPNP layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1457,16 +1463,16 @@ class AGNNConv(nn.Module):
         else:
             self.register_buffer('beta', th.Tensor([init_beta]))
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute AGNN layer.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -1535,18 +1541,18 @@ class DenseGraphConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
 
-    def forward(self, feat, adj):
+    def forward(self, adj, feat):
         r"""Compute (Dense) Graph Convolution layer.
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
         adj : torch.Tensor
             The adjacency matrix of the graph to apply Graph Convolution on,
             should be of shape :math:`(N, N)`, where a row represents the destination
             and a column represents the source.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
@@ -1632,18 +1638,18 @@ class DenseSAGEConv(nn.Module):
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
-    def forward(self, feat, adj):
+    def forward(self, adj, feat):
         r"""Compute (Dense) Graph SAGE layer.
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
         adj : torch.Tensor
             The adjacency matrix of the graph to apply Graph Convolution on,
             should be of shape :math:`(N, N)`, where a row represents the destination
             and a column represents the source.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
@@ -1712,18 +1718,21 @@ class DenseChebConv(nn.Module):
         for i in range(self._k):
             init.xavier_normal_(self.W[i], init.calculate_gain('relu'))
 
-    def forward(self, feat, adj):
+    def forward(self, adj, feat, lambda_max=None):
         r"""Compute (Dense) Chebyshev Spectral Graph Convolution layer.
 
         Parameters
         ----------
-        feat : torch.Tensor
-            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
-            is size of input feature, :math:`N` is the number of nodes.
         adj : torch.Tensor
             The adjacency matrix of the graph to apply Graph Convolution on,
             should be of shape :math:`(N, N)`, where a row represents the destination
             and a column represents the source.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
+        lambda_max : float or None, optional
+            A float value indicates the largest eigenvalue of given graph.
+            Default: None.
 
         Returns
         -------
@@ -1739,10 +1748,11 @@ class DenseChebConv(nn.Module):
         I = th.eye(num_nodes).to(A)
         L = I - D_invsqrt @ A @ D_invsqrt
 
-        lambda_ = th.eig(L)[0][:, 0]
-        lambda_max = lambda_.max()
-        L_hat = 2 * L / lambda_max - I
+        if lambda_max is None:
+            lambda_ = th.eig(L)[0][:, 0]
+            lambda_max = lambda_.max()
 
+        L_hat = 2 * L / lambda_max - I
         Z = [th.eye(num_nodes).to(A)]
         for i in range(1, self._k):
             if i == 1:
