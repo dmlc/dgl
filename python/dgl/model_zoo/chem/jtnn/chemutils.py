@@ -135,7 +135,8 @@ def tree_decomp(mol):
         cnei = nei_list[atom]
         bonds = [c for c in cnei if len(cliques[c]) == 2]
         rings = [c for c in cnei if len(cliques[c]) > 4]
-        # In general, if len(cnei) >= 3, a singleton should be added, but 1 bond + 2 ring is currently not dealt with.
+        # In general, if len(cnei) >= 3, a singleton should be added, but 1
+        # bond + 2 ring is currently not dealt with.
         if len(bonds) > 2 or (len(bonds) == 2 and len(cnei) > 2):
             cliques.append([atom])
             c2 = len(cliques) - 1
@@ -155,7 +156,7 @@ def tree_decomp(mol):
                         # cnei[i] < cnei[j] by construction
                         edges[(c1, c2)] = len(inter)
 
-    edges = [u + (MST_MAX_WEIGHT-v,) for u, v in edges.items()]
+    edges = [u + (MST_MAX_WEIGHT - v,) for u, v in edges.items()]
     if len(edges) == 0:
         return cliques, edges
 
@@ -260,7 +261,8 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
         for a1 in ctr_atoms:
             for a2 in nei_mol.GetAtoms():
                 if atom_equal(a1, a2):
-                    # Optimize if atom is carbon (other atoms may change valence)
+                    # Optimize if atom is carbon (other atoms may change
+                    # valence)
                     if a1.GetAtomicNum() == 6 and a1.GetTotalNumHs() + a2.GetTotalNumHs() < 4:
                         continue
                     new_amap = amap + [(nei_idx, a1.GetIdx(), a2.GetIdx())]
@@ -271,13 +273,21 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
             for b1 in ctr_bonds:
                 for b2 in nei_mol.GetBonds():
                     if ring_bond_equal(b1, b2):
-                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetBeginAtom(
-                        ).GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetEndAtom().GetIdx())]
+                        new_amap = amap + [(nei_idx,
+                                            b1.GetBeginAtom().GetIdx(),
+                                            b2.GetBeginAtom().GetIdx()),
+                                           (nei_idx,
+                                            b1.GetEndAtom().GetIdx(),
+                                            b2.GetEndAtom().GetIdx())]
                         att_confs.append(new_amap)
 
                     if ring_bond_equal(b1, b2, reverse=True):
-                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom(
-                        ).GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
+                        new_amap = amap + [(nei_idx,
+                                            b1.GetBeginAtom().GetIdx(),
+                                            b2.GetEndAtom().GetIdx()),
+                                           (nei_idx,
+                                            b1.GetEndAtom().GetIdx(),
+                                            b2.GetBeginAtom().GetIdx())]
                         att_confs.append(new_amap)
     return att_confs
 
@@ -302,7 +312,7 @@ def enum_assemble_nx(node, neighbors, prev_nodes=[], prev_amap=[]):
         candidates = []
         for amap in cand_amap:
             cand_mol = local_attach_nx(
-                node['mol'], neighbors[:depth+1], prev_nodes, amap)
+                node['mol'], neighbors[:depth + 1], prev_nodes, amap)
             cand_mol = sanitize(cand_mol)
             if cand_mol is None:
                 continue
@@ -336,7 +346,13 @@ def enum_assemble_nx(node, neighbors, prev_nodes=[], prev_amap=[]):
 # Only used for debugging purpose
 
 
-def dfs_assemble_nx(graph, cur_mol, global_amap, fa_amap, cur_node_id, fa_node_id):
+def dfs_assemble_nx(
+        graph,
+        cur_mol,
+        global_amap,
+        fa_amap,
+        cur_node_id,
+        fa_node_id):
     cur_node = graph.nodes_dict[cur_node_id]
     fa_node = graph.nodes_dict[fa_node_id] if fa_node_id is not None else None
 
