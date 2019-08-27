@@ -52,6 +52,10 @@ by the multilevel interactions.
 - **Message Passing Neural Network** [6]: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) 
 as front end and Set2Set for output prediction.
 
+### Example Usage of Pre-trained Models
+
+![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/gcn_model_zoo_example.png)
+
 ## Generative Models
 
 We use generative models for two different purposes when it comes to molecules:
@@ -69,6 +73,12 @@ are also two accompanying review papers that are well written [7], [8].
 ### Models
 - **Deep Generative Models of Graphs (DGMG)** [11]: A very general framework for graph distribution learning by 
 progressively adding atoms and bonds.
+
+### Example Usage of Pre-trained Models
+
+![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example1.png)
+
+![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example2.png)
 
 ## References
 

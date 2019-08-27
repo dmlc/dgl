@@ -70,9 +70,9 @@ These properties have been calculated using the open-source computational chemis
 
 - **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize the continuous-filter 
 convolutional layers [4].   
-- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed hierarchical 
+- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a hierarchical 
 graph neural network directly extracts features from the conformation and spatial information followed by the multilevel interactions [5].    
-- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end 
+- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a network with edge network (enn) as front end 
 and Set2Set for output prediction [6].
 
 ### Usage
