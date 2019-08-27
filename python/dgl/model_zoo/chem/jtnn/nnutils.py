@@ -1,7 +1,16 @@
+# pylint: disable=C0111, C0103, E1101, W0611, W0612
+import os
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import os
+
+
+def create_var(tensor, requires_grad=None):
+    if requires_grad is None:
+        return Variable(tensor)
+    else:
+        return Variable(tensor, requires_grad=requires_grad)
 
 
 def cuda(tensor):
