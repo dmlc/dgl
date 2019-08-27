@@ -7,7 +7,7 @@ References:
 import mxnet as mx
 from mxnet import gluon
 import dgl
-from dgl.nn.mxnet import TGConv
+from dgl.nn.mxnet import TAGConv
 
 class TAGCN(gluon.Block):
     def __init__(self,

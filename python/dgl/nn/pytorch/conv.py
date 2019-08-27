@@ -7,7 +7,7 @@ from torch.nn import init
 from . import utils
 from ... import function as fn
 
-__all__ = ['GraphConv', 'TGConv', 'RelGraphConv']
+__all__ = ['GraphConv', 'TAGConv', 'RelGraphConv']
 
 class GraphConv(nn.Module):
     r"""Apply graph convolution over an input signal.

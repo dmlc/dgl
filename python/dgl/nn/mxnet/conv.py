@@ -9,7 +9,7 @@ import numpy as np
 from . import utils
 from ... import function as fn
 
-__all__ = ['GraphConv', 'TGConv', 'RelGraphConv']
+__all__ = ['GraphConv', 'TAGConv', 'RelGraphConv']
 
 class GraphConv(gluon.Block):
     r"""Apply graph convolution over an input signal.
