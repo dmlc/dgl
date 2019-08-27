@@ -81,7 +81,7 @@ def _S2AXWb(A, N, X, W, b):
 
     return Y + b
 
-def test_tgconv():
+def test_tagconv():
     g = dgl.DGLGraph(nx.path_graph(3))
     ctx = F.ctx()
     adj = g.adjacency_matrix(ctx=ctx)
@@ -354,6 +354,48 @@ def test_rgcn():
     h_new = rgc_basis(g, h, r)
     assert list(h_new.shape) == [100, O]
 
+def test_gated_graph_conv():
+    pass
+
+def test_nn_conv():
+    pass
+
+def test_gmm_conv():
+    pass
+
+def test_dense_graph_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
+    dense_conv.weight.data = conv.weight.data
+    dense_conv.bias.data = conv.bias.data
+    if F.gpu_ctx():
+        conv = conv.cuda()
+        dense_conv = dense_conv.cuda()
+    feat = F.randn((100, 5))
+    out_conv = conv(feat, g)
+    out_dense_conv = dense_conv(feat, adj)
+    assert F.allclose(out_conv, out_dense_conv)
+
+def test_dense_sage_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).to_dense()
+    sage = nn.SAGEConv(5, 2, 'gcn',)
+    dense_sage = nn.DenseSAGEConv(5, 2)
+    dense_sage.fc.weight.data = sage.fc_neigh.weight.data
+    dense_sage.fc.bias.data = sage.fc_neigh.bias.data
+    if F.gpu_ctx():
+        sage = sage.cuda()
+        dense_sage = dense_sage.cuda()
+
+    feat = F.randn((100, 5))
+    out_sage = sage(feat, g)
+    out_dense_sage = dense_sage(feat, adj)
+    assert F.allclose(out_sage, out_dense_sage)
+
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
@@ -362,3 +404,10 @@ if __name__ == '__main__':
     test_simple_pool()
     test_set_trans()
     test_rgcn()
+    test_tagconv()
+    test_gated_graph_conv()
+    test_nn_conv()
+    test_gmm_conv()
+    test_dense_graph_conv()
+    test_dense_sage_conv()
+

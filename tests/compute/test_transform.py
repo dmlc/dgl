@@ -141,7 +141,7 @@ def test_khop_adj():
             g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
         h_0 = g.ndata.pop('h')
         # use k-hop adj to do message passing for one time.
-        h_1 = adj @ feat
+        h_1 = F.matmul(adj, feat)
         assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
 def test_laplacian_lambda_max():

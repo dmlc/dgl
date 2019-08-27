@@ -13,7 +13,7 @@ from .softmax import edge_softmax
 
 __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
-           'ChebConv', 'AGNNConv', 'NNConv', 'DenseGCNConv', 'DenseSAGEConv']
+           'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv']
 
 # pylint: disable=W0235
 class Identity(nn.Module):
@@ -1388,7 +1388,7 @@ class AGNNConv(nn.Module):
         return graph.ndata.pop('h')
 
 
-class DenseGCNConv(nn.Module):
+class DenseGraphConv(nn.Module):
     """Graph Convolutional Network layer where the graph structure
     is given by an adjacency matrix.
     We recommend user to use this module when inducing graph convolution
@@ -1414,7 +1414,7 @@ class DenseGCNConv(nn.Module):
                  norm=True,
                  bias=True,
                  activation=None):
-        super(DenseGCNConv, self).__init__()
+        super(DenseGraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -1427,7 +1427,7 @@ class DenseGCNConv(nn.Module):
         self.reset_parameters()
         self._activation = activation
 
-    def register_parameter(self):
+    def reset_parameters(self):
         """Reinitialize learnable parameters."""
         init.xavier_uniform_(self.weight)
         if self.bias is not None:
