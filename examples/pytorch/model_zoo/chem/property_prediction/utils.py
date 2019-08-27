@@ -1,7 +1,6 @@
 import datetime
 import dgl
 import numpy as np
-import os
 import random
 import torch
 from sklearn.metrics import roc_auc_score
