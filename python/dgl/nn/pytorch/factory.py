@@ -27,12 +27,12 @@ class NearestNeighborGraph(nn.Module):
 
     Parameters
     ----------
-    K : int
+    k : int
         The number of neighbors
 
     Inputs
     ------
-    h : Tensor
+    input : Tensor
         :math:`(M, D)` or :math:`(N, M, D)` where :math:`N` means the
         number of point sets, :math:`M` means the number of points in
         each point set, and :math:`D` means the size of features.
@@ -41,12 +41,12 @@ class NearestNeighborGraph(nn.Module):
     -------
     - A DGLGraph with no features.
     """
-    def __init__(self, K):
+    def __init__(self, k):
         super(NearestNeighborGraph, self).__init__()
-        self.K = K
+        self.k = k
 
-    def forward(self, h):
-        return nearest_neighbor_graph(h, self.K)
+    def forward(self, input):
+        return nearest_neighbor_graph(input, self.k)
 
 
 class SegmentedNearestNeighborGraph(nn.Module):
@@ -63,12 +63,12 @@ class SegmentedNearestNeighborGraph(nn.Module):
 
     Parameters
     ----------
-    K : int
+    k : int
         The number of neighbors
 
     Inputs
     ------
-    h : Tensor
+    input : Tensor
         :math:`(M, D)` where :math:`M` means the total number of points
         in all point sets.
     segs : Tensor
@@ -79,9 +79,9 @@ class SegmentedNearestNeighborGraph(nn.Module):
     -------
     - A DGLGraph with no features.
     """
-    def __init__(self, K):
+    def __init__(self, k):
         super(SegmentedNearestNeighborGraph, self).__init__()
-        self.K = K
+        self.k = k
 
-    def forward(self, h, segs):
-        return segmented_nearest_neighbor_graph(h, self.K, segs)
+    def forward(self, input, segs):
+        return segmented_nearest_neighbor_graph(input, self.k, segs)

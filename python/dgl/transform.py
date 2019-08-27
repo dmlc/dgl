@@ -7,7 +7,6 @@ from .graph import DGLGraph
 from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
-import numpy as np
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
@@ -23,16 +22,16 @@ def pairwise_squared_distance(x):
     # assuming that __matmul__ is always implemented (true for PyTorch, MXNet and Chainer)
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
-def nearest_neighbor_graph(h, k):
+def nearest_neighbor_graph(input, k):
     """Transforms the given point coordinate matrix to a directed graph, where
     the predecessors of each point are its k-nearest neighbors.
 
     Parameters
     ----------
-    h : Tensor
+    input : Tensor
         The input tensor.
 
-        If 2D, each row of ``h`` corresponds to a node.
+        If 2D, each row of ``input`` corresponds to a node.
 
         If 3D, a k-NN graph would be constructed for each row.  Then
         the graphs are unioned.
@@ -42,14 +41,14 @@ def nearest_neighbor_graph(h, k):
     Returns
     -------
     DGLGraph
-        The graph.  The node IDs are in the same order as ``h``.
+        The graph.  The node IDs are in the same order as ``input``.
     """
-    if F.ndim(h) == 2:
-        h = F.unsqueeze(h, 0)
-    n_samples, n_points, n_dims = F.shape(h)
+    if F.ndim(input) == 2:
+        input = F.unsqueeze(input, 0)
+    n_samples, n_points, _ = F.shape(input)
 
-    d = pairwise_squared_distance(h)
-    k_indices = F.argtopk(d, k, 2, descending=False)
+    dist = pairwise_squared_distance(input)
+    k_indices = F.argtopk(dist, k, 2, descending=False)
     dst = F.copy_to(k_indices, F.cpu())
 
     src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
@@ -64,15 +63,15 @@ def nearest_neighbor_graph(h, k):
     g = DGLGraph(adj, readonly=True)
     return g
 
-def segmented_nearest_neighbor_graph(h, k, segs):
-    n_total_points, n_dims = F.shape(h)
+def segmented_nearest_neighbor_graph(input, k, segs):
+    n_total_points, _ = F.shape(input)
     offset = np.insert(np.cumsum(segs), 0, 0)
 
-    hs = F.split(h, segs, 0)
+    h_list = F.split(input, segs, 0)
     dst = [
         F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
         offset[i]
-        for i, h_g in enumerate(hs)]
+        for i, h_g in enumerate(h_list)]
     dst = F.cat(dst, 0)
     src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
 

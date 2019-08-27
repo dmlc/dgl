@@ -595,7 +595,9 @@ class EdgeConv(nn.Module):
         if batch_norm:
             self.bn = nn.BatchNorm1d(out_feat)
 
-    def apply_edges(self, edges):
+    def message(self, edges):
+        """The message computation function.
+        """
         theta_x = self.theta(edges.dst['x'] - edges.src['x'])
         phi_x = self.phi(edges.src['x'])
         return {'e': theta_x + phi_x}
@@ -616,12 +618,11 @@ class EdgeConv(nn.Module):
             New node features.
         """
         with g.local_scope():
-            n_total_points, n_dims = h.shape
             g.ndata['x'] = h
             if not self.batch_norm:
-                g.update_all(self.apply_edges, fn.max('e', 'x'))
+                g.update_all(self.message, fn.max('e', 'x'))
             else:
-                g.apply_edges(self.apply_edges)
+                g.apply_edges(self.message)
                 # Although the official implementation includes a per-edge
                 # batch norm within EdgeConv, I choose to replace it with a
                 # global batch norm for a number of reasons:
