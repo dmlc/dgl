@@ -60,11 +60,15 @@ dgl.nn.pytorch.conv
     :members: forward
     :show-inheritance:
 
-.. autoclass:: dgl.nn.pytorch.conv.DenseGCNConv
+.. autoclass:: dgl.nn.pytorch.conv.DenseGraphConv
     :members: forward
     :show-inheritance:
 
 .. autoclass:: dgl.nn.pytorch.conv.DenseSAGEConv
+    :members: forward
+    :show-inheritance:
+
+.. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
     :members: forward
     :show-inheritance:
 

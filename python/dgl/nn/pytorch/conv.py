@@ -607,7 +607,7 @@ class SAGEConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
-        self._norm = norm
+        self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
         # aggregator type: mean/pool/lstm/gcn
@@ -693,8 +693,8 @@ class SAGEConv(nn.Module):
         if self.activation is not None:
             rst = self.activation(rst)
         # normalization
-        if self._norm is not None:
-            rst = self._norm(rst)
+        if self.norm is not None:
+            rst = self.norm(rst)
         return rst
 
 
@@ -976,15 +976,15 @@ class ChebConv(nn.Module):
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
     .. math::
-        h_i^{l+1} & = \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
+        h_i^{l+1} &= \sum_{k=0}^{K-1} W^{k, l}z_i^{k, l}
 
-        Z^{0, l} & = H^{l}
+        Z^{0, l} &= H^{l}
 
-        Z^{1, l} & = \hat{L} \cdot H^{l}
+        Z^{1, l} &= \hat{L} \cdot H^{l}
 
-        Z^{k, l} & = 2 \hat{L} Z^{k-1, l} - Z^{k-2, l}
+        Z^{k, l} &= 2 \cdot \hat{L} \cdot Z^{k-1, l} - Z^{k-2, l}
 
-        \hat{L} & = 2(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})/\lambda_{max} - I
+        \hat{L} &= 2\left(I - \hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2}\right)/\lambda_{max} - I
 
     Parameters
     ----------
@@ -1108,18 +1108,22 @@ class SGConv(nn.Module):
         ``True`` in Transductive Learning setting.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+    norm : callable activation function/layer or None, optional
+        If not None, applies normalization oto the updated node features.
     """
     def __init__(self,
                  in_feats,
                  out_feats,
                  k=1,
                  cached=False,
-                 bias=True):
+                 bias=True,
+                 norm=None):
         super(SGConv, self).__init__()
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
         self._cached_h = None
         self._k = k
+        self.norm = norm
 
     def forward(self, feat, graph):
         r"""Compute Simplifying Graph Convolution layer.
@@ -1160,6 +1164,10 @@ class SGConv(nn.Module):
                                  fn.sum('m', 'h'))
                 feat = graph.ndata.pop('h')
                 feat = feat * norm
+
+            if self.norm is not None:
+                feat = self.norm(feat)
+
             # cache feature
             if self._cached:
                 self._cached_h = feat
@@ -1414,6 +1422,10 @@ class DenseGraphConv(nn.Module):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+
+    See also
+    --------
+    GraphConv
     """
     def __init__(self,
                  in_feats,
@@ -1511,6 +1523,10 @@ class DenseSAGEConv(nn.Module):
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
+
+    See also
+    --------
+    SAGEConv
     """
     def __init__(self,
                  in_feats,
