@@ -4,11 +4,14 @@
  * \brief Binary reduce C APIs and definitions.
  */
 #include <dgl/packed_func_ext.h>
+#include <dgl/immutable_graph.h>
 #include "./binary_reduce.h"
 #include "./common.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
+#include "../graph/bipartite.h"
+#include "./csr_interface.h"
 
 using namespace dgl::runtime;
 
@@ -201,6 +204,56 @@ inline bool NeedSwitchOrder(const std::string& op,
     && lhs > rhs;
 }
 
+class ImmutableGraphCSRWrapper : public CSRWrapper {
+ public:
+  explicit ImmutableGraphCSRWrapper(const ImmutableGraph* graph) :
+    gptr_(graph) { }
+
+  aten::CSRMatrix GetInCSRMatrix() const override {
+    return gptr_->GetInCSR()->ToCSRMatrix();
+  }
+
+  aten::CSRMatrix GetOutCSRMatrix() const override {
+    return gptr_->GetOutCSR()->ToCSRMatrix();
+  }
+
+  DGLContext Context() const override {
+    return gptr_->Context();
+  }
+
+  int NumBits() const override {
+    return gptr_->NumBits();
+  }
+
+ private:
+  const ImmutableGraph* gptr_;
+};
+
+class BipartiteCSRWrapper : public CSRWrapper {
+ public:
+  explicit BipartiteCSRWrapper(const Bipartite* graph) :
+    gptr_(graph) { }
+
+  aten::CSRMatrix GetInCSRMatrix() const override {
+    return gptr_->GetInCSRMatrix();
+  }
+
+  aten::CSRMatrix GetOutCSRMatrix() const override {
+    return gptr_->GetOutCSRMatrix();
+  }
+
+  DGLContext Context() const override {
+    return gptr_->Context();
+  }
+
+  int NumBits() const override {
+    return gptr_->NumBits();
+  }
+
+ private:
+  const Bipartite* gptr_;
+};
+
 }  // namespace
 
 
@@ -226,18 +279,18 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_data, NDArray rhs_data,
     NDArray out_data,
     NDArray lhs_mapping, NDArray rhs_mapping,
     NDArray out_mapping) {
-  const auto& ctx = graph->Context();
+  const auto& ctx = graph.Context();
   // sanity check
   CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "lhs_mapping", "rhs_mapping", "out_mapping"});
-  CheckIdArray(graph->NumBits(),
+  CheckIdArray(graph.NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
   // Switch order for commutative operation
@@ -266,11 +319,32 @@ void BinaryOpReduce(
   }
 }
 
+// Comes from DGLArgValue::AsObjectRef() that allows argvalue to be either a GraphRef
+// or a HeteroGraphRef
+#define CSRWRAPPER_SWITCH(argvalue, wrapper, ...) do {            \
+  DGLArgValue argval = (argvalue);                                \
+  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);         \
+  std::shared_ptr<Object>& sptr =                                 \
+      *argval.ptr<std::shared_ptr<Object>>();                     \
+  if (ObjectTypeChecker<GraphRef>::Check(sptr.get())) {           \
+    GraphRef g = argval;                                          \
+    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()); \
+    CHECK_NOTNULL(igptr);                                         \
+    ImmutableGraphCSRWrapper wrapper(igptr.get());                \
+    {__VA_ARGS__}                                                 \
+  } else if (ObjectTypeChecker<HeteroGraphRef>::Check(sptr.get())) { \
+    HeteroGraphRef g = argval;                                    \
+    auto bgptr = std::dynamic_pointer_cast<Bipartite>(g.sptr());  \
+    CHECK_NOTNULL(bgptr);                                         \
+    BipartiteCSRWrapper wrapper(bgptr.get());                     \
+    {__VA_ARGS__}                                                 \
+  }                                                               \
+} while (0)
+
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_data = args[5];
@@ -280,18 +354,18 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
     NDArray rhs_mapping = args[9];
     NDArray out_mapping = args[10];
 
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BinaryOpReduce(reducer, op, igptr.get(),
-        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-        lhs_data, rhs_data, out_data,
-        lhs_mapping, rhs_mapping, out_mapping);
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
+      BinaryOpReduce(reducer, op, wrapper,
+          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+          lhs_data, rhs_data, out_data,
+          lhs_mapping, rhs_mapping, out_mapping);
+      });
   });
 
 void BackwardLhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_mapping,
     NDArray rhs_mapping,
@@ -301,14 +375,14 @@ void BackwardLhsBinaryOpReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_lhs_data) {
-  const auto& ctx = graph->Context();
+  const auto& ctx = graph.Context();
   // sanity check
   CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_lhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_lhs_data",
        "lhs_mapping", "rhs_mapping", "out_mapping"});
-  CheckIdArray(graph->NumBits(),
+  CheckIdArray(graph.NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
   // Switch order for commutative operation
@@ -342,7 +416,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -354,20 +427,20 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_lhs_data = args[12];
 
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BackwardLhsBinaryOpReduce(
-        reducer, op, igptr.get(),
-        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        grad_lhs_data);
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
+      BackwardLhsBinaryOpReduce(
+          reducer, op, wrapper,
+          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_lhs_data);
+    });
   });
 
 void BackwardRhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target lhs, binary_op::Target rhs,
     NDArray lhs_mapping,
     NDArray rhs_mapping,
@@ -377,14 +450,14 @@ void BackwardRhsBinaryOpReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_rhs_data) {
-  const auto& ctx = graph->Context();
+  const auto& ctx = graph.Context();
   // sanity check
   CheckCtx(ctx,
       {lhs_data, rhs_data, out_data, grad_out_data, grad_rhs_data,
        lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_rhs_data",
        "lhs_mapping", "rhs_mapping", "out_mapping"});
-  CheckIdArray(graph->NumBits(),
+  CheckIdArray(graph.NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
   if (NeedSwitchOrder(op, lhs, rhs)) {
@@ -417,7 +490,6 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    GraphRef g = args[2];
     int lhs = args[3];
     int rhs = args[4];
     NDArray lhs_mapping = args[5];
@@ -429,28 +501,28 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
     NDArray grad_out_data = args[11];
     NDArray grad_rhs_data = args[12];
 
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BackwardRhsBinaryOpReduce(
-        reducer, op, igptr.get(),
-        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        grad_rhs_data);
+    CSRWRAPPER_SWITCH(args[2], wrapper, {
+      BackwardRhsBinaryOpReduce(
+          reducer, op, wrapper,
+          static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_rhs_data);
+    });
   });
 
 void CopyReduce(
     const std::string& reducer,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target target,
     NDArray in_data, NDArray out_data,
     NDArray in_mapping, NDArray out_mapping) {
-  const auto& ctx = graph->Context();
+  const auto& ctx = graph.Context();
   // sanity check
   CheckCtx(ctx,
       {in_data, out_data, in_mapping, out_mapping},
       {"in_data", "out_data", "in_mapping", "out_mapping"});
-  CheckIdArray(graph->NumBits(),
+  CheckIdArray(graph.NumBits(),
       {in_mapping, out_mapping},
       {"in_mapping", "out_mapping"});
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
@@ -463,24 +535,23 @@ void CopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
     NDArray in_mapping = args[5];
     NDArray out_mapping = args[6];
 
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    CopyReduce(reducer, igptr.get(),
-        static_cast<binary_op::Target>(target),
-        in_data, out_data,
-        in_mapping, out_mapping);
+    CSRWRAPPER_SWITCH(args[1], wrapper, {
+      CopyReduce(reducer, wrapper,
+          static_cast<binary_op::Target>(target),
+          in_data, out_data,
+          in_mapping, out_mapping);
+    });
   });
 
 void BackwardCopyReduce(
     const std::string& reducer,
-    const ImmutableGraph* graph,
+    const CSRWrapper& graph,
     binary_op::Target target,
     NDArray in_mapping,
     NDArray out_mapping,
@@ -488,12 +559,12 @@ void BackwardCopyReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_in_data) {
-  const auto& ctx = graph->Context();
+  const auto& ctx = graph.Context();
   // sanity check
   CheckCtx(ctx,
       {in_data, out_data, grad_out_data, grad_in_data, in_mapping, out_mapping},
       {"in_data", "out_data", "grad_out_data", "grad_in_data", "in_mapping", "out_mapping"});
-  CheckIdArray(graph->NumBits(),
+  CheckIdArray(graph.NumBits(),
       {in_mapping, out_mapping},
       {"in_mapping", "out_mapping"});
   if (!utils::IsNoneArray(out_mapping)) {
@@ -511,7 +582,6 @@ void BackwardCopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphRef g = args[1];
     int target = args[2];
     NDArray in_data = args[3];
     NDArray out_data = args[4];
@@ -520,13 +590,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
     NDArray in_mapping = args[7];
     NDArray out_mapping = args[8];
 
-    auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BackwardCopyReduce(
-        reducer, igptr.get(), static_cast<binary_op::Target>(target),
-        in_mapping, out_mapping,
-        in_data, out_data, grad_out_data,
-        grad_in_data);
+    CSRWRAPPER_SWITCH(args[1], wrapper, {
+      BackwardCopyReduce(
+          reducer, wrapper, static_cast<binary_op::Target>(target),
+          in_mapping, out_mapping,
+          in_data, out_data, grad_out_data,
+          grad_in_data);
+    });
   });
 
 }  // namespace kernel

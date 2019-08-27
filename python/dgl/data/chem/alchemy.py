@@ -2,22 +2,28 @@
 """Example dataloader of Tencent Alchemy Dataset
 https://alchemy.tencent.com/
 """
+
 import os
-import zipfile
 import os.path as osp
-from rdkit import Chem
-from rdkit.Chem import ChemicalFeatures
-from rdkit import RDConfig
+import zipfile
 import dgl
 from dgl.data.utils import download
+import pickle
 import torch
 from collections import defaultdict
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import pathlib
-import pandas as pd
 import numpy as np
-_urls = {'Alchemy': 'https://alchemy.tencent.com/data/'}
+import pathlib
+from ..utils import get_download_dir, download, _get_dgl_url
+try:
+    import pandas as pd
+    from rdkit import Chem
+    from rdkit.Chem import ChemicalFeatures
+    from rdkit import RDConfig
+except ImportError:
+    pass
+_urls = {'Alchemy': 'https://alchemy.tencent.com/data/dgl/'}
 
 
 class AlchemyBatcher:
@@ -155,18 +161,16 @@ class TencentAlchemyDataset(Dataset):
 
         return bond_feats_dict
 
-    def sdf_to_dgl(self, sdf_file, self_loop=False):
+    def mol_to_dgl(self, mol, self_loop=False):
         """
-        Read sdf file and convert to dgl_graph
+        Convert RDKit molecule object to DGLGraph
         Args:
-            sdf_file: path of sdf file
+            mol: Chem.rdchem.Mol read from sdf
             self_loop: Whetaher to add self loop
         Returns:
             g: DGLGraph
             l: related labels
         """
-        sdf = open(str(sdf_file)).read()
-        mol = Chem.MolFromMolBlock(sdf, removeHs=False)
 
         g = dgl.DGLGraph()
 
@@ -175,13 +179,6 @@ class TencentAlchemyDataset(Dataset):
         atom_feats = self.alchemy_nodes(mol)
         g.add_nodes(num=num_atoms, data=atom_feats)
 
-        # add edges
-        # The model we were interested assumes a complete graph.
-        # If this is not the case, do the code below instead
-        #
-        # for bond in mol.GetBonds():
-        #     u = bond.GetBeginAtomIdx()
-        #     v = bond.GetEndAtomIdx()
         if self_loop:
             g.add_edges(
                 [i for i in range(num_atoms) for j in range(num_atoms)],
@@ -196,46 +193,69 @@ class TencentAlchemyDataset(Dataset):
         bond_feats = self.alchemy_edges(mol, self_loop)
         g.edata.update(bond_feats)
 
-        # for val/test set, labels are molecule ID
-        l = torch.FloatTensor(self.target.loc[int(sdf_file.stem)].tolist()) \
-            if self.mode == 'dev' else torch.LongTensor([int(sdf_file.stem)])
-        return (g, l)
+        return g
 
-    def __init__(self, mode='dev', transform=None):
+    def __init__(self, mode='dev', transform=None, from_raw=False):
         assert mode in ['dev', 'valid',
                         'test'], "mode should be dev/valid/test"
         self.mode = mode
         self.transform = transform
-        self.file_dir = pathlib.Path('./Alchemy_data', mode)
-        self.zip_file_path = pathlib.Path('./Alchemy_data', '%s.zip' % mode)
-        download(_urls['Alchemy'] + "%s.zip" % mode,
+
+        # Construct the dgl graph from raw data or use the preprocessed data directly
+        self.from_raw = from_raw
+        file_dir = osp.join(get_download_dir(), './Alchemy_data')
+
+        if not from_raw:
+            file_name = "%s_processed" % (mode)
+        else:
+            file_name = "%s_single_sdf" % (mode)
+        self.file_dir = pathlib.Path(file_dir, file_name)
+
+        self.zip_file_path = pathlib.Path(file_dir, file_name + '.zip')
+        download(_urls['Alchemy'] + file_name + '.zip',
                  path=str(self.zip_file_path))
         if not os.path.exists(str(self.file_dir)):
-            archive = zipfile.ZipFile(str(self.zip_file_path))
-            archive.extractall('./Alchemy_data')
+            archive = zipfile.ZipFile(self.zip_file_path)
+            archive.extractall(file_dir)
             archive.close()
 
         self._load()
 
     def _load(self):
         if self.mode == 'dev':
-            target_file = pathlib.Path(self.file_dir, "dev_target.csv")
-            self.target = pd.read_csv(target_file,
-                                      index_col=0,
-                                      usecols=[
-                                          'gdb_idx',
-                                      ] +
-                                      ['property_%d' % x for x in range(12)])
-            self.target = self.target[['property_%d' % x for x in range(12)]]
+            if not self.from_raw:
+                with open(osp.join(self.file_dir, "dev_graphs.pkl"),
+                          "rb") as f:
+                    self.graphs = pickle.load(f)
+                with open(osp.join(self.file_dir, "dev_labels.pkl"),
+                          "rb") as f:
+                    self.labels = pickle.load(f)
 
-        sdf_dir = pathlib.Path(self.file_dir, "sdf")
-        self.graphs, self.labels = [], []
-        for sdf_file in sdf_dir.glob("**/*.sdf"):
-            result = self.sdf_to_dgl(sdf_file)
-            if result is None:
-                continue
-            self.graphs.append(result[0])
-            self.labels.append(result[1])
+            else:
+
+                target_file = pathlib.Path(self.file_dir, "dev_target.csv")
+                self.target = pd.read_csv(
+                    target_file,
+                    index_col=0,
+                    usecols=[
+                        'gdb_idx',
+                    ] + ['property_%d' % x for x in range(12)])
+                self.target = self.target[[
+                    'property_%d' % x for x in range(12)
+                ]]
+                self.graphs, self.labels = [], []
+
+                sdf_dir = pathlib.Path(self.file_dir, "sdf")
+                supp = Chem.SDMolSupplier(
+                    osp.join(self.file_dir, self.mode + ".sdf"))
+                cnt = 0
+                for sdf, label in zip(supp, self.target.iterrows()):
+                    graph = self.mol_to_dgl(sdf)
+                    cnt += 1
+                    self.graphs.append(graph)
+                    label = torch.FloatTensor(label[1].tolist())
+                    self.labels.append(label)
+
         self.normalize()
         print(len(self.graphs), "loaded!")
 
@@ -257,24 +277,32 @@ class TencentAlchemyDataset(Dataset):
             g = self.transform(g)
         return g, l
 
+    def split(self, train_size=0.8):
+        """
+        Split the dataset into two AlchemySubset for train&test.
+        """
 
-if __name__ == '__main__':
-    alchemy_dataset = TencentAlchemyDataset()
-    device = torch.device('cpu')
-    # To speed up the training with multi-process data loader,
-    # the num_workers could be set to > 1.
-    alchemy_loader = DataLoader(dataset=alchemy_dataset,
-                                batch_size=20,
-                                collate_fn=batcher(),
-                                shuffle=False,
-                                num_workers=0)
+        assert 0 < train_size < 1
+        train_num = int(len(self.graphs) * train_size)
+        train_set = AlchemySubset(self.graphs[:train_num],
+                                  self.labels[:train_num], self.mean, self.std,
+                                  self.transform)
+        test_set = AlchemySubset(self.graphs[train_num:],
+                                 self.labels[train_num:], self.mean, self.std,
+                                 self.transform)
+        return train_set, test_set
 
-    for step, batch in enumerate(alchemy_loader):
-        print("bs =", batch.graph.batch_size)
-        print('feature size =', batch.graph.ndata['n_feat'].size())
-        print('pos size =', batch.graph.ndata['pos'].size())
-        print('edge feature size =', batch.graph.edata['e_feat'].size())
-        print('edge distance size =', batch.graph.edata['distance'].size())
-        print('label size=', batch.label.size())
-        print(dgl.sum_nodes(batch.graph, 'n_feat').size())
-        break
+
+class AlchemySubset(TencentAlchemyDataset):
+    """
+    Sub-dataset split from TencentAlchemyDataset.
+    Used to construct the training & test set.
+    """
+
+    def __init__(self, graphs, labels, mean=0, std=1, transform=None):
+
+        self.graphs = graphs
+        self.labels = labels
+        self.mean = mean
+        self.std = std
+        self.transform = transform
