@@ -10,7 +10,7 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'nearest_neighbor_graph', 'segmented_nearest_neighbor_graph']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph']
 
 
 def pairwise_squared_distance(x):
@@ -23,7 +23,7 @@ def pairwise_squared_distance(x):
     return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
 
 #pylint: disable=invalid-name
-def nearest_neighbor_graph(x, k):
+def knn_graph(x, k):
     """Transforms the given point set to a directed graph, whose coordinates
     are given as a matrix. The predecessors of each point are its k-nearest
     neighbors.
@@ -69,7 +69,7 @@ def nearest_neighbor_graph(x, k):
     return g
 
 #pylint: disable=invalid-name
-def segmented_nearest_neighbor_graph(x, k, segs):
+def segmented_knn_graph(x, k, segs):
     """Transforms the given point set to a directed graph, whose coordinates
     are given as a matrix.  The predecessors of each point are its k-nearest
     neighbors.
