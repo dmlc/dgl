@@ -3,6 +3,7 @@
  * \file graph/graph.cc
  * \brief DGL graph index APIs
  */
+#include <dgl/packed_func_ext.h>
 #include <dgl/graph.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_op.h>
@@ -18,113 +19,12 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-namespace {
-// Convert EdgeArray structure to PackedFunc.
-template<class EdgeArray>
-PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        *rv = std::move(ea.src);
-      } else if (which == 1) {
-        *rv = std::move(ea.dst);
-      } else if (which == 2) {
-        *rv = std::move(ea.id);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-// Convert CSRArray structure to PackedFunc.
-PackedFunc ConvertAdjToPackedFunc(const std::vector<IdArray>& ea) {
-  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if ((size_t) which < ea.size()) {
-        *rv = std::move(ea[which]);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-// Convert Subgraph structure to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
-  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        GraphInterface* gptr = sg.graph->Reset();
-        GraphHandle ghandle = gptr;
-        *rv = ghandle;
-      } else if (which == 1) {
-        *rv = std::move(sg.induced_vertices);
-      } else if (which == 2) {
-        *rv = std::move(sg.induced_edges);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-}  // namespace
-
-namespace {
-// This namespace contains template functions for batching
-// and unbatching over graph and immutable graph
-template<typename T>
-void DGLDisjointPartitionByNum(const T *gptr, DGLArgs args, DGLRetValue *rv) {
-  int64_t num = args[1];
-  std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
-  // return the pointer array as an integer array
-  const int64_t len = rst.size();
-  NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
-  for (size_t i = 0; i < rst.size(); ++i) {
-    GraphInterface *ptr = rst[i].Reset();
-    ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
-  }
-  *rv = ptr_array;
-}
-
-template<typename T>
-void DGLDisjointUnion(GraphHandle *inhandles, int list_size, DGLRetValue *rv) {
-  std::vector<const T *> graphs;
-  for (int i = 0; i < list_size; ++i) {
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
-    const T *gr = dynamic_cast<const T *>(ptr);
-    CHECK(gr) << "Error: Attempted to batch MutableGraph with ImmutableGraph";
-    graphs.push_back(gr);
-  }
-
-  GraphHandle ghandle = GraphOp::DisjointUnion(std::move(graphs)).Reset();
-  *rv = ghandle;
-}
-
-template<typename T>
-void DGLDisjointPartitionBySizes(const T *gptr, const IdArray sizes, DGLRetValue *rv) {
-  std::vector<T> &&rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
-  // return the pointer array as an integer array
-  const int64_t len = rst.size();
-  NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
-  for (size_t i = 0; i < rst.size(); ++i) {
-    GraphInterface *ptr = rst[i].Reset();
-    ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
-  }
-  *rv = ptr_array;
-}
-}  // namespace
-
 ///////////////////////////// Graph API ///////////////////////////////////
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    bool multigraph = static_cast<bool>(args[0]);
-    GraphHandle ghandle = new Graph(multigraph);
-    *rv = ghandle;
+    bool multigraph = args[0];
+    *rv = GraphRef(Graph::Create(multigraph));
   });
 
 
@@ -135,20 +35,16 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const int multigraph = args[2];
     const int64_t num_nodes = args[3];
     const bool readonly = args[4];
-    GraphHandle ghandle;
     if (readonly) {
       if (multigraph == kBoolUnknown) {
-        COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
-        ghandle = new ImmutableGraph(coo);
+        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids));
       } else {
-        COOPtr coo(new COO(num_nodes, src_ids, dst_ids, multigraph));
-        ghandle = new ImmutableGraph(coo);
+        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
       }
     } else {
       CHECK_NE(multigraph, kBoolUnknown);
-      ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
+      *rv = GraphRef(Graph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
     }
-    *rv = ghandle;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
@@ -164,26 +60,22 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
-    ImmutableGraph *g = nullptr;
     if (shared_mem_name.empty()) {
       if (multigraph == kBoolUnknown) {
-        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-                                                             edge_dir));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
       } else {
-        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-                                                             multigraph, edge_dir));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(
+            indptr, indices, edge_ids, multigraph, edge_dir));
       }
     } else {
       if (multigraph == kBoolUnknown) {
-        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-                                                             edge_dir, shared_mem_name));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(
+            indptr, indices, edge_ids, edge_dir, shared_mem_name));
       } else {
-        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-                                                             multigraph, edge_dir,
-                                                             shared_mem_name));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+            multigraph, edge_dir, shared_mem_name));
       }
     }
-    *rv = g;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
@@ -194,407 +86,264 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const bool multigraph = args[3];
     const std::string edge_dir = args[4];
     // TODO(minjie): how to know multigraph
-    GraphHandle ghandle = new ImmutableGraph(ImmutableGraph::CreateFromCSR(
+    *rv = GraphRef(ImmutableGraph::CreateFromCSR(
       shared_mem_name, num_vertices, num_edges, multigraph, edge_dir));
-    *rv = ghandle;
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFree")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    delete gptr;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphAddVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     uint64_t num_vertices = args[1];
-    gptr->AddVertices(num_vertices);
+    g->AddVertices(num_vertices);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphAddEdge")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    gptr->AddEdge(src, dst);
+    g->AddEdge(src, dst);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphAddEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray src = args[1];
     const IdArray dst = args[2];
-    gptr->AddEdges(src, dst);
+    g->AddEdges(src, dst);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphClear")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    gptr->Clear();
+    GraphRef g = args[0];
+    g->Clear();
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
-    GraphHandle ghandle = args[0];
-    // NOTE: not const since we have caches
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    *rv = gptr->IsMultigraph();
+    GraphRef g = args[0];
+    *rv = g->IsMultigraph();
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsReadonly")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
-    GraphHandle ghandle = args[0];
-    // NOTE: not const since we have caches
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    *rv = gptr->IsReadonly();
+    GraphRef g = args[0];
+    *rv = g->IsReadonly();
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    *rv = static_cast<int64_t>(gptr->NumVertices());
+    GraphRef g = args[0];
+    *rv = static_cast<int64_t>(g->NumVertices());
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    *rv = static_cast<int64_t>(gptr->NumEdges());
+    GraphRef g = args[0];
+    *rv = static_cast<int64_t>(g->NumEdges());
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertex")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
-    *rv = gptr->HasVertex(vid);
+    *rv = g->HasVertex(vid);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = gptr->HasVertices(vids);
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray parent_vids = args[0];
-    const IdArray query = args[1];
-    *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
+    *rv = g->HasVertices(vids);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgeBetween")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = gptr->HasEdgeBetween(src, dst);
+    *rv = g->HasEdgeBetween(src, dst);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgesBetween")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray src = args[1];
     const IdArray dst = args[2];
-    *rv = gptr->HasEdgesBetween(src, dst);
+    *rv = g->HasEdgesBetween(src, dst);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphPredecessors")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
     const uint64_t radius = args[2];
-    *rv = gptr->Predecessors(vid, radius);
+    *rv = g->Predecessors(vid, radius);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphSuccessors")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
     const uint64_t radius = args[2];
-    *rv = gptr->Successors(vid, radius);
+    *rv = g->Successors(vid, radius);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeId")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = gptr->EdgeId(src, dst);
+    *rv = g->EdgeId(src, dst);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray src = args[1];
     const IdArray dst = args[2];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
+    *rv = ConvertEdgeArrayToPackedFunc(g->EdgeIds(src, dst));
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdge")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    const dgl_id_t eid = args[1];
+    const auto& pair = g->FindEdge(eid);
+    *rv = PackedFunc([pair] (DGLArgs args, DGLRetValue* rv) {
+        const int choice = args[0];
+        const int64_t ret = (choice == 0? pair.first : pair.second);
+        *rv = ret;
+      });
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray eids = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->FindEdges(eids));
+    *rv = ConvertEdgeArrayToPackedFunc(g->FindEdges(eids));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_1")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vid));
+    *rv = ConvertEdgeArrayToPackedFunc(g->InEdges(vid));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vids));
+    *rv = ConvertEdgeArrayToPackedFunc(g->InEdges(vids));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutEdges_1")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vid));
+    *rv = ConvertEdgeArrayToPackedFunc(g->OutEdges(vid));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vids));
+    *rv = ConvertEdgeArrayToPackedFunc(g->OutEdges(vids));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     std::string order = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->Edges(order));
+    *rv = ConvertEdgeArrayToPackedFunc(g->Edges(order));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
-    *rv = static_cast<int64_t>(gptr->InDegree(vid));
+    *rv = static_cast<int64_t>(g->InDegree(vid));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = gptr->InDegrees(vids);
+    *rv = g->InDegrees(vids);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const dgl_id_t vid = args[1];
-    *rv = static_cast<int64_t>(gptr->OutDegree(vid));
+    *rv = static_cast<int64_t>(g->OutDegree(vid));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = gptr->OutDegrees(vids);
+    *rv = g->OutDegrees(vids);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
+    std::shared_ptr<Subgraph> subg(new Subgraph(g->VertexSubgraph(vids)));
+    *rv = SubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *gptr = static_cast<GraphInterface*>(ghandle);
+    GraphRef g = args[0];
     const IdArray eids = args[1];
     bool preserve_nodes = args[2];
-    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids, preserve_nodes));
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* list = args[0];
-    GraphHandle* inhandles = static_cast<GraphHandle*>(list);
-    int list_size = args[1];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[0]);
-    const ImmutableGraph *im_gr = dynamic_cast<const ImmutableGraph *>(ptr);
-    const Graph *gr = dynamic_cast<const Graph *>(ptr);
-    if (gr) {
-      DGLDisjointUnion<Graph>(inhandles, list_size, rv);
-    } else {
-      CHECK(im_gr) << "Args[0] is not a list of valid DGLGraph";
-      DGLDisjointUnion<ImmutableGraph>(inhandles, list_size, rv);
-    }
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    if (gptr) {
-      DGLDisjointPartitionByNum(gptr, args, rv);
-    } else {
-      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
-      DGLDisjointPartitionByNum(im_gptr, args, rv);
-    }
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const IdArray sizes = args[1];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    if (gptr) {
-      DGLDisjointPartitionBySizes(gptr, sizes, rv);
-    } else {
-      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
-      DGLDisjointPartitionBySizes(im_gptr, sizes, rv);
-    }
-});
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    bool backtracking = args[1];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    CHECK(gptr) << "_CAPI_DGLGraphLineGraph isn't implemented in immutable graph";
-    Graph* lgptr = new Graph();
-    *lgptr = GraphOp::LineGraph(gptr, backtracking);
-    GraphHandle lghandle = lgptr;
-    *rv = lghandle;
+    std::shared_ptr<Subgraph> subg(
+        new Subgraph(g->EdgeSubgraph(eids, preserve_nodes)));
+    *rv = SubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     bool transpose = args[1];
     std::string format = args[2];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    auto res = ptr->GetAdj(transpose, format);
-    *rv = ConvertAdjToPackedFunc(res);
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutable")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    GraphHandle newhandle = new ImmutableGraph(ImmutableGraph::ToImmutable(ptr));
-    *rv = newhandle;
+    auto res = g->GetAdj(transpose, format);
+    *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    *rv = ptr->Context();
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const int device_type = args[1];
-    const int device_id = args[2];
-    DLContext ctx;
-    ctx.device_type = static_cast<DLDeviceType>(device_type);
-    ctx.device_id = device_id;
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
-    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
-    GraphHandle newhandle = new ImmutableGraph(ig->CopyTo(ctx));
-    *rv = newhandle;
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    std::string edge_dir = args[1];
-    std::string name = args[2];
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
-    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
-    GraphHandle newhandle = new ImmutableGraph(ig->CopyToSharedMem(edge_dir, name));
-    *rv = newhandle;
+    GraphRef g = args[0];
+    *rv = g->Context();
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    *rv = ptr->NumBits();
+    GraphRef g = args[0];
+    *rv = g->NumBits();
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+// Subgraph C APIs
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    int bits = args[1];
-    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
-    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
-    GraphHandle newhandle = new ImmutableGraph(ig->AsNumBits(bits));
-    *rv = newhandle;
+    SubgraphRef subg = args[0];
+    *rv = GraphRef(subg->graph);
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    GraphHandle ret = GraphOp::ToSimpleGraph(ptr).Reset();
-    *rv = ret;
+    SubgraphRef subg = args[0];
+    *rv = subg->induced_vertices;
   });
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    Graph* bgptr = new Graph();
-    *bgptr = GraphOp::ToBidirectedMutableGraph(ptr);
-    GraphHandle bghandle = bgptr;
-    *rv = bghandle;
-  });
-
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
-    *rv = bghandle;
+    SubgraphRef subg = args[0];
+    *rv = subg->induced_edges;
   });
 
 }  // namespace dgl

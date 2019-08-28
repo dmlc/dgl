@@ -1,18 +1,15 @@
 """Module for graph index class definition."""
 from __future__ import absolute_import
 
-import ctypes
 import numpy as np
 import networkx as nx
 import scipy
 
-from ._ffi.base import c_array
+from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
-
-GraphIndexHandle = ctypes.c_void_p
 
 class BoolFlag(object):
     """Bool flag with unknown value"""
@@ -20,24 +17,28 @@ class BoolFlag(object):
     BOOL_FALSE = 0
     BOOL_TRUE = 1
 
-class GraphIndex(object):
+@register_object('graph.Graph')
+class GraphIndex(ObjectBase):
     """Graph index object.
 
-    Parameters
-    ----------
-    handle : GraphIndexHandle
-        Handler
-    """
-    def __init__(self, handle):
-        self._handle = handle
-        self._multigraph = None  # python-side cache of the flag
-        self._readonly = None  # python-side cache of the flag
-        self._cache = {}
+    Note
+    ----
+    Do not create GraphIndex directly, you can create graph index object using
+    following functions:
 
-    def __del__(self):
-        """Free this graph index object."""
-        if hasattr(self, '_handle'):
-            _CAPI_DGLGraphFree(self._handle)
+    - `dgl.graph_index.from_edge_list`
+    - `dgl.graph_index.from_scipy_sparse_matrix`
+    - `dgl.graph_index.from_networkx`
+    - `dgl.graph_index.from_shared_mem_csr_matrix`
+    - `dgl.graph_index.from_csr`
+    - `dgl.graph_index.from_coo`
+    """
+    def __new__(cls):
+        obj = ObjectBase.__new__(cls)
+        obj._multigraph = None  # python-side cache of the flag
+        obj._readonly = None  # python-side cache of the flag
+        obj._cache = {}
+        return obj
 
     def __getstate__(self):
         src, dst, _ = self.edges()
@@ -59,17 +60,13 @@ class GraphIndex(object):
         self._readonly = readonly
         if multigraph is None:
             multigraph = BoolFlag.BOOL_UNKNOWN
-        self._handle = _CAPI_DGLGraphCreate(
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLGraphCreate,
             src.todgltensor(),
             dst.todgltensor(),
             int(multigraph),
             int(num_nodes),
             readonly)
-
-    @property
-    def handle(self):
-        """Get the CAPI handle."""
-        return self._handle
 
     def add_nodes(self, num):
         """Add nodes.
@@ -79,7 +76,7 @@ class GraphIndex(object):
         num : int
             Number of nodes to be added.
         """
-        _CAPI_DGLGraphAddVertices(self._handle, int(num))
+        _CAPI_DGLGraphAddVertices(self, int(num))
         self.clear_cache()
 
     def add_edge(self, u, v):
@@ -92,7 +89,7 @@ class GraphIndex(object):
         v : int
             The dst node.
         """
-        _CAPI_DGLGraphAddEdge(self._handle, u, v)
+        _CAPI_DGLGraphAddEdge(self, int(u), int(v))
         self.clear_cache()
 
     def add_edges(self, u, v):
@@ -107,12 +104,12 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
+        _CAPI_DGLGraphAddEdges(self, u_array, v_array)
         self.clear_cache()
 
     def clear(self):
         """Clear the graph."""
-        _CAPI_DGLGraphClear(self._handle)
+        _CAPI_DGLGraphClear(self)
         self.clear_cache()
 
     def clear_cache(self):
@@ -128,7 +125,7 @@ class GraphIndex(object):
             True if it is a multigraph, False otherwise.
         """
         if self._multigraph is None:
-            self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+            self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self))
         return self._multigraph
 
     def is_readonly(self):
@@ -140,7 +137,7 @@ class GraphIndex(object):
             True if it is a read-only graph, False otherwise.
         """
         if self._readonly is None:
-            self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
+            self._readonly = bool(_CAPI_DGLGraphIsReadonly(self))
         return self._readonly
 
     def readonly(self, readonly_state=True):
@@ -151,6 +148,7 @@ class GraphIndex(object):
         readonly_state : bool
             New readonly state of current graph index.
         """
+        # TODO(minjie): very ugly code, should fix this
         n_nodes, multigraph, _, src, dst = self.__getstate__()
         self.clear_cache()
         state = (n_nodes, multigraph, readonly_state, src, dst)
@@ -164,7 +162,7 @@ class GraphIndex(object):
         int
             The number of nodes
         """
-        return _CAPI_DGLGraphNumVertices(self._handle)
+        return _CAPI_DGLGraphNumVertices(self)
 
     def number_of_edges(self):
         """Return the number of edges.
@@ -174,7 +172,7 @@ class GraphIndex(object):
         int
             The number of edges
         """
-        return _CAPI_DGLGraphNumEdges(self._handle)
+        return _CAPI_DGLGraphNumEdges(self)
 
     def has_node(self, vid):
         """Return true if the node exists.
@@ -189,7 +187,7 @@ class GraphIndex(object):
         bool
             True if the node exists, False otherwise.
         """
-        return bool(_CAPI_DGLGraphHasVertex(self._handle, int(vid)))
+        return bool(_CAPI_DGLGraphHasVertex(self, int(vid)))
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -205,7 +203,7 @@ class GraphIndex(object):
             0-1 array indicating existence
         """
         vid_array = vids.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
+        return utils.toindex(_CAPI_DGLGraphHasVertices(self, vid_array))
 
     def has_edge_between(self, u, v):
         """Return true if the edge exists.
@@ -222,7 +220,7 @@ class GraphIndex(object):
         bool
             True if the edge exists, False otherwise
         """
-        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, int(u), int(v)))
+        return bool(_CAPI_DGLGraphHasEdgeBetween(self, int(u), int(v)))
 
     def has_edges_between(self, u, v):
         """Return true if the edge exists.
@@ -241,7 +239,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self._handle, u_array, v_array))
+        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self, u_array, v_array))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -259,7 +257,7 @@ class GraphIndex(object):
             Array of predecessors
         """
         return utils.toindex(_CAPI_DGLGraphPredecessors(
-            self._handle, int(v), int(radius)))
+            self, int(v), int(radius)))
 
     def successors(self, v, radius=1):
         """Return the successors of the node.
@@ -277,7 +275,7 @@ class GraphIndex(object):
             Array of successors
         """
         return utils.toindex(_CAPI_DGLGraphSuccessors(
-            self._handle, int(v), int(radius)))
+            self, int(v), int(radius)))
 
     def edge_id(self, u, v):
         """Return the id array of all edges between u and v.
@@ -294,7 +292,7 @@ class GraphIndex(object):
         utils.Index
             The edge id array.
         """
-        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, int(u), int(v)))
+        return utils.toindex(_CAPI_DGLGraphEdgeId(self, int(u), int(v)))
 
     def edge_ids(self, u, v):
         """Return a triplet of arrays that contains the edge IDs.
@@ -317,13 +315,31 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        edge_array = _CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array)
+        edge_array = _CAPI_DGLGraphEdgeIds(self, u_array, v_array)
 
         src = utils.toindex(edge_array(0))
         dst = utils.toindex(edge_array(1))
         eid = utils.toindex(edge_array(2))
 
         return src, dst, eid
+
+    def find_edge(self, eid):
+        """Return the edge tuple of the given id.
+
+        Parameters
+        ----------
+        eid : int
+            The edge id.
+
+        Returns
+        -------
+        int
+            src node id
+        int
+            dst node id
+        """
+        ret = _CAPI_DGLGraphFindEdge(self, int(eid))
+        return ret(0), ret(1)
 
     def find_edges(self, eid):
         """Return a triplet of arrays that contains the edge IDs.
@@ -343,7 +359,7 @@ class GraphIndex(object):
             The edge ids.
         """
         eid_array = eid.todgltensor()
-        edge_array = _CAPI_DGLGraphFindEdges(self._handle, eid_array)
+        edge_array = _CAPI_DGLGraphFindEdges(self, eid_array)
 
         src = utils.toindex(edge_array(0))
         dst = utils.toindex(edge_array(1))
@@ -369,10 +385,10 @@ class GraphIndex(object):
             The edge ids.
         """
         if len(v) == 1:
-            edge_array = _CAPI_DGLGraphInEdges_1(self._handle, int(v[0]))
+            edge_array = _CAPI_DGLGraphInEdges_1(self, int(v[0]))
         else:
             v_array = v.todgltensor()
-            edge_array = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
+            edge_array = _CAPI_DGLGraphInEdges_2(self, v_array)
         src = utils.toindex(edge_array(0))
         dst = utils.toindex(edge_array(1))
         eid = utils.toindex(edge_array(2))
@@ -396,10 +412,10 @@ class GraphIndex(object):
             The edge ids.
         """
         if len(v) == 1:
-            edge_array = _CAPI_DGLGraphOutEdges_1(self._handle, int(v[0]))
+            edge_array = _CAPI_DGLGraphOutEdges_1(self, int(v[0]))
         else:
             v_array = v.todgltensor()
-            edge_array = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
+            edge_array = _CAPI_DGLGraphOutEdges_2(self, v_array)
         src = utils.toindex(edge_array(0))
         dst = utils.toindex(edge_array(1))
         eid = utils.toindex(edge_array(2))
@@ -429,7 +445,7 @@ class GraphIndex(object):
         """
         if order is None:
             order = ""
-        edge_array = _CAPI_DGLGraphEdges(self._handle, order)
+        edge_array = _CAPI_DGLGraphEdges(self, order)
         src = edge_array(0)
         dst = edge_array(1)
         eid = edge_array(2)
@@ -451,7 +467,7 @@ class GraphIndex(object):
         int
             The in degree.
         """
-        return _CAPI_DGLGraphInDegree(self._handle, int(v))
+        return _CAPI_DGLGraphInDegree(self, int(v))
 
     def in_degrees(self, v):
         """Return the in degrees of the nodes.
@@ -463,11 +479,11 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
+        tensor
             The in degree array.
         """
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphInDegrees(self._handle, v_array))
+        return utils.toindex(_CAPI_DGLGraphInDegrees(self, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -482,7 +498,7 @@ class GraphIndex(object):
         int
             The out degree.
         """
-        return _CAPI_DGLGraphOutDegree(self._handle, int(v))
+        return _CAPI_DGLGraphOutDegree(self, int(v))
 
     def out_degrees(self, v):
         """Return the out degrees of the nodes.
@@ -494,11 +510,11 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
+        tensor
             The out degree array.
         """
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
+        return utils.toindex(_CAPI_DGLGraphOutDegrees(self, v_array))
 
     def node_subgraph(self, v):
         """Return the induced node subgraph.
@@ -514,10 +530,7 @@ class GraphIndex(object):
             The subgraph index.
         """
         v_array = v.todgltensor()
-        rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
-        induced_edges = utils.toindex(rst(2))
-        gidx = GraphIndex(rst(0))
-        return SubgraphIndex(gidx, self, v, induced_edges)
+        return _CAPI_DGLGraphVertexSubgraph(self, v_array)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -555,13 +568,10 @@ class GraphIndex(object):
             The subgraph index.
         """
         e_array = e.todgltensor()
-        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array, preserve_nodes)
-        induced_nodes = utils.toindex(rst(1))
-        gidx = GraphIndex(rst(0))
-        return SubgraphIndex(gidx, self, induced_nodes, e)
+        return _CAPI_DGLGraphEdgeSubgraph(self, e_array, preserve_nodes)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
-    def adjacency_matrix_scipy(self, transpose, fmt):
+    def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -570,14 +580,14 @@ class GraphIndex(object):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        The elements in the adajency matrix are edge ids.
-
         Parameters
         ----------
         transpose : bool
             A flag to transpose the returned adjacency matrix.
         fmt : str
             Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
 
         Returns
         -------
@@ -587,20 +597,30 @@ class GraphIndex(object):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
-        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+
+        if return_edge_ids is None:
+            dgl_warning(
+                "Adjacency matrix by default currently returns edge IDs."
+                "  As a result there is one 0 entry which is not eliminated."
+                "  In the next release it will return 1s by default,"
+                " and 0 will be eliminated otherwise.",
+                FutureWarning)
+            return_edge_ids = True
+
+        rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            shuffle = utils.toindex(rst(2)).tonumpy()
+            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
             n = self.number_of_nodes()
-            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
+            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(n, n))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0)).tonumpy()
             n = self.number_of_nodes()
             m = self.number_of_edges()
             row, col = np.reshape(idx, (2, m))
-            shuffle = np.arange(0, m)
-            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
+            data = np.arange(0, m) if return_edge_ids else np.ones_like(row)
+            return scipy.sparse.coo_matrix((data, (row, col)), shape=(n, n))
         else:
             raise Exception("unknown format")
 
@@ -630,9 +650,9 @@ class GraphIndex(object):
             The first element of the tuple is the shuffle order for outward graph
             The second element of the tuple is the shuffle order for inward graph
         """
-        csr = _CAPI_DGLGraphGetAdj(self._handle, True, "csr")
+        csr = _CAPI_DGLGraphGetAdj(self, True, "csr")
         order = csr(2)
-        rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
+        rev_csr = _CAPI_DGLGraphGetAdj(self, False, "csr")
         rev_order = rev_csr(2)
         return utils.toindex(order), utils.toindex(rev_order)
 
@@ -664,7 +684,7 @@ class GraphIndex(object):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
         fmt = F.get_preferred_sparse_format()
-        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
             indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
@@ -793,8 +813,7 @@ class GraphIndex(object):
         GraphIndex
             The line graph of this graph.
         """
-        handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
-        return GraphIndex(handle)
+        return _CAPI_DGLGraphLineGraph(self, backtracking)
 
     def to_immutable(self):
         """Convert this graph index to an immutable one.
@@ -804,8 +823,7 @@ class GraphIndex(object):
         GraphIndex
             An immutable graph index.
         """
-        handle = _CAPI_DGLToImmutable(self._handle)
-        return GraphIndex(handle)
+        return _CAPI_DGLToImmutable(self)
 
     def ctx(self):
         """Return the context of this graph index.
@@ -815,7 +833,7 @@ class GraphIndex(object):
         DGLContext
             The context of the graph.
         """
-        return _CAPI_DGLGraphContext(self._handle)
+        return _CAPI_DGLGraphContext(self)
 
     def copy_to(self, ctx):
         """Copy this immutable graph index to the given device context.
@@ -832,8 +850,7 @@ class GraphIndex(object):
         GraphIndex
             The graph index on the given device context.
         """
-        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
-        return GraphIndex(handle)
+        return _CAPI_DGLImmutableGraphCopyTo(self, ctx.device_type, ctx.device_id)
 
     def copyto_shared_mem(self, edge_dir, shared_mem_name):
         """Copy this immutable graph index to shared memory.
@@ -852,8 +869,7 @@ class GraphIndex(object):
         GraphIndex
             The graph index on the given device context.
         """
-        handle = _CAPI_DGLImmutableGraphCopyToSharedMem(self._handle, edge_dir, shared_mem_name)
-        return GraphIndex(handle)
+        return _CAPI_DGLImmutableGraphCopyToSharedMem(self, edge_dir, shared_mem_name)
 
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
@@ -863,7 +879,7 @@ class GraphIndex(object):
         int
             The number of bits.
         """
-        return _CAPI_DGLGraphNumBits(self._handle)
+        return _CAPI_DGLGraphNumBits(self)
 
     def bits_needed(self):
         """Return the number of integer bits needed to represent the graph
@@ -893,36 +909,47 @@ class GraphIndex(object):
         GraphIndex
             The graph index stored using the given number of bits.
         """
-        handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
-        return GraphIndex(handle)
+        return _CAPI_DGLImmutableGraphAsNumBits(self, int(bits))
 
-class SubgraphIndex(object):
-    """Internal subgraph data structure.
+@register_object('graph.Subgraph')
+class SubgraphIndex(ObjectBase):
+    """Subgraph data structure"""
+    @property
+    def graph(self):
+        """The subgraph structure
 
-    Parameters
-    ----------
-    graph : GraphIndex
-        The graph structure of this subgraph.
-    parent : GraphIndex
-        The parent graph index.
-    induced_nodes : utils.Index
-        The parent node ids in this subgraph.
-    induced_edges : utils.Index
-        The parent edge ids in this subgraph.
-    """
-    def __init__(self, graph, parent, induced_nodes, induced_edges):
-        self.graph = graph
-        self.parent = parent
-        self.induced_nodes = induced_nodes
-        self.induced_edges = induced_edges
+        Returns
+        -------
+        GraphIndex
+            The subgraph
+        """
+        return _CAPI_DGLSubgraphGetGraph(self)
 
-    def __getstate__(self):
-        raise NotImplementedError(
-            "SubgraphIndex pickling is not supported yet.")
+    @property
+    def induced_nodes(self):
+        """Induced nodes for each node type. The return list
+        length should be equal to the number of node types.
 
-    def __setstate__(self, state):
-        raise NotImplementedError(
-            "SubgraphIndex unpickling is not supported yet.")
+        Returns
+        -------
+        list of utils.Index
+            Induced nodes
+        """
+        ret = _CAPI_DGLSubgraphGetInducedVertices(self)
+        return utils.toindex(ret)
+
+    @property
+    def induced_edges(self):
+        """Induced edges for each edge type. The return list
+        length should be equal to the number of edge types.
+
+        Returns
+        -------
+        list of utils.Index
+            Induced edges
+        """
+        ret = _CAPI_DGLSubgraphGetInducedEdges(self)
+        return utils.toindex(ret)
 
 
 ###############################################################
@@ -954,19 +981,17 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     if is_multigraph is None:
         is_multigraph = BoolFlag.BOOL_UNKNOWN
     if readonly:
-        handle = _CAPI_DGLGraphCreate(
+        gidx = _CAPI_DGLGraphCreate(
             src.todgltensor(),
             dst.todgltensor(),
             int(is_multigraph),
             int(num_nodes),
             readonly)
-        gidx = GraphIndex(handle)
     else:
         if is_multigraph is BoolFlag.BOOL_UNKNOWN:
             # TODO(minjie): better behavior in the future
             is_multigraph = BoolFlag.BOOL_FALSE
-        handle = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
-        gidx = GraphIndex(handle)
+        gidx = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
         gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
     return gidx
@@ -992,13 +1017,13 @@ def from_csr(indptr, indices, is_multigraph,
     indices = utils.toindex(indices)
     if is_multigraph is None:
         is_multigraph = BoolFlag.BOOL_UNKNOWN
-    handle = _CAPI_DGLGraphCSRCreate(
+    gidx = _CAPI_DGLGraphCSRCreate(
         indptr.todgltensor(),
         indices.todgltensor(),
         shared_mem_name,
         int(is_multigraph),
         direction)
-    return GraphIndex(handle)
+    return gidx
 
 def from_shared_mem_csr_matrix(shared_mem_name,
                                num_nodes, num_edges, edge_dir,
@@ -1016,12 +1041,12 @@ def from_shared_mem_csr_matrix(shared_mem_name,
     edge_dir : string
         the edge direction. The supported option is "in" and "out".
     """
-    handle = _CAPI_DGLGraphCSRCreateMMap(
+    gidx = _CAPI_DGLGraphCSRCreateMMap(
         shared_mem_name,
         int(num_nodes), int(num_edges),
         is_multigraph,
         edge_dir)
-    return GraphIndex(handle)
+    return gidx
 
 def from_networkx(nx_graph, readonly):
     """Convert from networkx graph.
@@ -1174,10 +1199,7 @@ def disjoint_union(graphs):
     GraphIndex
         The disjoint union
     """
-    inputs = c_array(GraphIndexHandle, [gr._handle for gr in graphs])
-    inputs = ctypes.cast(inputs, ctypes.c_void_p)
-    handle = _CAPI_DGLDisjointUnion(inputs, len(graphs))
-    return GraphIndex(handle)
+    return _CAPI_DGLDisjointUnion(list(graphs))
 
 def disjoint_partition(graph, num_or_size_splits):
     """Partition the graph disjointly.
@@ -1201,17 +1223,13 @@ def disjoint_partition(graph, num_or_size_splits):
     """
     if isinstance(num_or_size_splits, utils.Index):
         rst = _CAPI_DGLDisjointPartitionBySizes(
-            graph._handle,
+            graph,
             num_or_size_splits.todgltensor())
     else:
         rst = _CAPI_DGLDisjointPartitionByNum(
-            graph._handle,
+            graph,
             int(num_or_size_splits))
-    graphs = []
-    for val in rst.asnumpy():
-        handle = ctypes.cast(int(val), ctypes.c_void_p)
-        graphs.append(GraphIndex(handle))
-    return graphs
+    return rst
 
 def create_graph_index(graph_data, multigraph, readonly):
     """Create a graph index object.
@@ -1235,8 +1253,7 @@ def create_graph_index(graph_data, multigraph, readonly):
             raise Exception("can't create an empty immutable graph")
         if multigraph is None:
             multigraph = False
-        handle = _CAPI_DGLGraphCreateMutable(multigraph)
-        return GraphIndex(handle)
+        return _CAPI_DGLGraphCreateMutable(multigraph)
     elif isinstance(graph_data, (list, tuple)):
         # edge list
         return from_edge_list(graph_data, multigraph, readonly)

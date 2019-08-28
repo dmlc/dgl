@@ -94,13 +94,18 @@ def tutorial_test_linux(backend) {
 }
 
 pipeline {
-  agent none
+  agent any
   stages {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
+      }
+      post {
+        always {
+          cleanWs disableDeferredWipeout: true, deleteDirs: true
+        }
       }
     }
     stage("Build") {
@@ -109,6 +114,11 @@ pipeline {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             build_dgl_linux("cpu")
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
         stage("GPU Build") {
@@ -122,6 +132,11 @@ pipeline {
             sh "nvidia-smi"
             build_dgl_linux("gpu")
           }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
         }
         stage("CPU Build (Win64)") {
           // Windows build machines are manually added to Jenkins master with
@@ -129,6 +144,11 @@ pipeline {
           agent { label "windows" }
           steps {
             build_dgl_win64("cpu")
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
         // Currently we don't have Windows GPU build machines
@@ -141,11 +161,21 @@ pipeline {
           steps {
             cpp_unit_test_linux()
           }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
         }
         stage("C++ CPU (Win64)") {
           agent { label "windows" }
           steps {
             cpp_unit_test_win64()
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
         stage("Torch CPU") {
@@ -167,6 +197,11 @@ pipeline {
               }
             }
           }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
         }
         stage("Torch CPU (Win64)") {
           agent { label "windows" }
@@ -180,6 +215,11 @@ pipeline {
               steps {
                 example_test_win64("pytorch", "cpu")
               }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
             }
           }
         }
@@ -203,6 +243,11 @@ pipeline {
               }
             }
           }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
         }
         stage("MXNet CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
@@ -212,16 +257,16 @@ pipeline {
                 unit_test_linux("mxnet", "cpu")
               }
             }
-            //stage("Example test") {
-            //  steps {
-            //    unit_test_linux("pytorch", "cpu")
-            //  }
-            //}
             //stage("Tutorial test") {
             //  steps {
             //    tutorial_test_linux("mxnet")
             //  }
             //}
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
         stage("MXNet GPU") {
@@ -238,18 +283,20 @@ pipeline {
                 unit_test_linux("mxnet", "gpu")
               }
             }
-            //stage("Example test") {
-            //  steps {
-            //    unit_test_linux("pytorch", "cpu")
-            //  }
-            //}
-            //stage("Tutorial test") {
-            //  steps {
-            //    tutorial_test_linux("mxnet")
-            //  }
-            //}
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
           }
         }
+      }
+    }
+  }
+  post {
+    always {
+      node('windows') {
+        bat "rmvirtualenv ${BUILD_TAG}"
       }
     }
   }

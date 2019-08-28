@@ -20,7 +20,7 @@ class TypeCode(object):
     DGL_TYPE = 5
     DGL_CONTEXT = 6
     ARRAY_HANDLE = 7
-    NODE_HANDLE = 8
+    OBJECT_HANDLE = 8
     MODULE_HANDLE = 9
     FUNC_HANDLE = 10
     STR = 11

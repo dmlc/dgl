@@ -2,7 +2,6 @@ import os
 import backend as F
 import networkx as nx
 import numpy as np
-import torch as th
 import dgl
 
 def test_node_removal():

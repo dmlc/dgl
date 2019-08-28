@@ -4,7 +4,12 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
 Difference compared to MichSchli/RelationPrediction
-* report raw metrics instead of filtered metrics
+* Report raw metrics instead of filtered metrics.
+* By default, we use uniform edge sampling instead of neighbor-based edge
+  sampling used in author's code. In practice, we find it achieves similar MRR
+  probably because the model only uses one GNN layer so messages are propagated
+  among immediate neighbors. User could specify "--edge-sampler=neighbor" to switch
+  to neighbor-based edge sampling.
 """
 
 import argparse
@@ -15,8 +20,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import random
 from dgl.contrib.data import load_data
+from dgl.nn.pytorch import RelGraphConv
 
-from layers import RGCNBlockLayer as RGCNLayer
 from model import BaseRGCN
 
 import utils
@@ -26,9 +31,8 @@ class EmbeddingLayer(nn.Module):
         super(EmbeddingLayer, self).__init__()
         self.embedding = torch.nn.Embedding(num_nodes, h_dim)
 
-    def forward(self, g):
-        node_id = g.ndata['id'].squeeze()
-        g.ndata['h'] = self.embedding(node_id)
+    def forward(self, g, h, r, norm):
+        return self.embedding(h.squeeze())
 
 class RGCN(BaseRGCN):
     def build_input_layer(self):
@@ -36,8 +40,9 @@ class RGCN(BaseRGCN):
 
     def build_hidden_layer(self, idx):
         act = F.relu if idx < self.num_hidden_layers - 1 else None
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
-                         activation=act, self_loop=True, dropout=self.dropout)
+        return RelGraphConv(self.h_dim, self.h_dim, self.num_rels, "bdd",
+                self.num_bases, activation=act, self_loop=True,
+                dropout=self.dropout)
 
 class LinkPredict(nn.Module):
     def __init__(self, in_dim, h_dim, num_rels, num_bases=-1,
@@ -58,26 +63,26 @@ class LinkPredict(nn.Module):
         score = torch.sum(s * r * o, dim=1)
         return score
 
-    def forward(self, g):
-        return self.rgcn.forward(g)
-
-    def evaluate(self, g):
-        # get embedding and relation weight without grad
-        embedding = self.forward(g)
-        return embedding, self.w_relation
+    def forward(self, g, h, r, norm):
+        return self.rgcn.forward(g, h, r, norm)
 
     def regularization_loss(self, embedding):
         return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))
 
-    def get_loss(self, g, triplets, labels):
+    def get_loss(self, g, embed, triplets, labels):
         # triplets is a list of data samples (positive and negative)
         # each row in the triplets is a 3-tuple of (source, relation, destination)
-        embedding = self.forward(g)
-        score = self.calc_score(embedding, triplets)
+        score = self.calc_score(embed, triplets)
         predict_loss = F.binary_cross_entropy_with_logits(score, labels)
-        reg_loss = self.regularization_loss(embedding)
+        reg_loss = self.regularization_loss(embed)
         return predict_loss + self.reg_param * reg_loss
 
+def node_norm_to_edge_norm(g, node_norm):
+    g = g.local_var()
+    # convert to edge norm
+    g.ndata['norm'] = node_norm
+    g.apply_edges(lambda edges : {'norm' : edges.dst['norm']})
+    return g.edata['norm']
 
 def main(args):
     # load graph data
@@ -114,9 +119,7 @@ def main(args):
                 range(test_graph.number_of_nodes())).float().view(-1,1)
     test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
     test_rel = torch.from_numpy(test_rel)
-    test_norm = torch.from_numpy(test_norm).view(-1, 1)
-    test_graph.ndata.update({'id': test_node_id, 'norm': test_norm})
-    test_graph.edata['type'] = test_rel
+    test_norm = node_norm_to_edge_norm(test_graph, torch.from_numpy(test_norm).view(-1, 1))
 
     if use_cuda:
         model.cuda()
@@ -144,24 +147,24 @@ def main(args):
         g, node_id, edge_type, node_norm, data, labels = \
             utils.generate_sampled_graph_and_labels(
                 train_data, args.graph_batch_size, args.graph_split_size,
-                num_rels, adj_list, degrees, args.negative_sample)
+                num_rels, adj_list, degrees, args.negative_sample,
+                args.edge_sampler)
         print("Done edge sampling")
 
         # set node/edge feature
-        node_id = torch.from_numpy(node_id).view(-1, 1)
+        node_id = torch.from_numpy(node_id).view(-1, 1).long()
         edge_type = torch.from_numpy(edge_type)
-        node_norm = torch.from_numpy(node_norm).view(-1, 1)
+        edge_norm = node_norm_to_edge_norm(g, torch.from_numpy(node_norm).view(-1, 1))
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
         deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
         if use_cuda:
             node_id, deg = node_id.cuda(), deg.cuda()
-            edge_type, node_norm = edge_type.cuda(), node_norm.cuda()
+            edge_type, edge_norm = edge_type.cuda(), edge_norm.cuda()
             data, labels = data.cuda(), labels.cuda()
-        g.ndata.update({'id': node_id, 'norm': node_norm})
-        g.edata['type'] = edge_type
 
         t0 = time.time()
-        loss = model.get_loss(g, data, labels)
+        embed = model(g, node_id, edge_type, edge_norm)
+        loss = model.get_loss(g, embed, data, labels)
         t1 = time.time()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm) # clip gradients
@@ -182,7 +185,8 @@ def main(args):
                 model.cpu()
             model.eval()
             print("start eval")
-            mrr = utils.evaluate(test_graph, model, valid_data, num_nodes,
+            embed = model(test_graph, test_node_id, test_rel, test_norm)
+            mrr = utils.calc_mrr(embed, model.w_relation, valid_data,
                                  hits=[1, 3, 10], eval_bz=args.eval_batch_size)
             # save best model
             if mrr < best_mrr:
@@ -207,9 +211,9 @@ def main(args):
     model.eval()
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
-    utils.evaluate(test_graph, model, test_data, num_nodes, hits=[1, 3, 10],
-                   eval_bz=args.eval_batch_size)
-
+    embed = model(test_graph, test_node_id, test_rel, test_norm)
+    utils.calc_mrr(embed, model.w_relation, test_data,
+                   hits=[1, 3, 10], eval_bz=args.eval_batch_size)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
@@ -243,8 +247,9 @@ if __name__ == '__main__':
             help="number of negative samples per positive sample")
     parser.add_argument("--evaluate-every", type=int, default=500,
             help="perform evaluation every n epochs")
+    parser.add_argument("--edge-sampler", type=str, default="uniform",
+            help="type of edge sampler: 'uniform' or 'neighbor'")
 
     args = parser.parse_args()
     print(args)
     main(args)
-

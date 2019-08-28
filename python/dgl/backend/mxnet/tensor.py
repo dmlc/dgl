@@ -6,8 +6,10 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 import numbers
+import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
+from ...function.base import TargetCode 
 
 MX_VERSION = LooseVersion(mx.__version__)
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -37,6 +39,9 @@ def tensor(data, dtype=None):
         else:
             dtype = np.float32
     return nd.array(data, dtype=dtype)
+
+def as_scalar(data):
+    return data.asscalar()
 
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
@@ -109,14 +114,47 @@ def asnumpy(input):
 def copy_to(input, ctx):
     return input.as_in_context(ctx)
 
-def sum(input, dim):
-    return nd.sum(input, axis=dim)
+def sum(input, dim, keepdims=False):
+    return nd.sum(input, axis=dim, keepdims=keepdims)
+
+def reduce_sum(input):
+    return input.sum()
 
 def mean(input, dim):
     return nd.mean(input, axis=dim)
 
+def reduce_mean(input):
+    return input.mean()
+
 def max(input, dim):
     return nd.max(input, axis=dim)
+
+def reduce_max(input):
+    return input.max()
+
+def min(input, dim):
+    return nd.min(input, axis=dim)
+
+def reduce_min(input):
+    return input.min()
+
+def topk(input, k, dim, descending=True):
+    return nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending)
+
+def argtopk(input, k, dim, descending=True):
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    return nd.slice_axis(input, dim, 0, k)
+
+def argsort(input, dim, descending):
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    idx = nd.cast(idx, dtype='int64')
+    return idx
+
+def exp(input):
+    return nd.exp(input)
+
+def softmax(input, dim=-1):
+    return nd.softmax(input, axis=dim)
 
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
@@ -125,14 +163,26 @@ def stack(seq, dim):
     return nd.stack(*seq, axis=dim)
 
 def split(x, sizes_or_sections, dim):
+    if isinstance(sizes_or_sections, list) and len(sizes_or_sections) == 1:
+        assert len(x) == sizes_or_sections[0]
+        return [x]
+
+    if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
+        if isinstance(sizes_or_sections, (np.ndarray, list)):
+            sizes_or_sections1 = tuple(np.cumsum(sizes_or_sections)[:-1])
+        return nd.split_v2(x, sizes_or_sections1, axis=dim)
+
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
-        # TODO: fallback to numpy is unfortunate
+        # Old MXNet doesn't support split with different section sizes.
         np_arr = x.asnumpy()
         indices = np.cumsum(sizes_or_sections)[:-1]
         res = np.split(np_arr, indices, axis=dim)
         return [tensor(arr, dtype=x.dtype) for arr in res]
     else:
         return nd.split(x, sizes_or_sections, axis=dim)
+
+def repeat(input, repeats, dim):
+    return nd.repeat(input, repeats, axis=dim)
 
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
@@ -143,6 +193,17 @@ def gather_row(data, row_index):
         return nd.take(data, row_index)
     else:
         return data[row_index,]
+
+def slice_axis(data, axis, begin, end):
+    dim = data.shape[axis]
+    if begin < 0:
+        begin += dim
+    if end <= 0:
+        end += dim
+    return nd.slice_axis(data, axis, begin, end)
+
+def take(data, indices, dim):
+    return nd.take(data, indices, dim)
 
 def narrow_row(data, start, stop):
     return data[start:stop]
@@ -163,6 +224,9 @@ def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
 
+def swapaxes(input, axis1, axis2):
+    return nd.swapaxes(input, axis1, axis2)
+
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
 
@@ -171,6 +235,35 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
+
+def pad_packed_tensor(input, lengths, value, l_min=None):
+    old_shape = input.shape
+    if isinstance(lengths, nd.NDArray):
+        max_len = as_scalar(input.max())
+    else:
+        max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
+    batch_size = len(lengths)
+    ctx = input.context
+    dtype = input.dtype
+    x = nd.full((batch_size * max_len, *old_shape[1:]), value, ctx=ctx, dtype=dtype)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return scatter_row(x, index, input).reshape(batch_size, max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    ctx = input.context
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = nd.array(index, ctx=ctx)
+    return gather_row(input.reshape(batch_size * max_len, -1), index)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     # TODO: support other dimensions
@@ -249,8 +342,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
-    # NOTE: not zerocopy
-    return nd.array(np_data, dtype=np_data.dtype)
+    return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
@@ -284,20 +376,48 @@ class BinaryReduce(mx.autograd.Function):
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
             self.rhs_map[0], self.out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if self.reducer == 'mean':
+            degs = nd.empty((out_data.shape[0],),
+                            ctx=out_data.context, dtype=out_data.dtype)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            if self.lhs != TargetCode.DST:
+                target = self.lhs
+                n = lhs_data.shape[0]
+                in_map = self.lhs_map[0]
+            else:
+                target = self.rhs
+                n = rhs_data.shape[0]
+                in_map = self.rhs_map[0]
+            in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', self.graph, target, in_ones_nd, degs_nd, 
+                in_map, self.out_map[0])
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            out_data = out_data / degs
+        else:
+            degs = None
         self.save_for_backward(lhs_data_nd, rhs_data_nd, out_data_nd,
-                               feat_shape)
+                               feat_shape, degs)
         return out_data
 
     def backward(self, grad_out):
-        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape = self.saved_tensors
+        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape, degs = self.saved_tensors
+        if self.reducer == 'mean':
+            grad_out = grad_out / degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_lhs = nd.empty((lhs_data_nd.shape[0],) + feat_shape,
                             ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_lhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_lhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
@@ -305,7 +425,8 @@ class BinaryReduce(mx.autograd.Function):
         grad_rhs = nd.empty((rhs_data_nd.shape[0],) + feat_shape,
                              ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_rhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
@@ -339,18 +460,39 @@ class CopyReduce(mx.autograd.Function):
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.graph, self.target, in_data_nd, out_data_nd,
             self.in_map[0], self.out_map[0])
-        self.save_for_backward(in_data_nd, out_data_nd)
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if self.reducer == 'mean':
+            in_ones = nd.ones((in_data.shape[0],),
+                              ctx=in_data.context, dtype=in_data.dtype)
+            degs = nd.empty((out_data.shape[0],),
+                            ctx=out_data.context, dtype=out_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', self.graph, self.target, in_ones_nd, degs_nd, 
+                self.in_map[0], self.out_map[0])
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            out_data = out_data / degs
+        else:
+            degs = None
+        self.save_for_backward(in_data_nd, out_data_nd, degs)
         return out_data
 
     def backward(self, grad_out):
-        in_data_nd, out_data_nd = self.saved_tensors
-        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        in_data_nd, out_data_nd, degs = self.saved_tensors
         grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
                             dtype=grad_out.dtype)
+        if self.reducer == 'mean':
+            grad_out = grad_out / degs
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         K.backward_copy_reduce(
-            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.graph, self.target, in_data_nd, out_data_nd,
             grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
             self.in_map[1], self.out_map[1])
         # clear saved tensors explicitly

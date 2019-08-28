@@ -214,7 +214,7 @@ _register_builtin_message_func()
 
 def src_mul_edge(src, edge, out):
     """Builtin message function that computes message by performing
-    binary operation mul between src feature and dst feature.
+    binary operation mul between src feature and edge feature.
 
     Notes
     -----

@@ -14,136 +14,172 @@
 #include "communicator.h"
 #include "msg_queue.h"
 #include "tcp_socket.h"
+#include "common.h"
 
 namespace dgl {
 namespace network {
 
-using dgl::network::MessageQueue;
-using dgl::network::TCPSocket;
-using dgl::network::Sender;
-using dgl::network::Receiver;
+static int kMaxTryCount = 1024;    // maximal connection: 1024
+static int kTimeOut = 10;          // 10 minutes for socket timeout
+static int kMaxConnection = 1024;  // maximal connection: 1024
 
 /*!
  * \breif Networking address
  */
-struct Addr {
-  std::string ip_;
-  int port_;
+struct IPAddr {
+  std::string ip;
+  int port;
 };
 
 /*!
- * \brief Network Sender for DGL distributed training.
+ * \brief SocketSender for DGL distributed training.
  *
- * Sender is an abstract class that defines a set of APIs for sending 
- * binary data over network. It can be implemented by different underlying 
- * networking libraries such TCP socket and ZMQ. One Sender can connect to 
- * multiple receivers, and it can send data to specified receiver via receiver's ID.
+ * SocketSender is the communicator implemented by tcp socket.
  */
 class SocketSender : public Sender {
  public:
   /*!
-   * \brief Add receiver address and it's ID to the namebook
-   * \param ip receviver's IP address
-   * \param port receiver's port
-   * \param id receiver's ID
+   * \brief Sender constructor
+   * \param queue_size size of message queue 
    */
-  void AddReceiver(const char* ip, int port, int recv_id);
+  explicit SocketSender(int64_t queue_size) : Sender(queue_size) {}
+
+  /*!
+   * \brief Add receiver's address and ID to the sender's namebook
+   * \param addr Networking address, e.g., 'socket://127.0.0.1:50091', 'mpi://0'
+   * \param id receiver's ID
+   *
+   * AddReceiver() is not thread-safe and only one thread can invoke this API.
+   */
+  void AddReceiver(const char* addr, int recv_id);
 
   /*!
    * \brief Connect with all the Receivers
-   * \return True for sucess and False for fail
+   * \return True for success and False for fail
+   *
+   * Connect() is not thread-safe and only one thread can invoke this API.
    */
   bool Connect();
 
   /*!
-   * \brief Send data to specified Receiver
-   * \param data data buffer for sending
-   * \param size data size for sending
+   * \brief Send data to specified Receiver. Actually pushing message to message queue.
+   * \param msg data message
    * \param recv_id receiver's ID
-   * \return bytes we sent
-   *   > 0 : bytes we sent
-   *   - 1 : error
+   * \return Status code
+   *
+   * (1) The send is non-blocking. There is no guarantee that the message has been 
+   *     physically sent out when the function returns.
+   * (2) The communicator will assume the responsibility of the given message.
+   * (3) The API is multi-thread safe.
+   * (4) Messages sent to the same receiver are guaranteed to be received in the same order. 
+   *     There is no guarantee for messages sent to different receivers.
    */
-  int64_t Send(const char* data, int64_t size, int recv_id);
+  STATUS Send(Message msg, int recv_id);
 
   /*!
-   * \brief Finalize Sender
+   * \brief Finalize SocketSender
+   *
+   * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize();
 
   /*!
-   * \brief Get data buffer
-   * \return buffer pointer
+   * \brief Communicator type: 'socket'
    */
-  char* GetBuffer();
-
-  /*!
-   * \brief Set data buffer
-   */
-  void SetBuffer(char* buffer);
+  inline std::string Type() const { return std::string("socket"); }
 
  private:
   /*!
-   * \brief socket map
+   * \brief socket for each connection of receiver
    */ 
-  std::unordered_map<int, TCPSocket*> socket_map_;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<TCPSocket>> sockets_;
 
   /*!
-   * \brief receiver address map
+   * \brief receivers' address
    */ 
-  std::unordered_map<int, Addr> receiver_addr_map_;
+  std::unordered_map<int /* receiver ID */, IPAddr> receiver_addrs_;
 
   /*!
-   * \brief data buffer
+   * \brief message queue for each socket connection
    */ 
-  char* buffer_ = nullptr;
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<MessageQueue>> msg_queue_;
+
+  /*!
+   * \brief Independent thread for each socket connection
+   */ 
+  std::unordered_map<int /* receiver ID */, std::shared_ptr<std::thread>> threads_;
+
+  /*!
+   * \brief Send-loop for each socket in per-thread
+   * \param socket TCPSocket for current connection
+   * \param queue message_queue for current connection
+   * 
+   * Note that, the SendLoop will finish its loop-job and exit thread
+   * when the main thread invokes Signal() API on the message queue.
+   */
+  static void SendLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
 /*!
- * \brief Network Receiver for DGL distributed training.
+ * \brief SocketReceiver for DGL distributed training.
  *
- * Receiver is an abstract class that defines a set of APIs for receiving binary 
- * data over network. It can be implemented by different underlying networking libraries 
- * such TCP socket and ZMQ. One Receiver can connect with multiple Senders, and it can receive 
- * data from these Senders concurrently via multi-threading and message queue.
+ * SocketReceiver is the communicator implemented by tcp socket.
  */
 class SocketReceiver : public Receiver {
  public:
   /*!
-   * \brief Wait all of the Senders to connect
-   * \param ip Receiver's IP address
-   * \param port Receiver's port
+   * \brief Receiver constructor
+   * \param queue_size size of message queue.
+   */
+  explicit SocketReceiver(int64_t queue_size) : Receiver(queue_size) {}
+
+  /*!
+   * \brief Wait for all the Senders to connect
+   * \param addr Networking address, e.g., 'socket://127.0.0.1:50051', 'mpi://0'
    * \param num_sender total number of Senders
-   * \param queue_size size of message queue
-   * \return True for sucess and False for fail
+   * \return True for success and False for fail
+   *
+   * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const char* ip, int port, int num_sender, int queue_size);
+  bool Wait(const char* addr, int num_sender);
 
   /*!
-   * \brief Recv data from Sender (copy data from message queue)
-   * \param dest data buffer of destination
-   * \param max_size maximul size of data buffer
-   * \return bytes we received
-   *   > 0 : bytes we received
-   *   - 1 : error
+   * \brief Recv data from Sender. Actually removing data from msg_queue.
+   * \param msg pointer of data message
+   * \param send_id which sender current msg comes from
+   * \return Status code
+   *
+   * (1) The Recv() API is blocking, which will not 
+   *     return until getting data from message queue.
+   * (2) The Recv() API is thread-safe.
+   * (3) Memory allocated by communicator but will not own it after the function returns.
    */
-  int64_t Recv(char* dest, int64_t max_size);
+  STATUS Recv(Message* msg, int* send_id);
 
   /*!
-   * \brief Finalize Receiver
+   * \brief Recv data from a specified Sender. Actually removing data from msg_queue.
+   * \param msg pointer of data message
+   * \param send_id sender's ID
+   * \return Status code
+   *
+   * (1) The RecvFrom() API is blocking, which will not 
+   *     return until getting data from message queue.
+   * (2) The RecvFrom() API is thread-safe.
+   * (3) Memory allocated by communicator but will not own it after the function returns.
+   */
+  STATUS RecvFrom(Message* msg, int send_id);
+
+  /*!
+   * \brief Finalize SocketReceiver
+   *
+   * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize();
 
   /*!
-   * \brief Get data buffer
-   * \return buffer pointer
+   * \brief Communicator type: 'socket'
    */
-  char* GetBuffer();
-
-  /*!
-   * \brief Set data buffer
-   */
-  void SetBuffer(char* buffer);
+  inline std::string Type() const { return std::string("socket"); }
 
  private:
   /*!
@@ -152,37 +188,34 @@ class SocketReceiver : public Receiver {
   int num_sender_;
 
   /*!
-   * \brief maximal size of message queue
+   * \brief server socket for listening connections
    */ 
-  int64_t queue_size_;
+  TCPSocket* server_socket_;
 
   /*!
-   * \brief socket list
+   * \brief socket for each client connections
    */ 
-  std::vector<TCPSocket*> socket_;
+  std::unordered_map<int /* Sender (virutal) ID */, std::shared_ptr<TCPSocket>> sockets_;
 
   /*!
-   * \brief Thread pool for socket connection
+   * \brief Message queue for each socket connection
    */ 
-  std::vector<std::thread*> thread_;
+  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>> msg_queue_;
 
   /*!
-   * \brief Message queue for communicator
+   * \brief Independent thead for each socket connection
    */ 
-  MessageQueue* queue_;
+  std::unordered_map<int /* Sender (virtual) ID */, std::shared_ptr<std::thread>> threads_;
 
   /*!
-   * \brief data buffer
-   */ 
-  char* buffer_ = nullptr;
-
-  /*!
-   * \brief Process received message in independent threads
-   * \param socket new accpeted socket
+   * \brief Recv-loop for each socket in per-thread
+   * \param socket client socket
    * \param queue message queue
-   * \param id producer_id
+   *
+   * Note that, the RecvLoop will finish its loop-job and exit thread
+   * when the main thread invokes Signal() API on the message queue.
    */ 
-  static void MsgHandler(TCPSocket* socket, MessageQueue* queue, int id);
+  static void RecvLoop(TCPSocket* socket, MessageQueue* queue);
 };
 
 }  // namespace network

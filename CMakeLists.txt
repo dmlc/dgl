@@ -87,12 +87,15 @@ add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier
 # Source file lists
 file(GLOB DGL_SRC
   src/*.cc
+  src/array/*.cc
+  src/array/cpu/*.cc
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
 )
 
 file(GLOB_RECURSE DGL_SRC_1
+  src/api/*.cc
   src/graph/*.cc
   src/scheduler/*.cc
 )
