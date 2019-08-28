@@ -7,7 +7,7 @@ import pickle
 import sys
 
 from dgl import DGLGraph
-from .utils import smile2graph
+from .utils import smile_to_bigraph
 
 
 class CSVDataset(object):
@@ -28,9 +28,9 @@ class CSVDataset(object):
     One column includes smiles and other columns for labels.
     Column names other than smiles column would be considered as task names.
 
-    smile2graph: callable, str -> DGLGraph
+    smile_to_graph: callable, str -> DGLGraph
     A function turns smiles into a DGLGraph. Default one can be found 
-    at python/dgl/data/chem/utils.py named with smile2graph.
+    at python/dgl/data/chem/utils.py named with smile_to_bigraph.
 
     smile_column: str
     Column name that including smiles
@@ -39,7 +39,7 @@ class CSVDataset(object):
     Path to store the preprocessed data
     """
 
-    def __init__(self, df, smile2graph=smile2graph, smile_column='smiles',
+    def __init__(self, df, smile_to_graph=smile_to_bigraph, smile_column='smiles',
                  cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
@@ -50,9 +50,9 @@ class CSVDataset(object):
         self.task_names = self.df.columns.drop([smile_column]).tolist()
         self.n_tasks = len(self.task_names)
         self.cache_file_path = cache_file_path
-        self._pre_process(smile2graph)
+        self._pre_process(smile_to_graph)
 
-    def _pre_process(self, smile2graph):
+    def _pre_process(self, smile_to_graph):
         """Pre-process the dataset
 
         * Convert molecules from smiles format into DGLGraphs
@@ -66,7 +66,7 @@ class CSVDataset(object):
             with open(self.cache_file_path, 'rb') as f:
                 self.graphs = pickle.load(f)
         else:
-            self.graphs = [smile2graph(s) for s in self.smiles]
+            self.graphs = [smile_to_graph(s) for s in self.smiles]
             with open(self.cache_file_path, 'wb') as f:
                 pickle.dump(self.graphs, f)
 

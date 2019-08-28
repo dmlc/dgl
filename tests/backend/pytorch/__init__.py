@@ -79,6 +79,9 @@ def min(x, dim):
 def prod(x, dim):
     return x.prod(dim)
 
+def matmul(a, b):
+    return a @ b
+
 class record_grad(object):
     def __init__(self):
         pass
