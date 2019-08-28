@@ -5,9 +5,7 @@ import torch.nn as nn
 
 class AminerDataset:
     """
-    The FullFreeBase dataset is adapted from OpenKE.
-    The dataset is divided into train, valid, test set with ratio of 90%, 5%, 5%.
-    Triples in train.txt, valid.txt, test.txt is encoded as entity2id.txt and relation2id.txt.
+    Download Aminer Dataset from Amazon S3 bucket. 
     """
     def __init__(self, path):
 
@@ -38,6 +36,3 @@ class AminerDataset:
             zf.extractall(path)
         print('Unzip finished.')
         self.fn = fn
-
-#if __name__ == '__main__':
-#    fb = FullFBDataset('/Users/ziqiaom/Desktop/dataloader/data')

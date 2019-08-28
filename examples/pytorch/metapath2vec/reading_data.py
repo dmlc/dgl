@@ -40,29 +40,15 @@ class DataReader:
                             print("Read " + str(int(self.token_count / 1000000)) + "M words.")
 
         wid = 0
-        #index2type = {}
         for w, c in word_frequency.items():
             if c < min_count:
                 continue
             self.word2id[w] = wid
             self.id2word[wid] = w
-            #index2type[wid] = w[0]
             self.word_frequency[wid] = c
             wid += 1
-        #type2indices = {}
-        #all_types = set(index2type.values())
-        #for node_type in all_types:
-        #    type2indices[node_type] = []
-
-        #for node_index, node_type in index2type.items():
-        #    type2indices[node_type].append(node_index)
-
-        #for node_type in all_types:
-        #    type2indices[node_type] = np.array(type2indices[node_type])
 
         self.word_count = len(self.word2id)
-        #self.index2type = index2type
-        #self.type2indices = type2indices
         print("Total embeddings: " + str(len(self.word2id)))
 
     def initTableDiscards(self):
@@ -83,32 +69,14 @@ class DataReader:
             self.negatives += [wid] * int(c)
         self.negatives = np.array(self.negatives)
         np.random.shuffle(self.negatives)
-
-        #all_types = set(self.index2type.values())
-        #type2probs = {}
-        #for node_type in all_types:
-        #    indicies_for_a_type = self.type2indices[node_type]
-        #    type2probs[node_type] = np.array(ratio[indicies_for_a_type])
-        #    type2probs[node_type] = type2probs[node_type] / np.sum(type2probs[node_type])
-
         self.sampling_prob = ratio
-        #self.type2probs = type2probs
 
     def getNegatives(self, target, size):  # TODO check equality with target
         if self.care_type == 0:
-            #response = np.random.choice(
-                #self.negatives, size=sizes)
             response = self.negatives[self.negpos:self.negpos + size]
             self.negpos = (self.negpos + size) % len(self.negatives)
             if len(response) != size:
                 return np.concatenate((response, self.negatives[0:self.negpos]))
-        #else:
-            #node_type = self.index2type[target]
-            #sampling_probs = self.type2probs[node_type]
-            #sampling_candidates = self.type2indices[node_type]
-            #negative_samples_indices = np.random.choice(len(sampling_candidates), size=sizes, replace=False,
-                                                               #p=sampling_probs)
-            #response = sampling_candidates[negative_samples_indices]
         return response
 
 
@@ -116,6 +84,7 @@ class DataReader:
 
 class Metapath2vecDataset(Dataset):
     def __init__(self, data, window_size):
+        # read in data, window_size and input filename
         self.data = data
         self.window_size = window_size
         self.input_file = open(data.inputFileName, encoding="ISO-8859-1")
@@ -125,7 +94,7 @@ class Metapath2vecDataset(Dataset):
         return self.data.sentences_count
 
     def __getitem__(self, idx):
-        # return the
+        # return the list of pairs (center, context, 5 negatives)
         while True:
             line = self.input_file.readline()
             if not line:
@@ -139,9 +108,6 @@ class Metapath2vecDataset(Dataset):
                     word_ids = [self.data.word2id[w] for w in words if
                                 w in self.data.word2id and np.random.rand() < self.data.discards[self.data.word2id[w]]]
 
-                    #boundary = np.random.randint(1, self.window_size)
-                    #return [(u, v, self.data.getNegatives(v, 5)) for i, u in enumerate(word_ids) for j, v in
-                            #enumerate(word_ids[max(i - boundary, 0):i + boundary]) if u != v]
                     pair_catch = []
                     for i, u in enumerate(word_ids):
                         for j, v in enumerate(

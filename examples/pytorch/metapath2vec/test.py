@@ -3,18 +3,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 
 
-if __name__ == "__main__":
-    #file = open("/Users/ziqiaom/Desktop/out_dbis/m2v.dbis.w1000.l100.txt.size128.window7.negative5.txt", encoding='latin-1')
-    #file = open("/Users/ziqiaom/Desktop/label 2/googlescholar.8area.venue.label.txt")
+if __name__ == "__main__":   
     venue_count = 133
     author_count = 246678
     experiment_times = 1
     percent = 0.05
-    #file = open("/Users/ziqiaom/Desktop/out_aminer/m2v.aminer2017.w1000.l100.txt.size128.window7.negative5.txt")
-    #file = open("/Users/ziqiaom/Desktop/save/out.vec")
     file = open(".../output_file_path/...")
-    #file_1 = open("/Users/ziqiaom/Desktop/label 2/googlescholar.8area.venue.label.txt")
-    #file_2 = open("/Users/ziqiaom/Desktop/label 2/googlescholar.8area.author.label.txt")
     file_2 = open(".../label 2/googlescholar.8area.author.label.txt")
     check_venue = {}
     check_author = {}
