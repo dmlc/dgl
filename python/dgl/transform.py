@@ -4,14 +4,112 @@ import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
 from .graph import DGLGraph
+from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
-from .backend import asnumpy, tensor
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max']
+           'laplacian_lambda_max', 'nearest_neighbor_graph', 'segmented_nearest_neighbor_graph']
 
+
+def pairwise_squared_distance(x):
+    """
+    x : (n_samples, n_points, dims)
+    return : (n_samples, n_points, n_points)
+    """
+    x2s = F.sum(x * x, -1, True)
+    # assuming that __matmul__ is always implemented (true for PyTorch, MXNet and Chainer)
+    return x2s + F.swapaxes(x2s, -1, -2) - 2 * x @ F.swapaxes(x, -1, -2)
+
+#pylint: disable=invalid-name
+def nearest_neighbor_graph(x, k):
+    """Transforms the given point set to a directed graph, whose coordinates
+    are given as a matrix. The predecessors of each point are its k-nearest
+    neighbors.
+
+    If a 3D tensor is given instead, then each row would be transformed into
+    a separate graph.  The graphs will be unioned.
+
+    Parameters
+    ----------
+    x : Tensor
+        The input tensor.
+
+        If 2D, each row of ``x`` corresponds to a node.
+
+        If 3D, a k-NN graph would be constructed for each row.  Then
+        the graphs are unioned.
+    k : int
+        The number of neighbors
+
+    Returns
+    -------
+    DGLGraph
+        The graph.  The node IDs are in the same order as ``x``.
+    """
+    if F.ndim(x) == 2:
+        x = F.unsqueeze(x, 0)
+    n_samples, n_points, _ = F.shape(x)
+
+    dist = pairwise_squared_distance(x)
+    k_indices = F.argtopk(dist, k, 2, descending=False)
+    dst = F.copy_to(k_indices, F.cpu())
+
+    src = F.zeros_like(dst) + F.reshape(F.arange(0, n_points), (1, -1, 1))
+
+    per_sample_offset = F.reshape(F.arange(0, n_samples) * n_points, (-1, 1, 1))
+    dst += per_sample_offset
+    src += per_sample_offset
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+
+    g = DGLGraph(adj, readonly=True)
+    return g
+
+#pylint: disable=invalid-name
+def segmented_nearest_neighbor_graph(x, k, segs):
+    """Transforms the given point set to a directed graph, whose coordinates
+    are given as a matrix.  The predecessors of each point are its k-nearest
+    neighbors.
+
+    The matrices are concatenated along the first axis, and are segmented by
+    ``segs``.  Each block would be transformed into a separate graph.  The
+    graphs will be unioned.
+
+    Parameters
+    ----------
+    x : Tensor
+        The input tensor.
+    k : int
+        The number of neighbors
+    segs : iterable of int
+        Number of points of each point set.
+        Must sum up to the number of rows in ``x``.
+
+    Returns
+    -------
+    DGLGraph
+        The graph.  The node IDs are in the same order as ``x``.
+    """
+    n_total_points, _ = F.shape(x)
+    offset = np.insert(np.cumsum(segs), 0, 0)
+
+    h_list = F.split(x, segs, 0)
+    dst = [
+        F.argtopk(pairwise_squared_distance(h_g), k, 1, descending=False) +
+        offset[i]
+        for i, h_g in enumerate(h_list)]
+    dst = F.cat(dst, 0)
+    src = F.arange(0, n_total_points).unsqueeze(1).expand(n_total_points, k)
+
+    dst = F.reshape(dst, (-1,))
+    src = F.reshape(src, (-1,))
+    adj = sparse.csr_matrix((F.asnumpy(F.zeros_like(dst) + 1), (F.asnumpy(dst), F.asnumpy(src))))
+
+    g = DGLGraph(adj, readonly=True)
+    return g
 
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
@@ -71,7 +169,7 @@ def khop_adj(g, k):
             [0., 1., 3., 3., 1.]])
     """
     adj_k = g.adjacency_matrix_scipy(return_edge_ids=False) ** k
-    return tensor(adj_k.todense().astype(np.float32))
+    return F.tensor(adj_k.todense().astype(np.float32))
 
 def khop_graph(g, k):
     """Return the graph that includes all :math:`k`-hop neighbors of the given graph as edges.
@@ -299,7 +397,7 @@ def laplacian_lambda_max(g):
     for g_i in g_arr:
         n = g_i.number_of_nodes()
         adj = g_i.adjacency_matrix_scipy(return_edge_ids=False).astype(float)
-        norm = sparse.diags(asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
+        norm = sparse.diags(F.asnumpy(g_i.in_degrees()).clip(1) ** -0.5, dtype=float)
         laplacian = sparse.eye(n) - norm * adj * norm
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
                                       return_eigenvectors=False)[0].real)
