@@ -121,10 +121,12 @@ dgl.nn.pytorch.softmax
 dgl.nn.pytorch.factory
 ----------------------
 
-.. automodule:: dgl.nn.pytorch.NearestNeighborGraph
+.. automodule:: dgl.nn.pytorch.conv
+
+.. autoclass:: dgl.nn.pytorch.factory.KNNGraph
     :members:
     :show-inheritance:
 
-.. automodule:: dgl.nn.pytorch.SegmentedNearestNeighborGraph
+.. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
     :members:
     :show-inheritance:

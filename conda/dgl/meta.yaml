@@ -25,4 +25,5 @@ build:
 
 about:
   home: https://github.com/dmlc/dgl.git
-  license_file: ../../LICENSE
+  license_file: {{ environ.get('SRC_DIR') }}/LICENSE
+  license: Apache
