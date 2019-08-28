@@ -1,4 +1,9 @@
 REM Needs vcvars64.bat to be called
+SET CUDADIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
+SET OLDPATH=%PATH%
+SET CUDA_PATH=%CUDADIR%\v%CUDA_VER%
+SET PATH=%CUDA_PATH%;%OLDPATH%
+SET CUDA_TOOLKIT_ROOT_DIR=%CUDA_PATH%
 git submodule init
 git submodule update
 md build
