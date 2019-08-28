@@ -322,7 +322,7 @@ class KVClient(object):
         self._data_size[name] = shape[0]
         count = math.ceil(shape[0] / self._server_count)
         # We hack the msg format here
-        init_type = 0.0 if type == 'zero' else 1.0
+        init_type = 0.0 if init_type == 'zero' else 1.0
         threshold = F.tensor([[init_type, init_type], [low, high]])
         # partition shape on server
         for server_id in range(self._server_count):
@@ -473,10 +473,11 @@ class KVClient(object):
             name=None,
             id=None,
             data=None)
-        # send message to server 0
-        _send_kv_msg(self._sender, msg, 0)
-        back_msg = _recv_kv_msg(self._receiver)
-        assert back_msg.type == KVMsgType.BARRIER, 'Recv kv msg error.'
+        for server_id in range(self._server_count):
+            _send_kv_msg(self._sender, msg, server_id)
+        for server_id in range(self._server_count):
+            back_msg = _recv_kv_msg(self._receiver)
+            assert back_msg.type == KVMsgType.BARRIER, 'Recv kv msg error.'
 
     def shut_down(self):
         """Shutdown all KVServer nodes

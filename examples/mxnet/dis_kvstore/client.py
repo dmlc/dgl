@@ -20,16 +20,12 @@ def start_client(args):
     client.init_data(name='embed_0', shape=[10, 3], init_type='zero')
     client.init_data(name='embed_1', shape=[11, 3], init_type='uniform', low=0.0, high=0.0)
 
-    client.barrier()
-
     tensor_id = mx.nd.array([0, 1, 2], dtype='int64')
     tensor_data = mx.nd.array([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
 
     for i in range(5):
         client.push('embed_0', tensor_id, tensor_data)
         client.push('embed_1', tensor_id, tensor_data)
-
-    client.barrier()
 
     tensor_id = mx.nd.array([6, 7, 8], dtype='int64')
     for i in range(5):
