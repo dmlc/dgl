@@ -74,7 +74,7 @@ class GraphConv(gluon.Block):
 
         with self.name_scope():
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                                          init=mx.init.Xavier())
+                                          init=mx.init.Xavier(mx.init.Xavier(magnitude=math.sqrt(2.0))))
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
                                             init=mx.init.Zero())
@@ -193,7 +193,7 @@ class TAGConv(gluon.Block):
 
         self.lin = self.params.get(
             'weight', shape=(self.in_feats * (self.k + 1), self.out_feats),
-            init=mx.init.Xavier())
+            init=mx.init.Xavier(mx.init.Xavier(magnitude=math.sqrt(2.0))))
         if self.bias:
             self.h_bias = self.params.get('bias', shape=(out_feats,),
                                           init=mx.init.Zero())
