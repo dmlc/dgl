@@ -55,7 +55,6 @@ def main(args):
         g.remove_edges_from(g.selfloop_edges())
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
-    degs = g.in_degrees().astype('float32')
 
     # create TAGCN model
     model = TAGCN(g,

@@ -1,6 +1,6 @@
 """Modules that transforms between graphs and between graph and tensors."""
 import torch.nn as nn
-from ...transform import nearest_neighbor_graph, segmented_nearest_neighbor_graph
+from ...transform import knn_graph, segmented_knn_graph
 
 def pairwise_squared_distance(x):
     '''
@@ -11,7 +11,7 @@ def pairwise_squared_distance(x):
     return x2s + x2s.transpose(-1, -2) - 2 * x @ x.transpose(-1, -2)
 
 
-class NearestNeighborGraph(nn.Module):
+class KNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
     point sets with the same number of points into a union of those graphs.
 
@@ -28,7 +28,7 @@ class NearestNeighborGraph(nn.Module):
         The number of neighbors
     """
     def __init__(self, k):
-        super(NearestNeighborGraph, self).__init__()
+        super(KNNGraph, self).__init__()
         self.k = k
 
     #pylint: disable=invalid-name
@@ -46,10 +46,10 @@ class NearestNeighborGraph(nn.Module):
         -------
         A DGLGraph with no features.
         """
-        return nearest_neighbor_graph(x, self.k)
+        return knn_graph(x, self.k)
 
 
-class SegmentedNearestNeighborGraph(nn.Module):
+class SegmentedKNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
     point sets with different number of points into a union of those graphs.
 
@@ -80,7 +80,7 @@ class SegmentedNearestNeighborGraph(nn.Module):
     - A DGLGraph with no features.
     """
     def __init__(self, k):
-        super(SegmentedNearestNeighborGraph, self).__init__()
+        super(SegmentedKNNGraph, self).__init__()
         self.k = k
 
     #pylint: disable=invalid-name
@@ -100,4 +100,4 @@ class SegmentedNearestNeighborGraph(nn.Module):
         -------
         A DGLGraph with no features.
         """
-        return segmented_nearest_neighbor_graph(x, self.k, segs)
+        return segmented_knn_graph(x, self.k, segs)

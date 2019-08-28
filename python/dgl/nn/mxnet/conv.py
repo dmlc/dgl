@@ -74,7 +74,7 @@ class GraphConv(gluon.Block):
 
         with self.name_scope():
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                                          init=mx.init.Xavier())
+                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
                                             init=mx.init.Zero())
@@ -108,7 +108,7 @@ class GraphConv(gluon.Block):
         graph = graph.local_var()
         if self._norm:
             degs = graph.in_degrees().astype('float32')
-            norm = mx.nd.power(degs, -0.5)
+            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = norm.reshape(shp).as_in_context(feat.context)
             feat = feat * norm
@@ -173,8 +173,10 @@ class TAGConv(gluon.Block):
 
     Attributes
     ----------
-    lin : torch.Module
-        The learnable linear module.
+    lin : mxnet.gluon.parameter.Parameter
+        The learnable weight tensor.
+    bias : mxnet.gluon.parameter.Parameter
+        The learnable bias tensor.
     """
     def __init__(self,
                  in_feats,
@@ -183,20 +185,18 @@ class TAGConv(gluon.Block):
                  bias=True,
                  activation=None):
         super(TAGConv, self).__init__()
-        self._in_feats = in_feats
-        self._out_feats = out_feats
-        self._k = k
-        self._activation = activation
+        self.out_feats = out_feats
+        self.k = k
+        self.bias = bias
+        self.activation = activation
+        self.in_feats = in_feats
 
-        in_feats = in_feats * (self._k + 1)
-        with self.name_scope():
-            self.lin = self.params.get('weight', shape=(in_feats, out_feats),
-                                        init=mx.init.Xavier())
-            if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
-            else:
-                self.bias = None
+        self.lin = self.params.get(
+            'weight', shape=(self.in_feats * (self.k + 1), self.out_feats),
+            init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+        if self.bias:
+            self.h_bias = self.params.get('bias', shape=(out_feats,),
+                                          init=mx.init.Zero())
 
     def forward(self, graph, feat):
         r"""Compute graph convolution
@@ -205,26 +205,25 @@ class TAGConv(gluon.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
         graph = graph.local_var()
 
         degs = graph.in_degrees().astype('float32')
-        norm = mx.nd.power(degs, -0.5)
+        norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = norm.reshape(shp).as_in_context(feat.context)
-        #D-1/2 A D -1/2 X
 
         rst = feat
-        for _ in range(self._k):
+        for _ in range(self.k):
             rst = rst * norm
             graph.ndata['h'] = rst
 
@@ -236,10 +235,10 @@ class TAGConv(gluon.Block):
 
         rst = mx.nd.dot(feat, self.lin.data(feat.context))
         if self.bias is not None:
-            rst = rst + self.bias.data(rst.context)
+            rst = rst + self.h_bias.data(rst.context)
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+        if self.activation is not None:
+            rst = self.activation(rst)
 
         return rst
 
