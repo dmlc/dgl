@@ -191,7 +191,7 @@ class TAGConv(gluon.Block):
         in_feats = in_feats * (self._k + 1)
         with self.name_scope():
             self.lin = self.params.get('weight', shape=(in_feats, out_feats),
-                                        init=mx.init.Xavier())
+                                       init=mx.init.Xavier())
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
                                             init=mx.init.Zero())
