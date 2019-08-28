@@ -1,6 +1,6 @@
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: "0.3"
+  version: "0.4"
 
 source:
   git_rev: 0.3.x
@@ -25,4 +25,5 @@ build:
 
 about:
   home: https://github.com/dmlc/dgl.git
-  license_file: ../../LICENSE
+  license_file: {{ environ.get('SRC_DIR') }}/LICENSE
+  license: Apache

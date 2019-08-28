@@ -7,12 +7,14 @@
 #ifndef DGL_GRAPH_BIPARTITE_H_
 #define DGL_GRAPH_BIPARTITE_H_
 
-#include <dgl/graph_interface.h>
 #include <dgl/base_heterograph.h>
-#include <vector>
-#include <string>
+#include <dgl/lazy.h>
+#include <dgl/array.h>
 #include <utility>
-#include <memory>
+#include <string>
+#include <vector>
+
+#include "../c_api_common.h"
 
 namespace dgl {
 
@@ -31,6 +33,12 @@ class Bipartite : public BaseHeteroGraph {
   static constexpr dgl_type_t kDstVType = 1;
   /*! \brief edge group type */
   static constexpr dgl_type_t kEType = 0;
+
+  // internal data structure
+  class COO;
+  class CSR;
+  typedef std::shared_ptr<COO> COOPtr;
+  typedef std::shared_ptr<CSR> CSRPtr;
 
   uint64_t NumVertexTypes() const override {
     return 2;
@@ -140,14 +148,11 @@ class Bipartite : public BaseHeteroGraph {
       int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids);
 
- private:
-  // internal data structure
-  class COO;
-  class CSR;
-  typedef std::shared_ptr<COO> COOPtr;
-  typedef std::shared_ptr<CSR> CSRPtr;
+  /*! \brief Convert the graph to use the given number of bits for storage */
+  static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
-  Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
+  /*! \brief Copy the data to another context */
+  static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
   /*! \return Return the in-edge CSR format. Create from other format if not exist. */
   CSRPtr GetInCSR() const;
@@ -157,6 +162,18 @@ class Bipartite : public BaseHeteroGraph {
 
   /*! \return Return the COO format. Create from other format if not exist. */
   COOPtr GetCOO() const;
+
+  /*! \return Return the in-edge CSR in the matrix form */
+  aten::CSRMatrix GetInCSRMatrix() const;
+
+  /*! \return Return the out-edge CSR in the matrix form */
+  aten::CSRMatrix GetOutCSRMatrix() const;
+
+  /*! \return Return the COO matrix form */
+  aten::COOMatrix GetCOOMatrix() const;
+
+ private:
+  Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;

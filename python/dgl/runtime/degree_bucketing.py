@@ -161,7 +161,8 @@ def gen_group_apply_edge_schedule(
         apply_func,
         u, v, eid,
         group_by,
-        var_nf,
+        var_src_nf,
+        var_dst_nf,
         var_ef,
         var_out):
     """Create degree bucketing schedule for group_apply_edge
@@ -186,8 +187,10 @@ def gen_group_apply_edge_schedule(
         Edges to apply
     group_by: str
         If "src", group by u. If "dst", group by v
-    var_nf : var.FEAT_DICT
-        The variable for node feature frame.
+    var_src_nf : var.FEAT_DICT
+        The variable for source feature frame.
+    var_dst_nf : var.FEAT_DICT
+        The variable for destination feature frame.
     var_ef : var.FEAT_DICT
         The variable for edge frame.
     var_out : var.FEAT_DICT
@@ -213,8 +216,8 @@ def gen_group_apply_edge_schedule(
         var_v = var.IDX(v_bkt)
         var_eid = var.IDX(eid_bkt)
         # apply edge UDF on each bucket
-        fdsrc = ir.READ_ROW(var_nf, var_u)
-        fddst = ir.READ_ROW(var_nf, var_v)
+        fdsrc = ir.READ_ROW(var_src_nf, var_u)
+        fddst = ir.READ_ROW(var_dst_nf, var_v)
         fdedge = ir.READ_ROW(var_ef, var_eid)
         fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst, ret=fdedge)  # reuse var
         # save for merge

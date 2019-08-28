@@ -28,9 +28,11 @@ def get_adj_and_degrees(num_nodes, triplets):
     return adj_list, degrees
 
 def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
-    """ Edge neighborhood sampling to reduce training graph size
-    """
+    """Sample edges by neighborhool expansion.
 
+    This guarantees that the sampled edges form a connected graph, which
+    may help deeper GNNs that require information from more than one hop.
+    """
     edges = np.zeros((sample_size), dtype=np.int32)
 
     #initialize
@@ -69,16 +71,25 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
+def sample_edge_uniform(adj_list, degrees, n_triplets, sample_size):
+    """Sample edges uniformly from all the edges."""
+    all_edges = np.arange(n_triplets)
+    return np.random.choice(all_edges, sample_size, replace=False)
+
 def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
                                       num_rels, adj_list, degrees,
-                                      negative_rate):
+                                      negative_rate, sampler="uniform"):
     """Get training graph and signals
     First perform edge neighborhood sampling on graph, then perform negative
     sampling to generate negative samples
     """
     # perform edge neighbor sampling
-    edges = sample_edge_neighborhood(adj_list, degrees, len(triplets),
-                                     sample_size)
+    if sampler == "uniform":
+        edges = sample_edge_uniform(adj_list, degrees, len(triplets), sample_size)
+    elif sampler == "neighbor":
+        edges = sample_edge_neighborhood(adj_list, degrees, len(triplets), sample_size)
+    else:
+        raise ValueError("Sampler type must be either 'uniform' or 'neighbor'.")
 
     # relabel nodes to have consecutive node ids
     edges = triplets[edges]
@@ -108,6 +119,7 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
     return g, uniq_v, rel, norm, samples, labels
 
 def comp_deg_norm(g):
+    g = g.local_var()
     in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
     norm = 1.0 / in_deg
     norm[np.isinf(norm)] = 0
@@ -163,15 +175,15 @@ def sort_and_rank(score, target):
     indices = indices[:, 1].view(-1)
     return indices
 
-def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
+def perturb_and_get_rank(embedding, w, a, r, b, test_size, batch_size=100):
     """ Perturb one element in the triplets
     """
-    n_batch = (num_entity + batch_size - 1) // batch_size
+    n_batch = (test_size + batch_size - 1) // batch_size
     ranks = []
     for idx in range(n_batch):
         print("batch {} / {}".format(idx, n_batch))
         batch_start = idx * batch_size
-        batch_end = min(num_entity, (idx + 1) * batch_size)
+        batch_end = min(test_size, (idx + 1) * batch_size)
         batch_a = a[batch_start: batch_end]
         batch_r = r[batch_start: batch_end]
         emb_ar = embedding[batch_a] * w[batch_r]
@@ -187,17 +199,17 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
 
 # TODO (lingfan): implement filtered metrics
 # return MRR (raw), and Hits @ (1, 3, 10)
-def evaluate(test_graph, model, test_triplets, num_entity, hits=[], eval_bz=100):
+def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
     with torch.no_grad():
-        embedding, w = model.evaluate(test_graph)
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
         o = test_triplets[:, 2]
+        test_size = test_triplets.shape[0]
 
         # perturb subject
-        ranks_s = perturb_and_get_rank(embedding, w, o, r, s, num_entity, eval_bz)
+        ranks_s = perturb_and_get_rank(embedding, w, o, r, s, test_size, eval_bz)
         # perturb object
-        ranks_o = perturb_and_get_rank(embedding, w, s, r, o, num_entity, eval_bz)
+        ranks_o = perturb_and_get_rank(embedding, w, s, r, o, test_size, eval_bz)
 
         ranks = torch.cat([ranks_s, ranks_o])
         ranks += 1 # change to 1-indexed
@@ -209,4 +221,3 @@ def evaluate(test_graph, model, test_triplets, num_entity, hits=[], eval_bz=100)
             avg_count = torch.mean((ranks <= hit).float())
             print("Hits (raw) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
-

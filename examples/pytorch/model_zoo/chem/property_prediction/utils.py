@@ -1,6 +1,6 @@
+import datetime
 import dgl
 import numpy as np
-import os
 import random
 import torch
 from sklearn.metrics import roc_auc_score
@@ -42,9 +42,12 @@ class Meter(object):
         return total_score / n_tasks
 
 class EarlyStopping(object):
-    def __init__(self, patience=10, filename="es_checkpoint.pth"):
-        assert not os.path.exists(filename), \
-            'Filename {} is occupied. Either rename it or delete it.'.format(filename)
+    def __init__(self, patience=10, filename=None):
+        if filename is None:
+            dt = datetime.datetime.now()
+            filename = 'early_stop_{}_{:02d}-{:02d}-{:02d}.pth'.format(
+                dt.date(), dt.hour, dt.minute, dt.second)
+
         self.patience = patience
         self.counter = 0
         self.filename = filename
@@ -71,11 +74,11 @@ class EarlyStopping(object):
 
     def save_checkpoint(self, model):
         '''Saves model when the metric on the validation set gets improved.'''
-        torch.save(model.state_dict(), self.filename)
+        torch.save({'model_state_dict': model.state_dict()}, self.filename)
 
     def load_checkpoint(self, model):
         '''Load model saved with early stopping.'''
-        model.load_state_dict(torch.load(self.filename))
+        model.load_state_dict(torch.load(self.filename)['model_state_dict'])
 
 def collate_molgraphs(data):
     """Batching a list of datapoints for dataloader
