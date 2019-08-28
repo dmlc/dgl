@@ -73,8 +73,8 @@ class NodeFlow(DGLBaseGraph):
     sampling and Layer-wise sampling.
 
     These sampling algorithms generate graphs with multiple layers. The
-    edges connect the nodes between two layers while there don't exist
-    edges between the nodes in the same layer. As illustrated
+    edges connect the nodes between two layers, which forms *blocks*, while
+    there don't exist edges between the nodes in the same layer. As illustrated
     in the figure, the last layer stores the target (seed) nodes where neighbors
     are sampled from. Neighbors reached in different hops are placed in different
     layers. Edges that connect to the neighbors in the next hop are placed
