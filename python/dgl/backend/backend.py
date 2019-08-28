@@ -723,26 +723,6 @@ def reshape(input, shape):
     """
     pass
 
-def uniform(shape, dtype, ctx, low, high):
-    """Crear a tensor with random value in an uniform 
-    distribution between low (inclusive) and high (exclusive).
-
-    Parameters
-    ----------
-    shape : tuple of int
-        The tensor shape.
-    dtype : data type
-        It should be one of the values in the data type dict.
-    ctx : context
-        The device of the result tensor.
-
-    Returns
-    -------
-    Tensor
-        The random tensor.
-    """
-    pass
-
 def zeros(shape, dtype, ctx):
     """Create a zero tensor.
 
@@ -794,6 +774,26 @@ def ones(shape, dtype, ctx):
     -------
     Tensor
         The one tensor.
+    """
+    pass
+
+def uniform(shape, dtype, ctx, low, high):
+    """Crear a tensor with random value in an uniform 
+    distribution between low (inclusive) and high (exclusive).
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The random tensor.
     """
     pass
 

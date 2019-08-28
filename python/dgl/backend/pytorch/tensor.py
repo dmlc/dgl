@@ -180,9 +180,6 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return th.reshape(input ,shape)
 
-def uniform(shape, dtype, ctx, low, high):
-    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
-
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
@@ -191,6 +188,9 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
+
+def uniform(shape, dtype, ctx, low, high):
+    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
