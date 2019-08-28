@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn.pytorch import NearestNeighborGraph, EdgeConv
+from dgl.nn.pytorch import KNNGraph, EdgeConv
 
 class Model(nn.Module):
     def __init__(self, k, feature_dims, emb_dims, output_classes, input_dims=3,
                  dropout_prob=0.5):
         super(Model, self).__init__()
 
-        self.nng = NearestNeighborGraph(k)
+        self.nng = KNNGraph(k)
         self.conv = nn.ModuleList()
 
         self.num_layers = len(feature_dims)
