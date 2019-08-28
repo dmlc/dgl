@@ -171,7 +171,6 @@ class GraphConv(nn.Module):
             summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
 
-
 class GATConv(nn.Module):
     r"""Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
     over an input signal.
@@ -305,7 +304,7 @@ class TAGConv(nn.Module):
     out_feats : int
         Output feature size.
     k: int, optional
-        Number of hops :math: `k`. (default: 3)
+        Number of hops :math: `k`. (default: 2)
     bias: bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional

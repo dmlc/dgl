@@ -72,6 +72,46 @@ def test_graph_conv():
     assert "h" in g.ndata
     check_close(g.ndata['h'], 2 * F.ones((3, 1)))
 
+def _S2AXWb(A, N, X, W, b):
+    X1 = X * N
+    X1 = mx.nd.dot(A, X1.reshape(X1.shape[0], -1))
+    X1 = X1 * N
+    X2 = X1 * N
+    X2 = mx.nd.dot(A, X2.reshape(X2.shape[0], -1))
+    X2 = X2 * N
+    X = mx.nd.concat(X, X1, X2, dim=-1)
+    Y = mx.nd.dot(X, W)
+
+    return Y + b
+
+def test_tagconv():
+    g = dgl.DGLGraph(nx.path_graph(3))
+    ctx = F.ctx()
+    adj = g.adjacency_matrix(ctx=ctx)
+    norm = mx.nd.power(g.in_degrees().astype('float32'), -0.5)
+
+    conv = nn.TAGConv(5, 2, bias=True)
+    conv.initialize(ctx=ctx)
+    print(conv)
+
+    # test#1: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(g, h0)
+    assert len(g.ndata) == 0
+    assert len(g.edata) == 0
+    shp = norm.shape + (1,) * (h0.ndim - 1)
+    norm = norm.reshape(shp).as_in_context(h0.context)
+
+    assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.data(ctx), conv.h_bias.data(ctx)))
+
+    conv = nn.TAGConv(5, 2)
+    conv.initialize(ctx=ctx)
+
+    # test#2: basic
+    h0 = F.ones((3, 5))
+    h1 = conv(g, h0)
+    assert h1.shape[-1] == 2
+
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
     ctx = F.ctx()
