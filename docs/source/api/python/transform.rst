@@ -15,3 +15,5 @@ Transform -- Graph Transformation
     khop_adj
     khop_graph
     laplacian_lambda_max
+    nearest_neighbor_graph
+    segmented_nearest_neighbor_graph

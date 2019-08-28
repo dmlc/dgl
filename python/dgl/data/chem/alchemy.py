@@ -10,11 +10,10 @@ import pickle
 import zipfile
 from collections import defaultdict
 
-import dgl
-import dgl.backend as F
-from dgl.data.utils import download, get_download_dir
-
 from .utils import mol_to_complete_graph
+from ..utils import download, get_download_dir
+from ...batched_graph import batch
+from ... import backend as F
 
 try:
     import pandas as pd
@@ -40,12 +39,12 @@ class AlchemyBatcher(object):
         self.graph = graph
         self.label = label
 
-def batcher_dev(batch):
+def batcher_dev(batch_data):
     """Batch datapoints
 
     Parameters
     ----------
-    batch : list
+    batch_data : list
         batch[i][0] gives the DGLGraph for the ith datapoint,
         and batch[i][1] gives the label for the ith datapoint.
 
@@ -54,15 +53,79 @@ def batcher_dev(batch):
     AlchemyBatcher
         An object holding the batch of data
     """
-    graphs, labels = zip(*batch)
-    batch_graphs = dgl.batch(graphs)
+    graphs, labels = zip(*batch_data)
+    batch_graphs = batch(graphs)
     labels = F.stack(labels, 0)
 
     return AlchemyBatcher(graph=batch_graphs, label=labels)
 
 class TencentAlchemyDataset(object):
-    fdef_name = osp.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
-    chem_feature_factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+    """`Tencent Alchemy Dataset <https://arxiv.org/abs/1906.09427>`__
+
+    Parameters
+    ----------
+    mode : str
+        'dev', 'valid' or 'test', default to be 'dev'
+    transform : transform operation on DGLGraphs
+        Default to be None.
+    from_raw : bool
+        Whether to process dataset from scratch or use a
+        processed one for faster speed. Default to be False.
+    """
+    def __init__(self, mode='dev', transform=None, from_raw=False):
+        assert mode in ['dev', 'valid', 'test'], "mode should be dev/valid/test"
+        self.mode = mode
+        self.transform = transform
+
+        # Construct DGLGraphs from raw data or use the preprocessed data
+        self.from_raw = from_raw
+        file_dir = osp.join(get_download_dir(), './Alchemy_data')
+
+        if not from_raw:
+            file_name = "%s_processed" % (mode)
+        else:
+            file_name = "%s_single_sdf" % (mode)
+        self.file_dir = pathlib.Path(file_dir, file_name)
+
+        self.zip_file_path = pathlib.Path(file_dir, file_name + '.zip')
+        download(_urls['Alchemy'] + file_name + '.zip',
+                 path=str(self.zip_file_path))
+        if not os.path.exists(str(self.file_dir)):
+            archive = zipfile.ZipFile(self.zip_file_path)
+            archive.extractall(file_dir)
+            archive.close()
+
+        self._load()
+
+    def _load(self):
+        if self.mode == 'dev':
+            if not self.from_raw:
+                with open(osp.join(self.file_dir, "dev_graphs.pkl"), "rb") as f:
+                    self.graphs = pickle.load(f)
+                with open(osp.join(self.file_dir, "dev_labels.pkl"), "rb") as f:
+                    self.labels = pickle.load(f)
+            else:
+                target_file = pathlib.Path(self.file_dir, "dev_target.csv")
+                self.target = pd.read_csv(
+                    target_file,
+                    index_col=0,
+                    usecols=['gdb_idx',] + ['property_%d' % x for x in range(12)])
+                self.target = self.target[['property_%d' % x for x in range(12)]]
+                self.graphs, self.labels = [], []
+
+                supp = Chem.SDMolSupplier(
+                    osp.join(self.file_dir, self.mode + ".sdf"))
+                cnt = 0
+                for sdf, label in zip(supp, self.target.iterrows()):
+                    graph = mol_to_complete_graph(sdf, atom_featurizer=self.alchemy_nodes,
+                                                  bond_featurizer=self.alchemy_edges)
+                    cnt += 1
+                    self.graphs.append(graph)
+                    label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
+                    self.labels.append(label)
+
+        self.normalize()
+        print(len(self.graphs), "loaded!")
 
     def alchemy_nodes(self, mol):
         """Featurization for all atoms in a molecule. The atom indices
@@ -135,8 +198,8 @@ class TencentAlchemyDataset(object):
         return atom_feats_dict
 
     def alchemy_edges(self, mol, self_loop=False):
-        """Featurization for all bonds in a molecule. The bond indices
-        will be preserved.
+        """Featurization for all bonds in a molecule.
+        The bond indices will be preserved.
 
         Parameters
         ----------
@@ -182,66 +245,16 @@ class TencentAlchemyDataset(object):
 
         return bond_feats_dict
 
-    def __init__(self, mode='dev', transform=None, from_raw=False):
-        assert mode in ['dev', 'valid', 'test'], "mode should be dev/valid/test"
-        self.mode = mode
-        self.transform = transform
-
-        # Construct the dgl graph from raw data or use the preprocessed data directly
-        self.from_raw = from_raw
-        file_dir = osp.join(get_download_dir(), './Alchemy_data')
-
-        if not from_raw:
-            file_name = "%s_processed" % (mode)
-        else:
-            file_name = "%s_single_sdf" % (mode)
-        self.file_dir = pathlib.Path(file_dir, file_name)
-
-        self.zip_file_path = pathlib.Path(file_dir, file_name + '.zip')
-        download(_urls['Alchemy'] + file_name + '.zip',
-                 path=str(self.zip_file_path))
-        if not os.path.exists(str(self.file_dir)):
-            archive = zipfile.ZipFile(self.zip_file_path)
-            archive.extractall(file_dir)
-            archive.close()
-
-        self._load()
-
-    def _load(self):
-        if self.mode == 'dev':
-            if not self.from_raw:
-                with open(osp.join(self.file_dir, "dev_graphs.pkl"), "rb") as f:
-                    self.graphs = pickle.load(f)
-                with open(osp.join(self.file_dir, "dev_labels.pkl"), "rb") as f:
-                    self.labels = pickle.load(f)
-            else:
-                target_file = pathlib.Path(self.file_dir, "dev_target.csv")
-                self.target = pd.read_csv(
-                    target_file,
-                    index_col=0,
-                    usecols=[
-                        'gdb_idx',
-                    ] + ['property_%d' % x for x in range(12)])
-                self.target = self.target[[
-                    'property_%d' % x for x in range(12)
-                ]]
-                self.graphs, self.labels = [], []
-
-                supp = Chem.SDMolSupplier(
-                    osp.join(self.file_dir, self.mode + ".sdf"))
-                cnt = 0
-                for sdf, label in zip(supp, self.target.iterrows()):
-                    graph = mol_to_complete_graph(sdf, atom_featurizer=self.alchemy_nodes,
-                                                  bond_featurizer=self.alchemy_edges)
-                    cnt += 1
-                    self.graphs.append(graph)
-                    label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
-                    self.labels.append(label)
-
-        self.normalize()
-        print(len(self.graphs), "loaded!")
-
     def normalize(self, mean=None, std=None):
+        """Set mean and std or compute from labels for future normalization.
+
+        Parameters
+        ----------
+        mean : int or float
+            Default to be None.
+        std : int or float
+            Default to be None.
+        """
         labels = np.array([i.numpy() for i in self.labels])
         if mean is None:
             mean = np.mean(labels, axis=0)
@@ -260,7 +273,20 @@ class TencentAlchemyDataset(object):
         return g, l
 
     def split(self, train_size=0.8):
-        """Split the dataset into two AlchemySubset for train&test."""
+        """Split the dataset into two AlchemySubset for train&test.
+
+        Parameters
+        ----------
+        train_size : float
+            Proportion of dataset to use for training. Default to be 0.8.
+
+        Returns
+        -------
+        train_set : AlchemySubset
+            Dataset for training
+        test_set : AlchemySubset
+            Dataset for test
+        """
         assert 0 < train_size < 1
         train_num = int(len(self.graphs) * train_size)
         train_set = AlchemySubset(self.graphs[:train_num],
@@ -275,6 +301,19 @@ class AlchemySubset(TencentAlchemyDataset):
     """
     Sub-dataset split from TencentAlchemyDataset.
     Used to construct the training & test set.
+
+    Parameters
+    ----------
+    graphs : list of DGLGraphs
+        DGLGraphs for datapoints in the subset
+    labels : list of tensors
+        Labels for datapoints in the subset
+    mean : int or float
+        Mean of labels in the subset
+    std : int or float
+        Std of labels in the subset
+    transform : transform operation on DGLGraphs
+        Default to be None.
     """
     def __init__(self, graphs, labels, mean=0, std=1, transform=None):
         super(AlchemySubset, self).__init__()
