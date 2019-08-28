@@ -220,14 +220,15 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
-def test_negative_sampler():
+def check_negative_sampler(mode, exclude_positive):
     g = generate_rand_graph(100)
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+    neg_size = 10
     for pos_edges, neg_edges in EdgeSampler(g, 50,
-                                            negative_mode="head",
-                                            neg_sample_size=10,
-                                            exclude_positive=True):
-        assert 10 * pos_edges.number_of_edges() == neg_edges.number_of_edges()
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive):
+        #assert neg_size * pos_edges.number_of_edges() == neg_edges.number_of_edges()
         pos_nid = pos_edges.parent_nid
         pos_eid = pos_edges.parent_eid
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
@@ -253,7 +254,12 @@ def test_negative_sampler():
             neg_d = int(F.asnumpy(neg_dst[i]))
             neg_e = int(F.asnumpy(neg_eid[i]))
             assert (neg_d, neg_e) in pos_map
-            assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+            if exclude_positive:
+                assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+
+def test_negative_sampler():
+    check_negative_sampler('head', True)
+    check_negative_sampler('PBG-head', False)
 
 
 if __name__ == '__main__':
