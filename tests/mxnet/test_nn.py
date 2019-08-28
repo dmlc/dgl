@@ -102,7 +102,7 @@ def test_tagconv():
     shp = norm.shape + (1,) * (h0.ndim - 1)
     norm = norm.reshape(shp).as_in_context(h0.context)
 
-    assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.data(ctx), conv.bias.data(ctx)))
+    assert F.allclose(h1, _S2AXWb(adj, norm, h0, conv.lin.data(ctx), conv.h_bias.data(ctx)))
 
     conv = nn.TAGConv(5, 2)
     conv.initialize(ctx=ctx)

@@ -108,7 +108,7 @@ class GraphConv(gluon.Block):
         graph = graph.local_var()
         if self._norm:
             degs = graph.in_degrees().astype('float32')
-            norm = mx.nd.power(degs, -0.5)
+            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = norm.reshape(shp).as_in_context(feat.context)
             feat = feat * norm
@@ -185,20 +185,18 @@ class TAGConv(gluon.Block):
                  bias=True,
                  activation=None):
         super(TAGConv, self).__init__()
-        self._in_feats = in_feats
-        self._out_feats = out_feats
-        self._k = k
-        self._activation = activation
+        self.out_feats = out_feats
+        self.k = k
+        self.bias = bias
+        self.activation = activation
+        self.in_feats = in_feats
 
-        in_feats = in_feats * (self._k + 1)
-        with self.name_scope():
-            self.lin = self.params.get('weight', shape=(in_feats, out_feats),
-                                       init=mx.init.Xavier())
-            if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
-            else:
-                self.bias = None
+        self.lin = self.params.get(
+            'weight', shape=(self.in_feats * (self.k + 1), self.out_feats),
+            init=mx.init.Xavier())
+        if self.bias:
+            self.h_bias = self.params.get('bias', shape=(out_feats,),
+                                          init=mx.init.Zero())
 
     def forward(self, graph, feat):
         r"""Compute graph convolution
@@ -220,12 +218,12 @@ class TAGConv(gluon.Block):
         graph = graph.local_var()
 
         degs = graph.in_degrees().astype('float32')
-        norm = mx.nd.power(degs, -0.5)
+        norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = norm.reshape(shp).as_in_context(feat.context)
 
         rst = feat
-        for _ in range(self._k):
+        for _ in range(self.k):
             rst = rst * norm
             graph.ndata['h'] = rst
 
@@ -237,10 +235,10 @@ class TAGConv(gluon.Block):
 
         rst = mx.nd.dot(feat, self.lin.data(feat.context))
         if self.bias is not None:
-            rst = rst + self.bias.data(rst.context)
+            rst = rst + self.h_bias.data(rst.context)
 
-        if self._activation is not None:
-            rst = self._activation(rst)
+        if self.activation is not None:
+            rst = self.activation(rst)
 
         return rst
 
