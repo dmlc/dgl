@@ -24,6 +24,10 @@ dgl.nn.pytorch.conv
     :members: forward
     :show-inheritance:
 
+.. autoclass:: dgl.nn.pytorch.conv.EdgeConv
+    :members: forward
+    :show-inheritance:
+
 .. autoclass:: dgl.nn.pytorch.conv.SAGEConv
     :members: forward
     :show-inheritance:
@@ -113,3 +117,14 @@ dgl.nn.pytorch.softmax
 
 .. automodule:: dgl.nn.pytorch.softmax
     :members: edge_softmax
+
+dgl.nn.pytorch.factory
+----------------------
+
+.. automodule:: dgl.nn.pytorch.NearestNeighborGraph
+    :members:
+    :show-inheritance:
+
+.. automodule:: dgl.nn.pytorch.SegmentedNearestNeighborGraph
+    :members:
+    :show-inheritance:
