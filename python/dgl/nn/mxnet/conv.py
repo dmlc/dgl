@@ -173,8 +173,10 @@ class TAGConv(gluon.Block):
 
     Attributes
     ----------
-    lin : torch.Module
-        The learnable linear module.
+    lin : mxnet.gluon.parameter.Parameter
+        The learnable weight tensor.
+    bias : mxnet.gluon.parameter.Parameter
+        The learnable bias tensor.
     """
     def __init__(self,
                  in_feats,
@@ -205,13 +207,13 @@ class TAGConv(gluon.Block):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
@@ -221,7 +223,6 @@ class TAGConv(gluon.Block):
         norm = mx.nd.power(degs, -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = norm.reshape(shp).as_in_context(feat.context)
-        #D-1/2 A D -1/2 X
 
         rst = feat
         for _ in range(self._k):
