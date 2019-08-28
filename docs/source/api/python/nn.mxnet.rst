@@ -12,6 +12,14 @@ dgl.nn.mxnet.conv
     :members: weight, bias, forward
     :show-inheritance:
 
+.. autoclass:: dgl.nn.mxnet.conv.RelGraphConv
+    :members: forward
+    :show-inheritance:
+
+.. autoclass:: dgl.nn.mxnet.conv.TAGConv
+    :members: forward
+    :show-inheritance:
+
 dgl.nn.mxnet.glob
 -----------------
 

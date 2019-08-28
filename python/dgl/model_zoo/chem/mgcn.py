@@ -1,20 +1,42 @@
 # -*- coding:utf-8 -*-
-
-import dgl
+# pylint: disable=C0103, C0111, W0621
+"""Implementation  of MGCN model"""
 import torch as th
 import torch.nn as nn
-from layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
+
+from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
+from ...batched_graph import sum_nodes
 
 
 class MGCNModel(nn.Module):
     """
-    MGCN Model from:
-    Chengqiang Lu, et al.
-    Molecular Property Prediction: A Multilevel
-    Quantum Interactions Modeling Perspective. (AAAI'2019)
-    """
+    MGCN from `Molecular Property Prediction: A Multilevel
+    Quantum Interactions Modeling Perspective <https://arxiv.org/abs/1906.11081>`__
 
+    Parameters
+    ----------
+    dim : int
+        Dimension of feature maps, default to be 128.
+    out_put_dim: int
+        Number of target properties to predict, default to be 1.
+    edge_dim : int
+        Dimension of edge feature, default to be 128.
+    cutoff : float
+        The maximum distance between nodes, default to be 5.0.
+    width : int
+        Width in the RBF layer, default to be 1.
+    n_conv : int
+        Number of convolutional layers, default to be 3.
+    norm : bool
+        Whether to perform normalization, default to be False.
+    atom_ref : Atom embeddings or None
+        If None, random representation initialization will be used. Otherwise,
+        they will be used to initialize atom representations. Default to be None.
+    pre_train : Atom embeddings or None
+        If None, random representation initialization will be used. Otherwise,
+        they will be used to initialize atom representations. Default to be None.
+    """
     def __init__(self,
                  dim=128,
                  output_dim=1,
@@ -25,21 +47,7 @@ class MGCNModel(nn.Module):
                  norm=False,
                  atom_ref=None,
                  pre_train=None):
-        """
-        Args:
-            dim: dimension of feature maps
-            out_put_dim: the num of target propperties to predict
-            edge_dim: dimension of edge feature
-            cutoff: the maximum distance between nodes
-            width: width in the RBF layer
-            n_conv: number of convolutional layers
-            norm: normalization
-            atom_ref: atom reference
-                      used as the initial value of atom embeddings,
-                      or set to None with random initialization
-            pre_train: pre_trained node embeddings
-        """
-        super().__init__()
+        super(MGCNModel, self).__init__()
         self.name = "MGCN"
         self._dim = dim
         self.output_dim = output_dim
@@ -71,11 +79,32 @@ class MGCNModel(nn.Module):
         self.node_dense_layer2 = nn.Linear(64, output_dim)
 
     def set_mean_std(self, mean, std, device):
+        """Set the mean and std of atom representations for normalization.
+
+        Parameters
+        ----------
+        mean : list or numpy array
+            The mean of labels
+        std : list or numpy array
+            The std of labels
+        device : str or torch.device
+            Device for storing the mean and std
+        """
         self.mean_per_node = th.tensor(mean, device=device)
         self.std_per_node = th.tensor(std, device=device)
 
     def forward(self, g):
+        """Predict molecule labels
 
+        Parameters
+        ----------
+        g : DGLGraph
+            Input DGLGraph for molecule(s)
+
+        Returns
+        -------
+        res : Predicted labels
+        """
         self.embedding_layer(g, "node_0")
         if self.atom_ref is not None:
             self.e0(g, "e0")
@@ -102,16 +131,5 @@ class MGCNModel(nn.Module):
         if self.norm:
             g.ndata["res"] = g.ndata[
                 "res"] * self.std_per_node + self.mean_per_node
-        res = dgl.sum_nodes(g, "res")
+        res = sum_nodes(g, "res")
         return res
-
-
-if __name__ == "__main__":
-    g = dgl.DGLGraph()
-    g.add_nodes(2)
-    g.add_edges([0, 0, 1, 1], [1, 0, 1, 0])
-    g.edata["distance"] = th.tensor([1.0, 3.0, 2.0, 4.0]).reshape(-1, 1)
-    g.ndata["node_type"] = th.LongTensor([1, 2])
-    model = MGCNModel(dim=2, edge_dim=2)
-    node = model(g)
-    print(node)

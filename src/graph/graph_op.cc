@@ -249,8 +249,8 @@ std::vector<GraphPtr> GraphOp::DisjointPartitionBySizes(
 }
 
 IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
-  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
-  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
+  CHECK(aten::IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(aten::IsValidIdArray(query)) << "Invalid query id array.";
   const auto parent_len = parent_vids->shape[0];
   const auto query_len = query->shape[0];
   const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);

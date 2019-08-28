@@ -57,8 +57,8 @@ def main(args):
     g = data.graph
     # add self loop
     if args.self_loop:
-            g.remove_edges_from(g.selfloop_edges())
-            g.add_edges_from(zip(g.nodes(), g.nodes()))
+        g.remove_edges_from(g.selfloop_edges())
+        g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
     # normalization
