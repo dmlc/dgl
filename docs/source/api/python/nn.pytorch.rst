@@ -1,130 +1,133 @@
 .. _apinn-pytorch:
 
-dgl.nn.pytorch
-==============
+NN Modules (PyTorch)
+====================
 
-dgl.nn.pytorch.conv
--------------------
+Conv Layers 
+----------------------------------------
 
 .. automodule:: dgl.nn.pytorch.conv
 
 .. autoclass:: dgl.nn.pytorch.conv.GraphConv
     :members: weight, bias, forward, reset_parameters
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.RelGraphConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.TAGConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.GATConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.EdgeConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.SAGEConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.SGConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.APPNPConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.GINConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.GatedGraphConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.GMMConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.ChebConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.AGNNConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.NNConv
     :members: forward
     :show-inheritance:
+    
+Dense Conv Layers
+----------------------------------------
 
 .. autoclass:: dgl.nn.pytorch.conv.DenseGraphConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.DenseSAGEConv
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
     :members: forward
     :show-inheritance:
+    
+Global Pooling Layers 
+----------------------------------------
 
-dgl.nn.pytorch.glob
--------------------
 .. automodule:: dgl.nn.pytorch.glob
 
 .. autoclass:: dgl.nn.pytorch.glob.SumPooling
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.AvgPooling
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.MaxPooling
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.SortPooling
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.Set2Set
     :members: forward
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.SetTransformerEncoder
     :members:
     :show-inheritance:
-
+    
 .. autoclass:: dgl.nn.pytorch.glob.SetTransformerDecoder
     :members:
     :show-inheritance:
+    
+Utility Modules
+----------------------------------------
 
-dgl.nn.pytorch.softmax
-----------------------
-
+.. autoclass:: dgl.nn.pytorch.factory.KNNGraph
+    :members:
+    :show-inheritance:
+    
+.. autoclass:: dgl.nn.pytorch.factory.SegmentedKNNGraph
+    :members:
+    :show-inheritance:
+    
 .. automodule:: dgl.nn.pytorch.softmax
     :members: edge_softmax
+    
 
-dgl.nn.pytorch.factory
-----------------------
-
-.. automodule:: dgl.nn.pytorch.NearestNeighborGraph
-    :members:
-    :show-inheritance:
-
-.. automodule:: dgl.nn.pytorch.SegmentedNearestNeighborGraph
-    :members:
-    :show-inheritance:

@@ -1,10 +1,10 @@
 .. _apinn-mxnet:
 
-dgl.nn.mxnet
-============
+NN Modules (MXNet)
+=================
 
-dgl.nn.mxnet.conv
------------------
+Conv Layers 
+----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.conv
 
@@ -20,15 +20,15 @@ dgl.nn.mxnet.conv
     :members: forward
     :show-inheritance:
 
-dgl.nn.mxnet.glob
------------------
+Global Pooling Layers 
+----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.glob
     :members:
     :show-inheritance:
 
-dgl.nn.mxnet.softmax
---------------------
+Utility Modules
+----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.softmax
     :members: edge_softmax
