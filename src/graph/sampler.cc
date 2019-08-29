@@ -1005,7 +1005,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
 
-  int64_t chunk_size = neg_sample_size;
+  int64_t chunk_size = neg_sample_size / 2;
   // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
   // is num_chunks + 1 and the last chunk size is last_chunk_size.
   // Otherwise, the actual number of chunks is num_chunks, the last chunk size
@@ -1014,8 +1014,8 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   int64_t last_chunk_size = num_pos_edges - num_chunks * chunk_size;
 
   // The number of negative edges.
-  int64_t num_neg_edges = (chunk_size * 2 - 1) * chunk_size * num_chunks;
-  int64_t num_neg_edges_last_chunk = (last_chunk_size + chunk_size - 1) * last_chunk_size;
+  int64_t num_neg_edges = (chunk_size * 2) * chunk_size * num_chunks;
+  int64_t num_neg_edges_last_chunk = (chunk_size * 2) * last_chunk_size;
   int64_t num_all_neg_edges = num_neg_edges + num_neg_edges_last_chunk;
 
   IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
@@ -1063,7 +1063,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
     // for each chunk.
-    size_t neg_idx = (chunk_size * 2 - 1) * chunk_size * i_chunk;
+    size_t neg_idx = (chunk_size * 2) * chunk_size * i_chunk;
     size_t pos_edge_idx = (chunk_size) * i_chunk;
     neg_vids.clear();
     RandomSample(num_tot_nodes, chunk_size, &neg_vids);
@@ -1075,11 +1075,6 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
       // generate 2 * chunk_size neg samples
       for (int64_t j = 0; j != chunk_size * 2; ++j) {
-        if (in_chunk == j) {
-          // first chunk uses original head or tail as negative nodes,
-          // j == in_chunk represents the exact pos sample which should be ignored.
-          continue;
-        }
         neg_unchanged[neg_idx] = local_unchanged;
         neg_eid_data[neg_idx] = curr_eid++;
 
@@ -1099,8 +1094,39 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       }
     }
   }
-  // TODO we need to deal with the last chunk.
-  assert(last_chunk_size == 0);
+  {
+    // for the last chunk
+    size_t neg_idx = (chunk_size * 2) * chunk_size * num_chunks;
+    size_t pos_edge_idx = (chunk_size) * num_chunks;
+    neg_vids.clear();
+    RandomSample(num_tot_nodes, 2 * chunk_size - last_chunk_size, &neg_vids);
+
+    for (int64_t in_chunk = 0; in_chunk != last_chunk_size; ++in_chunk) {
+      // For each positive node in a chunk.
+
+      dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
+      dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
+      // generate 2 * chunk_size neg samples
+      for (int64_t j = 0; j != chunk_size * 2; ++j) {
+        neg_unchanged[neg_idx] = local_unchanged;
+        neg_eid_data[neg_idx] = curr_eid++;
+
+        dgl_id_t global_changed_vid;
+        if (j < last_chunk_size) {
+          // first chunk_size neg samples use in-chunk node to corrupt.
+          global_changed_vid = induced_vid_data[changed[pos_edge_idx + j]];
+        } else {
+          // second chunk_size neg samples, use random-smapled node to corrupt.
+          global_changed_vid = neg_vids[j - last_chunk_size];
+        }
+        // TODO we can avoid the hashtable lookup here.
+        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
+        neg_changed[neg_idx] = local_changed;
+        induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
+        neg_idx++;
+      }
+    }
+  }
 
   // Now we know the number of vertices in the negative graph.
   int64_t num_neg_nodes = neg_map.size();
