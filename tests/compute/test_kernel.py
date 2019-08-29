@@ -96,7 +96,19 @@ def test_copy_src_reduce():
             F.backward(r2.sum())
             n_grad2 = F.grad(g.ndata['u'])
 
+        def _print_error(a, b):
+            print("ERROR: Test copy_src_{} partial: {}".
+                  format(red, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
         assert F.allclose(r1, r2)
+        if not F.allclose(n_grad1, n_grad2):
+            print('node grad')
+            _print_error(n_grad1, n_grad2)
         assert(F.allclose(n_grad1, n_grad2))
 
     _test('sum', False)
@@ -105,8 +117,6 @@ def test_copy_src_reduce():
     _test('sum', True)
     _test('max', True)
     _test('mean', True)
-
-
 
 
 def test_copy_edge_reduce():
@@ -147,7 +157,19 @@ def test_copy_edge_reduce():
             F.backward(r2.sum())
             e_grad2 = F.grad(g.edata['e'])
 
+        def _print_error(a, b):
+            print("ERROR: Test copy_edge_{} partial: {}".
+                  format(red, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
         assert F.allclose(r1, r2)
+        if not F.allclose(e_grad1, e_grad2):
+            print('edge gradient')
+            _print_error(e_grad1, e_grad2)
         assert(F.allclose(e_grad1, e_grad2))
 
     _test('sum', False)
@@ -296,6 +318,7 @@ def test_all_binary_builtins():
     g.add_edge(19, 1)
     nid = F.tensor([1, 3, 4, 5, 7, 10, 13, 17, 19])
     target = ["u", "v", "e"]
+
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
@@ -305,7 +328,7 @@ def test_all_binary_builtins():
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
-
+    
 if __name__ == '__main__':
     test_copy_src_reduce()
     test_copy_edge_reduce()
