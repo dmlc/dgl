@@ -251,6 +251,9 @@ def test_all_binary_builtins():
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
         if reducer == 'prod':
+            # increase tolerance for prod reducer
+            # NOTE(zihao) as far as I know prod reducer has never
+            # been used in any gnn models.
             rtol = 1e-2
             atol = 1e-2
         else:
@@ -258,10 +261,9 @@ def test_all_binary_builtins():
             atol = 1e-4
 
         def _print_error(a, b):
-            print("ERROR: Test {}_{}_{}_{} {}".
-                  format(lhs, binary_op, rhs, reducer, broadcast))
-            print(a, b)
-            for i, (x, y) in enumerate(zip(F.asnumpy(F.cpu(a)).flatten(), F.asnumpy(F.cpu(b)).flatten())):
+            print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
+                  format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
 
