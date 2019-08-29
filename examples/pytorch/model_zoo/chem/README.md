@@ -23,8 +23,6 @@ The rest dependencies can be installed with `pip install -r requirements.txt`.
 
 ## Property Prediction
 
-[**Get started with our example code!**](https://github.com/dmlc/dgl/tree/master/examples/pytorch/model_zoo/chem/property_prediction)
-
 To evaluate molecules for drug candidates, we need to know their properties and activities. In practice, this is
 mostly achieved via wet lab experiments. We can cast the problem as a regression or classification problem.
 In practice, this can be quite difficult due to the scarcity of labeled data.
@@ -54,7 +52,22 @@ as front end and Set2Set for output prediction.
 
 ### Example Usage of Pre-trained Models
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/gcn_model_zoo_example.png)
+```python
+from dgl.data import Tox21
+from dgl import model_zoo
+
+dataset = Tox21()
+model = model_zoo.chem.load_pretrained('GCN_Tox21') # Pretrained model loaded
+model.eval()
+
+smiles, g, label, mask = dataset[0]
+feats = g.ndata.pop('h')
+label_pred = model(feats, g)
+print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
+print(label_pred[:, mask != 0]) # Mask non-existing labels
+# tensor([[-0.7956,  0.4054,  0.4288, -0.5565, -0.0911,  
+# 0.9981, -0.1663,  0.2311, -0.2376,  0.9196]])
+```
 
 ## Generative Models
 
@@ -76,7 +89,24 @@ progressively adding atoms and bonds.
 
 ### Example Usage of Pre-trained Models
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example1.png)
+```python
+# We recommend running the code below with Jupyter notebooks
+from IPython.display import SVG
+from rdkit import Chem
+from rdkit.Chem import Draw
+
+from dgl import model_zoo
+
+model = model_zoo.chem.load_pretrained('DGMG_ZINC_canonical')
+model.eval()
+mols = []
+for i in range(4):
+    SMILES = model(rdkit_mol=True)
+    mols.append(Chem.MolFromSmiles(SMILES))
+# Generating 4 molecules takes less than a second.
+
+SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True))
+```
 
 ![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example2.png)
 
