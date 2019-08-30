@@ -8,7 +8,6 @@ A set of high-level pre-defined modules are provided to build graph neural netwo
 
 .. toctree::
    :glob:
-   :maxdepth: 4
    :caption: NN Modules
  
    ../api/python/nn
