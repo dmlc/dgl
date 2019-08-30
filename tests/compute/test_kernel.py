@@ -10,7 +10,6 @@ np.random.seed(42)
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
 
-
 def udf_copy_edge(edges):
     return {'m': edges.data['e']}
 
@@ -316,7 +315,7 @@ def test_all_binary_builtins():
     g.add_edge(18, 1)
     g.add_edge(19, 0)
     g.add_edge(19, 1)
-    nid = F.tensor([1, 3, 4, 5, 7, 10, 13, 17, 19])
+    nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19])
     target = ["u", "v", "e"]
 
     for lhs, rhs in product(target, target):
@@ -330,6 +329,6 @@ def test_all_binary_builtins():
                               broadcast=broadcast)
     
 if __name__ == '__main__':
-    test_copy_src_reduce()
-    test_copy_edge_reduce()
+    #test_copy_src_reduce()
+    #test_copy_edge_reduce()
     test_all_binary_builtins()
