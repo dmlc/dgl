@@ -1,5 +1,5 @@
 """Torch modules for graph global pooling."""
-# pylint: disable= no-member, arguments-differ, C0103, W0235
+# pylint: disable= no-member, arguments-differ, invalid-name, W0235
 import torch as th
 import torch.nn as nn
 import numpy as np
@@ -12,7 +12,7 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobalAttentionPooling', 'Set2Set',
-           'SetTransformerEncoder', 'SetTransformerDecoder']
+           'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the nodes in the graph.
@@ -23,17 +23,17 @@ class SumPooling(nn.Module):
     def __init__(self):
         super(SumPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sum pooling.
 
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -57,16 +57,16 @@ class AvgPooling(nn.Module):
     def __init__(self):
         super(AvgPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute average pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -90,16 +90,16 @@ class MaxPooling(nn.Module):
     def __init__(self):
         super(MaxPooling, self).__init__()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute max pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, *)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -127,16 +127,16 @@ class SortPooling(nn.Module):
         super(SortPooling, self).__init__()
         self.k = k
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute sort pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -178,28 +178,17 @@ class GlobalAttentionPooling(nn.Module):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
         self.feat_nn = feat_nn
-        self.reset_parameters()
 
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        for p in self.gate_nn.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-        if self.feat_nn:
-            for p in self.feat_nn.parameters():
-                if p.dim() > 1:
-                    nn.init.xavier_uniform_(p)
-
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute global attention pooling.
 
         Parameters
         ----------
+        graph : DGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph
-            The graph.
 
         Returns
         -------
@@ -263,16 +252,16 @@ class Set2Set(nn.Module):
         """Reinitialize learnable parameters."""
         self.lstm.reset_parameters()
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         r"""Compute set2set pooling.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -579,17 +568,17 @@ class SetTransformerEncoder(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         """
         Compute the Encoder part of Set Transformer.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -645,17 +634,17 @@ class SetTransformerDecoder(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, feat, graph):
+    def forward(self, graph, feat):
         """
         Compute the decoder part of Set Transformer.
 
         Parameters
         ----------
+        graph : DGLGraph or BatchedDGLGraph
+            The graph.
         feat : torch.Tensor
             The input feature with shape :math:`(N, D)` where
             :math:`N` is the number of nodes in the graph.
-        graph : DGLGraph or BatchedDGLGraph
-            The graph.
 
         Returns
         -------
@@ -679,3 +668,43 @@ class SetTransformerDecoder(nn.Module):
             return feat.view(graph.batch_size, self.k * self.d_model)
         else:
             return feat.view(self.k * self.d_model)
+
+
+class WeightAndSum(nn.Module):
+    """Compute importance weights for atoms and perform a weighted sum.
+
+    Parameters
+    ----------
+    in_feats : int
+        Input atom feature size
+    """
+    def __init__(self, in_feats):
+        super(WeightAndSum, self).__init__()
+        self.in_feats = in_feats
+        self.atom_weighting = nn.Sequential(
+            nn.Linear(in_feats, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, bg, feats):
+        """Compute molecule representations out of atom representations
+
+        Parameters
+        ----------
+        bg : BatchedDGLGraph
+            B Batched DGLGraphs for processing multiple molecules in parallel
+        feats : FloatTensor of shape (N, self.in_feats)
+            Representations for all atoms in the molecules
+            * N is the total number of atoms in all molecules
+
+        Returns
+        -------
+        FloatTensor of shape (B, self.in_feats)
+            Representations for B molecules
+        """
+        with bg.local_scope():
+            bg.ndata['h'] = feats
+            bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
+            h_g_sum = sum_nodes(bg, 'h', 'w')
+
+        return h_g_sum

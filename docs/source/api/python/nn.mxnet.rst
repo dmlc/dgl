@@ -16,6 +16,10 @@ dgl.nn.mxnet.conv
     :members: forward
     :show-inheritance:
 
+.. autoclass:: dgl.nn.mxnet.conv.TAGConv
+    :members: forward
+    :show-inheritance:
+
 dgl.nn.mxnet.glob
 -----------------
 

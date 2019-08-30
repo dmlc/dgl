@@ -1,8 +1,11 @@
 # DGL for Chemistry
 
-With atoms being nodes and bonds being edges, molecular graphs are among the core objects for study in drug discovery. 
-As drug discovery is known to be costly and time consuming, deep learning on graphs can be potentially beneficial for 
-improving the efficiency of drug discovery [1], [2].
+With atoms being nodes and bonds being edges, molecular graphs are among the core objects for study in Chemistry. 
+Deep learning on graphs can be beneficial for various applications in Chemistry like drug and material discovery 
+[1], [2], [12].
+
+To make it easy for domain scientists, the DGL team releases a model zoo for Chemistry, focusing on two particular cases 
+-- property prediction and target generation/optimization. 
 
 With pre-trained models and training scripts, we hope this model zoo will be helpful for both
 the chemistry community and the deep learning community to further their research.
@@ -11,20 +14,14 @@ the chemistry community and the deep learning community to further their researc
 
 Before you proceed, make sure you have installed the dependencies below:
 - PyTorch 1.2
-    - Check the [official website](https://pytorch.org/) for installation guide
-- pandas 0.24.2
-    - Install with either `conda install pandas` or `pip install pandas`
+    - Check the [official website](https://pytorch.org/) for installation guide.
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
-- requests 2.22.0
-    - Install with `pip install requests`
-- scikit-learn 0.21.2
-    - Install with `pip install -U scikit-learn` or `conda install scikit-learn`
+
+The rest dependencies can be installed with `pip install -r requirements.txt`.
 
 ## Property Prediction
-
-[**Get started with our example code!**](https://github.com/dmlc/dgl/tree/master/examples/pytorch/model_zoo/chem/property_prediction)
 
 To evaluate molecules for drug candidates, we need to know their properties and activities. In practice, this is
 mostly achieved via wet lab experiments. We can cast the problem as a regression or classification problem.
@@ -40,16 +37,37 @@ mostly developed based on molecule fingerprints.
 Graph neural networks make it possible for a data-driven representation of molecules out of the atoms, bonds and 
 molecular graph topology, which may be viewed as a learned fingerprint [3]. 
 
-### Models  
-
-- **Graph Convolutional Network**: Graph Convolutional Networks (GCN) have been one of the most popular graph neural 
-networks and they can be easily extended for graph level prediction.  
-- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
-the continuous-filter convolutional layers [4].   
-- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
+### Models
+- **Graph Convolutional Networks** [3], [9]: Graph Convolutional Networks (GCN) have been one of the most popular graph 
+neural networks and they can be easily extended for graph level prediction.
+- **Graph Attention Networks** [10]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
+explicitly modeling the interactions between adjacent atoms.
+- **SchNet** [4]: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize 
+the continuous-filter convolutional layers.   
+- **Multilevel Graph Convolutional neural Network** [5]: Multilevel Graph Convolutional neural Network (MGCN) is a well-designed 
 hierarchical graph neural network directly extracts features from the conformation and spatial information followed 
-by the multilevel interactions [5].    
-- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) as front end and us  Set2Set to output prediction [6].
+by the multilevel interactions.    
+- **Message Passing Neural Network** [6]: Message Passing Neural Network (MPNN) is a well-designed network with edge network (enn) 
+as front end and Set2Set for output prediction.
+
+### Example Usage of Pre-trained Models
+
+```python
+from dgl.data import Tox21
+from dgl import model_zoo
+
+dataset = Tox21()
+model = model_zoo.chem.load_pretrained('GCN_Tox21') # Pretrained model loaded
+model.eval()
+
+smiles, g, label, mask = dataset[0]
+feats = g.ndata.pop('h')
+label_pred = model(feats, g)
+print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
+print(label_pred[:, mask != 0]) # Mask non-existing labels
+# tensor([[-0.7956,  0.4054,  0.4288, -0.5565, -0.0911,  
+# 0.9981, -0.1663,  0.2311, -0.2376,  0.9196]])
+```
 
 ## Generative Models
 
@@ -66,8 +84,31 @@ Generative models are known to be difficult for evaluation. [GuacaMol](https://g
 are also two accompanying review papers that are well written [7], [8].
 
 ### Models
-- **Deep Generative Models of Graphs (DGMG)**: A very general framework for graph distribution learning by progressively
-adding atoms and bonds.
+- **Deep Generative Models of Graphs (DGMG)** [11]: A very general framework for graph distribution learning by 
+progressively adding atoms and bonds.
+
+### Example Usage of Pre-trained Models
+
+```python
+# We recommend running the code below with Jupyter notebooks
+from IPython.display import SVG
+from rdkit import Chem
+from rdkit.Chem import Draw
+
+from dgl import model_zoo
+
+model = model_zoo.chem.load_pretrained('DGMG_ZINC_canonical')
+model.eval()
+mols = []
+for i in range(4):
+    SMILES = model(rdkit_mol=True)
+    mols.append(Chem.MolFromSmiles(SMILES))
+# Generating 4 molecules takes less than a second.
+
+SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True))
+```
+
+![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example2.png)
 
 ## References
 
@@ -92,3 +133,13 @@ Machine Learning* JMLR. 1263-1272.
 1096-1108.
 
 [8] Polykovskiy et al. (2019) Molecular Sets (MOSES): A Benchmarking Platform for Molecular Generation Models. *arXiv*. 
+
+[9] Kipf et al. (2017) Semi-Supervised Classification with Graph Convolutional Networks.
+*The International Conference on Learning Representations (ICLR)*. 
+
+[10] Veličković et al. (2018) Graph Attention Networks. 
+*The International Conference on Learning Representations (ICLR)*. 
+
+[11] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
+
+[12] Goh et al. (2017) Deep learning for computational chemistry. *Journal of Computational Chemistry* 16, 1291-1307.

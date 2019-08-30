@@ -222,7 +222,7 @@ class NeighborSampler(NodeFlowSampler):
     layer :math:`i+1` are in layer :math:`i`. All the edges are from nodes
     in layer :math:`i` to layer :math:`i+1`.
 
-    TODO(minjie): give a figure here.
+    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NodeFlow.png
     
     As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
     of the initial seed nodes (number of nodes in the last layer).
@@ -554,10 +554,11 @@ class EdgeSampler(object):
             return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
         else:
             rets = []
-            assert self._num_workers * 2 == len(subgs)
-            for i in range(self._num_workers):
+            assert len(subgs) % 2 == 0
+            num_pos = int(len(subgs) / 2)
+            for i in range(num_pos):
                 pos_subg = subgraph.DGLSubGraph(self.g, subgs[i])
-                neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + self._num_workers])
+                neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + num_pos])
                 rets.append((pos_subg, neg_subg))
             return rets
 

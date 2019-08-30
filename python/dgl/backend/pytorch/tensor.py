@@ -78,9 +78,9 @@ def astype(input, ty):
 
 def asnumpy(input):
     if isinstance(input, th.sparse.FloatTensor):
-        return input.to_dense().cpu().numpy()
+        return input.to_dense().cpu().detach().numpy()
     else:
-        return input.cpu().numpy()
+        return input.cpu().detach().numpy()
 
 def copy_to(input, ctx):
     if ctx.type == 'cpu':
@@ -92,8 +92,8 @@ def copy_to(input, ctx):
     else:
         raise RuntimeError('Invalid context', ctx)
 
-def sum(input, dim):
-    return th.sum(input, dim=dim)
+def sum(input, dim, keepdims=False):
+    return th.sum(input, dim=dim, keepdim=keepdims)
 
 def reduce_sum(input):
     return input.sum()
@@ -124,6 +124,9 @@ def argsort(input, dim, descending):
 def topk(input, k, dim, descending=True):
     return th.topk(input, k, dim, largest=descending)[0]
 
+def argtopk(input, k, dim, descending=True):
+    return th.topk(input, k, dim, largest=descending)[1]
+
 def exp(input):
     return th.exp(input)
 
@@ -149,14 +152,7 @@ def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
 
 def slice_axis(data, axis, begin, end):
-    dim = data.shape[axis]
-    if begin < 0:
-        begin += dim
-    if end <= 0:
-        end += dim
-    if begin >= end:
-        raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
-    return th.index_select(data, axis, th.arange(begin, end, device=data.device))
+    return th.narrow(data, axis, begin, end - begin)
 
 def take(data, indices, dim):
     new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
@@ -179,6 +175,9 @@ def unsqueeze(input, dim):
 
 def reshape(input, shape):
     return th.reshape(input ,shape)
+
+def swapaxes(input, axis1, axis2):
+    return th.transpose(input, axis1, axis2)
 
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)

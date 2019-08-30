@@ -2,7 +2,7 @@ import numpy as np
 import sys
 
 from .csv_dataset import CSVDataset
-from .utils import smile2graph
+from .utils import smile_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
 
 try:
@@ -32,11 +32,11 @@ class Tox21(CSVDataset):
 
     Parameters
     ----------
-    smile2graph: callable, str -> DGLGraph
+    smile_to_graph: callable, str -> DGLGraph
     A function turns smiles into a DGLGraph. Default one can be found 
-    at python/dgl/data/chem/utils.py named with smile2graph.
+    at python/dgl/data/chem/utils.py named with smile_to_bigraph.
     """
-    def __init__(self, smile2graph=smile2graph):
+    def __init__(self, smile_to_graph=smile_to_bigraph):
         if 'pandas' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning("Please install pandas")
@@ -48,7 +48,7 @@ class Tox21(CSVDataset):
 
         df = df.drop(columns=['mol_id'])
 
-        super().__init__(df, smile2graph, cache_file_path="tox21_dglgraph.pkl")
+        super().__init__(df, smile_to_graph, cache_file_path="tox21_dglgraph.pkl")
         self._weight_balancing()
 
     
