@@ -5,11 +5,10 @@ import numpy as np
 import backend as F
 from itertools import product
 
-np.random.seed(42)
+np.random.seed(31)
 
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
-
 
 def udf_copy_edge(edges):
     return {'m': edges.data['e']}
@@ -96,7 +95,19 @@ def test_copy_src_reduce():
             F.backward(r2.sum())
             n_grad2 = F.grad(g.ndata['u'])
 
+        def _print_error(a, b):
+            print("ERROR: Test copy_src_{} partial: {}".
+                  format(red, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
         assert F.allclose(r1, r2)
+        if not F.allclose(n_grad1, n_grad2):
+            print('node grad')
+            _print_error(n_grad1, n_grad2)
         assert(F.allclose(n_grad1, n_grad2))
 
     _test('sum', False)
@@ -105,8 +116,6 @@ def test_copy_src_reduce():
     _test('sum', True)
     _test('max', True)
     _test('mean', True)
-
-
 
 
 def test_copy_edge_reduce():
@@ -147,7 +156,19 @@ def test_copy_edge_reduce():
             F.backward(r2.sum())
             e_grad2 = F.grad(g.edata['e'])
 
+        def _print_error(a, b):
+            print("ERROR: Test copy_edge_{} partial: {}".
+                  format(red, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2):
+            _print_error(r1, r2)
         assert F.allclose(r1, r2)
+        if not F.allclose(e_grad1, e_grad2):
+            print('edge gradient')
+            _print_error(e_grad1, e_grad2)
         assert(F.allclose(e_grad1, e_grad2))
 
     _test('sum', False)
@@ -251,6 +272,9 @@ def test_all_binary_builtins():
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
         if reducer == 'prod':
+            # increase tolerance for prod reducer
+            # NOTE(zihao) as far as I know prod reducer has never
+            # been used in any gnn models.
             rtol = 1e-2
             atol = 1e-2
         else:
@@ -258,10 +282,9 @@ def test_all_binary_builtins():
             atol = 1e-4
 
         def _print_error(a, b):
-            print("ERROR: Test {}_{}_{}_{} {}".
-                  format(lhs, binary_op, rhs, reducer, broadcast))
-            print(a, b)
-            for i, (x, y) in enumerate(zip(F.asnumpy(F.cpu(a)).flatten(), F.asnumpy(F.cpu(b)).flatten())):
+            print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
+                  format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
 
@@ -292,8 +315,9 @@ def test_all_binary_builtins():
     g.add_edge(18, 1)
     g.add_edge(19, 0)
     g.add_edge(19, 1)
-    nid = F.tensor([1, 3, 4, 5, 7, 10, 13, 17, 19])
+    nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19])
     target = ["u", "v", "e"]
+
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
@@ -303,8 +327,8 @@ def test_all_binary_builtins():
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
-
+    
 if __name__ == '__main__':
-    test_copy_src_reduce()
-    test_copy_edge_reduce()
+    #test_copy_src_reduce()
+    #test_copy_edge_reduce()
     test_all_binary_builtins()
