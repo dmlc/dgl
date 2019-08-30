@@ -3,6 +3,15 @@
 NN Modules (PyTorch)
 ====================
 
+.. contents:: Contents
+    :local:
+
+We welcome your contribution! If you want a model to be implemented in DGL as a NN Module,
+create an issue stared with "[Feature Request] NN Module XXXModel".
+
+If you want to contribute a NN module, create a pull request started with "[NN] XXXModel PyTorch NN Modules"
+and our team member would review this PR.
+
 Conv Layers 
 ----------------------------------------
 
