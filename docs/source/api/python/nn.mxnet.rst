@@ -1,7 +1,7 @@
 .. _apinn-mxnet:
 
 NN Modules (MXNet)
-=================
+===================
 
 .. contents:: Contents
     :local:
