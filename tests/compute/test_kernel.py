@@ -5,7 +5,7 @@ import numpy as np
 import backend as F
 from itertools import product
 
-np.random.seed(42)
+np.random.seed(31)
 
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
