@@ -5,6 +5,7 @@ Requirements
 ------------
 * sphinx
 * sphinx-gallery
+* sphinx_rtd_theme
 * Both pytorch and mxnet installed.
 
 Build documents
