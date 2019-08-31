@@ -34,15 +34,57 @@ def time_builtin(G):
             dur.append(time.time() - t0)
     return np.average(dur)
 
-G.ndata['h'] = torch.randn((N, 16, 1))
-G.edata['w'] = torch.randn((M, 16, 32))
+'''
+G.ndata['h'] = torch.randn((N, 4, 1))
+G.edata['w'] = torch.randn((M, 4, 2))
 G.to(torch.device('cuda:0'))
 print('udf time:', time_udf(G))
 val_udf = G.ndata['hh']
 print('builtin time:', time_builtin(G))
 val_builtin = G.ndata['hh']
+#print(val_udf)
+#print(val_builtin)
 print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+'''
+G.ndata['h'] = torch.randn((N, 64, 1))
+G.edata['w'] = torch.randn((M, 64, 16))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('64x16 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
 
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 64, 16))
+G.edata['w'] = torch.randn((M, 64, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('64x16 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G.ndata['h'] = torch.randn((N, 64, 1))
+G.edata['w'] = torch.randn((M, 64, 32))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('64x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 64, 32))
+G.edata['w'] = torch.randn((M, 64, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('64x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
 G.ndata['h'] = torch.randn((N, 64, 1))
 G.edata['w'] = torch.randn((M, 64, 64))
 G.to(torch.device('cuda:0'))
@@ -50,8 +92,9 @@ print('udf time:', time_udf(G))
 val_udf = G.ndata['hh']
 print('builtin time:', time_builtin(G))
 val_builtin = G.ndata['hh']
-print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+print('64x64 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
 
+G = dgl.DGLGraph(adj)
 G.ndata['h'] = torch.randn((N, 64, 64))
 G.edata['w'] = torch.randn((M, 64, 1))
 G.to(torch.device('cuda:0'))
@@ -59,17 +102,89 @@ print('udf time:', time_udf(G))
 val_udf = G.ndata['hh']
 print('builtin time:', time_builtin(G))
 val_builtin = G.ndata['hh']
-print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+print('64x64 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
 
-G.ndata['h'] = torch.randn((N, 64, 1, 4))
-G.edata['w'] = torch.randn((M, 64, 64, 4))
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 1))
+G.edata['w'] = torch.randn((M, 256, 32))
 G.to(torch.device('cuda:0'))
 print('udf time:', time_udf(G))
 val_udf = G.ndata['hh']
 print('builtin time:', time_builtin(G))
 val_builtin = G.ndata['hh']
-print('Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+print('256x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
 
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 32))
+G.edata['w'] = torch.randn((M, 256, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('256x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 1))
+G.edata['w'] = torch.randn((M, 256, 64))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('256x64 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 64))
+G.edata['w'] = torch.randn((M, 256, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('256x64 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 1))
+G.edata['w'] = torch.randn((M, 256, 128))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('256x128 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 256, 128))
+G.edata['w'] = torch.randn((M, 256, 1))
+G.to(torch.device('cuda:0'))
+print('udf time:', time_udf(G))
+val_udf = G.ndata['hh']
+print('builtin time:', time_builtin(G))
+val_builtin = G.ndata['hh']
+print('256x128 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 64, 1, 16))
+G.edata['w'] = torch.randn((M, 64, 32, 16))
+G.to(torch.device('cuda:0'))
+time_udf(G)
+val_udf = G.ndata['hh']
+time_builtin(G)
+val_builtin = G.ndata['hh']
+print('6xx1x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
+G.ndata['h'] = torch.randn((N, 64, 32, 16))
+G.edata['w'] = torch.randn((M, 64, 1, 16))
+G.to(torch.device('cuda:0'))
+time_udf(G)
+val_udf = G.ndata['hh']
+time_builtin(G)
+val_builtin = G.ndata['hh']
+print('6xx1x32 Currect?:', torch.allclose(val_udf.float().cpu(), val_builtin.float().cpu(), rtol=1e-4, atol=1e-4))
+
+G = dgl.DGLGraph(adj)
 G.ndata['h'] = torch.randn((N, 64, 64))
 G.edata['w'] = torch.randn((M, 64, 64))
 G.to(torch.device('cuda:0'))
