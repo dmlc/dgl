@@ -10,6 +10,7 @@ General development process
 A non-inclusive list of types of contribution is as follows:
 
 * New features and enhancements (`example <https://github.com/dmlc/dgl/pull/331>`__).
+* New NN Modules (`example <https://github.com/dmlc/dgl/pull/788>`__).
 * Bugfix (`example <https://github.com/dmlc/dgl/pull/247>`__).
 * Document improvement (`example <https://github.com/dmlc/dgl/pull/263>`__).
 * New models and examples (`example <https://github.com/dmlc/dgl/pull/279>`__).

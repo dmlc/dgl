@@ -59,13 +59,19 @@ build.
 ### Using anaconda
 
 ```
-conda install -c dglteam dgl
+conda install -c dglteam dgl           # cpu version
+conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
+conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
+conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 ```
 
 ### Using pip
 
 ```
-pip install dgl
+pip install dgl       # cpu version
+pip install dgl-cu90  # CUDA 9.0
+pip install dgl-cu92  # CUDA 9.2
+pip install dgl-cu100 # CUDA 10.0
 ```
 
 ### From source
