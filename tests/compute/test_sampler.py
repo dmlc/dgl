@@ -222,6 +222,14 @@ def test_setseed():
 
 def check_negative_sampler(mode, exclude_positive):
     g = generate_rand_graph(100)
+
+    pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
+    pos_map = {}
+    for i in range(len(pos_geid)):
+        pos_d = int(F.asnumpy(pos_gdst[i]))
+        pos_e = int(F.asnumpy(pos_geid[i]))
+        pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
+
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     neg_size = 10
     for pos_edges, neg_edges in EdgeSampler(g, 50,
@@ -236,12 +244,6 @@ def check_negative_sampler(mode, exclude_positive):
         pos_dst = pos_nid[pos_ldst]
         pos_eid = pos_eid[pos_leid]
         assert_array_equal(F.asnumpy(pos_eid), F.asnumpy(g.edge_ids(pos_src, pos_dst)))
-
-        pos_map = {}
-        for i in range(len(pos_eid)):
-            pos_d = int(F.asnumpy(pos_dst[i]))
-            pos_e = int(F.asnumpy(pos_eid[i]))
-            pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_src[i]))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
         neg_nid = neg_edges.parent_nid

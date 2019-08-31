@@ -903,10 +903,11 @@ dgl_id_t global2local_map(dgl_id_t global_id,
   }
 }
 
-Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
+Subgraph NegEdgeSubgraph(GraphPtr gptr, const Subgraph &pos_subg,
                          const std::string &neg_mode,
-                         int neg_sample_size, bool is_multigraph,
-                         bool exclude_positive) {
+                         int neg_sample_size, bool exclude_positive) {
+  int64_t num_tot_nodes = gptr->NumVertices();
+  bool is_multigraph = gptr->IsMultigraph();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
@@ -947,19 +948,19 @@ Subgraph NegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       unchanged = dst_data;
       neg_unchanged = neg_dst_data;
       neg_changed = neg_src_data;
-      neigh_it = pos_subg.graph->PredVec(unchanged[i]);
+      neigh_it = gptr->PredVec(induced_vid_data[unchanged[i]]);
     } else {
       unchanged = src_data;
       neg_unchanged = neg_src_data;
       neg_changed = neg_dst_data;
-      neigh_it = pos_subg.graph->SuccVec(unchanged[i]);
+      neigh_it = gptr->SuccVec(induced_vid_data[unchanged[i]]);
     }
 
     if (exclude_positive) {
       std::vector<size_t> exclude;
       for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
-        dgl_id_t local_vid = *it;
-        exclude.push_back(induced_vid_data[local_vid]);
+        dgl_id_t global_vid = *it;
+        exclude.push_back(global_vid);
       }
       RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
     } else {
@@ -1199,9 +1200,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
                                                gptr->IsMultigraph(), exclude_positive);
         negative_subgs[i] = ConvertRef(neg_subg);
       } else if (neg_mode.size() > 0) {
-        Subgraph neg_subg = NegEdgeSubgraph(gptr->NumVertices(), subg,
-                                            neg_mode, neg_sample_size,
-                                            gptr->IsMultigraph(), exclude_positive);
+        Subgraph neg_subg = NegEdgeSubgraph(gptr, subg, neg_mode, neg_sample_size,
+                                            exclude_positive);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
     }
