@@ -10,4 +10,9 @@ Training on giant graphs
   <https://github.com/dmlc/dgl/tree/master/examples/pytorch/sampling>`__:
   we can perform neighbor sampling and control-variate sampling to train
   graph convolution networks and its variants on a giant graph.
-
+* **Scale to giant graphs** `[tutorial] <5_giant_graph/2_giant.html>`__
+  `[MXNet code] <https://github.com/dmlc/dgl/tree/master/examples/mxnet/sampling>`__
+  `[Pytorch code]
+  <https://github.com/dmlc/dgl/tree/master/examples/pytorch/sampling>`__:
+  We provide two components (graph store and distributed sampler) to scale to
+  graphs with hundreds of millions of nodes.

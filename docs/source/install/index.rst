@@ -21,6 +21,10 @@ DGL supports multiple tensor libraries (e.g. PyTorch, MXNet) as backends; refer
 `Working with different backends`_ for requirements on backends and how to select a
 backend.
 
+Starting from 0.3 DGL is separated into CPU and CUDA builds.  The builds share the
+same Python package name, so installing DGL with CUDA 9 build after installing the
+CPU build will overwrite the latter.
+
 Install from conda
 ----------------------
 One can either grab `miniconda <https://conda.io/miniconda.html>`_ or
@@ -31,15 +35,57 @@ Once the conda environment is activated, run
 
 .. code:: bash
 
-   conda install -c dglteam dgl
+   conda install -c dglteam dgl              # For CPU Build
+   conda install -c dglteam dgl-cuda9.0      # For CUDA 9.0 Build
+   conda install -c dglteam dgl-cuda10.0     # For CUDA 10.0 Build
 
 Install from pip
 ----------------
-One can simply run the following command to install via ``pip``:
+For CPU builds, one can simply run the following command to install via ``pip``:
 
 .. code:: bash
 
    pip install dgl
+   
+For CUDA builds, one needs to specify the URL:
+
+.. code:: bash
+
+   pip install https://s3.us-east-2.amazonaws.com/dgl.ai/<BUILD-DIR>/dgl-0.3-<PYTHON-ABI>-<PLATFORM>.whl
+   
+where ``<BUILD-DIR>``, ``<PYTHON-ABI>`` and ``<PLATFORM>`` can take either of the following values:
+
++------------+---------------------+
+| Build Type | ``<BUILD>``         |
++============+=====================+
+| CUDA 9.0   | ``wheels/cuda9.0``  |
++------------+---------------------+
+| CUDA 10.0  | ``wheels/cuda10.0`` |
++------------+---------------------+
+
++------------------+------------------+
+| Python Version   | ``<PYTHON-ABI>`` |
++==================+==================+
+| Python 3.5       | ``cp35-cp35m``   |
++------------------+------------------+
+| Python 3.6       | ``cp36-cp36m``   |
++------------------+------------------+
+| Python 3.7       | ``cp37-cp37m``   |
++------------------+------------------+
+
++-------------+-----------------------+
+| OS/Arch     | ``<PLATFORM>``        |
++=============+=======================+
+| Linux x64   | ``manylinux1_x86_64`` |
++-------------+-----------------------+
+| Windows x64 | ``win_amd64``         |
++-------------+-----------------------+
+
+For instance, if one wants to install the CUDA 9.0 build on Linux, Python 3.5, then the command is
+
+.. code:: bash
+
+   pip install https://s3.us-east-2.amazonaws.com/dgl.ai/wheels/cuda9.0/dgl-0.3-cp35-cp35m-manylinux1_x86_64.whl
 
 Working with different backends
 -------------------------------
@@ -58,12 +104,18 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 | pytorch | PyTorch | Requires 0.4.1 or later; see                     |
 |         |         | `official website <https://pytorch.org>`_        |
 +---------+---------+--------------------------------------------------+
-| mxnet   | MXNet   | Requires nightly build; run the following        |
-|         |         | command to install:                              |
+| mxnet   | MXNet   | Requires MXNet 1.5                               |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
-|         |         |    pip install --pre mxnet                       |
+|         |         |    pip install mxnet                             |
+|         |         |                                                  |
+|         |         | or cuda version (e.g. for cuda 9.0)              |
+|         |         |                                                  |
+|         |         | .. code:: bash                                   |
+|         |         |                                                  |
+|         |         |    pip install mxnet-cu90                        |
+|         |         |                                                  |
 +---------+---------+--------------------------------------------------+
 | numpy   | NumPy   | Does not support gradient computation            |
 +---------+---------+--------------------------------------------------+
@@ -102,14 +154,31 @@ For Fedora/RHEL/CentOS users, run:
 
    sudo yum install -y gcc-c++ python3-devel make cmake
 
-Build the shared library and install the Python binding afterwards:
+Build the shared library. Use the configuration template ``cmake/config.cmake``.
+Copy it to either the project directory or the build directory and change the
+configuration as you wish. For example, change ``USE_CUDA`` to ``ON`` will
+enable cuda build. You could also pass ``-DKEY=VALUE`` to the cmake command
+for the same purpose.
+
+- CPU-only build:
+   .. code:: bash
+
+      mkdir build
+      cd build
+      cmake ..
+      make -j4
+- Cuda build:
+   .. code:: bash
+
+      mkdir build
+      cd build
+      cmake -DUSE_CUDA=ON ..
+      make -j4
+
+Finally, install the Python binding.
 
 .. code:: bash
 
-   mkdir build
-   cd build
-   cmake ..
-   make -j4
    cd ../python
    python setup.py install
 

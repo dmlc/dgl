@@ -1,7 +1,3 @@
-# Currently readonly graph construction only accepts sparse tensor in MXNet,
-# and pytorch doesn't support readonly graph or graph creation from sparse
-# tensor.  For now, readonly graph test is postponed until we have better
-# readonly graph support.
 import backend as F
 import dgl
 import networkx as nx
@@ -204,7 +200,7 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.get_e_repr()['id'], F.arange(0, 4))
+    assert F.array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
@@ -318,7 +314,7 @@ def test_apply_edges():
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([1, 2, 3, 9, 9, 9])
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = g.edge_ids(u, v)
+    eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 def test_update_routines():
@@ -647,8 +643,8 @@ def test_group_apply_edges():
             u, v, eid = g.out_edges(1, form='all')
         else:
             u, v, eid = g.in_edges(5, form='all')
-        out_feat = g.edata['norm_feat'][eid]
-        result = (g.ndata['h'][u] + g.ndata['h'][v]) * g.edata['feat'][eid]
+        out_feat = g.edges[eid].data['norm_feat']
+        result = (g.nodes[u].data['h'] + g.nodes[v].data['h']) * g.edges[eid].data['feat']
         result = F.softmax(F.sum(result, dim=1), dim=0)
         assert F.allclose(out_feat, result)
 
@@ -658,6 +654,137 @@ def test_group_apply_edges():
     # test group by destination nodes
     _test('dst')
 
+def test_local_var():
+    g = DGLGraph(nx.path_graph(5))
+    g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
+    g.edata['w'] = F.zeros((g.number_of_edges(), 4))
+    # test override
+    def foo(g):
+        g = g.local_var()
+        g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['w'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update
+    def foo(g):
+        g = g.local_var()
+        g.nodes[[2, 3]].data['h'] = F.ones((2, 3))
+        g.edges[[2, 3]].data['w'] = F.ones((2, 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update 2
+    def foo(g):
+        g = g.local_var()
+        g.apply_nodes(lambda nodes: {'h' : nodes.data['h'] + 10}, [2, 3])
+        g.apply_edges(lambda edges: {'w' : edges.data['w'] + 10}, [2, 3])
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test auto-pop
+    def foo(g):
+        g = g.local_var()
+        g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
+
+    # test initializer1
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edges([0, 1], [1, 1])
+    g.set_n_initializer(dgl.init.zero_initializer)
+    def foo(g):
+        g = g.local_var()
+        g.nodes[0].data['h'] = F.ones((1, 1))
+        assert F.allclose(g.ndata['h'], F.tensor([[1.], [0.]]))
+    foo(g)
+    # test initializer2
+    def foo_e_initializer(shape, dtype, ctx, id_range):
+        return F.ones(shape)
+    g.set_e_initializer(foo_e_initializer, field='h')
+    def foo(g):
+        g = g.local_var()
+        g.edges[0, 1].data['h'] = F.ones((1, 1))
+        assert F.allclose(g.edata['h'], F.ones((2, 1)))
+        g.edges[0, 1].data['w'] = F.ones((1, 1))
+        assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
+    foo(g)
+
+def test_local_scope():
+    g = DGLGraph(nx.path_graph(5))
+    g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
+    g.edata['w'] = F.zeros((g.number_of_edges(), 4))
+    # test override
+    def foo(g):
+        with g.local_scope():
+            g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['w'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update
+    def foo(g):
+        with g.local_scope():
+            g.nodes[[2, 3]].data['h'] = F.ones((2, 3))
+            g.edges[[2, 3]].data['w'] = F.ones((2, 4))
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test out-place update 2
+    def foo(g):
+        with g.local_scope():
+            g.apply_nodes(lambda nodes: {'h' : nodes.data['h'] + 10}, [2, 3])
+            g.apply_edges(lambda edges: {'w' : edges.data['w'] + 10}, [2, 3])
+    foo(g)
+    assert F.allclose(g.ndata['h'], F.zeros((g.number_of_nodes(), 3)))
+    assert F.allclose(g.edata['w'], F.zeros((g.number_of_edges(), 4)))
+    # test auto-pop
+    def foo(g):
+        with g.local_scope():
+            g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
+
+    # test nested scope
+    def foo(g):
+        with g.local_scope():
+            g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+            g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+            with g.local_scope():
+                g.ndata['hhh'] = F.ones((g.number_of_nodes(), 3))
+                g.edata['www'] = F.ones((g.number_of_edges(), 4))
+            assert 'hhh' not in g.ndata
+            assert 'www' not in g.edata
+    foo(g)
+    assert 'hh' not in g.ndata
+    assert 'ww' not in g.edata
+
+    # test initializer1
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edges([0, 1], [1, 1])
+    g.set_n_initializer(dgl.init.zero_initializer)
+    def foo(g):
+        with g.local_scope():
+            g.nodes[0].data['h'] = F.ones((1, 1))
+            assert F.allclose(g.ndata['h'], F.tensor([[1.], [0.]]))
+    foo(g)
+    # test initializer2
+    def foo_e_initializer(shape, dtype, ctx, id_range):
+        return F.ones(shape)
+    g.set_e_initializer(foo_e_initializer, field='h')
+    def foo(g):
+        with g.local_scope():
+            g.edges[0, 1].data['h'] = F.ones((1, 1))
+            assert F.allclose(g.edata['h'], F.ones((2, 1)))
+            g.edges[0, 1].data['w'] = F.ones((1, 1))
+            assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
+    foo(g)
 
 if __name__ == '__main__':
     test_nx_conversion()
@@ -676,3 +803,5 @@ if __name__ == '__main__':
     test_dynamic_addition()
     test_repr()
     test_group_apply_edges()
+    test_local_var()
+    test_local_scope()

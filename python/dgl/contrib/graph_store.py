@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import scipy
 from xmlrpc.server import SimpleXMLRPCServer
@@ -12,7 +13,7 @@ from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
-from ..graph_index import GraphIndex, create_graph_index
+from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_csr_matrix
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -30,10 +31,13 @@ def _get_edata_path(graph_name, edata_name):
 def _get_graph_path(graph_name):
     return "/" + graph_name
 
+dtype_dict = F.data_type_dict
+dtype_dict = {dtype_dict[key]:key for key in dtype_dict}
+
 def _move_data_to_shared_mem_array(arr, name):
     dlpack = F.zerocopy_to_dlpack(arr)
     dgl_tensor = nd.from_dlpack(dlpack)
-    new_arr = empty_shared_mem(name, True, F.shape(arr), np.dtype(F.dtype(arr)).name)
+    new_arr = empty_shared_mem(name, True, F.shape(arr), dtype_dict[F.dtype(arr)])
     dgl_tensor.copyto(new_arr)
     dlpack = new_arr.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
@@ -288,10 +292,19 @@ class SharedMemoryStoreServer(object):
     and store them in shared memory. The loaded graph can be identified by
     the graph name in the input argument.
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     edge_dir : string
         the edge direction for the graph structure ("in" or "out")
     graph_name : string
@@ -306,14 +319,17 @@ class SharedMemoryStoreServer(object):
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
         if isinstance(graph_data, GraphIndex):
-            graph_idx = graph_data
+            graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+        elif isinstance(graph_data, DGLGraph):
+            graph_data = graph_data._graph.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
         else:
-            graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-            graph_idx.from_csr_matrix(utils.toindex(indptr), utils.toindex(indices),
-                                      edge_dir, _get_graph_path(graph_name))
+            graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
+                                 multigraph, edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
 
-        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
         self._graph_name = graph_name
         self._edge_dir = edge_dir
@@ -344,37 +360,39 @@ class SharedMemoryStoreServer(object):
         def init_ndata(init, ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
-                assert np.all(ndata.shape == tuple(shape))
+                assert np.all(tuple(F.shape(ndata)) == tuple(shape))
                 return 0
 
             assert self._graph.number_of_nodes() == shape[0]
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
             self._graph.ndata[ndata_name] = data
+            F.sync()
             return 0
 
         # RPC command: initialize edge embedding in the server.
         def init_edata(init, edata_name, shape, dtype):
             if edata_name in self._graph.edata:
                 edata = self._graph.edata[edata_name]
-                assert np.all(edata.shape == tuple(shape))
+                assert np.all(tuple(F.shape(edata)) == tuple(shape))
                 return 0
 
             assert self._graph.number_of_edges() == shape[0]
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
+            F.sync()
             self._graph.edata[edata_name] = data
             return 0
 
         # RPC command: get the names of all node embeddings.
         def list_ndata():
             ndata = self._graph.ndata
-            return [[key, F.shape(ndata[key]), np.dtype(F.dtype(ndata[key])).name] for key in ndata]
+            return [[key, tuple(F.shape(ndata[key])), dtype_dict[F.dtype(ndata[key])]] for key in ndata]
 
         # RPC command: get the names of all edge embeddings.
         def list_edata():
             edata = self._graph.edata
-            return [[key, F.shape(edata[key]), np.dtype(F.dtype(edata[key])).name] for key in edata]
+            return [[key, tuple(F.shape(edata[key])), dtype_dict[F.dtype(edata[key])]] for key in edata]
 
         # RPC command: notify the server of the termination of the client.
         def terminate():
@@ -394,7 +412,7 @@ class SharedMemoryStoreServer(object):
         def all_enter(worker_id, barrier_id):
             return self._barrier.all_enter(worker_id, barrier_id)
 
-        self.server = SimpleXMLRPCServer(("localhost", port))
+        self.server = SimpleXMLRPCServer(("127.0.0.1", port), logRequests=False)
         self.server.register_function(register, "register")
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
@@ -533,15 +551,15 @@ class SharedMemoryDGLGraph(BaseGraphStore):
     def __init__(self, graph_name, port):
         self._graph_name = graph_name
         self._pid = os.getpid()
-        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
+        self.proxy = xmlrpc.client.ServerProxy("http://127.0.0.1:" + str(port) + "/")
         self._worker_id, self._num_workers = self.proxy.register(graph_name)
         if self._worker_id < 0:
             raise Exception('fail to get graph ' + graph_name + ' from the graph store')
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
+        graph_idx = from_shared_mem_csr_matrix(_get_graph_path(graph_name),
+                num_nodes, num_edges, edge_dir, multigraph)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 
@@ -560,16 +578,16 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         # These two functions create initialized tensors on the server.
         def node_initializer(init, name, shape, dtype, ctx):
             init = self._init_manager.serialize(init)
-            dtype = np.dtype(dtype).name
-            self.proxy.init_ndata(init, name, shape, dtype)
+            dtype = dtype_dict[dtype]
+            self.proxy.init_ndata(init, name, tuple(shape), dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
         def edge_initializer(init, name, shape, dtype, ctx):
             init = self._init_manager.serialize(init)
-            dtype = np.dtype(dtype).name
-            self.proxy.init_edata(init, name, shape, dtype)
+            dtype = dtype_dict[dtype]
+            self.proxy.init_edata(init, name, tuple(shape), dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
@@ -616,14 +634,33 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         """
         return self._worker_id
 
-    def _sync_barrier(self):
+    def _sync_barrier(self, timeout=None):
+        """This is a sync barrier among all workers.
+
+        Parameters
+        ----------
+        timeout: int
+            time out in seconds.
+        """
+        # Before entering the barrier, we need to make sure all computation in the local
+        # process has completed.
+        F.sync()
+
         # Here I manually implement multi-processing barrier with RPC.
         # It uses busy wait with RPC. Whenever, all_enter is called, there is
         # a context switch, so it doesn't burn CPUs so badly.
+
+        # if timeout isn't specified, we wait forever.
+        if timeout is None:
+            timeout = sys.maxsize
+
         bid = self.proxy.enter_barrier(self._worker_id)
-        while not self.proxy.all_enter(self._worker_id, bid):
+        start = time.time()
+        while not self.proxy.all_enter(self._worker_id, bid) and time.time() - start < timeout:
             continue
         self.proxy.leave_barrier(self._worker_id, bid)
+        if time.time() - start >= timeout and not self.proxy.all_enter(self._worker_id, bid):
+            raise TimeoutError("leave the sync barrier because of timeout.")
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
@@ -647,10 +684,10 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             raise Exception("graph store only supports CPU context for node data")
         init = self._node_frame.get_initializer(ndata_name)
         if init is None:
-            self._node_frame._frame._warn_and_set_initializer()
+            self._node_frame._frame._set_zero_default_initializer()
         init = self._node_frame.get_initializer(ndata_name)
         init = self._init_manager.serialize(init)
-        self.proxy.init_ndata(init, ndata_name, shape, dtype)
+        self.proxy.init_ndata(init, ndata_name, tuple(shape), dtype)
         self._init_ndata(ndata_name, shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
@@ -675,10 +712,10 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             raise Exception("graph store only supports CPU context for edge data")
         init = self._edge_frame.get_initializer(edata_name)
         if init is None:
-            self._edge_frame._frame._warn_and_set_initializer()
+            self._edge_frame._frame._set_zero_default_initializer()
         init = self._edge_frame.get_initializer(edata_name)
         init = self._init_manager.serialize(init)
-        self.proxy.init_edata(init, edata_name, shape, dtype)
+        self.proxy.init_edata(init, edata_name, tuple(shape), dtype)
         self._init_edata(edata_name, shape, dtype)
 
     def get_n_repr(self, u=ALL):
@@ -1028,10 +1065,19 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     After the server runs, the graph store clients can access the graph data
     with the specified graph name.
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     graph_name : string
         Define the name of the graph.
     store_type : string

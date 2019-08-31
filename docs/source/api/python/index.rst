@@ -16,3 +16,6 @@ API Reference
    transform
    nn
    subgraph
+   graph_store
+   nodeflow
+   random

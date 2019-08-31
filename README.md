@@ -1,6 +1,6 @@
 # Deep Graph Library (DGL)
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
-[![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 [Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
 [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
@@ -13,16 +13,17 @@ maintaining high computation efficiency.
 
 A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations:
 
-| Model | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time) | DGL speed (epoch time) | Improvement |
-| ----- | ----------------- | ------------ | ------------------------------------ | ---------------------- | ----------- |
-| [GCN](https://arxiv.org/abs/1609.02907)   | 81.5% | 81.0% | [0.0051s (TF)](https://github.com/tkipf/gcn) | 0.0038s | 1.34x |
-| [SGC](https://arxiv.org/abs/1902.07153) | 81.0% | 81.9% | n/a | 0.0008s | n/a |
-| [TreeLSTM](http://arxiv.org/abs/1503.00075) | 51.0% | 51.72% | [14.02s (DyNet)](https://github.com/clab/dynet/tree/master/examples/treelstm) | 3.18s | 4.3x |
-| [R-GCN <br> (classification)](https://arxiv.org/abs/1703.06103) | 73.23% | 73.53% | [0.2853s (Theano)](https://github.com/tkipf/relational-gcn) | 0.0097s | 29.4x |
-| [R-GCN <br> (link prediction)](https://arxiv.org/abs/1703.06103) | 0.158 | 0.151 | [2.204s (TF)](https://github.com/MichSchli/RelationPrediction) | 0.453s | 4.86x |
-| [JTNN](https://arxiv.org/abs/1802.04364) | 96.44% | 96.44% | [1826s (Pytorch)](https://github.com/wengong-jin/icml18-jtnn) | 743s | 2.5x |
-| [LGNN](https://arxiv.org/abs/1705.08415) | 94% | 94% | n/a | 1.45s | n/a |
-| [DGMG](https://arxiv.org/pdf/1803.03324.pdf) | 84% | 90% | n/a | 238s | n/a |
+| Model                                                            | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time)                                          | DGL speed (epoch time) | Improvement |
+| -----                                                            | -----------------      | ------------      | ------------------------------------                                          | ---------------------- | ----------- |
+| [GCN](https://arxiv.org/abs/1609.02907)                          | 81.5%                  | 81.0%             | [0.0051s (TF)](https://github.com/tkipf/gcn)                                  | 0.0031s                | 1.64x       |
+| [GAT](https://arxiv.org/abs/1710.10903)                          | 83.0%                  | 83.9%             | [0.0982s (TF)](https://github.com/PetarV-/GAT)                                | 0.0113s                | 8.69x       |
+| [SGC](https://arxiv.org/abs/1902.07153)                          | 81.0%                  | 81.9%             | n/a                                                                           | 0.0008s                | n/a         |
+| [TreeLSTM](http://arxiv.org/abs/1503.00075)                      | 51.0%                  | 51.72%            | [14.02s (DyNet)](https://github.com/clab/dynet/tree/master/examples/treelstm) | 3.18s                  | 4.3x        |
+| [R-GCN <br> (classification)](https://arxiv.org/abs/1703.06103)  | 73.23%                 | 73.53%            | [0.2853s (Theano)](https://github.com/tkipf/relational-gcn)                   | 0.0075s                | 38.2x       |
+| [R-GCN <br> (link prediction)](https://arxiv.org/abs/1703.06103) | 0.158                  | 0.151             | [2.204s (TF)](https://github.com/MichSchli/RelationPrediction)                | 0.453s                 | 4.86x       |
+| [JTNN](https://arxiv.org/abs/1802.04364)                         | 96.44%                 | 96.44%            | [1826s (Pytorch)](https://github.com/wengong-jin/icml18-jtnn)                 | 743s                   | 2.5x        |
+| [LGNN](https://arxiv.org/abs/1705.08415)                         | 94%                    | 94%               | n/a                                                                           | 1.45s                  | n/a         |
+| [DGMG](https://arxiv.org/pdf/1803.03324.pdf)                     | 84%                    | 90%               | n/a                                                                           | 238s                   | n/a         |
 
 With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150M edges on a P3.8xlarge instance, 
 with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
@@ -33,12 +34,12 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 ## News
 
+v0.3 has just been released! Huge performance improvement (up to 19x). See release note
+[here](https://github.com/dmlc/dgl/releases/tag/v0.3).
+
 We presented DGL at [GTC 2019](https://www.nvidia.com/en-us/gtc/) as an
 instructor-led training session. Check out our slides and tutorial materials
 [here](https://github.com/dglai/DGL-GTC2019)!!!
-
-v0.2 has just been released! Many features, bugfix and performance improvement. See release note
-[here](https://github.com/dmlc/dgl/releases/tag/v0.2).
 
 ## System requirements
 
@@ -58,13 +59,19 @@ build.
 ### Using anaconda
 
 ```
-conda install -c dglteam dgl
+conda install -c dglteam dgl           # cpu version
+conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
+conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
+conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 ```
 
 ### Using pip
 
 ```
-pip install dgl
+pip install dgl       # cpu version
+pip install dgl-cu90  # CUDA 9.0
+pip install dgl-cu92  # CUDA 9.2
+pip install dgl-cu100 # CUDA 10.0
 ```
 
 ### From source

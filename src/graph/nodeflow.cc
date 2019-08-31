@@ -5,9 +5,10 @@
  */
 
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/nodeflow.h>
 
-#include <string.h>
+#include <string>
 
 #include "../c_api_common.h"
 
@@ -24,24 +25,24 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
   CHECK_GE(layer1_start, layer0_size);
   if (fmt == std::string("csr")) {
     dgl_id_t first_vid = layer1_start - layer0_size;
-    CSRMatrix csr = SliceRows(graph.GetInCSR()->ToCSRMatrix(), layer1_start, layer1_end);
+    auto csr = aten::CSRSliceRows(graph.GetInCSR()->ToCSRMatrix(), layer1_start, layer1_end);
     if (remap) {
       dgl_id_t *eid_data = static_cast<dgl_id_t*>(csr.data->data);
       const dgl_id_t first_eid = eid_data[0];
-      IdArray new_indices = Sub(csr.indices, first_vid);
-      IdArray new_data = Sub(csr.data, first_eid);
+      IdArray new_indices = aten::Sub(csr.indices, first_vid);
+      IdArray new_data = aten::Sub(csr.data, first_eid);
       return {csr.indptr, new_indices, new_data};
     } else {
       return {csr.indptr, csr.indices, csr.data};
     }
   } else if (fmt == std::string("coo")) {
-    CSRMatrix csr = graph.GetInCSR()->ToCSRMatrix();
+    auto csr = graph.GetInCSR()->ToCSRMatrix();
     const dgl_id_t* indptr = static_cast<dgl_id_t*>(csr.indptr->data);
     const dgl_id_t* indices = static_cast<dgl_id_t*>(csr.indices->data);
     const dgl_id_t* edge_ids = static_cast<dgl_id_t*>(csr.data->data);
     int64_t nnz = indptr[layer1_end] - indptr[layer1_start];
-    IdArray idx = NewIdArray(2 * nnz);
-    IdArray eid = NewIdArray(nnz);
+    IdArray idx = aten::NewIdArray(2 * nnz);
+    IdArray eid = aten::NewIdArray(nnz);
     int64_t *idx_data = static_cast<int64_t*>(idx->data);
     dgl_id_t *eid_data = static_cast<dgl_id_t*>(eid->data);
     size_t num_edges = 0;
@@ -78,14 +79,14 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
+    GraphRef g = args[0];
     std::string format = args[1];
     int64_t layer0_size = args[2];
     int64_t start = args[3];
     int64_t end = args[4];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, true);
+    const bool remap = args[5];
+    auto ig = CHECK_NOTNULL(std::dynamic_pointer_cast<ImmutableGraph>(g.sptr()));
+    auto res = GetNodeFlowSlice(*ig, format, layer0_size, start, end, remap);
     *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 

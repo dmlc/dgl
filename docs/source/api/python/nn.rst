@@ -1,7 +1,9 @@
 .. _apinn:
 
-dgl.nn
-======
+NN Modules
+==========
+
+.. automodule:: dgl.nn
 
 .. toctree::
 

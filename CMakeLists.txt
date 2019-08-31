@@ -1,8 +1,14 @@
+cmake_minimum_required(VERSION 3.5)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
-cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
+message(STATUS "Start configuring project ${PROJECT_NAME}")
+
+# cmake utils
+include(cmake/util/Util.cmake)
+include(cmake/util/MshadowUtil.cmake)
+include(cmake/util/FindCUDA.cmake)
 
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
   include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
@@ -12,10 +18,26 @@ else()
   endif()
 endif()
 
+# NOTE: do not modify this file to change option values.
+# You can create a config.cmake at build folder
+# and add set(OPTION VALUE) to override these build options.
+# Alernatively, use cmake -DOPTION=VALUE through command-line.
+dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(USE_OPENMP "Build with OpenMP" ON)
+dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
+
+if(USE_CUDA)
+  message(STATUS "Build with CUDA support")
+  project(dgl C CXX)
+  include(cmake/modules/CUDA.cmake)
+endif(USE_CUDA)
+
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
+include_directories("third_party/minigun/minigun")
+include_directories("third_party/minigun/third_party/moderngpu/src")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -31,6 +53,7 @@ if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_definitions(-D_SCL_SECURE_NO_WARNINGS)
   add_definitions(-DNOMINMAX)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS 1)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
@@ -48,21 +71,48 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+endif(MSVC)
 
+if(USE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
   endif(OPENMP_FOUND)
-endif(MSVC)
+endif(USE_OPENMP)
+
+# configure minigun
+add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 
 # Source file lists
-file(GLOB CORE_SRCS src/graph/*.cc src/graph/network/* src/*.cc src/scheduler/*.cc)
+file(GLOB DGL_SRC
+  src/*.cc
+  src/array/*.cc
+  src/array/cpu/*.cc
+  src/kernel/*.cc
+  src/kernel/cpu/*.cc
+  src/runtime/*.cc
+)
 
-file(GLOB RUNTIME_SRCS src/runtime/*.cc)
+file(GLOB_RECURSE DGL_SRC_1
+  src/api/*.cc
+  src/graph/*.cc
+  src/scheduler/*.cc
+)
 
+list(APPEND DGL_SRC ${DGL_SRC_1})
 
-add_library(dgl SHARED ${CORE_SRCS} ${RUNTIME_SRCS})
+# Configure cuda
+if(USE_CUDA)
+  dgl_config_cuda(DGL_CUDA_SRC)
+  list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+endif(USE_CUDA)
+
+if(USE_CUDA)
+  cuda_add_library(dgl SHARED ${DGL_SRC})
+else(USE_CUDA)
+  add_library(dgl SHARED ${DGL_SRC})
+endif(USE_CUDA)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
@@ -71,7 +121,7 @@ install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
 # Testing
 if(BUILD_CPP_TEST)
-  message("Build with unittest")
+  message(STATUS "Build with unittest")
   add_subdirectory(./third_party/googletest)
   enable_testing()
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})

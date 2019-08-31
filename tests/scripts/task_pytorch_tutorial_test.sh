@@ -1,19 +1,24 @@
 #!/bin/bash
 # The working directory for this script will be "tests/scripts"
 
-TUTORIAL_ROOT="../../tutorials"
+TUTORIAL_ROOT="./tutorials"
 
 function fail {
     echo FAIL: $@
     exit -1
 }
 
+export MPLBACKEND=Agg
+export DGLBACKEND=pytorch
+export DGL_LIBRARY_PATH=${PWD}/build
+export PYTHONPATH=${PWD}/python:$PYTHONPATH
+export DGL_DOWNLOAD_DIR=${PWD}
+
 pushd ${TUTORIAL_ROOT} > /dev/null
 # Install requirements
 pip3 install -r requirements.txt || fail "installing requirements"
 
 # Test
-export MPLBACKEND=Agg
 for f in $(find . -name "*.py" ! -name "*_mx.py")
 do
     echo "Running tutorial ${f} ..."

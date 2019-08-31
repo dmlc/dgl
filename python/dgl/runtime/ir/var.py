@@ -11,26 +11,30 @@ class VarType(object):
     FEAT = 0
     FEAT_DICT = 1
     # Types for concrete objects (i.e, they must have values).
-    SPMAT = 2
+    GRAPH = 2
     IDX = 3
     STR = 4
     FUNC = 5
+    MAP = 6
+    INT = 7
 
 VAR_TYPE_NAME_MAP = [
     'Feat',
     'FeatDict',
-    'SpMat',
+    'GRAPH',
     'Idx',
     'Str',
     'Func',
+    'Map',
+    'Int',
 ]
 
 class Var(object):
     """Class for variables in IR.
 
     Variables represent data in the IR. A variable can contain concrete values.
-    Otherwise, it can act as a "symbol", whose values are not materialized at the
-    moment, but later.
+    Otherwise, it can act as a "symbol", whose values are not materialized at
+    the moment, but later.
 
     Parameters
     ----------
@@ -42,6 +46,7 @@ class Var(object):
         The data.
     """
     __slots__ = ['name', 'typecode', 'data']
+
     def __init__(self, name, typecode, data):
         self.name = name
         self.typecode = typecode
@@ -73,9 +78,9 @@ def FEAT_DICT(data=None, name=None):
     """Create a variable for feature dict."""
     return new(VarType.FEAT_DICT, data, name)
 
-def SPMAT(data=None, name=None):
-    """Create a variable for sparse matrix lambda."""
-    return new(VarType.SPMAT, data, name)
+def GRAPH(data=None, name=None):
+    """Create a variable for graph index lambda."""
+    return new(VarType.GRAPH, data, name)
 
 def IDX(data=None, name=None):
     """Create a variable for index."""
@@ -88,3 +93,11 @@ def STR(data=None, name=None):
 def FUNC(data=None, name=None):
     """Create a variable for function."""
     return new(VarType.FUNC, data, name)
+
+def MAP(data=None, name=None):
+    """Create a variable for mapping lambda"""
+    return new(VarType.MAP, data, name)
+
+def INT(data=None, name=None):
+    """Create a variable for int value"""
+    return new(VarType.INT, data, name)

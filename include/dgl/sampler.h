@@ -13,24 +13,6 @@
 #include "graph_interface.h"
 #include "nodeflow.h"
 
-#ifdef _MSC_VER
-// rand in MS compiler works well in multi-threading.
-inline int rand_r(unsigned *seed) {
-  return rand();
-}
-
-inline unsigned int randseed() {
-  unsigned int seed = time(nullptr);
-  srand(seed);  // need to set seed manually since there's no rand_r
-  return seed;
-}
-#define _CRT_RAND_S
-#else
-inline unsigned int randseed() {
-  return time(nullptr);
-}
-#endif
-
 namespace dgl {
 
 class ImmutableGraph;
@@ -56,13 +38,16 @@ class SamplerOp {
    * \param num_hops the number of hops to sample neighbors.
    * \param expand_factor the max number of neighbors to sample.
    * \param add_self_loop whether to add self loop to the sampled subgraph
+   * \param probability the transition probability (float/double).
    * \return a NodeFlow graph.
    */
-  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
-                                        const std::vector<dgl_id_t>& seeds,
-                                        const std::string &edge_type,
-                                        int num_hops, int expand_factor,
-                                        const bool add_self_loop);
+  template<typename ValueType>
+  static NodeFlow NeighborSample(const ImmutableGraph *graph,
+                                 const std::vector<dgl_id_t>& seeds,
+                                 const std::string &edge_type,
+                                 int num_hops, int expand_factor,
+                                 const bool add_self_loop,
+                                 const ValueType *probability);
 
   /*!
    * \brief Sample a graph from the seed vertices with layer sampling.

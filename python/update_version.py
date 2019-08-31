@@ -11,7 +11,8 @@ import re
 # current version
 # We use the version of the incoming release for code
 # that is under development
-__version__ = "0.2"
+__version__ = "0.4" + os.getenv('DGL_PRERELEASE', '')
+print(__version__)
 
 # Implementations
 def update(file_name, pattern, repl):

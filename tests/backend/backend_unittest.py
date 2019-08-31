@@ -9,6 +9,10 @@ def cuda():
     """Context object for CUDA."""
     pass
 
+def is_cuda_available():
+    """Check whether CUDA is available."""
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
@@ -19,7 +23,7 @@ def array_equal(a, b):
     """Check whether the two tensors are *exactly* equal."""
     pass
 
-def allclose(a, b):
+def allclose(a, b, rtol=1e-4, atol=1e-4):
     """Check whether the two tensors are numerically close to each other."""
     pass
 
@@ -37,7 +41,7 @@ def attach_grad(x):
 
 def backward(x, head_gradient=None):
     """Invoke backward computation with an optional head gradient.
-    
+
     Returns nothing."""
     pass
 
@@ -69,6 +73,46 @@ def reduce_sum(x):
 
 def softmax(x, dim):
     """Softmax Operation on Tensors"""
+    pass
+
+def spmm(x, y):
+    """Sparse dense matrix multiply"""
+    pass
+
+def add(a, b):
+    """Compute a + b"""
+    pass
+
+def sub(a, b):
+    """Compute a - b"""
+    pass
+
+def mul(a, b):
+    """Compute a * b"""
+    pass
+
+def div(a, b):
+    """Compute a / b"""
+    pass
+
+def sum(x, dim):
+    """Computes the sum of array elements over given axes"""
+    pass
+
+def max(x, dim):
+    """Computes the max of array elements over given axes"""
+    pass
+
+def min(x, dim):
+    """Computes the min of array elements over given axes"""
+    pass
+
+def prod(x, dim):
+    """Computes the prod of array elements over given axes"""
+    pass
+
+def matmul(a, b):
+    """Compute Matrix Multiplication between a and b"""
     pass
 
 ###############################################################################

@@ -3,6 +3,9 @@ import numpy as np
 import scipy as sp
 import dgl
 from dgl import utils
+from numpy.testing import assert_array_equal
+
+np.random.seed(42)
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
@@ -11,14 +14,14 @@ def generate_rand_graph(n):
 def test_create_full():
     g = generate_rand_graph(100)
     full_nf = dgl.contrib.sampling.sampler.create_full_nodeflow(g, 5)
-    assert full_nf.number_of_nodes() == 600
+    assert full_nf.number_of_nodes() == g.number_of_nodes() * 6
     assert full_nf.number_of_edges() == g.number_of_edges() * 5
 
 def test_1neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
-            g, 1, 100, neighbor_type='in', num_workers=4)):
+            g, 1, g.number_of_nodes(), neighbor_type='in', num_workers=4)):
         seed_ids = subg.layer_parent_nid(-1)
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
@@ -78,8 +81,8 @@ def test_prefetch_neighbor_sampler():
 def test_10neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg in dgl.contrib.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
-                                                     num_workers=4):
+    for subg in dgl.contrib.sampling.NeighborSampler(g, 10, g.number_of_nodes(),
+                                                     neighbor_type='in', num_workers=4):
         seed_ids = subg.layer_parent_nid(-1)
         assert F.array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(-1)))
 
@@ -104,7 +107,7 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
-def test_layer_sampler(prefetch=False):
+def _test_layer_sampler(prefetch=False):
     g = generate_rand_graph(100)
     nid = g.nodes()
     src, dst, eid = g.all_edges(form='all', order='eid')
@@ -149,6 +152,110 @@ def test_layer_sampler(prefetch=False):
         sub_m = sub_g.number_of_edges()
         assert sum(F.shape(sub_g.block_eid(i))[0] for i in range(n_blocks)) == sub_m
 
+def test_layer_sampler():
+    _test_layer_sampler()
+    _test_layer_sampler(prefetch=True)
+
+def test_nonuniform_neighbor_sampler():
+    # Construct a graph with
+    # (1) A path (0, 1, ..., 99) with weight 1
+    # (2) A bunch of random edges with weight 0.
+    edges = []
+    for i in range(99):
+        edges.append((i, i + 1))
+    for i in range(1000):
+        edge = (np.random.randint(100), np.random.randint(100))
+        if edge not in edges:
+            edges.append(edge)
+    src, dst = zip(*edges)
+    g = dgl.DGLGraph()
+    g.add_nodes(100)
+    g.add_edges(src, dst)
+    g.readonly()
+
+    g.edata['w'] = F.cat([
+        F.ones((99,), F.float64, F.cpu()),
+        F.zeros((len(edges) - 99,), F.float64, F.cpu())], 0)
+
+    # Test 1-neighbor NodeFlow with 99 as target node.
+    # The generated NodeFlow should only contain node i on layer i.
+    sampler = dgl.contrib.sampling.NeighborSampler(
+        g, 1, 1, 99, 'in', transition_prob='w', seed_nodes=[99])
+    nf = next(iter(sampler))
+
+    assert nf.num_layers == 100
+    for i in range(nf.num_layers):
+        assert nf.layer_size(i) == 1
+        assert nf.layer_parent_nid(i)[0] == i
+
+    # Test the reverse direction
+    sampler = dgl.contrib.sampling.NeighborSampler(
+        g, 1, 1, 99, 'out', transition_prob='w', seed_nodes=[0])
+    nf = next(iter(sampler))
+
+    assert nf.num_layers == 100
+    for i in range(nf.num_layers):
+        assert nf.layer_size(i) == 1
+        assert nf.layer_parent_nid(i)[0] == 99 - i
+
+def test_setseed():
+    g = generate_rand_graph(100)
+
+    nids = []
+
+    dgl.random.seed(42)
+    for subg in dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1):
+        nids.append(
+            tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3)))
+
+    # reinitialize
+    dgl.random.seed(42)
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=1)):
+        item = tuple(tuple(F.asnumpy(subg.layer_parent_nid(i))) for i in range(3))
+        assert item == nids[i]
+
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
+        pass
+
+def test_negative_sampler():
+    g = generate_rand_graph(100)
+    EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+    for pos_edges, neg_edges in EdgeSampler(g, 50,
+                                            negative_mode="head",
+                                            neg_sample_size=10,
+                                            exclude_positive=True):
+        assert 10 * pos_edges.number_of_edges() == neg_edges.number_of_edges()
+        pos_nid = pos_edges.parent_nid
+        pos_eid = pos_edges.parent_eid
+        pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        pos_src = pos_nid[pos_lsrc]
+        pos_dst = pos_nid[pos_ldst]
+        pos_eid = pos_eid[pos_leid]
+        assert_array_equal(F.asnumpy(pos_eid), F.asnumpy(g.edge_ids(pos_src, pos_dst)))
+
+        pos_map = {}
+        for i in range(len(pos_eid)):
+            pos_d = int(F.asnumpy(pos_dst[i]))
+            pos_e = int(F.asnumpy(pos_eid[i]))
+            pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_src[i]))
+
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_nid = neg_edges.parent_nid
+        neg_eid = neg_edges.parent_eid
+        neg_src = neg_nid[neg_lsrc]
+        neg_dst = neg_nid[neg_ldst]
+        neg_eid = neg_eid[neg_leid]
+
+        for i in range(len(neg_eid)):
+            neg_d = int(F.asnumpy(neg_dst[i]))
+            neg_e = int(F.asnumpy(neg_eid[i]))
+            assert (neg_d, neg_e) in pos_map
+            assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -156,4 +263,6 @@ if __name__ == '__main__':
     test_1neighbor_sampler()
     test_10neighbor_sampler()
     test_layer_sampler()
-    test_layer_sampler(prefetch=True)
+    test_nonuniform_neighbor_sampler()
+    test_setseed()
+    test_negative_sampler()
