@@ -4,7 +4,7 @@ It'll be great if relevant reviewers can be assigned as well.-->
 
 ## Checklist
 Please feel free to remove inapplicable items for your PR.
-- [ ] The PR title starts with [$CATEGORY] (such as [Model], [Doc], [Feature]])
+- [ ] The PR title starts with [$CATEGORY] (such as [NN], [Model], [Doc], [Feature]])
 - [ ] Changes are complete (i.e. I finished coding on this PR)
 - [ ] All changes have test coverage
 - [ ] Code is well-documented
