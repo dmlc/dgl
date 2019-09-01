@@ -28,8 +28,11 @@ __all__ = [
     "schedule_pull"
 ]
 
-def schedule_send(graph, u, v, eid, message_func):
-    """get send schedule
+def schedule_send(graph,
+                  u, v, eid,
+                  message_func,
+                  msgframe=None):
+    """Schedule send
 
     Parameters
     ----------
@@ -43,8 +46,10 @@ def schedule_send(graph, u, v, eid, message_func):
         Ids of sending edges
     message_func: callable or list of callable
         The message function
+    msgframe : FrameRef, optional
+        The storage to write messages to. If None, use graph.msgframe.
     """
-    var_mf = var.FEAT_DICT(graph.msgframe)
+    var_mf = var.FEAT_DICT(msgframe if msgframe is not None else graph.msgframe)
     var_src_nf = var.FEAT_DICT(graph.srcframe)
     var_dst_nf = var.FEAT_DICT(graph.dstframe)
     var_ef = var.FEAT_DICT(graph.edgeframe)
@@ -68,7 +73,8 @@ def schedule_recv(graph,
                   recv_nodes,
                   reduce_func,
                   apply_func,
-                  inplace):
+                  inplace,
+                  outframe=None):
     """Schedule recv.
 
     Parameters
@@ -83,6 +89,8 @@ def schedule_recv(graph,
         The apply node function
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.dstframe.
     """
     src, dst, eid = graph.in_edges(recv_nodes)
     if len(eid) > 0:
@@ -95,9 +103,11 @@ def schedule_recv(graph,
         #   1) all recv nodes are 0-degree nodes
         #   2) no send has been called
         if apply_func is not None:
-            schedule_apply_nodes(recv_nodes, apply_func, graph.dstframe, inplace)
+            schedule_apply_nodes(recv_nodes, apply_func, graph.dstframe,
+                                 inplace, outframe)
     else:
-        var_dst_nf = var.FEAT_DICT(graph.dstframe, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph.dstframe, 'dst_nf')
+        var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
         # sort and unique the argument
         recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))
         recv_nodes = utils.toindex(recv_nodes)
@@ -109,9 +119,9 @@ def schedule_recv(graph,
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_(var_out_nf, var_recv_nodes, final_feat)
         # set message indicator to 0
         graph.msgindicator = graph.msgindicator.set_items(eid, 0)
         if not graph.msgindicator.has_nonzero():
@@ -122,7 +132,8 @@ def schedule_snr(graph,
                  message_func,
                  reduce_func,
                  apply_func,
-                 inplace):
+                 inplace,
+                 outframe=None):
     """Schedule send_and_recv.
 
     Currently it builds a subgraph from edge_tuples with the same number of
@@ -144,12 +155,15 @@ def schedule_snr(graph,
         The apply node function
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.dstframe.
     """
     u, v, eid = edge_tuples
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
     recv_nodes = utils.toindex(recv_nodes)
     # create vars
-    var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
+    var_dst_nf = var.FEAT_DICT(graph.dstframe, 'dst_nf')
+    var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
@@ -174,15 +188,16 @@ def schedule_snr(graph,
     final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf, reduced_feat,
                                    apply_func)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
     else:
-        ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_(var_out_nf, var_recv_nodes, final_feat)
 
 def schedule_update_all(graph,
                         message_func,
                         reduce_func,
-                        apply_func):
-    """get send and recv schedule
+                        apply_func,
+                        outframe=None):
+    """Get send and recv schedule
 
     Parameters
     ----------
@@ -194,17 +209,21 @@ def schedule_update_all(graph,
         The reduce function
     apply_func: callable
         The apply node function
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.dstframe.
     """
     if graph.num_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph.num_dst()))
-            schedule_apply_nodes(nodes, apply_func, graph.dstframe, inplace=False)
+            schedule_apply_nodes(nodes, apply_func, graph.dstframe,
+                                 inplace=False, outframe=outframe)
     else:
         eid = utils.toindex(slice(0, graph.num_edges())) # ALL
         recv_nodes = utils.toindex(slice(0, graph.num_dst())) # ALL
         # create vars
-        var_dst_nf = var.FEAT_DICT(graph.dstframe, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
+        var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         var_eid = var.IDX(eid)
         # generate send + reduce
@@ -227,13 +246,14 @@ def schedule_update_all(graph,
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
-        ir.WRITE_DICT_(var_dst_nf, final_feat)
+        ir.WRITE_DICT_(var_out_nf, final_feat)
 
 def schedule_apply_nodes(v,
                          apply_func,
                          node_frame,
-                         inplace):
-    """get apply nodes schedule
+                         inplace,
+                         outframe=None):
+    """Get apply nodes schedule
 
     Parameters
     ----------
@@ -245,6 +265,8 @@ def schedule_apply_nodes(v,
         Node feature frame.
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use the given node_frame.
 
     Returns
     -------
@@ -252,6 +274,7 @@ def schedule_apply_nodes(v,
     """
     var_v = var.IDX(v)
     var_nf = var.FEAT_DICT(node_frame, name='nf')
+    var_out_nf = var_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
         nbatch = NodeBatch(v, node_data)
@@ -259,16 +282,16 @@ def schedule_apply_nodes(v,
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_nf, var_v, applied_feat)
+        ir.WRITE_ROW_INPLACE_(var_out_nf, var_v, applied_feat)
     else:
-        ir.WRITE_ROW_(var_nf, var_v, applied_feat)
+        ir.WRITE_ROW_(var_out_nf, var_v, applied_feat)
 
 def schedule_nodeflow_apply_nodes(graph,
                                   layer_id,
                                   v,
                                   apply_func,
                                   inplace):
-    """get apply nodes schedule in NodeFlow.
+    """Get apply nodes schedule in NodeFlow.
 
     Parameters
     ----------
@@ -304,7 +327,8 @@ def schedule_nodeflow_apply_nodes(graph,
 def schedule_apply_edges(graph,
                          u, v, eid,
                          apply_func,
-                         inplace):
+                         inplace,
+                         outframe=None):
     """Get apply edges schedule
 
     Parameters
@@ -321,6 +345,8 @@ def schedule_apply_edges(graph,
         The apply edge function
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.edge_frame.
 
     Returns
     -------
@@ -330,13 +356,14 @@ def schedule_apply_edges(graph,
     var_src_nf = var.FEAT_DICT(graph.srcframe, 'uframe')
     var_dst_nf = var.FEAT_DICT(graph.dstframe, 'vframe')
     var_ef = var.FEAT_DICT(graph.edgeframe, 'eframe')
+    var_out_ef = var_ef if outframe is None else var.FEAT_DICT(outframe, 'out_ef')
     var_out = _gen_send(graph=graph, u=u, v=v, eid=eid, mfunc=apply_func,
                         var_src_nf=var_src_nf, var_dst_nf=var_dst_nf,
                         var_ef=var_ef)
     var_eid = var.IDX(eid)
     # schedule apply edges
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
+        ir.WRITE_ROW_INPLACE_(var_out_ef, var_eid, var_out)
     else:
         ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
@@ -344,7 +371,7 @@ def schedule_nodeflow_apply_edges(graph, block_id,
                                   u, v, eid,
                                   apply_func,
                                   inplace):
-    """get apply edges schedule in NodeFlow.
+    """Get apply edges schedule in NodeFlow.
 
     Parameters
     ----------
@@ -385,8 +412,9 @@ def schedule_push(graph,
                   message_func,
                   reduce_func,
                   apply_func,
-                  inplace):
-    """get push schedule
+                  inplace,
+                  outframe=None):
+    """Get push schedule
 
     Parameters
     ----------
@@ -402,21 +430,25 @@ def schedule_push(graph,
         The apply node function
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.dstframe.
     """
     u, v, eid = graph.out_edges(u)
     if len(eid) == 0:
         # All the pushing nodes have no out edges. No computation is scheduled.
         return
     schedule_snr(graph, (u, v, eid),
-                 message_func, reduce_func, apply_func, inplace)
+                 message_func, reduce_func, apply_func,
+                 inplace, outframe)
 
 def schedule_pull(graph,
                   pull_nodes,
                   message_func,
                   reduce_func,
                   apply_func,
-                  inplace):
-    """get pull schedule
+                  inplace,
+                  outframe=None):
+    """Get pull schedule
 
     Parameters
     ----------
@@ -432,6 +464,8 @@ def schedule_pull(graph,
         The apply node function
     inplace: bool
         If True, the update will be done in place
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.dstframe.
     """
     # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
     #   can be specialized to SPMV. This needs support for creating adjmat
@@ -440,12 +474,13 @@ def schedule_pull(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_apply_nodes(pull_nodes, apply_func, graph.dstframe, inplace)
+            schedule_apply_nodes(pull_nodes, apply_func, graph.dstframe, inplace, outframe)
     else:
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
         # create vars
-        var_dst_nf = var.FEAT_DICT(graph.dstframe, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
+        var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
         var_pull_nodes = var.IDX(pull_nodes, name='pull_nodes')
         var_u = var.IDX(u)
         var_v = var.IDX(v)
@@ -461,18 +496,20 @@ def schedule_pull(graph,
                                         var_pull_nodes, uv_getter, adj_creator,
                                         out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_pull_nodes, var_dst_nf, reduced_feat, apply_func)
+        final_feat = _apply_with_accum(graph, var_pull_nodes, var_dst_nf,
+                                       reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_out_nf, var_pull_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_dst_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_(var_out_nf, var_pull_nodes, final_feat)
 
 def schedule_group_apply_edge(graph,
                               u, v, eid,
                               apply_func,
                               group_by,
-                              inplace):
-    """group apply edges schedule
+                              inplace,
+                              outframe=None):
+    """Group apply edges schedule
 
     Parameters
     ----------
@@ -490,23 +527,22 @@ def schedule_group_apply_edge(graph,
         Specify how to group edges. Expected to be either 'src' or 'dst'
     inplace: bool
         If True, the update will be done in place
-
-    Returns
-    -------
-    A list of executors for DGL Runtime
+    outframe : FrameRef, optional
+        The storage to write output data. If None, use graph.edgeframe.
     """
     # vars
     var_src_nf = var.FEAT_DICT(graph.srcframe, name='src_nf')
     var_dst_nf = var.FEAT_DICT(graph.dstframe, name='dst_nf')
     var_ef = var.FEAT_DICT(graph.edgeframe, name='ef')
+    var_out_ef = var_ef if outframe is None else var.FEAT_DICT(outframe, name='out_ef')
     var_out = var.FEAT_DICT(name='new_ef')
     db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
                                      var_src_nf, var_dst_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
+        ir.WRITE_ROW_INPLACE_(var_out_ef, var_eid, var_out)
     else:
-        ir.WRITE_ROW_(var_ef, var_eid, var_out)
+        ir.WRITE_ROW_(var_out_ef, var_eid, var_out)
 
 
 def schedule_nodeflow_update_all(graph,
@@ -514,7 +550,7 @@ def schedule_nodeflow_update_all(graph,
                                  message_func,
                                  reduce_func,
                                  apply_func):
-    """get update_all schedule in a block.
+    """Get update_all schedule in a block.
 
     Parameters
     ----------

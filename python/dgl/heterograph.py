@@ -239,7 +239,7 @@ class DGLHeteroGraph(object):
     # Mutation operations
     #################################################################
 
-    def add_nodes(self, node_type, num, data=None):
+    def add_nodes(self, num, data=None, ntype=None):
         """Add multiple new nodes of the same node type
 
         Parameters
@@ -264,7 +264,7 @@ class DGLHeteroGraph(object):
         """
         raise DGLError('Mutation is not supported in heterograph.')
 
-    def add_edge(self, etype, u, v, data=None):
+    def add_edge(self, u, v, data=None, etype=None):
         """Add an edge of ``etype`` between u of the source node type, and v
         of the destination node type..
 
@@ -293,7 +293,7 @@ class DGLHeteroGraph(object):
         """
         raise DGLError('Mutation is not supported in heterograph.')
 
-    def add_edges(self, u, v, etype, data=None):
+    def add_edges(self, u, v, data=None, etype=None):
         """Add multiple edges of ``etype`` between list of source nodes ``u``
         and list of destination nodes ``v`` of type ``vtype``.  A single edge
         is added between every pair of ``u[i]`` and ``v[i]``.
@@ -1673,7 +1673,6 @@ class DGLHeteroGraph(object):
     def recv(self,
              nodes,
              reduce_func,
-             cross_type_reducer=None,
              apply_node_func=None,
              inplace=False):
         """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
@@ -1743,9 +1742,9 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        v : int, container or tensor, optional
+        v : int, container or tensor
             The node(s) to be updated. Default is receiving all the nodes.
-        reduce_func : callable, optional
+        reduce_func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable
@@ -1754,32 +1753,61 @@ class DGLHeteroGraph(object):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        assert not utils.is_dict_like(reduce_func) and \
-            not utils.is_dict_like(apply_node_func), \
-            "multiple-type message passing is not implemented"
-        assert reduce_func is not None
-
+        # only one node type and edge type
+        ntid = self.get_ntype_id(None)  # must be 0
+        etid = self.get_etype_id(None)  # must be 0
         if is_all(v):
-            v = F.arange(0, self._graph.number_of_nodes(self._current_dsttype_idx))
+            v = F.arange(0, self.number_of_nodes(ntid))
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v)
         if len(v) == 0:
             # no vertex to be triggered.
             return
-
         with ir.prog() as prog:
-            scheduler.schedule_recv(graph=self,
-                                    recv_nodes=v,
-                                    reduce_func=reduce_func,
-                                    apply_func=apply_node_func,
+            scheduler.schedule_recv(AdaptedHeteroGraph(self, ntid, ntid, etid),
+                                    v, reduce_func, apply_node_func,
                                     inplace=inplace)
             Runtime.run(prog)
 
+    def multi_recv(self, v, reducer_dict, cross_reducer, apply_func=None, inplace=False):
+        # infer receive node type
+        ntype = infer_ntype_from_dict(reducer_dict)
+        ntid = self.get_ntype_id(ntype)
+        if is_all(v):
+            v = F.arange(0, self.number_of_nodes(ntid))
+        elif isinstance(v, int):
+            v = [v]
+        v = utils.toindex(v)
+        if len(v) == 0:
+            return
+        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
+        #   Should replace it with fused kernel.
+        all_out = []
+        with ir.prog() as prog:
+            for ety, args in reducer_dict.items():
+                outframe = FrameRef()
+                args = pad_tuple(args, 2)  # (rfunc, afunc)
+                if len(args) == 0:
+                    raise DGLError('Invalid per-type arguments. Should be either '
+                                   '(1) reduce_func or (2) (reduce_func, apply_func)')
+                etid = self.get_etype_id(ety)
+                stid, dtid = self._graph.metagraph.find_edge(etid)
+                scheduler.schedule_recv(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                        v, *args,
+                                        inplace=inplace, outframe=outframe)
+                all_out.append(outframe)
+            Runtime.run(prog)
+        # merge by cross_reducer
+        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer))
+        # apply
+        if apply_func is not None:
+            self.apply_nodes(apply_func, v, ntype, inplace)
+
     def send_and_recv(self,
                       edges,
-                      message_func=None,
-                      reduce_func=None,
+                      message_func,
+                      reduce_func,
                       apply_node_func=None,
                       inplace=False):
         """Send messages along edges with the same edge type, and let destinations
@@ -1804,10 +1832,10 @@ class DGLHeteroGraph(object):
         edges : valid edges type
             Edges on which to apply ``func``. See :func:`send` for valid
             edges type.
-        message_func : callable, optional
+        message_func : callable
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable, optional
+        reduce_func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
@@ -1816,40 +1844,81 @@ class DGLHeteroGraph(object):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        assert not utils.is_dict_like(message_func) and \
-            not utils.is_dict_like(reduce_func) and \
-            not utils.is_dict_like(apply_node_func), \
-            "multiple-type message passing is not implemented"
         assert message_func is not None
         assert reduce_func is not None
+        # only one node type and edge type
+        etid = self.get_etype_id(None)  # must be 0
+        stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(self._current_etype_idx, u, v)
+            u, v, eid = self._graph.edge_ids(etid, u, v)
         else:
             eid = utils.toindex(edges)
-            u, v, _ = self._graph.find_edges(self._current_etype_idx, eid)
+            u, v, _ = self._graph.find_edges(etid, eid)
 
         if len(u) == 0:
             # no edges to be triggered
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_snr(graph=self,
-                                   edge_tuples=(u, v, eid),
-                                   message_func=message_func,
-                                   reduce_func=reduce_func,
-                                   apply_func=apply_node_func,
+            scheduler.schedule_snr(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                   (u, v, eid),
+                                   message_func, reduce_func, apply_node_func,
                                    inplace=inplace)
             Runtime.run(prog)
 
+    def multi_send_and_recv(self, etype_dict, cross_reducer, apply_func=None, inplace=False):
+        # infer receive node type
+        ntype = infer_ntype_from_dict(etype_dict)
+        dtid = self.get_ntype_id(ntype)
+
+        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
+        #   Should replace it with fused kernel.
+        all_out = []
+        all_vs = []
+        with ir.prog() as prog:
+            for etype, args in etype_dict.items():
+                etid = self.get_etype_id(etype)
+                stid, _ = self._graph.metagraph.find_edge(etid)
+                outframe = FrameRef()
+                edges, mfunc, rfunc, afunc = pad_tuple(args, 4)
+                if len(args) == 0:
+                    raise DGLError('Invalid per-type arguments. Should be '
+                                   '(edges, msg_func, reduce_func, [apply_func])')
+                if isinstance(edges, tuple):
+                    u, v = edges
+                    u = utils.toindex(u)
+                    v = utils.toindex(v)
+                    # Rewrite u, v to handle edge broadcasting and multigraph.
+                    u, v, eid = self._graph.edge_ids(etid, u, v)
+                else:
+                    eid = utils.toindex(edges)
+                    u, v, _ = self._graph.find_edges(etid, eid)
+                all_vs.append(v)
+                if len(u) == 0:
+                    # no edges to be triggered
+                    continue
+                scheduler.schedule_snr(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                       (u, v, eid),
+                                       mfunc, rfunc, afunc,
+                                       inplace=inplace, outframe=outframe)
+                all_out.append(outframe)
+            Runtime.run(prog)
+        # merge by cross_reducer
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        # apply
+        if apply_func is not None:
+            dstnodes = F.unique(F.cat([x.tousertensor() for x in all_vs], 0))
+            self.apply_nodes(apply_func, dstnodes, ntype, inplace)
+
     def pull(self,
              v,
-             message_func=None,
-             reduce_func=None,
+             message_func,
+             reduce_func,
              apply_node_func=None,
              inplace=False):
         """Pull messages from the node(s)' predecessors and then update their features.
@@ -1873,39 +1942,68 @@ class DGLHeteroGraph(object):
         ----------
         v : int, container or tensor, optional
             The node(s) to be updated. Default is receiving all the nodes.
-        message_func : callable, optional
+        message_func : callable
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable, optional
+        reduce_func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         """
-        assert not utils.is_dict_like(message_func) and \
-            not utils.is_dict_like(reduce_func) and \
-            not utils.is_dict_like(apply_node_func), \
-            "multiple-type message passing is not implemented"
         assert message_func is not None
         assert reduce_func is not None
+
+        # only one type of edges
+        etid = self.get_etype_id(None)  # must be 0
+        stid, dtid = self._graph.metagraph.find_edge(etid)
 
         v = utils.toindex(v)
         if len(v) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_pull(graph=self,
-                                    pull_nodes=v,
-                                    message_func=message_func,
-                                    reduce_func=reduce_func,
-                                    apply_func=apply_node_func,
+            scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                    v,
+                                    message_func, reduce_func, apply_node_func,
                                     inplace=inplace)
             Runtime.run(prog)
 
+    def multi_pull(self, v, etype_dict, cross_reducer, apply_func=None, inplace=False):
+        v = utils.toindex(v)
+        if len(v) == 0:
+            return
+        # infer receive node type
+        ntype = infer_ntype_from_dict(etype_dict)
+        dtid = self.get_ntype_id(ntype)
+        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
+        #   Should replace it with fused kernel.
+        all_out = []
+        with ir.prog() as prog:
+            for etype, args in etype_dict.items():
+                etid = self.get_etype_id(etype)
+                stid, _ = self._graph.metagraph.find_edge(etid)
+                outframe = FrameRef()
+                mfunc, rfunc, afunc = pad_tuple(args, 3)
+                if len(args) == 0:
+                    raise DGLError('Invalid per-type arguments. Should be '
+                                   '(msg_func, reduce_func, [apply_func])')
+                scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                        v,
+                                        mfunc, rfunc, afunc,
+                                        inplace=inplace, outframe=outframe)
+                all_out.append(outframe)
+            Runtime.run(prog)
+        # merge by cross_reducer
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        # apply
+        if apply_func is not None:
+            self.apply_nodes(apply_func, v, ntype, inplace)
+
     def push(self,
              u,
-             message_func=None,
-             reduce_func=None,
+             message_func,
+             reduce_func,
              apply_node_func=None,
              inplace=False):
         """Send message from the node(s) to their successors and update them.
@@ -1923,10 +2021,10 @@ class DGLHeteroGraph(object):
         ----------
         u : int, container or tensor
             The node(s) to push messages out.
-        message_func : callable, optional
+        message_func : callable
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable, optional
+        reduce_func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
@@ -1935,28 +2033,26 @@ class DGLHeteroGraph(object):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        assert not utils.is_dict_like(message_func) and \
-            not utils.is_dict_like(reduce_func) and \
-            not utils.is_dict_like(apply_node_func), \
-            "multiple-type message passing is not implemented"
         assert message_func is not None
         assert reduce_func is not None
+
+        # only one type of edges
+        etid = self.get_etype_id(None)  # must be 0
+        stid, dtid = self._graph.metagraph.find_edge(etid)
 
         u = utils.toindex(u)
         if len(u) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_push(graph=self,
-                                    u=u,
-                                    message_func=message_func,
-                                    reduce_func=reduce_func,
-                                    apply_func=apply_node_func,
+            scheduler.schedule_push(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                    u,
+                                    message_func, reduce_func, apply_node_func,
                                     inplace=inplace)
             Runtime.run(prog)
 
     def update_all(self,
-                   message_func=None,
-                   reduce_func=None,
+                   message_func,
+                   reduce_func,
                    apply_node_func=None):
         """Send messages through all edges and update all nodes.
 
@@ -1975,29 +2071,53 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        message_func : callable, optional
+        message_func : callable
             Message function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        reduce_func : callable, optional
+        reduce_func : callable
             Reduce function on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         """
-        assert not utils.is_dict_like(message_func) and \
-            not utils.is_dict_like(reduce_func) and \
-            not utils.is_dict_like(apply_node_func), \
-            "multiple-type message passing is not implemented"
         assert message_func is not None
         assert reduce_func is not None
 
+        # only one type of edges
+        etid = self.get_etype_id(None)  # must be 0
+        stid, dtid = self._graph.metagraph.find_edge(etid)
+
         with ir.prog() as prog:
-            scheduler.schedule_update_all(graph=self,
-                                          message_func=message_func,
-                                          reduce_func=reduce_func,
-                                          apply_func=apply_node_func)
+            scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                          message_func, reduce_func,
+                                          apply_node_func)
             Runtime.run(prog)
+
+    def multi_update_all(self, etype_dict, cross_reducer, apply_func=None):
+        # TODO(minjie): currently loop over each edge type and reuse the old schedule.
+        #   Should replace it with fused kernel.
+        all_out = defaultdict(list)
+        with ir.prog() as prog:
+            for etype, args in etype_dict.items():
+                etid = self.get_etype_id(etype)
+                stid, dtid = self._graph.metagraph.find_edge(etid)
+                outframe = FrameRef()
+                mfunc, rfunc, afunc = pad_tuple(args, 3)
+                if len(args) == 0:
+                    raise DGLError('Invalid per-type arguments. Should be '
+                                   '(msg_func, reduce_func, [apply_func])')
+                scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
+                                              message_func, reduce_func,
+                                              apply_node_func)
+                all_out[dtid].append(outframe)
+            Runtime.run(prog)
+        for dtid, frames in all_out.items():
+            # merge by cross_reducer
+            self._node_frames[dtid].update(merge_frames(frames, cross_reducer))
+            # apply
+            if apply_func is not None:
+                self.apply_nodes(apply_func, ALL, ntype, inplace=False)
 
     def prop_nodes(self,
                    nodes_generator,
@@ -2376,6 +2496,86 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     for s, d, e in zip(src, dst, eid):
         rst.append((ntypes[s], etypes[e], ntypes[d]))
     return rst
+
+def infer_ntype_from_dict(graph, etype_dict):
+    """Infer node type from dictionary of edge type to values.
+
+    All the edge types in the dict must share the same destination node type
+    and the node type will be returned. Otherwise, throw error.
+
+    Parameters
+    ----------
+    graph : DGLHeteroGraph
+        Graph
+    etype_dict : dict
+        Dictionary whose key is edge type
+
+    Returns
+    -------
+    str
+        Node type
+    """
+    ntype = None
+    for ety in etype_dict:
+        _, _, dty = graph.to_canonical_etype(ety)
+        if ntype is None:
+            ntype = dty
+        if ntype != dty:
+            raise DGLError("Cannot infer destination node type from the dictionary. "
+                           "A valid specification must make sure that all the edge "
+                           "type keys share the same destination node type.")
+    return ntype
+
+def pad_tuple(tup, length, pad_val=None):
+    """Pad the given tuple to the given length.
+
+    If the input is not a tuple, convert it to a tuple of length one.
+    Return an empty tuple if pad fails.
+    """
+    if not isinstance(tup, tuple):
+        tup = (tup, )
+    if len(tup) > length:
+        return ()
+    elif len(tup) == length:
+        return tup
+    else:
+        return tup + (None,) * (length - len(tup))
+
+def merge_frames(frames, reducer):
+    """Merge input frames into one. Resolve conflict fields using reducer.
+
+    Parameters
+    ----------
+    frames : list of FrameRef
+        Input frames
+    reducer : str
+        One of "sum", "max", "min", "mean"
+
+    Returns
+    -------
+    FrameRef
+        Merged frame
+    """
+    if len(frames) == 1:
+        return frames[0]
+    redfn = getattr(F, reducer, None)
+    if redfn is None:
+        raise DGLError('Invalid cross type reducer. Must be one of '
+                       '"sum", "max", "min" or "mean".')
+    ret = FrameRef()
+    keys = set()
+    for f in frames:
+        keys.update(f.keys())
+    for k in keys:
+        flist = []
+        for f in frames:
+            if k in f:
+                flist.append(f[k].data)
+        if len(flist) > 1:
+            ret[k] = redfn(F.stack(flist, 0), 0)
+        else:
+            ret[k] = flist[0]
+    return ret
 
 class AdaptedHeteroGraph(GraphAdapter):
     """Adapt DGLGraph to interface required by scheduler.
