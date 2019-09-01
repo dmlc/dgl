@@ -1067,7 +1067,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
     size_t neg_idx = (chunk_size * 2) * chunk_size * i_chunk;
     size_t pos_edge_idx = (chunk_size) * i_chunk;
     neg_vids.clear();
-    RandomSample(num_tot_nodes, chunk_size, &neg_vids);
+    RandomSample(num_tot_nodes, chunk_size * 2, &neg_vids);
 
     for (int64_t in_chunk = 0; in_chunk != chunk_size; ++in_chunk) {
       // For each positive node in a chunk.
@@ -1080,13 +1080,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
         neg_eid_data[neg_idx] = curr_eid++;
 
         dgl_id_t global_changed_vid;
-        if (j < chunk_size) {
-          // first chunk_size neg samples use in-chunk node to corrupt.
-          global_changed_vid = induced_vid_data[changed[pos_edge_idx + j]];
-        } else {
-          // second chunk_size neg samples, use random-smapled node to corrupt.
-          global_changed_vid = neg_vids[j - chunk_size];
-        }
+        global_changed_vid = neg_vids[j];
         // TODO we can avoid the hashtable lookup here.
         dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
         neg_changed[neg_idx] = local_changed;
