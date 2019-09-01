@@ -17,7 +17,10 @@ if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
-mx.set_np_shape(True)
+# mx.set_np_shape(True)
+from mxnet import npx
+npx.set_np()
+
 
 def data_type_dict():
     return {'float16' : np.float16,
