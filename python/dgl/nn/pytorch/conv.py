@@ -184,7 +184,7 @@ class GATConv(nn.Module):
     .. math::
         \alpha_{ij}^{l} & = \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} & = \mathrm{LeakyReLU}\left(\vec{a}^T [W h^{I} \| W h^{j}]\right)
+        e_{ij}^{l} & = \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
 
     Parameters
     ----------
@@ -672,7 +672,7 @@ class SAGEConv(nn.Module):
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
-        If not None, applies normalization oto the updated node features.
+        If not None, applies normalization to the updated node features.
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
