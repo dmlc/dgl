@@ -61,7 +61,7 @@ struct BinaryReduce {
  *   2. Convert multi-dimension index to flattened index for lhs.
  *   3. Convert multi-dimension index to flattened index for rhs.
  */
-__device__ __forceinline__ void UnravelRravel(
+__device__ __forceinline__ void UnravelRavel(
     const int64_t idx, const int ndim, const int64_t* out_shape, const int64_t* out_stride,
     const int64_t* lhs_shape, const int64_t* lhs_stride,
     const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t *lhs_out, int64_t *rhs_out) {
@@ -133,7 +133,7 @@ struct BinaryReduceBcast {
     while (tx < gdata->out_len) {
       int64_t lhs_add = 0;
       int64_t rhs_add = 0;
-      UnravelRravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
           gdata->lhs_shape, gdata->lhs_stride,
           gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType lhs = Functors::Read(lhsoff + lhs_add);
