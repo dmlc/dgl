@@ -4,11 +4,12 @@ References:
 - Topology Adaptive Graph Convolutional Networks
 - Paper: https://arxiv.org/abs/1710.10370
 """
-import torch
-import torch.nn as nn
-from dgl.nn.pytorch.conv import TAGConv
+import mxnet as mx
+from mxnet import gluon
+import dgl
+from dgl.nn.mxnet import TAGConv
 
-class TAGCN(nn.Module):
+class TAGCN(gluon.Block):
     def __init__(self,
                  g,
                  in_feats,
@@ -19,15 +20,15 @@ class TAGCN(nn.Module):
                  dropout):
         super(TAGCN, self).__init__()
         self.g = g
-        self.layers = nn.ModuleList()
+        self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.append(TAGConv(in_feats, n_hidden, activation=activation))
+        self.layers.add(TAGConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(TAGConv(n_hidden, n_hidden, activation=activation))
+            self.layers.add(TAGConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.append(TAGConv(n_hidden, n_classes)) #activation=None
-        self.dropout = nn.Dropout(p=dropout)
+        self.layers.add(TAGConv(n_hidden, n_classes)) #activation=None
+        self.dropout = gluon.nn.Dropout(rate=dropout)
 
     def forward(self, features):
         h = features
