@@ -24,6 +24,7 @@ def check_array_shared_memory(g, worker_id, arrays):
         g._sync_barrier(60)
     else:
         g._sync_barrier(60)
+        time.sleep(3)
         for i, arr in enumerate(arrays):
             assert_almost_equal(F.asnumpy(arr[0]), i + 10)
 
@@ -40,7 +41,6 @@ def create_graph_store(graph_name):
 
 def check_init_func(worker_id, graph_name, return_dict):
     time.sleep(3)
-    print("worker starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
@@ -262,7 +262,7 @@ def test_copy_shared_mem():
     p2.join()
 
 if __name__ == '__main__':
-    test_copy_shared_mem()
+    #test_copy_shared_mem()
     test_init()
-    test_sync_barrier()
-    test_compute()
+    #test_sync_barrier()
+    #test_compute()
