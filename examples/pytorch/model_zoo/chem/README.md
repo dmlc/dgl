@@ -53,7 +53,7 @@ as front end and Set2Set for output prediction.
 ### Example Usage of Pre-trained Models
 
 ```python
-from dgl.data import Tox21
+from dgl.data.chem import Tox21
 from dgl import model_zoo
 
 dataset = Tox21()
