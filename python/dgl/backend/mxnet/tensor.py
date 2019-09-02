@@ -12,10 +12,12 @@ from ... import kernel as K
 from ...function.base import TargetCode 
 
 MX_VERSION = LooseVersion(mx.__version__)
+if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
+    raise Exception("DGL has to work with MXNet version >= 1.5")
+
 # After MXNet 1.5, empty tensors aren't supprted by default.
-# after we turn on the numpy compatible flag, MXNet supports empty NDArray.
-if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
-    mx.set_np_shape(True)
+# After we turn on the numpy compatible flag, MXNet supports empty NDArray.
+mx.set_np_shape(True)
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -114,8 +116,8 @@ def asnumpy(input):
 def copy_to(input, ctx):
     return input.as_in_context(ctx)
 
-def sum(input, dim):
-    return nd.sum(input, axis=dim)
+def sum(input, dim, keepdims=False):
+    return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
     return input.sum()
@@ -140,6 +142,10 @@ def reduce_min(input):
 
 def topk(input, k, dim, descending=True):
     return nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending)
+
+def argtopk(input, k, dim, descending=True):
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    return nd.slice_axis(input, dim, 0, k)
 
 def argsort(input, dim, descending):
     idx = nd.argsort(input, dim, is_ascend=not descending)
@@ -219,6 +225,9 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
+
+def swapaxes(input, axis1, axis2):
+    return nd.swapaxes(input, axis1, axis2)
 
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)

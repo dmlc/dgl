@@ -12,7 +12,7 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
            'GlobalAttentionPooling', 'Set2Set',
-           'SetTransformerEncoder', 'SetTransformerDecoder']
+           'SetTransformerEncoder', 'SetTransformerDecoder', 'WeightAndSum']
 
 class SumPooling(nn.Module):
     r"""Apply sum pooling over the nodes in the graph.
@@ -668,3 +668,43 @@ class SetTransformerDecoder(nn.Module):
             return feat.view(graph.batch_size, self.k * self.d_model)
         else:
             return feat.view(self.k * self.d_model)
+
+
+class WeightAndSum(nn.Module):
+    """Compute importance weights for atoms and perform a weighted sum.
+
+    Parameters
+    ----------
+    in_feats : int
+        Input atom feature size
+    """
+    def __init__(self, in_feats):
+        super(WeightAndSum, self).__init__()
+        self.in_feats = in_feats
+        self.atom_weighting = nn.Sequential(
+            nn.Linear(in_feats, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, bg, feats):
+        """Compute molecule representations out of atom representations
+
+        Parameters
+        ----------
+        bg : BatchedDGLGraph
+            B Batched DGLGraphs for processing multiple molecules in parallel
+        feats : FloatTensor of shape (N, self.in_feats)
+            Representations for all atoms in the molecules
+            * N is the total number of atoms in all molecules
+
+        Returns
+        -------
+        FloatTensor of shape (B, self.in_feats)
+            Representations for B molecules
+        """
+        with bg.local_scope():
+            bg.ndata['h'] = feats
+            bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
+            h_g_sum = sum_nodes(bg, 'h', 'w')
+
+        return h_g_sum

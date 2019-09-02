@@ -105,6 +105,7 @@ def test_tagconv():
     conv = nn.TAGConv(5, 2)
     if F.gpu_ctx():
         conv = conv.to(ctx)
+
     # test#2: basic
     h0 = F.ones((3, 5))
     h1 = conv(g, h0)
