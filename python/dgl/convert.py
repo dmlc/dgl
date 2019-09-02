@@ -129,6 +129,7 @@ def from_scipy2(spmat, utype, etype, vtype, with_edge_id=False):
         col = utils.toindex(spmat.col)
         hgidx = heterograph_index.create_unitgraph_from_coo(
             num_ntypes, num_src, num_dst, row, col)
+        u, v, eid = hgidx.edges(0)
     else:
         spmat = spmat.tocsr()
         indptr = utils.toindex(spmat.indptr)

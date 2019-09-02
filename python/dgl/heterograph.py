@@ -315,15 +315,11 @@ class DGLHeteroGraph(object):
             nx_graph = self._graph.metagraph.to_networkx()
             self._nx_metagraph = nx.MultiDiGraph()
             for u_v in nx_graph.edges:
-                etype = self._etypes[nx_graph.edges[u_v]['id']]
-                srctype = self._ntypes[u_v[0]]
-                dsttype = self._ntypes[u_v[1]]
-                assert etype[0] == srctype
-                assert etype[2] == dsttype
-                self._nx_metagraph.add_edge(srctype, dsttype, etype[1])
+                srctype, etype, dsttype = self.canonical_etypes[nx_graph.edges[u_v]['id']]
+                self._nx_metagraph.add_edge(srctype, dsttype, etype)
         return self._nx_metagraph
 
-    def to_canonical_etype(etype):
+    def to_canonical_etype(self, etype):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
         
         The input can already be a canonical tuple.
@@ -388,10 +384,10 @@ class DGLHeteroGraph(object):
         -------
         int
         """
-        if ntype is None:
+        if etype is None:
             if self._graph.number_of_etypes() != 1:
-                raise DGLError('Node type name must be specified if there are more than one '
-                               'node types.')
+                raise DGLError('Edge type name must be specified if there are more than one '
+                               'edge types.')
             return 0
         etid = self._etypes_invmap.get(self.to_canonical_etype(etype), None)
         if etid is None:
