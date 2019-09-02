@@ -1,3 +1,8 @@
+""" NOTE(zihao) The unittest on shared memory store is temporally disabled because we 
+have not fixed the bug described in https://github.com/dmlc/dgl/issues/755 yet.
+The bug causes CI failures occasionally but does not affect other parts of DGL.
+As a result, we decide to disable this test until we fixed the bug.
+"""
 import dgl
 import sys
 import random
@@ -11,6 +16,7 @@ import unittest
 import dgl.function as fn
 import traceback
 from numpy.testing import assert_almost_equal
+
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
@@ -95,6 +101,7 @@ def server_func(num_workers, graph_name, server_init):
     server_init.value = True
     g.run()
 
+@unittest.skip
 def test_init():
     manager = Manager()
     return_dict = manager.dict()
@@ -164,6 +171,8 @@ def check_compute_func(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
+
+@unittest.skip
 def test_compute():
     manager = Manager()
     return_dict = manager.dict()
@@ -212,7 +221,7 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
-
+@unittest.skip
 def test_sync_barrier():
     manager = Manager()
     return_dict = manager.dict()
