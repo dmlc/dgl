@@ -55,9 +55,12 @@ def from_edges2(u, v, utype, etype, vtype, urange=None, vrange=None):
     vrange = vrange or (max(v) + 1)
     if utype == vtype:
         urange = vrange = max(urange, vrange)
+        num_ntypes = 1
+    else:
+        num_ntypes = 2
     u = utils.toindex(u)
     v = utils.toindex(v)
-    hgidx = heterograph_index.create_bipartite_from_coo(urange, vrange, u, v)
+    hgidx = heterograph_index.create_unitgraph_from_coo(num_ntypes, urange, vrange, u, v)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
@@ -102,7 +105,7 @@ def from_scipy2(spmat, utype, etype, vtype, with_edge_id=False):
     Parameters
     ----------
     spmat : scipy.sparse.spmatrix
-        The bipartite graph matrix whose rows represent sources and columns
+        The adjacency matrix whose rows represent sources and columns
         represent destinations.
     utype : str
         Source node type name.
@@ -120,17 +123,20 @@ def from_scipy2(spmat, utype, etype, vtype, with_edge_id=False):
     DGLHeteroGraph
     """
     num_src, num_dst = spmat.shape
+    num_ntypes = 1 if utype == vtype else 2
     if spmat.getformat() == 'coo':
         row = utils.toindex(spmat.row)
         col = utils.toindex(spmat.col)
-        hgidx = heterograph_index.create_bipartite_from_coo(num_src, num_dst, row, col)
+        hgidx = heterograph_index.create_unitgraph_from_coo(
+            num_ntypes, num_src, num_dst, row, col)
     else:
         spmat = spmat.tocsr()
         indptr = utils.toindex(spmat.indptr)
         indices = utils.toindex(spmat.indices)
         # TODO(minjie): with_edge_id is only reasonable for csr matrix. How to fix?
         data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
-        hgidx = heterograph_index.create_bipartite_from_csr(num_src, num_dst, indptr, indices, data)
+        hgidx = heterograph_index.create_unitgraph_from_csr(
+            num_ntypes, num_src, num_dst, indptr, indices, data)
     return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def graph(data, utype='_N', etype='_E', vtype='_N', card=None):

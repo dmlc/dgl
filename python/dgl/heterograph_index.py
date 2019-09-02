@@ -49,7 +49,7 @@ class HeteroGraphIndex(ObjectBase):
         return self.metagraph.number_of_edges()
 
     def get_relation_graph(self, etype):
-        """Get the bipartite graph of the given edge/relation type.
+        """Get the unitgraph graph of the given edge/relation type.
 
         Parameters
         ----------
@@ -59,7 +59,7 @@ class HeteroGraphIndex(ObjectBase):
         Returns
         -------
         HeteroGraphIndex
-            The bipartite graph.
+            The unitgraph graph.
         """
         return _CAPI_DGLHeteroGetRelationGraph(self, int(etype))
 
@@ -132,7 +132,7 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroNumBits(self)
 
     def bits_needed(self, etype):
-        """Return the number of integer bits needed to represent the bipartite graph.
+        """Return the number of integer bits needed to represent the unitgraph graph.
 
         Parameters
         ----------
@@ -697,9 +697,9 @@ class HeteroGraphIndex(ObjectBase):
         eids = [edges.todgltensor() for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
-    @utils.cached_member(cache='_cache', prefix='bipartite')
-    def get_bipartite(self, etype, ctx):
-        """Create a bipartite graph from given edge type and copy to the given device
+    @utils.cached_member(cache='_cache', prefix='unitgraph')
+    def get_unitgraph(self, etype, ctx):
+        """Create a unitgraph graph from given edge type and copy to the given device
         context.
 
         Note: this internal function is for DGL scheduler use only
@@ -779,11 +779,13 @@ class HeteroSubgraphIndex(ObjectBase):
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data) for v in ret]
 
-def create_bipartite_from_coo(num_src, num_dst, row, col):
-    """Create a bipartite graph index from COO format
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
+    """Create a unitgraph graph index from COO format
 
     Parameters
     ----------
+    num_ntypes : int
+        Number of node types (must be 1 or 2).
     num_src : int
         Number of nodes in the src type.
     num_dst : int
@@ -797,14 +799,16 @@ def create_bipartite_from_coo(num_src, num_dst, row, col):
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateBipartiteFromCOO(
-        int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+    return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
+        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
 
-def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
-    """Create a bipartite graph index from CSR format
+def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
+    """Create a unitgraph graph index from CSR format
 
     Parameters
     ----------
+    num_ntypes : int
+        Number of node types (must be 1 or 2).
     num_src : int
         Number of nodes in the src type.
     num_dst : int
@@ -820,8 +824,8 @@ def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateBipartiteFromCSR(
-        int(num_src), int(num_dst),
+    return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
+        int(num_ntypes), int(num_src), int(num_dst),
         indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
 
 def create_heterograph_from_relations(metagraph, rel_graphs):

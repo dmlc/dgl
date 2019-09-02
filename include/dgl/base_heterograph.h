@@ -46,10 +46,14 @@ class BaseHeteroGraph : public runtime::Object {
   ////////////////////////// query/operations on meta graph ////////////////////////
 
   /*! \return the number of vertex types */
-  virtual uint64_t NumVertexTypes() const = 0;
+  virtual uint64_t NumVertexTypes() const {
+    return meta_graph_->NumVertices();
+  }
 
   /*! \return the number of edge types */
-  virtual uint64_t NumEdgeTypes() const = 0;
+  virtual uint64_t NumEdgeTypes() const {
+    return meta_graph_->NumEdges();
+  }
 
   /*! \return the meta graph */
   virtual GraphPtr meta_graph() const {

@@ -6,7 +6,7 @@ from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..heterograph_index import create_bipartite_from_coo
+from ..heterograph_index import create_unitgraph_from_coo
 
 from . import ir
 from .ir import var
@@ -178,7 +178,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
         Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
-    gidx = create_bipartite_from_coo(num_src, num_dst, u, v)
+    gidx = create_unitgraph_from_coo(2, num_src, num_dst, u, v)
     forward, backward = gidx.get_csr_shuffle_order(0)
     eid = eid.tousertensor()
     nbits = gidx.bits_needed(0)

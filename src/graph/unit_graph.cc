@@ -1,29 +1,52 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/bipartite.cc
- * \brief Bipartite graph implementation
+ * \file graph/unit_graph.cc
+ * \brief UnitGraph graph implementation
  */
 #include <dgl/array.h>
 #include <dgl/lazy.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/base_heterograph.h>
 
-#include "./bipartite.h"
+#include "./unit_graph.h"
 #include "../c_api_common.h"
 
 namespace dgl {
 
 namespace {
+// create metagraph of one node type
+inline GraphPtr CreateUnitGraphMetaGraph1() {
+  // a self-loop edge 0->0
+  std::vector<int64_t> row_vec(1, 0);
+  std::vector<int64_t> col_vec(1, 0);
+  IdArray row = aten::VecToIdArray(row_vec);
+  IdArray col = aten::VecToIdArray(col_vec);
+  GraphPtr g = ImmutableGraph::CreateFromCOO(1, row, col);
+  return g;
+}
 
-inline GraphPtr CreateBipartiteMetaGraph() {
-  std::vector<int64_t> row_vec(1, Bipartite::kSrcVType);
-  std::vector<int64_t> col_vec(1, Bipartite::kDstVType);
+// create metagraph of two node types
+inline GraphPtr CreateUnitGraphMetaGraph2() {
+  // an edge 0->1
+  std::vector<int64_t> row_vec(1, 0);
+  std::vector<int64_t> col_vec(1, 1);
   IdArray row = aten::VecToIdArray(row_vec);
   IdArray col = aten::VecToIdArray(col_vec);
   GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
-const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
+
+inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
+  static GraphPtr mg1 = CreateUnitGraphMetaGraph1();
+  static GraphPtr mg2 = CreateUnitGraphMetaGraph2();
+  if (num_vtypes == 1)
+    return mg1;
+  else if (num_vtypes == 2)
+    return mg2;
+  else
+    LOG(FATAL) << "Invalid number of vertex types. Must be 1 or 2.";
+  return {};
+}
 
 };  // namespace
 
@@ -33,48 +56,55 @@ const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
 //
 //////////////////////////////////////////////////////////
 
-class Bipartite::COO : public BaseHeteroGraph {
+class UnitGraph::COO : public BaseHeteroGraph {
  public:
-  COO(int64_t num_src, int64_t num_dst, IdArray src, IdArray dst)
-    : BaseHeteroGraph(kBipartiteMetaGraph) {
+  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src, IdArray dst)
+    : BaseHeteroGraph(metagraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  COO(int64_t num_src, int64_t num_dst, IdArray src, IdArray dst, bool is_multigraph)
-    : BaseHeteroGraph(kBipartiteMetaGraph),
+  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
+      IdArray src, IdArray dst, bool is_multigraph)
+    : BaseHeteroGraph(metagraph),
       is_multigraph_(is_multigraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  explicit COO(const aten::COOMatrix& coo) : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo) {}
+  explicit COO(GraphPtr metagraph, const aten::COOMatrix& coo)
+    : BaseHeteroGraph(metagraph), adj_(coo) {}
 
-  uint64_t NumVertexTypes() const override {
-    return 2;
+  inline dgl_type_t SrcType() const {
+    return 0;
   }
-  uint64_t NumEdgeTypes() const override {
-    return 1;
+
+  inline dgl_type_t DstType() const {
+    return NumVertexTypes() == 1? 0 : 1;
+  }
+
+  inline dgl_type_t EdgeType() const {
+    return 0;
   }
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
-    LOG(FATAL) << "The method shouldn't be called for Bipartite graph. "
+    LOG(FATAL) << "The method shouldn't be called for UnitGraph graph. "
       << "The relation graph is simply this graph itself.";
     return {};
   }
 
   void AddVertices(dgl_type_t vtype, uint64_t num_vertices) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdge(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdges(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void Clear() override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   DLContext Context() const override {
@@ -96,9 +126,9 @@ class Bipartite::COO : public BaseHeteroGraph {
   }
 
   uint64_t NumVertices(dgl_type_t vtype) const override {
-    if (vtype == Bipartite::kSrcVType) {
+    if (vtype == SrcType()) {
       return adj_.num_rows;
-    } else if (vtype == Bipartite::kDstVType) {
+    } else if (vtype == DstType()) {
       return adj_.num_cols;
     } else {
       LOG(FATAL) << "Invalid vertex type: " << vtype;
@@ -258,7 +288,7 @@ class Bipartite::COO : public BaseHeteroGraph {
       const auto new_nsrc = subg.induced_vertices[0]->shape[0];
       const auto new_ndst = subg.induced_vertices[1]->shape[0];
       subg.graph = std::make_shared<COO>(
-          new_nsrc, new_ndst, new_src, new_dst);
+          meta_graph(), new_nsrc, new_ndst, new_src, new_dst);
       subg.induced_edges = eids;
     } else {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
@@ -266,7 +296,7 @@ class Bipartite::COO : public BaseHeteroGraph {
       subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(0), NumBits(), Context()));
       subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(1), NumBits(), Context()));
       subg.graph = std::make_shared<COO>(
-          NumVertices(0), NumVertices(1), new_src, new_dst);
+          meta_graph(), NumVertices(0), NumVertices(1), new_src, new_dst);
       subg.induced_edges = eids;
     }
     return subg;
@@ -291,50 +321,55 @@ class Bipartite::COO : public BaseHeteroGraph {
 //////////////////////////////////////////////////////////
 
 /*! \brief CSR graph */
-class Bipartite::CSR : public BaseHeteroGraph {
+class UnitGraph::CSR : public BaseHeteroGraph {
  public:
-  CSR(int64_t num_src, int64_t num_dst,
+  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids)
-    : BaseHeteroGraph(kBipartiteMetaGraph) {
+    : BaseHeteroGraph(metagraph) {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
-  CSR(int64_t num_src, int64_t num_dst,
+  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-    : BaseHeteroGraph(kBipartiteMetaGraph),
-      is_multigraph_(is_multigraph) {
+    : BaseHeteroGraph(metagraph), is_multigraph_(is_multigraph) {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
-  explicit CSR(const aten::CSRMatrix& csr) : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr) {}
+  explicit CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
+    : BaseHeteroGraph(metagraph), adj_(csr) {}
 
-  uint64_t NumVertexTypes() const override {
-    return 2;
+  inline dgl_type_t SrcType() const {
+    return 0;
   }
-  uint64_t NumEdgeTypes() const override {
-    return 1;
+
+  inline dgl_type_t DstType() const {
+    return NumVertexTypes() == 1? 0 : 1;
+  }
+
+  inline dgl_type_t EdgeType() const {
+    return 0;
   }
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
-    LOG(FATAL) << "The method shouldn't be called for Bipartite graph. "
+    LOG(FATAL) << "The method shouldn't be called for UnitGraph graph. "
       << "The relation graph is simply this graph itself.";
     return {};
   }
 
   void AddVertices(dgl_type_t vtype, uint64_t num_vertices) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdge(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdges(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void Clear() override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   DLContext Context() const override {
@@ -350,6 +385,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
       return *this;
     } else {
       CSR ret(
+          meta_graph_,
           adj_.num_rows, adj_.num_cols,
           aten::AsNumBits(adj_.indptr, bits),
           aten::AsNumBits(adj_.indices, bits),
@@ -364,6 +400,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
       return *this;
     } else {
       CSR ret(
+          meta_graph_,
           adj_.num_rows, adj_.num_cols,
           adj_.indptr.CopyTo(ctx),
           adj_.indices.CopyTo(ctx),
@@ -384,9 +421,9 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   uint64_t NumVertices(dgl_type_t vtype) const override {
-    if (vtype == Bipartite::kSrcVType) {
+    if (vtype == SrcType()) {
       return adj_.num_rows;
-    } else if (vtype == Bipartite::kDstVType) {
+    } else if (vtype == DstType()) {
       return adj_.num_cols;
     } else {
       LOG(FATAL) << "Invalid vertex type: " << vtype;
@@ -408,8 +445,8 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
-    CHECK(HasVertex(0, src)) << "Invalid src vertex id: " << src;
-    CHECK(HasVertex(1, dst)) << "Invalid dst vertex id: " << dst;
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
+    CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
     return aten::CSRIsNonZero(adj_, src, dst);
   }
 
@@ -425,13 +462,13 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   IdArray Successors(dgl_type_t etype, dgl_id_t src) const override {
-    CHECK(HasVertex(0, src)) << "Invalid src vertex id: " << src;
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     return aten::CSRGetRowColumnIndices(adj_, src);
   }
 
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
-    CHECK(HasVertex(0, src)) << "Invalid src vertex id: " << src;
-    CHECK(HasVertex(1, dst)) << "Invalid dst vertex id: " << dst;
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
+    CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
     return aten::CSRGetData(adj_, src, dst);
   }
 
@@ -463,7 +500,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    CHECK(HasVertex(0, vid)) << "Invalid src vertex id: " << vid;
+    CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
     IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
     IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
     IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
@@ -499,7 +536,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   uint64_t OutDegree(dgl_type_t etype, dgl_id_t vid) const override {
-    CHECK(HasVertex(0, vid)) << "Invalid src vertex id: " << vid;
+    CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
     return aten::CSRGetRowNNZ(adj_, vid);
   }
 
@@ -545,13 +582,14 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
-    CHECK_EQ(vids.size(), 2) << "Number of vertex types mismatch";
-    CHECK(aten::IsValidIdArray(vids[0])) << "Invalid vertex id array.";
-    CHECK(aten::IsValidIdArray(vids[1])) << "Invalid vertex id array.";
+    CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
+    auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
+    CHECK(aten::IsValidIdArray(srcvids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
-    const auto& submat = aten::CSRSliceMatrix(adj_, vids[0], vids[1]);
+    const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
-    subg.graph = std::make_shared<CSR>(submat.num_rows, submat.num_cols,
+    subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
         submat.indptr, submat.indices, sub_eids);
     subg.induced_vertices = vids;
     subg.induced_edges.emplace_back(submat.data);
@@ -578,40 +616,40 @@ class Bipartite::CSR : public BaseHeteroGraph {
 
 //////////////////////////////////////////////////////////
 //
-// bipartite graph implementation
+// unit graph implementation
 //
 //////////////////////////////////////////////////////////
 
-DLContext Bipartite::Context() const {
+DLContext UnitGraph::Context() const {
   return GetAny()->Context();
 }
 
-uint8_t Bipartite::NumBits() const {
+uint8_t UnitGraph::NumBits() const {
   return GetAny()->NumBits();
 }
 
-bool Bipartite::IsMultigraph() const {
+bool UnitGraph::IsMultigraph() const {
   return GetAny()->IsMultigraph();
 }
 
-uint64_t Bipartite::NumVertices(dgl_type_t vtype) const {
+uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
   return GetAny()->NumVertices(vtype);
 }
 
-uint64_t Bipartite::NumEdges(dgl_type_t etype) const {
+uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
   return GetAny()->NumEdges(etype);
 }
 
-bool Bipartite::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
+bool UnitGraph::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
   return GetAny()->HasVertex(vtype, vid);
 }
 
-BoolArray Bipartite::HasVertices(dgl_type_t vtype, IdArray vids) const {
+BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
   CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices(vtype));
 }
 
-bool Bipartite::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
+bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
   if (in_csr_) {
     return in_csr_->HasEdgeBetween(etype, dst, src);
   } else {
@@ -619,7 +657,7 @@ bool Bipartite::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) con
   }
 }
 
-BoolArray Bipartite::HasEdgesBetween(
+BoolArray UnitGraph::HasEdgesBetween(
     dgl_type_t etype, IdArray src, IdArray dst) const {
   if (in_csr_) {
     return in_csr_->HasEdgesBetween(etype, dst, src);
@@ -628,15 +666,15 @@ BoolArray Bipartite::HasEdgesBetween(
   }
 }
 
-IdArray Bipartite::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
+IdArray UnitGraph::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
   return GetInCSR()->Successors(etype, dst);
 }
 
-IdArray Bipartite::Successors(dgl_type_t etype, dgl_id_t src) const {
+IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
   return GetOutCSR()->Successors(etype, src);
 }
 
-IdArray Bipartite::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
+IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
   if (in_csr_) {
     return in_csr_->EdgeId(etype, dst, src);
   } else {
@@ -644,7 +682,7 @@ IdArray Bipartite::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
   }
 }
 
-EdgeArray Bipartite::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
+EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
   if (in_csr_) {
     EdgeArray edges = in_csr_->EdgeIds(etype, dst, src);
     return EdgeArray{edges.dst, edges.src, edges.id};
@@ -653,33 +691,33 @@ EdgeArray Bipartite::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
   }
 }
 
-std::pair<dgl_id_t, dgl_id_t> Bipartite::FindEdge(dgl_type_t etype, dgl_id_t eid) const {
+std::pair<dgl_id_t, dgl_id_t> UnitGraph::FindEdge(dgl_type_t etype, dgl_id_t eid) const {
   return GetCOO()->FindEdge(etype, eid);
 }
 
-EdgeArray Bipartite::FindEdges(dgl_type_t etype, IdArray eids) const {
+EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
   return GetCOO()->FindEdges(etype, eids);
 }
 
-EdgeArray Bipartite::InEdges(dgl_type_t etype, dgl_id_t vid) const {
+EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
   const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid);
   return {ret.dst, ret.src, ret.id};
 }
 
-EdgeArray Bipartite::InEdges(dgl_type_t etype, IdArray vids) const {
+EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
   const EdgeArray& ret = GetInCSR()->OutEdges(etype, vids);
   return {ret.dst, ret.src, ret.id};
 }
 
-EdgeArray Bipartite::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
+EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
   return GetOutCSR()->OutEdges(etype, vid);
 }
 
-EdgeArray Bipartite::OutEdges(dgl_type_t etype, IdArray vids) const {
+EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
   return GetOutCSR()->OutEdges(etype, vids);
 }
 
-EdgeArray Bipartite::Edges(dgl_type_t etype, const std::string &order) const {
+EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
   if (order.empty()) {
     // arbitrary order
     if (in_csr_) {
@@ -701,39 +739,39 @@ EdgeArray Bipartite::Edges(dgl_type_t etype, const std::string &order) const {
   return {};
 }
 
-uint64_t Bipartite::InDegree(dgl_type_t etype, dgl_id_t vid) const {
+uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
   return GetInCSR()->OutDegree(etype, vid);
 }
 
-DegreeArray Bipartite::InDegrees(dgl_type_t etype, IdArray vids) const {
+DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
   return GetInCSR()->OutDegrees(etype, vids);
 }
 
-uint64_t Bipartite::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
+uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
   return GetOutCSR()->OutDegree(etype, vid);
 }
 
-DegreeArray Bipartite::OutDegrees(dgl_type_t etype, IdArray vids) const {
+DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
   return GetOutCSR()->OutDegrees(etype, vids);
 }
 
-DGLIdIters Bipartite::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
+DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
   return GetOutCSR()->SuccVec(etype, vid);
 }
 
-DGLIdIters Bipartite::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
+DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
   return GetOutCSR()->OutEdgeVec(etype, vid);
 }
 
-DGLIdIters Bipartite::PredVec(dgl_type_t etype, dgl_id_t vid) const {
+DGLIdIters UnitGraph::PredVec(dgl_type_t etype, dgl_id_t vid) const {
   return GetInCSR()->SuccVec(etype, vid);
 }
 
-DGLIdIters Bipartite::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
+DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
   return GetInCSR()->OutEdgeVec(etype, vid);
 }
 
-std::vector<IdArray> Bipartite::GetAdj(
+std::vector<IdArray> UnitGraph::GetAdj(
     dgl_type_t etype, bool transpose, const std::string &fmt) const {
   // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
   //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
@@ -753,43 +791,50 @@ std::vector<IdArray> Bipartite::GetAdj(
   }
 }
 
-HeteroSubgraph Bipartite::VertexSubgraph(const std::vector<IdArray>& vids) const {
+HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
   // We prefer to generate a subgraph from out-csr.
   auto sg = GetOutCSR()->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new Bipartite(nullptr, subcsr, nullptr));
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
 }
 
-HeteroSubgraph Bipartite::EdgeSubgraph(
+HeteroSubgraph UnitGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
   auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new Bipartite(nullptr, nullptr, subcoo));
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
 }
 
-HeteroGraphPtr Bipartite::CreateFromCOO(
-    int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col) {
-  COOPtr coo(new COO(num_src, num_dst, row, col));
-  return HeteroGraphPtr(new Bipartite(nullptr, nullptr, coo));
+HeteroGraphPtr UnitGraph::CreateFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(num_src, num_dst);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  COOPtr coo(new COO(mg, num_src, num_dst, row, col));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo));
 }
 
-HeteroGraphPtr Bipartite::CreateFromCSR(
-    int64_t num_src, int64_t num_dst,
+HeteroGraphPtr UnitGraph::CreateFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids) {
-  CSRPtr csr(new CSR(num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new Bipartite(nullptr, csr, nullptr));
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(num_src, num_dst);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr));
 }
 
-HeteroGraphPtr Bipartite::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
+HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   if (g->NumBits() == bits) {
     return g;
   } else {
@@ -797,15 +842,15 @@ HeteroGraphPtr Bipartite::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     //   we make sure that this graph (on CPU) has materialized CSR,
     //   and then copy them to other context (usually GPU). This should
     //   be fixed later.
-    auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
     CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
     CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
-    return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
+    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
   }
 }
 
-HeteroGraphPtr Bipartite::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   if (ctx == g->Context()) {
     return g;
   }
@@ -813,78 +858,79 @@ HeteroGraphPtr Bipartite::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   //   we make sure that this graph (on CPU) has materialized CSR,
   //   and then copy them to other context (usually GPU). This should
   //   be fixed later.
-  auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+  auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
   CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
+  return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
 }
 
-Bipartite::Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
-  : BaseHeteroGraph(kBipartiteMetaGraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
+  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
-Bipartite::CSRPtr Bipartite::GetInCSR() const {
+UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   if (!in_csr_) {
     if (out_csr_) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      const_cast<Bipartite*>(this)->in_csr_ = std::make_shared<CSR>(newadj);
+      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& adj = coo_->adj();
       const auto& newadj = aten::COOToCSR(
           aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
-      const_cast<Bipartite*>(this)->in_csr_ = std::make_shared<CSR>(newadj);
+      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return in_csr_;
 }
 
 /* !\brief Return out csr. If not exist, transpose the other one.*/
-Bipartite::CSRPtr Bipartite::GetOutCSR() const {
+UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRTranspose(in_csr_->adj());
-      const_cast<Bipartite*>(this)->out_csr_ = std::make_shared<CSR>(newadj);
+      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& newadj = aten::COOToCSR(coo_->adj());
-      const_cast<Bipartite*>(this)->out_csr_ = std::make_shared<CSR>(newadj);
+      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return out_csr_;
 }
 
 /* !\brief Return coo. If not exist, create from csr.*/
-Bipartite::COOPtr Bipartite::GetCOO() const {
+UnitGraph::COOPtr UnitGraph::GetCOO() const {
   if (!coo_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
-      const_cast<Bipartite*>(this)->coo_ = std::make_shared<COO>(
+      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(
+          meta_graph(),
           aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
     } else {
       CHECK(out_csr_) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
-      const_cast<Bipartite*>(this)->coo_ = std::make_shared<COO>(newadj);
+      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
     }
   }
   return coo_;
 }
 
-aten::CSRMatrix Bipartite::GetInCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetInCSRMatrix() const {
   return GetInCSR()->adj();
 }
 
-aten::CSRMatrix Bipartite::GetOutCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetOutCSRMatrix() const {
   return GetOutCSR()->adj();
 }
 
-aten::COOMatrix Bipartite::GetCOOMatrix() const {
+aten::COOMatrix UnitGraph::GetCOOMatrix() const {
   return GetCOO()->adj();
 }
 
-HeteroGraphPtr Bipartite::GetAny() const {
+HeteroGraphPtr UnitGraph::GetAny() const {
   if (in_csr_) {
     return in_csr_;
   } else if (out_csr_) {
