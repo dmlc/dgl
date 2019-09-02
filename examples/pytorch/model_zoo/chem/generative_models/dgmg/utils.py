@@ -578,6 +578,7 @@ def preprocess_dataset(atom_types, bond_types, smiles, max_num_atoms=23):
         mol = smiles_to_standard_mol(raw_s)
         if mol is None:
             continue
+        standard_s = Chem.MolToSmiles(mol)
 
         if (max_num_atoms is not None) and (mol.GetNumAtoms() > max_num_atoms):
             continue
@@ -586,10 +587,10 @@ def preprocess_dataset(atom_types, bond_types, smiles, max_num_atoms=23):
         canonical_mol = Chem.MolFromSmiles(canonical_s)
         random_mol = Chem.MolFromSmiles(random_s)
 
-        if (raw_s != canonical_s) or (canonical_s != random_s) or (canonical_mol is None) or (random_mol is None):
+        if (standard_s != canonical_s) or (canonical_s != random_s) or (canonical_mol is None) or (random_mol is None):
             continue
 
-        valid_smiles.append(Chem.MolToSmiles(mol))
+        valid_smiles.append(standard_s)
 
     valid_smiles = list(set(valid_smiles))
     return valid_smiles
