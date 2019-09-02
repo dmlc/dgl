@@ -8,6 +8,7 @@ from .base import ALL, is_all, DGLError
 from . import backend as F
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
+EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class NodeView(object):
     """A NodeView class to act as G.nodes for a DGLGraph.
@@ -74,8 +75,6 @@ class NodeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_n_repr(self._nodes)
         return repr({key : data[key] for key in self._graph._node_frame})
-
-EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class EdgeView(object):
     """A EdgeView class to act as G.edges for a DGLGraph.
@@ -250,46 +249,30 @@ class HeteroNodeView(object):
     def __init__(self, graph):
         self._graph = graph
 
-    def __getitem__(self, ntype):
-        return HeteroNodeTypeView(self._graph, ntype)
-
-class HeteroNodeTypeView(object):
-    """A NodeView class to act as G.nodes[ntype] for a DGLHeteroGraph.
-
-    See Also
-    --------
-    dgl.DGLGraph.nodes
-    """
-    __slots__ = ['_graph', '_ntype']
-
-    def __init__(self, graph, ntype):
-        self._graph = graph
-        self._ntype = ntype
-
-    def __len__(self):
-        return self._graph.number_of_nodes(self._graph._ntypes_invmap[self._ntype])
-
-    def __getitem__(self, nodes):
-        if isinstance(nodes, slice):
+    def __getitem__(self, key):
+        if isinstance(key, slice):
             # slice
-            if not (nodes.start is None and nodes.stop is None
-                    and nodes.step is None):
+            if not (key.start is None and key.stop is None
+                    and key.step is None):
                 raise DGLError('Currently only full slice ":" is supported')
-            return NodeSpace(data=HeteroNodeTypeDataView(self._graph, self._ntype, ALL))
+            nodes = ALL
+            ntype = None
+        elif isinstance(key, tuple):
+            nodes, ntype = key
+        elif isinstance(key, str):
+            nodes = ALL
+            ntype = key
         else:
-            return NodeSpace(data=HeteroNodeTypeDataView(self._graph, self._ntype, nodes))
+            nodes = key
+            ntype = None
+        return NodeSpace(data=HeteroNodeDataView(self._graph, ntype, nodes))
 
-    def __call__(self):
+    def __call__(self, ntype=None):
         """Return the nodes."""
-        return F.arange(0, len(self))
+        return F.arange(0, self._graph.number_of_nodes(ntype))
 
-class HeteroNodeTypeDataView(MutableMapping):
-    """The data view class when G.nodes[ntype][...].data is called.
-
-    See Also
-    --------
-    dgl.DGLGraph.nodes
-    """
+class HeteroNodeDataView(MutableMapping):
+    """The data view class when G.ndata[ntype] is called."""
     __slots__ = ['_graph', '_ntype', '_nodes']
 
     def __init__(self, graph, ntype, nodes):
@@ -298,63 +281,24 @@ class HeteroNodeTypeDataView(MutableMapping):
         self._nodes = nodes
 
     def __getitem__(self, key):
-        return self._graph.get_n_repr(self._ntype, self._nodes)[key]
+        return self._graph._get_n_repr(self._ntype, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        self._graph.set_n_repr(self._ntype, {key : val}, self._nodes)
+        self._graph._set_n_repr(self._ntype, self._nodes, {key : val})
 
     def __delitem__(self, key):
-        raise DGLError('Delete feature data is not supported on only a subset'
-                       ' of nodes. Please use `del G.ndata[key]` instead.')
+        self._graph._pop_n_repr(self._ntype, key)
 
     def __len__(self):
-        return len(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
+        return len(self._graph._node_frames[self._graph.get_ntype_id(self._ntype)])
 
     def __iter__(self):
-        return iter(self._graph.get_n_repr(self._ntype, self._nodes))
+        return iter(self._graph._node_frames[self._graph.get_ntype_id(self._ntype)])
 
     def __repr__(self):
-        data = self._graph.get_n_repr(self._ntype, self._nodes)
+        data = self._graph._get_n_repr(self._ntype, self._nodes)
         return repr({key : data[key]
-                     for key in self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]]})
-
-class HeteroNodeDataView(object):
-    """The data view class when G.ndata is called."""
-    __slots__ = ['_graph']
-
-    def __init__(self, graph):
-        self._graph = graph
-
-    def __getitem__(self, key):
-        return HeteroNodeDataTypeView(self._graph, key)
-
-class HeteroNodeDataTypeView(MutableMapping):
-    """The data view class when G.ndata[ntype] is called."""
-    __slots__ = ['_graph', '_ntype']
-
-    def __init__(self, graph, ntype):
-        self._graph = graph
-        self._ntype = ntype
-
-    def __getitem__(self, key):
-        return self._graph.get_n_repr(self._ntype)[key]
-
-    def __setitem__(self, key, val):
-        self._graph.set_n_repr(self._ntype, {key : val})
-
-    def __delitem__(self, key):
-        self._graph.pop_n_repr(self._ntype, key)
-
-    def __len__(self):
-        return len(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
-
-    def __iter__(self):
-        return iter(self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]])
-
-    def __repr__(self):
-        data = self._graph.get_n_repr(self._ntype)
-        return repr({key : data[key]
-                     for key in self._graph._node_frames[self._graph._ntypes_invmap[self._ntype]]})
+                     for key in self._graph._node_frames[self._graph.get_ntype_id(self._ntype)]})
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -363,46 +307,35 @@ class HeteroEdgeView(object):
     def __init__(self, graph):
         self._graph = graph
 
-    def __getitem__(self, etype):
-        return HeteroEdgeTypeView(self._graph, etype)
-
-class HeteroEdgeTypeView(object):
-    """A EdgeView class to act as G.edges[etype] for a DGLHeteroGraph.
-
-    See Also
-    --------
-    dgl.DGLGraph.edges
-    """
-    __slots__ = ['_graph', '_etype']
-
-    def __init__(self, graph, etype):
-        self._graph = graph
-        self._etype = etype
-
-    def __len__(self):
-        return self._graph.number_of_edges(self._graph._etypes_invmap[self._etype])
-
-    def __getitem__(self, edges):
-        if isinstance(edges, slice):
+    def __getitem__(self, key):
+        if isinstance(key, slice):
             # slice
-            if not (edges.start is None and edges.stop is None
-                    and edges.step is None):
+            if not (key.start is None and key.stop is None
+                    and key.step is None):
                 raise DGLError('Currently only full slice ":" is supported')
-            return EdgeSpace(data=HeteroEdgeTypeDataView(self._graph, self._etype, ALL))
+            edges = ALL
+            etype = None
+        elif isinstance(key, tuple):
+            if len(key) == 3:
+                edges = ALL
+                etype = key
+            else:
+                edges = key
+                etype = None
+        elif isinstance(key, (str, tuple)):
+            edges = ALL
+            etype = key
         else:
-            return EdgeSpace(data=HeteroEdgeTypeDataView(self._graph, self._etype, edges))
+            edges = key
+            etype = None
+        return EdgeSpace(data=HeteroEdgeDataView(self._graph, etype, edges))
 
-    def __call__(self):
-        """Return the edges."""
-        return F.arange(0, len(self))
+    def __call__(self, *args, **kwargs):
+        """Return all the edges."""
+        return self._graph.all_edges(*args, **kwargs)
 
-class HeteroEdgeTypeDataView(MutableMapping):
-    """The data view class when G.edges[etype][...].data is called.
-
-    See Also
-    --------
-    dgl.DGLGraph.edges
-    """
+class HeteroEdgeDataView(MutableMapping):
+    """The data view class when G.ndata[etype] is called."""
     __slots__ = ['_graph', '_etype', '_edges']
 
     def __init__(self, graph, etype, edges):
@@ -411,60 +344,21 @@ class HeteroEdgeTypeDataView(MutableMapping):
         self._edges = edges
 
     def __getitem__(self, key):
-        return self._graph.get_e_repr(self._etype, self._edges)[key]
+        return self._graph._get_e_repr(self._etype, self._edges)[key]
 
     def __setitem__(self, key, val):
-        self._graph.set_e_repr(self._etype, {key : val}, self._edges)
+        self._graph._set_e_repr(self._etype, self._edges, {key : val})
 
     def __delitem__(self, key):
-        raise DGLError('Delete feature data is not supported on only a subset'
-                       ' of edges. Please use `del G.edata[key]` instead.')
+        self._graph._pop_e_repr(self._etype, key)
 
     def __len__(self):
-        return len(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
+        return len(self._graph._edge_frames[self._graph.get_etype_id(self._etype)])
 
     def __iter__(self):
-        return iter(self._graph.get_e_repr(self._etype, self._edges))
+        return iter(self._graph._edge_frames[self._graph.get_etype_id(self._etype)])
 
     def __repr__(self):
-        data = self._graph.get_e_repr(self._etype, self._edges)
+        data = self._graph._get_e_repr(self._etype, self._edges)
         return repr({key : data[key]
-                     for key in self._graph._edge_frames[self._graph._etypes_invmap[self._etype]]})
-
-class HeteroEdgeDataView(object):
-    """The data view class when G.edata is called."""
-    __slots__ = ['_graph']
-
-    def __init__(self, graph):
-        self._graph = graph
-
-    def __getitem__(self, key):
-        return HeteroEdgeDataTypeView(self._graph, key)
-
-class HeteroEdgeDataTypeView(MutableMapping):
-    """The data view class when G.edata[etype] is called."""
-    __slots__ = ['_graph', '_etype']
-
-    def __init__(self, graph, etype):
-        self._graph = graph
-        self._etype = etype
-
-    def __getitem__(self, key):
-        return self._graph.get_e_repr(self._etype)[key]
-
-    def __setitem__(self, key, val):
-        self._graph.set_e_repr(self._etype, {key : val})
-
-    def __delitem__(self, key):
-        self._graph.pop_e_repr(self._etype, key)
-
-    def __len__(self):
-        return len(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
-
-    def __iter__(self):
-        return iter(self._graph._edge_frames[self._graph._etypes_invmap[self._etype]])
-
-    def __repr__(self):
-        data = self._graph.get_e_repr(self._etype)
-        return repr({key : data[key]
-                     for key in self._graph._edge_frames[self._graph._etypes_invmap[self._etype]]})
+                     for key in self._graph._edge_frames[self._graph.get_etype_id(self._etype)]})

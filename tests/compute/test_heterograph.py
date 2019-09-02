@@ -18,13 +18,6 @@ def create_test_heterograph():
     #    ('developer', 'game', 'develops')])
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    #g = dgl.DGLHeteroGraph((mg, {
-    #    ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-    #    ('user', 'plays', 'game'): plays_spmat,
-    #    ('user', 'wishes', 'game'): [(0, 1), (2, 0)],
-    #    ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-    #    }))
-
     follows_g = dgl.from_edge_list2(
         [(0, 1), (1, 2)], 'user', 'follows', 'user')
     plays_g = dgl.from_scipy2(
@@ -46,7 +39,6 @@ def test_query():
         ('user', 'wishes', 'game'),
         ('developer', 'develops', 'game')]
     etypes = ['follows', 'plays', 'wishes', 'develops']
-    
 
     # node & edge types
     assert set(ntypes) == set(g.ntypes)
@@ -153,6 +145,7 @@ def test_query():
         'wishes': ([0, 2], [1, 0]),
         'develops': ([0, 1], [0, 1]),
     }
+    # edges that does not exist in the graph
     negative_edges = {
         'follows': ([0, 1], [0, 1]),
         'plays': ([0, 2], [1, 0]),
@@ -161,13 +154,14 @@ def test_query():
     }
     _test()
 
+    etypes = canonical_etypes
     edges = {
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
         ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
         ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
     }
-     edges that does not exist in the graph
+    # edges that does not exist in the graph
     negative_edges = {
         ('user', 'follows', 'user'): ([0, 1], [0, 1]),
         ('user', 'plays', 'game'): ([0, 2], [1, 0]),
@@ -176,20 +170,146 @@ def test_query():
         }
     _test()
     
-def test_frame():
+def test_view():
+    # test data view
     g = create_test_heterograph()
 
     f1 = F.randn((3, 6))
-    g.ndata['user']['h'] = f1       # ok
-    f2 = g.ndata['user']['h']
+    g.nodes['user'].data['h'] = f1       # ok
+    f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(g.nodes['user'][0].data['h'], f1[0:1])
+    assert F.array_equal(g.nodes('user'), F.arange(0, 3))
 
     f3 = F.randn((2, 4))
-    g.edata['user', 'follows', 'user']['h'] = f3
-    f4 = g.edata['user', 'follows', 'user']['h']
+    g.edges['user', 'follows', 'user'].data['h'] = f3
+    f4 = g.edges['user', 'follows', 'user'].data['h']
+    f5 = g.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
-    assert F.array_equal(g.edges['user', 'follows', 'user'][0].data['h'], f3[0:1])
+    assert F.array_equal(f3, f5)
+    assert F.array_equal(g.edges('follows', form='eid'), F.arange(0, 2))
+
+def test_view1():
+    # test relation view
+    HG = create_test_heterograph()
+    ntypes = ['user', 'game', 'developer']
+    canonical_etypes = [
+        ('user', 'follows', 'user'),
+        ('user', 'plays', 'game'),
+        ('user', 'wishes', 'game'),
+        ('developer', 'develops', 'game')]
+    etypes = ['follows', 'plays', 'wishes', 'develops']
+
+    def _test_query():
+        for etype in etypes:
+            utype, _, vtype = HG.to_canonical_etype(etype)
+            g = HG[etype]
+            srcs, dsts = edges[etype]
+            for src, dst in zip(srcs, dsts):
+                assert g.has_edge_between(src, dst)
+            assert F.asnumpy(g.has_edges_between(srcs, dsts)).all()
+
+            srcs, dsts = negative_edges[etype]
+            for src, dst in zip(srcs, dsts):
+                assert not g.has_edge_between(src, dst)
+            assert not F.asnumpy(g.has_edges_between(srcs, dsts)).any()
+
+            srcs, dsts = edges[etype]
+            n_edges = len(srcs)
+
+            # predecessors & in_edges & in_degree
+            pred = [s for s, d in zip(srcs, dsts) if d == 0]
+            assert set(F.asnumpy(g.predecessors(0)).tolist()) == set(pred)
+            u, v = g.in_edges([0])
+            assert F.asnumpy(v).tolist() == [0] * len(pred)
+            assert set(F.asnumpy(u).tolist()) == set(pred)
+            assert g.in_degree(0) == len(pred)
+
+            # successors & out_edges & out_degree
+            succ = [d for s, d in zip(srcs, dsts) if s == 0]
+            assert set(F.asnumpy(g.successors(0)).tolist()) == set(succ)
+            u, v = g.out_edges([0])
+            assert F.asnumpy(u).tolist() == [0] * len(succ)
+            assert set(F.asnumpy(v).tolist()) == set(succ)
+            assert g.out_degree(0) == len(succ)
+
+            # edge_id & edge_ids
+            for i, (src, dst) in enumerate(zip(srcs, dsts)):
+                assert g.edge_id(src, dst) == i
+                assert F.asnumpy(g.edge_id(src, dst, force_multi=True)).tolist() == [i]
+            assert F.asnumpy(g.edge_ids(srcs, dsts)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_ids(srcs, dsts, force_multi=True)
+            assert F.asnumpy(u).tolist() == srcs
+            assert F.asnumpy(v).tolist() == dsts
+            assert F.asnumpy(e).tolist() == list(range(n_edges))
+
+            # find_edges
+            u, v = g.find_edges(list(range(n_edges)))
+            assert F.asnumpy(u).tolist() == srcs
+            assert F.asnumpy(v).tolist() == dsts
+
+            # all_edges.
+            for order in ['eid']:
+                u, v, e = g.all_edges(form='all', order=order)
+                assert F.asnumpy(u).tolist() == srcs
+                assert F.asnumpy(v).tolist() == dsts
+                assert F.asnumpy(e).tolist() == list(range(n_edges))
+
+            # in_degrees & out_degrees
+            in_degrees = F.asnumpy(g.in_degrees())
+            out_degrees = F.asnumpy(g.out_degrees())
+            src_count = Counter(srcs)
+            dst_count = Counter(dsts)
+            for i in range(g.number_of_nodes(utype)):
+                assert out_degrees[i] == src_count[i]
+            for i in range(g.number_of_nodes(vtype)):
+                assert in_degrees[i] == dst_count[i]   
+
+    edges = {
+        'follows': ([0, 1], [1, 2]),
+        'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+        'wishes': ([0, 2], [1, 0]),
+        'develops': ([0, 1], [0, 1]),
+    }
+    # edges that does not exist in the graph
+    negative_edges = {
+        'follows': ([0, 1], [0, 1]),
+        'plays': ([0, 2], [1, 0]),
+        'wishes': ([0, 1], [0, 1]),
+        'develops': ([0, 1], [1, 0]),
+    }
+    _test_query()
+    etypes = canonical_etypes
+    edges = {
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
+    }
+    # edges that does not exist in the graph
+    negative_edges = {
+        ('user', 'follows', 'user'): ([0, 1], [0, 1]),
+        ('user', 'plays', 'game'): ([0, 2], [1, 0]),
+        ('user', 'wishes', 'game'): ([0, 1], [0, 1]),
+        ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
+        }
+    _test_query()
+
+    # test only one node type
+    g = HG['follows']
+    assert g.number_of_nodes() == 3
+
+    # test ndata and edata
+    f1 = F.randn((3, 6))
+    g.ndata['h'] = f1       # ok
+    f2 = g.ndata['h']
+    assert F.array_equal(f1, f2)
+    assert F.array_equal(g.nodes(), F.arange(0, 3))
+
+    f3 = F.randn((2, 4))
+    g.edata['h'] = f3
+    f4 = g.edata['h']
+    assert F.array_equal(f3, f4)
+    assert F.array_equal(g.edges(form='eid'), F.arange(0, 2))
 
 def test_apply():
     def node_udf(nodes):
@@ -255,6 +375,7 @@ def test_updates():
 
 if __name__ == '__main__':
     test_query()
-    #test_frame()
+    test_view()
+    test_view1()
     #test_apply()
     #test_updates()

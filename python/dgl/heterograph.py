@@ -176,15 +176,13 @@ class DGLHeteroGraph(object):
             node_frames = [
                 FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
                 for i in range(len(self._ntypes))]
-        else:
-            self._node_frames = node_frames
+        self._node_frames = node_frames
 
         if edge_frames is None:
-            self._edge_frames = [
+            edge_frames = [
                 FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
                 for i in range(len(self._etypes))]
-        else:
-            self._edge_frames = edge_frames
+        self._edge_frames = edge_frames
 
         # message indicators
         self._msg_indices = [None] * len(self._etypes)
@@ -419,7 +417,7 @@ class DGLHeteroGraph(object):
         To set features of games in a heterogeneous graph:
         >>> g.ndata['game']['h'] = torch.zeros(2, 5)
         """
-        return HeteroNodeDataView(self)
+        return HeteroNodeDataView(self, None, ALL)
 
     @property
     def edges(self):
@@ -442,7 +440,7 @@ class DGLHeteroGraph(object):
         --------
         >>> g.edata['developer', 'develops', 'game']['h'] = torch.zeros(2, 5)
         """
-        return HeteroEdgeDataView(self)
+        return HeteroEdgeDataView(self, None, ALL)
 
     def __getitem__(self, key):
         """Return the relation view of this graph.
@@ -1210,7 +1208,7 @@ class DGLHeteroGraph(object):
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
-    def _set_n_repr(self, ntype, data, u, inplace=False):
+    def _set_n_repr(self, ntype, u, data, inplace=False):
         """Internal API to set node features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1225,10 +1223,10 @@ class DGLHeteroGraph(object):
         ----------
         ntype : str
             The node type
-        data : dict of tensor
-            Node representation.
         u : node, container or tensor
             The node(s).
+        data : dict of tensor
+            Node representation.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
             (Default: False)
@@ -1295,7 +1293,7 @@ class DGLHeteroGraph(object):
         ntid = self.get_ntype_id(ntype)
         return self._node_frames[ntid].pop(key)
 
-    def _set_e_repr(self, etype, data, edges, inplace=False):
+    def _set_e_repr(self, etype, edges, data, inplace=False):
         """Internal API to set edge(s) features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1309,8 +1307,6 @@ class DGLHeteroGraph(object):
         ----------
         etype : (str, str, str)
             The source-edge-destination type triplet
-        data : tensor or dict of tensor
-            Edge representation.
         edges : edges
             Edges can be either
 
@@ -1319,6 +1315,8 @@ class DGLHeteroGraph(object):
             * A tensor of edge ids of the given type.
 
             The default value is all the edges.
+        data : tensor or dict of tensor
+            Edge representation.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
             (Default: False)

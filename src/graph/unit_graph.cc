@@ -633,7 +633,14 @@ bool UnitGraph::IsMultigraph() const {
 }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
-  return GetAny()->NumVertices(vtype);
+  if (in_csr_) {
+    vtype = (vtype == SrcType()) ? DstType() : SrcType();
+    return in_csr_->NumVertices(vtype);
+  } else if (out_csr_) {
+    return out_csr_->NumVertices(vtype);
+  } else {
+    return GetCOO()->NumVertices(vtype);
+  }
 }
 
 uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
@@ -641,7 +648,14 @@ uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
 }
 
 bool UnitGraph::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
-  return GetAny()->HasVertex(vtype, vid);
+  if (in_csr_) {
+    vtype = (vtype == SrcType()) ? DstType() : SrcType();
+    return in_csr_->HasVertex(vtype, vid);
+  } else if (out_csr_) {
+    return out_csr_->HasVertex(vtype, vid);
+  } else {
+    return GetCOO()->HasVertex(vtype, vid);
+  }
 }
 
 BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
