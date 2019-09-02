@@ -46,31 +46,7 @@ def test_query():
         ('user', 'wishes', 'game'),
         ('developer', 'develops', 'game')]
     etypes = ['follows', 'plays', 'wishes', 'develops']
-    #edges = {
-    #    ('user', 'follows', 'user'): ([0, 1], [1, 2]),
-    #    ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-    #    ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
-    #    ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
-    #}
-    edges = {
-        'follows': ([0, 1], [1, 2]),
-        'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
-        'wishes': ([0, 2], [1, 0]),
-        'develops': ([0, 1], [0, 1]),
-    }
-    # edges that does not exist in the graph
-    #negative_edges = {
-    #    ('user', 'follows', 'user'): ([0, 1], [0, 1]),
-    #    ('user', 'plays', 'game'): ([0, 2], [1, 0]),
-    #    ('user', 'wishes', 'game'): ([0, 1], [0, 1]),
-    #    ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
-    #    }
-    negative_edges = {
-        'follows': ([0, 1], [0, 1]),
-        'plays': ([0, 2], [1, 0]),
-        'wishes': ([0, 1], [0, 1]),
-        'develops': ([0, 1], [1, 0]),
-    }
+    
 
     # node & edge types
     assert set(ntypes) == set(g.ntypes)
@@ -107,69 +83,99 @@ def test_query():
         assert np.array_equal(
             F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
 
-    for etype in etypes:
-        srcs, dsts = edges[etype]
-        for src, dst in zip(srcs, dsts):
-            assert g.has_edge_between(src, dst, etype)
-        assert F.asnumpy(g.has_edges_between(srcs, dsts, etype)).all()
+    def _test():
+        for etype in etypes:
+            srcs, dsts = edges[etype]
+            for src, dst in zip(srcs, dsts):
+                assert g.has_edge_between(src, dst, etype)
+            assert F.asnumpy(g.has_edges_between(srcs, dsts, etype)).all()
 
-        srcs, dsts = negative_edges[etype]
-        for src, dst in zip(srcs, dsts):
-            assert not g.has_edge_between(src, dst, etype)
-        assert not F.asnumpy(g.has_edges_between(srcs, dsts, etype)).any()
+            srcs, dsts = negative_edges[etype]
+            for src, dst in zip(srcs, dsts):
+                assert not g.has_edge_between(src, dst, etype)
+            assert not F.asnumpy(g.has_edges_between(srcs, dsts, etype)).any()
 
-        srcs, dsts = edges[etype]
-        n_edges = len(srcs)
+            srcs, dsts = edges[etype]
+            n_edges = len(srcs)
 
-        # predecessors & in_edges & in_degree
-        pred = [s for s, d in zip(srcs, dsts) if d == 0]
-        assert set(F.asnumpy(g.predecessors(0, etype)).tolist()) == set(pred)
-        u, v = g.in_edges([0], etype)
-        assert F.asnumpy(v).tolist() == [0] * len(pred)
-        assert set(F.asnumpy(u).tolist()) == set(pred)
-        assert g.in_degree(0, etype) == len(pred)
+            # predecessors & in_edges & in_degree
+            pred = [s for s, d in zip(srcs, dsts) if d == 0]
+            assert set(F.asnumpy(g.predecessors(0, etype)).tolist()) == set(pred)
+            u, v = g.in_edges([0], etype)
+            assert F.asnumpy(v).tolist() == [0] * len(pred)
+            assert set(F.asnumpy(u).tolist()) == set(pred)
+            assert g.in_degree(0, etype) == len(pred)
 
-        # successors & out_edges & out_degree
-        succ = [d for s, d in zip(srcs, dsts) if s == 0]
-        assert set(F.asnumpy(g.successors(0, etype)).tolist()) == set(succ)
-        u, v = g.out_edges([0], etype)
-        assert F.asnumpy(u).tolist() == [0] * len(succ)
-        assert set(F.asnumpy(v).tolist()) == set(succ)
-        assert g.out_degree(0, etype) == len(succ)
+            # successors & out_edges & out_degree
+            succ = [d for s, d in zip(srcs, dsts) if s == 0]
+            assert set(F.asnumpy(g.successors(0, etype)).tolist()) == set(succ)
+            u, v = g.out_edges([0], etype)
+            assert F.asnumpy(u).tolist() == [0] * len(succ)
+            assert set(F.asnumpy(v).tolist()) == set(succ)
+            assert g.out_degree(0, etype) == len(succ)
 
-        # edge_id & edge_ids
-        for i, (src, dst) in enumerate(zip(srcs, dsts)):
-            assert g.edge_id(src, dst, etype) == i
-            assert F.asnumpy(g.edge_id(src, dst, etype, force_multi=True)).tolist() == [i]
-        assert F.asnumpy(g.edge_ids(srcs, dsts, etype)).tolist() == list(range(n_edges))
-        u, v, e = g.edge_ids(srcs, dsts, etype, force_multi=True)
-        assert F.asnumpy(u).tolist() == srcs
-        assert F.asnumpy(v).tolist() == dsts
-        assert F.asnumpy(e).tolist() == list(range(n_edges))
-
-        # find_edges
-        u, v = g.find_edges(list(range(n_edges)), etype)
-        assert F.asnumpy(u).tolist() == srcs
-        assert F.asnumpy(v).tolist() == dsts
-
-        # all_edges.
-        for order in ['eid']:
-            u, v, e = g.all_edges(etype, 'all', order)
+            # edge_id & edge_ids
+            for i, (src, dst) in enumerate(zip(srcs, dsts)):
+                assert g.edge_id(src, dst, etype) == i
+                assert F.asnumpy(g.edge_id(src, dst, etype, force_multi=True)).tolist() == [i]
+            assert F.asnumpy(g.edge_ids(srcs, dsts, etype)).tolist() == list(range(n_edges))
+            u, v, e = g.edge_ids(srcs, dsts, etype, force_multi=True)
             assert F.asnumpy(u).tolist() == srcs
             assert F.asnumpy(v).tolist() == dsts
             assert F.asnumpy(e).tolist() == list(range(n_edges))
 
-        # in_degrees & out_degrees
-        in_degrees = F.asnumpy(g.in_degrees(etype=etype))
-        out_degrees = F.asnumpy(g.out_degrees(etype=etype))
-        src_count = Counter(srcs)
-        dst_count = Counter(dsts)
-        utype, _, vtype = g.to_canonical_etype(etype)
-        for i in range(g.number_of_nodes(utype)):
-            assert out_degrees[i] == src_count[i]
-        for i in range(g.number_of_nodes(vtype)):
-            assert in_degrees[i] == dst_count[i]
+            # find_edges
+            u, v = g.find_edges(list(range(n_edges)), etype)
+            assert F.asnumpy(u).tolist() == srcs
+            assert F.asnumpy(v).tolist() == dsts
 
+            # all_edges.
+            for order in ['eid']:
+                u, v, e = g.all_edges(etype, 'all', order)
+                assert F.asnumpy(u).tolist() == srcs
+                assert F.asnumpy(v).tolist() == dsts
+                assert F.asnumpy(e).tolist() == list(range(n_edges))
+
+            # in_degrees & out_degrees
+            in_degrees = F.asnumpy(g.in_degrees(etype=etype))
+            out_degrees = F.asnumpy(g.out_degrees(etype=etype))
+            src_count = Counter(srcs)
+            dst_count = Counter(dsts)
+            utype, _, vtype = g.to_canonical_etype(etype)
+            for i in range(g.number_of_nodes(utype)):
+                assert out_degrees[i] == src_count[i]
+            for i in range(g.number_of_nodes(vtype)):
+                assert in_degrees[i] == dst_count[i]
+
+    edges = {
+        'follows': ([0, 1], [1, 2]),
+        'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+        'wishes': ([0, 2], [1, 0]),
+        'develops': ([0, 1], [0, 1]),
+    }
+    negative_edges = {
+        'follows': ([0, 1], [0, 1]),
+        'plays': ([0, 2], [1, 0]),
+        'wishes': ([0, 1], [0, 1]),
+        'develops': ([0, 1], [1, 0]),
+    }
+    _test()
+
+    edges = {
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1]),
+    }
+     edges that does not exist in the graph
+    negative_edges = {
+        ('user', 'follows', 'user'): ([0, 1], [0, 1]),
+        ('user', 'plays', 'game'): ([0, 2], [1, 0]),
+        ('user', 'wishes', 'game'): ([0, 1], [0, 1]),
+        ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
+        }
+    _test()
+    
 def test_frame():
     g = create_test_heterograph()
 
