@@ -10,24 +10,35 @@ import networkx as nx
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
-    mg = nx.MultiDiGraph([
-        ('user', 'user', 'follows'),
-        ('user', 'game', 'plays'),
-        ('user', 'game', 'wishes'),
-        ('developer', 'game', 'develops')])
+    # 3 users, 2 games, 2 developers
+    #mg = nx.MultiDiGraph([
+    #    ('user', 'user', 'follows'),
+    #    ('user', 'game', 'plays'),
+    #    ('user', 'game', 'wishes'),
+    #    ('developer', 'game', 'develops')])
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    g = dgl.DGLHeteroGraph((mg, {
-        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
-        ('user', 'plays', 'game'): plays_spmat,
-        ('user', 'wishes', 'game'): [(0, 1), (2, 0)],
-        ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
-        }))
+    #g = dgl.DGLHeteroGraph((mg, {
+    #    ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+    #    ('user', 'plays', 'game'): plays_spmat,
+    #    ('user', 'wishes', 'game'): [(0, 1), (2, 0)],
+    #    ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+    #    }))
+
+    follows_g = dgl.from_edge_list2(
+        [(0, 1), (1, 2)], 'user', 'follows', 'user')
+    plays_g = dgl.from_scipy2(
+        plays_spmat, 'user', 'plays', 'game')
+    wishes_g = dgl.from_edge_list2(
+        [(0, 1), (2, 0)], 'user', 'wishes', 'game')
+    develops_g = dgl.from_edge_list2(
+        [(0, 0), (1, 1)], 'developer', 'develops', 'game')
 
     return g
 
 def test_query():
     g = create_test_heterograph()
+    assert False
 
     ntypes = ['user', 'game', 'developer']
     etypes = [
@@ -220,6 +231,6 @@ def test_updates():
 
 if __name__ == '__main__':
     test_query()
-    test_frame()
-    test_apply()
-    test_updates()
+    #test_frame()
+    #test_apply()
+    #test_updates()

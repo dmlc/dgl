@@ -1,16 +1,28 @@
 """Module for converting graph from/to other object."""
 
+import networkx as nx
+from . import heterograph_index
+from .heterograph import DGLHeteroGraph
+from . import graph_index
+from . import utils
+
 __all__ = [
-    'bipartite_from_edges',
-    'bipartite_from_edge_list',
-    'bipartite_from_scipy',
+    'from_edges',
+    'from_edges2',
+    'from_edge_list2',
+    'from_scipy2',
     'hetero_from_relations',
     'hetero_from_homo',
     'hetero_to_homo',
 ]
 
-def bipartite_from_edges(u, v, src_type, edge_type, dst_type, num_src=None, num_dst=None):
-    """Create a bipartite graph given edges in two index arrays.
+def from_edges(u, v, ntype=None, etype=None, nrange=None):
+    """TBD
+    """
+    pass
+
+def from_edges2(u, v, utype, etype, vtype, urange=None, vrange=None):
+    """Create a graph from incident nodes with types.
 
     Examples
     --------
@@ -22,33 +34,37 @@ def bipartite_from_edges(u, v, src_type, edge_type, dst_type, num_src=None, num_
         List of source node IDs.
     v : iterable of int
         List of destination node IDs.
-    src_type : str
+    utype : str
         Source node type name.
-    edge_type : str
+    etype : str
         Edge type name.
-    dst_type : str
+    vtype : str
         Destination node type name.
-    num_src : int, optional
-        The number of nodes of source type. If None, the value is the maximum
+    urange : int, optional
+        The source node ID range. If None, the value is the maximum
         of the source node IDs in the edge list plus 1. (Default: None)
-    num_dst : int, optional
-        The number of nodes of destination type. If None, the value is the
+    vrange : int, optional
+        The destination node ID range. If None, the value is the
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
 
     Returns
     -------
     DGLHeteroGraph
-        A bipartite graph.
     """
-    # TODO
-    num_src = num_src or (max(u) + 1)
-    num_dst = num_dst or (max(v) + 1)
+    urange = urange or (max(u) + 1)
+    vrange = vrange or (max(v) + 1)
+    if utype == vtype:
+        urange = vrange = max(urange, vrange)
     u = utils.toindex(u)
     v = utils.toindex(v)
-    return heterograph_index.create_bipartite_from_coo(num_src, num_dst, u, v)
+    hgidx = heterograph_index.create_bipartite_from_coo(urange, vrange, u, v)
+    if utype == vtype:
+        return DGLHeteroGraph(hgidx, [utype], [etype])
+    else:
+        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
-def bipartite_from_edge_list(elist, src_type, edge_type, dst_type, num_src=None, num_dst=None):
-    """Create a bipartite graph given a list of edge tuples
+def from_edge_list2(elist, utype, etype, vtype, urange=None, vrange=None):
+    """Create a graph from a list of edge tuples with types.
 
     Examples
     --------
@@ -58,40 +74,41 @@ def bipartite_from_edge_list(elist, src_type, edge_type, dst_type, num_src=None,
     ----------
     elist : iterable of int pairs
         List of (src, dst) node ID pairs.
-    src_type : str
+    utype : str
         Source node type name.
-    edge_type : str
+    etype : str
         Edge type name.
-    dst_type : str
+    vtype : str
         Destination node type name.
-    num_src : int, optional
-        The number of nodes of source type. If None, the value is the maximum
+    urange : int, optional
+        The source node ID range. If None, the value is the maximum
         of the source node IDs in the edge list plus 1. (Default: None)
-    num_dst : int, optional
-        The number of nodes of destination type. If None, the value is the
+    vrange : int, optional
+        The destination node ID range. If None, the value is the
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
 
     Returns
     -------
     DGLHeteroGraph
-        A bipartite graph.
     """
-    # TODO
-    pass
+    u, v = zip(*elist)
+    u = list(u)
+    v = list(v)
+    return from_edges2(u, v, utype, etype, vtype, urange, vrange)
 
-def bipartite_from_scipy(spmat, src_type, edge_type, dst_type, with_edge_id=False):
-    """Create a bipartite graph from a scipy sparse matrix.
+def from_scipy2(spmat, utype, etype, vtype, with_edge_id=False):
+    """Create a graph from a scipy sparse matrix with types.
 
     Parameters
     ----------
     spmat : scipy.sparse.spmatrix
         The bipartite graph matrix whose rows represent sources and columns
         represent destinations.
-    src_type : str
+    utype : str
         Source node type name.
-    edge_type : str
+    etype : str
         Edge type name.
-    dst_type : str
+    vtype : str
         Destination node type name.
     with_edge_id : bool
         If True, the entries in the sparse matrix are treated as edge IDs.
@@ -101,102 +118,66 @@ def bipartite_from_scipy(spmat, src_type, edge_type, dst_type, with_edge_id=Fals
     Returns
     -------
     DGLHeteroGraph
-        A bipartite graph.
     """
-    # TODO(handle both csr and coo)
-    spmat = spmat.tocsr()
     num_src, num_dst = spmat.shape
-    indptr = utils.toindex(spmat.indptr)
-    indices = utils.toindex(spmat.indices)
-    data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
-    return heterograph_index.create_bipartite_from_csr(num_src, num_dst, indptr, indices, data)
+    if spmat.getformat() == 'coo':
+        row = utils.toindex(spmat.row)
+        col = utils.toindex(spmat.col)
+        hgidx = heterograph_index.create_bipartite_from_coo(num_src, num_dst, row, col)
+    else:
+        spmat = spmat.tocsr()
+        indptr = utils.toindex(spmat.indptr)
+        indices = utils.toindex(spmat.indices)
+        # TODO(minjie): with_edge_id is only reasonable for csr matrix. How to fix?
+        data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
+        hgidx = heterograph_index.create_bipartite_from_csr(num_src, num_dst, indptr, indices, data)
+    return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
-def hetero_from_relations(meta_graph, rel_graphs):
-    """Create a heterograph from meta-graph and per-relation graphs.
+def graph(data, utype='_N', etype='_E', vtype='_N', card=None):
+    pass
 
-    Examples
-    --------
-    TBD
+def hetero_from_relations(rel_graphs):
+    """Create a heterograph from per-relation graphs.
+
+    TODO(minjie): this API can be generalized as a union operation of
+    the input graphs
+
+    TODO(minjie): handle node/edge data
 
     Parameters
     ----------
-    meta_graph : networkx.MultiDiGraph
-        The meta graph.
-    rel_graphs : dict of graph data
-        The key is the relation name and the value is any graph data that
-        can be converted to a bipartite graph (e.g. edge list, scipy sparse matrix)
+    rel_graphs : list of DGLHeteroGraph
+        Graph for each relation.
 
     Returns
     -------
     DGLHeteroGraph
         A heterograph.
     """
-        if isinstance(graph_data, tuple):
-            metagraph, edges_by_type = graph_data
-            if not isinstance(metagraph, nx.MultiDiGraph):
-                raise TypeError('Metagraph should be networkx.MultiDiGraph')
-
-            # create metagraph graph index
-            srctypes, dsttypes, etypes = [], [], []
-            ntypes = []
-            ntypes_invmap = {}
-            etypes_invmap = {}
-            for srctype, dsttype, etype in metagraph.edges(keys=True):
-                srctypes.append(srctype)
-                dsttypes.append(dsttype)
-                etypes_invmap[(srctype, etype, dsttype)] = len(etypes_invmap)
-                etypes.append((srctype, etype, dsttype))
-
-                if srctype not in ntypes_invmap:
-                    ntypes_invmap[srctype] = len(ntypes_invmap)
-                    ntypes.append(srctype)
-                if dsttype not in ntypes_invmap:
-                    ntypes_invmap[dsttype] = len(ntypes_invmap)
-                    ntypes.append(dsttype)
-
-            srctypes = [ntypes_invmap[srctype] for srctype in srctypes]
-            dsttypes = [ntypes_invmap[dsttype] for dsttype in dsttypes]
-
-            metagraph_index = graph_index.create_graph_index(
-                list(zip(srctypes, dsttypes)), None, True)  # metagraph is always immutable
-
-            # create base bipartites
-            bipartites = []
-            num_nodes = defaultdict(int)
-            # count the number of nodes for each type
-            for etype_triplet in etypes:
-                srctype, etype, dsttype = etype_triplet
-                edges = edges_by_type[etype_triplet]
-                if ssp.issparse(edges):
-                    num_src, num_dst = edges.shape
-                elif isinstance(edges, list):
-                    u, v = zip(*edges)
-                    num_src = max(u) + 1
-                    num_dst = max(v) + 1
-                else:
-                    raise TypeError('unknown edge list type %s' % type(edges))
-                num_nodes[srctype] = max(num_nodes[srctype], num_src)
-                num_nodes[dsttype] = max(num_nodes[dsttype], num_dst)
-            # create actual objects
-            for etype_triplet in etypes:
-                srctype, etype, dsttype = etype_triplet
-                edges = edges_by_type[etype_triplet]
-                if ssp.issparse(edges):
-                    bipartite = bipartite_from_scipy(edges)
-                elif isinstance(edges, list):
-                    u, v = zip(*edges)
-                    bipartite = bipartite_from_edge_list(
-                        u, v, num_nodes[srctype], num_nodes[dsttype])
-                bipartites.append(bipartite)
-
-            hg_index = heterograph_index.create_heterograph(metagraph_index, bipartites)
-
-            super(DGLHeteroGraph, self).__init__(hg_index, ntypes, etypes)
-        else:
-            raise TypeError('Unrecognized graph data type %s' % type(graph_data))
-
-
-    pass
+    # infer meta graph
+    ntype_dict = {}  # ntype -> ntid
+    etype_dict = {}  # etype -> etid
+    meta_edges = []
+    ntypes = []
+    etypes = []
+    for rg in rel_graphs:
+        assert len(rg.etypes) == 1
+        stype, etype, dtype = rg.canonical_etypes[0]
+        if not stype in ntype_dict:
+            ntype_dict[stype] = len(ntypes)
+            ntypes.append(stype)
+        stid = ntype_dict[stype]
+        if not dtype in ntype_dict:
+            ntype_dict[dtype] = len(ntypes)
+            ntypes.append(dtype)
+        dtid = ntype_dict[dtype]
+        meta_edges.append((stid, dtid))
+        etypes.append(etype)
+    metagraph = graph_index.from_edge_list(meta_edges, True, True)
+    # create graph index
+    hgidx = heterograph_index.create_heterograph_from_relations(
+        metagraph, [rg._graph for rg in rel_graphs])
+    return DGLHeteroGraph(hgidx, ntypes, etypes)
 
 def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='type'):
     """Create a heterograph from a DGLGraph.
@@ -256,7 +237,7 @@ def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
     """
     pass
 
-def hetero_from_networkx(
+def from_networkx(
             self,
             nx_graph,
             node_type_attr_name='type',

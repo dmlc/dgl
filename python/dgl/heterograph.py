@@ -13,46 +13,6 @@ from .base import ALL, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph']
 
-# TODO: depending on the progress of unifying DGLGraph and Bipartite, we may or may not
-# need the code of heterogeneous graph views.
-# pylint: disable=unnecessary-pass
-class DGLBaseHeteroGraph(object):
-    """Base Heterogeneous graph class.
-
-    Parameters
-    ----------
-    graph : graph index, optional
-        The graph index
-    ntypes : list[str]
-        The node type names
-    etypes : list[str]
-        The edge type names
-    _ntypes_invmap, _etypes_invmap, _view_ntype_idx, _view_etype_idx :
-        Internal arguments
-    """
-
-    # pylint: disable=unused-argument
-    def __init__(self, graph, ntypes, etypes,
-                 _ntypes_invmap=None, _etypes_invmap=None,
-                 _view_ntype_idx=None, _view_etype_idx=None):
-        super(DGLBaseHeteroGraph, self).__init__()
-
-        self._graph = graph
-        self._ntypes = ntypes
-        self._etypes = etypes
-        # inverse mapping from ntype str to int
-        self._ntypes_invmap = _ntypes_invmap or \
-            {ntype: i for i, ntype in enumerate(ntypes)}
-        # inverse mapping from etype str to int
-        self._etypes_invmap = _etypes_invmap or \
-            {etype: i for i, etype in enumerate(etypes)}
-
-        # Indicates which node/edge type (int) it is viewing.
-        self._view_ntype_idx = _view_ntype_idx
-        self._view_etype_idx = _view_etype_idx
-
-        self._cache = {}
-
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
 
@@ -185,18 +145,17 @@ class DGLHeteroGraph(object):
     Currently, all heterogeneous graphs are readonly.
     """
     # pylint: disable=unused-argument
-    def __init__(
-            self,
-            graph_data,
-            ntypes,
-            etypes,
-            node_frames=None,
-            edge_frames=None,
-            multigraph=None,
-            readonly=True):
+    def __init__(self,
+                 graph_data,
+                 ntypes,
+                 etypes,
+                 node_frames=None,
+                 edge_frames=None,
+                 multigraph=None,
+                 readonly=True):
         assert readonly, "Only readonly heterogeneous graphs are supported"
 
-        self._graph = heterograph_index.create_hetero(graph_data)
+        self._graph = heterograph_index.create_heterograph(graph_data)
         self._nx_metagraph = None
         self._ntypes = ntypes
         self._etypes = etypes
@@ -2487,10 +2446,12 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     # sanity check
     if len(etypes) != metagraph.number_of_edges():
         raise DGLError('Length of edge type list must match the number of '
-                       'edges in the metagraph.')
+                       'edges in the metagraph. {} vs {}'.format(
+                            len(etypes), metagraph.number_of_edges()))
     if len(ntypes) != metagraph.number_of_nodes():
         raise DGLError('Length of nodes type list must match the number of '
-                       'nodes in the metagraph.')
+                       'nodes in the metagraph. {} vs {}'.format(
+                            len(ntypes), metagraph.number_of_nodes()))
     rst = []
     src, dst, eid = metagraph.edges()
     for s, d, e in zip(src, dst, eid):

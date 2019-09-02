@@ -110,7 +110,6 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
   CHECK(!rel_graphs.empty()) << "Empty heterograph is not allowed.";
   // all relation graph must be bipartite graphs
   for (const auto rg : rel_graphs) {
-    CHECK_EQ(rg->NumVertexTypes(), 2) << "Each relation graph must be a bipartite graph.";
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must be a bipartite graph.";
   }
   // create num verts per type
