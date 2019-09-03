@@ -301,13 +301,13 @@ def test_view1():
     # test ndata and edata
     f1 = F.randn((3, 6))
     g.ndata['h'] = f1       # ok
-    f2 = g.ndata['h']
+    f2 = HG.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
     assert F.array_equal(g.nodes(), F.arange(0, 3))
 
     f3 = F.randn((2, 4))
     g.edata['h'] = f3
-    f4 = g.edata['h']
+    f4 = HG.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
     assert F.array_equal(g.edges(form='eid'), F.arange(0, 2))
 
@@ -318,13 +318,13 @@ def test_apply():
         return {'h': edges.data['h'] * 2 + edges.src['h']}
 
     g = create_test_heterograph()
-    g.ndata['user']['h'] = F.ones((3, 5))
-    g.apply_nodes({'user': node_udf})
-    assert F.array_equal(g.ndata['user']['h'], F.ones((3, 5)) * 2)
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.apply_nodes(node_udf, ntype='user')
+    assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 5)) * 2)
 
-    g.edata['user', 'plays', 'game']['h'] = F.ones((4, 5))
-    g.apply_edges({('user', 'plays', 'game'): edge_udf})
-    assert F.array_equal(g.edata['user', 'plays', 'game']['h'], F.ones((4, 5)) * 4)
+    g['plays'].edata['h'] = F.ones((4, 5))
+    g.apply_edges(edge_udf, etype=('user', 'plays', 'game'))
+    assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 4)
 
 def test_updates():
     def msg_func(edges):
@@ -377,5 +377,5 @@ if __name__ == '__main__':
     test_query()
     test_view()
     test_view1()
-    #test_apply()
+    test_apply()
     #test_updates()

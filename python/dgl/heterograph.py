@@ -1447,11 +1447,11 @@ class DGLHeteroGraph(object):
         """
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
-            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntid)))
+            v_ntype = utils.toindex(slice(0, self.number_of_nodes(ntype)))
         else:
             v_ntype = utils.toindex(v)
         with ir.prog() as prog:
-            scheduler.schedule_apply_nodes(v_ntype, nfunc, self._node_frames[ntid],
+            scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
                                            inplace=inplace)
             Runtime.run(prog)
 
@@ -1503,7 +1503,7 @@ class DGLHeteroGraph(object):
         with ir.prog() as prog:
             scheduler.schedule_apply_edges(
                 AdaptedHeteroGraph(self, stid, dtid, etid),
-                u, v, eid, efunc, inplace=inplace)
+                u, v, eid, func, inplace=inplace)
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, etype=None, inplace=False):
@@ -1986,9 +1986,6 @@ class DGLHeteroGraph(object):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        assert message_func is not None
-        assert reduce_func is not None
-
         # only one type of edges
         etid = self.get_etype_id(None)  # must be 0
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -2558,35 +2555,35 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def num_src(self):
         """Number of source nodes."""
-        return self.graph.number_of_nodes(stid)
+        return self.graph.number_of_nodes(self.stid)
 
     def num_dst(self):
         """Number of destination nodes."""
-        return self.graph.number_of_nodes(dtid)
+        return self.graph.number_of_nodes(self.dtid)
 
     def num_edges(self):
         """Number of edges."""
-        return self.graph.number_of_edges(etid)
+        return self.graph.number_of_edges(self.etid)
 
     @property
     def srcframe(self):
         """Frame to store source node features."""
-        return self.graph._node_frames[stid]
+        return self.graph._node_frames[self.stid]
 
     @property
     def dstframe(self):
         """Frame to store source node features."""
-        return self.graph._node_frames[dtid]
+        return self.graph._node_frames[self.dtid]
 
     @property
     def edgeframe(self):
         """Frame to store edge features."""
-        return self.graph._edge_frames[etid]
+        return self.graph._edge_frames[self.etid]
 
     @property
     def msgframe(self):
         """Frame to store messages."""
-        return self.graph._msg_frames[etid]
+        return self.graph._msg_frames[self.etid]
 
     @property
     def msgindicator(self):
@@ -2599,10 +2596,10 @@ class AdaptedHeteroGraph(GraphAdapter):
         self.graph._set_msg_index(val)
 
     def in_edges(self, nodes):
-        return self.graph._graph.in_edges(etid, nodes)
+        return self.graph._graph.in_edges(self.etid, nodes)
 
     def out_edges(self, nodes):
-        return self.graph._graph.out_edges(etid, nodes)
+        return self.graph._graph.out_edges(self.etid, nodes)
 
     def edges(self, form):
-        return self.graph._graph.edges(etid, form)
+        return self.graph._graph.edges(self.etid, form)
