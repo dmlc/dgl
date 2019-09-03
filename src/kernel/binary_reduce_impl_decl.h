@@ -104,7 +104,7 @@ void CallBinaryReduce(
  */
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector>
-void CallBinaryReduce(
+void CallBinaryMaskedDot(
     const minigun::advance::RuntimeConfig& rtcfg,
     const CSRWrapper& graph,
     GData<Idx, DType>* gdata);

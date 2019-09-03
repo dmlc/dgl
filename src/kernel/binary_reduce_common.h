@@ -321,14 +321,17 @@ struct BinaryDot {
     typedef SelectNone RightType;                              \
     {__VA_ARGS__}                                              \
   } else if (op == kDot && lhs == kSrc && rhs == kDst) {       \
+    typedef BinaryDot<DType> OpType;                           \
     typedef SelectSrc LeftType;                                \
     typedef SelectDst RightType;                               \
     {__VA_ARGS__}                                              \
   } else if (op == kDot && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinaryDot<DType> OpType;                           \
     typedef SelectSrc LeftType;                                \
     typedef SelectEdge RightType;                              \
     {__VA_ARGS__}                                              \
   } else if (op == kDot && lhs == kDst && rhs == kEdge) {      \
+    typedef BinaryDot<DType> OpType;                           \
     typedef SelectDst LeftType;                                \
     typedef SelectEdge RightType;                              \
     {__VA_ARGS__}                                              \

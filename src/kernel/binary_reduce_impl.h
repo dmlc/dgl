@@ -103,6 +103,8 @@ void BinaryReduceImpl(
         });
       });
     });
+
+    return;
   }
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
@@ -213,6 +215,7 @@ void BackwardBinaryReduceImpl(
 
     // Built in A dot B impl
     // (TODO: xiang song) To implement it
+    return;
   }
 
   if (reducer == binary_op::kReduceMean) {

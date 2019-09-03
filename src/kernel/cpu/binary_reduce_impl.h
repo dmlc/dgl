@@ -56,11 +56,11 @@ struct BinaryReduce {
 // Minigun UDF to compute binary reduce.
 template <typename Idx, typename DType, typename Functors>
 struct BinaryMaskedDot {
-  static __device__ __forceinline__ bool CondEdge(
+  static inline bool CondEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     return true;
   }
-  static __device__ __forceinline__ void ApplyEdge(
+  static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     return true;
   }
