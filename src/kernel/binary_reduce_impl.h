@@ -99,7 +99,7 @@ void BinaryReduceImpl(
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
         OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
-          CallBinaryDot<XPU, Idx, DType, LeftTarget, RightTarget>(rtcfg, graph, &gdata);
+          CallBinaryMaskedDot<XPU, Idx, DType, LeftTarget, RightTarget>(rtcfg, graph, &gdata);
         });
       });
     });

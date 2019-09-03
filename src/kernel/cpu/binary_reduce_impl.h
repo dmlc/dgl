@@ -55,7 +55,7 @@ struct BinaryReduce {
 
 // Minigun UDF to compute binary reduce.
 template <typename Idx, typename DType, typename Functors>
-struct BinaryDot {
+struct BinaryMaskedDot {
   static __device__ __forceinline__ bool CondEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     return true;
@@ -188,17 +188,17 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
-// Template implementation of BinaryReduce operator.
+// Template implementation of BinaryMaksedDot operator.
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector>
-void CallBinaryDot(const minigun::advance::RuntimeConfig& rtcfg,
+void CallBinaryMaskedDot(const minigun::advance::RuntimeConfig& rtcfg,
                       const CSRWrapper& graph,
                       GData<Idx, DType>* gdata) {
   //For binary dot, it should be none reducer.
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, binary_op::BinaryDot<Dtype>, ReduceNone<Dtype>>
+                        RightSelector, BinaryDot<DType>, ReduceNone<XPU, DType>>
           Functors;
-  typedef cpu::BinaryDot<Idx, DType, Functors> UDF;
+  typedef cpu::BinaryMaskedDot<Idx, DType, Functors> UDF;
   // csr
   auto outcsr = graph.GetOutCSRMatrix();
   minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
@@ -211,8 +211,11 @@ void CallBinaryDot(const minigun::advance::RuntimeConfig& rtcfg,
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
     gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
   }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
+
+  // For Masked Matrix Multiply, the output target should be edge.
+  // If the user-given mapping is none, we need to replace the mapping by the 
+  // edge ids in the csr graph.
+  if (gdata->out_mapping == nullptr) {
     gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   // TODO(minjie): allocator
