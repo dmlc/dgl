@@ -266,6 +266,15 @@ void CallBinaryReduceBcast(
       const CSRWrapper& graph,                                     \
       GData<IDX, dtype>* gdata);
 
+// Following macro is used to generate explicit-specialization of the template
+// operator.
+#define GEN_MASKED_DOT_DEFINE(dtype, lhs_tgt, rhs_tgt)             \
+  template void CallBinaryMaskedDot<XPU, IDX,                      \
+        dtype, lhs_tgt, rhs_tgt>(                                  \
+      const minigun::advance::RuntimeConfig& rtcfg,                \
+      const CSRWrapper& graph,                                     \
+      GData<IDX, dtype>* gdata);
+
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \
   template void CallBinaryReduceBcast<XPU, ndim, IDX, dtype,     \
                                  lhs_tgt, rhs_tgt,                  \
