@@ -29,6 +29,7 @@ static const char kAdd[] = "add";
 static const char kSub[] = "sub";
 static const char kMul[] = "mul";
 static const char kDiv[] = "div";
+static const char kDot[] = "dot";
 static const char kUseLhs[] = "use_lhs";
 
 /*!
@@ -192,6 +193,19 @@ struct BinaryUseLhs {
   }
 };
 
+template <typename DType>
+struct BinaryDot {
+  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
+    return lhs * rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
+};
+
 // Macro for dispatching op enum code and target code into template arguments.
 // The macro dispatches following combinations:
 //  - Add(Src, Dst), Add(Src, Edge), Add(Dst, Edge)
@@ -305,6 +319,18 @@ struct BinaryUseLhs {
     typedef BinaryUseLhs<DType> OpType;                        \
     typedef SelectEdge LeftType;                               \
     typedef SelectNone RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kSrc && rhs == kDst) {       \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kSrc && rhs == kEdge) {      \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kDst && rhs == kEdge) {      \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
     {__VA_ARGS__}                                              \
   } else {                                                     \
     LOG(FATAL) << "Unsupported operation: op=" << op           \

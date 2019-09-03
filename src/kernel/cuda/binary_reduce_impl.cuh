@@ -54,6 +54,19 @@ struct BinaryReduce {
   }
 };
 
+// Minigun UDF to compute binary reduce.
+template <typename Idx, typename DType, typename Functors>
+struct BinaryDot {
+  static __device__ __forceinline__ bool CondEdge(
+      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
+    return true;
+  }
+};
+
 // Convert flattened index to multi-dimension index (assume row-major).
 __device__ __forceinline__ void Unravel(
     int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
@@ -157,6 +170,39 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
+  // csr
+  auto outcsr = graph.GetOutCSRMatrix();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
+  // If the user-given mapping is none and the target is edge data, we need to
+  // replace the mapping by the edge ids in the csr graph so that the edge
+  // data is correctly read/written.
+  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
+  }
+  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
+  }
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
+      && gdata->out_mapping == nullptr) {
+    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
+  }
+  // TODO(minjie): allocator
+  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+}
+
+// Template implementation of BinaryDot operator.
+template <int XPU, typename Idx, typename DType,
+          typename LeftSelector, typename RightSelector>
+void CallBinaryDot(const minigun::advance::RuntimeConfig& rtcfg,
+                      const CSRWrapper& graph,
+                      GData<Idx, DType>* gdata) {
+  //For binary dot, it should be none reducer.
+  typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
+                        RightSelector, binary_op::BinaryDot<Dtype>, ReduceNone<Dtype>>
+          Functors;
+  typedef cuda::BinaryDot<Idx, DType, Functors> UDF;
+
   // csr
   auto outcsr = graph.GetOutCSRMatrix();
   minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
