@@ -1197,7 +1197,7 @@ class SGConv(nn.Module):
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
-        If not None, applies normalization oto the updated node features.
+        If not None, applies normalization to the updated node features.
     """
     def __init__(self,
                  in_feats,
@@ -1607,7 +1607,7 @@ class DenseSAGEConv(nn.Module):
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
-        If not None, applies normalization oto the updated node features.
+        If not None, applies normalization to the updated node features.
     activation : callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.

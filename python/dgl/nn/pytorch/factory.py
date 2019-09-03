@@ -44,7 +44,8 @@ class KNNGraph(nn.Module):
 
         Returns
         -------
-        A DGLGraph with no features.
+        DGLGraph
+            A DGLGraph with no features.
         """
         return knn_graph(x, self.k)
 
@@ -65,19 +66,6 @@ class SegmentedKNNGraph(nn.Module):
     ----------
     k : int
         The number of neighbors
-
-    Inputs
-    ------
-    x : Tensor
-        :math:`(M, D)` where :math:`M` means the total number of points
-        in all point sets.
-    segs : Tensor
-        :math:`(N)` integer tensors where :math:`N` means the number of
-        point sets.  The elements must sum up to :math:`M`.
-
-    Outputs
-    -------
-    - A DGLGraph with no features.
     """
     def __init__(self, k):
         super(SegmentedKNNGraph, self).__init__()
@@ -98,6 +86,7 @@ class SegmentedKNNGraph(nn.Module):
 
         Returns
         -------
-        A DGLGraph with no features.
+        DGLGraph
+            A DGLGraph with no features.
         """
         return segmented_knn_graph(x, self.k, segs)
