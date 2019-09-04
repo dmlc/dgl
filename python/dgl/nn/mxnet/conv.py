@@ -386,7 +386,7 @@ class RelGraphConv(gluon.Block):
         return {'msg': msg}
 
     def forward(self, g, x, etypes, norm=None):
-        """Forward computation
+        r"""Forward computation
 
         Parameters
         ----------
@@ -394,13 +394,13 @@ class RelGraphConv(gluon.Block):
             The graph.
         x : mx.ndarray.NDArray
             Input node features. Could be either
-              - (|V|, D) dense tensor
-              - (|V|,) int64 vector, representing the categorical values of each
+              - :math:`(|V|, D)` dense tensor
+              - :math:`(|V|,)` int64 vector, representing the categorical values of each
                 node. We then treat the input feature as an one-hot encoding feature.
         etypes : mx.ndarray.NDArray
-            Edge type tensor. Shape: (|E|,)
+            Edge type tensor. Shape: :math:`(|E|,)`
         norm : mx.ndarray.NDArray
-            Optional edge normalizer tensor. Shape: (|E|, 1)
+            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
 
         Returns
         -------
