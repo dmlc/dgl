@@ -17,13 +17,13 @@ def create_test_heterograph():
     #    ('developer', 'game', 'develops')])
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
-    follows_g = dgl.from_edge_list2(
-        [(0, 1), (1, 2)], 'user', 'follows', 'user')
-    plays_g = dgl.from_scipy2(
+    follows_g = dgl.graph(
+        [(0, 1), (1, 2)], 'user', 'follows')
+    plays_g = dgl.bipartite(
         plays_spmat, 'user', 'plays', 'game')
-    wishes_g = dgl.from_edge_list2(
+    wishes_g = dgl.bipartite(
         [(0, 1), (2, 0)], 'user', 'wishes', 'game')
-    develops_g = dgl.from_edge_list2(
+    develops_g = dgl.bipartite(
         [(0, 0), (1, 1)], 'developer', 'develops', 'game')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     return g

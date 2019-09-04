@@ -477,6 +477,7 @@ class DGLHeteroGraph(object):
             stid = self.get_ntype_id(srctype)
             etid = self.get_etype_id((srctype, etype, dsttype))
             dtid = self.get_ntype_id(dsttype)
+            new_g = self._graph.get_relation_graph(etid)
 
             if stid == dtid:
                 new_ntypes = [srctype]
