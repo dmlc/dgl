@@ -23,9 +23,38 @@ GAT_Tox21 = {
     'patience': 10
 }
 
+MPNN_Alchemy = {
+    'batch_size': 16,
+    'num_epochs': 250,
+    'output_dim': 12,
+    'lr': 0.0001,
+    'patience': 10
+}
+
+SCHNET_Alchemy = {
+    'batch_size': 16,
+    'num_epochs': 250,
+    'norm': True,
+    'output_dim': 12,
+    'lr': 0.0001,
+    'patience': 10
+}
+
+MGCN_Alchemy = {
+    'batch_size': 16,
+    'num_epochs': 250,
+    'norm': True,
+    'output_dim': 12,
+    'lr': 0.0001,
+    'patience': 10
+}
+
 experiment_configures = {
     'GCN_Tox21': GCN_Tox21,
-    'GAT_Tox21': GAT_Tox21
+    'GAT_Tox21': GAT_Tox21,
+    'MPNN_Alchemy': MPNN_Alchemy,
+    'SCHNET_Alchemy': SCHNET_Alchemy,
+    'MGCN_Alchemy': MGCN_Alchemy
 }
 
 def get_exp_configure(exp_name):
