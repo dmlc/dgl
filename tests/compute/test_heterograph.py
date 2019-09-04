@@ -709,8 +709,9 @@ def test_updates():
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
         del g.nodes['game'].data['y']
 
-        g['user', 'plays', 'game'].send(([0, 1, 2], [0, 1, 1]), msg)
-        g['user', 'plays', 'game'].recv([0, 1], red, apply)
+        plays_g = g['user', 'plays', 'game']
+        plays_g.send(([0, 1, 2], [0, 1, 1]), msg)
+        plays_g.recv([0, 1], red, apply)
         y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], x[0] * multiplier)
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)

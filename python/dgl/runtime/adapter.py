@@ -1,5 +1,5 @@
-"""Temporary adapter to unify DGLGraph and bipartite HeteroGraph for scheduler.
-NOTE(minjie): remove once all scheduler codes are migrated to bipartite
+"""Temporary adapter to unify DGLGraph and HeteroGraph for scheduler.
+NOTE(minjie): remove once all scheduler codes are migrated to heterograph 
 """
 from __future__ import absolute_import
 
@@ -108,5 +108,32 @@ class GraphAdapter(ABC):
         -------
         tuple of utils.Index
             (src, dst, eid)
+        """
+        pass
+
+    @abstractmethod
+    def get_immutable_gidx(self, ctx):
+        """Get immutable graph index for kernel computation.
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The context of the returned graph.
+
+        Returns
+        -------
+        GraphIndex
+
+        """
+        pass
+
+    @abstractmethod
+    def bits_needed(self):
+        """Return the number of integer bits needed to represent the graph
+
+        Returns
+        -------
+        int
+            The number of bits needed
         """
         pass

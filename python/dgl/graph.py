@@ -3535,3 +3535,9 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def edges(self, form):
         return self.graph._graph.edges(form)
+
+    def get_immutable_gidx(self, ctx):
+        return self.graph._graph.get_immutable_gidx(ctx)
+
+    def bits_needed(self):
+        return self.graph._graph.bits_needed()

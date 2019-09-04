@@ -247,7 +247,12 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
-    *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+    if (hg->NumEdgeTypes() == 1) {
+      CHECK_EQ(etype, 0);
+      *rv = hg;
+    } else {
+      *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+    }
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAddVertices")

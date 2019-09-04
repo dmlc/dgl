@@ -1,5 +1,6 @@
 """Classes for heterogeneous graphs."""
 from collections import defaultdict
+from functools import partial
 import networkx as nx
 import scipy.sparse as ssp
 from . import heterograph_index, graph_index
@@ -2620,3 +2621,9 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def edges(self, form):
         return self.graph._graph.edges(self.etid, form)
+
+    def get_immutable_gidx(self, ctx):
+        return self.graph._graph.get_unitgraph(self.etid, ctx)
+
+    def bits_needed(self):
+        return self.graph._graph.bits_needed(self.etid)

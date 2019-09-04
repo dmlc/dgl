@@ -706,7 +706,7 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
-        etype : int, or None
+        etype : int
             If the graph index is a Bipartite graph index, this argument must be None.
             Otherwise, it represents the edge type.
         ctx : DGLContext
@@ -716,7 +716,7 @@ class HeteroGraphIndex(ObjectBase):
         -------
         HeteroGraphIndex
         """
-        g = self.get_relation_graph(etype) if etype is not None else self
+        g = self.get_relation_graph(etype)
         return g.asbits(self.bits_needed(etype or 0)).copy_to(ctx)
 
     def get_csr_shuffle_order(self, etype):
