@@ -29,6 +29,7 @@ struct BinaryReduce {
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
+    const int64_t len = gdata->data_len
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -41,28 +42,13 @@ struct BinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
     for (int64_t tx = 0; tx < D; ++tx) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       Functors::Write(outoff + tx, out);
     }
-  }
-};
-
-// Minigun UDF to compute binary reduce.
-template <typename Idx, typename DType, typename Functors>
-struct BinaryMaskedDot {
-  static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
-    return true;
-  }
-  static inline void ApplyEdge(
-      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
-    return true;
   }
 };
 
@@ -93,6 +79,7 @@ struct BinaryReduceBcast {
   }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -105,17 +92,17 @@ struct BinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
       Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(
+          lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len, 
+          rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len, 
+          len);
+
       Functors::Write(outoff + tx, out);
     }
   }
@@ -138,11 +125,8 @@ struct FunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static inline DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
-  }
-  static inline DType Read(DType* addr) {
-    return *addr;
+  static inline Dtype Op(DType *lhs, Dtype *rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static inline void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
@@ -181,41 +165,6 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
-}
-
-// Template implementation of BinaryMaksedDot operator.
-template <int XPU, typename Idx, typename DType,
-          typename LeftSelector, typename RightSelector>
-void CallBinaryMaskedDot(const minigun::advance::RuntimeConfig& rtcfg,
-                      const CSRWrapper& graph,
-                      GData<Idx, DType>* gdata) {
-  //For binary dot, it should be none reducer.
-  typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
-                        RightSelector, BinaryDot<DType>, ReduceNone<XPU, DType>>
-          Functors;
-  typedef cpu::BinaryMaskedDot<Idx, DType, Functors> UDF;
-  // csr
-  auto outcsr = graph.GetOutCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
-  }
-
-  // For Masked Matrix Multiply, the output target should be edge.
-  // If the user-given mapping is none, we need to replace the mapping by the 
-  // edge ids in the csr graph.
-  if (gdata->out_mapping == nullptr) {
     gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
   // TODO(minjie): allocator
@@ -262,15 +211,6 @@ void CallBinaryReduceBcast(
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
   template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
-      const minigun::advance::RuntimeConfig& rtcfg,                \
-      const CSRWrapper& graph,                                     \
-      GData<IDX, dtype>* gdata);
-
-// Following macro is used to generate explicit-specialization of the template
-// operator.
-#define GEN_MASKED_DOT_DEFINE(dtype, lhs_tgt, rhs_tgt)             \
-  template void CallBinaryMaskedDot<XPU, IDX,                      \
-        dtype, lhs_tgt, rhs_tgt>(                                  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
       const CSRWrapper& graph,                                     \
       GData<IDX, dtype>* gdata);

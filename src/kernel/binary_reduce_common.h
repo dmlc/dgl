@@ -130,8 +130,8 @@ struct SwitchSrcDst<SelectDst> {
 // common binary functors
 template <typename DType>
 struct BinaryAdd {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs + rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] + rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -143,8 +143,8 @@ struct BinaryAdd {
 
 template <typename DType>
 struct BinaryMul {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs * rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] * rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return rhs;
@@ -156,8 +156,8 @@ struct BinaryMul {
 
 template <typename DType>
 struct BinarySub {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs - rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] - rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -169,8 +169,8 @@ struct BinarySub {
 
 template <typename DType>
 struct BinaryDiv {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs / rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] / rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return static_cast<DType>(1) / rhs;
@@ -182,8 +182,8 @@ struct BinaryDiv {
 
 template <typename DType>
 struct BinaryUseLhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -195,8 +195,13 @@ struct BinaryUseLhs {
 
 template <typename DType>
 struct BinaryDot {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs * rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    Dtype out = 0;
+    //simple vector dot vector
+    for (int i = 0; i < len; i ++)
+      out += lhs[i] * rhs[i];
+
+    return out;
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -362,7 +367,10 @@ struct BinaryDot {
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDiv))     \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinaryDiv))     \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectNone, BinaryUseLhs))  \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs))
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryDot))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDot))
 
 //////////////////////////////////////////////////////////////////////////
 // Defines reducer category. Each category is an empty structure.

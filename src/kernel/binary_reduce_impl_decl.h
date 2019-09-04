@@ -36,6 +36,8 @@ template <typename Idx, typename DType>
 struct GData {
   // length along x(feature) dimension
   int64_t x_length{0};
+  // size of data, can be single value or a vector
+  int64_t data_len;
   // number of rows of the output tensor
   int64_t out_size{0};
   // input data
@@ -81,34 +83,6 @@ void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const CSRWrapper& graph,
     GData<Idx, DType>* gdata);
-
-/*!
- * \brief Template declaration for BinaryMaskedDot operator.
- *
- * LeftSelector and RightSelector must be one of the four operand target
- * categories.
- *
- * The implementation of this template is device-dependent
- * (see kernel/xpu/binary_reduce_impl.(cu)h).
- *
- * See definitions in binary_reduce_common.h
- *
- * \tparam XPU the device flag
- * \tparam Idx type of node/edge index (e.g. int32_t, int64_t)
- * \tparam DType type of the feature data (e.g. float32)
- * \tparam LeftSelect lhs category type
- * \tparam RightSelect rhs category type
- * \param rtcfg Runtime configuration used by miningun
- * \param graph The graph object.
- * \param gdata The feature and mapping data used by the computation.
- */
-template <int XPU, typename Idx, typename DType,
-          typename LeftSelector, typename RightSelector>
-void CallBinaryMaskedDot(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const CSRWrapper& graph,
-    GData<Idx, DType>* gdata);
-
 
 /*!
  * \brief Template declaration for common logics shared by different devices.
@@ -250,6 +224,8 @@ struct BcastGData {
   int64_t lhs_len{0}, rhs_len{0};
   int64_t lhs_shape[NDim]{0}, lhs_stride[NDim]{0};
   int64_t rhs_shape[NDim]{0}, rhs_stride[NDim]{0};
+  // size of data, can be single value or a vector
+  int64_t data_len;
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // input id mappings

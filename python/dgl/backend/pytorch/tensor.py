@@ -285,7 +285,7 @@ class BinaryReduce(th.autograd.Function):
                 out_size, lhs_map, rhs_map, out_map):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
+        feat_shape = K.infer_binary_feature_shape(binary_op, lhs_data_nd, rhs_data_nd)
         out_data = lhs_data.new_empty((out_size,) + feat_shape)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.binary_op_reduce(

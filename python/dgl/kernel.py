@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from ._ffi.function import _init_api
 from .ndarray import empty
 
-def infer_binary_feature_shape(lhs, rhs):
+def infer_binary_feature_shape(op, lhs, rhs):
     """Infer the output feature shape after a binary operation between lhs and rhs.
 
     Parameter
@@ -19,7 +19,7 @@ def infer_binary_feature_shape(lhs, rhs):
     tuple of int
         The output feature shape.
     """
-    ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
+    ret = _CAPI_DGLKernelInferBinaryFeatureShape(op, lhs, rhs)
     return tuple(ret.asnumpy())
 
 # pylint: disable=invalid-name

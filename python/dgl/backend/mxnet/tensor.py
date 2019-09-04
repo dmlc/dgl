@@ -363,7 +363,7 @@ class BinaryReduce(mx.autograd.Function):
     def forward(self, lhs_data, rhs_data):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
+        feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
         out_data = nd.empty((self.out_size,) + feat_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)

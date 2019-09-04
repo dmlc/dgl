@@ -28,7 +28,7 @@ namespace kernel {
 ///////////////////////////////////////////////////////////////////////////////
 
 template <int XPU, typename Idx, typename DType, typename Reducer>
-GData<Idx, DType> AllocGData(
+GData<Idx, DType> AllocGData(const std::string& op,
     const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
@@ -49,6 +49,15 @@ GData<Idx, DType> AllocGData(
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
+
+  // for dot operation: vector [dot] vector
+  if (op == binary::kDot) {
+    //get size of vector
+    gdata.data_len = lhs_data->shape[lhs_data->ndim - 1];
+  } else {
+    gdata.data_len = 1;
+  }
+
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
@@ -83,29 +92,6 @@ void BinaryReduceImpl(
   //              instruction level parallelism
   rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
 #endif
-  if (op == binary_op::kDot) {
-    // A dot B impl is different from others
-    if (reducer != binary_op::kReduceNone) {
-      // TODO(xiang song): Need Reduce for A Dot B?
-      LOG(FATAL) << "With Dot operation, Only None reduce is supported.";
-    }
-
-    // Built in A dot B impl
-    const DLDataType& dtype = out_data->dtype;
-    const auto bits = graph.NumBits();
-    DGL_DTYPE_SWITCH(dtype, DType, {
-      DGL_IDX_TYPE_SWITCH(bits, Idx, {
-        auto gdata = AllocGData<XPU, Idx, DType, ReduceNone<XPU, DType>>(
-            rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
-            lhs_data, rhs_data, out_mapping, out_data);
-        OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
-          CallBinaryMaskedDot<XPU, Idx, DType, LeftTarget, RightTarget>(rtcfg, graph, &gdata);
-        });
-      });
-    });
-
-    return;
-  }
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -115,7 +101,7 @@ void BinaryReduceImpl(
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
+        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(op,
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
         OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
@@ -206,18 +192,6 @@ void BackwardBinaryReduceImpl(
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
   const auto bits = graph.NumBits();
 
-  if (op == binary_op::kDot) {
-    // A dot B impl is different from others
-    if (reducer != binary_op::kReduceNone) {
-      // TODO(xiang song): Need Reduce for A Dot B?
-      LOG(FATAL) << "With Dot operation, Only None reduce is supported.";
-    }
-
-    // Built in A dot B impl
-    // (TODO: xiang song) To implement it
-    return;
-  }
-
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -276,6 +250,8 @@ BcastGData<NDim, Idx, DType> AllocBcastGData(
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
+
+  gdata.data_len = info.data_len;
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
@@ -316,9 +292,7 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
   const auto bits = graph.NumBits();
-  if (op == binary_op::kDot) {
-    LOG(FATAL) << "dot operation is not allowed with broadcast";
-  }
+
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -426,9 +400,7 @@ void BackwardBinaryReduceBcastImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
   const auto bits = graph.NumBits();
-  if (op == binary_op::kDot) {
-    LOG(FATAL) << "dot operation is not allowed with broadcast";
-  }
+
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
