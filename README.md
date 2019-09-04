@@ -175,6 +175,19 @@ Please let us know if you encounter a bug or have any suggestions by [filing an 
 We welcome all contributions from bug fixes to new features and extensions.
 We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to our [contribution guide](https://docs.dgl.ai/contribute.html).
 
+## BibTeX
+
+If you happen to use DGL in your publication, please cite the following:
+```
+@inproceedings{dgl2019,
+    title={Deep Graph Library: Towards Efficient and Scalable Deep Learning on Graphs},
+    url={https://arxiv.org/pdf/1909.01315.pdf},
+    author={{Wang, Minjie and Yu, Lingfan and Zheng, Da and Gan, Quan and Gai, Yu and Ye, Zihao and Li, Mufei and Zhou, Jinjing and Huang, Qi and Ma, Chao and Huang, Ziyue and Guo, Qipeng and Zhang, Hao and Lin, Haibin and Zhao, Junbo and Li, Jinyang and Smola, Alexander J and Zhang, Zheng},
+    booktitle={ICLR Workshop on Representation Learning on Graphs and Manifolds},
+    year={2019}
+}
+```
+
 
 ## The Team
 
