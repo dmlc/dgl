@@ -63,6 +63,22 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroGetRelationGraph(self, int(etype))
 
+    def flatten_relations(self, etypes):
+        """Convert the list of requested unitgraph graphs into a single unitgraph
+        graph.
+
+        Parameters
+        ----------
+        etypes : list[int]
+            The edge/relation types.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The unitgraph graph.
+        """
+        return _CAPI_DGLHeteroGetFlattenedGraph(self, etypes)
+
     def add_nodes(self, ntype, num):
         """Add nodes.
 

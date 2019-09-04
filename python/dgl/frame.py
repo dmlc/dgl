@@ -920,3 +920,36 @@ def sync_frame_initializer(new_frame, reference_frame):
     # TODO(minjie): hack; cannot rely on keys as the _initializers
     #   now supports non-exist columns.
     new_frame._initializers = reference_frame._initializers
+
+def combine_frames(frames, ids):
+    """Merge the frames into one frame, taking the common columns.
+
+    Parameters
+    ----------
+    frames : List[FrameRef]
+        List of frames
+    ids : List[int]
+        List of frame IDs
+
+    Returns
+    -------
+    FrameRef
+        The resulting frame
+    """
+    # find common columns and check if their schemes match
+    schemes = {key: scheme for key, scheme in frames[0].schemes.items()}
+    for frame_id in ids:
+        frame = frames[frame_id]
+        for key, scheme in frame.schemes:
+            if key in schemes:
+                if schemes[key] != scheme:
+                    raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
+                            (key, schemes[key], scheme))
+            else:
+                del schemes[key]
+
+    # concatenate the columns
+    cols = {key: F.cat([
+            frames[frame_id][key] for frame_id in ids if frames[frame_id].num_rows > 0],
+            dim=0)}
+    return FrameRef(Frame(cols))

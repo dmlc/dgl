@@ -10,7 +10,7 @@ from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .base import ALL, is_all, DGLError
+from .base import ALL, SLICE_FULL, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph']
 
@@ -452,43 +452,75 @@ class DGLHeteroGraph(object):
         """
         return HeteroEdgeDataView(self, None, ALL)
 
+    def _find_etypes(self, key):
+        etypes = [
+            i for i, (srctype, etype, dsttype) in enumerate(self._canonical_etypes) if
+            (key[0] == SLICE_FULL or key[0] == srctype) and
+            (key[1] == SLICE_FULL or key[1] == etype) and
+            (key[2] == SLICE_FULL or key[2] == dsttype)]
+        return etypes
+
     def __getitem__(self, key):
         """Return the relation view of this graph.
         """
         err_msg = "Invalid slice syntax. Use G['etype'] or G['srctype', 'etype', 'dsttype'] " +\
-                  "to get view of one relation type. Use : to slice multiple types (e.g. " +\
+                  "to get view of one relation type. Use ... to slice multiple types (e.g. " +\
                   "G['srctype', :, 'dsttype'])."
-        # TODO(minjie): support : syntax
-        if isinstance(key, tuple):
-            # sanity check
-            if len(key) != 3:
-                raise DGLError(err_msg)
-            if isinstance(key[0], slice) and key[0] != slice(None, None, None):
-                raise DGLError(err_msg)
-            if isinstance(key[1], slice) and key[1] != slice(None, None, None):
-                raise DGLError(err_msg)
-            if isinstance(key[2], slice) and key[2] != slice(None, None, None):
-                raise DGLError(err_msg)
-            if (isinstance(key[0], slice) or isinstance(key[1], slice)
-                or isinstance(key[2], slice)):
-                raise DGLError("Multi-relation slice is not supported yet.")
-            srctype, etype, dsttype = key
+
+        if not isinstance(key, tuple):
+            key = (SLICE_FULL, key, SLICE_FULL)
+
+        etypes = self._find_etypes(key)
+        if len(etypes) == 1:
+            # no ambiguity: return the unitgraph itself
+            srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
+            stid = self.get_ntype_id(srctype)
+            etid = self.get_etype_id((srctype, etype, dsttype))
+            dtid = self.get_ntype_id(dsttype)
+
+            if stid == dtid:
+                new_ntypes = [srctype]
+                new_nframes = [self._node_frames[stid]]
+            else:
+                new_ntypes = [srctype, dsttype]
+                new_nframes = [self._node_frames[stid], self._node_frames[dtid]]
+            new_etypes = [etype]
+            new_eframes = [self._edge_frames[etid]]
+
+            return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
         else:
-            srctype, etype, dsttype = self.to_canonical_etype(key)
-        stid = self.get_ntype_id(srctype)
-        etid = self.get_etype_id((srctype, etype, dsttype))
-        dtid = self.get_ntype_id(dsttype)
-        new_g = self._graph.get_relation_graph(etid)
-        if stid == dtid:
-            new_ntypes = [srctype]
-            new_nframes = [self._node_frames[stid]]
-        else:
-            new_ntypes = [srctype, dsttype]
-            new_nframes = [self._node_frames[stid], self._node_frames[dtid]]
-        new_etypes = [etype]
-        new_eframes = [self._edge_frames[etid]]
-        return DGLHeteroGraph(new_g, new_ntypes, new_etypes,
-                              new_nframes, new_eframes)
+            fg = self._graph.flatten(etypes)
+            new_g = fg.graph
+
+            # merge frames
+            srctypes, _, dsttypes = zip(*etypes)
+            stids = [self.get_ntype_id(t) for t in srctypes]
+            etids = [self.get_etype_id(r) for r in etypes]
+            dtids = [self.get_ntype_id(t) for t in dsttypes]
+            new_ntypes = ['src', 'dst']
+            new_nframes = [
+                combine_frames(self._node_frames, stids),
+                combine_frames(self._node_frames, dtids)]
+            new_etypes = ['edge']
+            new_eframes = [combine_frames(self._edge_frames[i], etids)]
+
+            # create new heterograph
+            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+
+            # put the parent node/edge type and IDs
+            src_name = 'src'
+            dst_name = 'dst'
+            edge_name = 'edge'
+            type_col = '__type__'
+            id_col = '__id__'
+            new_hg.ndata[type_col, src_name] = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
+            new_hg.ndata[id_col, src_name] = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
+            new_hg.ndata[type_col, dst_name] = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
+            new_hg.ndata[id_col, dst_name] = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
+            new_hg.edata[type_col, edge_name] = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
+            new_hg.edata[id_col, edge_name] = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
+
+            return new_hg
 
     #################################################################
     # Graph query

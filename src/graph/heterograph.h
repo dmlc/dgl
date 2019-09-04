@@ -164,6 +164,8 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
+  FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
+
  private:
   /*! \brief A map from edge type to unit graph */
   std::vector<HeteroGraphPtr> relation_graphs_;

@@ -4,6 +4,7 @@
  * \brief Heterograph implementation
  */
 #include "./heterograph.h"
+#include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include "../c_api_common.h"
@@ -192,6 +193,67 @@ HeteroSubgraph HeteroGraph::EdgeSubgraph(
   }
 }
 
+FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etypes) const {
+  std::unordered_map<dgl_type_t, size_t> srctype_offsets, dsttype_offsets;
+  size_t src_nodes = 0, dst_nodes = 0;
+  std::vector<dgl_id_t> result_src, result_dst;
+  std::vector<dgl_type_t> induced_srctype, induced_etype, induced_dsttype;
+  std::vector<dgl_id_t> induced_srcid, induced_eid, induced_dstid;
+
+  for (dgl_type_t etype : etypes) {
+    auto src_dsttype = meta_graph_->FindEdge(etype);
+    dgl_type_t srctype = src_dsttype.first;
+    dgl_type_t dsttype = src_dsttype.second;
+    size_t num_srctype_nodes = NumVertices(srctype);
+    size_t num_dsttype_nodes = NumVertices(dsttype);
+
+    if (srctype_offsets.count(srctype) == 0) {
+      srctype_offsets[srctype] = src_nodes;
+      src_nodes += num_srctype_nodes;
+    }
+    if (dsttype_offsets.count(dsttype) == 0) {
+      dsttype_offsets[dsttype] = dst_nodes;
+      dst_nodes += num_dsttype_nodes;
+    }
+
+    size_t srctype_offset = srctype_offsets[srctype];
+    size_t dsttype_offset = dsttype_offsets[dsttype];
+
+    EdgeArray edges = Edges(etype);
+    size_t num_edges = NumEdges(etype);
+    const dgl_id_t* edges_src_data = static_cast<const dgl_id_t*>(edges.src->data);
+    const dgl_id_t* edges_dst_data = static_cast<const dgl_id_t*>(edges.dst->data);
+    const dgl_id_t* edges_eid_data = static_cast<const dgl_id_t*>(edges.id->data);
+    // TODO(gq) Use concat?
+    for (size_t i = 0; i < num_edges; ++i) {
+      result_src.push_back(edges_src_data[i] + srctype_offset);
+      result_dst.push_back(edges_dst_data[i] + dsttype_offset);
+      induced_srctype.push_back(srctype);
+      induced_etype.push_back(etype);
+      induced_dsttype.push_back(dsttype);
+      induced_srcid.push_back(edges_src_data[i]);
+      induced_eid.push_back(edges_eid_data[i]);
+      induced_dstid.push_back(edges_dst_data[i]);
+    }
+  }
+
+  HeteroGraphPtr gptr = CreateBipartiteFromCOO(
+      result_src.size(),
+      result_dst.size(),
+      aten::VecToIdArray(result_src),
+      aten::VecToIdArray(result_dst));
+
+  FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
+  result->graph = HeteroGraphRef(gptr);
+  result->induced_srctype = aten::VecToIdArray(induced_srctype);
+  result->induced_srcid = aten::VecToIdArray(induced_srcid);
+  result->induced_etype = aten::VecToIdArray(induced_etype);
+  result->induced_eid = aten::VecToIdArray(induced_eid);
+  result->induced_dsttype = aten::VecToIdArray(induced_dsttype);
+  result->induced_dstid = aten::VecToIdArray(induced_dstid);
+  return FlattenedHeteroGraphPtr(result);
+};
+
 // creator implementation
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs) {
@@ -253,6 +315,17 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
     } else {
       *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
     }
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFlattenedGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    List<Value> etypes = args[1];
+    std::vector<dgl_id_t> etypes_vec;
+    for (Value val : etypes)
+      etypes_vec.push_back(val->data);
+
+    *rv = FlattenedHeteroGraphRef(hg->Flatten(etypes_vec));
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroAddVertices")
