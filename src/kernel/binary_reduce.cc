@@ -140,6 +140,7 @@ BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
     accum = 0;
   }
   std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
+  ret.real_out_shape.push_back(ret.data_len);
   std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
   std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
   std::reverse(ret.out_shape.begin(), ret.out_shape.end());
@@ -243,9 +244,10 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
 
 
 std::vector<int64_t> InferBinaryFeatureShape(
+    const std::string& op,
     NDArray lhs,
     NDArray rhs) {
-  return CalcBcastInfo(lhs, rhs).real_out_shape;
+  return CalcBcastInfo(op, lhs, rhs).real_out_shape;
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")

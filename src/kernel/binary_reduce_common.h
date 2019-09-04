@@ -204,10 +204,10 @@ struct BinaryDot {
     return out;
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
-    return 1;
+    return rhs;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
-    return 1;
+    return lhs;
   }
 };
 
