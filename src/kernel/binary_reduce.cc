@@ -94,7 +94,7 @@ bool HasBcast(NDArray lhs, NDArray rhs) {
 // See also: BcastInfo (kernel/binary_reduce.h)
 BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastInfo ret;
-  const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
+  int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
   // for dot operation: vector [dot] vector
   // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
   // out_shape[ndim-1] = 1

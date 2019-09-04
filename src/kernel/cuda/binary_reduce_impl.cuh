@@ -81,7 +81,7 @@ struct BinaryReduceBcast {
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    constint64_t stride_x = blockDim.x * gridDim.x;
+    const int64_t stride_x = blockDim.x * gridDim.x;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);

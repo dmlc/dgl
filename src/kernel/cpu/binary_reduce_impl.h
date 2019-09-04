@@ -125,7 +125,7 @@ struct FunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static inline Dtype Op(DType *lhs, Dtype *rhs, int64_t len) {
+  static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
     return BinaryOp::Call(lhs, rhs, len);
   }
   static inline void Write(DType* addr, DType val) {

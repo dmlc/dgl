@@ -53,15 +53,22 @@ struct BackwardBinaryReduce {
       DType grad_out = Functors::Read(gradoutoff + tx);
       DType e = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+
+      DType* lhs_base = lhsoff + tx * len;
+      DType* rhs_base = rhsoff + tx * len;
       if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
         for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i); 
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
           AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
         }
       }
       if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
         for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
           AtomicAdd(gradrhsoff + tx * len + i, grad_rhs);
         }
       }
@@ -110,15 +117,24 @@ struct BackwardBinaryReduceBcast {
         rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
         len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+
+      DType* lhs_base = lhsoff + 
+          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
+      DType* rhs_base = rhsoff +
+          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
       if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
         for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
           AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
         }
       }
       if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
         for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
           AtomicAdd(gradrhsoff + tx * len + i, grad_rhs);
         }
       }

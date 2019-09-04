@@ -196,7 +196,7 @@ struct BinaryUseLhs {
 template <typename DType>
 struct BinaryDot {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
-    Dtype out = 0;
+    DType out = 0;
     //simple vector dot vector
     for (int i = 0; i < len; i ++)
       out += lhs[i] * rhs[i];
