@@ -7,7 +7,7 @@ from . import utils
 from . import backend as F
 from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef
+from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, is_all, DGLError
 
@@ -192,6 +192,15 @@ class DGLHeteroGraph(object):
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
 
+    def _get_msg_index(self, etid):
+        if self._msg_indices[etid] is None:
+            self._msg_indices[etid] = utils.zero_index(
+                size=self._graph.number_of_edges(etid))
+        return self._msg_indices[etid]
+
+    def _set_msg_index(self, etid, index):
+        self._msg_indices[etid] = index
+
     #################################################################
     # Mutation operations
     #################################################################
@@ -201,7 +210,7 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        node_type : str
+        ntype : str
             Type of the added nodes.  Must appear in the metagraph.
         num : int
             Number of nodes to be added.
@@ -1624,9 +1633,10 @@ class DGLHeteroGraph(object):
             Runtime.run(prog)
 
     def recv(self,
-             nodes,
+             v,
              reduce_func,
              apply_node_func=None,
+             etype=None,
              inplace=False):
         """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
 
@@ -1703,14 +1713,16 @@ class DGLHeteroGraph(object):
         apply_node_func : callable
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        # only one node type and edge type
-        ntid = self.get_ntype_id(None)  # must be 0
-        etid = self.get_etype_id(None)  # must be 0
+        etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes(ntid))
+            v = F.arange(0, self.number_of_nodes(dtid))
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v)
@@ -1718,14 +1730,14 @@ class DGLHeteroGraph(object):
             # no vertex to be triggered.
             return
         with ir.prog() as prog:
-            scheduler.schedule_recv(AdaptedHeteroGraph(self, ntid, ntid, etid),
+            scheduler.schedule_recv(AdaptedHeteroGraph(self, stid, dtid, etid),
                                     v, reduce_func, apply_node_func,
                                     inplace=inplace)
             Runtime.run(prog)
 
     def multi_recv(self, v, reducer_dict, cross_reducer, apply_func=None, inplace=False):
         # infer receive node type
-        ntype = infer_ntype_from_dict(reducer_dict)
+        ntype = infer_ntype_from_dict(self, reducer_dict)
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
             v = F.arange(0, self.number_of_nodes(ntid))
@@ -1739,7 +1751,7 @@ class DGLHeteroGraph(object):
         all_out = []
         with ir.prog() as prog:
             for ety, args in reducer_dict.items():
-                outframe = FrameRef()
+                outframe = FrameRef(frame_like(self._node_frames[ntid]._frame))
                 args = pad_tuple(args, 2)  # (rfunc, afunc)
                 if len(args) == 0:
                     raise DGLError('Invalid per-type arguments. Should be either '
@@ -1762,6 +1774,7 @@ class DGLHeteroGraph(object):
                       message_func,
                       reduce_func,
                       apply_node_func=None,
+                      etype=None,
                       inplace=False):
         """Send messages along edges with the same edge type, and let destinations
         receive them.
@@ -1794,13 +1807,13 @@ class DGLHeteroGraph(object):
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        assert message_func is not None
-        assert reduce_func is not None
-        # only one node type and edge type
-        etid = self.get_etype_id(None)  # must be 0
+        etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         if isinstance(edges, tuple):
@@ -1826,7 +1839,7 @@ class DGLHeteroGraph(object):
 
     def multi_send_and_recv(self, etype_dict, cross_reducer, apply_func=None, inplace=False):
         # infer receive node type
-        ntype = infer_ntype_from_dict(etype_dict)
+        ntype = infer_ntype_from_dict(self, etype_dict)
         dtid = self.get_ntype_id(ntype)
 
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
@@ -1837,7 +1850,7 @@ class DGLHeteroGraph(object):
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
                 stid, _ = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef()
+                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
                 edges, mfunc, rfunc, afunc = pad_tuple(args, 4)
                 if len(args) == 0:
                     raise DGLError('Invalid per-type arguments. Should be '
@@ -1873,6 +1886,7 @@ class DGLHeteroGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
+             etype=None,
              inplace=False):
         """Pull messages from the node(s)' predecessors and then update their features.
 
@@ -1904,12 +1918,14 @@ class DGLHeteroGraph(object):
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
         """
-        assert message_func is not None
-        assert reduce_func is not None
-
         # only one type of edges
-        etid = self.get_etype_id(None)  # must be 0
+        etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         v = utils.toindex(v)
@@ -1927,7 +1943,7 @@ class DGLHeteroGraph(object):
         if len(v) == 0:
             return
         # infer receive node type
-        ntype = infer_ntype_from_dict(etype_dict)
+        ntype = infer_ntype_from_dict(self, etype_dict)
         dtid = self.get_ntype_id(ntype)
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
@@ -1936,7 +1952,7 @@ class DGLHeteroGraph(object):
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
                 stid, _ = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef()
+                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
                 mfunc, rfunc, afunc = pad_tuple(args, 3)
                 if len(args) == 0:
                     raise DGLError('Invalid per-type arguments. Should be '
@@ -2003,7 +2019,8 @@ class DGLHeteroGraph(object):
     def update_all(self,
                    message_func,
                    reduce_func,
-                   apply_node_func=None):
+                   apply_node_func=None,
+                   etype=None):
         """Send messages through all edges and update all nodes.
 
         Optionally, apply a function to update the node features after receive.
@@ -2030,12 +2047,12 @@ class DGLHeteroGraph(object):
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         """
-        assert message_func is not None
-        assert reduce_func is not None
-
         # only one type of edges
-        etid = self.get_etype_id(None)  # must be 0
+        etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         with ir.prog() as prog:
@@ -2052,14 +2069,14 @@ class DGLHeteroGraph(object):
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
                 stid, dtid = self._graph.metagraph.find_edge(etid)
-                outframe = FrameRef()
+                outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
                 mfunc, rfunc, afunc = pad_tuple(args, 3)
                 if len(args) == 0:
                     raise DGLError('Invalid per-type arguments. Should be '
                                    '(msg_func, reduce_func, [apply_func])')
                 scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                              message_func, reduce_func,
-                                              apply_node_func)
+                                              mfunc, rfunc, afunc,
+                                              outframe=outframe)
                 all_out[dtid].append(outframe)
             Runtime.run(prog)
         for dtid, frames in all_out.items():
@@ -2067,7 +2084,7 @@ class DGLHeteroGraph(object):
             self._node_frames[dtid].update(merge_frames(frames, cross_reducer))
             # apply
             if apply_func is not None:
-                self.apply_nodes(apply_func, ALL, ntype, inplace=False)
+                self.apply_nodes(apply_func, ALL, self.ntypes[dtid], inplace=False)
 
     def prop_nodes(self,
                    nodes_generator,
@@ -2514,7 +2531,7 @@ def merge_frames(frames, reducer):
     if redfn is None:
         raise DGLError('Invalid cross type reducer. Must be one of '
                        '"sum", "max", "min" or "mean".')
-    ret = FrameRef()
+    ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for f in frames:
         keys.update(f.keys())
@@ -2555,15 +2572,15 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def num_src(self):
         """Number of source nodes."""
-        return self.graph.number_of_nodes(self.stid)
+        return self.graph._graph.number_of_nodes(self.stid)
 
     def num_dst(self):
         """Number of destination nodes."""
-        return self.graph.number_of_nodes(self.dtid)
+        return self.graph._graph.number_of_nodes(self.dtid)
 
     def num_edges(self):
         """Number of edges."""
-        return self.graph.number_of_edges(self.etid)
+        return self.graph._graph.number_of_edges(self.etid)
 
     @property
     def srcframe(self):
@@ -2588,12 +2605,12 @@ class AdaptedHeteroGraph(GraphAdapter):
     @property
     def msgindicator(self):
         """Message indicator tensor."""
-        return self.graph._get_msg_index()
+        return self.graph._get_msg_index(self.etid)
 
     @msgindicator.setter
     def msgindicator(self, val):
         """Set new message indicator tensor."""
-        self.graph._set_msg_index(val)
+        self.graph._set_msg_index(self.etid, val)
 
     def in_edges(self, nodes):
         return self.graph._graph.in_edges(self.etid, nodes)

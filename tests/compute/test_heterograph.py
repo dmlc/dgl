@@ -1,4 +1,3 @@
-
 import dgl
 import dgl.function as fn
 from collections import Counter
@@ -294,6 +293,10 @@ def test_view1():
         }
     _test_query()
 
+    # test features
+    HG.nodes['user'].data['h'] = F.ones((HG.number_of_nodes('user'), 5))
+    HG.nodes['game'].data['m'] = F.ones((HG.number_of_nodes('game'), 3)) * 2
+
     # test only one node type
     g = HG['follows']
     assert g.number_of_nodes() == 3
@@ -311,6 +314,22 @@ def test_view1():
     assert F.array_equal(f3, f4)
     assert F.array_equal(g.edges(form='eid'), F.arange(0, 2))
 
+    # test fail case
+    # fail due to multiple types
+    fail = False
+    try:
+        HG.ndata['h']
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    fail = False
+    try:
+        HG.edata['h']
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
 def test_apply():
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
@@ -326,6 +345,342 @@ def test_apply():
     g.apply_edges(edge_udf, etype=('user', 'plays', 'game'))
     assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 4)
 
+    # test apply on graph with only one type
+    g['follows'].apply_nodes(node_udf)
+    assert F.array_equal(g.nodes['user'].data['h'], F.ones((3, 5)) * 4)
+
+    g['plays'].apply_edges(edge_udf)
+    assert F.array_equal(g['plays'].edata['h'], F.ones((4, 5)) * 12)
+
+    # test fail case
+    # fail due to multiple types
+    fail = False
+    try:
+        g.apply_nodes(node_udf)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    fail = False
+    try:
+        g.apply_edges(edge_udf)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+def test_level1():
+    #edges = {
+    #    'follows': ([0, 1], [1, 2]),
+    #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+    #    'wishes': ([0, 2], [1, 0]),
+    #    'develops': ([0, 1], [0, 1]),
+    #}
+    g = create_test_heterograph()
+    def rfunc(nodes):
+        return {'y': F.sum(nodes.mailbox['m'], 1)}
+    def rfunc2(nodes):
+        return {'y': F.max(nodes.mailbox['m'], 1)}
+    def mfunc(edges):
+        return {'m': edges.src['h']}
+    def afunc(nodes):
+        return {'y' : nodes.data['y'] + 1}
+    g.nodes['user'].data['h'] = F.ones((3, 2))
+    g.send([2, 3], mfunc, etype='plays')
+    g.recv([0, 1], rfunc, etype='plays')
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+    g.nodes['game'].data.pop('y')
+
+    # only one type
+    play_g = g['plays']
+    play_g.send([2, 3], mfunc)
+    play_g.recv([0, 1], rfunc)
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+    # TODO(minjie): following codes will fail because messages are
+    #   not shared with the base graph. However, since send and recv
+    #   are rarely used, no fix at the moment.
+    # g['plays'].send([2, 3], mfunc)
+    # g['plays'].recv([0, 1], mfunc)
+
+    # test fail case
+    # fail due to multiple types
+    fail = False
+    try:
+        g.send([2, 3], mfunc)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    fail = False
+    try:
+        g.recv([0, 1], rfunc)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    # test multi recv
+    g.send(g.edges('plays'), mfunc, etype='plays')
+    g.send(g.edges('wishes'), mfunc, etype='wishes')
+    g.multi_recv([0, 1], {'plays' : rfunc, ('user', 'wishes', 'game'): rfunc2}, 'sum')
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
+
+    # test multi recv with apply function
+    g.send(g.edges('plays'), mfunc, etype='plays')
+    g.send(g.edges('wishes'), mfunc, etype='wishes')
+    g.multi_recv([0, 1], {'plays' : (rfunc, afunc), ('user', 'wishes', 'game'): rfunc2}, 'sum', afunc)
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
+
+    # test cross reducer
+    g.nodes['user'].data['h'] = F.randn((3, 2))
+    for cred in ['sum', 'max', 'min', 'mean']:
+        g.send(g.edges('plays'), mfunc, etype='plays')
+        g.send(g.edges('wishes'), mfunc, etype='wishes')
+        g.multi_recv([0, 1], {'plays' : (rfunc, afunc), 'wishes': rfunc2}, cred, afunc)
+        y = g.nodes['game'].data['y']
+        g1 = g['plays']
+        g2 = g['wishes']
+        g1.send(g1.edges(), mfunc)
+        g1.recv(g1.nodes('game'), rfunc, afunc)
+        y1 = g.nodes['game'].data['y']
+        g2.send(g2.edges(), mfunc)
+        g2.recv(g2.nodes('game'), rfunc2)
+        y2 = g.nodes['game'].data['y']
+        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        yy = yy + 1  # final afunc
+        assert F.array_equal(y, yy)
+
+    # test fail case
+    # fail because cannot infer ntype
+    fail = False
+    try:
+        g.multi_recv([0, 1], {'plays' : rfunc, 'follows': rfunc2}, 'sum')
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+def test_level2():
+    #edges = {
+    #    'follows': ([0, 1], [1, 2]),
+    #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+    #    'wishes': ([0, 2], [1, 0]),
+    #    'develops': ([0, 1], [0, 1]),
+    #}
+    g = create_test_heterograph()
+    def rfunc(nodes):
+        return {'y': F.sum(nodes.mailbox['m'], 1)}
+    def rfunc2(nodes):
+        return {'y': F.max(nodes.mailbox['m'], 1)}
+    def mfunc(edges):
+        return {'m': edges.src['h']}
+    def afunc(nodes):
+        return {'y' : nodes.data['y'] + 1}
+
+    #############################################################
+    #  send_and_recv
+    #############################################################
+
+    g.nodes['user'].data['h'] = F.ones((3, 2))
+    g.send_and_recv([2, 3], mfunc, rfunc, etype='plays')
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+
+    # only one type
+    g['plays'].send_and_recv([2, 3], mfunc, rfunc)
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+    
+    # test fail case
+    # fail due to multiple types
+    fail = False
+    try:
+        g.send_and_recv([2, 3], mfunc, rfunc)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    # test multi
+    g.multi_send_and_recv(
+        {'plays' : (g.edges('plays'), mfunc, rfunc),
+         ('user', 'wishes', 'game'): (g.edges('wishes'), mfunc, rfunc2)},
+        'sum')
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
+
+    # test multi
+    g.multi_send_and_recv(
+        {'plays' : (g.edges('plays'), mfunc, rfunc, afunc),
+         ('user', 'wishes', 'game'): (g.edges('wishes'), mfunc, rfunc2)},
+        'sum', afunc)
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
+
+    # test cross reducer
+    g.nodes['user'].data['h'] = F.randn((3, 2))
+    for cred in ['sum', 'max', 'min', 'mean']:
+        g.multi_send_and_recv(
+            {'plays' : (g.edges('plays'), mfunc, rfunc, afunc),
+             'wishes': (g.edges('wishes'), mfunc, rfunc2)},
+            cred, afunc)
+        y = g.nodes['game'].data['y']
+        g['plays'].send_and_recv(g.edges('plays'), mfunc, rfunc, afunc)
+        y1 = g.nodes['game'].data['y']
+        g['wishes'].send_and_recv(g.edges('wishes'), mfunc, rfunc2)
+        y2 = g.nodes['game'].data['y']
+        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        yy = yy + 1  # final afunc
+        assert F.array_equal(y, yy)
+
+    # test fail case
+    # fail because cannot infer ntype
+    fail = False
+    try:
+        g.multi_send_and_recv(
+            {'plays' : (g.edges('plays'), mfunc, rfunc),
+             'follows': (g.edges('follows'), mfunc, rfunc2)},
+            'sum')
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    g.nodes['game'].data.clear()
+
+    #############################################################
+    #  pull
+    #############################################################
+
+    g.nodes['user'].data['h'] = F.ones((3, 2))
+    g.pull(1, mfunc, rfunc, etype='plays')
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+
+    # only one type
+    g['plays'].pull(1, mfunc, rfunc)
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[0., 0.], [2., 2.]]))
+
+    # test fail case
+    fail = False
+    try:
+        g.pull(1, mfunc, rfunc)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    # test multi
+    g.multi_pull(
+        1,
+        {'plays' : (mfunc, rfunc),
+         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
+        'sum')
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [3., 3.]]))
+
+    # test multi
+    g.multi_pull(
+        1,
+        {'plays' : (mfunc, rfunc, afunc),
+         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
+        'sum', afunc)
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[0., 0.], [5., 5.]]))
+
+    # test cross reducer
+    g.nodes['user'].data['h'] = F.randn((3, 2))
+    for cred in ['sum', 'max', 'min', 'mean']:
+        g.multi_pull(
+            1,
+            {'plays' : (mfunc, rfunc, afunc),
+             'wishes': (mfunc, rfunc2)},
+            cred, afunc)
+        y = g.nodes['game'].data['y']
+        g['plays'].pull(1, mfunc, rfunc, afunc)
+        y1 = g.nodes['game'].data['y']
+        g['wishes'].pull(1, mfunc, rfunc2)
+        y2 = g.nodes['game'].data['y']
+        g.nodes['game'].data['y'] = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        g.apply_nodes(afunc, 1, ntype='game')
+        yy = g.nodes['game'].data['y']
+        assert F.array_equal(y, yy)
+
+    # test fail case
+    # fail because cannot infer ntype
+    fail = False
+    try:
+        g.multi_pull(
+            1,
+            {'plays' : (mfunc, rfunc),
+             'follows': (mfunc, rfunc2)},
+            'sum')
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    g.nodes['game'].data.clear()
+
+    #############################################################
+    #  update_all
+    #############################################################
+
+    g.nodes['user'].data['h'] = F.ones((3, 2))
+    g.update_all(mfunc, rfunc, etype='plays')
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[2., 2.], [2., 2.]]))
+
+    # only one type
+    g['plays'].update_all(mfunc, rfunc)
+    y = g.nodes['game'].data['y']
+    assert F.array_equal(y, F.tensor([[2., 2.], [2., 2.]]))
+
+    # test fail case
+    # fail due to multiple types
+    fail = False
+    try:
+        g.update_all(mfunc, rfunc)
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    # test multi
+    g.multi_update_all(
+        {'plays' : (mfunc, rfunc),
+         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
+        'sum')
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[3., 3.], [3., 3.]]))
+
+    # test multi
+    g.multi_update_all(
+        {'plays' : (mfunc, rfunc, afunc),
+         ('user', 'wishes', 'game'): (mfunc, rfunc2)},
+        'sum', afunc)
+    assert F.array_equal(g.nodes['game'].data['y'], F.tensor([[5., 5.], [5., 5.]]))
+
+    # test cross reducer
+    g.nodes['user'].data['h'] = F.randn((3, 2))
+    for cred in ['sum', 'max', 'min', 'mean']:
+        g.multi_update_all(
+            {'plays' : (mfunc, rfunc, afunc),
+             'wishes': (mfunc, rfunc2)},
+            cred, afunc)
+        y = g.nodes['game'].data['y']
+        g['plays'].update_all(mfunc, rfunc, afunc)
+        y1 = g.nodes['game'].data['y']
+        g['wishes'].update_all(mfunc, rfunc2)
+        y2 = g.nodes['game'].data['y']
+        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        yy = yy + 1  # final afunc
+        assert F.array_equal(y, yy)
+
+    # test fail case
+    # fail because cannot infer ntype
+    fail = False
+    try:
+        g.update_all(
+            {'plays' : (mfunc, rfunc),
+             'follows': (mfunc, rfunc2)},
+            'sum')
+    except dgl.DGLError:
+        fail = True
+    assert fail
+
+    g.nodes['game'].data.clear()
+
 def test_updates():
     def msg_func(edges):
         return {'m': edges.src['h']}
@@ -335,7 +690,7 @@ def test_updates():
         return {'y': nodes.data['y'] * 2}
     g = create_test_heterograph()
     x = F.randn((3, 5))
-    g.ndata['user']['h'] = x
+    g.nodes['user'].data['h'] = x
 
     for msg, red, apply in itertools.product(
             [fn.copy_u('h', 'm'), msg_func], [fn.sum('m', 'y'), reduce_func],
@@ -343,39 +698,41 @@ def test_updates():
         multiplier = 1 if apply is None else 2
 
         g['user', 'plays', 'game'].update_all(msg, red, apply)
-        y = g.ndata['game']['y']
+        y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], (x[0] + x[1]) * multiplier)
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
-        del g.ndata['game']['y']
+        del g.nodes['game'].data['y']
 
         g['user', 'plays', 'game'].send_and_recv(([0, 1, 2], [0, 1, 1]), msg, red, apply)
-        y = g.ndata['game']['y']
+        y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], x[0] * multiplier)
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
-        del g.ndata['game']['y']
+        del g.nodes['game'].data['y']
 
         g['user', 'plays', 'game'].send(([0, 1, 2], [0, 1, 1]), msg)
         g['user', 'plays', 'game'].recv([0, 1], red, apply)
-        y = g.ndata['game']['y']
+        y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], x[0] * multiplier)
         assert F.array_equal(y[1], (x[1] + x[2]) * multiplier)
-        del g.ndata['game']['y']
+        del g.nodes['game'].data['y']
 
         # pulls from destination (game) node 0
         g['user', 'plays', 'game'].pull(0, msg, red, apply)
-        y = g.ndata['game']['y']
+        y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], (x[0] + x[1]) * multiplier)
-        del g.ndata['game']['y']
+        del g.nodes['game'].data['y']
 
         # pushes from source (user) node 0
         g['user', 'plays', 'game'].push(0, msg, red, apply)
-        y = g.ndata['game']['y']
+        y = g.nodes['game'].data['y']
         assert F.array_equal(y[0], x[0] * multiplier)
-        del g.ndata['game']['y']
+        del g.nodes['game'].data['y']
 
 if __name__ == '__main__':
     test_query()
     test_view()
     test_view1()
     test_apply()
-    #test_updates()
+    test_level1()
+    test_level2()
+    test_updates()
