@@ -1,7 +1,6 @@
 import datetime
 import dgl
 import numpy as np
-import os
 import random
 import torch
 from sklearn.metrics import roc_auc_score
@@ -75,11 +74,11 @@ class EarlyStopping(object):
 
     def save_checkpoint(self, model):
         '''Saves model when the metric on the validation set gets improved.'''
-        torch.save(model.state_dict(), self.filename)
+        torch.save({'model_state_dict': model.state_dict()}, self.filename)
 
     def load_checkpoint(self, model):
         '''Load model saved with early stopping.'''
-        model.load_state_dict(torch.load(self.filename))
+        model.load_state_dict(torch.load(self.filename)['model_state_dict'])
 
 def collate_molgraphs(data):
     """Batching a list of datapoints for dataloader

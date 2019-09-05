@@ -47,7 +47,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(accumulate(lengths), lengths)]
 
 
-def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True):
+def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True, log=True):
     """Download a given URL.
 
     Codes borrowed from mxnet/gluon/utils.py
@@ -68,6 +68,8 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
         The number of times to attempt downloading in case of failure or non 200 return codes.
     verify_ssl : bool, default True
         Verify SSL certificates.
+    log : bool, default True
+        Whether to print the progress for download
 
     Returns
     -------
@@ -100,7 +102,8 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
             # Disable pyling too broad Exception
             # pylint: disable=W0703
             try:
-                print('Downloading %s from %s...' % (fname, url))
+                if log:
+                    print('Downloading %s from %s...' % (fname, url))
                 r = requests.get(url, stream=True, verify=verify_ssl)
                 if r.status_code != 200:
                     raise RuntimeError("Failed downloading url %s" % url)
@@ -119,8 +122,9 @@ def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_
                 if retries <= 0:
                     raise e
                 else:
-                    print("download failed, retrying, {} attempt{} left"
-                          .format(retries, 's' if retries > 1 else ''))
+                    if log:
+                        print("download failed, retrying, {} attempt{} left"
+                              .format(retries, 's' if retries > 1 else ''))
 
     return fname
 

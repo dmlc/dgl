@@ -170,6 +170,7 @@ Or go through all of them :doc:`here <tutorials/models/index>`.
    :glob:
 
    features/builtin
+   features/nn
 
 .. toctree::
    :maxdepth: 3
