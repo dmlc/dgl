@@ -157,6 +157,7 @@ def copy_e(e, out):
 #
 # dot message functions:
 # u_dot_v, u_dot_e, v_dot_e
+# v_dot_u, e_dot_u, e_dot_v
 
 _TARGET_MAP = {
     "u": TargetCode.SRC,
@@ -204,14 +205,7 @@ def _register_builtin_message_func():
     target = ["u", "v", "e"]
     for lhs, rhs in product(target, target):
         if lhs != rhs:
-            for binary_op in ["add", "sub", "mul", "div"]:
-                func = _gen_message_builtin(lhs, rhs, binary_op)
-                setattr(sys.modules[__name__], func.__name__, func)
-                __all__.append(func.__name__)
-
-    for lhs, rhs in product(["u", "v"], ["v", "e"]):
-        if lhs != rhs:
-            for binary_op in ["dot"]:
+            for binary_op in ["add", "sub", "mul", "div", "dot"]:
                 func = _gen_message_builtin(lhs, rhs, binary_op)
                 setattr(sys.modules[__name__], func.__name__, func)
                 __all__.append(func.__name__)

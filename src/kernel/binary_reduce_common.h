@@ -340,6 +340,21 @@ struct BinaryDot {
     typedef SelectDst LeftType;                                \
     typedef SelectEdge RightType;                              \
     {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kDst && rhs == kSrc) {       \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kEdge && rhs == kSrc) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kEdge && rhs == kDst) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
   } else {                                                     \
     LOG(FATAL) << "Unsupported operation: op=" << op           \
       << " lhs=" << lhs << " rhs=" << rhs;                     \
@@ -370,7 +385,10 @@ struct BinaryDot {
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs)) \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryDot))      \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryDot))     \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDot))
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc, BinaryDot))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinaryDot))
 
 //////////////////////////////////////////////////////////////////////////
 // Defines reducer category. Each category is an empty structure.

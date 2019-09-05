@@ -340,19 +340,9 @@ def test_all_binary_builtins():
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
-        for binary_op in ["add", "sub", "mul", "div"]:
+        for binary_op in ["add", "sub", "mul", "div", "dot"]:
             for reducer in ["sum", "max", "min", "prod", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
-                    for partial in [False, True]:
-                        _test(g, lhs, rhs, binary_op, reducer, partial, nid,
-                              broadcast=broadcast)
-
-    for lhs, rhs in product(["u", "v"], ["v", "e"]):
-        if lhs == rhs:
-            continue
-        binary_op = "dot"
-        for reducer in ["sum", "max", "min", "mean"]:
-            for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
