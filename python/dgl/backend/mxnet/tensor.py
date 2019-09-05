@@ -375,7 +375,7 @@ class BinaryReduce(mx.autograd.Function):
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
         feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
         out_shape = feat_shape
-        if binary_op == 'dot':
+        if self.binary_op == 'dot':
             out_shape = feat_shape[:-1]
         out_data = nd.empty((self.out_size,) + out_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
