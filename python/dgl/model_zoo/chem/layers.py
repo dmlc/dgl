@@ -3,13 +3,12 @@
 """
 The implementation of neural network layers used in SchNet and MGCN.
 """
-import torch as th
+import torch
 import torch.nn as nn
 from torch.nn import Softplus
 import numpy as np
 
 from ... import function as fn
-
 
 class AtomEmbedding(nn.Module):
     """
@@ -34,19 +33,19 @@ class AtomEmbedding(nn.Module):
         else:
             self.embedding = nn.Embedding(type_num, dim, padding_idx=0)
 
-    def forward(self, g, p_name="node"):
+    def forward(self, atom_types):
         """
         Parameters
         ----------
-        g : DGLGraph
-            Input DGLGraph(s)
-        p_name : str
-            Name for storing atom embeddings
-        """
-        atom_list = g.ndata["node_type"]
-        g.ndata[p_name] = self.embedding(atom_list)
-        return g.ndata[p_name]
+        atom_types : int64 tensor of shape (B1)
+            Types for atoms in the graph(s), B1 for the number of atoms.
 
+        Returns
+        -------
+        float32 tensor of shape (B1, self._dim)
+            Atom embeddings.
+        """
+        return self.embedding(atom_types)
 
 class EdgeEmbedding(nn.Module):
     """
@@ -97,7 +96,7 @@ class EdgeEmbedding(nn.Module):
 
         return {
             "type": atom_type_x * atom_type_y +
-                    (th.abs(atom_type_x - atom_type_y) - 1)**2 / 4
+                    (torch.abs(atom_type_x - atom_type_y) - 1)**2 / 4
         }
 
     def forward(self, g, p_name="edge_f"):
@@ -116,7 +115,6 @@ class EdgeEmbedding(nn.Module):
         g.apply_edges(self.generate_edge_type)
         g.edata[p_name] = self.embedding(g.edata["type"])
         return g.edata[p_name]
-
 
 class ShiftSoftplus(Softplus):
     """
@@ -138,43 +136,44 @@ class ShiftSoftplus(Softplus):
         """Applies the activation function"""
         return self.softplus(x) - np.log(float(self.shift))
 
-
 class RBFLayer(nn.Module):
     """
     Radial basis functions Layer.
+
     e(d) = exp(- gamma * ||d - mu_k||^2)
-    default settings:
-        gamma = 10
-        0 <= mu_k <= 30 for k=1~300
+
+    With the default parameters below, we are using a default settings:
+    * gamma = 10
+    * 0 <= mu_k <= 30 for k=1~300
+
+    Parameters
+    ----------
+    low : int
+        Smallest value to take for mu_k, default to be 0.
+    high : int
+        Largest value to take for mu_k, default to be 30.
+    gap : float
+        Difference between two consecutive values for mu_k, default to be 0.1.
+    dim : int
+        Output size for each center, default to be 1.
     """
     def __init__(self, low=0, high=30, gap=0.1, dim=1):
         super(RBFLayer, self).__init__()
         self._low = low
         self._high = high
-        self._gap = gap
         self._dim = dim
 
         self._n_centers = int(np.ceil((high - low) / gap))
         centers = np.linspace(low, high, self._n_centers)
-        self.centers = th.tensor(centers, dtype=th.float, requires_grad=False)
+        self.centers = torch.tensor(centers, dtype=torch.float, requires_grad=False)
         self.centers = nn.Parameter(self.centers, requires_grad=False)
         self._fan_out = self._dim * self._n_centers
-
         self._gap = centers[1] - centers[0]
 
-    def dis2rbf(self, edges):
-        """Convert distance matrix to RBF tensor."""
-        dist = edges.data["distance"]
-        radial = dist - self.centers
+    def forward(self, edge_distances):
+        radial = edge_distances - self.centers
         coef = -1 / self._gap
-        rbf = th.exp(coef * (radial**2))
-        return {"rbf": rbf}
-
-    def forward(self, g):
-        """Convert distance scalar to rbf vector"""
-        g.apply_edges(self.dis2rbf)
-        return g.edata["rbf"]
-
+        return torch.exp(coef * (radial ** 2))
 
 class CFConv(nn.Module):
     """
@@ -217,7 +216,6 @@ class CFConv(nn.Module):
                      reduce_func=fn.sum('neighbor_info', 'new_node'))
         return g.ndata["new_node"]
 
-
 class Interaction(nn.Module):
     """
     The interaction layer in the SchNet model.
@@ -256,7 +254,6 @@ class Interaction(nn.Module):
         new_node = self.node_layer3(cf_node_1a)
         g.ndata["node"] = g.ndata["node"] + new_node
         return g.ndata["node"]
-
 
 class VEConv(nn.Module):
     """
@@ -342,7 +339,6 @@ class VEConv(nn.Module):
                               g.ndata.pop("new_node_1")
 
         return g.ndata["new_node"]
-
 
 class MultiLevelInteraction(nn.Module):
     """

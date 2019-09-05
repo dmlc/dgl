@@ -45,7 +45,6 @@ def alchemy_nodes(mol):
     mol_feats = mol_featurizer.GetFeaturesForMol(mol)
     mol_conformers = mol.GetConformers()
     assert len(mol_conformers) == 1
-    geom = mol_conformers[0].GetPositions()
 
     for i in range(len(mol_feats)):
         if mol_feats[i].GetFamily() == 'Donor':
@@ -65,7 +64,6 @@ def alchemy_nodes(mol):
         aromatic = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
         num_h = atom.GetTotalNumHs()
-        atom_feats_dict['pos'].append(F.tensor(geom[u].astype(np.float32)))
         atom_feats_dict['node_type'].append(atom_type)
 
         h_u = []
@@ -84,7 +82,6 @@ def alchemy_nodes(mol):
         atom_feats_dict['n_feat'].append(F.tensor(np.array(h_u).astype(np.float32)))
 
     atom_feats_dict['n_feat'] = F.stack(atom_feats_dict['n_feat'], dim=0)
-    atom_feats_dict['pos'] = F.stack(atom_feats_dict['pos'], dim=0)
     atom_feats_dict['node_type'] = F.tensor(np.array(
         atom_feats_dict['node_type']).astype(np.int64))
 

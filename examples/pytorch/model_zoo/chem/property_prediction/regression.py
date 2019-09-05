@@ -6,22 +6,32 @@ from dgl import model_zoo
 
 from utils import set_random_seed, collate_molgraphs_for_regression, EarlyStopping
 
+def regress(args, model, bg):
+    if args['model'] == 'MPNN':
+        h = bg.ndata.pop('n_feat')
+        e = bg.edata.pop('e_feat')
+        h, e = h.to(args['device']), e.to(args['device'])
+        return model(bg, h, e)
+    else:
+        node_types = bg.ndata.pop('node_type')
+        edge_distances = bg.edata.pop('distance')
+        node_types, edge_distances = node_types.to(args['device']), \
+                                     edge_distances.to(args['device'])
+        return model(bg, node_types, edge_distances)
+
 def run_a_train_epoch(args, epoch, model, data_loader,
                       loss_criterion, score_criterion, optimizer):
     model.train()
     total_loss, total_score = 0, 0
     for batch_id, batch_data in enumerate(data_loader):
         smiles, bg, labels = batch_data
-        bg.to(args['device'])
         labels = labels.to(args['device'])
-        prediction = model(bg)
+        prediction = regress(args, model, bg)
         loss = loss_criterion(prediction, labels)
         score = score_criterion(prediction, labels)
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         total_loss += loss.detach().item()
         total_score += score.detach().item()
     total_loss /= len(data_loader.dataset)
@@ -35,9 +45,8 @@ def run_an_eval_epoch(args, model, data_loader, score_criterion):
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
             smiles, bg, labels = batch_data
-            bg.to(args['device'])
             labels = labels.to(args['device'])
-            prediction = model(bg)
+            prediction = regress(args, model, bg)
             score = score_criterion(prediction, labels)
             total_score += score.detach().item()
         total_score /= len(data_loader.dataset)

@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation  of MGCN model"""
-import torch as th
+import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
@@ -48,7 +48,6 @@ class MGCNModel(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super(MGCNModel, self).__init__()
-        self.name = "MGCN"
         self._dim = dim
         self.output_dim = output_dim
         self.edge_dim = edge_dim
@@ -90,8 +89,8 @@ class MGCNModel(nn.Module):
         device : str or torch.device
             Device for storing the mean and std
         """
-        self.mean_per_node = th.tensor(mean, device=device)
-        self.std_per_node = th.tensor(std, device=device)
+        self.mean_per_node = torch.tensor(mean, device=device)
+        self.std_per_node = torch.tensor(std, device=device)
 
     def forward(self, g):
         """Predict molecule labels
@@ -117,7 +116,7 @@ class MGCNModel(nn.Module):
 
         node_embeddings = tuple(g.ndata["node_%d" % (i)]
                                 for i in range(self.n_conv + 1))
-        g.ndata["node"] = th.cat(node_embeddings, 1)
+        g.ndata["node"] = torch.cat(node_embeddings, 1)
 
         # concat multilevel representations
         node = self.node_dense_layer1(g.ndata["node"])

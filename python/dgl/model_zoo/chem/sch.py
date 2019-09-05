@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation of SchNet model."""
-import torch as th
+import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
@@ -16,15 +16,15 @@ class SchNetModel(nn.Module):
     Parameters
     ----------
     dim : int
-        Dimension of features, default to be 64
+        Size for atom embeddings, default to be 64.
     cutoff : float
-        Radius cutoff for RBF, default to be 5.0
+        Radius cutoff for RBF, default to be 5.0.
     output_dim : int
-        Dimension of prediction, default to be 1
+        Size for regression prediction, default to be 1.
     width : int
-        Width in RBF, default to 1
+        Width in RBF, default to 1.
     n_conv : int
-        Number of conv (interaction) layers, default to be 1
+        Number of conv (interaction) layers, default to be 1.
     norm : bool
         Whether to normalize the output atom representations, default to be False.
     atom_ref : Atom embeddings or None
@@ -44,7 +44,6 @@ class SchNetModel(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super().__init__()
-        self.name = "SchNet"
         self._dim = dim
         self.cutoff = cutoff
         self.width = width
@@ -55,13 +54,15 @@ class SchNetModel(nn.Module):
 
         if atom_ref is not None:
             self.e0 = AtomEmbedding(1, pre_train=atom_ref)
+
         if pre_train is None:
             self.embedding_layer = AtomEmbedding(dim)
         else:
             self.embedding_layer = AtomEmbedding(pre_train=pre_train)
+
         self.rbf_layer = RBFLayer(0, cutoff, width)
         self.conv_layers = nn.ModuleList(
-            [Interaction(self.rbf_layer._fan_out, dim) for i in range(n_conv)])
+            [Interaction(self.rbf_layer._fan_out, dim) for _ in range(n_conv)])
 
         self.atom_dense_layer1 = nn.Linear(dim, 64)
         self.atom_dense_layer2 = nn.Linear(64, output_dim)
@@ -78,24 +79,30 @@ class SchNetModel(nn.Module):
         device : str or torch.device
             Device for storing the mean and std
         """
-        self.mean_per_atom = th.tensor(mean, device=device)
-        self.std_per_atom = th.tensor(std, device=device)
+        self.mean_per_atom = torch.tensor(mean, device=device)
+        self.std_per_atom = torch.tensor(std, device=device)
 
-    def forward(self, g):
+    def forward(self, g, atom_types, edge_distances):
         """Predict molecule labels
 
         Parameters
         ----------
         g : DGLGraph
             Input DGLGraph for molecule(s)
+        atom_types : int64 tensor of shape (B1)
+            Types for atoms in the graph(s), B1 for the number of atoms.
+        edge_distances : float32 tensor of shape (B2, 1)
+            Edge distances, B2 for the number of edges.
 
         Returns
         -------
-        res : Predicted labels
+        res :
+            Predicted values
         """
-        self.embedding_layer(g)
+        h = self.embedding_layer(atom_types)
         if self.atom_ref is not None:
-            self.e0(g, "e0")
+            h_ref = self.e0(atom_types)
+
         self.rbf_layer(g)
         for idx in range(self.n_conv):
             self.conv_layers[idx](g)
@@ -106,7 +113,7 @@ class SchNetModel(nn.Module):
         g.ndata["res"] = res
 
         if self.atom_ref is not None:
-            g.ndata["res"] = g.ndata["res"] + g.ndata["e0"]
+            g.ndata["res"] = g.ndata["res"] + h_ref
 
         if self.norm:
             g.ndata["res"] = g.ndata["res"] * self.std_per_atom + self.mean_per_atom
