@@ -26,33 +26,52 @@ def udf_max(nodes):
 D1 = 5
 D2 = 3
 D3 = 4
+D4 = 10 # NOTE(xiang): used to dot feature vector
 builtin = {'sum': fn.sum, 'max': fn.max, 'mean': fn.mean}
 udf_reduce = {'sum': udf_sum, 'max': udf_max, 'mean': udf_mean}
 fill_value = {'sum': 0, 'max': float("-inf")}
 
 
-def generate_feature(g, broadcast='none'):
+def generate_feature(g, broadcast='none', binary_op='none'):
     """Create graph with src, edge, dst feature. broadcast can be 'u',
     'e', 'v', 'none'
     """
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
-    if broadcast == 'e':
-        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-        e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1)))
-        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-    elif broadcast == 'u':
-        u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
-        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
-        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-    elif broadcast == 'v':
-        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
-        v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
+    if binary_op == 'dot':
+        if broadcast == 'e':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1, D4)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
+        elif broadcast == 'u':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1, D4)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
+        elif broadcast == 'v':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1, D4)))
+        else:
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
     else:
-        u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-        e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
-        v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        if broadcast == 'e':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        elif broadcast == 'u':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+        elif broadcast == 'v':
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
+        else:
+            u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+            e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
+            v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
     return u, v, e
 
 
@@ -62,7 +81,7 @@ def test_copy_src_reduce():
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         # https://github.com/dmlc/dgl/issues/761
         g.add_edges(g.nodes(), g.nodes())
-        hu, hv, he = generate_feature(g, 'none')
+        hu, hv, he = generate_feature(g, 'none', 'none')
         if partial:
             nid = F.tensor(list(range(0, 100, 2)))
 
@@ -123,7 +142,7 @@ def test_copy_edge_reduce():
         g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         g.add_edges(g.nodes(), g.nodes())
-        hu, hv, he = generate_feature(g, 'none')
+        hu, hv, he = generate_feature(g, 'none', 'none')
         if partial:
             nid = F.tensor(list(range(0, 100, 2)))
 
@@ -182,7 +201,7 @@ def test_copy_edge_reduce():
 def test_all_binary_builtins():
     def _test(g, lhs, rhs, binary_op, reducer, partial, nid, broadcast='none'):
         # initialize node/edge features with uniform(-1, 1)
-        hu, hv, he = generate_feature(g, broadcast)
+        hu, hv, he = generate_feature(g, broadcast, binary_op)
         if binary_op == 'div':
             # op = div
             # lhs range: [-1, 1]
@@ -327,8 +346,19 @@ def test_all_binary_builtins():
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
-    
+
+    for lhs, rhs in product(["u", "v"], ["v", "e"]):
+        if lhs == rhs:
+            continue
+        binary_op = "dot"
+        for reducer in ["sum", "max", "min", "mean"]:
+            for broadcast in ["none", lhs, rhs]:
+                    for partial in [False, True]:
+                        _test(g, lhs, rhs, binary_op, reducer, partial, nid,
+                              broadcast=broadcast)
+
 if __name__ == '__main__':
     #test_copy_src_reduce()
     #test_copy_edge_reduce()
     test_all_binary_builtins()
+

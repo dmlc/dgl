@@ -95,20 +95,23 @@ bool HasBcast(NDArray lhs, NDArray rhs) {
 // See also: BcastInfo (kernel/binary_reduce.h)
 BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastInfo ret;
-  int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
+  const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
+  int64_t accum = 0;
+  int j = 0;
   // for dot operation: vector [dot] vector
   // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
   // out_shape[ndim-1] = 1
   if (op == binary_op::kDot) {
     // get size of vector
     ret.data_len = lhs->shape[lhs->ndim - 1];
-    --max_ndim;
+    // skip vector size dim
+    ++j;
+    ret.real_out_shape.push_back(ret.data_len);
   } else {  // op != binary_op::kDot
     ret.data_len = 1;
   }
 
-  int64_t accum = 0;
-  for (int j = 0; j < max_ndim; ++j) {
+  for (; j < max_ndim; ++j) {
     const int dl = (lhs->ndim - 1 - j < 1)? 1 : lhs->shape[lhs->ndim - 1 - j];
     const int dr = (rhs->ndim - 1 - j < 1)? 1 : rhs->shape[rhs->ndim - 1 - j];
     if (dl != dr) {
@@ -141,9 +144,6 @@ BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
     accum = 0;
   }
   std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
-  if (op == binary_op::kDot) {
-    ret.real_out_shape.push_back(ret.data_len);
-  }
   std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
   std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
   std::reverse(ret.out_shape.begin(), ret.out_shape.end());

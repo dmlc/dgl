@@ -59,7 +59,7 @@ struct BackwardBinaryReduce {
       if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
         for (int64_t i = 0; i < len; ++i) {
           DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i); 
+          DType rhs = Functors::Read(rhs_base + i);
           DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
           AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
         }
@@ -118,7 +118,7 @@ struct BackwardBinaryReduceBcast {
         len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff + 
+      DType* lhs_base = lhsoff +
           Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
       DType* rhs_base = rhsoff +
           Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
