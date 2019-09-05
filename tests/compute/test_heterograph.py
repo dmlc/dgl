@@ -28,6 +28,9 @@ def create_test_heterograph():
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     return g
 
+def get_redfn(name):
+    return getattr(F, name)
+
 def test_query():
     g = create_test_heterograph()
 
@@ -477,7 +480,7 @@ def test_level1():
         g2.send(g2.edges(), mfunc)
         g2.recv(g2.nodes('game'), rfunc2)
         y2 = g.nodes['game'].data['y']
-        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         yy = yy + 1  # final afunc
         assert F.array_equal(y, yy)
 
@@ -556,7 +559,7 @@ def test_level2():
         y1 = g.nodes['game'].data['y']
         g['wishes'].send_and_recv(g.edges('wishes'), mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
-        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         yy = yy + 1  # final afunc
         assert F.array_equal(y, yy)
 
@@ -625,7 +628,7 @@ def test_level2():
         y1 = g.nodes['game'].data['y']
         g['wishes'].pull(1, mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
-        g.nodes['game'].data['y'] = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        g.nodes['game'].data['y'] = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         g.apply_nodes(afunc, 1, ntype='game')
         yy = g.nodes['game'].data['y']
         assert F.array_equal(y, yy)
@@ -684,7 +687,7 @@ def test_level2():
 
     # test cross reducer
     g.nodes['user'].data['h'] = F.randn((3, 2))
-    for cred in ['sum', 'max', 'min', 'mean']:
+    for cred in ['sum', 'max', 'min', 'mean', 'stack']:
         g.multi_update_all(
             {'plays' : (mfunc, rfunc, afunc),
              'wishes': (mfunc, rfunc2)},
@@ -694,7 +697,10 @@ def test_level2():
         y1 = g.nodes['game'].data['y']
         g['wishes'].update_all(mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
-        yy = getattr(F, cred)(F.stack([y1, y2], 0), 0)
+        if cred == 'stack':
+            yy = F.stack([y1.unsqueeze(1), y2.unsqueeze(1)], 1)
+        else:
+            yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         yy = yy + 1  # final afunc
         assert F.array_equal(y, yy)
 

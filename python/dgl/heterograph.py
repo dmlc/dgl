@@ -2546,7 +2546,7 @@ def merge_frames(frames, reducer):
     frames : list of FrameRef
         Input frames
     reducer : str
-        One of "sum", "max", "min", "mean"
+        One of "sum", "max", "min", "mean", "stack"
 
     Returns
     -------
@@ -2555,10 +2555,17 @@ def merge_frames(frames, reducer):
     """
     if len(frames) == 1:
         return frames[0]
-    redfn = getattr(F, reducer, None)
-    if redfn is None:
-        raise DGLError('Invalid cross type reducer. Must be one of '
-                       '"sum", "max", "min" or "mean".')
+    if reducer == 'stack':
+        def merger(flist):
+            flist = [F.unsqueeze(f, 1) for f in flist]
+            return F.stack(flist, 1)
+    else:
+        redfn = getattr(F, reducer, None)
+        if redfn is None:
+            raise DGLError('Invalid cross type reducer. Must be one of '
+                           '"sum", "max", "min", "mean" or "stack".')
+        def merger(flist):
+            return redfn(F.stack(flist, 0), 0)
     ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for f in frames:
@@ -2569,7 +2576,7 @@ def merge_frames(frames, reducer):
             if k in f:
                 flist.append(f[k].data)
         if len(flist) > 1:
-            ret[k] = redfn(F.stack(flist, 0), 0)
+            ret[k] = merger(flist)
         else:
             ret[k] = flist[0]
     return ret
