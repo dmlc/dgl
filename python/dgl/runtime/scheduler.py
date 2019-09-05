@@ -8,6 +8,8 @@ from .. import backend as F
 from ..frame import frame_like, FrameRef
 from ..function.base import BuiltinFunction
 from ..udf import EdgeBatch, NodeBatch
+from ..graph_index import GraphIndex
+from ..heterograph_index import HeteroGraphIndex
 
 from . import ir
 from .ir import var
@@ -28,6 +30,15 @@ __all__ = [
     "schedule_pull"
 ]
 
+def _dispatch(graph, method, *args, **kwargs):
+    graph_index = graph._graph
+    if isinstance(graph_index, GraphIndex):
+        return getattr(graph._graph, method)(*args, **kwargs)
+    elif isinstance(graph_index, HeteroGraphIndex):
+        return getattr(graph._graph, method)(graph._current_etype_idx, *args, **kwargs)
+    else:
+        raise TypeError('unknown type %s' % type(graph_index))
+
 def schedule_send(graph, u, v, eid, message_func):
     """get send schedule
 
@@ -45,7 +56,8 @@ def schedule_send(graph, u, v, eid, message_func):
         The message function
     """
     var_mf = var.FEAT_DICT(graph._msg_frame)
-    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_src_nf = var.FEAT_DICT(graph._src_frame)
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)
     var_eid = var.IDX(eid)
 
@@ -54,8 +66,8 @@ def schedule_send(graph, u, v, eid, message_func):
                         v=v,
                         eid=eid,
                         mfunc=message_func,
-                        var_src_nf=var_nf,
-                        var_dst_nf=var_nf,
+                        var_src_nf=var_src_nf,
+                        var_dst_nf=var_dst_nf,
                         var_ef=var_ef)
 
     # write tmp msg back
@@ -83,7 +95,7 @@ def schedule_recv(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    src, dst, eid = graph._graph.in_edges(recv_nodes)
+    src, dst, eid = _dispatch(graph, 'in_edges', recv_nodes)
     if len(eid) > 0:
         nonzero_idx = graph._get_msg_index().get_items(eid).nonzero()
         eid = eid.get_items(nonzero_idx)
@@ -96,7 +108,7 @@ def schedule_recv(graph,
         if apply_func is not None:
             schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         # sort and unique the argument
         recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))
         recv_nodes = utils.toindex(recv_nodes)
@@ -105,12 +117,12 @@ def schedule_recv(graph,
         reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, eid),
                                    recv_nodes)
         # apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
+        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+            ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
         # set message indicator to 0
         graph._set_msg_index(graph._get_msg_index().set_items(eid, 0))
         if not graph._get_msg_index().has_nonzero():
@@ -148,7 +160,7 @@ def schedule_snr(graph,
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
     recv_nodes = utils.toindex(recv_nodes)
     # create vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='dst_nf')
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
@@ -156,11 +168,11 @@ def schedule_snr(graph,
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
     adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
-        edge_tuples, graph.number_of_nodes())
+        edge_tuples, graph._number_of_src_nodes(), graph._number_of_dst_nodes())
     out_map_creator = lambda nbits: _build_idx_map(recv_nodes, nbits)
     reduced_feat = _gen_send_reduce(graph=graph,
-                                    src_node_frame=graph._node_frame,
-                                    dst_node_frame=graph._node_frame,
+                                    src_node_frame=graph._src_frame,
+                                    dst_node_frame=graph._dst_frame,
                                     edge_frame=graph._edge_frame,
                                     message_func=message_func,
                                     reduce_func=reduce_func,
@@ -170,12 +182,12 @@ def schedule_snr(graph,
                                     adj_creator=adj_creator,
                                     out_map_creator=out_map_creator)
     # generate apply schedule
-    final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat,
+    final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf, reduced_feat,
                                    apply_func)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_INPLACE_(var_dst_nf, var_recv_nodes, final_feat)
     else:
-        ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+        ir.WRITE_ROW_(var_dst_nf, var_recv_nodes, final_feat)
 
 def schedule_update_all(graph,
                         message_func,
@@ -194,27 +206,27 @@ def schedule_update_all(graph,
     apply_func: callable
         The apply node function
     """
-    if graph.number_of_edges() == 0:
+    if graph._number_of_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
-            nodes = utils.toindex(slice(0, graph.number_of_nodes()))
+            nodes = utils.toindex(slice(0, graph._number_of_dst_nodes()))
             schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
-        eid = utils.toindex(slice(0, graph.number_of_edges())) # ALL
-        recv_nodes = utils.toindex(slice(0, graph.number_of_nodes())) # ALL
+        eid = utils.toindex(slice(0, graph._number_of_edges())) # ALL
+        recv_nodes = utils.toindex(slice(0, graph._number_of_dst_nodes())) # ALL
         # create vars
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         var_eid = var.IDX(eid)
         # generate send + reduce
         def uv_getter():
-            src, dst, _ = graph._graph.edges('eid')
+            src, dst, _ = _dispatch(graph, 'edges', 'eid')
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_gidx_and_mapping_graph(graph)
         out_map_creator = lambda nbits: None
         reduced_feat = _gen_send_reduce(graph=graph,
-                                        src_node_frame=graph._node_frame,
-                                        dst_node_frame=graph._node_frame,
+                                        src_node_frame=graph._src_frame,
+                                        dst_node_frame=graph._dst_frame,
                                         edge_frame=graph._edge_frame,
                                         message_func=message_func,
                                         reduce_func=reduce_func,
@@ -224,9 +236,9 @@ def schedule_update_all(graph,
                                         adj_creator=adj_creator,
                                         out_map_creator=out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
+        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
-        ir.WRITE_DICT_(var_nf, final_feat)
+        ir.WRITE_DICT_(var_dst_nf, final_feat)
 
 def schedule_apply_nodes(graph,
                          v,
@@ -326,10 +338,12 @@ def schedule_apply_edges(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_src_nf = var.FEAT_DICT(graph._src_frame)
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)
     var_out = _gen_send(graph=graph, u=u, v=v, eid=eid, mfunc=apply_func,
-                        var_src_nf=var_nf, var_dst_nf=var_nf, var_ef=var_ef)
+                        var_src_nf=var_src_nf, var_dst_nf=var_dst_nf,
+                        var_ef=var_ef)
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_eid = var.IDX(eid)
     # schedule apply edges
@@ -401,7 +415,7 @@ def schedule_push(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    u, v, eid = graph._graph.out_edges(u)
+    u, v, eid = _dispatch(graph, 'out_edges', u)
     if len(eid) == 0:
         # All the pushing nodes have no out edges. No computation is scheduled.
         return
@@ -434,7 +448,7 @@ def schedule_pull(graph,
     # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
     #   can be specialized to SPMV. This needs support for creating adjmat
     #   directly from pull node frontier.
-    u, v, eid = graph._graph.in_edges(pull_nodes)
+    u, v, eid = _dispatch(graph, 'in_edges', pull_nodes)
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
@@ -443,27 +457,27 @@ def schedule_pull(graph,
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
         # create vars
-        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='nf')
         var_pull_nodes = var.IDX(pull_nodes, name='pull_nodes')
         var_u = var.IDX(u)
         var_v = var.IDX(v)
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        num_nodes = graph.number_of_nodes()
-        adj_creator = lambda: spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+        adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
+            (u, v, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         out_map_creator = lambda nbits: _build_idx_map(pull_nodes, nbits)
-        reduced_feat = _gen_send_reduce(graph, graph._node_frame,
-                                        graph._node_frame, graph._edge_frame,
+        reduced_feat = _gen_send_reduce(graph, graph._src_frame,
+                                        graph._dst_frame, graph._edge_frame,
                                         message_func, reduce_func, var_eid,
                                         var_pull_nodes, uv_getter, adj_creator,
                                         out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_pull_nodes, var_nf, reduced_feat, apply_func)
+        final_feat = _apply_with_accum(graph, var_pull_nodes, var_dst_nf, reduced_feat, apply_func)
         if inplace:
-            ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_INPLACE_(var_dst_nf, var_pull_nodes, final_feat)
         else:
-            ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
+            ir.WRITE_ROW_(var_dst_nf, var_pull_nodes, final_feat)
 
 def schedule_group_apply_edge(graph,
                               u, v, eid,
@@ -494,11 +508,12 @@ def schedule_group_apply_edge(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_src_nf = var.FEAT_DICT(graph._src_frame, name='src_nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, name='dst_nf')
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_out = var.FEAT_DICT(name='new_ef')
     db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
-                                     var_nf, var_ef, var_out)
+                                     var_src_nf, var_dst_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
@@ -719,17 +734,16 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     # node frame.
     # TODO(minjie): should replace this with an IR call to make the program
     # stateless.
-    tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
+    tmpframe = FrameRef(frame_like(graph._dst_frame._frame, len(recv_nodes)))
 
     # vars
     var_msg = var.FEAT_DICT(graph._msg_frame, 'msg')
-    var_nf = var.FEAT_DICT(graph._node_frame, 'nf')
+    var_dst_nf = var.FEAT_DICT(graph._dst_frame, 'nf')
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
-        num_nodes = graph.number_of_nodes()
         adj, edge_map, nbits = spmv.build_gidx_and_mapping_uv(
-            (src, dst, eid), num_nodes)
+            (src, dst, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         # using edge map instead of message map because messages are in global
         # message frame
         var_out_map = _build_idx_map(recv_nodes, nbits)
@@ -744,7 +758,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     else:
         # gen degree bucketing schedule for UDF recv
         db.gen_degree_bucketing_schedule(graph, rfunc, eid, dst, recv_nodes,
-                                         var_nf, var_msg, var_out)
+                                         var_dst_nf, var_msg, var_out)
         return var_out
 
 def _gen_send_reduce(
@@ -930,12 +944,12 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
     var_eid = var.IDX(eid)
 
     if mfunc_is_list:
-        if eid.is_slice(0, graph.number_of_edges()):
+        if eid.is_slice(0, graph._number_of_edges()):
             # full graph case
             res = spmv.build_gidx_and_mapping_graph(graph)
         else:
-            num_nodes = graph.number_of_nodes()
-            res = spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+            res = spmv.build_gidx_and_mapping_uv(
+                (u, v, eid), graph._number_of_src_nodes(), graph._number_of_dst_nodes())
         adj, edge_map, _ = res
         # create a tmp message frame
         tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))

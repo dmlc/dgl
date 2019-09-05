@@ -12,3 +12,8 @@ Transform -- Graph Transformation
     reverse
     to_simple_graph
     to_bidirected
+    khop_adj
+    khop_graph
+    laplacian_lambda_max
+    knn_graph
+    segmented_knn_graph

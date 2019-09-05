@@ -73,12 +73,16 @@ class NodeFlow(DGLBaseGraph):
     sampling and Layer-wise sampling.
 
     These sampling algorithms generate graphs with multiple layers. The
-    edges connect the nodes between two layers while there don't exist
-    edges between the nodes in the same layer.
-
-    We store multiple layers of the sampling results in a single graph.
+    edges connect the nodes between two layers, which forms *blocks*, while
+    there don't exist edges between the nodes in the same layer. As illustrated
+    in the figure, the last layer stores the target (seed) nodes where neighbors
+    are sampled from. Neighbors reached in different hops are placed in different
+    layers. Edges that connect to the neighbors in the next hop are placed
+    in a block.
     We store extra information, such as the node and edge mapping from
     the NodeFlow graph to the parent graph.
+
+    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/api/sampling.nodeflow.png
 
     DO NOT create NodeFlow object directly. Use sampling method to
     generate NodeFlow instead.

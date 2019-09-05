@@ -110,6 +110,11 @@ def min(x, dim):
 def prod(x, dim):
     """Computes the prod of array elements over given axes"""
     pass
+
+def matmul(a, b):
+    """Compute Matrix Multiplication between a and b"""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

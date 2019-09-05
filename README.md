@@ -59,13 +59,19 @@ build.
 ### Using anaconda
 
 ```
-conda install -c dglteam dgl
+conda install -c dglteam dgl           # cpu version
+conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
+conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
+conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
 ```
 
 ### Using pip
 
 ```
-pip install dgl
+pip install dgl       # cpu version
+pip install dgl-cu90  # CUDA 9.0
+pip install dgl-cu92  # CUDA 9.2
+pip install dgl-cu100 # CUDA 10.0
 ```
 
 ### From source
@@ -169,6 +175,18 @@ Please let us know if you encounter a bug or have any suggestions by [filing an 
 We welcome all contributions from bug fixes to new features and extensions.
 We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to our [contribution guide](https://docs.dgl.ai/contribute.html).
 
+## Cite
+
+If you use DGL in a scientific publication, we would appreciate citations to the following paper:
+```
+@article{wang2019dgl,
+    title={Deep Graph Library: Towards Efficient and Scalable Deep Learning on Graphs},
+    url={https://arxiv.org/abs/1909.01315},
+    author={{Wang, Minjie and Yu, Lingfan and Zheng, Da and Gan, Quan and Gai, Yu and Ye, Zihao and Li, Mufei and Zhou, Jinjing and Huang, Qi and Ma, Chao and Huang, Ziyue and Guo, Qipeng and Zhang, Hao and Lin, Haibin and Zhao, Junbo and Li, Jinyang and Smola, Alexander J and Zhang, Zheng},
+    journal={ICLR Workshop on Representation Learning on Graphs and Manifolds},
+    year={2019}
+}
+```
 
 ## The Team
 
