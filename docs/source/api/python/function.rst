@@ -40,6 +40,9 @@ Message functions
     e_sub_v
     e_mul_v
     e_div_v
+    u_dot_v
+    u_dot_e
+    v_dot_e
 
 Reduce functions
 ----------------
