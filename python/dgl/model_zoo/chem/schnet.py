@@ -8,7 +8,7 @@ from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
 from ...batched_graph import sum_nodes
 
 
-class SchNetModel(nn.Module):
+class SchNet(nn.Module):
     """
     `SchNet: A continuous-filter convolutional neural network for modeling
     quantum interactions. (NIPS'2017) <https://arxiv.org/abs/1706.08566>`__
@@ -43,14 +43,14 @@ class SchNetModel(nn.Module):
                  norm=False,
                  atom_ref=None,
                  pre_train=None):
-        super().__init__()
+        super(SchNet, self).__init__()
+
         self._dim = dim
         self.cutoff = cutoff
         self.width = width
         self.n_conv = n_conv
         self.atom_ref = atom_ref
         self.norm = norm
-        self.activation = ShiftSoftplus()
 
         if atom_ref is not None:
             self.e0 = AtomEmbedding(1, pre_train=atom_ref)
@@ -63,9 +63,11 @@ class SchNetModel(nn.Module):
         self.rbf_layer = RBFLayer(0, cutoff, width)
         self.conv_layers = nn.ModuleList(
             [Interaction(self.rbf_layer._fan_out, dim) for _ in range(n_conv)])
-
-        self.atom_dense_layer1 = nn.Linear(dim, 64)
-        self.atom_dense_layer2 = nn.Linear(64, output_dim)
+        self.atom_update = nn.Sequential(
+            nn.Linear(dim, 64),
+            ShiftSoftplus(),
+            nn.Linear(64, output_dim)
+        )
 
     def set_mean_std(self, mean, std, device="cpu"):
         """Set the mean and std of atom representations for normalization.
@@ -96,26 +98,25 @@ class SchNetModel(nn.Module):
 
         Returns
         -------
-        res :
-            Predicted values
+        prediction : float32 tensor of shape (B, output_dim)
+            Model prediction for the batch of graphs, B for the number
+            of graphs, output_dim for the prediction size.
         """
         h = self.embedding_layer(atom_types)
+        rbf_out = self.rbf_layer(edge_distances)
+        for idx in range(self.n_conv):
+            h = self.conv_layers[idx](g, h, rbf_out)
+        h = self.atom_update(h)
+
         if self.atom_ref is not None:
             h_ref = self.e0(atom_types)
-
-        self.rbf_layer(g)
-        for idx in range(self.n_conv):
-            self.conv_layers[idx](g)
-
-        atom = self.atom_dense_layer1(g.ndata["node"])
-        atom = self.activation(atom)
-        res = self.atom_dense_layer2(atom)
-        g.ndata["res"] = res
-
-        if self.atom_ref is not None:
-            g.ndata["res"] = g.ndata["res"] + h_ref
+            h = h + h_ref
 
         if self.norm:
-            g.ndata["res"] = g.ndata["res"] * self.std_per_atom + self.mean_per_atom
-        res = sum_nodes(g, "res")
-        return res
+            h = h * self.std_per_atom + self.mean_per_atom
+
+        with g.local_scope():
+            g.ndata['h'] = h
+            prediction = sum_nodes(g, 'h')
+
+        return prediction

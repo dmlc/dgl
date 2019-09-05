@@ -26,6 +26,7 @@ class AtomEmbedding(nn.Module):
     """
     def __init__(self, dim=128, type_num=100, pre_train=None):
         super(AtomEmbedding, self).__init__()
+
         self._dim = dim
         self._type_num = type_num
         if pre_train is not None:
@@ -63,6 +64,7 @@ class EdgeEmbedding(nn.Module):
     """
     def __init__(self, dim=128, edge_num=3000, pre_train=None):
         super(EdgeEmbedding, self).__init__()
+
         self._dim = dim
         self._edge_num = edge_num
         if pre_train is not None:
@@ -129,6 +131,7 @@ class ShiftSoftplus(Softplus):
     """
     def __init__(self, beta=1, shift=2, threshold=20):
         super(ShiftSoftplus, self).__init__(beta, threshold)
+
         self.shift = shift
         self.softplus = Softplus(beta, threshold)
 
@@ -159,6 +162,7 @@ class RBFLayer(nn.Module):
     """
     def __init__(self, low=0, high=30, gap=0.1, dim=1):
         super(RBFLayer, self).__init__()
+
         self._low = low
         self._high = high
         self._dim = dim
@@ -171,6 +175,17 @@ class RBFLayer(nn.Module):
         self._gap = centers[1] - centers[0]
 
     def forward(self, edge_distances):
+        """
+        Parameters
+        ----------
+        edge_distances : float32 tensor of shape (B, 1)
+            Edge distances, B for the number of edges.
+
+        Returns
+        -------
+        float32 tensor of shape (B, self._fan_out)
+            Computed RBF results
+        """
         radial = edge_distances - self.centers
         coef = -1 / self._gap
         return torch.exp(coef * (radial ** 2))
@@ -184,37 +199,45 @@ class CFConv(nn.Module):
     rbf_dim : int
         Dimension of the RBF layer output
     dim : int
-        Dimension of linear layers, default to be 64
-    act : str or activation function
+        Dimension of output, default to be 64
+    act : activation function or None.
         Activation function, default to be shifted softplus
     """
     def __init__(self, rbf_dim, dim=64, act=None):
         super(CFConv, self).__init__()
+
         self._rbf_dim = rbf_dim
         self._dim = dim
 
-        self.linear_layer1 = nn.Linear(self._rbf_dim, self._dim)
-        self.linear_layer2 = nn.Linear(self._dim, self._dim)
-
         if act is None:
-            self.activation = nn.Softplus(beta=0.5, threshold=14)
+            activation = nn.Softplus(beta=0.5, threshold=14)
         else:
-            self.activation = act
+            activation = act
 
-    def update_edge(self, edges):
-        """Update the edge features with two FC layers."""
-        rbf = edges.data["rbf"]
-        h = self.linear_layer1(rbf)
-        h = self.activation(h)
-        h = self.linear_layer2(h)
-        return {"h": h}
+        self.project = nn.Sequential(
+            nn.Linear(self._rbf_dim, self._dim),
+            activation,
+            nn.Linear(self._dim, self._dim)
+        )
 
-    def forward(self, g):
-        """Forward CFConv"""
-        g.apply_edges(self.update_edge)
-        g.update_all(message_func=fn.u_mul_e('new_node', 'h', 'neighbor_info'),
-                     reduce_func=fn.sum('neighbor_info', 'new_node'))
-        return g.ndata["new_node"]
+    def forward(self, g, node_weight, rbf_out):
+        """
+        Parameters
+        ----------
+        g : DGLGraph
+            The graph for performing convolution
+        node_weight : float32 tensor of shape (B1, D1)
+            The weight of nodes in message passing, B1 for number of nodes and
+            D1 for node weight size.
+        rbf_out : float32 tensor of shape (B2, D2)
+            The output of RBFLayer, B2 for number of edges and D2 for rbf out size.
+        """
+        g = g.local_var()
+        e = self.project(rbf_out)
+        g.ndata['node_weight'] = node_weight
+        g.edata['e'] = e
+        g.update_all(fn.u_mul_e('node_weight', 'e', 'm'), fn.sum('m', 'h'))
+        return g.ndata.pop('h')
 
 class Interaction(nn.Module):
     """
@@ -229,31 +252,36 @@ class Interaction(nn.Module):
     """
     def __init__(self, rbf_dim, dim):
         super(Interaction, self).__init__()
-        self._node_dim = dim
-        self.activation = nn.Softplus(beta=0.5, threshold=14)
+
+        self._dim = dim
         self.node_layer1 = nn.Linear(dim, dim, bias=False)
         self.cfconv = CFConv(rbf_dim, dim, act=self.activation)
-        self.node_layer2 = nn.Linear(dim, dim)
-        self.node_layer3 = nn.Linear(dim, dim)
+        self.node_layer2 = nn.Sequential(
+            nn.Linear(dim, dim),
+            Softplus(beta=0.5, threshold=14),
+            nn.Linear(dim, dim)
+        )
 
-    def forward(self, g):
+    def forward(self, g, n_feat, rbf_out):
         """
         Parameters
         ----------
         g : DGLGraph
+            The graph for performing convolution
+        n_feat : float32 tensor of shape (B1, D1)
+            Node features, B1 for number of nodes and D1 for feature size.
+        rbf_out : float32 tensor of shape (B2, D2)
+            The output of RBFLayer, B2 for number of edges and D2 for rbf out size.
 
         Returns
         -------
-        tensor
-            Updated atom representations
+        float32 tensor of shape (B1, D1)
+            Updated node representations
         """
-        g.ndata["new_node"] = self.node_layer1(g.ndata["node"])
-        cf_node = self.cfconv(g)
-        cf_node_1 = self.node_layer2(cf_node)
-        cf_node_1a = self.activation(cf_node_1)
-        new_node = self.node_layer3(cf_node_1a)
-        g.ndata["node"] = g.ndata["node"] + new_node
-        return g.ndata["node"]
+        n_weight = self.node_layer1(n_feat)
+        new_n_feat = self.cfconv(g, n_weight, rbf_out)
+        new_n_feat = self.node_layer2(new_n_feat)
+        return n_feat + new_n_feat
 
 class VEConv(nn.Module):
     """
@@ -271,6 +299,7 @@ class VEConv(nn.Module):
     """
     def __init__(self, rbf_dim, dim=64, update_edge=True):
         super(VEConv, self).__init__()
+
         self._rbf_dim = rbf_dim
         self._dim = dim
         self._update_edge = update_edge

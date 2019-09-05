@@ -72,7 +72,7 @@ def main(args):
     if args['model'] == 'MPNN':
         model = model_zoo.chem.MPNNModel(output_dim=args['output_dim'])
     elif args['model'] == 'SCHNET':
-        model = model_zoo.chem.SchNetModel(norm=args['norm'], output_dim=args['output_dim'])
+        model = model_zoo.chem.SchNet(norm=args['norm'], output_dim=args['output_dim'])
         model.set_mean_std(train_set.mean, train_set.std, args['device'])
     elif args['model'] == 'MGCN':
         model = model_zoo.chem.MGCNModel(norm=args['norm'], output_dim=args['output_dim'])

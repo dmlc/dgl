@@ -7,7 +7,7 @@ from .classifiers import GCNClassifier, GATClassifier
 from .dgmg import DGMG
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
-from .sch import SchNetModel
+from .schnet import SchNet
 from ...data.utils import _get_dgl_url, download, get_download_dir
 
 URL = {
@@ -103,7 +103,7 @@ def load_pretrained(model_name, log=True):
         model = MGCNModel(norm=True, output_dim=12)
 
     elif model_name == 'SCHNET_Alchemy':
-        model = SchNetModel(norm=True, output_dim=12)
+        model = SchNet(norm=True, output_dim=12)
 
     elif model_name == 'MPNN_Alchemy':
         model = MPNNModel(output_dim=12)
