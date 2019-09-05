@@ -766,6 +766,23 @@ def test_updates():
         assert F.array_equal(y[0], x[0] * multiplier)
         del g.nodes['game'].data['y']
 
+def test_backward():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    F.attach_grad(x)
+    g.nodes['user'].data['h'] = x
+    with F.record_grad():
+        g.multi_update_all(
+            {'plays' : (fn.copy_u('h', 'm'), fn.sum('m', 'y')),
+             'wishes': (fn.copy_u('h', 'm'), fn.sum('m', 'y'))},
+            'sum')
+        y = g.nodes['game'].data['y']
+        F.backward(y, F.ones(y.shape))
+    print(F.grad(x))
+    assert F.array_equal(F.grad(x), F.tensor([[2., 2., 2., 2., 2.],
+                                              [2., 2., 2., 2., 2.],
+                                              [2., 2., 2., 2., 2.]]))
+
 if __name__ == '__main__':
     test_query()
     test_view()
@@ -775,3 +792,4 @@ if __name__ == '__main__':
     test_level1()
     test_level2()
     test_updates()
+    test_backward()
