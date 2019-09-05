@@ -57,6 +57,7 @@ struct BackwardBinaryReduce {
       DType* lhs_base = lhsoff + tx * len;
       DType* rhs_base = rhsoff + tx * len;
       if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
+#pragma unroll
         for (int64_t i = 0; i < len; ++i) {
           DType lhs = Functors::Read(lhs_base + i);
           DType rhs = Functors::Read(rhs_base + i);
@@ -65,6 +66,7 @@ struct BackwardBinaryReduce {
         }
       }
       if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
+#pragma unroll
         for (int64_t i = 0; i < len; ++i) {
           DType lhs = Functors::Read(lhs_base + i);
           DType rhs = Functors::Read(rhs_base + i);
@@ -123,6 +125,7 @@ struct BackwardBinaryReduceBcast {
       DType* rhs_base = rhsoff +
           Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
       if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
+#pragma unroll
         for (int64_t i = 0; i < len; ++i) {
           DType lhs = Functors::Read(lhs_base + i);
           DType rhs = Functors::Read(rhs_base + i);
@@ -131,6 +134,7 @@ struct BackwardBinaryReduceBcast {
         }
       }
       if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
+#pragma unroll
         for (int64_t i = 0; i < len; ++i) {
           DType lhs = Functors::Read(lhs_base + i);
           DType rhs = Functors::Read(rhs_base + i);

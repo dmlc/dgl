@@ -198,6 +198,7 @@ struct BinaryDot {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     DType out = 0;
     // simple vector dot vector
+#pragma unroll
     for (int i = 0; i < len; i ++)
       out += lhs[i] * rhs[i];
 
@@ -220,6 +221,8 @@ struct BinaryDot {
 //  - Div(Src, Dst), Div(Src, Edge), Div(Dst, Edge)
 //    Div(Dst, Src), Div(Edge, Src), Div(Edge, Dst)
 //  - UseLhs(Src, None), UseLhs(Edge, None)
+//  - Dot(Src, Dst), Dot(Src, Edge), Dot(Dst, Edge)
+//  - Dot(Dst, Src), Dot(Edge, Src), Dot(Edge, Dst)
 // Note that for commutative operators (e.g. Add and Mul), we only generate
 // kernels for lhs code smaller than rhs code.
 #define OP_TARGET_SWITCH(op, lhs, rhs, DType, OpType, LeftType, RightType, ...)   \
