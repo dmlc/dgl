@@ -360,9 +360,9 @@ def test_flatten():
         src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
         src_fg, dst_fg = fg.find_edges([eid], 'edge')
         assert src_g == fg.induced_srcid[i]
-        assert g.canonical_etypes[etype][0] == g.ntypes[fg.induced_srctype[i]]
+        assert g.canonical_etypes[etype][0] == g.ntypes[F.asnumpy(fg.induced_srctype)[i]]
         assert dst_g == fg.induced_dstid[i]
-        assert g.canonical_etypes[etype][2] == g.ntypes[fg.induced_dsttype[i]]
+        assert g.canonical_etypes[etype][2] == g.ntypes[F.asnumpy(fg.induced_dsttype)[i]]
 
 def test_apply():
     def node_udf(nodes):
@@ -698,7 +698,7 @@ def test_level2():
         g['wishes'].update_all(mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
         if cred == 'stack':
-            yy = F.stack([y1.unsqueeze(1), y2.unsqueeze(1)], 1)
+            yy = F.stack([F.unsqueeze(y1, 1), F.unsqueeze(y2, 1)], 1)
         else:
             yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         yy = yy + 1  # final afunc

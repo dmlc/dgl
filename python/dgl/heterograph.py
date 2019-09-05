@@ -2574,7 +2574,7 @@ def merge_frames(frames, reducer):
         flist = []
         for f in frames:
             if k in f:
-                flist.append(f[k].data)
+                flist.append(f[k])
         if len(flist) > 1:
             ret[k] = merger(flist)
         else:
