@@ -286,10 +286,13 @@ class BinaryReduce(th.autograd.Function):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
         feat_shape = K.infer_binary_feature_shape(binary_op, lhs_data_nd, rhs_data_nd)
-        out_data = lhs_data.new_empty((out_size,) + feat_shape[:-1])
+        out_shape = feat_shape
+        if binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = lhs_data.new_empty((out_size,) + out_shape)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.binary_op_reduce(
-            reducer if reducer != 'mean' else 'sum', 
+            reducer if reducer != 'mean' else 'sum',
             binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
         # normalize if mean reducer
@@ -308,7 +311,7 @@ class BinaryReduce(th.autograd.Function):
             in_ones = lhs_data.new_ones((n,))
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
-                'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0]) 
+                'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
             # reshape
             degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
             out_data = out_data / degs

@@ -154,8 +154,8 @@ def copy_e(e, out):
 # v_add_e, v_sub_e, v_mul_e, v_div_e
 # e_add_u, e_sub_u, e_mul_u, e_div_u
 # e_add_v, e_sub_v, e_mul_v, e_div_v
-# 
-# masked-mm message functions:
+#
+# dot message functions:
 # u_dot_v, u_dot_e, v_dot_e
 
 _TARGET_MAP = {
@@ -209,7 +209,6 @@ def _register_builtin_message_func():
                 setattr(sys.modules[__name__], func.__name__, func)
                 __all__.append(func.__name__)
 
-    """Register builtin masked-mm functions"""
     for lhs, rhs in product(["u", "v"], ["v", "e"]):
         if lhs != rhs:
             for binary_op in ["dot"]:

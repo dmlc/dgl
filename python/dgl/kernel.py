@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from ._ffi.function import _init_api
 from .ndarray import empty
 
+# pylint: disable=invalid-name
 def infer_binary_feature_shape(op, lhs, rhs):
     """Infer the output feature shape after a binary operation between lhs and rhs.
 
