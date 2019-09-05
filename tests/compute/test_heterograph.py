@@ -349,17 +349,17 @@ def test_flatten():
     assert F.array_equal(fg.edata['e'], F.ones((6, 4)))
     assert 'f' not in fg.edata
 
-    etypes = F.asnumpy(fg.induced_etypes).tolist()
-    eids = F.asnumpy(fg.induced_eids).tolist()
+    etypes = F.asnumpy(fg.induced_etype).tolist()
+    eids = F.asnumpy(fg.induced_eid).tolist()
     assert set(zip(etypes, eids)) == set([(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)])
 
     for i, (etype, eid) in enumerate(zip(etypes, eids)):
         src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
         src_fg, dst_fg = fg.find_edges([eid], 'edge')
-        assert src_g == fg.induced_srcids[i]
-        assert g.canonical_etypes[etype][0] == g.ntypes[fg.induced_srctypes[i]]
-        assert dst_g == fg.induced_dstids[i]
-        assert g.canonical_etypes[etype][2] == g.ntypes[fg.induced_dsttypes[i]]
+        assert src_g == fg.induced_srcid[i]
+        assert g.canonical_etypes[etype][0] == g.ntypes[fg.induced_srctype[i]]
+        assert dst_g == fg.induced_dstid[i]
+        assert g.canonical_etypes[etype][2] == g.ntypes[fg.induced_dsttype[i]]
 
 def test_apply():
     def node_udf(nodes):

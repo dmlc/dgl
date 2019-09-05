@@ -494,10 +494,9 @@ class DGLHeteroGraph(object):
             new_g = fg.graph
 
             # merge frames
-            stids, dtids, etids = self._graph.metagraph.find_edges(utils.toindex(etypes))
-            stids = stids.tonumpy().tolist()
-            dtids = dtids.tonumpy().tolist()
-            etids = etids.tonumpy().tolist()
+            stids = fg.induced_srctype_set.asnumpy()
+            dtids = fg.induced_dsttype_set.asnumpy()
+            etids = fg.induced_etype_set.asnumpy()
             new_ntypes = ['src', 'dst']
             new_nframes = [
                 combine_frames(self._node_frames, stids),

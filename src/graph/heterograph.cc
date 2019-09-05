@@ -199,6 +199,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   std::vector<dgl_id_t> result_src, result_dst;
   std::vector<dgl_type_t> induced_srctype, induced_etype, induced_dsttype;
   std::vector<dgl_id_t> induced_srcid, induced_eid, induced_dstid;
+  std::vector<dgl_type_t> srctype_set, dsttype_set;
 
   for (dgl_type_t etype : etypes) {
     auto src_dsttype = meta_graph_->FindEdge(etype);
@@ -210,10 +211,12 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
     if (srctype_offsets.count(srctype) == 0) {
       srctype_offsets[srctype] = src_nodes;
       src_nodes += num_srctype_nodes;
+      srctype_set.push_back(srctype);
     }
     if (dsttype_offsets.count(dsttype) == 0) {
       dsttype_offsets[dsttype] = dst_nodes;
       dst_nodes += num_dsttype_nodes;
+      dsttype_set.push_back(dsttype);
     }
 
     size_t srctype_offset = srctype_offsets[srctype];
@@ -236,21 +239,25 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
       induced_dstid.push_back(edges_dst_data[i]);
     }
   }
+  std::cout << src_nodes << ' ' << dst_nodes << std::endl;
 
   HeteroGraphPtr gptr = UnitGraph::CreateFromCOO(
       2,
-      result_src.size(),
-      result_dst.size(),
+      src_nodes,
+      dst_nodes,
       aten::VecToIdArray(result_src),
       aten::VecToIdArray(result_dst));
 
   FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
   result->graph = HeteroGraphRef(gptr);
   result->induced_srctype = aten::VecToIdArray(induced_srctype);
+  result->induced_srctype_set = aten::VecToIdArray(srctype_set);
   result->induced_srcid = aten::VecToIdArray(induced_srcid);
   result->induced_etype = aten::VecToIdArray(induced_etype);
+  result->induced_etype_set = aten::VecToIdArray(etypes);
   result->induced_eid = aten::VecToIdArray(induced_eid);
   result->induced_dsttype = aten::VecToIdArray(induced_dsttype);
+  result->induced_dsttype_set = aten::VecToIdArray(dsttype_set);
   result->induced_dstid = aten::VecToIdArray(induced_dstid);
   return FlattenedHeteroGraphPtr(result);
 };

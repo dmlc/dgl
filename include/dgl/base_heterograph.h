@@ -402,26 +402,50 @@ struct HeteroSubgraph : public runtime::Object {
 struct FlattenedHeteroGraph : public runtime::Object {
   /*! \brief The graph */
   HeteroGraphRef graph;
-  /*! \brief Mapping from source node ID to node type in parent graph */
+  /*!
+   * \brief Mapping from source node ID to node type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
   IdArray induced_srctype;
+  /*!
+   * \brief The set of node types in parent graph appearing in source nodes.
+   */
+  IdArray induced_srctype_set;
   /*! \brief Mapping from source node ID to local node ID in parent graph */
   IdArray induced_srcid;
-  /*! \brief Mapping from edge ID to edge type in parent graph */
+  /*!
+   * \brief Mapping from edge ID to edge type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
   IdArray induced_etype;
+  /*!
+   * \brief The set of edge types in parent graph appearing in edges.
+   */
+  IdArray induced_etype_set;
   /*! \brief Mapping from edge ID to local edge ID in parent graph */
   IdArray induced_eid;
-  /*! \brief Mapping from destination node ID to node type in parent graph */
+  /*!
+   * \brief Mapping from destination node ID to node type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
   IdArray induced_dsttype;
+  /*!
+   * \brief The set of node types in parent graph appearing in destination nodes.
+   */
+  IdArray induced_dsttype_set;
   /*! \brief Mapping from destination node ID to local node ID in parent graph */
   IdArray induced_dstid;
   
   void VisitAttrs(runtime::AttrVisitor *v) final {
     v->Visit("graph", &graph);
     v->Visit("induced_srctype", &induced_srctype);
+    v->Visit("induced_srctype_set", &induced_srctype_set);
     v->Visit("induced_srcid", &induced_srcid);
     v->Visit("induced_etype", &induced_etype);
+    v->Visit("induced_etype_set", &induced_etype_set);
     v->Visit("induced_eid", &induced_eid);
     v->Visit("induced_dsttype", &induced_dsttype);
+    v->Visit("induced_dsttype_set", &induced_dsttype_set);
     v->Visit("induced_dstid", &induced_dstid);
   };
 
