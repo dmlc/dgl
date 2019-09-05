@@ -49,6 +49,14 @@ class DGLBaseGraph(object):
         """
         return self._graph.number_of_nodes()
 
+    def _number_of_src_nodes(self):
+        """Return number of source nodes (only used in scheduler)"""
+        return self.number_of_nodes()
+
+    def _number_of_dst_nodes(self):
+        """Return number of destination nodes (only used in scheduler)"""
+        return self.number_of_nodes()
+
     def __len__(self):
         """Return the number of nodes in the graph."""
         return self.number_of_nodes()
@@ -64,6 +72,10 @@ class DGLBaseGraph(object):
         """True if the graph is readonly, False otherwise.
         """
         return self._graph.is_readonly()
+
+    def _number_of_edges(self):
+        """Return number of edges in the current view (only used for scheduler)"""
+        return self.number_of_edges()
 
     def number_of_edges(self):
         """Return the number of edges in the graph.
@@ -938,6 +950,14 @@ class DGLGraph(DGLBaseGraph):
 
     def _set_msg_index(self, index):
         self._msg_index = index
+
+    @property
+    def _src_frame(self):
+        return self._node_frame
+
+    @property
+    def _dst_frame(self):
+        return self._node_frame
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.

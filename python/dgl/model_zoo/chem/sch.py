@@ -1,19 +1,39 @@
 # -*- coding:utf-8 -*-
-
-import dgl
+# pylint: disable=C0103, C0111, W0621
+"""Implementation of SchNet model."""
 import torch as th
 import torch.nn as nn
-from layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+
+from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+from ...batched_graph import sum_nodes
 
 
 class SchNetModel(nn.Module):
     """
-    SchNet Model from:
-        Schütt, Kristof, et al.
-        SchNet: A continuous-filter convolutional neural network
-        for modeling quantum interactions. (NIPS'2017)
-    """
+    `SchNet: A continuous-filter convolutional neural network for modeling
+    quantum interactions. (NIPS'2017) <https://arxiv.org/abs/1706.08566>`__
 
+    Parameters
+    ----------
+    dim : int
+        Dimension of features, default to be 64
+    cutoff : float
+        Radius cutoff for RBF, default to be 5.0
+    output_dim : int
+        Dimension of prediction, default to be 1
+    width : int
+        Width in RBF, default to 1
+    n_conv : int
+        Number of conv (interaction) layers, default to be 1
+    norm : bool
+        Whether to normalize the output atom representations, default to be False.
+    atom_ref : Atom embeddings or None
+        If None, random representation initialization will be used. Otherwise,
+        they will be used to initialize atom representations. Default to be None.
+    pre_train : Atom embeddings or None
+        If None, random representation initialization will be used. Otherwise,
+        they will be used to initialize atom representations. Default to be None.
+    """
     def __init__(self,
                  dim=64,
                  cutoff=5.0,
@@ -23,17 +43,6 @@ class SchNetModel(nn.Module):
                  norm=False,
                  atom_ref=None,
                  pre_train=None):
-        """
-        Args:
-            dim: dimension of features
-            output_dim: dimension of prediction
-            cutoff: radius cutoff
-            width: width in the RBF function
-            n_conv: number of interaction layers
-            atom_ref: used as the initial value of atom embeddings,
-                      or set to None with random initialization
-            norm: normalization
-        """
         super().__init__()
         self.name = "SchNet"
         self._dim = dim
@@ -58,12 +67,32 @@ class SchNetModel(nn.Module):
         self.atom_dense_layer2 = nn.Linear(64, output_dim)
 
     def set_mean_std(self, mean, std, device="cpu"):
+        """Set the mean and std of atom representations for normalization.
+
+        Parameters
+        ----------
+        mean : list or numpy array
+            The mean of labels
+        std : list or numpy array
+            The std of labels
+        device : str or torch.device
+            Device for storing the mean and std
+        """
         self.mean_per_atom = th.tensor(mean, device=device)
         self.std_per_atom = th.tensor(std, device=device)
 
     def forward(self, g):
-        """g is the DGL.graph"""
+        """Predict molecule labels
 
+        Parameters
+        ----------
+        g : DGLGraph
+            Input DGLGraph for molecule(s)
+
+        Returns
+        -------
+        res : Predicted labels
+        """
         self.embedding_layer(g)
         if self.atom_ref is not None:
             self.e0(g, "e0")
@@ -80,17 +109,6 @@ class SchNetModel(nn.Module):
             g.ndata["res"] = g.ndata["res"] + g.ndata["e0"]
 
         if self.norm:
-            g.ndata["res"] = g.ndata[
-                "res"] * self.std_per_atom + self.mean_per_atom
-        res = dgl.sum_nodes(g, "res")
+            g.ndata["res"] = g.ndata["res"] * self.std_per_atom + self.mean_per_atom
+        res = sum_nodes(g, "res")
         return res
-
-
-if __name__ == "__main__":
-    g = dgl.DGLGraph()
-    g.add_nodes(2)
-    g.add_edges([0, 0, 1, 1], [1, 0, 1, 0])
-    g.edata["distance"] = th.tensor([1.0, 3.0, 2.0, 4.0]).reshape(-1, 1)
-    g.ndata["node_type"] = th.LongTensor([1, 2])
-    model = SchNetModel(dim=2)
-    atom = model(g)

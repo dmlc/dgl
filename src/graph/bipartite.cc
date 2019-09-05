@@ -6,12 +6,15 @@
 #include <dgl/array.h>
 #include <dgl/lazy.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/base_heterograph.h>
 
 #include "./bipartite.h"
 #include "../c_api_common.h"
 
 namespace dgl {
+
 namespace {
+
 inline GraphPtr CreateBipartiteMetaGraph() {
   std::vector<int64_t> row_vec(1, Bipartite::kSrcVType);
   std::vector<int64_t> col_vec(1, Bipartite::kDstVType);
@@ -20,8 +23,9 @@ inline GraphPtr CreateBipartiteMetaGraph() {
   GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
   return g;
 }
-static const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
-}  // namespace
+const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
+
+};  // namespace
 
 //////////////////////////////////////////////////////////
 //
@@ -29,22 +33,20 @@ static const GraphPtr kBipartiteMetaGraph = CreateBipartiteMetaGraph();
 //
 //////////////////////////////////////////////////////////
 
-/*! \brief COO graph */
 class Bipartite::COO : public BaseHeteroGraph {
  public:
-  COO(int64_t num_src, int64_t num_dst,
-               IdArray src, IdArray dst)
+  COO(int64_t num_src, int64_t num_dst, IdArray src, IdArray dst)
     : BaseHeteroGraph(kBipartiteMetaGraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
-  COO(int64_t num_src, int64_t num_dst,
-               IdArray src, IdArray dst, bool is_multigraph)
+
+  COO(int64_t num_src, int64_t num_dst, IdArray src, IdArray dst, bool is_multigraph)
     : BaseHeteroGraph(kBipartiteMetaGraph),
       is_multigraph_(is_multigraph) {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
-  explicit COO(const aten::COOMatrix& coo)
-    : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo) {}
+
+  explicit COO(const aten::COOMatrix& coo) : BaseHeteroGraph(kBipartiteMetaGraph), adj_(coo) {}
 
   uint64_t NumVertexTypes() const override {
     return 2;
@@ -155,7 +157,7 @@ class Bipartite::COO : public BaseHeteroGraph {
   }
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
-    CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+    CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
                      aten::IndexSelect(adj_.col, eids),
                      eids};
@@ -288,7 +290,6 @@ class Bipartite::COO : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-
 /*! \brief CSR graph */
 class Bipartite::CSR : public BaseHeteroGraph {
  public:
@@ -305,8 +306,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
   }
 
-  explicit CSR(const aten::CSRMatrix& csr)
-    : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr) {}
+  explicit CSR(const aten::CSRMatrix& csr) : BaseHeteroGraph(kBipartiteMetaGraph), adj_(csr) {}
 
   uint64_t NumVertexTypes() const override {
     return 2;
@@ -343,6 +343,34 @@ class Bipartite::CSR : public BaseHeteroGraph {
 
   uint8_t NumBits() const override {
     return adj_.indices->dtype.bits;
+  }
+
+  CSR AsNumBits(uint8_t bits) const {
+    if (NumBits() == bits) {
+      return *this;
+    } else {
+      CSR ret(
+          adj_.num_rows, adj_.num_cols,
+          aten::AsNumBits(adj_.indptr, bits),
+          aten::AsNumBits(adj_.indices, bits),
+          aten::AsNumBits(adj_.data, bits));
+      ret.is_multigraph_ = is_multigraph_;
+      return ret;
+    }
+  }
+
+  CSR CopyTo(const DLContext& ctx) const {
+    if (Context() == ctx) {
+      return *this;
+    } else {
+      CSR ret(
+          adj_.num_rows, adj_.num_cols,
+          adj_.indptr.CopyTo(ctx),
+          adj_.indices.CopyTo(ctx),
+          adj_.data.CopyTo(ctx));
+      ret.is_multigraph_ = is_multigraph_;
+      return ret;
+    }
   }
 
   bool IsMultigraph() const override {
@@ -386,8 +414,8 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
-    CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
-    CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
     return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
   }
 
@@ -408,8 +436,8 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
-    CHECK(IsValidIdArray(src)) << "Invalid vertex id array.";
-    CHECK(IsValidIdArray(dst)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(src)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dst)) << "Invalid vertex id array.";
     const auto& arrs = aten::CSRGetDataAndIndices(adj_, src, dst);
     return EdgeArray{arrs[0], arrs[1], arrs[2]};
   }
@@ -443,7 +471,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override {
-    CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
     auto csrsubmat = aten::CSRSliceRows(adj_, vids);
     auto coosubmat = aten::CSRToCOO(csrsubmat, false);
     // Note that the row id in the csr submat is relabled, so
@@ -476,7 +504,7 @@ class Bipartite::CSR : public BaseHeteroGraph {
   }
 
   DegreeArray OutDegrees(dgl_type_t etype, IdArray vids) const override {
-    CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
     return aten::CSRGetRowNNZ(adj_, vids);
   }
 
@@ -518,8 +546,8 @@ class Bipartite::CSR : public BaseHeteroGraph {
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), 2) << "Number of vertex types mismatch";
-    CHECK(IsValidIdArray(vids[0])) << "Invalid vertex id array.";
-    CHECK(IsValidIdArray(vids[1])) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(vids[0])) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(vids[1])) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, vids[0], vids[1]);
     IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
@@ -579,7 +607,7 @@ bool Bipartite::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
 }
 
 BoolArray Bipartite::HasVertices(dgl_type_t vtype, IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid id array input";
+  CHECK(aten::IsValidIdArray(vids)) << "Invalid id array input";
   return aten::LT(vids, NumVertices(vtype));
 }
 
@@ -761,6 +789,37 @@ HeteroGraphPtr Bipartite::CreateFromCSR(
   return HeteroGraphPtr(new Bipartite(nullptr, csr, nullptr));
 }
 
+HeteroGraphPtr Bipartite::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
+  if (g->NumBits() == bits) {
+    return g;
+  } else {
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+    CHECK_NOTNULL(bg);
+    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+    return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
+  }
+}
+
+HeteroGraphPtr Bipartite::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
+  if (ctx == g->Context()) {
+    return g;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  auto bg = std::dynamic_pointer_cast<Bipartite>(g);
+  CHECK_NOTNULL(bg);
+  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
+  return HeteroGraphPtr(new Bipartite(new_incsr, new_outcsr, nullptr));
+}
+
 Bipartite::Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
   : BaseHeteroGraph(kBipartiteMetaGraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
@@ -811,6 +870,18 @@ Bipartite::COOPtr Bipartite::GetCOO() const {
     }
   }
   return coo_;
+}
+
+aten::CSRMatrix Bipartite::GetInCSRMatrix() const {
+  return GetInCSR()->adj();
+}
+
+aten::CSRMatrix Bipartite::GetOutCSRMatrix() const {
+  return GetOutCSR()->adj();
+}
+
+aten::COOMatrix Bipartite::GetCOOMatrix() const {
+  return GetCOO()->adj();
 }
 
 HeteroGraphPtr Bipartite::GetAny() const {

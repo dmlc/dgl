@@ -2,3 +2,4 @@
 from .conv import *
 from .glob import *
 from .softmax import *
+from .factory import *
