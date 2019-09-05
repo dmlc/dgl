@@ -116,7 +116,7 @@ struct BackwardBinaryReduceBcast {
         len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff + 
+      DType* lhs_base = lhsoff +
           Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
       DType* rhs_base = rhsoff +
           Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;

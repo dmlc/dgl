@@ -99,10 +99,10 @@ BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
   // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
   // out_shape[ndim-1] = 1
   if (op == binary_op::kDot) {
-    //get size of vector
+    // get size of vector
     ret.data_len = lhs->shape[lhs->ndim - 1];
     --max_ndim;
-  } else {//op != binary_op::kDot
+  } else {  // op != binary_op::kDot
     ret.data_len = 1;
   }
 

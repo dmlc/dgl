@@ -92,15 +92,15 @@ struct BinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
       Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
       DType out = Functors::Op(
-          lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len, 
-          rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len, 
+          lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
+          rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
           len);
 
       Functors::Write(outoff + tx, out);

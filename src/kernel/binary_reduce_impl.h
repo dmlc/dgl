@@ -52,7 +52,7 @@ GData<Idx, DType> AllocGData(const std::string& op,
 
   // for dot operation: vector [dot] vector
   if (op == binary_op::kDot) {
-    //get size of vector
+    // get size of vector
     gdata.data_len = lhs_data->shape[lhs_data->ndim - 1];
   } else {
     gdata.data_len = 1;
@@ -156,7 +156,7 @@ BackwardGData<Idx, DType> AllocBackwardGData(
 
   // for dot operation: vector [dot] vector
   if (op == binary_op::kDot) {
-    //get size of vector
+    // get size of vector
     gdata.data_len = lhs_data->shape[lhs_data->ndim - 1];
   } else {
     gdata.data_len = 1;
