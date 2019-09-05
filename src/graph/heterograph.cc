@@ -237,7 +237,8 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
     }
   }
 
-  HeteroGraphPtr gptr = CreateBipartiteFromCOO(
+  HeteroGraphPtr gptr = UnitGraph::CreateFromCOO(
+      2,
       result_src.size(),
       result_dst.size(),
       aten::VecToIdArray(result_src),

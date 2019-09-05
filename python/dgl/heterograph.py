@@ -490,36 +490,31 @@ class DGLHeteroGraph(object):
 
             return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
         else:
-            fg = self._graph.flatten(etypes)
+            fg = self._graph.flatten_relations(etypes)
             new_g = fg.graph
 
             # merge frames
-            srctypes, _, dsttypes = zip(*etypes)
-            stids = [self.get_ntype_id(t) for t in srctypes]
-            etids = [self.get_etype_id(r) for r in etypes]
-            dtids = [self.get_ntype_id(t) for t in dsttypes]
+            stids, dtids, etids = self._graph.metagraph.find_edges(utils.toindex(etypes))
+            stids = stids.tonumpy().tolist()
+            dtids = dtids.tonumpy().tolist()
+            etids = etids.tonumpy().tolist()
             new_ntypes = ['src', 'dst']
             new_nframes = [
                 combine_frames(self._node_frames, stids),
                 combine_frames(self._node_frames, dtids)]
             new_etypes = ['edge']
-            new_eframes = [combine_frames(self._edge_frames[i], etids)]
+            new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
-            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            new_hg = FlattenedHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
 
             # put the parent node/edge type and IDs
-            src_name = 'src'
-            dst_name = 'dst'
-            edge_name = 'edge'
-            type_col = '__type__'
-            id_col = '__id__'
-            new_hg.ndata[type_col, src_name] = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
-            new_hg.ndata[id_col, src_name] = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
-            new_hg.ndata[type_col, dst_name] = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
-            new_hg.ndata[id_col, dst_name] = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
-            new_hg.edata[type_col, edge_name] = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
-            new_hg.edata[id_col, edge_name] = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
+            new_hg.induced_srctype = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
+            new_hg.induced_srcid = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
+            new_hg.induced_dsttype = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
+            new_hg.induced_dstid = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
+            new_hg.induced_etype = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
+            new_hg.induced_eid = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
 
             return new_hg
 
@@ -2579,6 +2574,120 @@ def merge_frames(frames, reducer):
         else:
             ret[k] = flist[0]
     return ret
+
+def combine_frames(frames, ids):
+    """Merge the frames into one frame, taking the common columns.
+
+    Parameters
+    ----------
+    frames : List[FrameRef]
+        List of frames
+    ids : List[int]
+        List of frame IDs
+
+    Returns
+    -------
+    FrameRef
+        The resulting frame
+    """
+    # find common columns and check if their schemes match
+    schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
+    for frame_id in ids:
+        frame = frames[frame_id]
+        for key, scheme in schemes.items():
+            if key in frame.schemes:
+                if frame.schemes[key] != scheme:
+                    raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
+                            (key, frame.schemes[key], scheme))
+            else:
+                del schemes[key]
+
+    # concatenate the columns
+    cols = {key: F.cat([
+            frames[frame_id][key] for frame_id in ids if frames[frame_id].num_rows > 0],
+            dim=0)}
+    return FrameRef(Frame(cols))
+
+class FlattenedHeteroGraph(DGLHeteroGraph):
+    @property
+    def induced_srctype(self):
+        """Return the parent node type of source nodes in the induced unitgraph
+        """
+        return self._induced_srctype
+
+    @induced_srctype.setter
+    def induced_srctype(self, value):
+        self._induced_srctype = value
+
+    @property
+    def induced_srcid(self):
+        """Return the parent node ID of source nodes in the induced unitgraph
+        """
+        return self._induced_srcid
+
+    @induced_srcid.setter
+    def induced_srcid(self, value):
+        self._induced_srcid = value
+
+    @property
+    def induced_srctype(self):
+        """Return the parent node type of source nodes in the induced unitgraph
+        """
+        return self._induced_srctype
+
+    @induced_srctype.setter
+    def induced_srctype(self, value):
+        self._induced_srctype = value
+
+    @property
+    def induced_srcid(self):
+        """Return the parent node ID of source nodes in the induced unitgraph
+        """
+        return self._induced_srcid
+
+    @induced_srcid.setter
+    def induced_srcid(self, value):
+        self._induced_srcid = value
+
+    @property
+    def induced_etype(self):
+        """Return the parent edge type of edges in the induced unitgraph
+        """
+        return self._induced_etype
+
+    @induced_etype.setter
+    def induced_etype(self, value):
+        self._induced_etype = value
+
+    @property
+    def induced_eid(self):
+        """Return the parent edge ID of edges in the induced unitgraph
+        """
+        return self._induced_eid
+
+    @induced_eid.setter
+    def induced_eid(self, value):
+        self._induced_eid = value
+
+    @property
+    def induced_dsttype(self):
+        """Return the parent node type of destination nodes in the induced unitgraph
+        """
+        return self._induced_dsttype
+
+    @induced_dsttype.setter
+    def induced_dsttype(self, value):
+        self._induced_dsttype = value
+
+    @property
+    def induced_dstid(self):
+        """Return the parent node ID of destination nodes in the induced unitgraph
+        """
+        return self._induced_dstid
+
+    @induced_dstid.setter
+    def induced_dstid(self, value):
+        self._induced_dstid = value
 
 class AdaptedHeteroGraph(GraphAdapter):
     """Adapt DGLGraph to interface required by scheduler.

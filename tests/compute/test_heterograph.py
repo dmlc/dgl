@@ -330,6 +330,37 @@ def test_view1():
         fail = True
     assert fail
 
+def test_flatten():
+    # check for wildcard slices
+    g = create_test_heterograph()
+    g.nodes['user'].data['h'] = F.ones((3, 5))
+    g.nodes['game'].data['h'] = F.ones((2, 5))
+    g.edges['plays'].data['e'] = F.ones((4, 4))
+    g.edges['wishes'].data['e'] = F.ones((2, 4))
+    g.edges['wishes'].data['f'] = F.ones((2, 4))
+
+    fg = g['user', :, 'game']   # user--plays->game and user--wishes->game
+    assert 'src' in fg.ntypes
+    assert 'dst' in fg.ntypes
+    assert 'edge' in fg.etypes
+
+    assert F.array_equal(fg.nodes['src'].data['h'], F.ones((3, 5)))
+    assert F.array_equal(fg.nodes['dst'].data['h'], F.ones((2, 5)))
+    assert F.array_equal(fg.edata['e'], F.ones((6, 4)))
+    assert 'f' not in fg.edata
+
+    etypes = F.asnumpy(fg.induced_etypes).tolist()
+    eids = F.asnumpy(fg.induced_eids).tolist()
+    assert set(zip(etypes, eids)) == set([(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)])
+
+    for i, (etype, eid) in enumerate(zip(etypes, eids)):
+        src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
+        src_fg, dst_fg = fg.find_edges([eid], 'edge')
+        assert src_g == fg.induced_srcids[i]
+        assert g.canonical_etypes[etype][0] == g.ntypes[fg.induced_srctypes[i]]
+        assert dst_g == fg.induced_dstids[i]
+        assert g.canonical_etypes[etype][2] == g.ntypes[fg.induced_dsttypes[i]]
+
 def test_apply():
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
@@ -733,6 +764,7 @@ if __name__ == '__main__':
     test_query()
     test_view()
     test_view1()
+    test_flatten()
     test_apply()
     test_level1()
     test_level2()
