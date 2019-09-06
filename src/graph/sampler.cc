@@ -1081,7 +1081,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
 
         dgl_id_t global_changed_vid;
         global_changed_vid = neg_vids[j];
-        // TODO we can avoid the hashtable lookup here.
+        // TODO(zhengda) we can avoid the hashtable lookup here.
         dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
         neg_changed[neg_idx] = local_changed;
         induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
@@ -1114,7 +1114,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
           // second chunk_size neg samples, use random-smapled node to corrupt.
           global_changed_vid = neg_vids[j - last_chunk_size];
         }
-        // TODO we can avoid the hashtable lookup here.
+        // TODO(zhengda) we can avoid the hashtable lookup here.
         dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
         neg_changed[neg_idx] = local_changed;
         induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
