@@ -109,7 +109,9 @@ class MGCNModel(nn.Module):
 
         Returns
         -------
-        res : Predicted labels
+        prediction : float32 tensor of shape (B, output_dim)
+            Model prediction for the batch of graphs, B for the number
+            of graphs, output_dim for the prediction size.
         """
         h = self.embedding_layer(atom_types)
         e = self.edge_embedding_layer(g, atom_types)
