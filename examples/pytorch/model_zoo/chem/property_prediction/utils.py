@@ -63,8 +63,8 @@ class Meter(object):
         total_score = 0
         for task in range(n_tasks):
             task_w = mask[:, task]
-            task_y_true = y_true[:, task][task_w != 0].cpu().numpy()
-            task_y_pred = y_pred[:, task][task_w != 0].cpu().detach().numpy()
+            task_y_true = y_true[:, task][task_w != 0].numpy()
+            task_y_pred = y_pred[:, task][task_w != 0].numpy()
             total_score += roc_auc_score(task_y_true, task_y_pred)
         return total_score / n_tasks
 
