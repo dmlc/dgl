@@ -61,6 +61,19 @@ def load_pretrained(model_name, log=True):
     Parameters
     ----------
     model_name : str
+        Currently supported options include
+
+        * ``'GCN_Tox21'``
+        * ``'GAT_Tox21'``
+        * ``'MGCN_Alchemy'``
+        * ``'SCHNET_Alchemy'``
+        * ``'MPNN_Alchemy'``
+        * ``'DGMG_ChEMBL_canonical'``
+        * ``'DGMG_ChEMBL_random'``
+        * ``'DGMG_ZINC_canonical'``
+        * ``'DGMG_ZINC_random'``
+        * ``'JTNN_ZINC'``
+
     log : bool
         Whether to print progress for model loading
 

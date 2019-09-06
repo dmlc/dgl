@@ -138,9 +138,6 @@ def alchemy_edges(mol, self_loop=False):
     return bond_feats_dict
 
 class TencentAlchemyDataset(object):
-
-    _url = 'dataset/alchemy/'
-
     """
     Developed by the Tencent Quantum Lab, the dataset lists 12 quantum mechanical
     properties of 130, 000+ organic molecules, comprising up to 12 heavy atoms
@@ -180,6 +177,7 @@ class TencentAlchemyDataset(object):
             file_name = "%s_single_sdf" % (mode)
         self.file_dir = pathlib.Path(file_dir, file_name)
 
+        self._url = 'dataset/alchemy/'
         self.zip_file_path = pathlib.Path(file_dir, file_name + '.zip')
         download(_get_dgl_url(self._url + file_name + '.zip'), path=str(self.zip_file_path))
         if not os.path.exists(str(self.file_dir)):
@@ -224,10 +222,40 @@ class TencentAlchemyDataset(object):
             with open(osp.join(self.file_dir, "%s_labels.pkl" % self.mode), "wb") as f:
                 pickle.dump(self.labels, f)
 
-        self.normalize()
+        self.set_mean_and_std()
         print(len(self.graphs), "loaded!")
 
-    def normalize(self, mean=None, std=None):
+    def __getitem__(self, item):
+        """Get datapoint with index
+
+        Parameters
+        ----------
+        item : int
+            Datapoint index
+
+        Returns
+        -------
+        str
+            SMILES for the ith datapoint
+        DGLGraph
+            DGLGraph for the ith datapoint
+        Tensor of dtype float32
+            Labels of the datapoint for all tasks
+        """
+        g, l = self.graphs[item], self.labels[item]
+        return g.smile, g, l
+
+    def __len__(self):
+        """Length of the dataset
+
+        Returns
+        -------
+        int
+            Length of Dataset
+        """
+        return len(self.graphs)
+
+    def set_mean_and_std(self, mean=None, std=None):
         """Set mean and std or compute from labels for future normalization.
 
         Parameters
@@ -244,10 +272,3 @@ class TencentAlchemyDataset(object):
             std = np.std(labels, axis=0)
         self.mean = mean
         self.std = std
-
-    def __len__(self):
-        return len(self.graphs)
-
-    def __getitem__(self, idx):
-        g, l = self.graphs[idx], self.labels[idx]
-        return g.smile, g, l

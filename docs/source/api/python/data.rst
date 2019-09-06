@@ -15,6 +15,10 @@ Utils
     utils.download
     utils.check_sha1
     utils.extract_archive
+    utils.split_dataset
+
+.. autoclass:: dgl.data.utils.Subset
+    :members: __getitem__, __len__
 
 Dataset Classes
 ---------------
@@ -57,3 +61,54 @@ Protein-Protein Interaction dataset
 
 .. autoclass:: PPIDataset
     :members: __getitem__, __len__
+
+Molecular Graphs
+----------------
+
+To work on molecular graphs, make sure you have installed `RDKit 2018.09.3 <https://www.rdkit.org/docs/Install.html>`__.
+
+Featurization
+`````````````
+
+For the use of graph neural networks, we need to featurize nodes (atoms) and edges (bonds). Below we list some
+featurization methods/utilities:
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.one_hot_encoding
+    chem.BaseAtomFeaturizer
+    chem.CanonicalAtomFeaturizer
+
+Graph Construction
+``````````````````
+
+Several methods for constructing DGLGraphs from SMILES/RDKit molecule objects are listed below:
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.mol_to_graph
+    chem.smile_to_bigraph
+    chem.mol_to_bigraph
+    chem.smile_to_complete_graph
+    chem.mol_to_complete_graph
+
+Dataset Classes
+```````````````
+
+If your dataset is stored in a ``.csv`` file, you may find it helpful to use
+
+.. autoclass:: dgl.data.chem.CSVDataset
+    :members: __getitem__, __len__
+
+Currently two datasets are supported:
+
+* Tox21
+* TencentAlchemyDataset
+
+.. autoclass:: dgl.data.chem.Tox21
+    :members: __getitem__, __len__, task_pos_weights
+
+.. autoclass:: dgl.data.chem.TencentAlchemyDataset
+    :members: __getitem__, __len__, set_mean_and_std
