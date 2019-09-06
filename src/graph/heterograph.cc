@@ -260,7 +260,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   result->induced_dsttype_set = aten::VecToIdArray(dsttype_set);
   result->induced_dstid = aten::VecToIdArray(induced_dstid);
   return FlattenedHeteroGraphPtr(result);
-};
+}
 
 // creator implementation
 HeteroGraphPtr CreateHeteroGraph(

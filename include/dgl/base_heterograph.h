@@ -366,7 +366,7 @@ class BaseHeteroGraph : public runtime::Object {
   virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const {
     LOG(FATAL) << "Flatten operation unsupported";
     return nullptr;
-  };
+  }
 
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
@@ -435,7 +435,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
   IdArray induced_dsttype_set;
   /*! \brief Mapping from destination node ID to local node ID in parent graph */
   IdArray induced_dstid;
-  
+
   void VisitAttrs(runtime::AttrVisitor *v) final {
     v->Visit("graph", &graph);
     v->Visit("induced_srctype", &induced_srctype);
@@ -447,7 +447,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
     v->Visit("induced_dsttype", &induced_dsttype);
     v->Visit("induced_dsttype_set", &induced_dsttype_set);
     v->Visit("induced_dstid", &induced_dstid);
-  };
+  }
 
   static constexpr const char* _type_key = "graph.FlattenedHeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(FlattenedHeteroGraph, runtime::Object);
