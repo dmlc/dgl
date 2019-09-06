@@ -1015,9 +1015,13 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   int64_t last_chunk_size = num_pos_edges - num_chunks * chunk_size;
 
   // The number of negative edges.
-  int64_t num_neg_edges = (chunk_size * 2) * chunk_size * num_chunks;
-  int64_t num_neg_edges_last_chunk = (chunk_size * 2) * last_chunk_size;
+  int64_t num_neg_edges = neg_sample_size * chunk_size * num_chunks;
+  int64_t num_neg_edges_last_chunk = neg_sample_size * last_chunk_size;
   int64_t num_all_neg_edges = num_neg_edges + num_neg_edges_last_chunk;
+
+  // We should include the last chunk.
+  if (last_chunk_size > 0)
+    num_chunks++;
 
   IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
@@ -1039,81 +1043,68 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
 
   bool neg_head = (neg_mode == "head");
 
+  std::vector<dgl_id_t> changed;
   const dgl_id_t *unchanged;
-  const dgl_id_t *changed;
   dgl_id_t *neg_unchanged;
   dgl_id_t *neg_changed;
 
   // corrupt head nodes.
   if (neg_head) {
     unchanged = dst_data;
-    changed = src_data;
+    changed.insert(changed.end(), src_data, src_data + num_pos_edges);
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
   } else {
     // corrupt tail nodes.
     unchanged = src_data;
-    changed = dst_data;
+    changed.insert(changed.end(), dst_data, dst_data + num_pos_edges);
     neg_unchanged = neg_src_data;
     neg_changed = neg_dst_data;
   }
+  // corrupt edges by randomly shuffling nodes on one side.
+  // TODO(zhengda) set seed.
+  std::random_shuffle(changed.begin(), changed.end());
+
+  // We first sample all negative edges.
+  std::vector<size_t> neg_vids;
+  RandomSample(num_tot_nodes,
+               num_chunks * neg_sample_size - num_pos_edges,
+               &neg_vids);
 
   dgl_id_t curr_eid = 0;
-  std::vector<size_t> neg_vids;
-  neg_vids.reserve(chunk_size * 2);
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
     // for each chunk.
     size_t neg_idx = (chunk_size * 2) * chunk_size * i_chunk;
-    size_t pos_edge_idx = (chunk_size) * i_chunk;
-    neg_vids.clear();
-    RandomSample(num_tot_nodes, chunk_size * 2, &neg_vids);
+    size_t pos_edge_idx = chunk_size * i_chunk;
+    size_t neg_node_idx = pos_edge_idx;
+    // The actual chunk size. It'll be different for the last chunk.
+    size_t chunk_size1;
+    if (i_chunk == num_chunks - 1 && last_chunk_size > 0)
+      chunk_size1 = last_chunk_size;
+    else
+      chunk_size1 = chunk_size;
 
-    for (int64_t in_chunk = 0; in_chunk != chunk_size; ++in_chunk) {
+    for (int64_t in_chunk = 0; in_chunk != chunk_size1; ++in_chunk) {
       // For each positive node in a chunk.
 
       dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
       dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
-      // generate 2 * chunk_size neg samples
-      for (int64_t j = 0; j != chunk_size * 2; ++j) {
+      for (int64_t j = 0; j < neg_sample_size; ++j) {
         neg_unchanged[neg_idx] = local_unchanged;
         neg_eid_data[neg_idx] = curr_eid++;
 
         dgl_id_t global_changed_vid;
-        global_changed_vid = neg_vids[j];
-        // TODO(zhengda) we can avoid the hashtable lookup here.
-        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
-        neg_changed[neg_idx] = local_changed;
-        induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
-        neg_idx++;
-      }
-    }
-  }
-  {
-    // for the last chunk
-    size_t neg_idx = (chunk_size * 2) * chunk_size * num_chunks;
-    size_t pos_edge_idx = (chunk_size) * num_chunks;
-    neg_vids.clear();
-    RandomSample(num_tot_nodes, 2 * chunk_size - last_chunk_size, &neg_vids);
-
-    for (int64_t in_chunk = 0; in_chunk != last_chunk_size; ++in_chunk) {
-      // For each positive node in a chunk.
-
-      dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
-      dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
-      // generate 2 * chunk_size neg samples
-      for (int64_t j = 0; j != chunk_size * 2; ++j) {
-        neg_unchanged[neg_idx] = local_unchanged;
-        neg_eid_data[neg_idx] = curr_eid++;
-
-        dgl_id_t global_changed_vid;
-        if (j < last_chunk_size) {
+        if (j < chunk_size1) {
           // first chunk_size neg samples use in-chunk node to corrupt.
+          assert(pos_edge_idx + j < num_pos_edges);
           global_changed_vid = induced_vid_data[changed[pos_edge_idx + j]];
         } else {
           // second chunk_size neg samples, use random-smapled node to corrupt.
-          global_changed_vid = neg_vids[j - last_chunk_size];
+          assert(neg_node_idx + j - chunk_size1 < neg_vids.size());
+          global_changed_vid = neg_vids[neg_node_idx + j - chunk_size1];
         }
+
         // TODO(zhengda) we can avoid the hashtable lookup here.
         dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
         neg_changed[neg_idx] = local_changed;
