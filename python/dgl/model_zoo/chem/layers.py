@@ -262,7 +262,7 @@ class Interaction(nn.Module):
 
         self._dim = dim
         self.node_layer1 = nn.Linear(dim, dim, bias=False)
-        self.cfconv = CFConv(rbf_dim, dim, act=self.activation)
+        self.cfconv = CFConv(rbf_dim, dim, Softplus(beta=0.5, threshold=14))
         self.node_layer2 = nn.Sequential(
             nn.Linear(dim, dim),
             Softplus(beta=0.5, threshold=14),
