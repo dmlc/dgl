@@ -180,7 +180,7 @@ def collate_molgraphs_for_regression(data):
         Batched datapoint labels. B is len(data) and
         T is the number of total tasks.
     """
-    smiles, graphs, labels, mask = map(list, zip(*data))
+    smiles, graphs, labels = map(list, zip(*data))
     bg = dgl.batch(graphs)
     bg.set_n_initializer(dgl.init.zero_initializer)
     bg.set_e_initializer(dgl.init.zero_initializer)
