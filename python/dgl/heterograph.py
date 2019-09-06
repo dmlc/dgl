@@ -2160,28 +2160,6 @@ class DGLHeteroGraph(object):
         """
         pass
 
-    def subgraphs(self, nodes):
-        """Return a list of subgraphs, each induced in the corresponding given
-        nodes in the list.
-
-        Equivalent to
-        ``[self.subgraph(nodes_list) for nodes_list in nodes]``
-
-        Parameters
-        ----------
-        nodes : a list of dict[str, list or iterable]
-            A list of type-ID dictionaries to construct corresponding
-            subgraphs.  The dictionaries are of the same form as
-            :func:`subgraph`.
-            All nodes in all the list items must exist in the graph.
-
-        Returns
-        -------
-        G : A list of DGLHeteroSubGraph
-            The subgraphs.
-        """
-        pass
-
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
 
@@ -2207,7 +2185,7 @@ class DGLHeteroGraph(object):
         """
         pass
 
-    def adjacency_matrix_scipy(self, etype, transpose=False, fmt='csr'):
+    def adjacency_matrix_scipy(self, etype=None, transpose=False, fmt='csr'):
         """Return the scipy adjacency matrix representation of edges with the
         given edge type.
 
@@ -2236,7 +2214,7 @@ class DGLHeteroGraph(object):
         """
         pass
 
-    def adjacency_matrix(self, etype, transpose=False, ctx=F.cpu()):
+    def adjacency_matrix(self, etype=None, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of edges with the
         given edge type.
 
@@ -2356,16 +2334,6 @@ class DGLHeteroGraph(object):
         -------
         tensor
             The filtered edges represented by their ids.
-        """
-        pass
-
-    def readonly(self, readonly_state=True):
-        """Set this graph's readonly state in-place.
-
-        Parameters
-        ----------
-        readonly_state : bool, optional
-            New readonly state of the graph, defaults to True.
         """
         pass
 

@@ -205,53 +205,6 @@ def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
     """
     pass
 
-def from_networkx(
-            self,
-            nx_graph,
-            node_type_attr_name='type',
-            edge_type_attr_name='type',
-            node_id_attr_name='id',
-            edge_id_attr_name='id',
-            node_attrs=None,
-            edge_attrs=None):
-    """Convert from networkx graph.
-
-    The networkx graph must satisfy the metagraph.  That is, for any
-    edge in the networkx graph, the source/destination node type must
-    be the same as the source/destination node of the edge type in
-    the metagraph.  An error will be raised otherwise.
-
-    Parameters
-    ----------
-    nx_graph : networkx.DiGraph
-        The networkx graph.
-    node_type_attr_name : str
-        The node attribute name for the node type.
-        The attribute contents must be strings.
-    edge_type_attr_name : str
-        The edge attribute name for the edge type.
-        The attribute contents must be strings.
-    node_id_attr_name : str
-        The node attribute name for node type-specific IDs.
-        The attribute contents must be integers.
-        If the IDs of the same type are not consecutive integers, its
-        nodes will be relabeled using consecutive integers.  The new
-        node ordering will inherit that of the sorted IDs.
-    edge_id_attr_name : str or None
-        The edge attribute name for edge type-specific IDs.
-        The attribute contents must be integers.
-        If the IDs of the same type are not consecutive integers, its
-        nodes will be relabeled using consecutive integers.  The new
-        node ordering will inherit that of the sorted IDs.
-
-        If None is provided, the edge order would be arbitrary.
-    node_attrs : iterable of str, optional
-        The node attributes whose data would be copied.
-    edge_attrs : iterable of str, optional
-        The edge attributes whose data would be copied.
-    """
-    pass
-
 ############################################################
 # Internal APIs
 ############################################################
@@ -374,3 +327,51 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
         hgidx = heterograph_index.create_unitgraph_from_csr(
             num_ntypes, num_src, num_dst, indptr, indices, data)
     return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
+
+def create_from_networkx(nx_graph,
+                         node_type_attr_name='type',
+                         edge_type_attr_name='type',
+                         node_id_attr_name='id',
+                         edge_id_attr_name='id',
+                         node_attrs=None,
+                         edge_attrs=None):
+    """Convert from networkx graph.
+
+    Examples
+    --------
+    TBD
+
+    Parameters
+    ----------
+    nx_graph : networkx.DiGraph
+        The networkx graph.
+    node_type_attr_name : str
+        The node attribute name for the node type.
+        The attribute contents must be strings.
+    edge_type_attr_name : str
+        The edge attribute name for the edge type.
+        The attribute contents must be strings.
+    node_id_attr_name : str
+        The node attribute name for node type-specific IDs.
+        The attribute contents must be integers.
+        If the IDs of the same type are not consecutive integers, its
+        nodes will be relabeled using consecutive integers.  The new
+        node ordering will inherit that of the sorted IDs.
+    edge_id_attr_name : str or None
+        The edge attribute name for edge type-specific IDs.
+        The attribute contents must be integers.
+        If the IDs of the same type are not consecutive integers, its
+        nodes will be relabeled using consecutive integers.  The new
+        node ordering will inherit that of the sorted IDs.
+
+        If None is provided, the edge order would be arbitrary.
+    node_attrs : iterable of str, optional
+        The node attributes whose data would be copied.
+    edge_attrs : iterable of str, optional
+        The edge attributes whose data would be copied.
+
+    Returns
+    -------
+    DGLHeteroGraph
+    """
+    pass
