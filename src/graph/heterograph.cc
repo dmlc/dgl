@@ -201,6 +201,8 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   std::vector<dgl_id_t> induced_srcid, induced_eid, induced_dstid;
   std::vector<dgl_type_t> srctype_set, dsttype_set;
 
+  // XXXtype_offsets contain the mapping from node type and number of nodes after this
+  // loop.
   for (dgl_type_t etype : etypes) {
     auto src_dsttype = meta_graph_->FindEdge(etype);
     dgl_type_t srctype = src_dsttype.first;
@@ -209,16 +211,49 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
     size_t num_dsttype_nodes = NumVertices(dsttype);
 
     if (srctype_offsets.count(srctype) == 0) {
-      srctype_offsets[srctype] = src_nodes;
-      src_nodes += num_srctype_nodes;
+      srctype_offsets[srctype] = num_srctype_nodes;
       srctype_set.push_back(srctype);
     }
     if (dsttype_offsets.count(dsttype) == 0) {
-      dsttype_offsets[dsttype] = dst_nodes;
-      dst_nodes += num_dsttype_nodes;
+      dsttype_offsets[dsttype] = num_dsttype_nodes;
       dsttype_set.push_back(dsttype);
     }
+  }
 
+  // Sort the node types so that we can compare the sets and decide whether a homograph
+  // should be returned.
+  std::sort(srctype_set.begin(), srctype_set.end());
+  std::sort(dsttype_set.begin(), dsttype_set.end());
+  bool homograph = (srctype_set.size() == dsttype_set.size()) &&
+    std::equal(srctype_set.begin(), srctype_set.end(), dsttype_set.begin());
+
+  // XXXtype_offsets contain the mapping from node type to node ID offsets after these
+  // two loops.
+  for (size_t i = 0; i < srctype_set.size(); ++i) {
+    dgl_type_t ntype = srctype_set[i];
+    size_t num_nodes = srctype_offsets[ntype];
+    srctype_offsets[ntype] = src_nodes;
+    src_nodes += num_nodes;
+    for (size_t j = 0; j < num_nodes; ++j) {
+      induced_srctype.push_back(ntype);
+      induced_srcid.push_back(j);
+    }
+  }
+  for (size_t i = 0; i < dsttype_set.size(); ++i) {
+    dgl_type_t ntype = dsttype_set[i];
+    size_t num_nodes = dsttype_offsets[ntype];
+    dsttype_offsets[ntype] = dst_nodes;
+    dst_nodes += num_nodes;
+    for (size_t j = 0; j < num_nodes; ++j) {
+      induced_dsttype.push_back(ntype);
+      induced_dstid.push_back(j);
+    }
+  }
+
+  for (dgl_type_t etype : etypes) {
+    auto src_dsttype = meta_graph_->FindEdge(etype);
+    dgl_type_t srctype = src_dsttype.first;
+    dgl_type_t dsttype = src_dsttype.second;
     size_t srctype_offset = srctype_offsets[srctype];
     size_t dsttype_offset = dsttype_offsets[dsttype];
 
@@ -231,18 +266,13 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
     for (size_t i = 0; i < num_edges; ++i) {
       result_src.push_back(edges_src_data[i] + srctype_offset);
       result_dst.push_back(edges_dst_data[i] + dsttype_offset);
-      induced_srctype.push_back(srctype);
       induced_etype.push_back(etype);
-      induced_dsttype.push_back(dsttype);
-      induced_srcid.push_back(edges_src_data[i]);
       induced_eid.push_back(edges_eid_data[i]);
-      induced_dstid.push_back(edges_dst_data[i]);
     }
   }
-  std::cout << src_nodes << ' ' << dst_nodes << std::endl;
 
   HeteroGraphPtr gptr = UnitGraph::CreateFromCOO(
-      2,
+      homograph ? 1 : 2,
       src_nodes,
       dst_nodes,
       aten::VecToIdArray(result_src),

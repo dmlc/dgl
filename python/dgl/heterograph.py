@@ -10,7 +10,7 @@ from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .base import ALL, SLICE_FULL, is_all, DGLError
+from .base import ALL, SLICE_FULL, SRC, DST, DEFAULT, NTYPE, NID, ETYPE, EID, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph']
 
@@ -174,15 +174,17 @@ class DGLHeteroGraph(object):
 
         # node and edge frame
         if node_frames is None:
-            node_frames = [
-                FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                for i in range(len(self._ntypes))]
+            node_frames = [None for i in range(len(self._ntypes))]
+        for i in range(len(node_frames)):
+            if node_frames[i] is None:
+                node_frames[i] = FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
         self._node_frames = node_frames
 
         if edge_frames is None:
-            edge_frames = [
-                FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                for i in range(len(self._etypes))]
+            edge_frames = [None for i in range(len(self._etypes))]
+        for i in range(len(edge_frames)):
+            if edge_frames[i] is None:
+                edge_frames[i] = FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
         self._edge_frames = edge_frames
 
         # message indicators
@@ -497,23 +499,25 @@ class DGLHeteroGraph(object):
             stids = fg.induced_srctype_set.asnumpy()
             dtids = fg.induced_dsttype_set.asnumpy()
             etids = fg.induced_etype_set.asnumpy()
-            new_ntypes = ['src', 'dst']
+            new_ntypes = [SRC, DST] if new_g.number_of_ntypes() == 2 else [DEFAULT]
             new_nframes = [
                 combine_frames(self._node_frames, stids),
                 combine_frames(self._node_frames, dtids)]
-            new_etypes = ['edge']
+            new_etypes = [DEFAULT]
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
-            new_hg = FlattenedHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
+            new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
 
+            src = SRC if new_g.number_of_ntypes() == 2 else DEFAULT
+            dst = DST if new_g.number_of_ntypes() == 2 else DEFAULT
             # put the parent node/edge type and IDs
-            new_hg.induced_srctype = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
-            new_hg.induced_srcid = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
-            new_hg.induced_dsttype = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
-            new_hg.induced_dstid = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
-            new_hg.induced_etype = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
-            new_hg.induced_eid = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
+            new_hg.nodes[src].data[NTYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
+            new_hg.nodes[src].data[NID] = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
+            new_hg.nodes[dst].data[NTYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
+            new_hg.nodes[dst].data[NID] = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
+            new_hg.edata[ETYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
+            new_hg.edata[EID] = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
 
             return new_hg
 
@@ -2600,7 +2604,7 @@ def combine_frames(frames, ids):
     schemes = {key: scheme for key, scheme in frames[ids[0]].schemes.items()}
     for frame_id in ids:
         frame = frames[frame_id]
-        for key, scheme in schemes.items():
+        for key, scheme in list(schemes.items()):
             if key in frame.schemes:
                 if frame.schemes[key] != scheme:
                     raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
@@ -2608,92 +2612,15 @@ def combine_frames(frames, ids):
             else:
                 del schemes[key]
 
+    if len(schemes) == 0:
+        return None
+
     # concatenate the columns
     cols = {key: F.cat([
             frames[frame_id][key] for frame_id in ids if frames[frame_id].num_rows > 0],
-            dim=0)}
+            dim=0)
+            for key in schemes}
     return FrameRef(Frame(cols))
-
-class FlattenedHeteroGraph(DGLHeteroGraph):
-    @property
-    def induced_srctype(self):
-        """Return the parent node type of source nodes in the induced unitgraph
-        """
-        return self._induced_srctype
-
-    @induced_srctype.setter
-    def induced_srctype(self, value):
-        self._induced_srctype = value
-
-    @property
-    def induced_srcid(self):
-        """Return the parent node ID of source nodes in the induced unitgraph
-        """
-        return self._induced_srcid
-
-    @induced_srcid.setter
-    def induced_srcid(self, value):
-        self._induced_srcid = value
-
-    @property
-    def induced_srctype(self):
-        """Return the parent node type of source nodes in the induced unitgraph
-        """
-        return self._induced_srctype
-
-    @induced_srctype.setter
-    def induced_srctype(self, value):
-        self._induced_srctype = value
-
-    @property
-    def induced_srcid(self):
-        """Return the parent node ID of source nodes in the induced unitgraph
-        """
-        return self._induced_srcid
-
-    @induced_srcid.setter
-    def induced_srcid(self, value):
-        self._induced_srcid = value
-
-    @property
-    def induced_etype(self):
-        """Return the parent edge type of edges in the induced unitgraph
-        """
-        return self._induced_etype
-
-    @induced_etype.setter
-    def induced_etype(self, value):
-        self._induced_etype = value
-
-    @property
-    def induced_eid(self):
-        """Return the parent edge ID of edges in the induced unitgraph
-        """
-        return self._induced_eid
-
-    @induced_eid.setter
-    def induced_eid(self, value):
-        self._induced_eid = value
-
-    @property
-    def induced_dsttype(self):
-        """Return the parent node type of destination nodes in the induced unitgraph
-        """
-        return self._induced_dsttype
-
-    @induced_dsttype.setter
-    def induced_dsttype(self, value):
-        self._induced_dsttype = value
-
-    @property
-    def induced_dstid(self):
-        """Return the parent node ID of destination nodes in the induced unitgraph
-        """
-        return self._induced_dstid
-
-    @induced_dstid.setter
-    def induced_dstid(self, value):
-        self._induced_dstid = value
 
 class AdaptedHeteroGraph(GraphAdapter):
     """Adapt DGLGraph to interface required by scheduler.

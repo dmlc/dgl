@@ -334,35 +334,63 @@ def test_view1():
     assert fail
 
 def test_flatten():
+    def check_mapping(g, fg):
+        if len(fg.ntypes) == 1:
+            SRC = DST = dgl.DEFAULT
+        else:
+            SRC = dgl.SRC
+            DST = dgl.DST
+
+        etypes = F.asnumpy(fg.edata[dgl.ETYPE]).tolist()
+        eids = F.asnumpy(fg.edata[dgl.EID]).tolist()
+
+        for i, (etype, eid) in enumerate(zip(etypes, eids)):
+            src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
+            src_fg, dst_fg = fg.find_edges([i])
+            # TODO(gq): I feel this code is quite redundant; can we just add new members (like
+            # "induced_srcid") to returned heterograph object and not store them as features?
+            assert src_g == fg.nodes[SRC].data[dgl.NID][src_fg]
+            assert g.canonical_etypes[etype][0] == g.ntypes[fg.nodes[SRC].data[dgl.NTYPE][src_fg]]
+            assert dst_g == fg.nodes[DST].data[dgl.NID][dst_fg]
+            assert g.canonical_etypes[etype][2] == g.ntypes[fg.nodes[DST].data[dgl.NTYPE][dst_fg]]
+
     # check for wildcard slices
     g = create_test_heterograph()
     g.nodes['user'].data['h'] = F.ones((3, 5))
-    g.nodes['game'].data['h'] = F.ones((2, 5))
+    g.nodes['game'].data['i'] = F.ones((2, 5))
     g.edges['plays'].data['e'] = F.ones((4, 4))
     g.edges['wishes'].data['e'] = F.ones((2, 4))
     g.edges['wishes'].data['f'] = F.ones((2, 4))
 
     fg = g['user', :, 'game']   # user--plays->game and user--wishes->game
-    assert 'src' in fg.ntypes
-    assert 'dst' in fg.ntypes
-    assert 'edge' in fg.etypes
+    assert len(fg.ntypes) == 2
+    assert dgl.SRC in fg.ntypes
+    assert dgl.DST in fg.ntypes
+    assert fg.etypes == [dgl.DEFAULT]
 
-    assert F.array_equal(fg.nodes['src'].data['h'], F.ones((3, 5)))
-    assert F.array_equal(fg.nodes['dst'].data['h'], F.ones((2, 5)))
+    assert F.array_equal(fg.nodes[dgl.SRC].data['h'], F.ones((3, 5)))
+    assert F.array_equal(fg.nodes[dgl.DST].data['i'], F.ones((2, 5)))
     assert F.array_equal(fg.edata['e'], F.ones((6, 4)))
     assert 'f' not in fg.edata
 
-    etypes = F.asnumpy(fg.induced_etype).tolist()
-    eids = F.asnumpy(fg.induced_eid).tolist()
+    etypes = F.asnumpy(fg.edata[dgl.ETYPE]).tolist()
+    eids = F.asnumpy(fg.edata[dgl.EID]).tolist()
     assert set(zip(etypes, eids)) == set([(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)])
 
-    for i, (etype, eid) in enumerate(zip(etypes, eids)):
-        src_g, dst_g = g.find_edges([eid], g.canonical_etypes[etype])
-        src_fg, dst_fg = fg.find_edges([eid], 'edge')
-        assert src_g == fg.induced_srcid[i]
-        assert g.canonical_etypes[etype][0] == g.ntypes[F.asnumpy(fg.induced_srctype)[i]]
-        assert dst_g == fg.induced_dstid[i]
-        assert g.canonical_etypes[etype][2] == g.ntypes[F.asnumpy(fg.induced_dsttype)[i]]
+    check_mapping(g, fg)
+
+    # NOTE:
+    # I (gq) was thinking of using g[:, :, :] to convert the heterograph into a homogeneous
+    # graph (i.e. discard all type-specific information).  Turns out that the idea has an
+    # issue.
+    # The problem is that by our definition of flattening, g[:, :, :] would NOT
+    # be converted into a homogeneous graph, because 'game' never appears as source node,
+    # and 'developer' never appears as destination node.
+    # We still need a separate interface for converting to homographs.
+    fg = g[:, :, :]
+    #assert fg.ntypes == [dgl.DEFAULT]
+    assert fg.etypes == [dgl.DEFAULT]
+    check_mapping(g, fg)
 
 def test_apply():
     def node_udf(nodes):
