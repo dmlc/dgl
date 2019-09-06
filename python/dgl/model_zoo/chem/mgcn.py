@@ -6,26 +6,26 @@ import torch.nn as nn
 
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
-from ...batched_graph import sum_nodes
+from ...nn.pytorch import SumPooling
 
 
 class MGCNModel(nn.Module):
     """
-    MGCN from `Molecular Property Prediction: A Multilevel
+    `Molecular Property Prediction: A Multilevel
     Quantum Interactions Modeling Perspective <https://arxiv.org/abs/1906.11081>`__
 
     Parameters
     ----------
     dim : int
-        Dimension of feature maps, default to be 128.
-    out_put_dim: int
-        Number of target properties to predict, default to be 1.
-    edge_dim : int
-        Dimension of edge feature, default to be 128.
-    cutoff : float
-        The maximum distance between nodes, default to be 5.0.
+        Size for embeddings, default to be 128.
     width : int
         Width in the RBF layer, default to be 1.
+    cutoff : float
+        The maximum distance between nodes, default to be 5.0.
+    edge_dim : int
+        Size for edge embedding, default to be 128.
+    out_put_dim: int
+        Number of target properties to predict, default to be 1.
     n_conv : int
         Number of convolutional layers, default to be 3.
     norm : bool
@@ -39,15 +39,16 @@ class MGCNModel(nn.Module):
     """
     def __init__(self,
                  dim=128,
-                 output_dim=1,
-                 edge_dim=128,
-                 cutoff=5.0,
                  width=1,
+                 cutoff=5.0,
+                 edge_dim=128,
+                 output_dim=1,
                  n_conv=3,
                  norm=False,
                  atom_ref=None,
                  pre_train=None):
         super(MGCNModel, self).__init__()
+
         self._dim = dim
         self.output_dim = output_dim
         self.edge_dim = edge_dim
@@ -57,27 +58,29 @@ class MGCNModel(nn.Module):
         self.atom_ref = atom_ref
         self.norm = norm
 
-        self.activation = nn.Softplus(beta=1, threshold=20)
-
-        if atom_ref is not None:
-            self.e0 = AtomEmbedding(1, pre_train=atom_ref)
         if pre_train is None:
             self.embedding_layer = AtomEmbedding(dim)
         else:
             self.embedding_layer = AtomEmbedding(pre_train=pre_train)
+        self.rbf_layer = RBFLayer(0, cutoff, width)
         self.edge_embedding_layer = EdgeEmbedding(dim=edge_dim)
 
-        self.rbf_layer = RBFLayer(0, cutoff, width)
+        if atom_ref is not None:
+            self.e0 = AtomEmbedding(1, pre_train=atom_ref)
 
         self.conv_layers = nn.ModuleList([
             MultiLevelInteraction(self.rbf_layer._fan_out, dim)
             for i in range(n_conv)
         ])
 
-        self.node_dense_layer1 = nn.Linear(dim * (self.n_conv + 1), 64)
-        self.node_dense_layer2 = nn.Linear(64, output_dim)
+        self.out_project = nn.Sequential(
+            nn.Linear(dim * (self.n_conv + 1), 64),
+            nn.Softplus(beta=1, threshold=20),
+            nn.Linear(64, output_dim)
+        )
+        self.readout = SumPooling()
 
-    def set_mean_std(self, mean, std, device):
+    def set_mean_std(self, mean, std, device="cpu"):
         """Set the mean and std of atom representations for normalization.
 
         Parameters
@@ -92,43 +95,40 @@ class MGCNModel(nn.Module):
         self.mean_per_node = torch.tensor(mean, device=device)
         self.std_per_node = torch.tensor(std, device=device)
 
-    def forward(self, g):
+    def forward(self, g, atom_types, edge_distances):
         """Predict molecule labels
 
         Parameters
         ----------
         g : DGLGraph
             Input DGLGraph for molecule(s)
+        atom_types : int64 tensor of shape (B1)
+            Types for atoms in the graph(s), B1 for the number of atoms.
+        edge_distances : float32 tensor of shape (B2, 1)
+            Edge distances, B2 for the number of edges.
 
         Returns
         -------
         res : Predicted labels
         """
-        self.embedding_layer(g, "node_0")
-        if self.atom_ref is not None:
-            self.e0(g, "e0")
-        self.rbf_layer(g)
+        h = self.embedding_layer(atom_types)
+        e = self.edge_embedding_layer(g, atom_types)
+        rbf_out = self.rbf_layer(edge_distances)
 
-        self.edge_embedding_layer(g)
-
+        all_layer_h = [h]
         for idx in range(self.n_conv):
-            self.conv_layers[idx](g, idx + 1)
-
-        node_embeddings = tuple(g.ndata["node_%d" % (i)]
-                                for i in range(self.n_conv + 1))
-        g.ndata["node"] = torch.cat(node_embeddings, 1)
+            h, e = self.conv_layers[idx](g, h, e, rbf_out)
+            all_layer_h.append(h)
 
         # concat multilevel representations
-        node = self.node_dense_layer1(g.ndata["node"])
-        node = self.activation(node)
-        res = self.node_dense_layer2(node)
-        g.ndata["res"] = res
+        h = torch.cat(all_layer_h, dim=1)
+        h = self.out_project(h)
 
         if self.atom_ref is not None:
-            g.ndata["res"] = g.ndata["res"] + g.ndata["e0"]
+            h_ref = self.e0(atom_types)
+            h = h + h_ref
 
         if self.norm:
-            g.ndata["res"] = g.ndata[
-                "res"] * self.std_per_node + self.mean_per_node
-        res = sum_nodes(g, "res")
-        return res
+            h = h * self.std_per_node + self.mean_per_node
+
+        return self.readout(g, h)

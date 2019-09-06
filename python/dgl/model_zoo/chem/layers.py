@@ -18,7 +18,7 @@ class AtomEmbedding(nn.Module):
     Parameters
     ----------
     dim : int
-        Dim of embeddings, default to be 128.
+        Size of embeddings, default to be 128.
     type_num : int
         The largest atomic number of atoms in the dataset, default to be 100.
     pre_train : None or pre-trained embeddings
@@ -56,11 +56,11 @@ class EdgeEmbedding(nn.Module):
     Parameters
     ----------
     dim : int
-        Dim of edge embeddings, default to be 128.
+        Size of embeddings, default to be 128.
     edge_num : int
-        Maximum number of edge types, default to be 128.
+        Maximum number of edge types allowed, default to be 3000.
     pre_train : Edge embeddings or None
-        Pre-trained edge embeddings
+        Pre-trained edge embeddings, default to be None.
     """
     def __init__(self, dim=128, edge_num=3000, pre_train=None):
         super(EdgeEmbedding, self).__init__()
@@ -75,12 +75,13 @@ class EdgeEmbedding(nn.Module):
     def generate_edge_type(self, edges):
         """Generate edge type.
 
-        The edge type is based on the type of the src&dst atom.
-        Note that C-O and O-C are the same edge type.
+        The edge type is based on the type of the src & dst atom.
+        Note that directions are not distinguished, e.g. C-O and O-C are the same edge type.
+
         To map a pair of nodes to one number, we use an unordered pairing function here
         See more detail in this disscussion:
         https://math.stackexchange.com/questions/23503/create-unique-number-from-2-numbers
-        Note that, the edge_num should be larger than the square of maximum atomic number
+        Note that the edge_num should be larger than the square of maximum atomic number
         in the dataset.
 
         Parameters
@@ -93,32 +94,35 @@ class EdgeEmbedding(nn.Module):
         dict
             Stores the edge types in "type"
         """
-        atom_type_x = edges.src["node_type"]
-        atom_type_y = edges.dst["node_type"]
+        atom_type_x = edges.src['ntype']
+        atom_type_y = edges.dst['ntype']
 
         return {
-            "type": atom_type_x * atom_type_y +
-                    (torch.abs(atom_type_x - atom_type_y) - 1)**2 / 4
+            'etype': atom_type_x * atom_type_y +
+                    (torch.abs(atom_type_x - atom_type_y) - 1) ** 2 / 4
         }
 
-    def forward(self, g, p_name="edge_f"):
+    def forward(self, g, atom_types):
         """Compute edge embeddings
 
         Parameters
         ----------
         g : DGLGraph
             The graph to compute edge embeddings
-        p_name : str
+        atom_types : int64 tensor of shape (B1)
+            Types for atoms in the graph(s), B1 for the number of atoms.
 
         Returns
         -------
-        computed edge embeddings
+        float32 tensor of shape (B2, self._dim)
+            Computed edge embeddings
         """
+        g = g.local_var()
+        g.ndata['ntype'] = atom_types
         g.apply_edges(self.generate_edge_type)
-        g.edata[p_name] = self.embedding(g.edata["type"])
-        return g.edata[p_name]
+        return self.embedding(g.edata.pop('etype'))
 
-class ShiftSoftplus(Softplus):
+class ShiftSoftplus(nn.Module):
     """
     ShiftSoftplus activation function:
         1/beta * (log(1 + exp**(beta * x)) - log(shift))
@@ -133,7 +137,7 @@ class ShiftSoftplus(Softplus):
         Default to be 20.
     """
     def __init__(self, beta=1, shift=2, threshold=20):
-        super(ShiftSoftplus, self).__init__(beta, threshold)
+        super(ShiftSoftplus, self).__init__()
 
         self.shift = shift
         self.softplus = Softplus(beta, threshold)
@@ -288,15 +292,15 @@ class Interaction(nn.Module):
 
 class VEConv(nn.Module):
     """
-    The Vertex-Edge convolution layer in MGCN which takes edge & vertex features
-    in consideration at the same time.
+    The Vertex-Edge convolution layer in MGCN which takes both edge & vertex features
+    in consideration.
 
     Parameters
     ----------
     rbf_dim : int
-        Dimension of the RBF layer output
+        Size of the RBF layer output
     dim : int
-        Dimension of intermediate representations, default to be 64.
+        Size of intermediate representations, default to be 64.
     update_edge : bool
         Whether to apply a linear layer to update edge representations, default to be True.
     """
@@ -307,70 +311,49 @@ class VEConv(nn.Module):
         self._dim = dim
         self._update_edge = update_edge
 
-        self.linear_layer1 = nn.Linear(self._rbf_dim, self._dim)
-        self.linear_layer2 = nn.Linear(self._dim, self._dim)
-        self.linear_layer3 = nn.Linear(self._dim, self._dim)
+        self.update_rbf = nn.Sequential(
+            nn.Linear(self._rbf_dim, self._dim),
+            nn.Softplus(beta=0.5, threshold=14),
+            nn.Linear(self._dim, self._dim)
+        )
+        self.update_efeat = nn.Linear(self._dim, self._dim)
 
-        self.activation = nn.Softplus(beta=0.5, threshold=14)
-
-    def update_rbf(self, edges):
-        """Update the RBF features
-
-        Parameters
-        ----------
-        edges : EdgeBatch
-
-        Returns
-        -------
-        dict
-            Stores updated features in 'h'
+    def forward(self, g, n_feat, e_feat, rbf_out):
         """
-        rbf = edges.data["rbf"]
-        h = self.linear_layer1(rbf)
-        h = self.activation(h)
-        h = self.linear_layer2(h)
-        return {"h": h}
-
-    def update_edge(self, edges):
-        """Update the edge features.
-
-        Parameters
-        ----------
-        edges : EdgeBatch
-
-        Returns
-        -------
-        dict
-            Stores updated features in 'edge_f'
-        """
-        edge_f = edges.data["edge_f"]
-        h = self.linear_layer3(edge_f)
-        return {"edge_f": h}
-
-    def forward(self, g):
-        """VEConv layer forward
-
         Parameters
         ----------
         g : DGLGraph
+            The graph for performing convolution
+        n_feat : float32 tensor of shape (B1, D1)
+            Node features, B1 for number of nodes and D1 for feature size.
+        e_feat : float32 tensor of shape (B2, D2)
+            Edge features. B2 for number of edges and D2 for
+            the edge feature size.
+        rbf_out : float32 tensor of shape (B2, D3)
+            The output of RBFLayer, B2 for number of edges and D3 for rbf out size.
 
         Returns
         -------
-        tensor
-            Updated atom representations
+        n_feat : float32 tensor
+            Updated node features.
+        e_feat : float32 tensor
+            (Potentially updated) edge features
         """
-        g.apply_edges(self.update_rbf)
+        rbf_out = self.update_rbf(rbf_out)
+
         if self._update_edge:
-            g.apply_edges(self.update_edge)
+            e_feat = self.update_efeat(e_feat)
 
-        g.update_all(message_func=[fn.u_mul_e("new_node", "h", "m_0"),
-                                   fn.copy_e("edge_f", "m_1")],
-                     reduce_func=[fn.sum("m_0", "new_node_0"),
-                                  fn.sum("m_1", "new_node_1")])
-        g.ndata["new_node"] = g.ndata.pop("new_node_0") + \
-                              g.ndata.pop("new_node_1")
+        g = g.local_var()
+        g.ndata.update({'n_feat': n_feat})
+        g.edata.update({'rbf_out': rbf_out, 'e_feat': e_feat})
+        g.update_all(message_func=[fn.u_mul_e('n_feat', 'rbf_out', 'm_0'),
+                                   fn.copy_e('e_feat', 'm_1')],
+                     reduce_func=[fn.sum('m_0', 'n_feat_0'),
+                                  fn.sum('m_1', 'n_feat_1')])
+        n_feat = g.ndata.pop('n_feat_0') + g.ndata.pop('n_feat_1')
 
-        return g.ndata["new_node"]
+        return n_feat, e_feat
 
 class MultiLevelInteraction(nn.Module):
     """
@@ -387,35 +370,43 @@ class MultiLevelInteraction(nn.Module):
         super(MultiLevelInteraction, self).__init__()
 
         self._atom_dim = dim
-        self.activation = nn.Softplus(beta=0.5, threshold=14)
         self.node_layer1 = nn.Linear(dim, dim, bias=True)
-        self.edge_layer1 = nn.Linear(dim, dim, bias=True)
         self.conv_layer = VEConv(rbf_dim, dim)
-        self.node_layer2 = nn.Linear(dim, dim)
-        self.node_layer3 = nn.Linear(dim, dim)
+        self.activation = nn.Softplus(beta=0.5, threshold=14)
+        self.edge_layer1 = nn.Linear(dim, dim, bias=True)
 
-    def forward(self, g, level=1):
+        self.node_out = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.Softplus(beta=0.5, threshold=14),
+            nn.Linear(dim, dim)
+        )
+
+    def forward(self, g, n_feat, e_feat, rbf_out):
         """
         Parameters
         ----------
         g : DGLGraph
-        level : int
-            Level of interaction
+            The graph for performing convolution
+        n_feat : float32 tensor of shape (B1, D1)
+            Node features, B1 for number of nodes and D1 for feature size.
+        e_feat : float32 tensor of shape (B2, D2)
+            Edge features. B2 for number of edges and D2 for
+            the edge feature size.
+        rbf_out : float32 tensor of shape (B2, D3)
+            The output of RBFLayer, B2 for number of edges and D3 for rbf out size.
 
         Returns
         -------
-        tensor
-            Updated atom representations
+        n_feat : float32 tensor
+            Updated node representations
+        e_feat : float32 tensor
+            Updated edge representations
         """
-        g.ndata["new_node"] = self.node_layer1(
-            g.ndata["node_%s" % (level - 1)])
-        node = self.conv_layer(g)
-        g.edata["edge_f"] = self.activation(
-            self.edge_layer1(g.edata["edge_f"]))
-        node_1 = self.node_layer2(node)
-        node_1a = self.activation(node_1)
-        new_node = self.node_layer3(node_1a)
+        new_n_feat = self.node_layer1(n_feat)
+        new_n_feat, e_feat = self.conv_layer(g, new_n_feat, e_feat, rbf_out)
+        new_n_feat = self.node_out(new_n_feat)
+        n_feat = n_feat + new_n_feat
 
-        g.ndata["node_%s" % (level)] = g.ndata["node_%s" % (level - 1)] + new_node
+        e_feat = self.activation(self.edge_layer1(e_feat))
 
-        return g.ndata["node_%s" % (level)]
+        return n_feat, e_feat

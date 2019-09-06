@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
-from ...batched_graph import sum_nodes
+from ...nn.pytorch import SumPooling
 
 
 class SchNet(nn.Module):
@@ -20,7 +20,7 @@ class SchNet(nn.Module):
     cutoff : float
         Radius cutoff for RBF, default to be 5.0.
     output_dim : int
-        Size for regression prediction, default to be 1.
+        Number of target properties to predict, default to be 1.
     width : int
         Width in RBF, default to 1.
     n_conv : int
@@ -68,6 +68,7 @@ class SchNet(nn.Module):
             ShiftSoftplus(),
             nn.Linear(64, output_dim)
         )
+        self.readout = SumPooling()
 
     def set_mean_std(self, mean, std, device="cpu"):
         """Set the mean and std of atom representations for normalization.
@@ -81,8 +82,8 @@ class SchNet(nn.Module):
         device : str or torch.device
             Device for storing the mean and std
         """
-        self.mean_per_atom = torch.tensor(mean, device=device)
-        self.std_per_atom = torch.tensor(std, device=device)
+        self.mean_per_node = torch.tensor(mean, device=device)
+        self.std_per_node = torch.tensor(std, device=device)
 
     def forward(self, g, atom_types, edge_distances):
         """Predict molecule labels
@@ -113,10 +114,6 @@ class SchNet(nn.Module):
             h = h + h_ref
 
         if self.norm:
-            h = h * self.std_per_atom + self.mean_per_atom
+            h = h * self.std_per_node + self.mean_per_node
 
-        with g.local_scope():
-            g.ndata['h'] = h
-            prediction = sum_nodes(g, 'h')
-
-        return prediction
+        return self.readout(g, h)
