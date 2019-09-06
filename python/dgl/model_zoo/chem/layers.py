@@ -120,14 +120,17 @@ class EdgeEmbedding(nn.Module):
 
 class ShiftSoftplus(Softplus):
     """
-    Shiftsoft plus activation function:
+    ShiftSoftplus activation function:
         1/beta * (log(1 + exp**(beta * x)) - log(shift))
 
     Parameters
     ----------
     beta : int
+        Default to be 1.
     shift : int
+        Default to be 2.
     threshold : int
+        Default to be 20.
     """
     def __init__(self, beta=1, shift=2, threshold=20):
         super(ShiftSoftplus, self).__init__(beta, threshold)
