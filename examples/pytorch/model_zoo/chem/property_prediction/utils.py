@@ -41,9 +41,9 @@ class Meter(object):
             Mask for indicating the existence of ground
             truth labels with shape (B, T)
         """
-        self.y_pred.append(y_pred.detach())
-        self.y_true.append(y_true.detach())
-        self.mask.append(mask.detach())
+        self.y_pred.append(y_pred.detach().cpu())
+        self.y_true.append(y_true.detach().cpu())
+        self.mask.append(mask.detach().cpu())
 
     def roc_auc_averaged_over_tasks(self):
         """Compute roc-auc score for each task and return the average.
