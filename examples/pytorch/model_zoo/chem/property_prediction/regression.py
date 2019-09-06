@@ -32,8 +32,8 @@ def run_a_train_epoch(args, epoch, model, data_loader,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        total_loss += loss.detach().item()
-        total_score += score.detach().item()
+        total_loss += loss.detach().item() * bg.batch_size
+        total_score += score.detach().item() * bg.batch_size
     total_loss /= len(data_loader.dataset)
     total_score /= len(data_loader.dataset)
     print('epoch {:d}/{:d}, training loss {:.4f}, training score {:.4f}'.format(
@@ -48,7 +48,7 @@ def run_an_eval_epoch(args, model, data_loader, score_criterion):
             labels = labels.to(args['device'])
             prediction = regress(args, model, bg)
             score = score_criterion(prediction, labels)
-            total_score += score.detach().item()
+            total_score += score.detach().item() * bg.batch_size
         total_score /= len(data_loader.dataset)
     return total_score
 
@@ -79,8 +79,8 @@ def main(args):
         model.set_mean_std(train_set.mean, train_set.std, args['device'])
     model.to(args['device'])
 
-    loss_fn = nn.MSELoss(reduction='sum')
-    score_fn = nn.L1Loss(reduction='sum')
+    loss_fn = nn.MSELoss()
+    score_fn = nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
     stopper = EarlyStopping(mode='lower', patience=args['patience'])
 

@@ -28,7 +28,7 @@ MPNN_Alchemy = {
     'num_epochs': 250,
     'output_dim': 12,
     'lr': 0.0001,
-    'patience': 10
+    'patience': 50
 }
 
 SCHNET_Alchemy = {
@@ -37,7 +37,7 @@ SCHNET_Alchemy = {
     'norm': True,
     'output_dim': 12,
     'lr': 0.0001,
-    'patience': 10
+    'patience': 50
 }
 
 MGCN_Alchemy = {
@@ -46,7 +46,7 @@ MGCN_Alchemy = {
     'norm': True,
     'output_dim': 12,
     'lr': 0.0001,
-    'patience': 10
+    'patience': 50
 }
 
 experiment_configures = {
