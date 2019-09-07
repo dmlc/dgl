@@ -15,7 +15,7 @@ into training, validation and test set with a 80/10/10 ratio. By default we foll
 - **Graph Convolutional Network** [2], [3]. Graph Convolutional Networks (GCN) have been one of the most popular graph neural
 networks and they can be easily extended for graph level prediction. MoleculeNet [1] reports baseline results of graph
 convolutions over multiple datasets.
-- **Graph Attention Networks** [7]: Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
+- **Graph Attention Networks** [7]. Graph Attention Networks (GATs) incorporate multi-head attention into GCNs,
 explicitly modeling the interactions between adjacent atoms.
 
 ### Usage
@@ -49,16 +49,11 @@ a real difference.
 | ---------------- | ---------------------- |
 | Pretrained model | 0.827                  |
 
-## Dataset Customization
-
-To customize your own dataset, see the instructions
-[here](https://github.com/dmlc/dgl/tree/master/python/dgl/data/chem).
-
 ## Regression   
 
 Regression tasks require assigning continuous labels to a molecule, e.g. molecular energy.
 
-### Dataset  
+### Datasets  
 
 - **Alchemy**. The [Alchemy Dataset](https://alchemy.tencent.com/) is introduced by Tencent Quantum Lab to facilitate the development of new 
 machine learning models useful for chemistry and materials science. The dataset lists 12 quantum mechanical properties of 130,000+ organic 
@@ -68,29 +63,39 @@ These properties have been calculated using the open-source computational chemis
 
 ### Models  
 
-- **SchNet**: SchNet is a novel deep learning architecture modeling quantum interactions in molecules which utilize the continuous-filter 
-convolutional layers [4].   
-- **Multilevel Graph Convolutional neural Network**: Multilevel Graph Convolutional neural Network (MGCN) is a hierarchical 
-graph neural network directly extracts features from the conformation and spatial information followed by the multilevel interactions [5].    
-- **Message Passing Neural Network**: Message Passing Neural Network (MPNN) is a network with edge network (enn) as front end 
-and Set2Set for output prediction [6].
+- **Message Passing Neural Network** [6]. Message Passing Neural Networks (MPNNs) have reached the best performance on
+the QM9 dataset for some time.
+- **SchNet** [4]. SchNet employs continuous filter convolutional layers to model quantum interactions in molecules 
+without requiring them to lie on grids.
+- **Multilevel Graph Convolutional Neural Network** [5]. Multilevel Graph Convolutional Neural Networks (MGCN) are 
+hierarchical graph neural networks that extract features from the conformation and spatial information followed by the
+multilevel interactions.
 
 ### Usage
 
-```py  
-python regression.py --model sch --epoch 200
-```  
-The model option must be one of 'sch', 'mgcn' or 'mpnn'.  
+Use `regression.py` with arguments
+```
+-m {MPNN,SCHNET,MGCN}, Model to use
+-d {Alchemy}, Dataset to use
+```
 
 ### Performance    
 
-#### Alchemy   
+#### Alchemy
 
-|Model        |Mean Absolute Error (MAE)|  
-|-------------|-------------------------|
-|SchNet[4]    |0.065|
-|MGCN[5]      |0.050|
-|MPNN[6]      |0.056|
+The Alchemy contest is still ongoing. Before the test set is fully released, we only include the performance numbers
+on the training and validation set for reference.
+
+| Model      | Training MAE | Validation MAE |  
+| ---------- | ------------ | -------------- |
+| SchNet [4] | 0.2665       | 0.6139         |
+| MGCN [5]   | 0.2395       | 0.6463         |
+| MPNN [6]   | 0.2452       | 0.6259         |
+
+## Dataset Customization
+
+To customize your own dataset, see the instructions
+[here](https://github.com/dmlc/dgl/tree/master/python/dgl/data/chem).
 
 ## References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.
