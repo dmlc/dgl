@@ -1006,7 +1006,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
 
-  int64_t chunk_size = neg_sample_size / 2;
+  int64_t chunk_size = neg_sample_size;
   // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
   // is num_chunks + 1 and the last chunk size is last_chunk_size.
   // Otherwise, the actual number of chunks is num_chunks, the last chunk size
@@ -1043,7 +1043,6 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
 
   bool neg_head = (neg_mode == "head");
 
-  std::vector<dgl_id_t> changed;
   const dgl_id_t *unchanged;
   dgl_id_t *neg_unchanged;
   dgl_id_t *neg_changed;
@@ -1051,33 +1050,28 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   // corrupt head nodes.
   if (neg_head) {
     unchanged = dst_data;
-    changed.insert(changed.end(), src_data, src_data + num_pos_edges);
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
   } else {
     // corrupt tail nodes.
     unchanged = src_data;
-    changed.insert(changed.end(), dst_data, dst_data + num_pos_edges);
     neg_unchanged = neg_src_data;
     neg_changed = neg_dst_data;
   }
-  // corrupt edges by randomly shuffling nodes on one side.
-  // TODO(zhengda) set seed.
-  std::random_shuffle(changed.begin(), changed.end());
 
   // We first sample all negative edges.
   std::vector<size_t> neg_vids;
   RandomSample(num_tot_nodes,
-               num_chunks * neg_sample_size - num_pos_edges,
+               num_chunks * neg_sample_size,
                &neg_vids);
 
   dgl_id_t curr_eid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
     // for each chunk.
-    size_t neg_idx = (chunk_size * 2) * chunk_size * i_chunk;
+    size_t neg_idx = neg_sample_size * chunk_size * i_chunk;
     size_t pos_edge_idx = chunk_size * i_chunk;
-    size_t neg_node_idx = pos_edge_idx;
+    size_t neg_node_idx = neg_sample_size * i_chunk;
     // The actual chunk size. It'll be different for the last chunk.
     size_t chunk_size1;
     if (i_chunk == num_chunks - 1 && last_chunk_size > 0)
@@ -1093,17 +1087,7 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
       for (int64_t j = 0; j < neg_sample_size; ++j) {
         neg_unchanged[neg_idx] = local_unchanged;
         neg_eid_data[neg_idx] = curr_eid++;
-
-        dgl_id_t global_changed_vid;
-        if (j < chunk_size1) {
-          // first chunk_size neg samples use in-chunk node to corrupt.
-          assert(pos_edge_idx + j < num_pos_edges);
-          global_changed_vid = induced_vid_data[changed[pos_edge_idx + j]];
-        } else {
-          // second chunk_size neg samples, use random-smapled node to corrupt.
-          assert(neg_node_idx + j - chunk_size1 < neg_vids.size());
-          global_changed_vid = neg_vids[neg_node_idx + j - chunk_size1];
-        }
+        dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
 
         // TODO(zhengda) we can avoid the hashtable lookup here.
         dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
