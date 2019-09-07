@@ -90,24 +90,30 @@ inline bool COOHasData(COOMatrix csr) {
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
-    if (indices_data[i] == col) {
-      return true;
+  if (sorted) {
+    const IdType *start = indices_data + indptr_data[row];
+    const IdType *end = indices_data + indptr_data[row + 1];
+    return std::binary_search(start, end, col);
+  } else {
+    for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
+      if (indices_data[i] == col) {
+        return true;
+      }
     }
   }
   return false;
 }
 
-template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
-template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t, bool sorted);
+template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t, bool sorted);
 
 template <DLDeviceType XPU, typename IdType>
-NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col, bool sorted) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
   const auto rstlen = std::max(rowlen, collen);
@@ -118,13 +124,13 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
+    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j], sorted)? 1 : 0;
   }
   return rst;
 }
 
-template NDArray CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, NDArray, NDArray);
-template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, NDArray, NDArray, bool sorted);
+template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray, bool sorted);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
