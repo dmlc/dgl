@@ -98,8 +98,8 @@ class EdgeEmbedding(nn.Module):
         atom_type_y = edges.dst['ntype']
 
         return {
-            'etype': atom_type_x * atom_type_y +
-                    (torch.abs(atom_type_x - atom_type_y) - 1) ** 2 / 4
+            'etype': atom_type_x * atom_type_y + \
+                     (torch.abs(atom_type_x - atom_type_y) - 1) ** 2 / 4
         }
 
     def forward(self, g, atom_types):
