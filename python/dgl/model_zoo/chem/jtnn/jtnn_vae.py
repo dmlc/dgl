@@ -27,7 +27,10 @@ from .nnutils import create_var, cuda, move_dgl_to_cuda
 
 
 class DGLJTNNVAE(nn.Module):
-
+    """
+    `Junction Tree Variational Autoencoder for Molecular Graph Generation
+    <https://arxiv.org/abs/1802.04364>`__
+    """
     def __init__(self, hidden_size, latent_size, depth, vocab=None, vocab_file=None):
         super(DGLJTNNVAE, self).__init__()
         if vocab is None:
