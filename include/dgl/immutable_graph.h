@@ -240,9 +240,11 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
+  void SortAdj();
+
  private:
   /*! \brief prive default constructor */
-  CSR() {}
+  CSR() {sorted_ = false;}
 
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
@@ -254,6 +256,8 @@ class CSR : public GraphInterface {
   // The name of the shared memory to store data.
   // If it's empty, data isn't stored in shared memory.
   std::string shared_mem_name_;
+
+  bool sorted_;
 };
 
 class COO : public GraphInterface {
@@ -950,6 +954,10 @@ class ImmutableGraph: public GraphInterface {
    * \return the reversed graph
    */
   ImmutableGraphPtr Reverse() const;
+
+  void SortAdj() {
+    GetInCSR()->SortAdj();
+  }
 
  protected:
   /* !\brief internal default constructor */

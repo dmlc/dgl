@@ -346,6 +346,9 @@ class GraphInterface : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
+  virtual void SortAdj() {
+  }
+
   static constexpr const char* _type_key = "graph.Graph";
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };

@@ -421,6 +421,9 @@ class GraphIndex(ObjectBase):
         eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
+    def sort_adj(self):
+        _CAPI_DGLSortAdj(self)
+
     @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, order=None):
         """Return all the edges

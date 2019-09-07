@@ -233,18 +233,18 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 
 ///////////////////////// CSR routines //////////////////////////
 
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   bool ret = false;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col, sorted);
   });
   return ret;
 }
 
-NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col, bool sorted) {
   NDArray ret;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col, sorted);
   });
   return ret;
 }

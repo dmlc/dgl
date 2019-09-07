@@ -164,12 +164,12 @@ struct COOMatrix {
 ///////////////////////// CSR routines //////////////////////////
 
 /*! \brief Return true if the value (row, col) is non-zero */
-bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
+bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col, bool sorted);
 /*!
  * \brief Batched implementation of CSRIsNonZero.
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
-runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
+runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col, bool sorted);
 
 /*! \brief Return the nnz of the given row */
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);

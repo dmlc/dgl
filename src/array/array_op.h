@@ -46,10 +46,11 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType>
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col);
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRIsNonZero(CSRMatrix csr, runtime::NDArray row, runtime::NDArray col);
+runtime::NDArray CSRIsNonZero(CSRMatrix csr, runtime::NDArray row, runtime::NDArray col,
+                              bool sorted);
 
 template <DLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr);

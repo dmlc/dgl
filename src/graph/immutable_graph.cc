@@ -56,6 +56,7 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
                          aten::NewIdArray(num_vertices + 1),
                          aten::NewIdArray(num_edges),
                          aten::NewIdArray(num_edges)};
+  sorted_ = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
@@ -65,6 +66,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+  sorted_ = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
@@ -75,6 +77,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+  sorted_ = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -93,6 +96,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
+  sorted_ = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
@@ -112,6 +116,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
+  sorted_ = false;
 }
 
 CSR::CSR(const std::string &shared_mem_name,
@@ -122,6 +127,7 @@ CSR::CSR(const std::string &shared_mem_name,
   adj_.num_cols = num_verts;
   std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, false);
+  sorted_ = false;
 }
 
 bool CSR::IsMultigraph() const {
@@ -157,13 +163,13 @@ DegreeArray CSR::OutDegrees(IdArray vids) const {
 bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
   CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
-  return aten::CSRIsNonZero(adj_, src, dst);
+  return aten::CSRIsNonZero(adj_, src, dst, sorted_);
 }
 
 BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
   CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-  return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
+  return aten::CSRIsNonZero(adj_, src_ids, dst_ids, sorted_);
 }
 
 IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
@@ -196,6 +202,7 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
   const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
   IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
   CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
+  subcsr->sorted_ = this->sorted_;
   Subgraph subg;
   subg.graph = subcsr;
   subg.induced_vertices = vids;
@@ -230,6 +237,7 @@ CSR CSR::CopyToSharedMem(const std::string &name) const {
     CHECK(name == shared_mem_name_);
     return *this;
   } else {
+    // TODO(zhengda) we need to set sorted_ properly.
     return CSR(adj_.indptr, adj_.indices, adj_.data, name);
   }
 }
@@ -264,6 +272,18 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
   const dgl_id_t start = indptr_data[vid];
   const dgl_id_t end = indptr_data[vid + 1];
   return DGLIdIters(eid_data + start, eid_data + end);
+}
+
+void CSR::SortAdj() {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
+  size_t num_rows = adj_.num_rows;
+  for (size_t row = 0; row < num_rows; row++) {
+    dgl_id_t *start = indices_data + indptr_data[row];
+    dgl_id_t *end = indices_data + indptr_data[row + 1];
+    std::sort(start, end);
+  }
+  sorted_ = true;
 }
 
 //////////////////////////////////////////////////////////
