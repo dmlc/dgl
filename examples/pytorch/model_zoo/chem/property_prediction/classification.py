@@ -1,11 +1,12 @@
-from dgl.data.utils import split_dataset
-from dgl import model_zoo
 import torch
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-from utils import Meter, EarlyStopping, collate_molgraphs, set_random_seed
+from dgl import model_zoo
+from dgl.data.utils import split_dataset
+
+from utils import Meter, EarlyStopping, collate_molgraphs_for_classification, set_random_seed
 
 def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer):
     model.train()
@@ -45,15 +46,18 @@ def main(args):
     args['device'] = "cuda" if torch.cuda.is_available() else "cpu"
     set_random_seed()
 
-    # Interchangeable with other Dataset
+    # Interchangeable with other datasets
     if args['dataset'] == 'Tox21':
         from dgl.data.chem import Tox21
         dataset = Tox21()
 
     trainset, valset, testset = split_dataset(dataset, args['train_val_test_split'])
-    train_loader = DataLoader(trainset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
-    val_loader = DataLoader(valset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
-    test_loader = DataLoader(testset, batch_size=args['batch_size'], collate_fn=collate_molgraphs)
+    train_loader = DataLoader(trainset, batch_size=args['batch_size'],
+                              collate_fn=collate_molgraphs_for_classification)
+    val_loader = DataLoader(valset, batch_size=args['batch_size'],
+                            collate_fn=collate_molgraphs_for_classification)
+    test_loader = DataLoader(testset, batch_size=args['batch_size'],
+                             collate_fn=collate_molgraphs_for_classification)
 
     if args['pre_trained']:
         args['num_epochs'] = 0
