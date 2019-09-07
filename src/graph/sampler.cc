@@ -1069,11 +1069,11 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
     // for each chunk.
-    size_t neg_idx = neg_sample_size * chunk_size * i_chunk;
-    size_t pos_edge_idx = chunk_size * i_chunk;
-    size_t neg_node_idx = neg_sample_size * i_chunk;
+    int64_t neg_idx = neg_sample_size * chunk_size * i_chunk;
+    int64_t pos_edge_idx = chunk_size * i_chunk;
+    int64_t neg_node_idx = neg_sample_size * i_chunk;
     // The actual chunk size. It'll be different for the last chunk.
-    size_t chunk_size1;
+    int64_t chunk_size1;
     if (i_chunk == num_chunks - 1 && last_chunk_size > 0)
       chunk_size1 = last_chunk_size;
     else
