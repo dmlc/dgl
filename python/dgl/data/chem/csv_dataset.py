@@ -24,21 +24,17 @@ class CSVDataset(object):
     Parameters
     ----------
     df: pandas.DataFrame
-    Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
-    One column includes smiles and other columns for labels.
-    Column names other than smiles column would be considered as task names.
-
+        Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
+        One column includes smiles and other columns for labels.
+        Column names other than smiles column would be considered as task names.
     smile_to_graph: callable, str -> DGLGraph
-    A function turns smiles into a DGLGraph. Default one can be found 
-    at python/dgl/data/chem/utils.py named with smile_to_bigraph.
-
+        A function turns smiles into a DGLGraph. Default one can be found
+        at python/dgl/data/chem/utils.py named with smile_to_bigraph.
     smile_column: str
-    Column name that including smiles
-
+        Column name that including smiles
     cache_file_path: str
-    Path to store the preprocessed data
+        Path to store the preprocessed data
     """
-
     def __init__(self, df, smile_to_graph=smile_to_bigraph, smile_column='smiles',
                  cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
@@ -59,6 +55,11 @@ class CSVDataset(object):
           and featurize their atoms
         * Set missing labels to be 0 and use a binary masking
           matrix to mask them
+
+        Parameters
+        ----------
+        smile_to_graph : callable, SMILES -> DGLGraph
+            Function for converting a SMILES (str) into a DGLGraph
         """
         if os.path.exists(self.cache_file_path):
             # DGLGraphs have been constructed before, reload them
@@ -76,7 +77,12 @@ class CSVDataset(object):
         self.mask = (~np.isnan(_label_values)).astype(np.float32)
 
     def __getitem__(self, item):
-        """Get the ith datapoint
+        """Get datapoint with index
+
+        Parameters
+        ----------
+        item : int
+            Datapoint index
 
         Returns
         -------
@@ -87,17 +93,17 @@ class CSVDataset(object):
         Tensor of dtype float32
             Labels of the datapoint for all tasks
         Tensor of dtype float32
-            Weights of the datapoint for all tasks
+            Binary masks indicating the existence of labels for all tasks
         """
         return self.smiles[item], self.graphs[item], \
                F.zerocopy_from_numpy(self.labels[item]),  \
                F.zerocopy_from_numpy(self.mask[item])
 
     def __len__(self):
-        """Length of Dataset
+        """Length of the dataset
 
-        Return
-        ------
+        Returns
+        -------
         int
             Length of Dataset
         """

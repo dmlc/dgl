@@ -86,6 +86,7 @@ are also two accompanying review papers that are well written [7], [8].
 ### Models
 - **Deep Generative Models of Graphs (DGMG)** [11]: A very general framework for graph distribution learning by 
 progressively adding atoms and bonds.
+- **Junction Tree Variational Autoencoder for Molecular Graph Generation (JTNN)** [13]:
 
 ### Example Usage of Pre-trained Models
 
@@ -143,3 +144,6 @@ Machine Learning* JMLR. 1263-1272.
 [11] Li et al. (2018) Learning Deep Generative Models of Graphs. *arXiv preprint arXiv:1803.03324*.
 
 [12] Goh et al. (2017) Deep learning for computational chemistry. *Journal of Computational Chemistry* 16, 1291-1307.
+
+[13] Jin et al. (2018) Junction Tree Variational Autoencoder for Molecular Graph Generation. 
+*Proceedings of the 35th International Conference on Machine Learning (ICML)*, 2323-2332.
