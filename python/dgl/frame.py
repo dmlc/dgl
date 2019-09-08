@@ -30,7 +30,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
         try:
             state = (self.shape, F.reverse_data_type_dict[self.dtype])
             return self._reconstruct_scheme, state
-        except KeyError as e:
+        except KeyError:
             state = (self.shape, self.dtype)
             return self._np_reconstruct_scheme, state
 
