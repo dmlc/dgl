@@ -38,6 +38,7 @@ TAGConv
     :members: forward
     :show-inheritance:
 
+
 Global Pooling Layers 
 ----------------------------------------
 
