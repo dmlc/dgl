@@ -1,14 +1,17 @@
 """Classes for heterogeneous graphs."""
 from collections import defaultdict
+from contextlib import contextmanager
 from functools import partial
 import networkx as nx
+
 import scipy.sparse as ssp
+
 from . import heterograph_index, graph_index
 from . import utils
 from . import backend as F
 from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
-from .frame import Frame, FrameRef, frame_like
+from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, SRC, DST, DEFAULT, NTYPE, NID, ETYPE, EID, is_all, DGLError
 
@@ -1249,6 +1252,67 @@ class DGLHeteroGraph(object):
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
+    def set_n_initializer(self, initializer, field=None, ntype=None):
+        """Set the initializer for empty node features.
+
+        Initializer is a callable that returns a tensor given the shape, data type
+        and device context.
+
+        When a subset of the nodes are assigned a new feature, initializer is
+        used to create feature for rest of the nodes.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        ntype : str, optional
+            The node type. Could be omitted if there is only one node
+            type in the graph. Error will be raised otherwise.
+            (Default: None)
+
+        Examples
+        --------
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+
+        """
+        ntid = self.get_ntype_id(ntype)
+        self._node_frames[ntid].set_initializer(initializer, field)
+
+    def set_e_initializer(self, initializer, field=None, etype=None):
+        """Set the initializer for empty edge features.
+
+        Initializer is a callable that returns a tensor given the shape, data
+        type and device context.
+
+        When a subset of the edges are assigned a new feature, initializer is
+        used to create feature for rest of the edges.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+        """
+        etid = self.get_etype_id(etype)
+        self._edge_frames[etid].set_initializer(initializer, field)
+
     def _set_n_repr(self, ntid, u, data, inplace=False):
         """Internal API to set node features.
 
@@ -1582,7 +1646,7 @@ class DGLHeteroGraph(object):
             scheduler.schedule_group_apply_edge(
                 AdaptedHeteroGraph(self, stid, dtid, etid),
                 u, v, eid,
-                efunc, group_by,
+                func, group_by,
                 inplace=inplace)
             Runtime.run(prog)
 
@@ -2413,6 +2477,137 @@ class DGLHeteroGraph(object):
     # pylint: disable=useless-super-delegation
     def __repr__(self):
         return super(DGLHeteroGraph, self).__repr__()
+
+    def local_var(self):
+        """Return a graph object that can be used in a local function scope.
+
+        The returned graph object shares the feature data and graph structure of this graph.
+        However, any out-place mutation to the feature data will not reflect to this graph,
+        thus making it easier to use in a function scope.
+
+        If set, the local graph object will use same initializers for node features and
+        edge features.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
+        >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        Notes
+        -----
+        Internally, the returned graph shares the same feature tensors, but construct a new
+        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
+        graph will not reflect to the original graph. However, inplace operations do change
+        the shared tensor values, so will be reflected to the original graph. This function
+        also has little overhead when the number of feature tensors in this graph is small.
+
+        See Also
+        --------
+        local_var
+
+        Returns
+        -------
+        DGLGraph
+            The graph object that can be used as a local variable.
+        """
+        local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
+        local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        for fr1, fr2 in zip(local_node_frames, self._node_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        for fr1, fr2 in zip(local_edge_frames, self._edge_frames):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        return DGLHeteroGraph(self._graph, self.ntypes, self.etypes,
+                              local_node_frames,
+                              local_edge_frames)
+
+    @contextmanager
+    def local_scope(self):
+        """Enter a local scope context for this graph.
+
+        By entering a local scope, any out-place mutation to the feature data will
+        not reflect to the original graph, thus making it easier to use in a function scope.
+
+        If set, the local scope will use same initializers for node features and
+        edge features.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     with g.local_scope():
+        >>>         g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>         return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
+
+        >>> def foo(g):
+        >>>     with g.local_scope():
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
+        >>>         g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>         return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        See Also
+        --------
+        local_var
+        """
+        old_nframes = self._node_frames
+        old_eframes = self._edge_frames
+        self._node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
+        self._edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        for fr1, fr2 in zip(self._node_frames, old_nframes):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        for fr1, fr2 in zip(self._edge_frames, old_eframes):
+            sync_frame_initializer(fr1._frame, fr2._frame)
+        yield
+        self._node_frames = old_nframes
+        self._edge_frames = old_eframes
 
 # pylint: disable=abstract-method
 class DGLHeteroSubGraph(DGLHeteroGraph):

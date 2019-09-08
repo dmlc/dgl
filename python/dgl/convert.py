@@ -282,9 +282,12 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None):
     -------
     DGLHeteroGraph
     """
-    u, v = zip(*elist)
-    u = list(u)
-    v = list(v)
+    if len(elist) == 0:
+        u, v = [], []
+    else:
+        u, v = zip(*elist)
+        u = list(u)
+        v = list(v)
     return create_from_edges(u, v, utype, etype, vtype, urange, vrange)
 
 def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
