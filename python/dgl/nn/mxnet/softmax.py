@@ -119,6 +119,7 @@ def edge_softmax(graph, logits, eids=ALL):
     -----
         * Input shape: :math:`(E, *, 1)` where * means any number of
           additional dimensions, :math:`E` equals the length of eids.
+          If eids is ALL, :math:`E` equals number of edges in the graph.
         * Return shape: :math:`(E, *, 1)`
 
     Examples
