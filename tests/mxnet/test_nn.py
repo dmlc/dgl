@@ -235,7 +235,7 @@ def test_partial_edge_softmax():
     score.attach_grad()
     grad = F.randn((300, 1))
     import numpy as np
-    eids = np.random.choice(900, 300, replace=False, dtype='int64')
+    eids = np.random.choice(900, 300, replace=False).astype('int64')
     eids = F.zerocopy_from_numpy(eids)
     # compute partial edge softmax
     with mx.autograd.record():

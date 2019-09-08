@@ -332,7 +332,7 @@ def test_partial_edge_softmax():
     score.requires_grad_()
     grad = F.randn((300, 1))
     import numpy as np
-    eids = np.random.choice(900, 300, replace=False, dtype='int64')
+    eids = np.random.choice(900, 300, replace=False).astype('int64')
     eids = F.zerocopy_from_numpy(eids)
     # compute partial edge softmax
     y_1 = nn.edge_softmax(g, score, eids)
