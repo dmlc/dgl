@@ -29,8 +29,8 @@ class EdgeSoftmax(mx.autograd.Function):
         super(EdgeSoftmax, self).__init__()
         self.g = g
         if is_all(eids):
-            eids = mx.nd.arange(g.number_of_edges(), dtype='int64')
-        self.eids = eids
+            eids = mx.nd.arange(g.number_of_edges())
+        self.eids = eids.astype('int64')
 
     def forward(self, score):
         """Forward function.

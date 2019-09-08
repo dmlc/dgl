@@ -46,6 +46,7 @@ class EdgeSoftmax(th.autograd.Function):
         g = g.local_var()
         if is_all(eids):
             eids = th.arange(g.number_of_edges())
+        eids = eids.long()
 
         g.edges[eids].data['s'] = score
         g.send_and_recv(eids, fn.copy_e('s', 'm'), fn.max('m', 'smax'))
