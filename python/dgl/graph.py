@@ -3250,8 +3250,8 @@ class DGLGraph(DGLBaseGraph):
         filter_nodes
         """
         if is_all(edges):
-            eid = ALL
             u, v, _ = self._graph.edges('eid')
+            eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)

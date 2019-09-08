@@ -273,32 +273,33 @@ class HeteroNodeView(object):
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
-    __slots__ = ['_graph', '_ntype', '_nodes']
+    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
 
     def __init__(self, graph, ntype, nodes):
         self._graph = graph
         self._ntype = ntype
+        self._ntid = self._graph.get_ntype_id(ntype)
         self._nodes = nodes
 
     def __getitem__(self, key):
-        return self._graph._get_n_repr(self._ntype, self._nodes)[key]
+        return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        self._graph._set_n_repr(self._ntype, self._nodes, {key : val})
+        self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
 
     def __delitem__(self, key):
-        self._graph._pop_n_repr(self._ntype, key)
+        self._graph._pop_n_repr(self._ntid, key)
 
     def __len__(self):
-        return len(self._graph._node_frames[self._graph.get_ntype_id(self._ntype)])
+        return len(self._graph._node_frames[self._ntid])
 
     def __iter__(self):
-        return iter(self._graph._node_frames[self._graph.get_ntype_id(self._ntype)])
+        return iter(self._graph._node_frames[self._ntid])
 
     def __repr__(self):
-        data = self._graph._get_n_repr(self._ntype, self._nodes)
+        data = self._graph._get_n_repr(self._ntid, self._nodes)
         return repr({key : data[key]
-                     for key in self._graph._node_frames[self._graph.get_ntype_id(self._ntype)]})
+                     for key in self._graph._node_frames[self._ntid]})
 
 class HeteroEdgeView(object):
     """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
@@ -336,29 +337,30 @@ class HeteroEdgeView(object):
 
 class HeteroEdgeDataView(MutableMapping):
     """The data view class when G.ndata[etype] is called."""
-    __slots__ = ['_graph', '_etype', '_edges']
+    __slots__ = ['_graph', '_etype', '_etid', '_edges']
 
     def __init__(self, graph, etype, edges):
         self._graph = graph
         self._etype = etype
+        self._etid = self._graph.get_etype_id(etype)
         self._edges = edges
 
     def __getitem__(self, key):
-        return self._graph._get_e_repr(self._etype, self._edges)[key]
+        return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
-        self._graph._set_e_repr(self._etype, self._edges, {key : val})
+        self._graph._set_e_repr(self._etid, self._edges, {key : val})
 
     def __delitem__(self, key):
-        self._graph._pop_e_repr(self._etype, key)
+        self._graph._pop_e_repr(self._etid, key)
 
     def __len__(self):
-        return len(self._graph._edge_frames[self._graph.get_etype_id(self._etype)])
+        return len(self._graph._edge_frames[self._etid])
 
     def __iter__(self):
-        return iter(self._graph._edge_frames[self._graph.get_etype_id(self._etype)])
+        return iter(self._graph._edge_frames[self._etid])
 
     def __repr__(self):
-        data = self._graph._get_e_repr(self._etype, self._edges)
+        data = self._graph._get_e_repr(self._etid, self._edges)
         return repr({key : data[key]
-                     for key in self._graph._edge_frames[self._graph.get_etype_id(self._etype)]})
+                     for key in self._graph._edge_frames[self._etid]})

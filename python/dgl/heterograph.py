@@ -1249,7 +1249,7 @@ class DGLHeteroGraph(object):
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
-    def _set_n_repr(self, ntype, u, data, inplace=False):
+    def _set_n_repr(self, ntid, u, data, inplace=False):
         """Internal API to set node features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1262,8 +1262,8 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        ntype : str
-            The node type
+        ntid : int
+            Node type id.
         u : node, container or tensor
             The node(s).
         data : dict of tensor
@@ -1272,7 +1272,6 @@ class DGLHeteroGraph(object):
             If True, update will be done in place, but autograd will break.
             (Default: False)
         """
-        ntid = self.get_ntype_id(ntype)
         if is_all(u):
             num_nodes = self._graph.number_of_nodes(ntid)
         else:
@@ -1290,15 +1289,15 @@ class DGLHeteroGraph(object):
         else:
             self._node_frames[ntid].update_rows(u, data, inplace=inplace)
 
-    def _get_n_repr(self, ntype, u):
+    def _get_n_repr(self, ntid, u):
         """Get node(s) representation of a single node type.
 
         The returned feature tensor batches multiple node features on the first dimension.
 
         Parameters
         ----------
-        ntype : str
-            The node type
+        ntid : int
+            Node type id.
         u : node, container or tensor
             The node(s).
 
@@ -1307,22 +1306,19 @@ class DGLHeteroGraph(object):
         dict
             Representation dict from feature name to feature tensor.
         """
-        if len(self.node_attr_schemes(ntype)) == 0:
-            return dict()
-        ntid = self.get_ntype_id(ntype)
         if is_all(u):
             return dict(self._node_frames[ntid])
         else:
             u = utils.toindex(u)
             return self._node_frames[ntid].select_rows(u)
 
-    def _pop_n_repr(self, ntype, key):
+    def _pop_n_repr(self, ntid, key):
         """Internal API to get and remove the specified node feature.
 
         Parameters
         ----------
-        ntype : str
-            The node type
+        ntid : int
+            Node type id.
         key : str
             The attribute name.
 
@@ -1331,10 +1327,9 @@ class DGLHeteroGraph(object):
         Tensor
             The popped representation
         """
-        ntid = self.get_ntype_id(ntype)
         return self._node_frames[ntid].pop(key)
 
-    def _set_e_repr(self, etype, edges, data, inplace=False):
+    def _set_e_repr(self, etid, edges, data, inplace=False):
         """Internal API to set edge(s) features.
 
         `data` is a dictionary from the feature name to feature tensor. Each tensor
@@ -1346,8 +1341,8 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        etype : (str, str, str)
-            The source-edge-destination type triplet
+        etid : int
+            Edge type id.
         edges : edges
             Edges can be either
 
@@ -1362,7 +1357,6 @@ class DGLHeteroGraph(object):
             If True, update will be done in place, but autograd will break.
             (Default: False)
         """
-        etid = self.get_etype_id(etype)
         # parse argument
         if is_all(edges):
             eid = ALL
@@ -1399,13 +1393,13 @@ class DGLHeteroGraph(object):
             # update row
             self._edge_frames[etid].update_rows(eid, data, inplace=inplace)
 
-    def _get_e_repr(self, etype, edges):
+    def _get_e_repr(self, etid, edges):
         """Internal API to get edge features.
 
         Parameters
         ----------
-        etype : (str, str, str)
-            The source-edge-destination type triplet
+        etid : int
+            Edge type id.
         edges : edges
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
@@ -1415,9 +1409,6 @@ class DGLHeteroGraph(object):
         dict
             Representation dict
         """
-        etid = self.get_etype_id(etype)
-        if len(self.edge_attr_schemes(etype)) == 0:
-            return dict()
         # parse argument
         if is_all(edges):
             eid = ALL
@@ -1436,13 +1427,13 @@ class DGLHeteroGraph(object):
             eid = utils.toindex(eid)
             return self._edge_frames[etid].select_rows(eid)
 
-    def _pop_e_repr(self, etype, key):
+    def _pop_e_repr(self, etid, key):
         """Get and remove the specified edge repr of a single edge type.
 
         Parameters
         ----------
-        etype : (str, str, str)
-            The source-edge-destination type triplet
+        etid : int
+            Edge type id.
         key : str
           The attribute name.
 
@@ -1451,7 +1442,6 @@ class DGLHeteroGraph(object):
         Tensor
             The popped representation
         """
-        etid = self.get_etype_id(etype)
         self._edge_frames[etid].pop(key)
 
     #################################################################
@@ -2006,6 +1996,7 @@ class DGLHeteroGraph(object):
              message_func,
              reduce_func,
              apply_node_func=None,
+             etype=None,
              inplace=False):
         """Send message from the node(s) to their successors and update them.
 
@@ -2031,11 +2022,14 @@ class DGLHeteroGraph(object):
         apply_node_func : callable, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
         # only one type of edges
-        etid = self.get_etype_id(None)  # must be 0
+        etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
 
         u = utils.toindex(u)
@@ -2120,21 +2114,83 @@ class DGLHeteroGraph(object):
 
     def prop_nodes(self,
                    nodes_generator,
-                   message_func=None,
-                   reduce_func=None,
-                   apply_node_func=None):
-        """Node propagation in heterogeneous graph is not supported.
+                   message_func,
+                   reduce_func,
+                   apply_node_func=None,
+                   etype=None):
+        """Propagate messages using graph traversal by triggering
+        :func:`pull()` on nodes.
+
+        The traversal order is specified by the ``nodes_generator``. It generates
+        node frontiers, which is a list or a tensor of nodes. The nodes in the
+        same frontier will be triggered together, while nodes in different frontiers
+        will be triggered according to the generating order.
+
+        Parameters
+        ----------
+        node_generators : iterable, each element is a list or a tensor of node ids
+            The generator of node frontiers. It specifies which nodes perform
+            :func:`pull` at each timestep.
+        message_func : callable
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        See Also
+        --------
+        prop_edges
         """
-        raise NotImplementedError('not supported')
+        for node_frontier in nodes_generator:
+            self.pull(node_frontier, message_func, reduce_func, apply_node_func, etype=etype)
 
     def prop_edges(self,
                    edges_generator,
-                   message_func=None,
-                   reduce_func=None,
-                   apply_node_func=None):
-        """Edge propagation in heterogeneous graph is not supported.
+                   message_func,
+                   reduce_func,
+                   apply_node_func=None,
+                   etype=None):
+        """Propagate messages using graph traversal by triggering
+        :func:`send_and_recv()` on edges.
+
+        The traversal order is specified by the ``edges_generator``. It generates
+        edge frontiers. The edge frontiers should be of *valid edges type*.
+        See :func:`send` for more details.
+
+        Edges in the same frontier will be triggered together, while edges in
+        different frontiers will be triggered according to the generating order.
+
+        Parameters
+        ----------
+        edges_generator : generator
+            The generator of edge frontiers.
+        message_func : callable
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        See Also
+        --------
+        prop_nodes
         """
-        raise NotImplementedError('not supported')
+        for edge_frontier in edges_generator:
+            self.send_and_recv(edge_frontier, message_func, reduce_func,
+                               apply_node_func, etype=etype)
 
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
@@ -2185,36 +2241,7 @@ class DGLHeteroGraph(object):
         """
         pass
 
-    def adjacency_matrix_scipy(self, etype=None, transpose=False, fmt='csr'):
-        """Return the scipy adjacency matrix representation of edges with the
-        given edge type.
-
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
-
-        When transpose is True, a row represents the source and a column represents
-        a destination.
-
-        The elements in the adajency matrix are edge ids.
-
-        Parameters
-        ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
-        transpose : bool, optional (default=False)
-            A flag to transpose the returned adjacency matrix.
-        fmt : str, optional (default='csr')
-            Indicates the format of returned adjacency matrix.
-
-        Returns
-        -------
-        scipy.sparse.spmatrix
-            The scipy representation of adjacency matrix.
-        """
-        pass
-
-    def adjacency_matrix(self, etype=None, transpose=False, ctx=F.cpu()):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix representation of edges with the
         given edge type.
 
@@ -2226,22 +2253,24 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         transpose : bool, optional (default=False)
             A flag to transpose the returned adjacency matrix.
         ctx : context, optional (default=cpu)
             The context of returned adjacency matrix.
+        scipy_fmt : str, optional (default=None)
+            If specified, return a scipy sparse matrix in the given format.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
-        SparseTensor
-            The adjacency matrix.
+        SparseTensor or scipy.sparse.spmatrix
+            Adjacency matrix.
         """
         pass
 
-    def incidence_matrix(self, etype, typestr, ctx=F.cpu()):
+    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
@@ -2287,14 +2316,15 @@ class DGLHeteroGraph(object):
         """
         pass
 
-    def filter_nodes(self, ntype, predicate, nodes=ALL):
+    def to_networkx(self, node_attrs=None, edge_attrs=None):
+        pass
+
+    def filter_nodes(self, predicate, nodes=ALL, ntype=None):
         """Return a tensor of node IDs with the given node type that satisfy
         the given predicate.
 
         Parameters
         ----------
-        ntype : str
-            The node type.
         predicate : callable
             A function of signature ``func(nodes) -> tensor``.
             ``nodes`` are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
@@ -2303,23 +2333,37 @@ class DGLHeteroGraph(object):
             the batch satisfies the predicate.
         nodes : int, iterable or tensor of ints
             The nodes to filter on. Default value is all the nodes.
+        ntype : str, optional
+            The node type. Can be omitted if there is only one node type
+            in the graph.
 
         Returns
         -------
         tensor
-            The filtered nodes.
+            The nodes that satisfy the predicate.
         """
-        pass
+        ntid = self.get_ntype_id(ntype)
+        if is_all(nodes):
+            v = utils.toindex(slice(0, self._graph.number_of_nodes(ntid)))
+        else:
+            v = utils.toindex(nodes)
 
-    def filter_edges(self, etype, predicate, edges=ALL):
+        n_repr = self._get_n_repr(ntid, v)
+        nbatch = NodeBatch(v, n_repr)
+        n_mask = F.copy_to(predicate(nbatch), F.cpu())
+
+        if is_all(nodes):
+            return F.nonzero_1d(n_mask)
+        else:
+            nodes = F.tensor(nodes)
+            return F.boolean_mask(nodes, n_mask)
+
+    def filter_edges(self, predicate, edges=ALL, etype=None):
         """Return a tensor of edge IDs with the given edge type that satisfy
         the given predicate.
 
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         predicate : callable
             A function of signature ``func(edges) -> tensor``.
             ``edges`` are :class:`EdgeBatch` objects as in :mod:`~dgl.udf`.
@@ -2329,13 +2373,41 @@ class DGLHeteroGraph(object):
         edges : valid edges type
             Edges on which to apply ``func``. See :func:`send` for valid
             edges type. Default value is all the edges.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
         tensor
-            The filtered edges represented by their ids.
+            The edges that satisfy the predicate.
         """
-        pass
+        etid = self.get_etype_id(etype)
+        stid, dtid = self._graph.metagraph.find_edge(etid)
+        if is_all(edges):
+            u, v, _ = self._graph.edges(etid, 'eid')
+            eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(etid, u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(etid, eid)
+
+        src_data = self._get_n_repr(stid, u)
+        edge_data = self._get_e_repr(etid, eid)
+        dst_data = self._get_n_repr(dtid, v)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
+        e_mask = F.copy_to(predicate(ebatch), F.cpu())
+
+        if is_all(edges):
+            return F.nonzero_1d(e_mask)
+        else:
+            edges = F.tensor(edges)
+            return F.boolean_mask(edges, e_mask)
 
     # TODO: replace this after implementing frame
     # pylint: disable=useless-super-delegation
