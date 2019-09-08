@@ -27,8 +27,16 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     # I raised an issue in PyTorch bug tracker:
     # https://github.com/pytorch/pytorch/issues/14057
     def __reduce__(self):
-        state = (self.shape, F.reverse_data_type_dict[self.dtype])
-        return self._reconstruct_scheme, state
+        try:
+            state = (self.shape, F.reverse_data_type_dict[self.dtype])
+            return self._reconstruct_scheme, state
+        except KeyError as e:
+            state = (self.shape, self.dtype)
+            return self._np_reconstruct_scheme, state
+
+    @classmethod
+    def _np_reconstruct_scheme(cls, shape, dtype_str):
+        return cls(shape, dtype_str)
 
     @classmethod
     def _reconstruct_scheme(cls, shape, dtype_str):
