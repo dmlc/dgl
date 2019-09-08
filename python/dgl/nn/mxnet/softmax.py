@@ -3,6 +3,7 @@
 import mxnet as mx
 
 from ... import function as fn
+from ...base import ALL, is_all
 
 __all__ = ['edge_softmax']
 
@@ -24,9 +25,12 @@ class EdgeSoftmax(mx.autograd.Function):
     the attention weights are computed with such an edgesoftmax operation.
     """
 
-    def __init__(self, g):
+    def __init__(self, g, eids):
         super(EdgeSoftmax, self).__init__()
         self.g = g
+        if is_all(eids):
+            eids = mx.nd.arange(g.number_of_edges(), dtype='int64')
+        self.eids = eids
 
     def forward(self, score):
         """Forward function.
@@ -43,13 +47,14 @@ class EdgeSoftmax(mx.autograd.Function):
             return out.data
         """
         g = self.g.local_var()
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = g.edata['out'].exp()
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
+        eids = self.eids
+        g.edges[eids].data['s'] = score
+        g.send_and_recv(eids, fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'), eids)
+        g.edges[eids].data['out'] = g.edges[eids].data['out'].exp()
+        g.send_and_recv(eids, fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'), eids)
+        out = g.edges[eids].data['out']
         self.save_for_backward(out)
         return out
 
@@ -68,17 +73,18 @@ class EdgeSoftmax(mx.autograd.Function):
             grad_score = sds - sds * sds_sum  # multiple expressions
         """
         g = self.g.local_var()
+        eids = self.eids
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
         # clear saved tensors explicitly
         self.saved_tensors = None
-        g.edata['out'] = out
-        g.edata['grad_score'] = out * grad_out
-        g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        grad_score = g.edata['grad_score'] - g.edata['out']
+        g.edges[eids].data['out'] = out
+        g.edges[eids].data['grad_score'] = out * grad_out
+        g.send_and_recv(eids, fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'), eids)
+        grad_score = g.edges[eids].data['grad_score'] - g.edges[eids].data['out']
         return grad_score
 
-def edge_softmax(graph, logits):
+def edge_softmax(graph, logits, eids=ALL):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -98,8 +104,11 @@ def edge_softmax(graph, logits):
     ----------
     graph : DGLGraph
         The graph to perform edge softmax
-    logits : torch.Tensor
+    logits : mxnet.NDArray
         The input edge feature
+    eids : mxnet.NDArray or ALL, optional
+        Edges on which to apply edge softmax. If ALL, apply edge softmax
+        on all edges in the graph. Default: ALL.
 
     Returns
     -------
@@ -108,9 +117,9 @@ def edge_softmax(graph, logits):
 
     Notes
     -----
-        * Input shape: :math:`(N, *, 1)` where * means any number of
-          additional dimensions, :math:`N` is the number of edges.
-        * Return shape: :math:`(N, *, 1)`
+        * Input shape: :math:`(E, *, 1)` where * means any number of
+          additional dimensions, :math:`E` equals the length of eids.
+        * Return shape: :math:`(E, *, 1)`
 
     Examples
     --------
@@ -143,6 +152,14 @@ def edge_softmax(graph, logits):
      [0.33333334]
      [0.33333334]]
     <NDArray 6x1 @cpu(0)>
+
+    Apply edge softmax on first 4 edges of g:
+    >>> edge_softmax(g, edata, nd.array([0,1,2,3], dtype='int64'))
+    [[1. ]
+     [0.5]
+     [1. ]
+     [0.5]]
+    <NDArray 4x1 @cpu(0)>
     """
-    softmax_op = EdgeSoftmax(graph)
+    softmax_op = EdgeSoftmax(graph, eids)
     return softmax_op(logits)

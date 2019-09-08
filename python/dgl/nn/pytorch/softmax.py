@@ -3,6 +3,7 @@
 import torch as th
 
 from ... import function as fn
+from ...base import ALL, is_all
 
 __all__ = ['edge_softmax']
 
@@ -25,7 +26,7 @@ class EdgeSoftmax(th.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, g, score):
+    def forward(ctx, g, score, eids):
         """Forward function.
 
         Pseudo-code:
@@ -43,14 +44,17 @@ class EdgeSoftmax(th.autograd.Function):
         # a local variable
         ctx.backward_cache = g
         g = g.local_var()
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = th.exp(g.edata['out'])
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
-        ctx.save_for_backward(out)
+        if is_all(eids):
+            eids = th.arange(g.number_of_edges())
+
+        g.edges[eids].data['s'] = score
+        g.send_and_recv(eids, fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'), eids)
+        g.edges[eids].data['out'] = th.exp(g.edges[eids].data['out'])
+        g.send_and_recv(eids, fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'), eids)
+        out = g.edges[eids].data['out']
+        ctx.save_for_backward(out, eids)
         return out
 
     @staticmethod
@@ -71,18 +75,18 @@ class EdgeSoftmax(th.autograd.Function):
         """
         g = ctx.backward_cache
         g = g.local_var()
-        out, = ctx.saved_tensors
+        out, eids = ctx.saved_tensors
         # clear backward cache explicitly
         ctx.backward_cache = None
-        g.edata['out'] = out
-        g.edata['grad_s'] = out * grad_out
-        g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        grad_score = g.edata['grad_s'] - g.edata['out']
-        return None, grad_score
+        g.edges[eids].data['out'] = out
+        g.edges[eids].data['grad_s'] = out * grad_out
+        g.send_and_recv(eids, fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'), eids)
+        grad_score = g.edges[eids].data['grad_s'] - g.edges[eids].data['out']
+        return None, grad_score, None
 
 
-def edge_softmax(graph, logits):
+def edge_softmax(graph, logits, eids=ALL):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -104,6 +108,9 @@ def edge_softmax(graph, logits):
         The graph to perform edge softmax
     logits : torch.Tensor
         The input edge feature
+    eids : torch.Tensor or ALL, optional
+        Edges on which to apply edge softmax. If ALL, apply edge
+        softmax on all edges in the graph. Default: ALL.
 
     Returns
     -------
@@ -112,9 +119,9 @@ def edge_softmax(graph, logits):
 
     Notes
     -----
-        * Input shape: :math:`(N, *, 1)` where * means any number of
-          additional dimensions, :math:`N` is the number of edges.
-        * Return shape: :math:`(N, *, 1)`
+        * Input shape: :math:`(E, *, 1)` where * means any number of
+          additional dimensions, :math:`E` equals the length of eids.
+        * Return shape: :math:`(E, *, 1)`
 
     Examples
     --------
@@ -145,5 +152,12 @@ def edge_softmax(graph, logits):
         [0.5000],
         [0.3333],
         [0.3333]])
+
+    Apply edge softmax on first 4 edges of g:
+    >>> edge_softmax(g, edata[:4], th.Tensor([0,1,2,3]))
+    tensor([[1.0000],
+        [0.5000],
+        [1.0000],
+        [0.5000]])
     """
-    return EdgeSoftmax.apply(graph, logits)
+    return EdgeSoftmax.apply(graph, logits, eids)
