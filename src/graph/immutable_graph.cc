@@ -278,6 +278,7 @@ void CSR::SortAdj() {
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
   dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
   size_t num_rows = adj_.num_rows;
+#pragma omp parallel for
   for (size_t row = 0; row < num_rows; row++) {
     dgl_id_t *start = indices_data + indptr_data[row];
     dgl_id_t *end = indices_data + indptr_data[row + 1];
