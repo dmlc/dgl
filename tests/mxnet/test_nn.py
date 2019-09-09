@@ -223,6 +223,36 @@ def test_edge_softmax():
     assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
             1e-4, 1e-4)
 
+def test_partial_edge_softmax():
+    g = dgl.DGLGraph()
+    g.add_nodes(30)
+    # build a complete graph
+    for i in range(30):
+        for j in range(30):
+            g.add_edge(i, j)
+
+    score = F.randn((300, 1))
+    score.attach_grad()
+    grad = F.randn((300, 1))
+    import numpy as np
+    eids = np.random.choice(900, 300, replace=False).astype('int64')
+    eids = F.zerocopy_from_numpy(eids)
+    # compute partial edge softmax
+    with mx.autograd.record():
+        y_1 = nn.edge_softmax(g, score, eids)
+        y_1.backward(grad)
+        grad_1 = score.grad
+
+    # compute edge softmax on edge subgraph
+    subg = g.edge_subgraph(eids)
+    with mx.autograd.record():
+        y_2 = nn.edge_softmax(subg, score)
+        y_2.backward(grad)
+        grad_2 = score.grad
+
+    assert F.allclose(y_1, y_2)
+    assert F.allclose(grad_1, grad_2)
+
 def test_rgcn():
     ctx = F.ctx()
     etype = []
@@ -277,6 +307,7 @@ def test_rgcn():
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
+    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
