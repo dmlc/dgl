@@ -1298,10 +1298,10 @@ class DGLHeteroGraph(object):
         else:
             return self._graph.adjacency_matrix_scipy(etid, transpose, scipy_fmt, False)
 
-    # Alias of adjacency_matrix
+    # Alias of ``adjacency_matrix``
     adj = adjacency_matrix
 
-    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
+    def incidence_matrix(self, typestr, ctx=F.cpu()):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
@@ -1332,9 +1332,6 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
         typestr : str
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional (default=cpu)
@@ -1345,9 +1342,9 @@ class DGLHeteroGraph(object):
         SparseTensor
             The incidence matrix.
         """
-        pass
+        return self._graph.incidence_matrix(typestr, ctx)[0]
 
-    # Alias of incidence matrix
+    # Alias of ``incidence_matrix``
     inc = incidence_matrix
 
     #################################################################

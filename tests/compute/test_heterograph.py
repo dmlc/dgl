@@ -223,31 +223,33 @@ def test_adj():
             adj.todense(),
             np.array([[1., 1., 0.],
                       [0., 1., 1.]]))
-
-def test_inc():
-    g = create_test_heterograph()
-    adj = F.sparse_to_numpy(g.inc('in', etype='follows'))
+    adj = F.sparse_to_numpy(g['follows'].adj())
     assert np.allclose(
             adj,
             np.array([[0., 0., 0.],
                       [1., 0., 0.],
                       [0., 1., 0.]]))
-    adj = F.sparse_to_numpy(g.adj('out', etype='follows'))
+
+def test_inc():
+    g = create_test_heterograph()
+    #follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    adj = F.sparse_to_numpy(g['follows'].inc('in'))
     assert np.allclose(
             adj,
-            np.array([[0., 1., 0.],
-                      [0., 0., 1.],
-                      [0., 0., 0.]]))
-    adj = F.sparse_to_numpy(g.adj(etype='plays'))
-    assert np.allclose(
-            adj,
-            np.array([[1., 1., 0.],
-                      [0., 1., 1.]]))
-    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='plays'))
+            np.array([[0., 0.],
+                      [1., 0.],
+                      [0., 1.]]))
+    adj = F.sparse_to_numpy(g['follows'].inc('out'))
     assert np.allclose(
             adj,
             np.array([[1., 0.],
-                      [1., 1.],
+                      [0., 1.],
+                      [0., 0.]]))
+    adj = F.sparse_to_numpy(g['follows'].inc('both'))
+    assert np.allclose(
+            adj,
+            np.array([[-1., 0.],
+                      [1., -1.],
                       [0., 1.]]))
     
 def test_view():
