@@ -319,7 +319,36 @@ def test_edge_softmax():
     assert len(g.ndata) == 0
     assert len(g.edata) == 2
     assert F.allclose(a1.grad, a2.grad, rtol=1e-4, atol=1e-4) # Follow tolerance in unittest backend
-    
+
+def test_partial_edge_softmax():
+    g = dgl.DGLGraph()
+    g.add_nodes(30)
+    # build a complete graph
+    for i in range(30):
+        for j in range(30):
+            g.add_edge(i, j)
+
+    score = F.randn((300, 1))
+    score.requires_grad_()
+    grad = F.randn((300, 1))
+    import numpy as np
+    eids = np.random.choice(900, 300, replace=False).astype('int64')
+    eids = F.zerocopy_from_numpy(eids)
+    # compute partial edge softmax
+    y_1 = nn.edge_softmax(g, score, eids)
+    y_1.backward(grad)
+    grad_1 = score.grad
+    score.grad.zero_()
+    # compute edge softmax on edge subgraph
+    subg = g.edge_subgraph(eids)
+    y_2 = nn.edge_softmax(subg, score)
+    y_2.backward(grad)
+    grad_2 = score.grad
+    score.grad.zero_()
+
+    assert F.allclose(y_1, y_2)
+    assert F.allclose(grad_1, grad_2)
+
 def test_rgcn():
     ctx = F.ctx()
     etype = []
@@ -570,6 +599,7 @@ def test_dense_cheb_conv():
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
+    test_partial_edge_softmax()
     test_set2set()
     test_glob_att_pool()
     test_simple_pool()
