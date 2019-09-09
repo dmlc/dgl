@@ -207,6 +207,25 @@ class DGLHeteroGraph(object):
     def _set_msg_index(self, etid, index):
         self._msg_indices[etid] = index
 
+    def __repr__(self):
+        if len(self.ntypes) == 1 and len(self.etypes) == 1:
+            ret = ('Graph(num_nodes={node}, num_edges={edge},\n'
+                   '      ndata_schemes={ndata}\n'
+                   '      edata_schemes={edata})')
+            return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                              ndata=str(self.node_attr_schemes()),
+                              edata=str(self.edge_attr_schemes()))
+        else:
+            ret = ('Graph(num_nodes={node},\n'
+                   '      num_edges={edge},\n'
+                   '      metagraph={meta})')
+            nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
+                          for i in range(len(self.ntypes))}
+            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+                          for i in range(len(self.etypes))}
+            meta = str(self.metagraph.edges())
+            return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+
     #################################################################
     # Mutation operations
     #################################################################
@@ -1197,6 +1216,130 @@ class DGLHeteroGraph(object):
         else:
             v = utils.toindex(v)
         return self._graph.out_degrees(etid, v).tousertensor()
+
+    def subgraph(self, nodes):
+        """Return the subgraph induced on given nodes.
+
+        Parameters
+        ----------
+        nodes : dict[str, list or iterable]
+            A dictionary of node types to node ID array to construct
+            subgraph.
+            All nodes must exist in the graph.
+
+        Returns
+        -------
+        G : DGLHeteroSubGraph
+            The subgraph.
+            The nodes are relabeled so that node `i` of type `t` in the
+            subgraph is mapped to the ``nodes[i]`` of type `t` in the
+            original graph.
+            The edges are also relabeled.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+        """
+        pass
+
+    def edge_subgraph(self, edges):
+        """Return the subgraph induced on given edges.
+
+        Parameters
+        ----------
+        edges : dict[etype, list or iterable]
+            A dictionary of edge types to edge ID array to construct
+            subgraph.
+            All edges must exist in the subgraph.
+            The edge type is characterized by a triplet of source type name,
+            destination type name, and edge type name.
+
+        Returns
+        -------
+        G : DGLHeteroSubGraph
+            The subgraph.
+            The edges are relabeled so that edge `i` of type `t` in the
+            subgraph is mapped to the ``edges[i]`` of type `t` in the
+            original graph.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+        """
+        pass
+
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
+        """Return the adjacency matrix representation of edges with the
+        given edge type.
+
+        By default, a row of returned adjacency matrix represents the
+        destination of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column
+        represents a destination.
+
+        Parameters
+        ----------
+        transpose : bool, optional (default=False)
+            A flag to transpose the returned adjacency matrix.
+        ctx : context, optional (default=cpu)
+            The context of returned adjacency matrix.
+        scipy_fmt : str, optional (default=None)
+            If specified, return a scipy sparse matrix in the given format.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Returns
+        -------
+        SparseTensor or scipy.sparse.spmatrix
+            Adjacency matrix.
+        """
+        pass
+
+    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
+        """Return the incidence matrix representation of edges with the given
+        edge type.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix :math:`I`:
+
+        * ``in``:
+
+            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`
+              (or :math:`v` is the dst node of :math:`e`);
+            - :math:`I[v, e] = 0` otherwise.
+
+        * ``out``:
+
+            - :math:`I[v, e] = 1` if :math:`e` is the out-edge of :math:`v`
+              (or :math:`v` is the src node of :math:`e`);
+            - :math:`I[v, e] = 0` otherwise.
+
+        * ``both``:
+
+            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
+            - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
+            - :math:`I[v, e] = 0` otherwise (including self-loop).
+
+        Parameters
+        ----------
+        etype : tuple[str, str, str]
+            The edge type, characterized by a triplet of source type name,
+            destination type name, and edge type name.
+        typestr : str
+            Can be either ``in``, ``out`` or ``both``
+        ctx : context, optional (default=cpu)
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        """
+        pass
 
     #################################################################
     # Features
@@ -2261,132 +2404,65 @@ class DGLHeteroGraph(object):
             self.send_and_recv(edge_frontier, message_func, reduce_func,
                                apply_node_func, etype=etype)
 
-    def subgraph(self, nodes):
-        """Return the subgraph induced on given nodes.
-
-        Parameters
-        ----------
-        nodes : dict[str, list or iterable]
-            A dictionary of node types to node ID array to construct
-            subgraph.
-            All nodes must exist in the graph.
-
-        Returns
-        -------
-        G : DGLHeteroSubGraph
-            The subgraph.
-            The nodes are relabeled so that node `i` of type `t` in the
-            subgraph is mapped to the ``nodes[i]`` of type `t` in the
-            original graph.
-            The edges are also relabeled.
-            One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `parent_nid` and `parent_eid` properties of the
-            subgraph.
-        """
-        pass
-
-    def edge_subgraph(self, edges):
-        """Return the subgraph induced on given edges.
-
-        Parameters
-        ----------
-        edges : dict[etype, list or iterable]
-            A dictionary of edge types to edge ID array to construct
-            subgraph.
-            All edges must exist in the subgraph.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-
-        Returns
-        -------
-        G : DGLHeteroSubGraph
-            The subgraph.
-            The edges are relabeled so that edge `i` of type `t` in the
-            subgraph is mapped to the ``edges[i]`` of type `t` in the
-            original graph.
-            One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `parent_nid` and `parent_eid` properties of the
-            subgraph.
-        """
-        pass
-
-    def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
-        """Return the adjacency matrix representation of edges with the
-        given edge type.
-
-        By default, a row of returned adjacency matrix represents the
-        destination of an edge and the column represents the source.
-
-        When transpose is True, a row represents the source and a column
-        represents a destination.
-
-        Parameters
-        ----------
-        transpose : bool, optional (default=False)
-            A flag to transpose the returned adjacency matrix.
-        ctx : context, optional (default=cpu)
-            The context of returned adjacency matrix.
-        scipy_fmt : str, optional (default=None)
-            If specified, return a scipy sparse matrix in the given format.
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        SparseTensor or scipy.sparse.spmatrix
-            Adjacency matrix.
-        """
-        pass
-
-    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
-        """Return the incidence matrix representation of edges with the given
-        edge type.
-
-        An incidence matrix is an n x m sparse matrix, where n is
-        the number of nodes and m is the number of edges. Each nnz
-        value indicating whether the edge is incident to the node
-        or not.
-
-        There are three types of an incidence matrix :math:`I`:
-
-        * ``in``:
-
-            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`
-              (or :math:`v` is the dst node of :math:`e`);
-            - :math:`I[v, e] = 0` otherwise.
-
-        * ``out``:
-
-            - :math:`I[v, e] = 1` if :math:`e` is the out-edge of :math:`v`
-              (or :math:`v` is the src node of :math:`e`);
-            - :math:`I[v, e] = 0` otherwise.
-
-        * ``both``:
-
-            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
-            - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
-            - :math:`I[v, e] = 0` otherwise (including self-loop).
-
-        Parameters
-        ----------
-        etype : tuple[str, str, str]
-            The edge type, characterized by a triplet of source type name,
-            destination type name, and edge type name.
-        typestr : str
-            Can be either ``in``, ``out`` or ``both``
-        ctx : context, optional (default=cpu)
-            The context of returned incidence matrix.
-
-        Returns
-        -------
-        SparseTensor
-            The incidence matrix.
-        """
-        pass
+    #################################################################
+    # Misc
+    #################################################################
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
-        pass
+        """Convert this graph to networkx graph.
+
+        The edge id will be saved as the 'id' edge attribute.
+
+        Parameters
+        ----------
+        node_attrs : iterable of str, optional
+            The node attributes to be copied.
+        edge_attrs : iterable of str, optional
+            The edge attributes to be copied.
+
+        Returns
+        -------
+        networkx.DiGraph
+            The nx graph
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> g = DGLGraph()
+        >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
+        >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
+        >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+
+        See Also
+        --------
+        dgl.to_networkx
+        """
+        # TODO(minjie): multi-type support
+        assert len(self.ntypes) == 1
+        assert len(self.etypes) == 1
+        src, dst = self.edges()
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        nx_graph = nx.MultiDiGraph() if self.is_multigraph else nx.DiGraph()
+        nx_graph.add_nodes_from(range(self.number_of_nodes()))
+        for eid, (u, v) in enumerate(zip(src, dst)):
+            nx_graph.add_edge(u, v, id=eid)
+
+        if node_attrs is not None:
+            for nid, attr in nx_graph.nodes(data=True):
+                feat_dict = self._get_n_repr(0, nid)
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
+        if edge_attrs is not None:
+            for _, _, attr in nx_graph.edges(data=True):
+                eid = attr['id']
+                feat_dict = self._get_e_repr(0, eid)
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
+        return nx_graph
 
     def filter_nodes(self, predicate, nodes=ALL, ntype=None):
         """Return a tensor of node IDs with the given node type that satisfy
@@ -2478,24 +2554,32 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def __repr__(self):
-        if len(self.ntypes) == 1 and len(self.etypes) == 1:
-            ret = ('Graph(num_nodes={node}, num_edges={edge},\n'
-                   '      ndata_schemes={ndata}\n'
-                   '      edata_schemes={edata})')
-            return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
-                              ndata=str(self.node_attr_schemes()),
-                              edata=str(self.edge_attr_schemes()))
-        else:
-            ret = ('Graph(num_nodes={node},\n'
-                   '      num_edges={edge},\n'
-                   '      metagraph={meta})')
-            nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
-                          for i in range(len(self.ntypes))}
-            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
-                          for i in range(len(self.etypes))}
-            meta = str(self.metagraph.edges())
-            return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
+    def to(self, ctx):
+        """Move both ndata and edata to the targeted mode (cpu/gpu)
+        Framework agnostic
+
+        Parameters
+        ----------
+        ctx : framework-specific context object
+            The context to move data to.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> import torch
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
+        >>> G.to(torch.device('cuda:0'))
+        """
+        for i in range(len(self._node_frames)):
+            for k in self._node_frames[i].keys():
+                self._node_frames[i][k] = F.copy_to(self._node_frames[i][k], ctx)
+        for i in range(len(self._edge_frames)):
+            for k in self._edge_frames[i].keys():
+                self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
 
     def local_var(self):
         """Return a graph object that can be used in a local function scope.

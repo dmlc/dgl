@@ -518,51 +518,8 @@ def create_from_networkx_multi(nx_graph,
 def to_networkx(g, node_attrs=None, edge_attrs=None):
     """Convert to networkx graph.
 
-    The edge id will be saved as the 'id' edge attribute.
-
-    Parameters
-    ----------
-    node_attrs : iterable of str, optional
-        The node attributes to be copied.
-    edge_attrs : iterable of str, optional
-        The edge attributes to be copied.
-
-    Returns
-    -------
-    networkx.DiGraph
-        The nx graph
-
-    Examples
+    See Also
     --------
-
-    .. note:: Here we use pytorch syntax for demo. The general idea applies
-        to other frameworks with minor syntax change (e.g. replace
-        ``torch.tensor`` with ``mxnet.ndarray``).
-
-    >>> import torch as th
-    >>> g = DGLGraph()
-    >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
-    >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
-    >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+    DGLGraph.to_networkx
     """
-    # TODO(minjie): multi-type support
-    assert len(g.ntypes) == 1
-    assert len(g.etypes) == 1
-    src, dst = g.edges()
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    nx_graph = nx.MultiDiGraph() if g.is_multigraph else nx.DiGraph()
-    nx_graph.add_nodes_from(range(g.number_of_nodes()))
-    for eid, (u, v) in enumerate(zip(src, dst)):
-        nx_graph.add_edge(u, v, id=eid)
-
-    if node_attrs is not None:
-        for nid, attr in nx_graph.nodes(data=True):
-            feat_dict = g._get_n_repr(0, nid)
-            attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
-    if edge_attrs is not None:
-        for _, _, attr in nx_graph.edges(data=True):
-            eid = attr['id']
-            feat_dict = g._get_e_repr(0, eid)
-            attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
-    return nx_graph
+    return g.to_networkx(node_attrs, edge_attrs)
