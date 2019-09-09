@@ -1,12 +1,14 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
+import numpy as np
+import scipy
+
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
-#from .graph import DGLGraph
 
 @register_object('graph.HeteroGraph')
 class HeteroGraphIndex(ObjectBase):
@@ -672,6 +674,65 @@ class HeteroGraphIndex(ObjectBase):
             adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (nrows, ncols))
             shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
             return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
+
+    def adjacency_matrix_scipy(self, etype, transpose, fmt, return_edge_ids=None):
+        """Return the scipy adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        fmt : str
+            Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
+
+        Returns
+        -------
+        scipy.sparse.spmatrix
+            The scipy representation of adjacency matrix.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+
+        if return_edge_ids is None:
+            dgl_warning(
+                "Adjacency matrix by default currently returns edge IDs."
+                "  As a result there is one 0 entry which is not eliminated."
+                "  In the next release it will return 1s by default,"
+                " and 0 will be eliminated otherwise.",
+                FutureWarning)
+            return_edge_ids = True
+
+        rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
+        srctype, dsttype = self.metagraph.find_edge(etype)
+        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
+        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nnz = self.number_of_edges(etype)
+        if fmt == "csr":
+            indptr = utils.toindex(rst(0)).tonumpy()
+            indices = utils.toindex(rst(1)).tonumpy()
+            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
+            print(indptr)
+            print(indices)
+            print(data)
+            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(nrows, ncols))
+        elif fmt == 'coo':
+            idx = utils.toindex(rst(0)).tonumpy()
+            row, col = np.reshape(idx, (2, nnz))
+            data = np.arange(0, nnz) if return_edge_ids else np.ones_like(row)
+            return scipy.sparse.coo_matrix((data, (row, col)), shape=(nrows, ncols))
         else:
             raise Exception("unknown format")
 

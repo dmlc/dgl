@@ -174,6 +174,81 @@ def test_query():
 
     # test repr
     print(g)
+
+def test_adj():
+    g = create_test_heterograph()
+    adj = F.sparse_to_numpy(g.adj(etype='follows'))
+    assert np.allclose(
+            adj,
+            np.array([[0., 0., 0.],
+                      [1., 0., 0.],
+                      [0., 1., 0.]]))
+    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='follows'))
+    assert np.allclose(
+            adj,
+            np.array([[0., 1., 0.],
+                      [0., 0., 1.],
+                      [0., 0., 0.]]))
+    adj = F.sparse_to_numpy(g.adj(etype='plays'))
+    assert np.allclose(
+            adj,
+            np.array([[1., 1., 0.],
+                      [0., 1., 1.]]))
+    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='plays'))
+    assert np.allclose(
+            adj,
+            np.array([[1., 0.],
+                      [1., 1.],
+                      [0., 1.]]))
+
+    adj = g.adj(scipy_fmt='csr', etype='follows')
+    assert np.allclose(
+            adj.todense(),
+            np.array([[0., 0., 0.],
+                      [1., 0., 0.],
+                      [0., 1., 0.]]))
+    adj = g.adj(scipy_fmt='coo', etype='follows')
+    assert np.allclose(
+            adj.todense(),
+            np.array([[0., 0., 0.],
+                      [1., 0., 0.],
+                      [0., 1., 0.]]))
+    adj = g.adj(scipy_fmt='csr', etype='plays')
+    assert np.allclose(
+            adj.todense(),
+            np.array([[1., 1., 0.],
+                      [0., 1., 1.]]))
+    adj = g.adj(scipy_fmt='coo', etype='plays')
+    assert np.allclose(
+            adj.todense(),
+            np.array([[1., 1., 0.],
+                      [0., 1., 1.]]))
+
+def test_inc():
+    g = create_test_heterograph()
+    adj = F.sparse_to_numpy(g.inc('in', etype='follows'))
+    assert np.allclose(
+            adj,
+            np.array([[0., 0., 0.],
+                      [1., 0., 0.],
+                      [0., 1., 0.]]))
+    adj = F.sparse_to_numpy(g.adj('out', etype='follows'))
+    assert np.allclose(
+            adj,
+            np.array([[0., 1., 0.],
+                      [0., 0., 1.],
+                      [0., 0., 0.]]))
+    adj = F.sparse_to_numpy(g.adj(etype='plays'))
+    assert np.allclose(
+            adj,
+            np.array([[1., 1., 0.],
+                      [0., 1., 1.]]))
+    adj = F.sparse_to_numpy(g.adj(transpose=True, etype='plays'))
+    assert np.allclose(
+            adj,
+            np.array([[1., 0.],
+                      [1., 1.],
+                      [0., 1.]]))
     
 def test_view():
     # test data view
@@ -849,6 +924,8 @@ def test_backward():
 
 if __name__ == '__main__':
     test_query()
+    test_adj()
+    test_inc()
     test_view()
     test_view1()
     #test_flatten()
