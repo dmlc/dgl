@@ -5,13 +5,17 @@
 [Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
 [Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
 
+Model Zoos: [Chemistry](https://github.com/dmlc/dgl/tree/master/examples/pytorch/model_zoo) | [Citation Networks](https://github.com/dmlc/dgl/tree/master/examples/pytorch/model_zoo/citation_network)
+
 DGL is a Python package that interfaces between existing tensor libraries and data being expressed as
 graphs.
 
 It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, and many others) easy while
 maintaining high computation efficiency.
 
-A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations:
+All model examples can be found [here](https://github.com/dmlc/dgl/tree/master/examples).
+
+A summary of part of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations:
 
 | Model                                                            | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time)                                          | DGL speed (epoch time) | Improvement |
 | -----                                                            | -----------------      | ------------      | ------------------------------------                                          | ---------------------- | ----------- |
@@ -175,6 +179,18 @@ Please let us know if you encounter a bug or have any suggestions by [filing an 
 We welcome all contributions from bug fixes to new features and extensions.
 We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to our [contribution guide](https://docs.dgl.ai/contribute.html).
 
+## Cite
+
+If you use DGL in a scientific publication, we would appreciate citations to the following paper:
+```
+@article{wang2019dgl,
+    title={Deep Graph Library: Towards Efficient and Scalable Deep Learning on Graphs},
+    url={https://arxiv.org/abs/1909.01315},
+    author={{Wang, Minjie and Yu, Lingfan and Zheng, Da and Gan, Quan and Gai, Yu and Ye, Zihao and Li, Mufei and Zhou, Jinjing and Huang, Qi and Ma, Chao and Huang, Ziyue and Guo, Qipeng and Zhang, Hao and Lin, Haibin and Zhao, Junbo and Li, Jinyang and Smola, Alexander J and Zhang, Zheng},
+    journal={ICLR Workshop on Representation Learning on Graphs and Manifolds},
+    year={2019}
+}
+```
 
 ## The Team
 

@@ -2,7 +2,7 @@
 """Model Zoo Package"""
 
 from .classifiers import GCNClassifier, GATClassifier
-from .sch import SchNetModel
+from .schnet import SchNet
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .dgmg import DGMG
