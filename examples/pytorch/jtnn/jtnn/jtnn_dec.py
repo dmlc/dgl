@@ -260,7 +260,6 @@ class DGLJTNNDecoder(nn.Module):
         for step in range(MAX_DECODE_LEN):
             u, u_slots = stack[-1]
             udata = mol_tree.nodes[u].data
-            wid = udata['wid']
             x = udata['x']
             h = udata['h']
 

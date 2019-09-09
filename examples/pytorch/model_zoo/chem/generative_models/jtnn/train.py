@@ -41,8 +41,6 @@ parser.add_argument("-z", "--beta", dest="beta", default=1.0,
                     help="Coefficient of KL Divergence term")
 parser.add_argument("-q", "--lr", dest="lr", default=1e-3,
                     help="Learning Rate")
-parser.add_argument("-T", "--test", dest="test", action="store_true",
-                    help="Add this flag to run test mode")
 args = parser.parse_args()
 
 dataset = JTNNDataset(data=args.train, vocab=args.vocab, training=True)
@@ -130,35 +128,8 @@ def train():
         print("learning rate: %.6f" % scheduler.get_lr()[0])
         torch.save(model.state_dict(), args.save_path + "/model.iter-" + str(epoch))
 
-
-def test():
-    dataset.training = False
-    dataloader = DataLoader(
-        dataset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=0,
-        collate_fn=JTNNCollator(vocab, False),
-        drop_last=True,
-        worker_init_fn=worker_init_fn)
-
-    # Just an example of molecule decoding; in reality you may want to sample
-    # tree and molecule vectors.
-    for it, batch in enumerate(dataloader):
-        gt_smiles = batch['mol_trees'][0].smiles
-        print(gt_smiles)
-        model.move_to_cuda(batch)
-        _, tree_vec, mol_vec = model.encode(batch)
-        tree_vec, mol_vec, _, _ = model.sample(tree_vec, mol_vec)
-        smiles = model.decode(tree_vec, mol_vec)
-        print(smiles)
-
-
 if __name__ == '__main__':
-    if args.test:
-        test()
-    else:
-        train()
+    train()
 
     print('# passes:', model.n_passes)
     print('Total # nodes processed:', model.n_nodes_total)

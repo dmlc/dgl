@@ -45,7 +45,6 @@ To start training, use `python train.py`. By default, the script will use ZINC d
 -d DEPTH, Depth of message passing hops (default: 3)
 -z BETA, Coefficient of KL Divergence term (default: 1.0)
 -q LR, Learning Rate (default: 0.001)
--T, Add this flag to run test mode (default: False)
 ```
 
 Model will be saved periodically. 
