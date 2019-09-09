@@ -386,16 +386,16 @@ def test_flatten():
     assert set(fg.etypes) == {'follows'}
     u1, v1 = g.edges('follows', order='eid')
     u2, v2 = fg.edges('follows', order='eid')
-    assert F.array_equal(u1, v1)
-    assert F.array_equal(u2, v2)
+    assert F.array_equal(u1, u2)
+    assert F.array_equal(v1, v2)
 
     fg = g['developer', :, 'game']
     assert set(fg.ntypes) == {'developer', 'game'}
     assert set(fg.etypes) == {'develops'}
     u1, v1 = g.edges('develops', order='eid')
     u2, v2 = fg.edges('develops', order='eid')
-    assert F.array_equal(u1, v1)
-    assert F.array_equal(u2, v2)
+    assert F.array_equal(u1, u2)
+    assert F.array_equal(v1, v2)
 
     # NOTE:
     # I (gq) was thinking of using g[:, :, :] to convert the heterograph into a homogeneous
@@ -408,6 +408,15 @@ def test_flatten():
     fg = g[:, :, :]
     #assert fg.ntypes == [dgl.DEFAULT]
     assert fg.etypes == [dgl.DEFAULT]
+    check_mapping(g, fg)
+
+    # Test another heterograph
+    g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows')
+    g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows')
+    g = dgl.hetero_from_relations([g_x, g_y])
+    fg = g['user', :, 'user']
+    check_mapping(g, fg)
+    fg = g['user', :, :]
     check_mapping(g, fg)
 
 def test_apply():

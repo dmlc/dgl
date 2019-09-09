@@ -3,7 +3,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 import networkx as nx
-
+import numpy as np
 import scipy.sparse as ssp
 
 from . import heterograph_index, graph_index
@@ -502,10 +502,15 @@ class DGLHeteroGraph(object):
             stids = fg.induced_srctype_set.asnumpy()
             dtids = fg.induced_dsttype_set.asnumpy()
             etids = fg.induced_etype_set.asnumpy()
-            new_ntypes = [SRC, DST] if new_g.number_of_ntypes() == 2 else [DEFAULT]
-            new_nframes = [
-                combine_frames(self._node_frames, stids),
-                combine_frames(self._node_frames, dtids)]
+            if new_g.number_of_ntypes() == 2:
+                new_ntypes = [SRC, DST]
+                new_nframes = [
+                    combine_frames(self._node_frames, stids),
+                    combine_frames(self._node_frames, dtids)]
+            else:
+                assert np.array_equal(stids, dtids)
+                new_ntypes = [DEFAULT]
+                new_nframes = [combine_frames(self._node_frames, stids)]
             new_etypes = [DEFAULT]
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
