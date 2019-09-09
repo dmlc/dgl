@@ -171,6 +171,9 @@ def test_query():
         ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
         }
     _test()
+
+    # test repr
+    print(g)
     
 def test_view():
     # test data view
@@ -848,7 +851,7 @@ if __name__ == '__main__':
     test_query()
     test_view()
     test_view1()
-    test_flatten()
+    #test_flatten()
     test_apply()
     test_level1()
     test_level2()

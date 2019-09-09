@@ -2478,10 +2478,24 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    # TODO: replace this after implementing frame
-    # pylint: disable=useless-super-delegation
     def __repr__(self):
-        return super(DGLHeteroGraph, self).__repr__()
+        if len(self.ntypes) == 1 and len(self.etypes) == 1:
+            ret = ('Graph(num_nodes={node}, num_edges={edge},\n'
+                   '      ndata_schemes={ndata}\n'
+                   '      edata_schemes={edata})')
+            return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                              ndata=str(self.node_attr_schemes()),
+                              edata=str(self.edge_attr_schemes()))
+        else:
+            ret = ('Graph(num_nodes={node},\n'
+                   '      num_edges={edge},\n'
+                   '      metagraph={meta})')
+            nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
+                          for i in range(len(self.ntypes))}
+            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+                          for i in range(len(self.etypes))}
+            meta = str(self.metagraph.edges())
+            return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
 
     def local_var(self):
         """Return a graph object that can be used in a local function scope.
