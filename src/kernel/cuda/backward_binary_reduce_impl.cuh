@@ -88,24 +88,6 @@ struct BackwardBinaryReduce {
   }
 };
 
-// Convert flattened index to multi-dimension index (assume row-major).
-__device__ __forceinline__ void Unravel(
-    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
-  for (int d = 0; d < ndim; ++d) {
-    out[d] = (idx / stride[d]) % shape[d];
-  }
-}
-
-// Convert multi-dimension index to flattened index (assume row-major).
-__device__ __forceinline__ int64_t Ravel(
-    const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
-  int64_t out = 0;
-  for (int d = 0; d < ndim; ++d) {
-    out += min(idx[d], shape[d] - 1) * stride[d];
-  }
-  return out;
-}
-
 // Minigun UDF to compute backward binary reduce with broadcasting.
 template <int Mode, int NDim, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
@@ -136,21 +118,19 @@ struct BackwardBinaryReduceBcast {
     DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len * len;
     DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len * len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(
-        lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
-        rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
-        len);
+      DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
-      DType* rhs_base = rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
+      DType* lhs_base = lhsoff + lhs_add * len;
+      DType* rhs_base = rhsoff + rhs_add * len;
       if (Mode == binary_op::kGradBoth) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {

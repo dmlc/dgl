@@ -71,13 +71,12 @@ __device__ __forceinline__ void UnravelRavel(
       int64_t o_st = out_stride[d];
       int64_t rhs_sh = rhs_shape[d];
       int64_t rhs_st = rhs_stride[d];
-      
       int64_t i = (idx / o_st) % o_sh;
       /*
        * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
        * rhs_sh be o_sh or 1
        */
-      if (rhs_sh > i) { 
+      if (rhs_sh > i) {
         *rhs_out += i * rhs_st;
       }
     }
@@ -89,7 +88,7 @@ __device__ __forceinline__ void UnravelRavel(
       int64_t o_st = out_stride[d];
       int64_t lhs_sh = lhs_shape[d];
       int64_t lhs_st = lhs_stride[d];
-  
+
       int64_t i = (idx / o_st) % o_sh;
       /*
        * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
