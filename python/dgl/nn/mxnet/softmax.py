@@ -53,6 +53,7 @@ class EdgeSoftmax(mx.autograd.Function):
         g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
         g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
         out = g.edata['out']
+        self.save_for_backward(out)
         return out
 
     def backward(self, grad_out):
