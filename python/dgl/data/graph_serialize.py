@@ -1,13 +1,14 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
-from .graph import DGLGraph
-from ._ffi.object import ObjectBase, register_object
-from ._ffi.function import _init_api
-from . import backend as F
+from ..graph import DGLGraph
+from ..batched_graph import BatchedDGLGraph
+from .._ffi.object import ObjectBase, register_object
+from .._ffi.function import _init_api
+from .. import backend as F
 
-_init_api("dgl.graph_serialize")
+_init_api("dgl.data.graph_serialize")
 
-__all__ = ['save_graphs']
+__all__ = ['save_graphs', "load_graphs", "load_labels"]
 
 @register_object("graph_serialize.StorageMetaData")
 class StorageMetaData(ObjectBase):
@@ -28,6 +29,7 @@ class GraphData(ObjectBase):
     @staticmethod
     def create(g: DGLGraph):
         """Create GraphData"""
+        assert not isinstance(g, BatchedDGLGraph), "BatchedDGLGraph is not supported for serialization"
         ghandle = g._graph
         if len(g.ndata) != 0:
             node_tensors = dict()
@@ -59,11 +61,40 @@ class GraphData(ObjectBase):
 
 
 def save_graphs(filename, g_list, labels=None):
-    """
-    Save DGLGraphs to file
-    :param filename: file to store DGLGraphs
-    :param g_list: DGLGraph or list of DGLGraph
-    :return:
+    r"""
+    Save DGLGraphs and graph labels to file
+
+    Parameters
+    ----------
+    filename : str
+        File name to store DGLGraphs. 
+    g_list: list
+        DGLGraph or list of DGLGraph
+    labels: dict (Default: None)
+        labels should be dict of tensors/ndarray, with str as keys
+
+    Examples
+    ----------
+    >>> import dgl
+    >>> import torch as th
+
+    Create :code:`DGLGraph` objects and initialize node and edge features.
+
+    >>> g1 = dgl.DGLGraph()
+    >>> g1.add_nodes(3)
+    >>> g1.add_edges([0, 0, 0, 1, 1, 2], [0, 1, 2, 1, 2, 2])
+    >>> g1.ndata["e"] = th.ones(3, 5)
+    >>> g2 = dgl.DGLGraph()
+    >>> g2.add_nodes(3)
+    >>> g2.add_edges([0, 1, 2], [1, 2, 1])
+    >>> g1.edata["e"] = th.ones(3, 4)
+
+    Save Graphs into file
+
+    >>> from dgl.data.utils import save_graphs
+    >>> graph_labels = {"glabel": th.tensor([0, 1])}
+    >>> save_graphs([g1, g2], "./data.bin", graph_labels)
+
     """
     if isinstance(g_list, DGLGraph):
         g_list = [g_list]
@@ -80,11 +111,29 @@ def save_graphs(filename, g_list, labels=None):
 def load_graphs(filename, idx_list=None):
     """
     Load DGLGraphs from file
-    :param filename: file to load DGLGraphs
-    :param idx_list: list of index of graph to be loaded. If not specified, will load all graphs
-    from file
-    :return: list of immutable DGLGraphs, and labels stored in files (empty dict returned if no
+
+    Parameters
+    ----------
+    filename: str
+        filename to load DGLGraphs
+    idx_list: list of int
+        list of index of graph to be loaded. If not specified, will
+        load all graphs from file
+
+    Returns
+    ----------
+    graph_list: list of immutable DGLGraphs
+    labels: dict of labels stored in file (empty dict returned if no
     label stored)
+
+    Examples
+    ----------
+    Following the example in save_graphs.
+
+    >>> from dgl.utils.data import load_graphs
+    >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
+    >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
+
     """
     assert isinstance(idx_list, list)
     if idx_list is None:
@@ -99,9 +148,26 @@ def load_graphs(filename, idx_list=None):
 
 def load_labels(filename):
     """
-    Load labels from file
-    :param filename: file to load DGLGraphs
-    :return: label_dict: dict of tensors
+    Load label dict from file
+
+    Parameters
+    ----------
+    filename: str
+        filename to load DGLGraphs
+
+    Returns
+    ----------
+    labels: dict
+        dict of labels stored in file (empty dict returned if no
+        label stored)
+
+    Examples
+    ----------
+    Following the example in save_graphs.
+
+    >>> from dgl.data.utils import load_labels
+    >>> label_dict = load_graphs("./data.bin")
+
     """
     metadata = _CAPI_DGLLoadGraphs(filename, [], True)
     label_dict = {}

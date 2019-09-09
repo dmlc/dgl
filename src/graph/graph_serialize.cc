@@ -68,7 +68,7 @@ enum GraphType {
   kImmutableGraph = 1ull
 };
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_MakeGraphData")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphRef gptr = args[0];
     ImmutableGraphPtr imGPtr = ToImmutableGraph(gptr.sptr());
@@ -79,7 +79,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
     *rv = gd;
 });
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLSaveGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<GraphData> graph_data = args[1];
@@ -94,7 +94,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLSaveGraphs")
     SaveDGLGraphs(filename, graph_data, labels_list);
 });
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLLoadGraphs")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     std::string filename = args[0];
     List<Value> idxs = args[1];
@@ -106,13 +106,13 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_DGLLoadGraphs")
     *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
 });
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataGraphHandle")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataGraphHandle")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
     *rv = gdata->gptr;
 });
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataNodeTensors")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
     Map<std::string, Value> rvmap;
@@ -122,7 +122,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataNodeTensors")
     *rv = rvmap;
 });
 
-DGL_REGISTER_GLOBAL("graph_serialize._CAPI_GDataEdgeTensors")
+DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
 .set_body([](DGLArgs args, DGLRetValue *rv) {
     GraphData gdata = args[0];
     Map<std::string, Value> rvmap;

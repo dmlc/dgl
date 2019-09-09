@@ -16,6 +16,9 @@ Utils
     utils.check_sha1
     utils.extract_archive
     utils.split_dataset
+    utils.save_graphs
+    utils.load_graphs
+    utils.load_labels
 
 .. autoclass:: dgl.data.utils.Subset
     :members: __getitem__, __len__

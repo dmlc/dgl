@@ -7,7 +7,7 @@ import os
 
 from dgl import DGLGraph
 import dgl
-from dgl.graph_serialize import save_graphs, load_graphs, load_labels
+from dgl.data.utils import save_graphs, load_graphs, load_labels
 
 np.random.seed(44)
 
