@@ -108,6 +108,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
         return create_from_edge_list(data, utype, etype, vtype, urange, vrange)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(data, utype, etype, vtype)
+    elif isinstance(data, nx.Graph):
+        return create_from_networkx_bipartite(data, utype, etype, vtype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -393,7 +395,6 @@ def create_from_networkx(nx_graph,
             g.ndata[attr] = _batcher(attr_dict[attr])
 
     if edge_attrs is not None:
-        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
         # mapping from feature name to a list of tensors to be concatenated
         attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
         # each defaultdict value is initialized to be a list of None
@@ -402,7 +403,7 @@ def create_from_networkx(nx_graph,
         if has_edge_id:
             num_edges = g.number_of_edges()
             for _, _, attrs in nx_graph.edges(data=True):
-                if attrs['id'] >= num_edges:
+                if attrs[edge_id_attr_name] >= num_edges:
                     raise DGLError('Expect the pre-specified edge ids to be'
                                    ' smaller than the number of edges --'
                                    ' {}, got {}.'.format(num_edges, attrs['id']))
@@ -437,7 +438,7 @@ def create_from_networkx_bipartite(nx_graph,
         nx_graph = nx_graph.to_directed()
 
     top_nodes = {n for n, d in nx_graph.nodes(data=True) if d['bipartite'] == 0}
-    bottom_nodes = set(B) - top_nodes
+    bottom_nodes = set(nx_graph) - top_nodes
     top_nodes = sorted(top_nodes)
     bottom_nodes = sorted(bottom_nodes)
     top_map = {n : i for i, n in enumerate(top_nodes)}
@@ -467,6 +468,8 @@ def create_from_networkx_bipartite(nx_graph,
     g = create_from_edges(src, dst, utype, etype, vtype, len(top_nodes), len(bottom_nodes))
 
     # TODO attributes
+    assert node_attrs is None
+    assert edge_attrs is None
     return g
 
 def create_from_networkx_multi(nx_graph,
