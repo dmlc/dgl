@@ -251,7 +251,7 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
     }
   }
 
-  metadata->setGraphData(gdata_refs);
+  metadata->SetGraphData(gdata_refs);
 
   delete fs;
   return metadata;
@@ -337,7 +337,7 @@ void StorageMetaDataObject::SetMetaData(dgl_id_t num_graph,
   }
 }
 
-void StorageMetaDataObject::setGraphData(std::vector<GraphData> gdata) {
+void StorageMetaDataObject::SetGraphData(std::vector<GraphData> gdata) {
   this->graph_data = List<GraphData>(gdata);
 }
 

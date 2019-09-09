@@ -74,7 +74,7 @@ class StorageMetaDataObject : public runtime::Object {
                    std::vector<int64_t> edges_num_list,
                    std::vector<NamedTensor> labels_list);
 
-  void setGraphData(std::vector<GraphData> gdata);
+  void SetGraphData(std::vector<GraphData> gdata);
 
   void VisitAttrs(AttrVisitor *v) final {
     v->Visit("num_graph", &num_graph);
