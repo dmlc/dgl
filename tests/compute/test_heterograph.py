@@ -414,9 +414,15 @@ def test_flatten():
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows')
     g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows')
     g = dgl.hetero_from_relations([g_x, g_y])
+
     fg = g['user', :, 'user']
+    assert fg.ntypes == [dgl.DEFAULT]
+    assert fg.etypes == [dgl.DEFAULT]
     check_mapping(g, fg)
+
     fg = g['user', :, :]
+    assert fg.ntypes == [dgl.DEFAULT]
+    assert fg.etypes == [dgl.DEFAULT]
     check_mapping(g, fg)
 
 def test_apply():
