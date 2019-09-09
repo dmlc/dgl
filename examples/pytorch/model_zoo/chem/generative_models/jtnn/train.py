@@ -5,9 +5,8 @@ import torch.optim.lr_scheduler as lr_scheduler
 from dgl import model_zoo
 from torch.utils.data import DataLoader
 
-import math, random, sys
+import sys
 import argparse
-from collections import deque
 import rdkit
 
 from jtnn import *

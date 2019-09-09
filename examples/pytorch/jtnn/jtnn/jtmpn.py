@@ -1,16 +1,13 @@
 import torch
 import torch.nn as nn
 from .nnutils import cuda
-from .chemutils import get_mol
-#from mpn import atom_features, bond_features, ATOM_FDIM, BOND_FDIM
 import rdkit.Chem as Chem
-from dgl import DGLGraph, batch, unbatch, mean_nodes
+from dgl import DGLGraph, mean_nodes
 import dgl.function as DGLF
-from .line_profiler_integration import profile
 import os
-import numpy as np
 
-ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
+             'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
 ATOM_FDIM = len(ELEM_LIST) + 6 + 5 + 1
 BOND_FDIM = 5 
