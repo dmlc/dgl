@@ -189,21 +189,19 @@ def test_nx_conversion():
     n3 = F.randn((5, 4))
     e1 = F.randn((4, 5))
     e2 = F.randn((4, 7))
-    g = DGLGraph(multigraph=True)
-    g.add_nodes(5)
-    g.add_edges([0,1,3,4], [2,4,0,3])
+    g = dgl.graph([(0,2),(1,4),(3,0),(4,3)])
     g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
     g.edata.update({'e1': e1, 'e2': e2})
 
     # convert to networkx
-    nxg = g.to_networkx(node_attrs=['n1', 'n3'], edge_attrs=['e1', 'e2'])
+    nxg = dgl.to_networkx(g, node_attrs=['n1', 'n3'], edge_attrs=['e1', 'e2'])
     assert len(nxg) == 5
     assert nxg.size() == 4
     _check_nx_feature(nxg, {'n1': n1, 'n3': n3}, {'e1': e1, 'e2': e2})
 
     # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
+    g = dgl.graph(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
     # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -215,33 +213,33 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
+    assert F.array_equal(g.edata['id'], F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
-    g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
-    new_n = F.randn((2, 3))
-    new_e = F.randn((3, 5))
-    g.add_nodes(2, data={'n1': new_n})
-    # add three edges, one is a multi-edge
-    g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
-    n1 = F.cat((n1, new_n), 0)
-    e1 = F.cat((e1, new_e), 0)
-    # convert to networkx again
-    nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
-    assert len(nxg) == 7
-    assert nxg.size() == 7
-    _check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
+    # TODO(minjie): enable after mutation is supported
+    #g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
+    #new_n = F.randn((2, 3))
+    #new_e = F.randn((3, 5))
+    #g.add_nodes(2, data={'n1': new_n})
+    ## add three edges, one is a multi-edge
+    #g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
+    #n1 = F.cat((n1, new_n), 0)
+    #e1 = F.cat((e1, new_e), 0)
+    ## convert to networkx again
+    #nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+    #assert len(nxg) == 7
+    #assert nxg.size() == 7
+    #_check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
 
     # now test convert from networkx without id in edge feature
     # first pop id in edge feature
     for _, _, attr in nxg.edges(data=True):
         attr.pop('id')
     # test with a new graph
-    g = DGLGraph(multigraph=True)
-    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
+    g = dgl.graph(nxg , node_attrs=['n1'], edge_attrs=['e1'])
     # check graph size
-    assert g.number_of_nodes() == 7
-    assert g.number_of_edges() == 7
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
     # check number of features
     assert len(g.ndata) == 1
     assert len(g.edata) == 1
@@ -764,7 +762,7 @@ def test_local_scope():
     foo(g)
 
 if __name__ == '__main__':
-    #test_nx_conversion()
+    test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()

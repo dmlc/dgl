@@ -1,7 +1,11 @@
 """Module for converting graph from/to other object."""
-
+from collections import defaultdict
+import numpy as np
 import scipy as sp
 import networkx as nx
+from networkx.algorithms import bipartite
+
+from . import backend as F
 from . import heterograph_index
 from .heterograph import DGLHeteroGraph
 from . import graph_index
@@ -13,6 +17,7 @@ __all__ = [
     'hetero_from_relations',
     'hetero_from_homo',
     'hetero_to_homo',
+    'to_networkx',
 ]
 
 def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
@@ -51,6 +56,8 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
         return create_from_edge_list(data, ntype, etype, ntype, urange, vrange)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(data, ntype, etype, ntype)
+    elif isinstance(data, nx.Graph):
+        return create_from_networkx(data, ntype, etype, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -332,13 +339,145 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
     return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_networkx(nx_graph,
-                         node_type_attr_name='type',
-                         edge_type_attr_name='type',
-                         node_id_attr_name='id',
+                         ntype, etype,
                          edge_id_attr_name='id',
                          node_attrs=None,
                          edge_attrs=None):
-    """Convert from networkx graph.
+    """Create graph that has only one set of nodes and edges.
+    """
+    if not nx_graph.is_directed():
+        nx_graph = nx_graph.to_directed()
+
+    # Relabel nodes using consecutive integers
+    nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
+
+    # nx_graph.edges(data=True) returns src, dst, attr_dict
+    if nx_graph.number_of_edges() > 0:
+        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
+    else:
+        has_edge_id = False
+
+    if has_edge_id:
+        num_edges = nx_graph.number_of_edges()
+        src = np.zeros((num_edges,), dtype=np.int64)
+        dst = np.zeros((num_edges,), dtype=np.int64)
+        for u, v, attr in nx_graph.edges(data=True):
+            eid = attr[edge_id_attr_name]
+            src[eid] = u
+            dst[eid] = v
+    else:
+        src = []
+        dst = []
+        for e in nx_graph.edges:
+            src.append(e[0])
+            dst.append(e[1])
+    src = utils.toindex(src)
+    dst = utils.toindex(dst)
+    num_nodes = nx_graph.number_of_nodes()
+    g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes)
+
+    # handle features
+    # copy attributes
+    def _batcher(lst):
+        if F.is_tensor(lst[0]):
+            return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
+        else:
+            return F.tensor(lst)
+    if node_attrs is not None:
+        # mapping from feature name to a list of tensors to be concatenated
+        attr_dict = defaultdict(list)
+        for nid in range(g.number_of_nodes()):
+            for attr in node_attrs:
+                attr_dict[attr].append(nx_graph.nodes[nid][attr])
+        for attr in node_attrs:
+            g.ndata[attr] = _batcher(attr_dict[attr])
+
+    if edge_attrs is not None:
+        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+        # mapping from feature name to a list of tensors to be concatenated
+        attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
+        # each defaultdict value is initialized to be a list of None
+        # None here serves as placeholder to be replaced by feature with
+        # corresponding edge id
+        if has_edge_id:
+            num_edges = g.number_of_edges()
+            for _, _, attrs in nx_graph.edges(data=True):
+                if attrs['id'] >= num_edges:
+                    raise DGLError('Expect the pre-specified edge ids to be'
+                                   ' smaller than the number of edges --'
+                                   ' {}, got {}.'.format(num_edges, attrs['id']))
+                for key in edge_attrs:
+                    attr_dict[key][attrs['id']] = attrs[key]
+        else:
+            # XXX: assuming networkx iteration order is deterministic
+            #      so the order is the same as graph_index.from_networkx
+            for eid, (_, _, attrs) in enumerate(nx_graph.edges(data=True)):
+                for key in edge_attrs:
+                    attr_dict[key][eid] = attrs[key]
+        for attr in edge_attrs:
+            for val in attr_dict[attr]:
+                if val is None:
+                    raise DGLError('Not all edges have attribute {}.'.format(attr))
+            g.edata[attr] = _batcher(attr_dict[attr])
+
+    return g
+
+def create_from_networkx_bipartite(nx_graph,
+                                   utype, etype, vtype,
+                                   edge_id_attr_name='id',
+                                   node_attrs=None,
+                                   edge_attrs=None):
+    """Create graph that has only one set of nodes and edges.
+
+    The input graph must follow the bipartite graph convention of networkx.
+    Each node has an attribute ``bipartite`` with values 0 and 1 indicating which
+    set it belongs to. Edges are all from node set 0 to node set 1.
+    """
+    if not nx_graph.is_directed():
+        nx_graph = nx_graph.to_directed()
+
+    top_nodes = {n for n, d in nx_graph.nodes(data=True) if d['bipartite'] == 0}
+    bottom_nodes = set(B) - top_nodes
+    top_nodes = sorted(top_nodes)
+    bottom_nodes = sorted(bottom_nodes)
+    top_map = {n : i for i, n in enumerate(top_nodes)}
+    bottom_map = {n : i for i, n in enumerate(bottom_nodes)}
+
+    if nx_graph.number_of_edges() > 0:
+        has_edge_id = edge_id_attr_name in next(iter(nx_graph.edges(data=True)))[-1]
+    else:
+        has_edge_id = False
+
+    if has_edge_id:
+        num_edges = nx_graph.number_of_edges()
+        src = np.zeros((num_edges,), dtype=np.int64)
+        dst = np.zeros((num_edges,), dtype=np.int64)
+        for u, v, attr in nx_graph.edges(data=True):
+            eid = attr[edge_id_attr_name]
+            src[eid] = top_map[u]
+            dst[eid] = bottom_map[v]
+    else:
+        src = []
+        dst = []
+        for e in nx_graph.edges:
+            src.append(top_map[e[0]])
+            dst.append(bottom_map[e[1]])
+    src = utils.toindex(src)
+    dst = utils.toindex(dst)
+    g = create_from_edges(src, dst, utype, etype, vtype, len(top_nodes), len(bottom_nodes))
+
+    # TODO attributes
+    return g
+
+def create_from_networkx_multi(nx_graph,
+                               edge_id_attr_name='id',
+                               node_type_attr_name='type',
+                               node_attrs=None,
+                               edge_attrs=None):
+    """Create a graph containing multiple types from networkx.
+
+    The input is an nx.MultiDiGraph. The edge key is treated as edge
+    types. The node types are stored as node attributes.
 
     Examples
     --------
@@ -346,28 +485,18 @@ def create_from_networkx(nx_graph,
 
     Parameters
     ----------
-    nx_graph : networkx.DiGraph
+    nx_graph : networkx.MultiDiGraph
         The networkx graph.
-    node_type_attr_name : str
-        The node attribute name for the node type.
-        The attribute contents must be strings.
-    edge_type_attr_name : str
-        The edge attribute name for the edge type.
-        The attribute contents must be strings.
-    node_id_attr_name : str
-        The node attribute name for node type-specific IDs.
-        The attribute contents must be integers.
-        If the IDs of the same type are not consecutive integers, its
-        nodes will be relabeled using consecutive integers.  The new
-        node ordering will inherit that of the sorted IDs.
-    edge_id_attr_name : str or None
+    edge_id_attr_name : str, optional
         The edge attribute name for edge type-specific IDs.
         The attribute contents must be integers.
         If the IDs of the same type are not consecutive integers, its
         nodes will be relabeled using consecutive integers.  The new
         node ordering will inherit that of the sorted IDs.
-
         If None is provided, the edge order would be arbitrary.
+    node_type_attr_name : str, optional
+        The node attribute name for the node type.
+        The attribute contents must be strings.
     node_attrs : iterable of str, optional
         The node attributes whose data would be copied.
     edge_attrs : iterable of str, optional
@@ -378,3 +507,55 @@ def create_from_networkx(nx_graph,
     DGLHeteroGraph
     """
     pass
+
+def to_networkx(g, node_attrs=None, edge_attrs=None):
+    """Convert to networkx graph.
+
+    The edge id will be saved as the 'id' edge attribute.
+
+    Parameters
+    ----------
+    node_attrs : iterable of str, optional
+        The node attributes to be copied.
+    edge_attrs : iterable of str, optional
+        The edge attributes to be copied.
+
+    Returns
+    -------
+    networkx.DiGraph
+        The nx graph
+
+    Examples
+    --------
+
+    .. note:: Here we use pytorch syntax for demo. The general idea applies
+        to other frameworks with minor syntax change (e.g. replace
+        ``torch.tensor`` with ``mxnet.ndarray``).
+
+    >>> import torch as th
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
+    >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
+    >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+    """
+    # TODO(minjie): multi-type support
+    assert len(g.ntypes) == 1
+    assert len(g.etypes) == 1
+    src, dst = g.edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    nx_graph = nx.MultiDiGraph() if g.is_multigraph else nx.DiGraph()
+    nx_graph.add_nodes_from(range(g.number_of_nodes()))
+    for eid, (u, v) in enumerate(zip(src, dst)):
+        nx_graph.add_edge(u, v, id=eid)
+
+    if node_attrs is not None:
+        for nid, attr in nx_graph.nodes(data=True):
+            feat_dict = g._get_n_repr(0, nid)
+            attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
+    if edge_attrs is not None:
+        for _, _, attr in nx_graph.edges(data=True):
+            eid = attr['id']
+            feat_dict = g._get_e_repr(0, eid)
+            attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
+    return nx_graph
