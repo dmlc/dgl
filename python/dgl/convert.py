@@ -184,6 +184,8 @@ def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='typ
     -------
     DGLHeteroGraph
         A heterograph.
+        The parent node and edge ID are stored in the column dgl.NID and dgl.EID
+        respectively for all node/edge types.
     """
     pass
 
@@ -211,6 +213,8 @@ def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
     -------
     DGLGraph
         A homogenous graph.
+        The parent node and edge type/ID are stored in columns dgl.NTYPE/dgl.NID and
+        dgl.ETYPE/dgl.EID respectively.
     """
     pass
 

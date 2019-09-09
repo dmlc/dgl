@@ -379,6 +379,24 @@ def test_flatten():
 
     check_mapping(g, fg)
 
+    fg = g['user', :, 'user']
+    # NOTE(gq): The node/edge types from the parent graph is returned if there is only one
+    # node/edge type.  This differs from the behavior above.
+    assert set(fg.ntypes) == {'user'}
+    assert set(fg.etypes) == {'follows'}
+    u1, v1 = g.edges('follows', order='eid')
+    u2, v2 = fg.edges('follows', order='eid')
+    assert F.array_equal(u1, v1)
+    assert F.array_equal(u2, v2)
+
+    fg = g['developer', :, 'game']
+    assert set(fg.ntypes) == {'developer', 'game'}
+    assert set(fg.etypes) == {'develops'}
+    u1, v1 = g.edges('develops', order='eid')
+    u2, v2 = fg.edges('develops', order='eid')
+    assert F.array_equal(u1, v1)
+    assert F.array_equal(u2, v2)
+
     # NOTE:
     # I (gq) was thinking of using g[:, :, :] to convert the heterograph into a homogeneous
     # graph (i.e. discard all type-specific information).  Turns out that the idea has an
