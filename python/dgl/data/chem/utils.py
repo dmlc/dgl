@@ -10,6 +10,10 @@ try:
 except ImportError:
     pass
 
+__all__ = ['one_hot_encoding', 'BaseAtomFeaturizer', 'CanonicalAtomFeaturizer',
+           'mol_to_graph', 'smile_to_bigraph', 'mol_to_bigraph',
+           'smile_to_complete_graph', 'mol_to_complete_graph']
+
 def one_hot_encoding(x, allowable_set):
     """One-hot encoding.
 
