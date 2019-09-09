@@ -38,7 +38,7 @@ class GraphDataObject : public runtime::Object {
   std::vector<NamedTensor> edge_tensors;
   static constexpr const char *_type_key = "graph_serialize.GraphData";
 
-  void setData(ImmutableGraphPtr gptr,
+  void SetData(ImmutableGraphPtr gptr,
                Map<std::string, Value> node_tensors,
                Map<std::string, Value> edge_tensors);
 
@@ -69,7 +69,7 @@ class StorageMetaDataObject : public runtime::Object {
   List<GraphData> graph_data;
   static constexpr const char *_type_key = "graph_serialize.StorageMetaData";
 
-  void setMetaData(dgl_id_t num_graph,
+  void SetMetaData(dgl_id_t num_graph,
                    std::vector<int64_t> nodes_num_list,
                    std::vector<int64_t> edges_num_list,
                    std::vector<NamedTensor> labels_list);

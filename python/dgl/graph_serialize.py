@@ -2,20 +2,20 @@
 from __future__ import absolute_import
 from .graph import DGLGraph
 from ._ffi.object import ObjectBase, register_object
-# from ._ffi.base import c_array
 from ._ffi.function import _init_api
 from . import backend as F
 
 _init_api("dgl.graph_serialize")
 
+__all__ = ['save_graphs']
 
 @register_object("graph_serialize.StorageMetaData")
-class MetaData(ObjectBase):
-    """MetaData Object
+class StorageMetaData(ObjectBase):
+    """StorageMetaData Object
     attributes available:
       num_graph [int]: return numbers of graphs
-      nodes_num_list [list of int]: return number of nodes for each graph
-      edges_num_list [list of int]: return number of edges for each graph
+      nodes_num_list Value of NDArray: return number of nodes for each graph
+      edges_num_list Value of NDArray: return number of edges for each graph
       labels [dict of backend tensors]: return dict of labels
       graph_data [list of GraphData]: return list of GraphData Object
     """

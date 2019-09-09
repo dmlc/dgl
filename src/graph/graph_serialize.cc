@@ -75,7 +75,7 @@ DGL_REGISTER_GLOBAL("graph_serialize._CAPI_MakeGraphData")
     Map<std::string, Value> node_tensors = args[1];
     Map<std::string, Value> edge_tensors = args[2];
     GraphData gd = GraphData::Create();
-    gd->setData(imGPtr, node_tensors, edge_tensors);
+    gd->SetData(imGPtr, node_tensors, edge_tensors);
     *rv = gd;
 });
 
@@ -216,7 +216,7 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
   CHECK(fs->Read(&edges_num_list)) << "Invalid edge num list";
   CHECK(fs->Read(&labels_list)) << "Invalid label list";
 
-  metadata->setMetaData(num_graph, nodes_num_list, edges_num_list, labels_list);
+  metadata->SetMetaData(num_graph, nodes_num_list, edges_num_list, labels_list);
 
   std::vector<GraphData> gdata_refs;
 
@@ -257,7 +257,7 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
   return metadata;
 }
 
-void GraphDataObject::setData(ImmutableGraphPtr gptr,
+void GraphDataObject::SetData(ImmutableGraphPtr gptr,
                               Map<std::string, Value> node_tensors,
                               Map<std::string, Value> edge_tensors) {
   this->gptr = gptr;
@@ -316,15 +316,16 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
   } else {
     MutableGraphPtr mgr = std::dynamic_pointer_cast<Graph>(g);
     CHECK(mgr) << "Invalid Graph Pointer";
-    IdArray srcs_array = mgr->Edges("srcdst").src;
-    IdArray dsts_array = mgr->Edges("srcdst").dst;
+    EdgeArray earray = mgr->Edges("eid");
+    IdArray srcs_array = earray.src;
+    IdArray dsts_array = earray.dst;
     ImmutableGraphPtr imgptr = ImmutableGraph::CreateFromCOO(mgr->NumVertices(), srcs_array,
                                                              dsts_array);
     return imgptr;
   }
 }
 
-void StorageMetaDataObject::setMetaData(dgl_id_t num_graph,
+void StorageMetaDataObject::SetMetaData(dgl_id_t num_graph,
                                         std::vector<int64_t> nodes_num_list,
                                         std::vector<int64_t> edges_num_list,
                                         std::vector<NamedTensor> labels_list) {
