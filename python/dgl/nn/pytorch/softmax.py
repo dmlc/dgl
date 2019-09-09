@@ -42,20 +42,18 @@ class EdgeSoftmax(th.autograd.Function):
         """
         # remember to save the graph to backward cache before making it
         # a local variable
+        if not is_all(eids):
+            g = g.edge_subgraph(eids.long())
         ctx.backward_cache = g
         g = g.local_var()
-        if is_all(eids):
-            eids = th.arange(g.number_of_edges())
-        eids = eids.long()
-
-        g.edges[eids].data['s'] = score
-        g.send_and_recv(eids, fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'), eids)
-        g.edges[eids].data['out'] = th.exp(g.edges[eids].data['out'])
-        g.send_and_recv(eids, fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'), eids)
-        out = g.edges[eids].data['out']
-        ctx.save_for_backward(out, eids)
+        g.edata['s'] = score
+        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        g.edata['out'] = th.exp(g.edata['out'])
+        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = g.edata['out']
+        ctx.save_for_backward(out)
         return out
 
     @staticmethod
@@ -76,14 +74,14 @@ class EdgeSoftmax(th.autograd.Function):
         """
         g = ctx.backward_cache
         g = g.local_var()
-        out, eids = ctx.saved_tensors
+        out, = ctx.saved_tensors
         # clear backward cache explicitly
         ctx.backward_cache = None
-        g.edges[eids].data['out'] = out
-        g.edges[eids].data['grad_s'] = out * grad_out
-        g.send_and_recv(eids, fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'), eids)
-        grad_score = g.edges[eids].data['grad_s'] - g.edges[eids].data['out']
+        g.edata['out'] = out
+        g.edata['grad_s'] = out * grad_out
+        g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        grad_score = g.edata['grad_s'] - g.edata['out']
         return None, grad_score, None
 
 

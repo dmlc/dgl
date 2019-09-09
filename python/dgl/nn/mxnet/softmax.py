@@ -27,10 +27,9 @@ class EdgeSoftmax(mx.autograd.Function):
 
     def __init__(self, g, eids):
         super(EdgeSoftmax, self).__init__()
+        if not is_all(eids):
+            g = g.edge_subgraph(eids.astype('int64'))
         self.g = g
-        if is_all(eids):
-            eids = mx.nd.arange(g.number_of_edges())
-        self.eids = eids.astype('int64')
 
     def forward(self, score):
         """Forward function.
@@ -47,15 +46,13 @@ class EdgeSoftmax(mx.autograd.Function):
             return out.data
         """
         g = self.g.local_var()
-        eids = self.eids
-        g.edges[eids].data['s'] = score
-        g.send_and_recv(eids, fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'), eids)
-        g.edges[eids].data['out'] = g.edges[eids].data['out'].exp()
-        g.send_and_recv(eids, fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'), eids)
-        out = g.edges[eids].data['out']
-        self.save_for_backward(out)
+        g.edata['s'] = score
+        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        g.edata['out'] = g.edata['out'].exp()
+        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = g.edata['out']
         return out
 
     def backward(self, grad_out):
@@ -73,15 +70,14 @@ class EdgeSoftmax(mx.autograd.Function):
             grad_score = sds - sds * sds_sum  # multiple expressions
         """
         g = self.g.local_var()
-        eids = self.eids
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
         # clear saved tensors explicitly
         self.saved_tensors = None
-        g.edges[eids].data['out'] = out
-        g.edges[eids].data['grad_score'] = out * grad_out
-        g.send_and_recv(eids, fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'), eids)
-        grad_score = g.edges[eids].data['grad_score'] - g.edges[eids].data['out']
+        g.edata['out'] = out
+        g.edata['grad_score'] = out * grad_out
+        g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
+        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        grad_score = g.edata['grad_score'] - g.edata['out']
         return grad_score
 
 def edge_softmax(graph, logits, eids=ALL):
