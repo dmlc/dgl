@@ -116,7 +116,7 @@ def schedule_recv(graph,
         reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, eid),
                                    recv_nodes)
         # apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
+        final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
@@ -185,7 +185,7 @@ def schedule_snr(graph,
                                     adj_creator=adj_creator,
                                     out_map_creator=out_map_creator)
     # generate apply schedule
-    final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf, reduced_feat,
+    final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf, reduced_feat,
                                    apply_func)
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
@@ -244,7 +244,7 @@ def schedule_update_all(graph,
                                         adj_creator=adj_creator,
                                         out_map_creator=out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_dst_nf,
+        final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         ir.WRITE_DICT_(var_out_nf, final_feat)
 
@@ -496,7 +496,7 @@ def schedule_pull(graph,
                                         var_pull_nodes, uv_getter, adj_creator,
                                         out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_pull_nodes, var_dst_nf,
+        final_feat = _apply_with_accum(var_pull_nodes, var_dst_nf,
                                        reduced_feat, apply_func)
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_out_nf, var_pull_nodes, final_feat)
@@ -536,7 +536,7 @@ def schedule_group_apply_edge(graph,
     var_ef = var.FEAT_DICT(graph.edgeframe, name='ef')
     var_out_ef = var_ef if outframe is None else var.FEAT_DICT(outframe, name='out_ef')
     var_out = var.FEAT_DICT(name='new_ef')
-    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
+    db.gen_group_apply_edge_schedule(apply_func, u, v, eid, group_by,
                                      var_src_nf, var_dst_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
     if inplace:
@@ -591,7 +591,7 @@ def schedule_nodeflow_update_all(graph,
                                     adj_creator=adj_creator,
                                     out_map_creator=out_map_creator)
     # generate optional apply
-    final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf, reduced_feat, apply_func)
+    final_feat = _apply_with_accum(var_dest_nodes, var_nf, reduced_feat, apply_func)
     ir.WRITE_DICT_(var_nf, final_feat)
 
 
@@ -662,7 +662,7 @@ def schedule_nodeflow_compute(graph,
                                         adj_creator=adj_creator,
                                         out_map_creator=out_map_creator)
         # generate optional apply
-        final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf,
+        final_feat = _apply_with_accum(var_dest_nodes, var_nf,
                                        reduced_feat, apply_func)
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_nf, var_dest_nodes, final_feat)
@@ -704,7 +704,7 @@ def _standardize_func_usage(func, func_name):
                            ' Got: %s' % (func_name, str(func)))
         return func
 
-def _apply_with_accum(graph, var_nodes, var_nf, var_accum, apply_func):
+def _apply_with_accum(var_nodes, var_nf, var_accum, apply_func):
     """Apply with accumulated features.
 
     Paramters
@@ -781,7 +781,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         return var_out
     else:
         # gen degree bucketing schedule for UDF recv
-        db.gen_degree_bucketing_schedule(graph, rfunc, eid, dst, recv_nodes,
+        db.gen_degree_bucketing_schedule(rfunc, eid, dst, recv_nodes,
                                          var_dst_nf, var_msg, var_out)
         return var_out
 
@@ -923,7 +923,7 @@ def _gen_send_reduce(
                                    edge_map=edge_map)
     else:
         # generate UDF send schedule
-        var_mf = _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, var_u,
+        var_mf = _gen_udf_send(var_src_nf, var_dst_nf, var_ef, var_u,
                                var_v, var_eid, mfunc)
 
     # 6. Generate reduce
@@ -940,12 +940,12 @@ def _gen_send_reduce(
     else:
         # gen degree bucketing schedule for UDF recv
         mid = utils.toindex(slice(0, len(var_v.data)))
-        db.gen_degree_bucketing_schedule(graph, rfunc, mid, var_v.data,
+        db.gen_degree_bucketing_schedule(rfunc, mid, var_v.data,
                                          reduce_nodes, var_dst_nf, var_mf,
                                          var_out)
         return var_out
 
-def _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc):
+def _gen_udf_send(var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc):
     """Internal function to generate send schedule for UDF message function."""
     fdsrc = ir.READ_ROW(var_src_nf, u)
     fddst = ir.READ_ROW(var_dst_nf, v)
@@ -988,7 +988,7 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
                                    edge_map=edge_map)
     else:
         # UDF send
-        var_out = _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, var_u,
+        var_out = _gen_udf_send(var_src_nf, var_dst_nf, var_ef, var_u,
                                 var_v, var_eid, mfunc)
     return var_out
 

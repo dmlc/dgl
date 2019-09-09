@@ -19,7 +19,7 @@ class GraphAdapter(ABC):
     @abstractmethod
     def num_dst(self):
         """Number of destination nodes."""
-        
+
     @abstractmethod
     def num_edges(self):
         """Number of edges."""
@@ -43,7 +43,7 @@ class GraphAdapter(ABC):
     @abstractmethod
     def msgframe(self):
         """Frame to store messages."""
-        
+
 
     @property
     @abstractmethod
@@ -114,7 +114,7 @@ class GraphAdapter(ABC):
         GraphIndex
 
         """
-        
+
     @abstractmethod
     def bits_needed(self):
         """Return the number of integer bits needed to represent the graph

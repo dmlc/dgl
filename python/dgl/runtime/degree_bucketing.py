@@ -10,7 +10,6 @@ from . import ir
 from .ir import var
 
 def gen_degree_bucketing_schedule(
-        graph,
         reduce_udf,
         message_ids,
         dst_nodes,
@@ -28,8 +27,6 @@ def gen_degree_bucketing_schedule(
 
     Parameters
     ----------
-    graph : DGLGraph
-        DGLGraph to use
     reduce_udf : callable
         The UDF to reduce messages.
     message_ids : utils.Index
@@ -157,7 +154,6 @@ def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
     return _rfunc_wrapper
 
 def gen_group_apply_edge_schedule(
-        graph,
         apply_func,
         u, v, eid,
         group_by,
@@ -175,8 +171,6 @@ def gen_group_apply_edge_schedule(
 
     Parameters
     ----------
-    graph : DGLGraph
-        DGLGraph to use
     apply_func: callable
         The edge_apply_func UDF
     u: utils.Index
