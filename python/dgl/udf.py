@@ -1,9 +1,6 @@
 """User-defined function related data structures."""
 from __future__ import absolute_import
 
-from . import backend as F
-from . import utils
-
 class EdgeBatch(object):
     """The class that can represent a batch of edges.
 

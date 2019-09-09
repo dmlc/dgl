@@ -1,12 +1,10 @@
 """Classes for heterogeneous graphs."""
 from collections import defaultdict
 from contextlib import contextmanager
-from functools import partial
 import networkx as nx
 import numpy as np
-import scipy.sparse as ssp
 
-from . import heterograph_index, graph_index
+from . import heterograph_index
 from . import utils
 from . import backend as F
 from . import init
@@ -177,17 +175,13 @@ class DGLHeteroGraph(object):
 
         # node and edge frame
         if node_frames is None:
-            node_frames = [None for i in range(len(self._ntypes))]
-        for i in range(len(node_frames)):
-            if node_frames[i] is None:
-                node_frames[i] = FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+            node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+                           for i in range(len(self._ntypes))]
         self._node_frames = node_frames
 
         if edge_frames is None:
-            edge_frames = [None for i in range(len(self._etypes))]
-        for i in range(len(edge_frames)):
-            if edge_frames[i] is None:
-                edge_frames[i] = FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+            edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+                           for i in range(len(self._etypes))]
         self._edge_frames = edge_frames
 
         # message indicators
@@ -320,16 +314,20 @@ class DGLHeteroGraph(object):
 
     @property
     def ntypes(self):
-        """Return the list of node types of the entire heterograph."""
+        """Return the list of node types of this graph."""
         return self._ntypes
 
     @property
     def etypes(self):
-        """Return the list of edge types of the entire heterograph."""
+        """Return the list of edge types of this graph."""
         return self._etypes
 
     @property
     def canonical_etypes(self):
+        """Return the list of canonical edge types of this graph.
+
+        A canonical edge type is a tuple of string (src_type, edge_type, dst_type).
+        """
         return self._canonical_etypes
 
     @property
@@ -353,7 +351,7 @@ class DGLHeteroGraph(object):
 
     def to_canonical_etype(self, etype):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
-        
+
         The input can already be a canonical tuple.
 
         Parameters
@@ -494,6 +492,9 @@ class DGLHeteroGraph(object):
         if not isinstance(key, tuple):
             key = (SLICE_FULL, key, SLICE_FULL)
 
+        if len(key) != 3:
+            raise DGLError(err_msg)
+
         etypes = self._find_etypes(key)
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
@@ -603,7 +604,7 @@ class DGLHeteroGraph(object):
     def is_readonly(self):
         """True if the graph is readonly, False otherwise."""
         return self._graph.is_readonly()
-    
+
     def has_node(self, vid, ntype=None):
         """Return True if the graph contains node `vid` of type `ntype`.
 
@@ -1143,7 +1144,7 @@ class DGLHeteroGraph(object):
         in_degree
         """
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
+        _, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(dtid)))
         else:
@@ -1210,7 +1211,7 @@ class DGLHeteroGraph(object):
         out_degree
         """
         etid = self.get_etype_id(etype)
-        stid, dtid = self._graph.metagraph.find_edge(etid)
+        stid, _ = self._graph.metagraph.find_edge(etid)
         if is_all(v):
             v = utils.toindex(slice(0, self._graph.number_of_nodes(stid)))
         else:
@@ -1665,7 +1666,7 @@ class DGLHeteroGraph(object):
     #################################################################
     # Message passing
     #################################################################
-    
+
     def apply_nodes(self, func, v=ALL, ntype=None, inplace=False):
         """Apply the function on the nodes with the same type to update their
         features.
@@ -1878,31 +1879,17 @@ class DGLHeteroGraph(object):
              apply_node_func=None,
              etype=None,
              inplace=False):
-        """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
+        r"""Receive and reduce incoming messages and update the features of node(s) :math:`v`.
 
-        Two kinds of computation are supported:
-
-        If there is only one edge type in the graph, ``G.recv(v, reduce_func, apply_func)``
-        calculates:
+        It calculates:
 
         .. math::
-            h_v^{new} = \sigma(\sum_{u\in\mathcal{N}(v)}m_{uv})
+            h_v^{new} = \sigma(\sum_{u\in\mathcal{N}_{t}(v)}m_{uv})
 
-        where :math:`\mathcal{N}(v)` defines the predecessors of node(s) ``v``, and
-        :math:`m_{uv}` is the message on edge (u,v). 
+        where :math:`\mathcal{N}_t(v)` defines the predecessors of node(s) ``v`` connected by
+        edge type :math:`t`, and :math:`m_{uv}` is the message on edge (u,v).
 
         * ``reduce_func`` specifies :math:`\sum`.
-        * ``apply_func`` specifies :math:`\sigma`.
-        
-        If there are more than one edge types, ``G.recv(v, per_type_reducer,
-        cross_type_reducer, apply_func)`` calculates:
-
-        .. math::
-            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N_t}(v)}m_{uv})
-
-        * ``per_type_reducer`` is a dictionary from edge type to reduce functions
-          :math:`\sum_{u\in\mathcal{N_t}(v)}` of each type.
-        * ``cross_type_reducer`` specifies :math:`\prod_{t\inT_e}`
         * ``apply_func`` specifies :math:`\sigma`.
 
         Other notes:
@@ -1976,6 +1963,37 @@ class DGLHeteroGraph(object):
             Runtime.run(prog)
 
     def multi_recv(self, v, reducer_dict, cross_reducer, apply_func=None, inplace=False):
+        r"""Receive messages from multiple edge types and perform aggregation.
+
+        It calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N}_t(v)}m_{uv})
+
+        * ``per_type_reducer`` is a dictionary from edge type to reduce functions
+          :math:`\sum_{u\in\mathcal{N_t}(v)}` of each type.
+        * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
+        * ``apply_func`` specifies :math:`\sigma`.
+
+        Examples
+        --------
+        TBD
+
+        Parameters
+        ----------
+        v : int, container or tensor
+            The node(s) to be updated.
+        reduce_dict : dict of callable
+            Reduce function per edge type. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        cross_reducer : str
+            Cross type reducer. One of "sum", "min", "max", "mean", "stack".
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
         ntid = self.get_ntype_id(ntype)
@@ -1992,14 +2010,15 @@ class DGLHeteroGraph(object):
         with ir.prog() as prog:
             for ety, args in reducer_dict.items():
                 outframe = FrameRef(frame_like(self._node_frames[ntid]._frame))
-                args = pad_tuple(args, 2)  # (rfunc, afunc)
-                if len(args) == 0:
+                args = pad_tuple(args, 2)
+                if args is None:
                     raise DGLError('Invalid per-type arguments. Should be either '
                                    '(1) reduce_func or (2) (reduce_func, apply_func)')
+                rfunc, afunc = args
                 etid = self.get_etype_id(ety)
                 stid, dtid = self._graph.metagraph.find_edge(etid)
                 scheduler.schedule_recv(AdaptedHeteroGraph(self, stid, dtid, etid),
-                                        v, *args,
+                                        v, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
             Runtime.run(prog)
@@ -2078,6 +2097,38 @@ class DGLHeteroGraph(object):
             Runtime.run(prog)
 
     def multi_send_and_recv(self, etype_dict, cross_reducer, apply_func=None, inplace=False):
+        r"""Send and receive messages along multiple edge types and perform aggregation.
+
+        It calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N}_t(v)}\phi_t(
+            h_u, h_v, h_{uv}))
+
+        * ``etype_dict`` is a dictionary from edge type to a tuple of arguments for a
+          normal ``send_and_recv``.
+        * :math:`\mathcal{N}_t(v)` is defined by the edges given for type :math:`t`.
+        * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
+        * ``apply_func`` specifies :math:`\sigma`.
+
+        Examples
+        --------
+        TBD
+
+        Parameters
+        ----------
+        v : int, container or tensor
+            The node(s) to be updated.
+        etype_dict : dict of callable
+            ``send_and_recv`` arguments per edge type.
+        cross_reducer : str
+            Cross type reducer. One of "sum", "min", "max", "mean", "stack".
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
         dtid = self.get_ntype_id(ntype)
@@ -2091,10 +2142,11 @@ class DGLHeteroGraph(object):
                 etid = self.get_etype_id(etype)
                 stid, _ = self._graph.metagraph.find_edge(etid)
                 outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                edges, mfunc, rfunc, afunc = pad_tuple(args, 4)
-                if len(args) == 0:
+                args = pad_tuple(args, 4)
+                if args is None:
                     raise DGLError('Invalid per-type arguments. Should be '
                                    '(edges, msg_func, reduce_func, [apply_func])')
+                edges, mfunc, rfunc, afunc = args
                 if isinstance(edges, tuple):
                     u, v = edges
                     u = utils.toindex(u)
@@ -2179,6 +2231,41 @@ class DGLHeteroGraph(object):
             Runtime.run(prog)
 
     def multi_pull(self, v, etype_dict, cross_reducer, apply_func=None, inplace=False):
+        r"""Pull and receive messages of the given nodes along multiple edge types
+        and perform aggregation.
+
+        It calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N}_t(v)}\phi_t(
+            h_u, h_v, h_{uv}))
+
+        * ``etype_dict`` is a dictionary from edge type to a tuple of arguments for a
+          normal ``pull``.
+        * :math:`\mathcal{N}_t(v)` is the set of predecessors of ``v`` connected by edge
+          type :math:`t`.
+        * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
+        * ``apply_func`` specifies :math:`\sigma`.
+
+        Examples
+        --------
+        TBD
+
+        Parameters
+        ----------
+        v : int, container or tensor
+            The node(s) to be updated.
+        etype_dict : dict of callable
+            ``pull`` arguments per edge type.
+        cross_reducer : str
+            Cross type reducer. One of "sum", "min", "max", "mean", "stack".
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
+
         v = utils.toindex(v)
         if len(v) == 0:
             return
@@ -2193,10 +2280,11 @@ class DGLHeteroGraph(object):
                 etid = self.get_etype_id(etype)
                 stid, _ = self._graph.metagraph.find_edge(etid)
                 outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                mfunc, rfunc, afunc = pad_tuple(args, 3)
-                if len(args) == 0:
+                args = pad_tuple(args, 3)
+                if args is None:
                     raise DGLError('Invalid per-type arguments. Should be '
                                    '(msg_func, reduce_func, [apply_func])')
+                mfunc, rfunc, afunc = args
                 scheduler.schedule_pull(AdaptedHeteroGraph(self, stid, dtid, etid),
                                         v,
                                         mfunc, rfunc, afunc,
@@ -2306,6 +2394,40 @@ class DGLHeteroGraph(object):
             Runtime.run(prog)
 
     def multi_update_all(self, etype_dict, cross_reducer, apply_func=None):
+        r"""Send and receive messages along all edges.
+
+        It calculates:
+
+        .. math::
+            h_v^{new} = \sigma(\prod_{t\inT_e}\sum_{u\in\mathcal{N}_t(v)}\phi_t(
+            h_u, h_v, h_{uv}))
+
+        * ``etype_dict`` is a dictionary from edge type to a tuple of arguments for a
+          normal ``update_all``.
+        * :math:`\mathcal{N}_t(v)` is the set of predecessors of ``v`` connected by edge
+          type :math:`t`.
+        * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
+        * ``apply_func`` specifies :math:`\sigma`.
+
+        Examples
+        --------
+        TBD
+
+        Parameters
+        ----------
+        v : int, container or tensor
+            The node(s) to be updated.
+        etype_dict : dict of callable
+            ``update_all`` arguments per edge type.
+        cross_reducer : str
+            Cross type reducer. One of "sum", "min", "max", "mean", "stack".
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
+
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = defaultdict(list)
@@ -2314,10 +2436,11 @@ class DGLHeteroGraph(object):
                 etid = self.get_etype_id(etype)
                 stid, dtid = self._graph.metagraph.find_edge(etid)
                 outframe = FrameRef(frame_like(self._node_frames[dtid]._frame))
-                mfunc, rfunc, afunc = pad_tuple(args, 3)
-                if len(args) == 0:
+                args = pad_tuple(args, 3)
+                if args is None:
                     raise DGLError('Invalid per-type arguments. Should be '
                                    '(msg_func, reduce_func, [apply_func])')
+                mfunc, rfunc, afunc = args
                 scheduler.schedule_update_all(AdaptedHeteroGraph(self, stid, dtid, etid),
                                               mfunc, rfunc, afunc,
                                               outframe=outframe)
@@ -2560,7 +2683,7 @@ class DGLHeteroGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def to(self, ctx):
+    def to(self, ctx):  # pylint: disable=invalid-name
         """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
@@ -2831,15 +2954,15 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     if len(etypes) != metagraph.number_of_edges():
         raise DGLError('Length of edge type list must match the number of '
                        'edges in the metagraph. {} vs {}'.format(
-                            len(etypes), metagraph.number_of_edges()))
+                           len(etypes), metagraph.number_of_edges()))
     if len(ntypes) != metagraph.number_of_nodes():
         raise DGLError('Length of nodes type list must match the number of '
                        'nodes in the metagraph. {} vs {}'.format(
-                            len(ntypes), metagraph.number_of_nodes()))
+                           len(ntypes), metagraph.number_of_nodes()))
     rst = []
     src, dst, eid = metagraph.edges()
-    for s, d, e in zip(src, dst, eid):
-        rst.append((ntypes[s], etypes[e], ntypes[d]))
+    for sid, did, eid in zip(src, dst, eid):
+        rst.append((ntypes[sid], etypes[eid], ntypes[did]))
     return rst
 
 def infer_ntype_from_dict(graph, etype_dict):
@@ -2875,16 +2998,16 @@ def pad_tuple(tup, length, pad_val=None):
     """Pad the given tuple to the given length.
 
     If the input is not a tuple, convert it to a tuple of length one.
-    Return an empty tuple if pad fails.
+    Return None if pad fails.
     """
     if not isinstance(tup, tuple):
         tup = (tup, )
     if len(tup) > length:
-        return ()
+        return None
     elif len(tup) == length:
         return tup
     else:
-        return tup + (None,) * (length - len(tup))
+        return tup + (pad_val,) * (length - len(tup))
 
 def merge_frames(frames, reducer):
     """Merge input frames into one. Resolve conflict fields using reducer.
@@ -2916,13 +3039,13 @@ def merge_frames(frames, reducer):
             return redfn(F.stack(flist, 0), 0)
     ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
-    for f in frames:
-        keys.update(f.keys())
+    for frm in frames:
+        keys.update(frm.keys())
     for k in keys:
         flist = []
-        for f in frames:
-            if k in f:
-                flist.append(f[k])
+        for frm in frames:
+            if k in frm:
+                flist.append(frm[k])
         if len(flist) > 1:
             ret[k] = merger(flist)
         else:
@@ -2952,7 +3075,7 @@ def combine_frames(frames, ids):
             if key in frame.schemes:
                 if frame.schemes[key] != scheme:
                     raise DGLError('Cannot concatenate column %s with shape %s and shape %s' %
-                            (key, frame.schemes[key], scheme))
+                                   (key, frame.schemes[key], scheme))
             else:
                 del schemes[key]
 
@@ -2960,10 +3083,8 @@ def combine_frames(frames, ids):
         return None
 
     # concatenate the columns
-    cols = {key: F.cat([
-            frames[frame_id][key] for frame_id in ids if frames[frame_id].num_rows > 0],
-            dim=0)
-            for key in schemes}
+    to_cat = lambda key: [frames[i][key] for i in ids if frames[i].num_rows > 0]
+    cols = {key: F.cat(to_cat(key), dim=0) for key in schemes}
     return FrameRef(Frame(cols))
 
 class AdaptedHeteroGraph(GraphAdapter):

@@ -3,7 +3,6 @@ from collections import defaultdict
 import numpy as np
 import scipy as sp
 import networkx as nx
-from networkx.algorithms import bipartite
 
 from . import backend as F
 from . import heterograph_index
@@ -133,13 +132,12 @@ def hetero_from_relations(rel_graphs):
     """
     # infer meta graph
     ntype_dict = {}  # ntype -> ntid
-    etype_dict = {}  # etype -> etid
     meta_edges = []
     ntypes = []
     etypes = []
-    for rg in rel_graphs:
-        assert len(rg.etypes) == 1
-        stype, etype, dtype = rg.canonical_etypes[0]
+    for rgrh in rel_graphs:
+        assert len(rgrh.etypes) == 1
+        stype, etype, dtype = rgrh.canonical_etypes[0]
         if not stype in ntype_dict:
             ntype_dict[stype] = len(ntypes)
             ntypes.append(stype)
@@ -153,7 +151,7 @@ def hetero_from_relations(rel_graphs):
     metagraph = graph_index.from_edge_list(meta_edges, True, True)
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph, [rg._graph for rg in rel_graphs])
+        metagraph, [rgrh._graph for rgrh in rel_graphs])
     return DGLHeteroGraph(hgidx, ntypes, etypes)
 
 def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='type'):
@@ -333,7 +331,6 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
         col = utils.toindex(spmat.col)
         hgidx = heterograph_index.create_unitgraph_from_coo(
             num_ntypes, num_src, num_dst, row, col)
-        u, v, eid = hgidx.edges(0)
     else:
         spmat = spmat.tocsr()
         indptr = utils.toindex(spmat.indptr)

@@ -1013,7 +1013,6 @@ def create_heterograph_from_homo(graph):
     HeteroGraphIndex
     """
     # TODO
-    pass
 
 def create_heterograph(graph_data):
     """Entry point of creating heterograph index from various type of

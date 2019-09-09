@@ -56,7 +56,7 @@ def gen_degree_bucketing_schedule(
     fd_list = []
     for deg, vbkt, mid in zip(degs, buckets, msg_ids):
         # create per-bkt rfunc
-        rfunc = _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt)
+        rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt)
         # vars
         vbkt = var.IDX(vbkt)
         mid = var.IDX(mid)
@@ -144,7 +144,7 @@ def _process_node_buckets(buckets):
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
 
-def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
+def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
     """Internal function to generate the per degree bucket node UDF."""
     def _rfunc_wrapper(node_data, mail_data):
         def _reshaped_getter(key):
@@ -209,7 +209,7 @@ def gen_group_apply_edge_schedule(
     fd_list = []
     for deg, u_bkt, v_bkt, eid_bkt in zip(degs, uids, vids, eids):
         # create per-bkt efunc
-        _efunc = var.FUNC(_create_per_bkt_efunc(graph, apply_func, deg,
+        _efunc = var.FUNC(_create_per_bkt_efunc(apply_func, deg,
                                                 u_bkt, v_bkt, eid_bkt))
         # vars
         var_u = var.IDX(u_bkt)
@@ -280,7 +280,7 @@ def _process_edge_buckets(buckets):
     eids = split(eids)
     return degs, uids, vids, eids
 
-def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
+def _create_per_bkt_efunc(apply_func, deg, u, v, eid):
     """Internal function to generate the per degree bucket edge UDF."""
     batch_size = len(u) // deg
     def _efunc_wrapper(src_data, edge_data, dst_data):
