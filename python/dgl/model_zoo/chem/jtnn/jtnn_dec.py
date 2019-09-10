@@ -1,8 +1,4 @@
 # pylint: disable=C0111, C0103, E1101, W0611, W0612
-import copy
-import itertools
-
-import networkx as nx
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,7 +8,6 @@ import dgl.function as DGLF
 from dgl import batch, dfs_labeled_edges_generator
 
 from .chemutils import enum_assemble_nx, get_mol
-from .mol_tree import Vocab
 from .mol_tree_nx import DGLMolTree
 from .nnutils import GRUUpdate, cuda
 
@@ -274,7 +269,6 @@ class DGLJTNNDecoder(nn.Module):
         stack.append((0, self.vocab.get_slots(root_wid)))
 
         all_nodes = {0: root_node_dict}
-        h = {}
         first = True
         new_node_id = 0
         new_edge_id = 0
@@ -282,7 +276,6 @@ class DGLJTNNDecoder(nn.Module):
         for step in range(MAX_DECODE_LEN):
             u, u_slots = stack[-1]
             udata = mol_tree.nodes[u].data
-            wid = udata['wid']
             x = udata['x']
             h = udata['h']
 
