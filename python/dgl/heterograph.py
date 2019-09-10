@@ -11,7 +11,7 @@ from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .base import ALL, SLICE_FULL, SRC, DST, DEFAULT, NTYPE, NID, ETYPE, EID, is_all, DGLError
+from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError
 
 __all__ = ['DGLHeteroGraph']
 
@@ -1225,6 +1225,9 @@ class DGLHeteroGraph(object):
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
 
+        Examples
+        --------
+
         Parameters
         ----------
         nodes : dict[str, list or iterable]
@@ -1234,7 +1237,7 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        G : DGLHeteroSubGraph
+        G : DGLHeteroGraph
             The subgraph.
             The nodes are relabeled so that node `i` of type `t` in the
             subgraph is mapped to the ``nodes[i]`` of type `t` in the
@@ -1249,6 +1252,9 @@ class DGLHeteroGraph(object):
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
 
+        Examples
+        --------
+
         Parameters
         ----------
         edges : dict[etype, list or iterable]
@@ -1260,7 +1266,7 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        G : DGLHeteroSubGraph
+        G : DGLHeteroGraph
             The subgraph.
             The edges are relabeled so that edge `i` of type `t` in the
             subgraph is mapped to the ``edges[i]`` of type `t` in the

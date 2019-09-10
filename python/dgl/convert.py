@@ -235,6 +235,7 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
         dtid = ntype_ids[dst[one_edge]]
         canonical_etids.append((stid, etid, dtid))
 
+    # construct relation graphs
     rel_graphs = []
     for stid, etid, dtid in canonical_etids:
         egrp = edge_groups[etid]

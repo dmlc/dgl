@@ -13,7 +13,7 @@ from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
 from ._ffi.base import DGLError, __version__
 
-from .base import ALL, SRC, DST, DEFAULT, NTYPE, NID, ETYPE, EID
+from .base import ALL, NTYPE, NID, ETYPE, EID
 from .backend import load_backend
 from .batched_graph import *
 from .convert import *
