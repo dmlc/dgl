@@ -68,7 +68,7 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(data_shape_.size());
     buffer_size += sizeof(int64_t) * data_shape_.size();
   }
-  // In the future, we should have a better memory management. 
+  // In the future, we should have a better memory management.
   // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
@@ -124,7 +124,7 @@ char* KVStoreMsg::Serialize(int64_t* size) {
     buffer_size += sizeof(this->name.size());
     buffer_size += this->name.size();
   }
-  // In the future, we should have a better memory management. 
+  // In the future, we should have a better memory management.
   // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
