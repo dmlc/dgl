@@ -903,6 +903,10 @@ dgl_id_t global2local_map(dgl_id_t global_id,
   }
 }
 
+inline bool is_neg_head_mode(const std::string &mode) {
+  return mode == "head";
+}
+
 Subgraph NegEdgeSubgraph(GraphPtr gptr, const Subgraph &pos_subg,
                          const std::string &neg_mode,
                          int neg_sample_size, bool exclude_positive) {
@@ -930,7 +934,6 @@ Subgraph NegEdgeSubgraph(GraphPtr gptr, const Subgraph &pos_subg,
   dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
-  bool neg_head = (neg_mode == "head");
   dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
@@ -944,7 +947,7 @@ Subgraph NegEdgeSubgraph(GraphPtr gptr, const Subgraph &pos_subg,
     const dgl_id_t *unchanged;
     dgl_id_t *neg_unchanged;
     dgl_id_t *neg_changed;
-    if (neg_head) {
+    if (is_neg_head_mode(neg_mode)) {
       unchanged = dst_data;
       neg_unchanged = neg_dst_data;
       neg_changed = neg_src_data;
@@ -1041,14 +1044,12 @@ Subgraph PBGNegEdgeSubgraph(int64_t num_tot_nodes, const Subgraph &pos_subg,
   dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
-  bool neg_head = (neg_mode == "head");
-
   const dgl_id_t *unchanged;
   dgl_id_t *neg_unchanged;
   dgl_id_t *neg_changed;
 
   // corrupt head nodes.
-  if (neg_head) {
+  if (is_neg_head_mode(neg_mode)) {
     unchanged = dst_data;
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
