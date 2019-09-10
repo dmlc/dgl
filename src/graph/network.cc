@@ -68,6 +68,8 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(data_shape_.size());
     buffer_size += sizeof(int64_t) * data_shape_.size();
   }
+  // In the future, we should have a better memory management. 
+  // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
   // Write msg_type_
@@ -122,6 +124,8 @@ char* KVStoreMsg::Serialize(int64_t* size) {
     buffer_size += sizeof(this->name.size());
     buffer_size += this->name.size();
   }
+  // In the future, we should have a better memory management. 
+  // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
   // write msg_type
@@ -339,7 +343,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSamplerEndSignal")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
-    ArrayMeta meta(kEndMsg);
+    ArrayMeta meta(kFinalMsg);
     int64_t size = 0;
     char* data = meta.Serialize(&size);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
@@ -423,12 +427,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
         DLDataType{kDLInt, 64, 1},
         DLContext{kDLCPU, 0},
         array_6.data);
-
       // Create CSR
       CSRPtr csr(new CSR(indptr, indice, edge_ids));
       nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
       *rv = nf;
-    } else if (meta.msg_type() == kEndMsg) {
+    } else if (meta.msg_type() == kFinalMsg) {
       *rv = meta.msg_type();
     } else {
       LOG(FATAL) << "Unknown message type: " << meta.msg_type();
@@ -447,7 +450,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
     kv_msg.msg_type = args[2];
     kv_msg.rank = args[3];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    if (kv_msg.msg_type != kEndMsg && kv_msg.msg_type != kBarrierMsg) {
+    if (kv_msg.msg_type != kFinalMsg && kv_msg.msg_type != kBarrierMsg) {
       std::string name = args[4];
       kv_msg.name = name;
       kv_msg.id = args[5];
@@ -463,7 +466,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
     send_kv_msg.size = kv_size;
     send_kv_msg.deallocator = DefaultMessageDeleter;
     CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
-    if (kv_msg.msg_type != kEndMsg && kv_msg.msg_type != kBarrierMsg) {
+    if (kv_msg.msg_type != kFinalMsg && kv_msg.msg_type != kBarrierMsg) {
       // Send ArrayMeta
       ArrayMeta meta(kv_msg.msg_type);
       meta.AddArray(kv_msg.id);
@@ -507,7 +510,7 @@ DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
     CHECK_EQ(receiver->Recv(&recv_kv_msg, &send_id), REMOVE_SUCCESS);
     kv_msg->Deserialize(recv_kv_msg.data, recv_kv_msg.size);
     recv_kv_msg.deallocator(&recv_kv_msg);
-    if (kv_msg->msg_type == kEndMsg || kv_msg->msg_type == kBarrierMsg) {
+    if (kv_msg->msg_type == kFinalMsg || kv_msg->msg_type == kBarrierMsg) {
       *rv = kv_msg;
       return;
     }

@@ -44,7 +44,7 @@ enum MessageType {
   /*!
    * \brief Message for end-signal
    */
-  kEndMsg = 1,
+  kFinalMsg = 1,
   /*!
    * \brief Initialize KVStore
    */

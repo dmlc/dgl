@@ -104,16 +104,20 @@ class KVServer(object):
             msg = _recv_kv_msg(self._receiver)
             if msg.type == KVMsgType.INIT:
                 if (msg.name in self._is_init) == False:
-                    # we hack the msg format here
+                    # we hack the msg format here:
+                    # msg.id store the shape of target tensor
+                    # msg.data has two row, and the first row is 
+                    # the init_type, [0, 0] means 'zero' and [1,1]
+                    # means 'uniform'. The second row is the min & max threshold.
                     data_shape = F.asnumpy(msg.id).tolist()
-                    array_0 = (F.asnumpy(msg.data).tolist())[0] 
-                    array_1 = (F.asnumpy(msg.data).tolist())[1]
-                    init_type = 'zero' if array_0[0] == 0.0 else 'uniform'
+                    row_0 = (F.asnumpy(msg.data).tolist())[0] 
+                    row_1 = (F.asnumpy(msg.data).tolist())[1]
+                    init_type = 'zero' if row_0[0] == 0.0 else 'uniform'
                     self._init_data(name=msg.name,
                         shape=data_shape,
                         init_type=init_type,
-                        low=array_1[0],
-                        high=array_1[1])
+                        low=row_1[0],
+                        high=row_1[1])
                     self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
                 # convert global ID to local ID
@@ -353,10 +357,9 @@ class KVClient(object):
         ID : tensor (mx.ndarray or torch.tensor)
             a vector storing the global IDs
         data : tensor (mx.ndarray or torch.tensor)
-            a matrix with the same row size of id
+            a tensor with the same row size of id
         """
         assert F.ndim(ID) == 1, 'ID must be a vector.'
-        assert F.ndim(data) == 2, 'data must be a matrix.'
         assert F.shape(ID)[0] == F.shape(data)[0], 'The data must has the same row size with ID.'
         group_size = [0] * self._server_count
         numpy_id = F.asnumpy(ID)
@@ -392,7 +395,7 @@ class KVClient(object):
         name : str
             data name
         data : tensor (mx.ndarray or torch.tensor)
-            data matrix
+            data tensor
         """
         ID = F.zerocopy_from_numpy(np.arange(F.shape(data)[0]))
         self.push(name, ID, data)
@@ -410,7 +413,7 @@ class KVClient(object):
         Return
         ------
         tensor
-            a matrix with the same row size of ID
+            a tensor with the same row size of ID
         """
         assert F.ndim(ID) == 1, 'ID must be a vector.'
         group_size = [0] * self._server_count
@@ -457,7 +460,7 @@ class KVClient(object):
         Return
         ------
         tensor
-            target data matrix
+            target data tensor
         """
         ID = F.zerocopy_from_numpy(np.arange(self._data_size[name]))
         return self.pull(name, ID)
