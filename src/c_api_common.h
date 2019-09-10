@@ -39,6 +39,9 @@ namespace dgl {
 // Communicator handler type
 typedef void* CommunicatorHandle;
 
+// KVstore message handler type
+typedef void* KVMsgHandle;
+
 /*! \brief Enum type for bool value with unknown */
 enum BoolFlag {
   kBoolUnknown = -1,
