@@ -1,5 +1,3 @@
-import rdkit
-import rdkit.Chem as Chem
 import copy
 import numpy as np
 from dgl import DGLGraph

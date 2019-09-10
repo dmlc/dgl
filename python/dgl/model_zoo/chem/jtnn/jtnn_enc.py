@@ -1,16 +1,11 @@
 # pylint: disable=C0111, C0103, E1101, W0611, W0612
-import itertools
-from collections import deque
-
-import networkx as nx
 import numpy as np
 import torch
 import torch.nn as nn
 
 import dgl.function as DGLF
-from dgl import batch, bfs_edges_generator, unbatch
+from dgl import batch, bfs_edges_generator
 
-from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
 
 MAX_NB = 8

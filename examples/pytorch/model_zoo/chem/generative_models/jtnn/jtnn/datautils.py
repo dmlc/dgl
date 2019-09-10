@@ -7,7 +7,8 @@ import os
 from .mol_tree import Vocab, DGLMolTree
 from .chemutils import mol2dgl_dec, mol2dgl_enc
 
-ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
+             'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
 ATOM_FDIM_DEC = len(ELEM_LIST) + 6 + 5 + 1
 BOND_FDIM_DEC = 5
