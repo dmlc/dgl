@@ -505,6 +505,35 @@ def test_flatten():
     assert fg.etypes == [dgl.DEFAULT]
     check_mapping(g, fg)
 
+def test_convert():
+    hg = create_test_heterograph()
+
+    g = dgl.hetero_to_homo(hg)
+
+    src, dst = g.all_edges(order='eid')
+    etype_id, eid = g.edata[dgl.ETYPE], g.edata[dgl.EID]
+    ntype_id, nid = g.ndata[dgl.NTYPE], g.ndata[dgl.NID]
+    for i in range(g.number_of_edges()):
+        srctype = hg.ntypes[ntype_id[src[i]]]
+        dsttype = hg.ntypes[ntype_id[dst[i]]]
+        etype = hg.etypes[etype_id[i]]
+        src_i, dst_i = hg.find_edges([eid[i]], (srctype, etype, dsttype))
+        assert np.asscalar(F.asnumpy(src_i)) == nid[src[i]]
+        assert np.asscalar(F.asnumpy(dst_i)) == nid[dst[i]]
+
+    hg2 = dgl.hetero_from_homo(
+            g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
+            ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE)
+    assert set(hg.ntypes) == set(hg2.ntypes)
+    assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
+    for ntype in hg.ntypes:
+        assert hg.number_of_nodes(ntype) == hg2.number_of_nodes(ntype)
+    for canonical_etype in hg.canonical_etypes:
+        src, dst = hg.all_edges(canonical_etype, order='eid')
+        src2, dst2 = hg2.all_edges(canonical_etype, order='eid')
+        assert F.array_equal(src, src2)
+        assert F.array_equal(dst, dst2)
+
 def test_apply():
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
@@ -931,6 +960,7 @@ if __name__ == '__main__':
     test_view()
     test_view1()
     test_flatten()
+    test_convert()
     test_apply()
     test_level1()
     test_level2()

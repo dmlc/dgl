@@ -192,6 +192,10 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     The returned node and edge types may not necessarily be in the same order as
     ``ntypes`` and ``etypes``.  And edge types may be duplicated if the source
     and destination types differ.
+
+    The node IDs of a single type in the returned heterogeneous graph is ordered
+    the same as the nodes with the same ``ntype_field`` feature.  Edge IDs of
+    a single type is similar.
     """
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
