@@ -200,60 +200,59 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
 
+    num_ntypes = np.max(ntype_ids) + 1
+    num_etypes = np.max(etype_ids) + 1
+
+    def _group_by(ids, val_range):
+        return [np.where(ids == v)[0] for v in range(val_range)]
+
+    node_groups = _group_by(ntype_ids, num_ntypes)
+    edge_groups = _group_by(etype_ids, num_etypes)
+
     src, dst = G.all_edges(order='eid')
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
-    srctype_ids = ntype_ids[src]
-    dsttype_ids = ntype_ids[dst]
 
-    canonical_etype_ids = {
-            k: i for i, k in enumerate(set(zip(srctype_ids, etype_ids, dsttype_ids)))}
+    # relabel nodes and edges
+    def _make_invmap(ids, invmap):
+        invmap[ids] = np.arange(len(ids))
 
-    nids = [[] for _ in range(len(ntypes))]
-    nids_invmap = {}
-    eids = [[] for _ in range(len(canonical_etype_ids))]
-    sids = [[] for _ in range(len(canonical_etype_ids))]
-    dids = [[] for _ in range(len(canonical_etype_ids))]
+    node_invmap = np.zeros((G.number_of_nodes(),), dtype=src.dtype) - 1
+    edge_invmap = np.zeros((G.number_of_edges(),), dtype=src.dtype) - 1
+    for grp in node_groups:
+        _make_invmap(grp, node_invmap)
+    for grp in edge_groups:
+        _make_invmap(grp, edge_invmap)
+
+    # infer metagraph
+    canonical_etids = []
+    for etid in range(num_etypes):
+        egrp = edge_groups[etid]
+        if len(egrp) == 0:
+            raise DGLError('Edge type id "%d" does not have any edge.' % etid)
+        one_edge = egrp[0]
+        stid = ntype_ids[src[one_edge]]
+        dtid = ntype_ids[dst[one_edge]]
+        canonical_etids.append((stid, etid, dtid))
+
     rel_graphs = []
-
-    for i in range(G.number_of_nodes()):
-        nids_invmap[i] = len(nids[ntype_ids[i]])
-        nids[ntype_ids[i]].append(i)
-    for i in range(len(src)):
-        etype_id = etype_ids[i]
-        srctype_id = srctype_ids[i]
-        dsttype_id = dsttype_ids[i]
-        canonical_etype_id = canonical_etype_ids[srctype_id, etype_id, dsttype_id]
-        eids[canonical_etype_id].append(i)
-        sids[canonical_etype_id].append(nids_invmap[src[i]])
-        dids[canonical_etype_id].append(nids_invmap[dst[i]])
-
-    for canonical_etype, canonical_etype_id in canonical_etype_ids.items():
-        st, et, dt = canonical_etype
-        rel_graph_src = sids[canonical_etype_id]
-        rel_graph_dst = dids[canonical_etype_id]
-        if st == dt:
-            rel_graph = graph(
-                    (rel_graph_src, rel_graph_dst),
-                    ntype=ntypes[st],
-                    etype=etypes[et])
+    for stid, etid, dtid in canonical_etids:
+        egrp = edge_groups[etid]
+        rel_graph_src = node_invmap[src[egrp]]
+        rel_graph_dst = node_invmap[dst[egrp]]
+        if stid == dtid:
+            rel_graph = graph((rel_graph_src, rel_graph_dst), ntypes[stid], etypes[etid])
         else:
-            rel_graph = bipartite(
-                    (rel_graph_src, rel_graph_dst),
-                    utype=ntypes[st],
-                    etype=etypes[et],
-                    vtype=ntypes[dt])
+            rel_graph = bipartite((rel_graph_src, rel_graph_dst),
+                                  ntypes[stid], etypes[etid], ntypes[dtid])
         rel_graphs.append(rel_graph)
 
     hg = hetero_from_relations(rel_graphs)
-    for ntype_id, ntype in enumerate(ntypes):
-        hg.nodes[ntype].data[NID] = F.tensor(nids[ntype_id])
-    for canonical_etype, canonical_etype_id in canonical_etype_ids.items():
-        srctype_id, etype_id, dsttype_id = canonical_etype
-        srctype = ntypes[srctype_id]
-        etype = etypes[etype_id]
-        dsttype = ntypes[dsttype_id]
-        hg.edges[srctype, etype, dsttype].data[EID] = F.tensor(eids[canonical_etype_id])
+
+    for ntid, ntype in enumerate(hg.ntypes):
+        hg.nodes[ntype].data[NID] = F.tensor(node_groups[ntid])
+    for etid, etype in enumerate(hg.canonical_etypes):
+        hg.edges[etype].data[EID] = F.tensor(edge_groups[etid])
 
     return hg
 
@@ -275,7 +274,7 @@ def hetero_to_homo(hgraph):
 
     Returns
     -------
-    DGLGraph
+    DGLHeteroGraph
         A homogenous graph.
         The parent node and edge type/ID are stored in columns dgl.NTYPE/dgl.NID and
         dgl.ETYPE/dgl.EID respectively.
@@ -303,8 +302,7 @@ def hetero_to_homo(hgraph):
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    # TODO: DGLGraph()?
-    g = DGLGraph((F.cat(srcs, 0), F.cat(dsts, 0)), readonly=True)
+    g = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
     g.ndata[NTYPE] = F.cat(ntype_ids, 0)
     g.ndata[NID] = F.cat(nids, 0)
     g.edata[ETYPE] = F.cat(etype_ids, 0)
@@ -568,45 +566,6 @@ def create_from_networkx_bipartite(nx_graph,
     assert node_attrs is None
     assert edge_attrs is None
     return g
-
-def create_from_networkx_multi(nx_graph,
-                               edge_id_attr_name='id',
-                               node_type_attr_name='type',
-                               node_attrs=None,
-                               edge_attrs=None):
-    """Create a graph containing multiple types from networkx.
-
-    The input is an nx.MultiDiGraph. The edge key is treated as edge
-    types. The node types are stored as node attributes.
-
-    Examples
-    --------
-    TBD
-
-    Parameters
-    ----------
-    nx_graph : networkx.MultiDiGraph
-        The networkx graph.
-    edge_id_attr_name : str, optional
-        The edge attribute name for edge type-specific IDs.
-        The attribute contents must be integers.
-        If the IDs of the same type are not consecutive integers, its
-        nodes will be relabeled using consecutive integers.  The new
-        node ordering will inherit that of the sorted IDs.
-        If None is provided, the edge order would be arbitrary.
-    node_type_attr_name : str, optional
-        The node attribute name for the node type.
-        The attribute contents must be strings.
-    node_attrs : iterable of str, optional
-        The node attributes whose data would be copied.
-    edge_attrs : iterable of str, optional
-        The edge attributes whose data would be copied.
-
-    Returns
-    -------
-    DGLHeteroGraph
-    """
-    pass
 
 def to_networkx(g, node_attrs=None, edge_attrs=None):
     """Convert to networkx graph.

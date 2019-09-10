@@ -50,8 +50,6 @@ def test_create():
     g0 = create_test_heterograph()
     g1 = create_test_heterograph1()
     assert g0.ntypes == g1.ntypes
-    print(g0.canonical_etypes)
-    print(g1.canonical_etypes)
     assert g0.canonical_etypes == g1.canonical_etypes
 
 def test_query():
@@ -100,7 +98,7 @@ def test_query():
         assert np.array_equal(
             F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
 
-    def _test():
+    def _test(g):
         for etype in etypes:
             srcs, dsts = edges[etype]
             for src, dst in zip(srcs, dsts):
@@ -177,7 +175,10 @@ def test_query():
         'wishes': ([0, 1], [0, 1]),
         'develops': ([0, 1], [1, 0]),
     }
-    _test()
+    g = create_test_heterograph()
+    _test(g)
+    g = create_test_heterograph1()
+    _test(g)
 
     etypes = canonical_etypes
     edges = {
@@ -193,7 +194,10 @@ def test_query():
         ('user', 'wishes', 'game'): ([0, 1], [0, 1]),
         ('developer', 'develops', 'game'): ([0, 1], [1, 0]),
         }
-    _test()
+    g = create_test_heterograph()
+    _test(g)
+    g = create_test_heterograph1()
+    _test(g)
 
     # test repr
     print(g)
