@@ -175,13 +175,17 @@ class DGLHeteroGraph(object):
 
         # node and edge frame
         if node_frames is None:
-            node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
-                           for i in range(len(self._ntypes))]
+            node_frames = [None] * len(self._ntypes)
+        node_frames = [FrameRef(Frame(num_rows=self._graph.number_of_nodes(i)))
+                       if frame is None else frame
+                       for i, frame in enumerate(node_frames)]
         self._node_frames = node_frames
 
         if edge_frames is None:
-            edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
-                           for i in range(len(self._etypes))]
+            edge_frames = [None] * len(self._etypes)
+        edge_frames = [FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
+                       if frame is None else frame
+                       for i, frame in enumerate(edge_frames)]
         self._edge_frames = edge_frames
 
         # message indicators

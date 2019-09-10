@@ -930,7 +930,7 @@ if __name__ == '__main__':
     test_inc()
     test_view()
     test_view1()
-    #test_flatten()
+    test_flatten()
     test_apply()
     test_level1()
     test_level2()
