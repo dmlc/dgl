@@ -7,8 +7,10 @@ import networkx as nx
 from . import backend as F
 from . import heterograph_index
 from .heterograph import DGLHeteroGraph
+from .graph import DGLGraph
 from . import graph_index
 from . import utils
+from .base import NTYPE, ETYPE, NID, EID
 
 __all__ = [
     'graph',
@@ -154,7 +156,7 @@ def hetero_from_relations(rel_graphs):
         metagraph, [rgrh._graph for rgrh in rel_graphs])
     return DGLHeteroGraph(hgidx, ntypes, etypes)
 
-def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='type'):
+def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     """Create a heterograph from a DGLGraph.
 
     Node and edge types are stored as features. Each feature must be an integer
@@ -167,7 +169,7 @@ def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='typ
 
     Parameters
     ----------
-    graph : DGLGraph
+    G : DGLGraph
         Input homogenous graph.
     ntypes : list of str
         The node type names.
@@ -184,10 +186,74 @@ def hetero_from_homo(graph, ntypes, etypes, ntype_field='type', etype_field='typ
         A heterograph.
         The parent node and edge ID are stored in the column dgl.NID and dgl.EID
         respectively for all node/edge types.
-    """
-    pass
 
-def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
+    Notes
+    -----
+    The returned node and edge types may not necessarily be in the same order as
+    ``ntypes`` and ``etypes``.  And edge types may be duplicated if the source
+    and destination types differ.
+    """
+    ntype_ids = F.asnumpy(G.ndata[ntype_field])
+    etype_ids = F.asnumpy(G.edata[etype_field])
+
+    src, dst = G.all_edges(order='eid')
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    srctype_ids = ntype_ids[src]
+    dsttype_ids = ntype_ids[dst]
+
+    canonical_etype_ids = {
+            k: i for i, k in enumerate(set(zip(srctype_ids, etype_ids, dsttype_ids)))}
+
+    nids = [[] for _ in range(len(ntypes))]
+    nids_invmap = {}
+    eids = [[] for _ in range(len(canonical_etype_ids))]
+    sids = [[] for _ in range(len(canonical_etype_ids))]
+    dids = [[] for _ in range(len(canonical_etype_ids))]
+    rel_graphs = []
+
+    for i in range(G.number_of_nodes()):
+        nids_invmap[i] = len(nids[ntype_ids[i]])
+        nids[ntype_ids[i]].append(i)
+    for i in range(len(src)):
+        etype_id = etype_ids[i]
+        srctype_id = srctype_ids[i]
+        dsttype_id = dsttype_ids[i]
+        canonical_etype_id = canonical_etype_ids[srctype_id, etype_id, dsttype_id]
+        eids[canonical_etype_id].append(i)
+        sids[canonical_etype_id].append(nids_invmap[src[i]])
+        dids[canonical_etype_id].append(nids_invmap[dst[i]])
+
+    for canonical_etype, canonical_etype_id in canonical_etype_ids.items():
+        st, et, dt = canonical_etype
+        rel_graph_src = sids[canonical_etype_id]
+        rel_graph_dst = dids[canonical_etype_id]
+        if st == dt:
+            rel_graph = graph(
+                    (rel_graph_src, rel_graph_dst),
+                    ntype=ntypes[st],
+                    etype=etypes[et])
+        else:
+            rel_graph = bipartite(
+                    (rel_graph_src, rel_graph_dst),
+                    utype=ntypes[st],
+                    etype=etypes[et],
+                    vtype=ntypes[dt])
+        rel_graphs.append(rel_graph)
+
+    hg = hetero_from_relations(rel_graphs)
+    for ntype_id, ntype in enumerate(ntypes):
+        hg.nodes[ntype].data[NID] = F.tensor(nids[ntype_id])
+    for canonical_etype, canonical_etype_id in canonical_etype_ids.items():
+        srctype_id, etype_id, dsttype_id = canonical_etype
+        srctype = ntypes[srctype_id]
+        etype = etypes[etype_id]
+        dsttype = ntypes[dsttype_id]
+        hg.edges[srctype, etype, dsttype].data[EID] = F.tensor(eids[canonical_etype_id])
+
+    return hg
+
+def hetero_to_homo(hgraph):
     """Convert a heterograph to a DGLGraph.
 
     Node and edge types are stored as features in the returned graph. Each feature
@@ -202,10 +268,6 @@ def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
     ----------
     hgraph : DGLHeteroGraph
         Input heterogenous graph.
-    ntype_field : str, optional
-        The feature field used to store node type. (Default: 'type')
-    etype_field : str, optional
-        The feature field used to store edge type. (Default: 'type')
 
     Returns
     -------
@@ -214,7 +276,37 @@ def hetero_to_homo(hgraph, ntype_field='type', etype_field='type'):
         The parent node and edge type/ID are stored in columns dgl.NTYPE/dgl.NID and
         dgl.ETYPE/dgl.EID respectively.
     """
-    pass
+    num_nodes_per_ntype = [hgraph.number_of_nodes(ntype) for ntype in hgraph.ntypes]
+    offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
+    srcs = []
+    dsts = []
+    etype_ids = []
+    eids = []
+    ntype_ids = []
+    nids = []
+
+    for ntype_id, ntype in enumerate(hgraph.ntypes):
+        num_nodes = hgraph.number_of_nodes(ntype)
+        ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
+        nids.append(F.arange(0, num_nodes))
+
+    for etype_id, etype in enumerate(hgraph.canonical_etypes):
+        srctype, _, dsttype = etype
+        src, dst = hgraph.all_edges(etype, order='eid')
+        num_edges = len(src)
+        srcs.append(src + offset_per_ntype[hgraph.get_ntype_id(srctype)])
+        dsts.append(dst + offset_per_ntype[hgraph.get_ntype_id(dsttype)])
+        etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
+        eids.append(F.arange(0, num_edges))
+
+    # TODO: DGLGraph()?
+    g = DGLGraph((F.cat(srcs, 0), F.cat(dsts, 0)), readonly=True)
+    g.ndata[NTYPE] = F.cat(ntype_ids, 0)
+    g.ndata[NID] = F.cat(nids, 0)
+    g.edata[ETYPE] = F.cat(etype_ids, 0)
+    g.edata[EID] = F.cat(eids, 0)
+
+    return g
 
 ############################################################
 # Internal APIs
