@@ -11,10 +11,10 @@ def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
     # 3 users, 2 games, 2 developers
     # metagraph:
-    #    ('user', 'user', 'follows'),
-    #    ('user', 'game', 'plays'),
-    #    ('user', 'game', 'wishes'),
-    #    ('developer', 'game', 'develops')])
+    #    ('user', 'follows', 'user'),
+    #    ('user', 'plays', 'game'),
+    #    ('user', 'wishes', 'game'),
+    #    ('developer', 'develops', 'game')])
 
     plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
     wishes_nx = nx.DiGraph()
@@ -29,8 +29,30 @@ def create_test_heterograph():
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     return g
 
+def create_test_heterograph1():
+    edges = []
+    edges.extend([(0,1), (1,2)])  # follows
+    edges.extend([(0,3), (1,3), (2,4), (1,4)])  # plays
+    edges.extend([(0,4), (2,3)])  # wishes
+    edges.extend([(5,3), (6,4)])  # develops
+    ntypes = F.tensor([0, 0, 0, 1, 1, 2, 2])
+    etypes = F.tensor([0, 0, 1, 1, 1, 1, 2, 2, 3, 3])
+    g0 = dgl.graph(edges)
+    g0.ndata['type'] = ntypes
+    g0.edata['type'] = etypes
+    return dgl.hetero_from_homo(g0, ['user', 'game', 'developer'],
+                                ['follows', 'plays', 'wishes', 'develops'])
+
 def get_redfn(name):
     return getattr(F, name)
+
+def test_create():
+    g0 = create_test_heterograph()
+    g1 = create_test_heterograph1()
+    assert g0.ntypes == g1.ntypes
+    print(g0.canonical_etypes)
+    print(g1.canonical_etypes)
+    assert g0.canonical_etypes == g1.canonical_etypes
 
 def test_query():
     g = create_test_heterograph()
@@ -485,14 +507,6 @@ def test_flatten():
     # be converted into a homogeneous graph, because 'game' never appears as source node,
     # and 'developer' never appears as destination node.
     # We still need a separate interface for converting to homographs.
-
-    # test heterograph from the docstring, plus a user -- wishes -- game relation
-    # 3 users, 2 games, 2 developers
-    # metagraph:
-    #    ('user', 'user', 'follows'),
-    #    ('user', 'game', 'plays'),
-    #    ('user', 'game', 'wishes'),
-    #    ('developer', 'game', 'develops')])
     fg = g[:, :, :]
     assert fg.ntypes == ['developer+user', 'game+user']
     assert fg.etypes == ['develops+follows+plays+wishes']
@@ -962,6 +976,7 @@ def test_backward():
                                               [2., 2., 2., 2., 2.]]))
 
 if __name__ == '__main__':
+    test_create()
     test_query()
     test_adj()
     test_inc()
