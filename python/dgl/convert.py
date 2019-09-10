@@ -7,7 +7,6 @@ import networkx as nx
 from . import backend as F
 from . import heterograph_index
 from .heterograph import DGLHeteroGraph
-from .graph import DGLGraph
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID
@@ -157,7 +156,7 @@ def hetero_from_relations(rel_graphs):
     return DGLHeteroGraph(hgidx, ntypes, etypes)
 
 def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
-    """Create a heterograph from a DGLGraph.
+    """Create a heterograph from a homogenous graph.
 
     Node and edge types are stored as features. Each feature must be an integer
     representing the type id, which can be used to retrieve the type names stored
@@ -169,7 +168,7 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
 
     Parameters
     ----------
-    G : DGLGraph
+    G : DGLHeteroGraph
         Input homogenous graph.
     ntypes : list of str
         The node type names.
@@ -258,7 +257,7 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     return hg
 
 def hetero_to_homo(hgraph):
-    """Convert a heterograph to a DGLGraph.
+    """Convert a heterograph to a homogeneous graph.
 
     Node and edge types are stored as features in the returned graph. Each feature
     is an integer representing the type id,  which can be used to retrieve the type
@@ -573,6 +572,6 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
 
     See Also
     --------
-    DGLGraph.to_networkx
+    DGLHeteroGraph.to_networkx
     """
     return g.to_networkx(node_attrs, edge_attrs)

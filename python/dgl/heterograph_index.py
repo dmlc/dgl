@@ -997,24 +997,6 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
 
-def create_heterograph_from_homo(graph):
-    """Create a heterograph from a homograph.
-
-    Node and edge types are stored as features. Each feature must be an integer
-    representing the type id.
-
-    Parameters
-    ----------
-    graph : DGLGraph
-        Input homogeneous graph.
-
-    Returns
-    -------
-    HeteroGraphIndex
-    """
-    # TODO
-    pass
-
 def create_heterograph(graph_data):
     """Entry point of creating heterograph index from various type of
     graph data.

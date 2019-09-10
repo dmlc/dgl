@@ -173,8 +173,7 @@ def schedule_snr(graph,
     adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
         edge_tuples, graph.num_src(), graph.num_dst())
     out_map_creator = lambda nbits: _build_idx_map(recv_nodes, nbits)
-    reduced_feat = _gen_send_reduce(graph=graph,
-                                    src_node_frame=graph.srcframe,
+    reduced_feat = _gen_send_reduce(src_node_frame=graph.srcframe,
                                     dst_node_frame=graph.dstframe,
                                     edge_frame=graph.edgeframe,
                                     message_func=message_func,
@@ -232,8 +231,7 @@ def schedule_update_all(graph,
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_gidx_and_mapping_graph(graph)
         out_map_creator = lambda nbits: None
-        reduced_feat = _gen_send_reduce(graph=graph,
-                                        src_node_frame=graph.srcframe,
+        reduced_feat = _gen_send_reduce(src_node_frame=graph.srcframe,
                                         dst_node_frame=graph.dstframe,
                                         edge_frame=graph.edgeframe,
                                         message_func=message_func,
@@ -490,7 +488,7 @@ def schedule_pull(graph,
         adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
             (u, v, eid), graph.num_src(), graph.num_dst())
         out_map_creator = lambda nbits: _build_idx_map(pull_nodes, nbits)
-        reduced_feat = _gen_send_reduce(graph, graph.srcframe,
+        reduced_feat = _gen_send_reduce(graph.srcframe,
                                         graph.dstframe, graph.edgeframe,
                                         message_func, reduce_func, var_eid,
                                         var_pull_nodes, uv_getter, adj_creator,
@@ -579,8 +577,7 @@ def schedule_nodeflow_update_all(graph,
         return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
     adj_creator = lambda: spmv.build_gidx_and_mapping_block(graph, block_id)
     out_map_creator = lambda nbits: None
-    reduced_feat = _gen_send_reduce(graph=graph,
-                                    src_node_frame=graph._get_node_frame(block_id),
+    reduced_feat = _gen_send_reduce(src_node_frame=graph._get_node_frame(block_id),
                                     dst_node_frame=graph._get_node_frame(block_id + 1),
                                     edge_frame=graph._get_edge_frame(block_id),
                                     message_func=message_func,
@@ -650,8 +647,7 @@ def schedule_nodeflow_compute(graph,
             graph, block_id, (u, v, eid))
         out_map_creator = lambda nbits: _build_idx_map(utils.toindex(dest_nodes), nbits)
 
-        reduced_feat = _gen_send_reduce(graph=graph,
-                                        src_node_frame=graph._get_node_frame(block_id),
+        reduced_feat = _gen_send_reduce(src_node_frame=graph._get_node_frame(block_id),
                                         dst_node_frame=graph._get_node_frame(block_id + 1),
                                         edge_frame=graph._get_edge_frame(block_id),
                                         message_func=message_func,
@@ -786,7 +782,6 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         return var_out
 
 def _gen_send_reduce(
-        graph,
         src_node_frame,
         dst_node_frame,
         edge_frame,
@@ -817,8 +812,6 @@ def _gen_send_reduce(
 
     Parameters
     ----------
-    graph : GraphAdaptor
-        The graph
     src_node_frame : NodeFrame
         The node frame of the source nodes.
     dst_node_frame : NodeFrame

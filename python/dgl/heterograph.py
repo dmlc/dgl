@@ -519,13 +519,13 @@ class DGLHeteroGraph(object):
 
             return DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
         else:
-            fg = self._graph.flatten_relations(etypes)
-            new_g = fg.graph
+            flat = self._graph.flatten_relations(etypes)
+            new_g = flat.graph
 
             # merge frames
-            stids = fg.induced_srctype_set.asnumpy()
-            dtids = fg.induced_dsttype_set.asnumpy()
-            etids = fg.induced_etype_set.asnumpy()
+            stids = flat.induced_srctype_set.asnumpy()
+            dtids = flat.induced_dsttype_set.asnumpy()
+            etids = flat.induced_etype_set.asnumpy()
             new_ntypes = [combine_names(self.ntypes, stids)]
             if new_g.number_of_ntypes() == 2:
                 new_ntypes.append(combine_names(self.ntypes, dtids))
@@ -544,12 +544,12 @@ class DGLHeteroGraph(object):
             src = new_ntypes[0]
             dst = new_ntypes[1] if new_g.number_of_ntypes() == 2 else src
             # put the parent node/edge type and IDs
-            new_hg.nodes[src].data[NTYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
-            new_hg.nodes[src].data[NID] = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
-            new_hg.nodes[dst].data[NTYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_dsttype)
-            new_hg.nodes[dst].data[NID] = F.zerocopy_from_dgl_ndarray(fg.induced_dstid)
-            new_hg.edata[ETYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_etype)
-            new_hg.edata[EID] = F.zerocopy_from_dgl_ndarray(fg.induced_eid)
+            new_hg.nodes[src].data[NTYPE] = F.zerocopy_from_dgl_ndarray(flat.induced_srctype)
+            new_hg.nodes[src].data[NID] = F.zerocopy_from_dgl_ndarray(flat.induced_srcid)
+            new_hg.nodes[dst].data[NTYPE] = F.zerocopy_from_dgl_ndarray(flat.induced_dsttype)
+            new_hg.nodes[dst].data[NID] = F.zerocopy_from_dgl_ndarray(flat.induced_dstid)
+            new_hg.edata[ETYPE] = F.zerocopy_from_dgl_ndarray(flat.induced_etype)
+            new_hg.edata[EID] = F.zerocopy_from_dgl_ndarray(flat.induced_eid)
 
             return new_hg
 
