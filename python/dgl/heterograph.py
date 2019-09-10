@@ -526,23 +526,23 @@ class DGLHeteroGraph(object):
             stids = fg.induced_srctype_set.asnumpy()
             dtids = fg.induced_dsttype_set.asnumpy()
             etids = fg.induced_etype_set.asnumpy()
+            new_ntypes = [combine_names(self.ntypes, stids)]
             if new_g.number_of_ntypes() == 2:
-                new_ntypes = [SRC, DST]
+                new_ntypes.append(combine_names(self.ntypes, dtids))
                 new_nframes = [
                     combine_frames(self._node_frames, stids),
                     combine_frames(self._node_frames, dtids)]
             else:
                 assert np.array_equal(stids, dtids)
-                new_ntypes = [DEFAULT]
                 new_nframes = [combine_frames(self._node_frames, stids)]
-            new_etypes = [DEFAULT]
+            new_etypes = [combine_names(self.etypes, etids)]
             new_eframes = [combine_frames(self._edge_frames, etids)]
 
             # create new heterograph
             new_hg = DGLHeteroGraph(new_g, new_ntypes, new_etypes, new_nframes, new_eframes)
 
-            src = SRC if new_g.number_of_ntypes() == 2 else DEFAULT
-            dst = DST if new_g.number_of_ntypes() == 2 else DEFAULT
+            src = new_ntypes[0]
+            dst = new_ntypes[1] if new_g.number_of_ntypes() == 2 else src
             # put the parent node/edge type and IDs
             new_hg.nodes[src].data[NTYPE] = F.zerocopy_from_dgl_ndarray(fg.induced_srctype)
             new_hg.nodes[src].data[NID] = F.zerocopy_from_dgl_ndarray(fg.induced_srcid)
@@ -3090,6 +3090,23 @@ def combine_frames(frames, ids):
     to_cat = lambda key: [frames[i][key] for i in ids if frames[i].num_rows > 0]
     cols = {key: F.cat(to_cat(key), dim=0) for key in schemes}
     return FrameRef(Frame(cols))
+
+def combine_names(names, ids):
+    """Combine the selected names into one new name.
+
+    Parameters
+    ----------
+    names : list of str
+        String names
+    ids : numpy.ndarray
+        Selected index
+
+    Returns
+    -------
+    str
+    """
+    selected = sorted([names[i] for i in ids])
+    return '+'.join(selected)
 
 class AdaptedHeteroGraph(GraphAdapter):
     """Adapt DGLGraph to interface required by scheduler.

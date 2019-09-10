@@ -21,6 +21,7 @@ def create_test_heterograph():
     wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
     wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
     wishes_nx.add_edges_from([('u0', 'g1'), ('u2', 'g0')])
+
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
     plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
     wishes_g = dgl.bipartite(wishes_nx, 'user', 'wishes', 'game')
@@ -416,10 +417,10 @@ def test_view1():
 def test_flatten():
     def check_mapping(g, fg):
         if len(fg.ntypes) == 1:
-            SRC = DST = dgl.DEFAULT
+            SRC = DST = fg.ntypes[0]
         else:
-            SRC = dgl.SRC
-            DST = dgl.DST
+            SRC = fg.ntypes[0]
+            DST = fg.ntypes[1]
 
         etypes = F.asnumpy(fg.edata[dgl.ETYPE]).tolist()
         eids = F.asnumpy(fg.edata[dgl.EID]).tolist()
@@ -444,12 +445,11 @@ def test_flatten():
 
     fg = g['user', :, 'game']   # user--plays->game and user--wishes->game
     assert len(fg.ntypes) == 2
-    assert dgl.SRC in fg.ntypes
-    assert dgl.DST in fg.ntypes
-    assert fg.etypes == [dgl.DEFAULT]
+    assert fg.ntypes == ['user', 'game']
+    assert fg.etypes == ['plays+wishes']
 
-    assert F.array_equal(fg.nodes[dgl.SRC].data['h'], F.ones((3, 5)))
-    assert F.array_equal(fg.nodes[dgl.DST].data['i'], F.ones((2, 5)))
+    assert F.array_equal(fg.nodes['user'].data['h'], F.ones((3, 5)))
+    assert F.array_equal(fg.nodes['game'].data['i'], F.ones((2, 5)))
     assert F.array_equal(fg.edata['e'], F.ones((6, 4)))
     assert 'f' not in fg.edata
 
@@ -462,16 +462,16 @@ def test_flatten():
     fg = g['user', :, 'user']
     # NOTE(gq): The node/edge types from the parent graph is returned if there is only one
     # node/edge type.  This differs from the behavior above.
-    assert set(fg.ntypes) == {'user'}
-    assert set(fg.etypes) == {'follows'}
+    assert fg.ntypes == ['user']
+    assert fg.etypes == ['follows']
     u1, v1 = g.edges('follows', order='eid')
     u2, v2 = fg.edges('follows', order='eid')
     assert F.array_equal(u1, u2)
     assert F.array_equal(v1, v2)
 
     fg = g['developer', :, 'game']
-    assert set(fg.ntypes) == {'developer', 'game'}
-    assert set(fg.etypes) == {'develops'}
+    assert fg.ntypes == ['developer', 'game']
+    assert fg.etypes == ['develops']
     u1, v1 = g.edges('develops', order='eid')
     u2, v2 = fg.edges('develops', order='eid')
     assert F.array_equal(u1, u2)
@@ -485,9 +485,17 @@ def test_flatten():
     # be converted into a homogeneous graph, because 'game' never appears as source node,
     # and 'developer' never appears as destination node.
     # We still need a separate interface for converting to homographs.
+
+    # test heterograph from the docstring, plus a user -- wishes -- game relation
+    # 3 users, 2 games, 2 developers
+    # metagraph:
+    #    ('user', 'user', 'follows'),
+    #    ('user', 'game', 'plays'),
+    #    ('user', 'game', 'wishes'),
+    #    ('developer', 'game', 'develops')])
     fg = g[:, :, :]
-    #assert fg.ntypes == [dgl.DEFAULT]
-    assert fg.etypes == [dgl.DEFAULT]
+    assert fg.ntypes == ['developer+user', 'game+user']
+    assert fg.etypes == ['develops+follows+plays+wishes']
     check_mapping(g, fg)
 
     # Test another heterograph
@@ -496,13 +504,13 @@ def test_flatten():
     g = dgl.hetero_from_relations([g_x, g_y])
 
     fg = g['user', :, 'user']
-    assert fg.ntypes == [dgl.DEFAULT]
-    assert fg.etypes == [dgl.DEFAULT]
+    assert fg.ntypes == ['user']
+    assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
     fg = g['user', :, :]
-    assert fg.ntypes == [dgl.DEFAULT]
-    assert fg.etypes == [dgl.DEFAULT]
+    assert fg.ntypes == ['user']
+    assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
 def test_convert():
