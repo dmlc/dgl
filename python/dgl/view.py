@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
+import numpy as np
+
 from .base import ALL, is_all, DGLError
 from . import backend as F
 
@@ -57,6 +59,8 @@ class NodeDataView(MutableMapping):
         return self._graph.get_n_repr(self._nodes)[key]
 
     def __setitem__(self, key, val):
+        if isinstance(val, np.ndarray):
+            val = F.zerocopy_from_numpy(val)
         self._graph.set_n_repr({key : val}, self._nodes)
 
     def __delitem__(self, key):
@@ -125,6 +129,8 @@ class EdgeDataView(MutableMapping):
         return self._graph.get_e_repr(self._edges)[key]
 
     def __setitem__(self, key, val):
+        if isinstance(val, np.ndarray):
+            val = F.zerocopy_from_numpy(val)
         self._graph.set_e_repr({key : val}, self._edges)
 
     def __delitem__(self, key):

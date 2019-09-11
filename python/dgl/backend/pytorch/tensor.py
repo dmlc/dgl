@@ -273,7 +273,7 @@ def zerocopy_to_numpy(input):
     return asnumpy(input)
 
 def zerocopy_from_numpy(np_array):
-    return th.from_numpy(np_array)
+    return th.as_tensor(np_array)
 
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
