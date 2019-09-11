@@ -188,6 +188,9 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
+def uniform(shape, dtype, ctx, low, high):
+    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, th.Tensor):
@@ -270,7 +273,7 @@ def zerocopy_to_numpy(input):
     return asnumpy(input)
 
 def zerocopy_from_numpy(np_array):
-    return th.from_numpy(np_array)
+    return th.as_tensor(np_array)
 
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))

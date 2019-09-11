@@ -8,6 +8,9 @@ import warnings
 import zipfile
 import tarfile
 import numpy as np
+
+from .graph_serialize import save_graphs, load_graphs, load_labels
+
 try:
     import requests
 except ImportError:
@@ -16,7 +19,8 @@ except ImportError:
     requests = requests_failed_to_import
 
 __all__ = ['download', 'check_sha1', 'extract_archive',
-           'get_download_dir', 'Subset', 'split_dataset']
+           'get_download_dir', 'Subset', 'split_dataset',
+           'save_graphs', "load_graphs", "load_labels"]
 
 
 def _get_dgl_url(file_url):

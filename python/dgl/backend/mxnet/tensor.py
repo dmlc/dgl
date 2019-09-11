@@ -238,6 +238,9 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
 
+def uniform(shape, dtype, ctx, low, high):
+    return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):

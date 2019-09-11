@@ -1,13 +1,8 @@
 import torch
 import torch.nn as nn
-from collections import deque
-from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
-import itertools
-import networkx as nx
-from dgl import batch, unbatch, bfs_edges_generator
+from dgl import batch, bfs_edges_generator
 import dgl.function as DGLF
-from .line_profiler_integration import profile
 import numpy as np
 
 MAX_NB = 8
