@@ -556,11 +556,12 @@ def test_send_multigraph():
     assert F.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
     assert F.allclose(new_repr[[0, 2]], F.zeros((2, 5)))
 
-def test_dynamic_addition():
+# Disabled - Heterograph doesn't support mutation
+def _test_dynamic_addition():
     N = 3
     D = 1
 
-    g = DGLGraph()
+    g = dgl.DGLGraph()
 
     # Test node addition
     g.add_nodes(N)
