@@ -1235,8 +1235,7 @@ class DGLHeteroGraph(object):
                 num_rows=len(induced_edges_of_etype)))
             for i, induced_edges_of_etype in enumerate(induced_edges)]
 
-        hsg = DGLHeteroGraph(
-                sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
+        hsg = DGLHeteroGraph(sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
         hsg.is_subgraph = True
         for ntype, induced_nid in zip(self.ntypes, induced_nodes):
             hsg.nodes[ntype].data[NID] = induced_nid.tousertensor()
@@ -1312,8 +1311,8 @@ class DGLHeteroGraph(object):
         """
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
-                utils.toindex(edges.get(canonical_etype, []))
-                for canonical_etype in self.canonical_etypes]
+            utils.toindex(edges.get(canonical_etype, []))
+            for canonical_etype in self.canonical_etypes]
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
         induced_nodes = sgi.induced_nodes
 
