@@ -236,7 +236,6 @@ def check_negative_sampler(mode, exclude_positive):
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=exclude_positive):
-        #assert neg_size * pos_edges.number_of_edges() == neg_edges.number_of_edges()
         pos_nid = pos_edges.parent_nid
         pos_eid = pos_edges.parent_eid
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
