@@ -350,6 +350,8 @@ class KVClient(object):
         The push() API will partition message into different 
         KVServer nodes automatically.
 
+        Note that we assume the row Ids in ID is in the ascending order.
+
         Parameters
         ----------
         name : str
@@ -390,6 +392,8 @@ class KVClient(object):
         The push_all() API will partition message into different
         KVServer nodes automatically.
 
+        Note that we assume the row Ids in ID is in the ascending order.
+
         Parameters
         ----------
         name : str
@@ -402,6 +406,8 @@ class KVClient(object):
 
     def pull(self, name, ID):
         """Pull sparse message from KVServer
+
+        Note that we assume the row Ids in ID is in the ascending order.
 
         Parameters
         ----------
@@ -453,6 +459,8 @@ class KVClient(object):
     def pull_all(self, name):
         """Pull the whole data from KVServer
 
+        Note that we assume the row Ids in ID is in the ascending order.
+        
         Parameters
         ----------
         name : str
