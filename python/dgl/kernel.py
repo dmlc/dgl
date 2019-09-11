@@ -10,6 +10,8 @@ def infer_binary_feature_shape(op, lhs, rhs):
 
     Parameter
     ---------
+    op : string
+        The binary_op name.
     lhs : dgl.ndarray.NDArray
         The lhs tensor.
     rhs : dgl.ndarray.NDArray
