@@ -363,10 +363,10 @@ class KVClient(object):
         assert F.shape(ID)[0] == F.shape(data)[0], 'The data must has the same row size with ID.'
         group_size = [0] * self._server_count
         numpy_id = F.asnumpy(ID)
-        for id in numpy_id:
-            # mapping data to corresponded server nodes
-            server_id = self._get_server_id(id, name)
-            group_size[server_id] += 1
+        count = math.ceil(self._data_size[name] / self._server_count)
+        server_id = numpy_id / count
+        for id in server_id:
+            group_size[int(id)] += 1
         min_idx = 0
         max_idx = 0
         for idx in range(self._server_count):
@@ -418,9 +418,10 @@ class KVClient(object):
         assert F.ndim(ID) == 1, 'ID must be a vector.'
         group_size = [0] * self._server_count
         numpy_id = F.asnumpy(ID)
-        for id in numpy_id:
-            server_id = self._get_server_id(id, name)
-            group_size[server_id] += 1
+        count = math.ceil(self._data_size[name] / self._server_count)
+        server_id = numpy_id / count
+        for id in server_id:
+            group_size[int(id)] += 1
         min_idx = 0
         max_idx = 0
         server_count = 0
@@ -505,24 +506,6 @@ class KVClient(object):
             KVClient ID
         """
         return self._client_id
-
-    def _get_server_id(self, id, name):
-        """Get target server id by given a data id
-
-        Parameters
-        ----------
-        id : int
-            data id
-        name : str
-            data name
-
-        Return
-        ------
-        int
-           target server id
-        """
-        count = math.ceil(self._data_size[name] / self._server_count)
-        return int(id / count)
 
     def _sort_func(self, msg):
         """Sort function for KVStoreMsg: sort message by rank
