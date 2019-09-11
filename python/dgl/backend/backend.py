@@ -817,6 +817,26 @@ def ones(shape, dtype, ctx):
     """
     pass
 
+def uniform(shape, dtype, ctx, low, high):
+    """Crear a tensor with random value in an uniform 
+    distribution between low (inclusive) and high (exclusive).
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The random tensor.
+    """
+    pass
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     """Pads a packed batch of variable length tensors with given value.
 
