@@ -35,23 +35,16 @@ encoded nodes(atoms) and edges(bonds), and other information for model to use.
 To start training, use `python train.py`. By default, the script will use ZINC dataset
  with preprocessed vocabulary, and save model checkpoint at the current working directory. 
 ```
-  -s SAVE_PATH, --save_dir SAVE_PATH
-                        Path to save checkpoint models, default to be current
-                        working directory (default: ./)
-  -m MODEL_PATH, --model MODEL_PATH
-                        Path to load pre-trained model (default: None)
-  -b BATCH_SIZE, --batch BATCH_SIZE
-                        Batch size (default: 40)
-  -w HIDDEN_SIZE, --hidden HIDDEN_SIZE
-                        Size of representation vectors (default: 200)
-  -l LATENT_SIZE, --latent LATENT_SIZE
-                        Latent Size of node(atom) features and edge(atom)
-                        features (default: 56)
-  -d DEPTH, --depth DEPTH
-                        Depth of message passing hops (default: 3)
-  -z BETA, --beta BETA  Coefficient of KL Divergence term (default: 1.0)
-  -q LR, --lr LR        Learning Rate (default: 0.001)
-  -T, --test            Add this flag to run test mode (default: False)
+-s SAVE_PATH, Path to save checkpoint models, default to be current
+              working directory (default: ./)
+-m MODEL_PATH, Path to load pre-trained model (default: None)
+-b BATCH_SIZE, Batch size (default: 40)
+-w HIDDEN_SIZE, Size of representation vectors (default: 200)
+-l LATENT_SIZE, Latent Size of node(atom) features and edge(atom)
+                features (default: 56)
+-d DEPTH, Depth of message passing hops (default: 3)
+-z BETA, Coefficient of KL Divergence term (default: 1.0)
+-q LR, Learning Rate (default: 0.001)
 ```
 
 Model will be saved periodically. 
@@ -70,22 +63,17 @@ If you want to use your own dataset, please create a file contains one SMILES a 
 
 To start evaluation, use `python reconstruct_eval.py`, and following arguments
 ```
-  -t TRAIN, --train TRAIN
-                        Training file name (default: test)
-  -m MODEL_PATH, --model MODEL_PATH
-                        Pre-trained model to be loaded for evalutaion. If not
-                        specified, would use pre-trained model from model zoo
-                        (default: None)
-  -w HIDDEN_SIZE, --hidden HIDDEN_SIZE
-                        Hidden size of representation vector, should be
-                        consistent with pre-trained model (default: 450)
-  -l LATENT_SIZE, --latent LATENT_SIZE
-                        Latent Size of node(atom) features and edge(atom)
-                        features, should be consistent with pre-trained model
-                        (default: 56)
-  -d DEPTH, --depth DEPTH
-                        Depth of message passing hops, should be consistent
-                        with pre-trained model (default: 3)
+-t TRAIN, Training file name (default: test)
+-m MODEL_PATH, Pre-trained model to be loaded for evalutaion. If not
+               specified, would use pre-trained model from model zoo
+               (default: None)
+-w HIDDEN_SIZE, Hidden size of representation vector, should be
+                consistent with pre-trained model (default: 450)
+-l LATENT_SIZE, Latent Size of node(atom) features and edge(atom)
+                features, should be consistent with pre-trained model
+                 (default: 56)
+-d DEPTH, Depth of message passing hops, should be consistent
+          with pre-trained model (default: 3)
 ```
 
 And it would print out the success rate of reconstructing the same molecules.

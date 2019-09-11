@@ -54,22 +54,54 @@ struct BinaryReduce {
   }
 };
 
-// Convert flattened index to multi-dimension index (assume row-major).
-__device__ __forceinline__ void Unravel(
-    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
-  for (int d = 0; d < ndim; ++d) {
-    out[d] = (idx / stride[d]) % shape[d];
+/*
+ * This func do the followings:
+ *   1. Convert flattened index to multi-dimension index
+ *      according to output shape (assume row-major).
+ *   2. Convert multi-dimension index to flattened index for lhs.
+ *   3. Convert multi-dimension index to flattened index for rhs.
+ */
+__device__ __forceinline__ void UnravelRavel(
+    const int64_t idx, const int ndim, const int64_t* out_shape, const int64_t* out_stride,
+    const int64_t* lhs_shape, const int64_t* lhs_stride,
+    const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t *lhs_out, int64_t *rhs_out) {
+  if (out_stride[0] == lhs_stride[0]) {
+#pragma unroll
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t rhs_sh = rhs_shape[d];
+      int64_t rhs_st = rhs_stride[d];
+      
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
+       * rhs_sh be o_sh or 1
+       */
+      if (rhs_sh > i) { 
+        *rhs_out += i * rhs_st;
+      }
+    }
+    *lhs_out = idx;
+  } else {
+#pragma unroll
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
+  
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
+       * lhs_sh be o_sh or 1
+       */
+      if (lhs_sh > i) {
+        *lhs_out += i * lhs_st;
+      }
+    }
+    *rhs_out = idx;
   }
-}
-
-// Convert multi-dimension index to flattened index (assume row-major).
-__device__ __forceinline__ int64_t Ravel(
-    const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
-  int64_t out = 0;
-  for (int d = 0; d < ndim; ++d) {
-    out += min(idx[d], shape[d] - 1) * stride[d];
-  }
-  return out;
 }
 
 // Minigun UDF to compute binary reduce with broadcasting.
@@ -98,13 +130,14 @@ struct BinaryReduceBcast {
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+      DType lhs = Functors::Read(lhsoff + lhs_add);
+      DType rhs = Functors::Read(rhsoff + rhs_add);
       DType out = Functors::Op(lhs, rhs);
       Functors::Write(outoff + tx, out);
       tx += stride_x;

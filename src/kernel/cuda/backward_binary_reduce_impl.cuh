@@ -67,6 +67,24 @@ struct BackwardBinaryReduce {
   }
 };
 
+// Convert flattened index to multi-dimension index (assume row-major).
+__device__ __forceinline__ void Unravel(
+    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
+  for (int d = 0; d < ndim; ++d) {
+    out[d] = (idx / stride[d]) % shape[d];
+  }
+}
+
+// Convert multi-dimension index to flattened index (assume row-major).
+__device__ __forceinline__ int64_t Ravel(
+    const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
+  int64_t out = 0;
+  for (int d = 0; d < ndim; ++d) {
+    out += min(idx[d], shape[d] - 1) * stride[d];
+  }
+  return out;
+}
+
 // Minigun UDF to compute backward binary reduce with broadcasting.
 template <int Mode, int NDim, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {

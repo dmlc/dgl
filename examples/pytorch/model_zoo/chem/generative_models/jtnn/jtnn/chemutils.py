@@ -1,10 +1,9 @@
-import rdkit
 import rdkit.Chem as Chem
 import torch
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
-from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers
 from dgl import DGLGraph
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na',
@@ -406,16 +405,12 @@ def mol2dgl_dec(cand_batch):
     tree_mess_target_edges = []  # these edges on candidate graphs
     tree_mess_target_nodes = []
     n_nodes = 0
-    n_edges = 0
     atom_x = []
     bond_x = []
 
     for mol, mol_tree, ctr_node_id in cand_batch:
         n_atoms = mol.GetNumAtoms()
-        n_bonds = mol.GetNumBonds()
 
-        ctr_node = mol_tree.nodes_dict[ctr_node_id]
-        ctr_bid = ctr_node['idx']
         g = DGLGraph()
 
         for i, atom in enumerate(mol.GetAtoms()):
