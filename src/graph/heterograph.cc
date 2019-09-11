@@ -175,8 +175,10 @@ HeteroSubgraph HeteroGraph::VertexSubgraph(const std::vector<IdArray>& vids) con
     auto pair = meta_graph_->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    const auto& rel_vsg = GetRelationGraph(etype)->VertexSubgraph(
-        {vids[src_vtype], vids[dst_vtype]});
+    const std::vector<IdArray> rel_vids = (src_vtype == dst_vtype) ?
+      std::vector<IdArray>({vids[src_vtype]}) :
+      std::vector<IdArray>({vids[src_vtype], vids[dst_vtype]});
+    const auto& rel_vsg = GetRelationGraph(etype)->VertexSubgraph(rel_vids);
     subrels[etype] = rel_vsg.graph;
     ret.induced_edges[etype] = rel_vsg.induced_edges[0];
   }

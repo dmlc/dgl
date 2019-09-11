@@ -186,8 +186,8 @@ class Frame(MutableMapping):
         update on one will not reflect to the other. The inplace update will
         be seen by both. This follows the semantic of python's container.
     num_rows : int, optional [default=0]
-        The number of rows in this frame. If ``data`` is provided, ``num_rows``
-        will be ignored and inferred from the given data.
+        The number of rows in this frame. If ``data`` is provided and is not empty,
+        ``num_rows`` will be ignored and inferred from the given data.
     """
     def __init__(self, data=None, num_rows=0):
         if data is None:
@@ -202,7 +202,7 @@ class Frame(MutableMapping):
             elif len(self._columns) != 0:
                 self._num_rows = len(next(iter(self._columns.values())))
             else:
-                self._num_rows = 0
+                self._num_rows = num_rows
             # sanity check
             for name, col in self._columns.items():
                 if len(col) != self._num_rows:

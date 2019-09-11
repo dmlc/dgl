@@ -560,6 +560,53 @@ def test_convert():
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
 
+def test_subgraph():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    y = F.randn((2, 4))
+    g.nodes['user'].data['h'] = x
+    g.edges['follows'].data['h'] = y
+
+    def _check_subgraph(g, sg):
+        assert sg.ntypes == ['user', 'game', 'developer']
+        assert sg.etypes == ['follows', 'plays', 'wishes', 'develops']
+        assert F.array_equal(sg.nodes['user'].data[dgl.NID], F.tensor([1, 2], F.int64))
+        assert F.array_equal(sg.nodes['game'].data[dgl.NID], F.tensor([0], F.int64))
+        assert F.array_equal(sg.edges['follows'].data[dgl.EID], F.tensor([1], F.int64))
+        assert F.array_equal(sg.edges['plays'].data[dgl.EID], F.tensor([1], F.int64))
+        assert F.array_equal(sg.edges['wishes'].data[dgl.EID], F.tensor([1], F.int64))
+        assert sg.number_of_nodes('developer') == 0
+        assert sg.number_of_edges('develops') == 0
+        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
+        assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'][1:2])
+
+    sg1 = g.subgraph({'user': [1, 2], 'game': [0]})
+    _check_subgraph(g, sg1)
+    sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
+    _check_subgraph(g, sg2)
+
+    def _check_typed_subgraph(g, sg):
+        assert set(sg.ntypes) == {'user', 'game'}
+        assert set(sg.etypes) == {'follows', 'plays', 'wishes'}
+        for ntype in sg.ntypes:
+            assert sg.number_of_nodes(ntype) == g.number_of_nodes(ntype)
+        for etype in sg.etypes:
+            src_sg, dst_sg = sg.all_edges(etype, order='eid')
+            src_g, dst_g = g.all_edges(etype, order='eid')
+            assert F.array_equal(src_sg, src_g)
+            assert F.array_equal(dst_sg, dst_g)
+        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
+        assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
+        g.nodes['user'].data['h'][2] = F.randn((5,))
+        g.edges['follows'].data['h'][1] = F.randn((4,))
+        assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
+        assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
+
+    sg3 = g.node_type_subgraph(['user', 'game'])
+    _check_typed_subgraph(g, sg3)
+    sg4 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
+    _check_typed_subgraph(g, sg4)
+
 def test_apply():
     def node_udf(nodes):
         return {'h': nodes.data['h'] * 2}
@@ -988,6 +1035,7 @@ if __name__ == '__main__':
     test_view1()
     test_flatten()
     test_convert()
+    test_subgraph()
     test_apply()
     test_level1()
     test_level2()

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import networkx as nx
 import numpy as np
 
+from . import graph_index
 from . import heterograph_index
 from . import utils
 from . import backend as F
@@ -1222,8 +1223,34 @@ class DGLHeteroGraph(object):
             v = utils.toindex(v)
         return self._graph.out_degrees(etid, v).tousertensor()
 
+    def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
+        node_frames = [
+                FrameRef(Frame(
+                    self._node_frames[i][induced_nodes_of_ntype],
+                    num_rows=len(induced_nodes_of_ntype)))
+                for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
+        edge_frames = [
+                FrameRef(Frame(
+                    self._edge_frames[i][induced_edges_of_etype],
+                    num_rows=len(induced_edges_of_etype)))
+                for i, induced_edges_of_etype in enumerate(induced_edges)]
+
+        hsg = DGLHeteroGraph(
+                sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
+        hsg.is_subgraph = True
+        for ntype, induced_nid in zip(self.ntypes, induced_nodes):
+            hsg.nodes[ntype].data[NID] = induced_nid.tousertensor()
+        for etype, induced_eid in zip(self.canonical_etypes, induced_edges):
+            hsg.edges[etype].data[EID] = induced_eid.tousertensor()
+
+        return hsg
+
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
+
+        The metagraph of the returned subgraph is the same as the parent graph.
+
+        Features are copied from the original graph.
 
         Examples
         --------
@@ -1244,13 +1271,21 @@ class DGLHeteroGraph(object):
             original graph.
             The edges are also relabeled.
             One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
             subgraph.
         """
-        pass
+        induced_nodes = [utils.toindex(nodes.get(ntype, [])) for ntype in self.ntypes]
+        sgi = self._graph.node_subgraph(induced_nodes)
+        induced_edges = sgi.induced_edges
 
-    def edge_subgraph(self, edges):
+        return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
+
+    def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
+
+        The metagraph of the returned subgraph is the same as the parent graph.
+
+        Features are copied from the original graph.
 
         Examples
         --------
@@ -1272,10 +1307,101 @@ class DGLHeteroGraph(object):
             subgraph is mapped to the ``edges[i]`` of type `t` in the
             original graph.
             One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
             subgraph.
         """
-        pass
+        edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
+        induced_edges = [
+                utils.toindex(edges.get(canonical_etype, []))
+                for canonical_etype in self.canonical_etypes]
+        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes)
+        induced_nodes = sgi.induced_nodes
+
+        return self._create_hetero_subgraph(sgi, induced_nodes, induced_edges)
+
+    def node_type_subgraph(self, ntypes):
+        """Return the subgraph induced on given node types.
+
+        The metagraph of the returned subgraph is the subgraph of the original metagraph
+        induced from the node types.
+
+        Features are shared with the original graph.
+
+        Examples
+        --------
+
+        Parameters
+        ----------
+        ntypes : list[str]
+            The node types
+
+        Returns
+        -------
+        G : DGLHeteroGraph
+            The subgraph.
+        """
+        rel_graphs = []
+        meta_edges = []
+        induced_etypes = []
+        node_frames = [self._node_frames[self.get_ntype_id(ntype)] for ntype in ntypes]
+        edge_frames = []
+
+        ntypes_invmap = {ntype: i for i, ntype in enumerate(ntypes)}
+        srctype_id, dsttype_id, _ = self._graph.metagraph.edges('eid')
+        for i in range(len(self._etypes)):
+            srctype = self._ntypes[srctype_id[i]]
+            dsttype = self._ntypes[dsttype_id[i]]
+
+            if srctype in ntypes and dsttype in ntypes:
+                meta_edges.append((ntypes_invmap[srctype], ntypes_invmap[dsttype]))
+                rel_graphs.append(self._graph.get_relation_graph(i))
+                induced_etypes.append(self.etypes[i])
+                edge_frames.append(self._edge_frames[i])
+
+        metagraph = graph_index.from_edge_list(meta_edges, True, True)
+        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
+        return hg
+
+    def edge_type_subgraph(self, etypes):
+        """Return the subgraph induced on given edge types.
+
+        The metagraph of the returned subgraph is the subgraph of the original metagraph
+        induced from the edge types.
+
+        Features are shared with the original graph.
+
+        Examples
+        --------
+
+        Parameters
+        ----------
+        etypes : list[str or tuple]
+            The edge types
+
+        Returns
+        -------
+        G : DGLHeteroGraph
+            The subgraph.
+        """
+        etype_ids = [self.get_etype_id(etype) for etype in etypes]
+        meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids))
+        rel_graphs = [self._graph.get_relation_graph(i) for i in etype_ids]
+        meta_src = meta_src.tonumpy()
+        meta_dst = meta_dst.tonumpy()
+        induced_ntype_ids = list(set(meta_src) | set(meta_dst))
+        induced_ntypes_invmap = {v: i for i, v in enumerate(induced_ntype_ids)}
+        mapped_meta_src = [induced_ntype_ids[v] for v in meta_src]
+        mapped_meta_dst = [induced_ntype_ids[v] for v in meta_dst]
+        node_frames = [self._node_frames[i] for i in induced_ntype_ids]
+        edge_frames = [self._edge_frames[i] for i in etype_ids]
+        induced_ntypes = [self._ntypes[i] for i in induced_ntype_ids]
+        induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
+
+        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
+        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
+        return hg
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
         """Return the adjacency matrix of edges of the given edge type.
@@ -2969,10 +3095,8 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
         raise DGLError('Length of nodes type list must match the number of '
                        'nodes in the metagraph. {} vs {}'.format(
                            len(ntypes), metagraph.number_of_nodes()))
-    rst = []
     src, dst, eid = metagraph.edges()
-    for sid, did, eid in zip(src, dst, eid):
-        rst.append((ntypes[sid], etypes[eid], ntypes[did]))
+    rst = [(ntypes[sid], etypes[eid], ntypes[did]) for sid, did, eid in zip(src, dst, eid)]
     return rst
 
 def infer_ntype_from_dict(graph, etype_dict):
