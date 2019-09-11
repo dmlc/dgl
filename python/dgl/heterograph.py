@@ -1225,15 +1225,15 @@ class DGLHeteroGraph(object):
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         node_frames = [
-                FrameRef(Frame(
-                    self._node_frames[i][induced_nodes_of_ntype],
-                    num_rows=len(induced_nodes_of_ntype)))
-                for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
+            FrameRef(Frame(
+                self._node_frames[i][induced_nodes_of_ntype],
+                num_rows=len(induced_nodes_of_ntype)))
+            for i, induced_nodes_of_ntype in enumerate(induced_nodes)]
         edge_frames = [
-                FrameRef(Frame(
-                    self._edge_frames[i][induced_edges_of_etype],
-                    num_rows=len(induced_edges_of_etype)))
-                for i, induced_edges_of_etype in enumerate(induced_edges)]
+            FrameRef(Frame(
+                self._edge_frames[i][induced_edges_of_etype],
+                num_rows=len(induced_edges_of_etype)))
+            for i, induced_edges_of_etype in enumerate(induced_edges)]
 
         hsg = DGLHeteroGraph(
                 sgi.graph, self._ntypes, self._etypes, node_frames, edge_frames)
@@ -1390,7 +1390,6 @@ class DGLHeteroGraph(object):
         meta_src = meta_src.tonumpy()
         meta_dst = meta_dst.tonumpy()
         induced_ntype_ids = list(set(meta_src) | set(meta_dst))
-        induced_ntypes_invmap = {v: i for i, v in enumerate(induced_ntype_ids)}
         mapped_meta_src = [induced_ntype_ids[v] for v in meta_src]
         mapped_meta_dst = [induced_ntype_ids[v] for v in meta_dst]
         node_frames = [self._node_frames[i] for i in induced_ntype_ids]
@@ -2976,95 +2975,6 @@ class DGLHeteroGraph(object):
         yield
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
-
-# pylint: disable=abstract-method
-class DGLHeteroSubGraph(DGLHeteroGraph):
-    """
-    Parameters
-    ----------
-    parent : DGLHeteroGraph
-        The parent graph.
-    parent_nid : dict[str, utils.Index]
-        The type-specific parent node IDs for each type.
-    parent_eid : dict[etype, utils.Index]
-        The type-specific parent edge IDs for each type.
-    graph_idx : GraphIndex
-        The graph index
-    shared : bool, optional
-        Whether the subgraph shares node/edge features with the parent graph
-    """
-    # pylint: disable=unused-argument, super-init-not-called
-    def __init__(
-            self,
-            parent,
-            parent_nid,
-            parent_eid,
-            graph_idx,
-            shared=False):
-        pass
-
-    @property
-    def parent_nid(self):
-        """Get the parent node ids.
-
-        The returned tensor dictionary can be used as a map from the node id
-        in this subgraph to the node id in the parent graph.
-
-        Returns
-        -------
-        dict[str, Tensor]
-            The parent node id array for each type.
-        """
-        pass
-
-    @property
-    def parent_eid(self):
-        """Get the parent edge ids.
-
-        The returned tensor dictionary can be used as a map from the edge id
-        in this subgraph to the edge id in the parent graph.
-
-        Returns
-        -------
-        dict[etype, Tensor]
-            The parent edge id array for each type.
-            The edge types are characterized by a triplet of source type
-            name, destination type name, and edge type name.
-        """
-        pass
-
-    def copy_to_parent(self, inplace=False):
-        """Write node/edge features to the parent graph.
-
-        Parameters
-        ----------
-        inplace : bool
-            If true, use inplace write (no gradient but faster)
-        """
-        pass
-
-    def copy_from_parent(self):
-        """Copy node/edge features from the parent graph.
-
-        All old features will be removed.
-        """
-        pass
-
-    def map_to_subgraph_nid(self, parent_vids):
-        """Map the node IDs in the parent graph to the node IDs in the
-        subgraph.
-
-        Parameters
-        ----------
-        parent_vids : dict[str, list or tensor]
-            The dictionary of node types to parent node ID array.
-
-        Returns
-        -------
-        dict[str, tensor]
-            The node ID array in the subgraph of each node type.
-        """
-        pass
 
 ############################################################
 # Internal APIs
