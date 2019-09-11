@@ -1,6 +1,12 @@
 """DGL Distributed Training Infrastructure."""
 from __future__ import absolute_import
 
+import time
+import signal
+from enum import Enum
+from collections import namedtuple
+
+import dgl.backend as F
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
 from . import utils
@@ -9,6 +15,21 @@ _init_api("dgl.network")
 
 
 ################################ Common Network Components ##################################
+
+_WAIT_TIME_SEC = 3  # 3 seconds
+
+def keyboard_interrupt_handler(my_signal):
+    """Users can use [Ctl + C] to exit loop service
+    """
+    print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up DGL ...".format(my_signal))
+    exit(0)
+
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
+def _network_wait():
+    """Sleep for a few seconds
+    """
+    time.sleep(_WAIT_TIME_SEC)
 
 def _create_sender(net_type):
     """Create a Sender communicator via C api
@@ -153,3 +174,121 @@ def _recv_nodeflow(receiver, graph):
         return res
     else:
         return NodeFlow(graph, res)
+
+
+################################ Distributed KVStore Components ################################
+
+
+class KVMsgType(Enum):
+    """Type of kvstore message
+    """
+    FINAL = 1
+    INIT = 2
+    PUSH = 3
+    PULL = 4
+    PULL_BACK = 5
+    BARRIER = 6
+
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
+"""Message of DGL kvstore
+
+Data Field
+----------
+type : KVMsgType
+    Type of DGL kvstore message
+rank : int
+    sender's ID
+name : str
+    data name
+id : tensor (mx.ndarray or torch.tensor)
+    data vector storing the global IDs
+data : tensor (mx.ndarray or torch.tensor)
+    data matrix with the same row size of id
+"""
+
+def _send_kv_msg(sender, msg, recv_id):
+    """Send kvstore message.
+
+    Parameters
+    ----------
+    sender : ctypes.c_void_p
+        C sender handle
+    msg : KVStoreMsg
+        kvstore message
+    recv_id : int
+        receiver's ID
+    """
+    if msg.type == KVMsgType.PULL:
+        tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank,
+            msg.name,
+            tensor_id)
+    elif msg.type in (KVMsgType.FINAL, KVMsgType.BARRIER):
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank)
+    else:
+        tensor_id = F.zerocopy_to_dgl_ndarray(msg.id)
+        data = F.zerocopy_to_dgl_ndarray(msg.data)
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank,
+            msg.name,
+            tensor_id,
+            data)
+
+def _recv_kv_msg(receiver):
+    """Receive kvstore message.
+
+    Parameters
+    ----------
+    receiver : ctypes.c_void_p
+        C Receiver handle
+
+    Return
+    ------
+    KVStoreMsg
+        kvstore message
+    """
+    msg_ptr = CAPI_ReceiverRecvKVMsg(receiver)
+    msg_type = KVMsgType(_CAPI_ReceiverGetKVMsgType(msg_ptr))
+    rank = _CAPI_ReceiverGetKVMsgRank(msg_ptr)
+    if msg_type == KVMsgType.PULL:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
+        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=tensor_id,
+            data=None)
+        return msg
+    elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=None,
+            id=None,
+            data=None)
+        return msg
+    else:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
+        tensor_id = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgID(msg_ptr))
+        data = F.zerocopy_from_dgl_ndarray(_CAPI_ReceiverGetKVMsgData(msg_ptr))
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=tensor_id,
+            data=data)
+        return msg
+
+    raise RuntimeError('Unknown message type: %d' % msg_type.value)
