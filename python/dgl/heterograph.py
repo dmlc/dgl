@@ -1233,6 +1233,7 @@ class DGLHeteroGraph(object):
         return self._graph.out_degrees(etid, v).tousertensor()
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
+        """Internal function to create a subgraph."""
         node_frames = [
             FrameRef(Frame(
                 self._node_frames[i][induced_nodes_of_ntype],

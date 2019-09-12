@@ -946,12 +946,16 @@ def test_level2():
         g['wishes'].update_all(mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
         if cred == 'stack':
-            yy = F.stack([F.unsqueeze(y1, 1), F.unsqueeze(y2, 1)], 1)
+            # stack has two both correct outcomes
+            yy1 = F.stack([F.unsqueeze(y1, 1), F.unsqueeze(y2, 1)], 1)
+            yy1 = yy1 + 1  # final afunc
+            yy2 = F.stack([F.unsqueeze(y2, 1), F.unsqueeze(y1, 1)], 1)
+            yy2 = yy2 + 1  # final afunc
+            assert F.array_equal(y, yy1) or F.array_equal(y, yy2)
         else:
             yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
-        yy = yy + 1  # final afunc
-        print(y, yy)
-        assert F.array_equal(y, yy)
+            yy = yy + 1  # final afunc
+            assert F.array_equal(y, yy)
 
     # test fail case
     # fail because cannot infer ntype
