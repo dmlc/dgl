@@ -60,6 +60,12 @@ def test_create():
     assert g.etypes == ['plays']
     assert g.number_of_edges() == 12
 
+    # create from scipy
+    spmat = ssp.coo_matrix(([1,1,1], ([0, 0, 1], [2, 3, 2])), shape=(4, 4))
+    g = dgl.graph(spmat)
+    assert g.number_of_nodes() == 4
+    assert g.number_of_edges() == 3
+
 def test_query():
     g = create_test_heterograph()
 

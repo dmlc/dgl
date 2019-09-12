@@ -537,7 +537,10 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
         data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
         hgidx = heterograph_index.create_unitgraph_from_csr(
             num_ntypes, num_src, num_dst, indptr, indices, data)
-    return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
+    if num_ntypes == 1:
+        return DGLHeteroGraph(hgidx, [utype], [etype])
+    else:
+        return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_networkx(nx_graph,
                          ntype, etype,
