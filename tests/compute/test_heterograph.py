@@ -20,7 +20,8 @@ def create_test_heterograph():
     wishes_nx = nx.DiGraph()
     wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
     wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
-    wishes_nx.add_edges_from([('u0', 'g1'), ('u2', 'g0')])
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
 
     follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
     plays_g = dgl.bipartite(plays_spmat, 'user', 'plays', 'game')
