@@ -3080,6 +3080,8 @@ def merge_frames(frames, reducer):
     if len(frames) == 1:
         return frames[0]
     if reducer == 'stack':
+        # TODO(minjie): Stack order does not matter. However, it must
+        #   be consistent! Need to enforce one type of order.
         def merger(flist):
             flist = [F.unsqueeze(f, 1) for f in flist]
             return F.stack(flist, 1)

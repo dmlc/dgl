@@ -575,11 +575,16 @@ def test_subgraph():
     def _check_subgraph(g, sg):
         assert sg.ntypes == ['user', 'game', 'developer']
         assert sg.etypes == ['follows', 'plays', 'wishes', 'develops']
-        assert F.array_equal(sg.nodes['user'].data[dgl.NID], F.tensor([1, 2], F.int64))
-        assert F.array_equal(sg.nodes['game'].data[dgl.NID], F.tensor([0], F.int64))
-        assert F.array_equal(sg.edges['follows'].data[dgl.EID], F.tensor([1], F.int64))
-        assert F.array_equal(sg.edges['plays'].data[dgl.EID], F.tensor([1], F.int64))
-        assert F.array_equal(sg.edges['wishes'].data[dgl.EID], F.tensor([1], F.int64))
+        assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
+                             F.tensor([1, 2], F.int64))
+        assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
+                             F.tensor([0], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['follows'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['plays'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
+        assert F.array_equal(F.tensor(sg.edges['wishes'].data[dgl.EID]),
+                             F.tensor([1], F.int64))
         assert sg.number_of_nodes('developer') == 0
         assert sg.number_of_edges('develops') == 0
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'][1:3])
