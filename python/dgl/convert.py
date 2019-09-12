@@ -344,8 +344,8 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None):
     """
     u = utils.toindex(u)
     v = utils.toindex(v)
-    urange = urange or (F.asnumpy(F.max(u.tousertensor(), dim=0))[0] + 1)
-    vrange = vrange or (F.asnumpy(F.max(v.tousertensor(), dim=0))[0] + 1)
+    urange = urange or (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1)
+    vrange = vrange or (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1)
     if utype == vtype:
         urange = vrange = max(urange, vrange)
         num_ntypes = 1
