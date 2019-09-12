@@ -34,6 +34,35 @@ For more information about the dataset, see `Sentiment Analysis <https://nlp.sta
 .. autoclass:: SST
     :members: __getitem__, __len__
 
+
+Karate Club dataset
+```````````````````````````````````
+
+.. autoclass:: KarateClub
+    :members: __getitem__, __len__
+
+
+CoraFull dataset
+```````````````````````````````````
+
+.. autoclass:: CoraFull
+    :members: __getitem__, __len__
+
+
+Amazon Co-Purchase dataset
+```````````````````````````````````
+
+.. autoclass:: AmazonCoBuy
+    :members: __getitem__, __len__
+
+
+Coauthor dataset
+```````````````````````````````````
+
+.. autoclass:: Coauthor
+    :members: __getitem__, __len__
+
+
 Mini graph classification dataset
 `````````````````````````````````
 

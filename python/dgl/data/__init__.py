@@ -10,6 +10,8 @@ from .sbm import SBMMixture
 from .reddit import RedditDataset
 from .ppi import PPIDataset
 from .tu import TUDataset
+from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
+from .karate import KarateClub
 from .gindt import GINDataset
 
 
