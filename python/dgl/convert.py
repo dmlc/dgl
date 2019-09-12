@@ -635,7 +635,7 @@ def create_from_networkx_bipartite(nx_graph,
     The input graph must follow the bipartite graph convention of networkx.
     Each node has an attribute ``bipartite`` with values 0 and 1 indicating which
     set it belongs to.
-    
+
     Only edges from node set 0 to node set 1 are added to the returned graph.
     """
     if not nx_graph.is_directed():
