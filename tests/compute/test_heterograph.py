@@ -458,9 +458,11 @@ def test_flatten():
             # TODO(gq): I feel this code is quite redundant; can we just add new members (like
             # "induced_srcid") to returned heterograph object and not store them as features?
             assert src_g == fg.nodes[SRC].data[dgl.NID][src_fg]
-            assert g.canonical_etypes[etype][0] == g.ntypes[fg.nodes[SRC].data[dgl.NTYPE][src_fg]]
+            tid = F.asnumpy(fg.nodes[SRC].data[dgl.NTYPE][src_fg])[0]
+            assert g.canonical_etypes[etype][0] == g.ntypes[tid]
             assert dst_g == fg.nodes[DST].data[dgl.NID][dst_fg]
-            assert g.canonical_etypes[etype][2] == g.ntypes[fg.nodes[DST].data[dgl.NTYPE][dst_fg]]
+            tid = F.asnumpy(fg.nodes[DST].data[dgl.NTYPE][dst_fg])[0]
+            assert g.canonical_etypes[etype][2] == g.ntypes[tid]
 
     # check for wildcard slices
     g = create_test_heterograph()
@@ -538,8 +540,10 @@ def test_convert():
     g = dgl.hetero_to_homo(hg)
 
     src, dst = g.all_edges(order='eid')
-    etype_id, eid = g.edata[dgl.ETYPE], g.edata[dgl.EID]
-    ntype_id, nid = g.ndata[dgl.NTYPE], g.ndata[dgl.NID]
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    etype_id, eid = F.asnumpy(g.edata[dgl.ETYPE]), F.asnumpy(g.edata[dgl.EID])
+    ntype_id, nid = F.asnumpy(g.ndata[dgl.NTYPE]), F.asnumpy(g.ndata[dgl.NID])
     for i in range(g.number_of_edges()):
         srctype = hg.ntypes[ntype_id[src[i]]]
         dsttype = hg.ntypes[ntype_id[dst[i]]]

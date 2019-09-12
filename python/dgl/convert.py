@@ -339,18 +339,18 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None):
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
 
     Returns
-    -------
+    ------
     DGLHeteroGraph
     """
-    urange = urange or (max(u) + 1)
-    vrange = vrange or (max(v) + 1)
+    u = utils.toindex(u)
+    v = utils.toindex(v)
+    urange = urange or (F.asnumpy(F.max(u.tousertensor(), dim=0))[0] + 1)
+    vrange = vrange or (F.asnumpy(F.max(v.tousertensor(), dim=0))[0] + 1)
     if utype == vtype:
         urange = vrange = max(urange, vrange)
         num_ntypes = 1
     else:
         num_ntypes = 2
-    u = utils.toindex(u)
-    v = utils.toindex(v)
     hgidx = heterograph_index.create_unitgraph_from_coo(num_ntypes, urange, vrange, u, v)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
