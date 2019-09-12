@@ -345,10 +345,12 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
         rel_graph_src = node_invmap[src[egrp]]
         rel_graph_dst = node_invmap[dst[egrp]]
         if stid == dtid:
-            rel_graph = graph((rel_graph_src, rel_graph_dst), ntypes[stid], etypes[etid])
+            rel_graph = graph((rel_graph_src, rel_graph_dst), ntypes[stid], etypes[etid],
+                              card=len(node_groups[stid]))
         else:
             rel_graph = bipartite((rel_graph_src, rel_graph_dst),
-                                  ntypes[stid], etypes[etid], ntypes[dtid])
+                                  ntypes[stid], etypes[etid], ntypes[dtid],
+                                  card=(len(node_groups[stid]), len(node_groups[dtid])))
         rel_graphs.append(rel_graph)
 
     hg = hetero_from_relations(rel_graphs)

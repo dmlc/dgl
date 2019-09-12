@@ -578,6 +578,19 @@ def test_convert():
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
 
+    # hetero_from_homo test case 2
+    g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)])
+    g.ndata['type'] = F.tensor([0, 0, 1, 2])
+    g.edata['type'] = F.tensor([0, 0, 1, 2])
+    hg = dgl.hetero_from_homo(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
+    assert hg.canonical_etypes == [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')]
+    assert hg.number_of_nodes('l0') == 2
+    assert hg.number_of_nodes('l1') == 1
+    assert hg.number_of_nodes('l2') == 1
+    assert hg.number_of_edges('e0') == 2
+    assert hg.number_of_edges('e1') == 1
+    assert hg.number_of_edges('e2') == 1
+
 def test_subgraph():
     g = create_test_heterograph()
     x = F.randn((3, 5))
