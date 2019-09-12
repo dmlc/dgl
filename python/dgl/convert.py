@@ -355,8 +355,13 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
 
     hg = hetero_from_relations(rel_graphs)
 
-    for ntid, ntype in enumerate(hg.ntypes):
-        hg.nodes[ntype].data[NID] = F.tensor(node_groups[ntid])
+    # TODO(minjie): Unfortunately, hetero_from_relations can guarantee the order
+    #   of etypes but NOT the ntypes. Therefore, we cannot simply iterate over
+    #   the node type list. Might need to fix this.
+    ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
+    for ntype in hg.ntypes:
+        hg.nodes[ntype].data[NID] = F.tensor(ntype2ngrp[ntype])
+        
     for etid, etype in enumerate(hg.canonical_etypes):
         hg.edges[etype].data[EID] = F.tensor(edge_groups[etid])
 
