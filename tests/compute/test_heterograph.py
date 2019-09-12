@@ -288,7 +288,7 @@ def test_view():
     g.nodes['user'].data['h'] = f1       # ok
     f2 = g.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(g.nodes('user'), F.arange(0, 3))
+    assert F.array_equal(F.tensor(g.nodes('user')), F.arange(0, 3))
 
     f3 = F.randn((2, 4))
     g.edges['user', 'follows', 'user'].data['h'] = f3
@@ -296,7 +296,7 @@ def test_view():
     f5 = g.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
     assert F.array_equal(f3, f5)
-    assert F.array_equal(g.edges('follows', form='eid'), F.arange(0, 2))
+    assert F.array_equal(F.tensor(g.edges('follows', form='eid')), F.arange(0, 2))
 
 def test_view1():
     # test relation view
@@ -417,13 +417,13 @@ def test_view1():
     g.ndata['h'] = f1       # ok
     f2 = HG.nodes['user'].data['h']
     assert F.array_equal(f1, f2)
-    assert F.array_equal(g.nodes(), F.arange(0, 3))
+    assert F.array_equal(F.tensor(g.nodes()), F.arange(0, 3))
 
     f3 = F.randn((2, 4))
     g.edata['h'] = f3
     f4 = HG.edges['follows'].data['h']
     assert F.array_equal(f3, f4)
-    assert F.array_equal(g.edges(form='eid'), F.arange(0, 2))
+    assert F.array_equal(F.tensor(g.edges(form='eid')), F.arange(0, 2))
 
     # test fail case
     # fail due to multiple types
@@ -950,6 +950,7 @@ def test_level2():
         else:
             yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
         yy = yy + 1  # final afunc
+        print(y, yy)
         assert F.array_equal(y, yy)
 
     # test fail case
