@@ -53,6 +53,13 @@ def test_create():
     assert g0.ntypes == g1.ntypes
     assert g0.canonical_etypes == g1.canonical_etypes
 
+    # create from nx complete bipartite graph
+    nxg = nx.complete_bipartite_graph(3, 4)
+    g = dgl.bipartite(nxg, 'user', 'plays', 'game')
+    assert g.ntypes == ['user', 'game']
+    assert g.etypes == ['plays']
+    assert g.number_of_edges() == 12
+
 def test_query():
     g = create_test_heterograph()
 

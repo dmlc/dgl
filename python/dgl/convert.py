@@ -23,6 +23,53 @@ __all__ = [
 def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
     """Create a graph.
 
+    The graph has only one type of nodes and edges.
+
+    In the sparse matrix perspective, :func:`dgl.graph` creates a graph
+    whose adjacency matrix must be square while :func:`dgl.bipartite`
+    creates a graph that does not necessarily have square adjacency matrix.
+
+    Examples
+    --------
+    Create from edges pairs:
+
+    >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
+
+    Creat from pair of vertex IDs lists
+
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.graph((u, v))
+
+    The IDs can also be stored in framework-specific tensors
+
+    >>> import torch
+    >>> u = torch.tensor([0, 0, 1])
+    >>> v = torch.tensor([2, 3, 2])
+    >>> g = dgl.graph((u, v))
+
+    Create from scipy sparse matrix
+
+    >>> from scipy.sparse import coo_matrix
+    >>> spmat = coo_matrix(([1,1,1], ([0, 0, 1], [2, 3, 2])), shape=(4, 4))
+    >>> g = dgl.graph(spmat)
+
+    Create from networkx graph
+
+    >>> import networkx as nx
+    >>> nxg = nx.path_graph(3)
+    >>> g = dgl.graph(nxg)
+
+    Specify node and edge type names
+
+    >>> g = dgl.graph(..., 'user', 'follows')
+    >>> g.ntypes
+    ['user']
+    >>> g.etypes
+    ['follows']
+    >>> g.canonical_etypes
+    [('user', 'follows', 'user')]
+
     Parameters
     ----------
     data : graph data
@@ -64,12 +111,69 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
 def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
     """Create a bipartite graph.
 
-    The result graph is directed and edges are from ``utype`` nodes
-    to ``vtype`` nodes.
+    The result graph is directed and edges must be from ``utype`` nodes
+    to ``vtype`` nodes. Nodes of each type have their own ID counts.
+
+    In the sparse matrix perspective, :func:`dgl.graph` creates a graph
+    whose adjacency matrix must be square while :func:`dgl.bipartite`
+    creates a graph that does not necessarily have square adjacency matrix.
 
     Examples
     --------
-    TBD
+    Create from edges pairs:
+
+    >>> g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays', 'game')
+    >>> g.ntypes
+    ['user', 'game']
+    >>> g.etypes
+    ['plays']
+    >>> g.canonical_etypes
+    [('user', 'plays', 'game')]
+    >>> g.number_of_nodes('user')
+    2
+    >>> g.number_of_nodes('game')
+    4
+    >>> g.number_of_edges('plays')  # 'plays' could be omitted here
+    3
+
+    Creat from pair of vertex IDs lists
+
+    >>> u = [0, 0, 1]
+    >>> v = [2, 3, 2]
+    >>> g = dgl.bipartite((u, v))
+
+    The IDs can also be stored in framework-specific tensors
+
+    >>> import torch
+    >>> u = torch.tensor([0, 0, 1])
+    >>> v = torch.tensor([2, 3, 2])
+    >>> g = dgl.bipartite((u, v))
+
+    Create from scipy sparse matrix. Since scipy sparse matrix has explicit
+    shape, the cardinality of the result graph is derived from that.
+
+    >>> from scipy.sparse import coo_matrix
+    >>> spmat = coo_matrix(([1,1,1], ([0, 0, 1], [2, 3, 2])), shape=(4, 4))
+    >>> g = dgl.bipartite(spmat, 'user', 'plays', 'game')
+    >>> g.number_of_nodes('user')
+    4
+    >>> g.number_of_nodes('game')
+    4
+
+    Create from networkx graph. The given graph must follow the bipartite
+    graph convention in networkx. Each node has a ``bipartite`` attribute
+    with values 0 or 1. The result graph has two types of nodes and only
+    edges from ``bipartite=0`` to ``bipartite=1`` will be included.
+
+    >>> import networkx as nx
+    >>> nxg = nx.complete_bipartite_graph(3, 4)
+    >>> g = dgl.graph(nxg, 'user', 'plays', 'game')
+    >>> g.number_of_nodes('user')
+    3
+    >>> g.number_of_nodes('game')
+    4
+    >>> g.edges()
+    (tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]), tensor([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]))
 
     Parameters
     ----------
@@ -527,7 +631,9 @@ def create_from_networkx_bipartite(nx_graph,
 
     The input graph must follow the bipartite graph convention of networkx.
     Each node has an attribute ``bipartite`` with values 0 and 1 indicating which
-    set it belongs to. Edges are all from node set 0 to node set 1.
+    set it belongs to.
+    
+    Only edges from node set 0 to node set 1 are added to the returned graph.
     """
     if not nx_graph.is_directed():
         nx_graph = nx_graph.to_directed()
@@ -556,8 +662,9 @@ def create_from_networkx_bipartite(nx_graph,
         src = []
         dst = []
         for e in nx_graph.edges:
-            src.append(top_map[e[0]])
-            dst.append(bottom_map[e[1]])
+            if e[0] in top_map:
+                src.append(top_map[e[0]])
+                dst.append(bottom_map[e[1]])
     src = utils.toindex(src)
     dst = utils.toindex(dst)
     g = create_from_edges(src, dst, utype, etype, vtype, len(top_nodes), len(bottom_nodes))
