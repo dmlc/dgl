@@ -932,6 +932,10 @@ class HeteroSubgraphIndex(ObjectBase):
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data) for v in ret]
 
+#################################################################
+# Creators
+#################################################################
+
 def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
     """Create a unitgraph graph index from COO format
 
@@ -996,25 +1000,5 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
-
-def create_heterograph(graph_data):
-    """Entry point of creating heterograph index from various type of
-    graph data.
-
-    Parameters
-    ----------
-    graph_data : graph data
-        Data to initialize graph structure.
-
-    Returns
-    -------
-    HeteroGraphIndex
-    """
-    if isinstance(graph_data, HeteroGraphIndex):
-        return graph_data
-    elif isinstance(graph_data, DGLGraph):
-        return create_heterograph_from_homo(graph_data)
-    else:
-        raise DGLError("Unsupported graph data type:", type(graph_data))
 
 _init_api("dgl.heterograph_index")

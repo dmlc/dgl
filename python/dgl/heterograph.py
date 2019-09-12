@@ -26,33 +26,6 @@ class DGLHeteroGraph(object):
     as their destination nodes, also have the same type (the source node
     types don't have to be the same as the destination node types).
 
-    Parameters
-    ----------
-    graph_data :
-        The graph data.  It can be one of the followings:
-
-        * (nx.MultiDiGraph, dict[str, list[tuple[int, int]]])
-        * (nx.MultiDiGraph, dict[str, scipy.sparse.matrix])
-
-          The first element is the metagraph of the heterogeneous graph, as a
-          networkx directed graph.  Its nodes represent the node types, and
-          its edges represent the edge types.  The edge type name should be
-          stored as edge keys.
-
-          The second element is a mapping from edge type to edge list.  The
-          edge list can be either a list of (u, v) pairs, or a scipy sparse
-          matrix whose rows represents sources and columns represents
-          destinations.  The edges will be added in the (source, destination)
-          order.
-    node_frames : dict[str, dict[str, Tensor]]
-        The node frames for each node type
-    edge_frames : dict[str, dict[str, Tensor]]
-        The edge frames for each edge type
-    multigraph : bool
-        Whether the heterogeneous graph is a multigraph.
-    readonly : bool
-        Whether the heterogeneous graph is readonly.
-
     Examples
     --------
     Suppose that we want to construct the following heterogeneous graph:
@@ -96,31 +69,71 @@ class DGLHeteroGraph(object):
 
     One can construct the graph as follows:
 
-    >>> mg = nx.MultiDiGraph([('user', 'user', 'follows'),
-    ...                       ('user', 'game', 'plays'),
-    ...                       ('developer', 'game', 'develops')])
-    >>> g = DGLHeteroGraph(
-    ...         mg, {
-    ...             'follows': [(0, 1), (1, 2)],
-    ...             'plays': [(0, 0), (1, 0), (1, 1), (2, 1)],
-    ...             'develops': [(0, 0), (1, 1)]})
+    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+    >>> dev_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, dev_g])
 
-    Then one can query the graph structure as follows:
+    :func:`dgl.graph` and :func:`dgl.bipartite` can create a graph from a variety of
+    data types including: edge list, edge tuples, networkx graph and scipy sparse matrix.
+    Click the function name for more details.
 
-    >>> g['user'].number_of_nodes()
+    Then one can query the graph structure by specifying the ``ntype`` or ``etype`` arguments:
+
+    >>> g.number_of_nodes('user')
     3
+    >>> g.number_of_edges('plays')
+    4
+    >>> g.out_degrees(etype='develops')  # out-degrees of source nodes of 'develops' relation
+    tensor([1, 1])
+    >>> g.in_edges(0, etype='develops')  # in-edges of destination node 0 of 'develops' relation
+    (tensor([0]), tensor([0]))
+
+    Or on the sliced graph for an edge type:
+
     >>> g['plays'].number_of_edges()
     4
-    >>> g['develops'].out_degrees() # out-degrees of source nodes of 'develops' relation
+    >>> g['develops'].out_degrees()
     tensor([1, 1])
-    >>> g['develops'].in_edges(0)   # in-edges of destination node 0 of 'develops' relation
-    (tensor([0]), tensor([0]))
+    >>> g['develops'].in_edges(0)
+
+    Node type names must be distinct (no two types have the same name). Edge types could
+    have the same name but they must be distinguishable by the ``(src_type, edge_type, dst_type)``
+    triplet (called *canonical edge type*).
+
+    For example, suppose a graph that has two types of relation "user-watches-movie"
+    and "user-watches-TV" as follows:
+
+    >>> g0 = dgl.bipartite([(0, 1), (1, 0), (1, 1)], 'user', 'watches', 'movie')
+    >>> g1 = dgl.bipartite([(0, 0), (1, 1)], 'user', 'watches', 'TV')
+    >>> GG = dgl.hetero_from_relations([g0, g1])
+
+    To distinguish between the two "watches" edge type, one must specify a full triplet:
+
+    >>> GG.number_of_edges(('user', 'watches', 'movie'))
+    3
+    >>> GG.number_of_edges(('user', 'watches', 'TV'))
+    2
+    >>> GG['user', 'watches', 'movie'].out_degrees()
+    tensor([1, 2])
+
+    Using only one single edge type string "watches" is ambiguous and will cause error:
+
+    >>> GG.number_of_edges('watches')  # AMBIGUOUS!!
+
+    In many cases, there is only one type of nodes or one type of edges, and the ``ntype``
+    and ``etype`` argument could be omitted. This is very common when using the sliced
+    graph, which usually contains only one edge type, and sometimes only one node type:
+
+    >>> g['follows'].number_of_nodes()  # OK!! because g['follows'] only has one node type 'user'
+    3
+    >>> g['plays'].number_of_nodes()  # ERROR!! There are two types 'user' and 'game'.
+    >>> g['plays'].number_of_edges()  # OK!! because there is only one edge type 'plays'
 
     Parameters
     ----------
-    graph_data : graph data
-        Data to initialize heterograph structure.
-        Supported type: DGLGraph, HeteroGraphIndex
+    gidx : HeteroGraphIndex
+        Graph index object.
     ntypes : list of str
         Node type list. The i^th element stores the type name
         of node type i.
@@ -139,17 +152,13 @@ class DGLHeteroGraph(object):
     readonly : bool, optional
         Whether the graph structure is read-only (default: True).
 
-    Attributes
-    ----------
-    TBD
-
     Notes
     -----
     Currently, all heterogeneous graphs are readonly.
     """
     # pylint: disable=unused-argument
     def __init__(self,
-                 graph_data,
+                 gidx,
                  ntypes,
                  etypes,
                  node_frames=None,
@@ -158,7 +167,7 @@ class DGLHeteroGraph(object):
                  readonly=True):
         assert readonly, "Only readonly heterogeneous graphs are supported"
 
-        self._graph = heterograph_index.create_heterograph(graph_data)
+        self._graph = gidx
         self._nx_metagraph = None
         self._ntypes = ntypes
         self._etypes = etypes
