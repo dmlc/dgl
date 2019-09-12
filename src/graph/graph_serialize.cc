@@ -99,7 +99,7 @@ DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLLoadGraphs")
     std::string filename = args[0];
     List<Value> idxs = args[1];
     bool onlyMeta = args[2];
-    std::vector<size_t> idx_list(idxs.size());
+    std::vector<dgl_id_t> idx_list(idxs.size());
     for (uint64_t i = 0; i < idxs.size(); ++i) {
       idx_list[i] = static_cast<dgl_id_t >(idxs[i]->data);
     }

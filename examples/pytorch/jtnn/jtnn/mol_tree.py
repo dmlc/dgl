@@ -1,4 +1,3 @@
-import rdkit
 import rdkit.Chem as Chem
 import copy
 

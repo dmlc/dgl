@@ -1,9 +1,8 @@
-import rdkit
 import rdkit.Chem as Chem
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
-from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers
 
 MST_MAX_WEIGHT = 100 
 MAX_NCAND = 2000
@@ -29,7 +28,8 @@ def decode_stereo(smiles2D):
     dec_isomers = [Chem.MolFromSmiles(Chem.MolToSmiles(mol, isomericSmiles=True)) for mol in dec_isomers]
     smiles3D = [Chem.MolToSmiles(mol, isomericSmiles=True) for mol in dec_isomers]
 
-    chiralN = [atom.GetIdx() for atom in dec_isomers[0].GetAtoms() if int(atom.GetChiralTag()) > 0 and atom.GetSymbol() == "N"]
+    chiralN = [atom.GetIdx() for atom in dec_isomers[0].GetAtoms()
+               if int(atom.GetChiralTag()) > 0 and atom.GetSymbol() == "N"]
     if len(chiralN) > 0:
         for mol in dec_isomers:
             for idx in chiralN:
@@ -117,7 +117,8 @@ def tree_decomp(mol):
         cnei = nei_list[atom]
         bonds = [c for c in cnei if len(cliques[c]) == 2]
         rings = [c for c in cnei if len(cliques[c]) > 4]
-        if len(bonds) > 2 or (len(bonds) == 2 and len(cnei) > 2): #In general, if len(cnei) >= 3, a singleton should be added, but 1 bond + 2 ring is currently not dealt with.
+        # In general, if len(cnei) >= 3, a singleton should be added, but 1 bond + 2 ring is currently not dealt with.
+        if len(bonds) > 2 or (len(bonds) == 2 and len(cnei) > 2):
             cliques.append([atom])
             c2 = len(cliques) - 1
             for c1 in cnei:
@@ -242,11 +243,13 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
             for b1 in ctr_bonds:
                 for b2 in nei_mol.GetBonds():
                     if ring_bond_equal(b1, b2):
-                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetBeginAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetEndAtom().GetIdx())]
+                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetBeginAtom().GetIdx()),
+                                           (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetEndAtom().GetIdx())]
                         att_confs.append( new_amap )
 
                     if ring_bond_equal(b1, b2, reverse=True):
-                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom().GetIdx()), (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
+                        new_amap = amap + [(nei_idx, b1.GetBeginAtom().GetIdx(), b2.GetEndAtom().GetIdx()),
+                                           (nei_idx, b1.GetEndAtom().GetIdx(), b2.GetBeginAtom().GetIdx())]
                         att_confs.append( new_amap )
     return att_confs
 

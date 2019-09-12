@@ -2,16 +2,12 @@ import torch
 import torch.nn as nn
 import rdkit.Chem as Chem
 import torch.nn.functional as F
-from .nnutils import *
 from .chemutils import get_mol
-from networkx import Graph, DiGraph, convert_node_labels_to_integers
-from dgl import DGLGraph, batch, unbatch, mean_nodes
+from dgl import DGLGraph, mean_nodes
 import dgl.function as DGLF
-from functools import partial
-from .line_profiler_integration import profile
-import numpy as np
 
-ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
+             'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
 ATOM_FDIM = len(ELEM_LIST) + 6 + 5 + 4 + 1
 BOND_FDIM = 5 + 6

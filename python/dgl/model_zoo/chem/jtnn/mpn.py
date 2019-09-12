@@ -1,18 +1,13 @@
 # pylint: disable=C0111, C0103, E1101, W0611, W0612
 # pylint: disable=redefined-outer-name
-from functools import partial
-
-import numpy as np
 import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as DGLF
-from dgl import DGLGraph, batch, mean_nodes, unbatch
-from networkx import DiGraph, Graph, convert_node_labels_to_integers
+from dgl import DGLGraph, mean_nodes
 
 from .chemutils import get_mol
-# from .nnutils import *
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na',
              'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
