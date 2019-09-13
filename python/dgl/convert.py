@@ -376,7 +376,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
             rows = F.copy_to(F.tensor(ntype2ngrp[ntype]), F.context(data))
             hg._node_frames[ntid][key] = F.gather_row(data, rows)
     for key, data in G.edata.items():
-        for etid, etype in enumerate(hg.canonical_etypes):
+        for etid in range(len(hg.canonical_etypes)):
             rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
             hg._edge_frames[etid][key] = F.gather_row(data, rows)
 
