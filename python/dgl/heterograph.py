@@ -14,13 +14,13 @@ from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
 from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError
 
-__all__ = ['DGLHeteroGraph']
+__all__ = ['DGLHeteroGraph', 'combine_names']
 
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
 
     Do NOT instantiate from this class directly; use :mod:`conversion methods
-    <dgl.convert>_` instead.
+    <dgl.convert>` instead.
 
     A Heterogeneous graph is defined as a graph with node types and edge
     types.
@@ -444,10 +444,31 @@ class DGLHeteroGraph(object):
         return etypes
 
     def __getitem__(self, key):
-        """Return the relation view of this graph.
+        """Return the relation slice of this graph.
+
+        A relation slice is accessed with ``self[srctype, etype, dsttype]``, where
+        ``srctype``, ``etype``, and ``dsttype`` can be either a string or a full
+        slice (``:``) representing wildcard (i.e. any source/edge/destination type).
+
+        A relation slice is a homogeneous (with one node type and one edge type) or
+        bipartite (with two node types and one edge type) graph, transformed from
+        the original heterogeneous graph.
+
+        If there is only one canonical edge type found, then the returned relation
+        slice would be a subgraph induced from the original graph.  That is, it is
+        equivalent to ``self.edge_type_subgraph(etype)``.  The node and edge features
+        of the returned graph would be shared with thew original graph.
+
+        If there are multiple canonical edge type found, then the source/edge/destination
+        node types would be a *concatenation* of original node/edge types.  The
+        new source/destination node type would have the concatenation determined by
+        :func:`dgl.combine_names() <dgl.combine_names>` called on original source/destination
+        types as its name.  The source/destination node would be formed by concatenating the
+        common features of the original source/destination types, therefore they are not
+        shared with the original graph.  Edge type is similar.
         """
         err_msg = "Invalid slice syntax. Use G['etype'] or G['srctype', 'etype', 'dsttype'] " +\
-                  "to get view of one relation type. Use ... to slice multiple types (e.g. " +\
+                  "to get view of one relation type. Use : to slice multiple types (e.g. " +\
                   "G['srctype', :, 'dsttype'])."
 
         if not isinstance(key, tuple):
@@ -3089,22 +3110,25 @@ def combine_frames(frames, ids):
     cols = {key: F.cat(to_cat(key), dim=0) for key in schemes}
     return FrameRef(Frame(cols))
 
-def combine_names(names, ids):
+def combine_names(names, ids=None):
     """Combine the selected names into one new name.
 
     Parameters
     ----------
     names : list of str
         String names
-    ids : numpy.ndarray
+    ids : numpy.ndarray, optional
         Selected index
 
     Returns
     -------
     str
     """
-    selected = sorted([names[i] for i in ids])
-    return '+'.join(selected)
+    if ids is None:
+        return '+'.join(names)
+    else:
+        selected = sorted([names[i] for i in ids])
+        return '+'.join(selected)
 
 class AdaptedHeteroGraph(GraphAdapter):
     """Adapt DGLGraph to interface required by scheduler.
