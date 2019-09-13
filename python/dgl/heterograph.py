@@ -3078,6 +3078,8 @@ def merge_frames(frames, reducer):
 def combine_frames(frames, ids):
     """Merge the frames into one frame, taking the common columns.
 
+    Return None if there is no common columns.
+
     Parameters
     ----------
     frames : List[FrameRef]
@@ -3125,7 +3127,7 @@ def combine_names(names, ids=None):
     str
     """
     if ids is None:
-        return '+'.join(names)
+        return '+'.join(sorted(names))
     else:
         selected = sorted([names[i] for i in ids])
         return '+'.join(selected)

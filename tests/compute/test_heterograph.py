@@ -39,10 +39,9 @@ def create_test_heterograph1():
     ntypes = F.tensor([0, 0, 0, 1, 1, 2, 2])
     etypes = F.tensor([0, 0, 1, 1, 1, 1, 2, 2, 3, 3])
     g0 = dgl.graph(edges)
-    g0.ndata['type'] = ntypes
-    g0.edata['type'] = etypes
-    return dgl.hetero_from_homo(g0, ['user', 'game', 'developer'],
-                                ['follows', 'plays', 'wishes', 'develops'])
+    g0.ndata[dgl.NTYPE] = ntypes
+    g0.edata[dgl.ETYPE] = etypes
+    return dgl.to_hetero(g0, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'])
 
 def get_redfn(name):
     return getattr(F, name)
@@ -519,14 +518,6 @@ def test_flatten():
     assert F.array_equal(u1, u2)
     assert F.array_equal(v1, v2)
 
-    # NOTE:
-    # I (gq) was thinking of using g[:, :, :] to convert the heterograph into a homogeneous
-    # graph (i.e. discard all type-specific information).  Turns out that the idea has an
-    # issue.
-    # The problem is that by our definition of flattening, g[:, :, :] would NOT
-    # be converted into a homogeneous graph, because 'game' never appears as source node,
-    # and 'developer' never appears as destination node.
-    # We still need a separate interface for converting to homographs.
     fg = g[:, :, :]
     assert fg.ntypes == ['developer+user', 'game+user']
     assert fg.etypes == ['develops+follows+plays+wishes']
@@ -549,8 +540,24 @@ def test_flatten():
 
 def test_convert():
     hg = create_test_heterograph()
+    hs = []
+    for ntype in hg.ntypes:
+        h = F.randn((hg.number_of_nodes(ntype), 5))
+        hg.nodes[ntype].data['h'] = h
+        hs.append(h)
+    hg.nodes['user'].data['x'] = F.randn((3, 3))
+    ws = []
+    for etype in hg.canonical_etypes:
+        w = F.randn((hg.number_of_edges(etype), 5))
+        hg.edges[etype].data['w'] = w
+        ws.append(w)
+    hg.edges['plays'].data['x'] = F.randn((4, 3))
 
-    g = dgl.hetero_to_homo(hg)
+    g = dgl.to_homo(hg)
+    assert F.array_equal(F.cat(hs, dim=0), g.ndata['h'])
+    assert 'x' not in g.ndata
+    assert F.array_equal(F.cat(ws, dim=0), g.edata['w'])
+    assert 'x' not in g.edata
 
     src, dst = g.all_edges(order='eid')
     src = F.asnumpy(src)
@@ -565,24 +572,26 @@ def test_convert():
         assert np.asscalar(F.asnumpy(src_i)) == nid[src[i]]
         assert np.asscalar(F.asnumpy(dst_i)) == nid[dst[i]]
 
-    hg2 = dgl.hetero_from_homo(
+    hg2 = dgl.to_hetero(
             g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
             ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE)
     assert set(hg.ntypes) == set(hg2.ntypes)
     assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
     for ntype in hg.ntypes:
         assert hg.number_of_nodes(ntype) == hg2.number_of_nodes(ntype)
+        assert F.array_equal(hg.nodes[ntype].data['h'], hg2.nodes[ntype].data['h'])
     for canonical_etype in hg.canonical_etypes:
         src, dst = hg.all_edges(canonical_etype, order='eid')
         src2, dst2 = hg2.all_edges(canonical_etype, order='eid')
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
+        assert F.array_equal(hg.edges[canonical_etype].data['w'], hg2.edges[canonical_etype].data['w'])
 
     # hetero_from_homo test case 2
     g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)])
-    g.ndata['type'] = F.tensor([0, 0, 1, 2])
-    g.edata['type'] = F.tensor([0, 0, 1, 2])
-    hg = dgl.hetero_from_homo(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
+    g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
+    g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
+    hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
     assert hg.canonical_etypes == [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')]
     assert hg.number_of_nodes('l0') == 2
     assert hg.number_of_nodes('l1') == 1

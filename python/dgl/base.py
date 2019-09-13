@@ -11,10 +11,10 @@ ALL = "__ALL__"
 # An alias for [:]
 SLICE_FULL = slice(None, None, None)
 # Reserved column names for storing parent node/edge types and IDs in flattened heterographs
-NTYPE = '__NTYPE__'
-NID = '__NID__'
-ETYPE = '__ETYPE__'
-EID = '__EID__'
+NTYPE = '_TYPE'
+NID = '_ID'
+ETYPE = '_TYPE'
+EID = '_ID'
 
 def is_all(arg):
     """Return true if the argument is a special symbol for all nodes or edges."""

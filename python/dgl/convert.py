@@ -6,7 +6,7 @@ import networkx as nx
 
 from . import backend as F
 from . import heterograph_index
-from .heterograph import DGLHeteroGraph
+from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
 from .base import NTYPE, ETYPE, NID, EID
@@ -15,8 +15,8 @@ __all__ = [
     'graph',
     'bipartite',
     'hetero_from_relations',
-    'hetero_from_homo',
-    'hetero_to_homo',
+    'to_hetero',
+    'to_homo',
     'to_networkx',
 ]
 
@@ -259,11 +259,12 @@ def hetero_from_relations(rel_graphs):
         metagraph, [rgrh._graph for rgrh in rel_graphs])
     return DGLHeteroGraph(hgidx, ntypes, etypes)
 
-def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
-    """Create a heterograph from a homogenous graph.
+def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
+    """Convert the given graph to a heterogeneous graph.
 
-    Node and edge types are stored as features. Each feature must be an integer
-    representing the type id, which can be used to retrieve the type names stored
+    The input graph should have only one type of nodes and edges. Each node and edge
+    stores an integer feature (under ``ntype_field`` and ``etype_field``), representing
+    the type id, which which can be used to retrieve the type names stored
     in the given ``ntypes`` and ``etypes`` arguments.
 
     Examples
@@ -279,9 +280,9 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     etypes : list of str
         The edge type names.
     ntype_field : str, optional
-        The feature field used to store node type. (Default: 'type')
+        The feature field used to store node type. (Default: dgl.NTYPE)
     etype_field : str, optional
-        The feature field used to store edge type. (Default: 'type')
+        The feature field used to store edge type. (Default: dgl.ETYPE)
 
     Returns
     -------
@@ -300,6 +301,10 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     the same as the nodes with the same ``ntype_field`` feature.  Edge IDs of
     a single type is similar.
     """
+    if len(G.ntypes) > 1 or len(G.etypes) > 1:
+        raise DGLError('The input graph should be homogenous and have only one '
+                       ' type of nodes and edges.')
+
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
 
@@ -355,24 +360,36 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
 
     hg = hetero_from_relations(rel_graphs)
 
-    # TODO(minjie): Unfortunately, hetero_from_relations can guarantee the order
+    # TODO(minjie): Unfortunately, hetero_from_relations could only guarantee the order
     #   of etypes but NOT the ntypes. Therefore, we cannot simply iterate over
     #   the node type list. Might need to fix this.
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
-    for ntype in hg.ntypes:
-        hg.nodes[ntype].data[NID] = F.tensor(ntype2ngrp[ntype])
+    for ntid, ntype in enumerate(hg.ntypes):
+        hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
 
     for etid, etype in enumerate(hg.canonical_etypes):
-        hg.edges[etype].data[EID] = F.tensor(edge_groups[etid])
+        hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
+
+    # features
+    for key, data in G.ndata.items():
+        for ntid, ntype in enumerate(hg.ntypes):
+            rows = F.copy_to(F.tensor(ntype2ngrp[ntype]), F.context(data))
+            hg._node_frames[ntid][key] = F.gather_row(data, rows)
+    for key, data in G.edata.items():
+        for etid, etype in enumerate(hg.canonical_etypes):
+            rows = F.copy_to(F.tensor(edge_groups[etid]), F.context(data))
+            hg._edge_frames[etid][key] = F.gather_row(data, rows)
 
     return hg
 
-def hetero_to_homo(hgraph):
-    """Convert a heterograph to a homogeneous graph.
+def to_homo(G):
+    """Convert the given graph to a homogeneous graph.
+
+    The returned graph has only one type of nodes and etypes.
 
     Node and edge types are stored as features in the returned graph. Each feature
-    is an integer representing the type id,  which can be used to retrieve the type
-    names stored in ``hgraph.ntypes`` and ``hgraph.etypes`` arguments.
+    is an integer representing the type id, which can be used to retrieve the type
+    names stored in ``G.ntypes`` and ``G.etypes`` arguments.
 
     Examples
     --------
@@ -380,7 +397,7 @@ def hetero_to_homo(hgraph):
 
     Parameters
     ----------
-    hgraph : DGLHeteroGraph
+    G : DGLHeteroGraph
         Input heterogenous graph.
 
     Returns
@@ -390,7 +407,7 @@ def hetero_to_homo(hgraph):
         The parent node and edge type/ID are stored in columns dgl.NTYPE/dgl.NID and
         dgl.ETYPE/dgl.EID respectively.
     """
-    num_nodes_per_ntype = [hgraph.number_of_nodes(ntype) for ntype in hgraph.ntypes]
+    num_nodes_per_ntype = [G.number_of_nodes(ntype) for ntype in G.ntypes]
     offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
     srcs = []
     dsts = []
@@ -399,27 +416,35 @@ def hetero_to_homo(hgraph):
     ntype_ids = []
     nids = []
 
-    for ntype_id, ntype in enumerate(hgraph.ntypes):
-        num_nodes = hgraph.number_of_nodes(ntype)
+    for ntype_id, ntype in enumerate(G.ntypes):
+        num_nodes = G.number_of_nodes(ntype)
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes))
 
-    for etype_id, etype in enumerate(hgraph.canonical_etypes):
+    for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
-        src, dst = hgraph.all_edges(etype, order='eid')
+        src, dst = G.all_edges(etype, order='eid')
         num_edges = len(src)
-        srcs.append(src + offset_per_ntype[hgraph.get_ntype_id(srctype)])
-        dsts.append(dst + offset_per_ntype[hgraph.get_ntype_id(dsttype)])
+        srcs.append(src + offset_per_ntype[G.get_ntype_id(srctype)])
+        dsts.append(dst + offset_per_ntype[G.get_ntype_id(dsttype)])
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    g = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
-    g.ndata[NTYPE] = F.cat(ntype_ids, 0)
-    g.ndata[NID] = F.cat(nids, 0)
-    g.edata[ETYPE] = F.cat(etype_ids, 0)
-    g.edata[EID] = F.cat(eids, 0)
+    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
+    retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
+    retg.ndata[NID] = F.cat(nids, 0)
+    retg.edata[ETYPE] = F.cat(etype_ids, 0)
+    retg.edata[EID] = F.cat(eids, 0)
 
-    return g
+    # features
+    comb_nf = combine_frames(G._node_frames, range(len(G.ntypes)))
+    comb_ef = combine_frames(G._edge_frames, range(len(G.etypes)))
+    if comb_nf is not None:
+        retg.ndata.update(comb_nf)
+    if comb_ef is not None:
+        retg.edata.update(comb_ef)
+
+    return retg
 
 ############################################################
 # Internal APIs
