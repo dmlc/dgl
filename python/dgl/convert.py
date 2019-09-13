@@ -301,7 +301,10 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
     the same as the nodes with the same ``ntype_field`` feature.  Edge IDs of
     a single type is similar.
     """
-    if len(G.ntypes) > 1 or len(G.etypes) > 1:
+    # TODO(minjie): use hasattr to support DGLGraph input; should be fixed once
+    #  DGLGraph is merged with DGLHeteroGraph
+    if (hasattr(G, 'ntypes') and len(G.ntypes) > 1
+            or hasattr(G, 'etypes') and len(G.etypes) > 1):
         raise DGLError('The input graph should be homogenous and have only one '
                        ' type of nodes and edges.')
 
