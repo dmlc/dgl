@@ -19,6 +19,9 @@ __all__ = ['DGLHeteroGraph']
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
 
+    Do NOT instantiate from this class directly; use :mod:`conversion methods
+    <dgl.convert>_` instead.
+
     A Heterogeneous graph is defined as a graph with node types and edge
     types.
 
@@ -241,25 +244,7 @@ class DGLHeteroGraph(object):
     def add_nodes(self, num, data=None, ntype=None):
         """Add multiple new nodes of the same node type
 
-        Parameters
-        ----------
-        ntype : str
-            Type of the added nodes.  Must appear in the metagraph.
-        num : int
-            Number of nodes to be added.
-        data : dict, optional
-            Feature data of the added nodes.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['game'].number_of_nodes()
-        2
-        >>> g.add_nodes(3, 'game')  # add 3 new games
-        >>> g['game'].number_of_nodes()
-        5
+        Currently not supported.
         """
         raise DGLError('Mutation is not supported in heterograph.')
 
@@ -267,28 +252,7 @@ class DGLHeteroGraph(object):
         """Add an edge of ``etype`` between u of the source node type, and v
         of the destination node type..
 
-        Parameters
-        ----------
-        etype : (str, str, str)
-            The source-edge-destination type triplet
-        u : int
-            The source node ID of type ``utype``.  Must exist in the graph.
-        v : int
-            The destination node ID of type ``vtype``.  Must exist in the
-            graph.
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['plays'].number_of_edges()
-        4
-        >>> g.add_edge(2, 0, 'plays')
-        >>> g['plays'].number_of_edges()
-        5
+        Currently not supported.
         """
         raise DGLError('Mutation is not supported in heterograph.')
 
@@ -297,28 +261,7 @@ class DGLHeteroGraph(object):
         and list of destination nodes ``v`` of type ``vtype``.  A single edge
         is added between every pair of ``u[i]`` and ``v[i]``.
 
-        Parameters
-        ----------
-        u : list, tensor
-            The source node IDs of type ``utype``.  Must exist in the graph.
-        v : list, tensor
-            The destination node IDs of type ``vtype``.  Must exist in the
-            graph.
-        etype : (str, str, str)
-            The source-edge-destination type triplet
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['plays'].number_of_edges()
-        4
-        >>> g.add_edges([0, 2], [1, 0], 'plays')
-        >>> g['plays'].number_of_edges()
-        6
+        Currently not supported.
         """
         raise DGLError('Mutation is not supported in heterograph.')
 
@@ -449,19 +392,21 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        To set features of User #0 and #2 in a heterogeneous graph:
-        >>> g.nodes['user'][[0, 2]].data['h'] = torch.zeros(2, 5)
+        To set features of all Users:
+        >>> g.nodes['user'].data['h'] = torch.zeros(3, 5)
         """
         return HeteroNodeView(self)
 
     @property
     def ndata(self):
-        """Return the data view of all the nodes of a single node type.
+        """Return the data view of all the nodes.
+
+        Only works if the graph has only one node type.
 
         Examples
         --------
-        To set features of games in a heterogeneous graph:
-        >>> g.ndata['game']['h'] = torch.zeros(2, 5)
+        To set features of all nodes in a heterogeneous graph with only one node type:
+        >>> g.ndata['h'] = torch.zeros(2, 5)
         """
         return HeteroNodeDataView(self, None, ALL)
 
@@ -472,19 +417,21 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        To set features of gameplays #1 (Bob -> Tetris) and #3 (Carol ->
-        Minecraft) in a heterogeneous graph:
-        >>> g.edges['user', 'plays', 'game'][[1, 3]].data['h'] = torch.zeros(2, 5)
+        To set features of all "play" relationships:
+        >>> g.edges['plays'].data['h'] = torch.zeros(4, 4)
         """
         return HeteroEdgeView(self)
 
     @property
     def edata(self):
-        """Return the data view of all the edges of a single edge type.
+        """Return the data view of all the edges.
+
+        Only works if the graph has only one edge type
 
         Examples
         --------
-        >>> g.edata['developer', 'develops', 'game']['h'] = torch.zeros(2, 5)
+        To set features of all edges in a heterogeneous graph with only one edge type:
+        >>> g.edata['h'] = torch.zeros(2, 5)
         """
         return HeteroEdgeDataView(self, None, ALL)
 
