@@ -361,7 +361,7 @@ def hetero_from_homo(G, ntypes, etypes, ntype_field='type', etype_field='type'):
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntype in hg.ntypes:
         hg.nodes[ntype].data[NID] = F.tensor(ntype2ngrp[ntype])
-        
+
     for etid, etype in enumerate(hg.canonical_etypes):
         hg.edges[etype].data[EID] = F.tensor(edge_groups[etid])
 
