@@ -367,7 +367,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
     for ntid, ntype in enumerate(hg.ntypes):
         hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
 
-    for etid, etype in enumerate(hg.canonical_etypes):
+    for etid in range(len(hg.canonical_etypes)):
         hg._edge_frames[etid][EID] = F.tensor(edge_groups[etid])
 
     # features
