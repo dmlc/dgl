@@ -28,7 +28,8 @@ struct BinaryReduce {
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+    const int64_t stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -41,13 +42,11 @@ struct BinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
     while (tx < D) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -72,13 +71,12 @@ __device__ __forceinline__ void UnravelRavel(
       int64_t o_st = out_stride[d];
       int64_t rhs_sh = rhs_shape[d];
       int64_t rhs_st = rhs_stride[d];
-      
       int64_t i = (idx / o_st) % o_sh;
       /*
        * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
        * rhs_sh be o_sh or 1
        */
-      if (rhs_sh > i) { 
+      if (rhs_sh > i) {
         *rhs_out += i * rhs_st;
       }
     }
@@ -90,7 +88,7 @@ __device__ __forceinline__ void UnravelRavel(
       int64_t o_st = out_stride[d];
       int64_t lhs_sh = lhs_shape[d];
       int64_t lhs_st = lhs_stride[d];
-  
+
       int64_t i = (idx / o_st) % o_sh;
       /*
        * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
@@ -114,7 +112,8 @@ struct BinaryReduceBcast {
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+    const int64_t stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -127,8 +126,8 @@ struct BinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     while (tx < gdata->out_len) {
       int64_t lhs_add = 0;
@@ -136,9 +135,8 @@ struct BinaryReduceBcast {
       UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
           gdata->lhs_shape, gdata->lhs_stride,
           gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
-      DType lhs = Functors::Read(lhsoff + lhs_add);
-      DType rhs = Functors::Read(rhsoff + rhs_add);
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -162,11 +160,8 @@ struct FunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
-  }
-  static __device__ __forceinline__ DType Read(DType* addr) {
-    return LDGReader<DType>::Call(addr);
+  static __device__ __forceinline__ DType Op(DType *lhs, DType *rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);

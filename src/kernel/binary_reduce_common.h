@@ -29,6 +29,7 @@ static const char kAdd[] = "add";
 static const char kSub[] = "sub";
 static const char kMul[] = "mul";
 static const char kDiv[] = "div";
+static const char kDot[] = "dot";
 static const char kUseLhs[] = "use_lhs";
 
 /*!
@@ -129,8 +130,8 @@ struct SwitchSrcDst<SelectDst> {
 // common binary functors
 template <typename DType>
 struct BinaryAdd {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs + rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] + rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -142,8 +143,8 @@ struct BinaryAdd {
 
 template <typename DType>
 struct BinaryMul {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs * rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] * rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return rhs;
@@ -155,8 +156,8 @@ struct BinaryMul {
 
 template <typename DType>
 struct BinarySub {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs - rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] - rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -168,8 +169,8 @@ struct BinarySub {
 
 template <typename DType>
 struct BinaryDiv {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs / rhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0] / rhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return static_cast<DType>(1) / rhs;
@@ -181,14 +182,33 @@ struct BinaryDiv {
 
 template <typename DType>
 struct BinaryUseLhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs;
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    return lhs[0];
   }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return 0;
+  }
+};
+
+template <typename DType>
+struct BinaryDot {
+  static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
+    DType out = 0;
+    // simple vector dot vector
+#pragma unroll
+    for (int i = 0; i < len; i ++)
+      out += lhs[i] * rhs[i];
+
+    return out;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return lhs;
   }
 };
 
@@ -201,6 +221,8 @@ struct BinaryUseLhs {
 //  - Div(Src, Dst), Div(Src, Edge), Div(Dst, Edge)
 //    Div(Dst, Src), Div(Edge, Src), Div(Edge, Dst)
 //  - UseLhs(Src, None), UseLhs(Edge, None)
+//  - Dot(Src, Dst), Dot(Src, Edge), Dot(Dst, Edge)
+//  - Dot(Dst, Src), Dot(Edge, Src), Dot(Edge, Dst)
 // Note that for commutative operators (e.g. Add and Mul), we only generate
 // kernels for lhs code smaller than rhs code.
 #define OP_TARGET_SWITCH(op, lhs, rhs, DType, OpType, LeftType, RightType, ...)   \
@@ -306,6 +328,36 @@ struct BinaryUseLhs {
     typedef SelectEdge LeftType;                               \
     typedef SelectNone RightType;                              \
     {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kSrc && rhs == kDst) {       \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kDst && rhs == kEdge) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kDst && rhs == kSrc) {       \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kEdge && rhs == kSrc) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDot && lhs == kEdge && rhs == kDst) {      \
+    typedef BinaryDot<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
   } else {                                                     \
     LOG(FATAL) << "Unsupported operation: op=" << op           \
       << " lhs=" << lhs << " rhs=" << rhs;                     \
@@ -333,7 +385,13 @@ struct BinaryUseLhs {
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDiv))     \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinaryDiv))     \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectNone, BinaryUseLhs))  \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs))
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryDot))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc, BinaryDot))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc, BinaryDot))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinaryDot))
 
 //////////////////////////////////////////////////////////////////////////
 // Defines reducer category. Each category is an empty structure.
