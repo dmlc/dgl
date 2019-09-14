@@ -1488,7 +1488,7 @@ class DGLHeteroGraph(object):
         --------
         The following uses PyTorch backend.
 
-        >>> g.ndata['user']['h'] = torch.randn(3, 4)
+        >>> g.nodes['user'].data['h'] = torch.randn(3, 4)
         >>> g.node_attr_schemes('user')
         {'h': Scheme(shape=(4,), dtype=torch.float32)}
         """
@@ -1515,7 +1515,7 @@ class DGLHeteroGraph(object):
         --------
         The following uses PyTorch backend.
 
-        >>> g.edata['user', 'plays', 'game']['h'] = torch.randn(4, 4)
+        >>> g.edges['user', 'plays', 'game'].data['h'] = torch.randn(4, 4)
         >>> g.edge_attr_schemes(('user', 'plays', 'game'))
         {'h': Scheme(shape=(4,), dtype=torch.float32)}
         """
@@ -1802,9 +1802,9 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g.ndata['h', 'user'] = torch.ones(3, 5)
+        >>> g.nodes['user'].data['h'] = torch.ones(3, 5)
         >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
-        >>> g.ndata['h', 'user']
+        >>> g.nodes['user'].data['h']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
@@ -1841,9 +1841,9 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g.edata['h', ('user', 'plays', 'game')] = torch.ones(4, 5)
+        >>> g.edges[('user', 'plays', 'game')].data['h'] = torch.ones(4, 5)
         >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
-        >>> g.edata['h', ('user', 'plays', 'game')]
+        >>> g.edges[('user', 'plays', 'game')].data['h']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
