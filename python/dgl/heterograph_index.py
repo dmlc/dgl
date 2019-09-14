@@ -733,7 +733,7 @@ class HeteroGraphIndex(ObjectBase):
         else:
             raise Exception("unknown format")
 
-    def incidence_matrix(self, typestr, ctx):
+    def incidence_matrix(self, etype, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 
         An incidence matrix is an n x m sparse matrix, where n is
@@ -755,6 +755,8 @@ class HeteroGraphIndex(ObjectBase):
 
         Parameters
         ----------
+        etype : int
+            Edge type
         typestr : str
             Can be either "in", "out" or "both"
         ctx : context
@@ -768,16 +770,15 @@ class HeteroGraphIndex(ObjectBase):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        if not (self.number_of_ntypes() == 1 and self.number_of_etypes() == 1):
-            raise DGLError('Incidence matrix can only be calculated on graphs with'
-                           ' one node and edge type.')
-        src, dst, eid = self.edges(0)
+        src, dst, eid = self.edges(etype)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
-        n = self.number_of_nodes(0)
-        m = self.number_of_edges(0)
+        srctype, dsttype = self.metagraph.find_edge(etype)
+
+        m = self.number_of_edges(etype)
         if typestr == 'in':
+            n = self.number_of_nodes(dsttype)
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
@@ -785,6 +786,7 @@ class HeteroGraphIndex(ObjectBase):
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif typestr == 'out':
+            n = self.number_of_nodes(srctype)
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
@@ -792,6 +794,9 @@ class HeteroGraphIndex(ObjectBase):
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif typestr == 'both':
+            assert srctype == dsttype, \
+                    "'both' is supported only if source and destination type are the same"
+            n = self.number_of_nodes(srctype)
             # first remove entries for self loops
             mask = F.logical_not(F.equal(src, dst))
             src = F.boolean_mask(src, mask)

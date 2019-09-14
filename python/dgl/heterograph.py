@@ -605,9 +605,9 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        >>> g.has_node('user', 0)
+        >>> g.has_node(0, 'user')
         True
-        >>> g.has_node('user', 4)
+        >>> g.has_node(4, 'user')
         False
 
         See Also
@@ -638,7 +638,7 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g.has_nodes('user', [0, 1, 2, 3, 4])
+        >>> g.has_nodes([0, 1, 2, 3, 4], 'user')
         tensor([1, 1, 1, 0, 0])
 
         See Also
@@ -670,11 +670,11 @@ class DGLHeteroGraph(object):
         Examples
         --------
         Check whether Alice plays Tetris
-        >>> g.has_edge_between(('user', 'plays', 'game'), 0, 1)
+        >>> g.has_edge_between(0, 1, ('user', 'plays', 'game'))
         True
 
         And whether Alice plays Minecraft
-        >>> g.has_edge_between(('user', 'plays', 'game'), 0, 2)
+        >>> g.has_edge_between(0, 2, ('user', 'plays', 'game'))
         False
 
         See Also
@@ -708,7 +708,7 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        >>> g.has_edges_between(('user', 'plays', 'game'), [0, 0], [1, 2])
+        >>> g.has_edges_between([0, 0], [1, 2], ('user', 'plays', 'game'))
         tensor([1, 0])
 
         See Also
@@ -745,7 +745,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Query who plays Tetris:
-        >>> g.predecessors(('user', 'plays', 'game'), 0)
+        >>> g.predecessors(0, ('user', 'plays', 'game'))
         tensor([0, 1])
 
         This indicates User #0 (Alice) and User #1 (Bob).
@@ -781,7 +781,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Asks which game Alice plays:
-        >>> g.successors(('user', 'plays', 'game'), 0)
+        >>> g.successors(0, ('user', 'plays', 'game'))
         tensor([0])
 
         This indicates Game #0 (Tetris).
@@ -792,12 +792,9 @@ class DGLHeteroGraph(object):
         """
         return self._graph.successors(self.get_etype_id(etype), v).tousertensor()
 
-    def edge_id(self, u, v, etype=None, force_multi=False):
+    def edge_id(self, u, v, force_multi=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
         `u` and destination node `v`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
 
         Parameters
         ----------
@@ -805,12 +802,12 @@ class DGLHeteroGraph(object):
             The node ID of source type.
         v : int
             The node ID of destination type.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
         force_multi : bool, optional
             If False, will return a single edge ID if the graph is a simple graph.
             If True, will always return an array. (Default: False)
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
@@ -823,7 +820,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the edge ID of "Bob plays Tetris"
-        >>> g.edge_id(('user', 'plays', 'game'), 1, 0)
+        >>> g.edge_id(1, 0, etype=('user', 'plays', 'game'))
         1
 
         See Also
@@ -833,12 +830,9 @@ class DGLHeteroGraph(object):
         idx = self._graph.edge_id(self.get_etype_id(etype), u, v)
         return idx.tousertensor() if force_multi or self._graph.is_multigraph() else idx[0]
 
-    def edge_ids(self, u, v, etype=None, force_multi=False):
+    def edge_ids(self, u, v, force_multi=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
         node array `v`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
 
         Parameters
         ----------
@@ -846,11 +840,11 @@ class DGLHeteroGraph(object):
             The node ID array of source type.
         v : list, tensor
             The node ID array of destination type.
+        force_multi : bool, optional
+            Whether to always treat the graph as a multigraph. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
-        force_multi : bool, optional
-            Whether to always treat the graph as a multigraph. (Default: False)
 
         Returns
         -------
@@ -872,7 +866,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the edge IDs of "Alice plays Tetris" and "Bob plays Minecraft".
-        >>> g.edge_ids(('user', 'plays', 'game'), [0, 1], [0, 1])
+        >>> g.edge_ids([0, 1], [0, 1], etype=('user', 'plays', 'game'))
         tensor([0, 2])
 
         See Also
@@ -912,29 +906,29 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the user and game of gameplay #0 and #2:
-        >>> g.find_edges(('user', 'plays', 'game'), [0, 2])
+        >>> g.find_edges([0, 2], ('user', 'plays', 'game'))
         (tensor([0, 1]), tensor([0, 1]))
         """
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src.tousertensor(), dst.tousertensor()
 
-    def in_edges(self, v, etype=None, form='uv'):
+    def in_edges(self, v, form='uv', etype=None):
         """Return the inbound edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s) of destination type.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
         form : str, optional
             The return form. Currently support:
 
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
@@ -952,7 +946,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the gameplay IDs of game #0 (Tetris)
-        >>> g.in_edges(('user', 'plays', 'game'), 0, 'eid')
+        >>> g.in_edges(0, 'eid', ('user', 'plays', 'game'))
         tensor([0, 1])
         """
         v = utils.toindex(v)
@@ -966,22 +960,22 @@ class DGLHeteroGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def out_edges(self, v, etype=None, form='uv'):
+    def out_edges(self, v, form='uv', etype=None):
         """Return the outbound edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s) of source type.
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
         form : str, optional
             The return form. Currently support:
 
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
@@ -999,7 +993,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the gameplay IDs of user #0 (Alice)
-        >>> g.out_edges(('user', 'plays', 'game'), 0, 'eid')
+        >>> g.out_edges(0, 'eid', ('user', 'plays', 'game'))
         tensor([0])
         """
         v = utils.toindex(v)
@@ -1013,14 +1007,11 @@ class DGLHeteroGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def all_edges(self, etype=None, form='uv', order=None):
+    def all_edges(self, form='uv', order=None, etype=None):
         """Return all the edges.
 
         Parameters
         ----------
-        etype : str or tuple of str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
         form : str, optional
             The return form. Currently support:
 
@@ -1033,6 +1024,9 @@ class DGLHeteroGraph(object):
             - 'srcdst' : sorted by their src and dst ids.
             - 'eid'    : sorted by edge Ids.
             - None     : the arbitrary order.
+        etype : str or tuple of str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
@@ -1051,7 +1045,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find the user-game pairs for all gameplays:
-        >>> g.all_edges(('user', 'plays', 'game'), 'uv')
+        >>> g.all_edges('uv', etype=('user', 'plays', 'game'))
         (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
         """
         src, dst, eid = self._graph.edges(self.get_etype_id(etype), order)
@@ -1085,7 +1079,7 @@ class DGLHeteroGraph(object):
         Examples
         --------
         Find how many users are playing Game #0 (Tetris):
-        >>> g.in_degree(('user', 'plays', 'game'), 0)
+        >>> g.in_degree(0, ('user', 'plays', 'game'))
         2
 
         See Also
@@ -1118,7 +1112,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find how many users are playing Game #0 and #1 (Tetris and Minecraft):
-        >>> g.in_degrees(('user', 'plays', 'game'), [0, 1])
+        >>> g.in_degrees([0, 1], ('user', 'plays', 'game'))
         tensor([2, 2])
 
         See Also
@@ -1152,7 +1146,7 @@ class DGLHeteroGraph(object):
         Examples
         --------
         Find how many games User #0 Alice is playing
-        >>> g.out_degree(('user', 'plays', 'game'), 0)
+        >>> g.out_degree(0, ('user', 'plays', 'game'))
         1
 
         See Also
@@ -1185,7 +1179,7 @@ class DGLHeteroGraph(object):
         The following example uses PyTorch backend.
 
         Find how many games User #0 and #1 (Alice and Bob) are playing
-        >>> g.out_degrees(('user', 'plays', 'game'), [0, 1])
+        >>> g.out_degrees([0, 1], ('user', 'plays', 'game'))
         tensor([1, 2])
 
         See Also
@@ -1231,6 +1225,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
+        TBD
 
         Parameters
         ----------
@@ -1266,6 +1261,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
+        TBD
 
         Parameters
         ----------
@@ -1306,6 +1302,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
+        TBD
 
         Parameters
         ----------
@@ -1350,6 +1347,7 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
+        TBD
 
         Parameters
         ----------
@@ -1414,7 +1412,7 @@ class DGLHeteroGraph(object):
     # Alias of ``adjacency_matrix``
     adj = adjacency_matrix
 
-    def incidence_matrix(self, typestr, ctx=F.cpu()):
+    def incidence_matrix(self, typestr, ctx=F.cpu(), etype=None):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
@@ -1437,7 +1435,7 @@ class DGLHeteroGraph(object):
               (or :math:`v` is the src node of :math:`e`);
             - :math:`I[v, e] = 0` otherwise.
 
-        * ``both``:
+        * ``both`` (only if source and destination node type are the same):
 
             - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
             - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
@@ -1449,13 +1447,17 @@ class DGLHeteroGraph(object):
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional (default=cpu)
             The context of returned incidence matrix.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
 
         Returns
         -------
         SparseTensor
             The incidence matrix.
         """
-        return self._graph.incidence_matrix(typestr, ctx)[0]
+        etid = self.get_etype_id(etype)
+        return self._graph.incidence_matrix(etid, typestr, ctx)[0]
 
     # Alias of ``incidence_matrix``
     inc = incidence_matrix

@@ -426,7 +426,7 @@ def to_homo(G):
 
     for etype_id, etype in enumerate(G.canonical_etypes):
         srctype, _, dsttype = etype
-        src, dst = G.all_edges(etype, order='eid')
+        src, dst = G.all_edges(etype=etype, order='eid')
         num_edges = len(src)
         srcs.append(src + offset_per_ntype[G.get_ntype_id(srctype)])
         dsts.append(dst + offset_per_ntype[G.get_ntype_id(dsttype)])
