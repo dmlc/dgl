@@ -115,6 +115,10 @@ def matmul(a, b):
     """Compute Matrix Multiplication between a and b"""
     pass
 
+def dot(a, b):
+    """Compute Dot between a and b"""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

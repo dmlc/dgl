@@ -376,8 +376,11 @@ class BinaryReduce(mx.autograd.Function):
     def forward(self, lhs_data, rhs_data):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = nd.empty((self.out_size,) + feat_shape,
+        feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if self.binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = nd.empty((self.out_size,) + out_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
@@ -402,10 +405,10 @@ class BinaryReduce(mx.autograd.Function):
             in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
-                'sum', self.graph, target, in_ones_nd, degs_nd, 
+                'sum', self.graph, target, in_ones_nd, degs_nd,
                 in_map, self.out_map[0])
             # reshape
-            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
             out_data = out_data / degs
         else:
             degs = None
