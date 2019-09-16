@@ -6,14 +6,22 @@ import os
 from .utils import get_download_dir, download
 
 class QM7b(object):
+    """
+    This dataset consists of 7,211 molecules with 14 regression targets.
+    Nodes means atoms and edges means bonds. Edge data 'h' means 
+    the entry of Coulomb matrix.
 
+    Reference:
+    - `QM7b Dataset <http://quantum-machine.org/datasets/>`_
+
+    """
     _url = 'http://deepchem.io.s3-website-us-west-1.amazonaws.com/' \
         'datasets/qm7b.mat'
 
     def __init__(self):
         self.dir = get_download_dir()
         self.path = os.path.join(self.dir, 'qm7b', "qm7b.mat")
-        download(_url, path=self.path)
+        download(self._url, path=self.path)
         self.graphs = []
         self._load(self.path)
 
@@ -29,6 +37,7 @@ class QM7b(object):
             g.add_nodes(num_nodes)
             g.add_edges(edge_list[0], edge_list[1])
             g.edata['h'] = feats[i][edge_list[0], edge_list[1]].reshape(-1, 1)
+            g.gdata = {'label': labels[i]} # Should be changed to g.gdata['label'] = labels[i] later
             self.graphs.append(g)
         
     def __getitem__(self, idx):
