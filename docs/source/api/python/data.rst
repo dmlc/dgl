@@ -63,6 +63,42 @@ Coauthor dataset
     :members: __getitem__, __len__
 
 
+BitcoinOTC dataset
+```````````````````````````````````
+
+.. autoclass:: BitcoinOTC
+    :members: __getitem__, __len__
+
+
+ICEWS18 dataset
+```````````````````````````````````
+
+.. autoclass:: ICEWS18
+    :members: __getitem__, __len__
+
+
+QM7b dataset
+```````````````````````````````````
+
+.. autoclass:: QM7b
+    :members: __getitem__, __len__
+
+
+QM9 dataset
+```````````````````````````````````
+
+.. autoclass:: QM9
+    :members: __getitem__, __len__
+
+
+
+GDELT dataset
+```````````````````````````````````
+
+.. autoclass:: GDELT
+    :members: __getitem__, __len__
+
+
 Mini graph classification dataset
 `````````````````````````````````
 

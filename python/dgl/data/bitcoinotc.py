@@ -8,6 +8,20 @@ from .utils import get_download_dir, download, extract_archive
 
 
 class BitcoinOTC(object):
+    """
+    This is who-trusts-whom network of people who trade using Bitcoin 
+    on a platform called Bitcoin OTC. 
+    Since Bitcoin users are anonymous, there is a need to maintain a
+     record of users' reputation to prevent transactions with fraudulent
+     and risky users. Members of Bitcoin OTC rate other members in a
+     scale of -10 (total distrust) to +10 (total trust) in steps of 1. 
+
+    Reference:
+    - `Bitcoin OTC trust weighted signed network <http://snap.stanford.edu/data/soc-sign-bitcoin-otc.html>`_
+    - `EvolveGCN: Evolving Graph
+    Convolutional Networks for Dynamic Graphs
+    <https://arxiv.org/abs/1902.10191>`_
+    """
     _url = 'https://snap.stanford.edu/data/soc-sign-bitcoinotc.csv.gz'
 
     def __init__(self):

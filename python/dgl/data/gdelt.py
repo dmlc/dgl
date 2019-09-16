@@ -7,19 +7,19 @@ import datetime
 from .utils import get_download_dir, download, extract_archive
 
 
-class ICEWS18(object):
+class GDELT(object):
     """
-    Integrated Crisis Early Warning System (ICEWS18)
-    Event data consists of coded interactions between socio-political
-     actors (i.e., cooperative or hostile actions between individuals,
-     groups, sectors and nation states).
-    This Dataset consists of events from 1/1/2018
-     to 10/31/2018 (24 hours time granularity).
+    The Global Database of Events, Language, and Tone (GDELT) dataset.
+    This contains events happend all over the world (ie every protest held anywhere
+     in Russia on a given day is collapsed to a single entry).
+
+    This Dataset consists of
+    events collected from 1/1/2018 to 1/31/2018 (15 minutes time granularity).
     
     Reference:
     - `Recurrent Event Network for Reasoning over Temporal
     Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
-    - `ICEWS Coded Event Data <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
+    - `The Global Database of Events, Language, and Tone (GDELT) <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/28075>`_
 
 
     Parameters
@@ -29,9 +29,9 @@ class ICEWS18(object):
 
     """
     _url = {
-        'train': 'https://github.com/INK-USC/RENet/raw/master/data/ICEWS18/train.txt',
-        'valid': 'https://github.com/INK-USC/RENet/raw/master/data/ICEWS18/valid.txt',
-        'test': 'https://github.com/INK-USC/RENet/raw/master/data/ICEWS18/test.txt',
+        'train': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/train.txt',
+        'valid': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/valid.txt',
+        'test': 'https://github.com/INK-USC/RENet/raw/master/data/GDELT/test.txt',
     }
 
     def __init__(self, mode):
@@ -41,22 +41,22 @@ class ICEWS18(object):
         self.graphs = []
         for dname in self._url:
             dpath = os.path.join(
-                self.dir, 'ICEWS18', self._url[dname.lower()].split('/')[-1])
+                self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
             download(self._url[dname.lower()], path=dpath)
         train_data = np.loadtxt(os.path.join(
-            self.dir, 'ICEWS18', 'train.txt'), delimiter='\t').astype(np.int64)
+            self.dir, 'GDELT', 'train.txt'), delimiter='\t').astype(np.int64)
         if self.mode == 'train':
             self._load(train_data)
         elif self.mode == 'valid':
             val_data = np.loadtxt(os.path.join(
-                self.dir, 'ICEWS18', 'valid.txt'), delimiter='\t').astype(np.int64)
+                self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             self._load(np.concatenate([train_data, val_data], axis=0))
         elif self.mode == 'test':
             val_data = np.loadtxt(os.path.join(
-                self.dir, 'ICEWS18', 'valid.txt'), delimiter='\t').astype(np.int64)
+                self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
             test_data = np.loadtxt(os.path.join(
-                self.dir, 'ICEWS18', 'test.txt'), delimiter='\t').astype(np.int64)
+                self.dir, 'GDELT', 'test.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             val_data[:, 3] = -1
             self._load(np.concatenate(
@@ -66,7 +66,7 @@ class ICEWS18(object):
         num_nodes = 23033
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.
-        time_index = np.floor(data[:, 3]/24).astype(np.int64)
+        time_index = np.floor(data[:, 3]/15).astype(np.int64)
         start_time = time_index[time_index != -1].min()
         end_time = time_index.max()
         for i in range(start_time, end_time+1):
