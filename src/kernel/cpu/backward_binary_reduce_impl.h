@@ -27,6 +27,7 @@ struct BackwardBinaryReduce {
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -39,28 +40,46 @@ struct BackwardBinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * D;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * D;
+    DType* gradlhsoff = gdata->grad_lhs_data + lid * D * len;
+    DType* gradrhsoff = gdata->grad_rhs_data + rid * D * len;
     DType* gradoutoff = gdata->grad_out_data + oid * D;
     for (int64_t tx = 0; tx < D; ++tx) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhs, rhs);
+      DType e = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+
+      DType* lhs_base = lhsoff + tx * len;
+      DType* rhs_base = rhsoff + tx * len;
+      if (Mode == binary_op::kGradBoth) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad = grad_lhs + grad_rhs;
 #pragma omp atomic
-        gradlhsoff[tx] += grad_lhs;
-      }
-      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          gradlhsoff[tx * len + i] += grad;
+        }
+      } else if (Mode == binary_op::kGradLhs) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
 #pragma omp atomic
-        gradrhsoff[tx] += grad_rhs;
+          gradlhsoff[tx * len + i] += grad_lhs;
+        }
+      } else if (Mode == binary_op::kGradRhs) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+#pragma omp atomic
+          gradrhsoff[tx * len + i] += grad_rhs;
+        }
       }
     }
   }
@@ -76,6 +95,7 @@ struct BackwardBinaryReduceBcast {
   }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -88,32 +108,53 @@ struct BackwardBinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len;
+    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len * len;
+    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len * len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
     int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
       Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhs, rhs);
+      DType e = Functors::Op(
+        lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
+        rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
+        len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+
+      DType* lhs_base = lhsoff +
+          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
+      DType* rhs_base = rhsoff +
+          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
+      if (Mode == binary_op::kGradBoth) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad = grad_lhs + grad_rhs;
 #pragma omp atomic
-        gradlhsoff[tx] += grad_lhs;
-      }
-      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          gradlhsoff[tx * len + i] += grad;
+        }
+      } else if (Mode == binary_op::kGradLhs) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
 #pragma omp atomic
-        gradrhsoff[tx] += grad_rhs;
+          gradlhsoff[tx * len + i] += grad_lhs;
+        }
+      } else if (Mode == binary_op::kGradRhs) {
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+#pragma omp atomic
+          gradrhsoff[tx * len + i] += grad_rhs;
+        }
       }
     }
   }
@@ -137,8 +178,8 @@ struct BackwardFunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static inline DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
+  static inline DType Op(DType* lhs, DType* rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static inline DType Read(DType* addr) {
     return *addr;

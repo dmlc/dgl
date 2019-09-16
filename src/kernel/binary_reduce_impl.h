@@ -28,7 +28,7 @@ namespace kernel {
 ///////////////////////////////////////////////////////////////////////////////
 
 template <int XPU, typename Idx, typename DType, typename Reducer>
-GData<Idx, DType> AllocGData(
+GData<Idx, DType> AllocGData(const std::string& op,
     const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
@@ -48,6 +48,15 @@ GData<Idx, DType> AllocGData(
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
+
+  // for dot operation: vector [dot] vector
+  if (op == binary_op::kDot) {
+    // get size of vector
+    gdata.data_len = lhs_data->shape[lhs_data->ndim - 1];
+  } else {
+    gdata.data_len = 1;
+  }
+
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
@@ -91,7 +100,7 @@ void BinaryReduceImpl(
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
+        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(op,
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
         OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
@@ -109,7 +118,7 @@ void BinaryReduceImpl(
 
 template <int XPU, typename Idx, typename DType>
 BackwardGData<Idx, DType> AllocBackwardGData(
-    const DLContext& ctx, int64_t x_len,
+    const std::string& op, const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
     runtime::NDArray grad_out_data,
@@ -141,6 +150,14 @@ BackwardGData<Idx, DType> AllocBackwardGData(
   }
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
+  }
+
+  // for dot operation: vector [dot] vector
+  if (op == binary_op::kDot) {
+    // get size of vector
+    gdata.data_len = lhs_data->shape[lhs_data->ndim - 1];
+  } else {
+    gdata.data_len = 1;
   }
   return gdata;
 }
@@ -180,13 +197,14 @@ void BackwardBinaryReduceImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
   const auto bits = graph.NumBits();
+
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-      auto gdata = AllocBackwardGData<XPU, Idx, DType>(
+      auto gdata = AllocBackwardGData<XPU, Idx, DType>(op,
           rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
           grad_lhs_data, grad_rhs_data);
@@ -238,6 +256,8 @@ BcastGData<NDim, Idx, DType> AllocBcastGData(
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
+  gdata.data_len = info.data_len;
+
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
@@ -278,6 +298,7 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
   const auto bits = graph.NumBits();
+
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -332,6 +353,8 @@ BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
   if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
+  gdata.data_len = info.data_len;
+
   // data
   gdata.lhs_data = static_cast<DType*>(lhs->data);
   gdata.rhs_data = static_cast<DType*>(rhs->data);
@@ -385,6 +408,7 @@ void BackwardBinaryReduceBcastImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
   const auto bits = graph.NumBits();
+
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";

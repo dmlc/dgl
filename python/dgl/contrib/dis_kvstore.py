@@ -367,8 +367,9 @@ class KVClient(object):
         numpy_id = F.asnumpy(ID)
         count = math.ceil(self._data_size[name] / self._server_count)
         server_id = numpy_id / count
-        for id in server_id:
-            group_size[int(id)] += 1
+        id_list, id_count = np.unique(server_id, return_counts=True)
+        for idx in range(len(id_list)):
+            group_size[int(id_list[idx])] += id_count[idx]
         min_idx = 0
         max_idx = 0
         for idx in range(self._server_count):
@@ -426,8 +427,9 @@ class KVClient(object):
         numpy_id = F.asnumpy(ID)
         count = math.ceil(self._data_size[name] / self._server_count)
         server_id = numpy_id / count
-        for id in server_id:
-            group_size[int(id)] += 1
+        id_list, id_count = np.unique(server_id, return_counts=True)
+        for idx in range(len(id_list)):
+            group_size[int(id_list[idx])] += id_count[idx]
         min_idx = 0
         max_idx = 0
         server_count = 0

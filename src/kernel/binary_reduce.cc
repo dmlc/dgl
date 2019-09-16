@@ -93,11 +93,25 @@ bool HasBcast(NDArray lhs, NDArray rhs) {
 //    e.g. (4, 1, 3, 3) and (4, 5, 3, 3) become (4, 1, 9) and (4, 5, 9)
 //
 // See also: BcastInfo (kernel/binary_reduce.h)
-BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
+BcastInfo CalcBcastInfo(const std::string& op, NDArray lhs, NDArray rhs) {
   BcastInfo ret;
   const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
   int64_t accum = 0;
-  for (int j = 0; j < max_ndim; ++j) {
+  int j = 0;
+  // for dot operation: vector [dot] vector
+  // lhs_shape[ndim-1] == rhs_shape[ndim-1] = sizeof(vector)
+  // out_shape[ndim-1] = 1
+  if (op == binary_op::kDot) {
+    // get size of vector
+    ret.data_len = lhs->shape[lhs->ndim - 1];
+    // skip vector size dim
+    ++j;
+    ret.real_out_shape.push_back(ret.data_len);
+  } else {  // op != binary_op::kDot
+    ret.data_len = 1;
+  }
+
+  for (; j < max_ndim; ++j) {
     const int dl = (lhs->ndim - 1 - j < 1)? 1 : lhs->shape[lhs->ndim - 1 - j];
     const int dr = (rhs->ndim - 1 - j < 1)? 1 : rhs->shape[rhs->ndim - 1 - j];
     if (dl != dr) {
@@ -258,16 +272,18 @@ class UnitGraphCSRWrapper : public CSRWrapper {
 
 
 std::vector<int64_t> InferBinaryFeatureShape(
+    const std::string& op,
     NDArray lhs,
     NDArray rhs) {
-  return CalcBcastInfo(lhs, rhs).real_out_shape;
+  return CalcBcastInfo(op, lhs, rhs).real_out_shape;
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray lhs = args[0];
-    NDArray rhs = args[1];
-    const auto& shape = InferBinaryFeatureShape(lhs, rhs);
+    std::string op = args[0];
+    NDArray lhs = args[1];
+    NDArray rhs = args[2];
+    const auto& shape = InferBinaryFeatureShape(op, lhs, rhs);
     const int64_t len = shape.size();
     NDArray ret = NDArray::Empty(
         {len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -300,7 +316,7 @@ void BinaryOpReduce(
         rhs_mapping, lhs_mapping, out_mapping);
   } else {
     if (HasBcast(lhs_data, rhs_data)) {
-      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      BcastInfo info = CalcBcastInfo(op, lhs_data, rhs_data);
       DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
           info, reducer, op, graph,
           lhs, rhs,
@@ -394,7 +410,7 @@ void BackwardLhsBinaryOpReduce(
         grad_out_data, grad_lhs_data);
   } else {
     if (HasBcast(lhs_data, rhs_data)) {
-      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      BcastInfo info = CalcBcastInfo(op, lhs_data, rhs_data);
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
           info, reducer, op, graph,
           lhs, rhs,
@@ -468,7 +484,7 @@ void BackwardRhsBinaryOpReduce(
         grad_out_data, grad_rhs_data);
   } else {
     if (HasBcast(lhs_data, rhs_data)) {
-      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      BcastInfo info = CalcBcastInfo(op, lhs_data, rhs_data);
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
           info, reducer, op, graph,
           lhs, rhs,
