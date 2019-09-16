@@ -3,8 +3,7 @@
 import math
 
 import mxnet as mx
-from mxnet import gluon, nd
-from mxnet.gluon import nn
+from mxnet import gluon
 
 from .... import function as fn
 
