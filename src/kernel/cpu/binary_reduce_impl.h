@@ -29,6 +29,7 @@ struct BinaryReduce {
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -41,13 +42,11 @@ struct BinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
     for (int64_t tx = 0; tx < D; ++tx) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       Functors::Write(outoff + tx, out);
     }
   }
@@ -80,6 +79,7 @@ struct BinaryReduceBcast {
   }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -92,17 +92,17 @@ struct BinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
       Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(
+          lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
+          rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
+          len);
+
       Functors::Write(outoff + tx, out);
     }
   }
@@ -125,11 +125,8 @@ struct FunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static inline DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
-  }
-  static inline DType Read(DType* addr) {
-    return *addr;
+  static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static inline void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
