@@ -2,6 +2,8 @@
 #pylint: disable=no-member, invalid-name
 
 import torch as th
+from torch import nn
+
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -86,3 +88,16 @@ def bmm_maybe_select(A, B, index):
     else:
         BB = B.index_select(0, index)
         return th.bmm(A.unsqueeze(1), BB).squeeze()
+
+# pylint: disable=W0235
+class Identity(nn.Module):
+    """A placeholder identity operator that is argument-insensitive.
+    (Identity has already been supported by PyTorch 1.2, we will directly
+    import torch.nn.Identity in the future)
+    """
+    def __init__(self):
+        super(Identity, self).__init__()
+
+    def forward(self, x):
+        """Return input"""
+        return x
