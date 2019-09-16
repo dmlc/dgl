@@ -41,3 +41,9 @@ class RedditDataset(object):
         print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
         print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
 
+    def __getitem__(self, idx):
+        assert idx == 0, "Reddit Dataset only has one graph"
+        return self.graph
+    
+    def __len__(self):
+        return 1

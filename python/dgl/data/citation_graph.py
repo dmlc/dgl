@@ -112,8 +112,8 @@ class CitationGraphDataset(object):
         print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
 
     def __getitem__(self, idx):
-        assert idx == 0, "Citation Graph Dataset only have 1 graph"
-        return self.graph
+        assert idx == 0, "Citation Graph Dataset has only one graph"
+        return self.graph 
 
     def __len__(self):
         return 1

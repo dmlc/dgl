@@ -1,16 +1,19 @@
 from scipy import io
 import numpy as np
 from dgl import DGLGraph
+import os
 
-class QM7(object):
+from .utils import get_download_dir, download, extract_archive
 
-    _url = 'http://deepchem.io.s3-website-us-west-1.amazonaws.com/' \
-        'datasets/qm7b.mat'
+class QM9(object):
+
+    _url = 'http://www.roemisch-drei.de/qm9.tar.gz'
 
     def __init__(self):
         self.dir = get_download_dir()
-        self.path = os.path.join(self.dir, 'qm7', "qm7b.mat")
+        self.path = os.path.join(self.dir, 'qm9', "qm9.tar.gz")
         download(_url, path=self.path)
+        extract_archive(self.path, os.path.join(self.dir, 'qm9', 'qm9'))
         self.graphs = []
         self._load(self.path)
 
@@ -27,9 +30,9 @@ class QM7(object):
             g.add_edges(edge_list[0], edge_list[1])
             g.edata['h'] = feats[i][edge_list[0], edge_list[1]].reshape(-1, 1)
             self.graphs.append(g)
-        
+
     def __getitem__(self, idx):
         return self.graphs[idx]
-    
+
     def __len__(self):
         return len(self.graphs)
