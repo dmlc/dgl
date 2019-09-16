@@ -543,7 +543,16 @@ def test_flatten():
     # Test another heterograph
     g_x = dgl.graph(([0, 1, 2], [1, 2, 3]), 'user', 'follows')
     g_y = dgl.graph(([0, 2], [2, 3]), 'user', 'knows')
+    g_x.nodes['user'].data['h'] = F.randn((4, 3))
+    g_x.edges['follows'].data['w'] = F.randn((3, 2))
+    g_y.nodes['user'].data['hh'] = F.randn((4, 5))
+    g_y.edges['knows'].data['ww'] = F.randn((2, 10))
     g = dgl.hetero_from_relations([g_x, g_y])
+
+    assert F.array_equal(g.ndata['h'], g_x.ndata['h'])
+    assert F.array_equal(g.ndata['hh'], g_y.ndata['hh'])
+    assert F.array_equal(g.edges['follows'].data['w'], g_x.edata['w'])
+    assert F.array_equal(g.edges['knows'].data['ww'], g_y.edata['ww'])
 
     fg = g['user', :, 'user']
     assert fg.ntypes == ['user']

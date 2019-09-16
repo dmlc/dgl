@@ -257,7 +257,12 @@ def hetero_from_relations(rel_graphs):
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs])
-    return DGLHeteroGraph(hgidx, ntypes, etypes)
+    retg = DGLHeteroGraph(hgidx, ntypes, etypes)
+    for i, rgrh in enumerate(rel_graphs):
+        for ntype in rgrh.ntypes:
+            retg.nodes[ntype].data.update(rgrh.nodes[ntype].data)
+        retg._edge_frames[i].update(rgrh._edge_frames[0])
+    return retg
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
     """Convert the given graph to a heterogeneous graph.
