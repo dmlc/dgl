@@ -368,7 +368,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
         dst_of_etype = dst_local[edge_groups[i]]
         if stid == dtid:
             rel_graph = graph(
-                (src_of_etype, dst_of_etype), ntypes[st]id, etypes[etid],
+                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid],
                 card=ntype_count[stid])
         else:
             rel_graph = bipartite(
