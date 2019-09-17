@@ -6,117 +6,9 @@ from utils import get_activation
 import mxnet as mx
 import dgl.function as fn
 
-class MultiLinkGCNAggregator(Block):
-    def __init__(self, src_key, dst_key, units, src_in_units, dst_in_units, num_links,
-                 dropout_rate=0.0, accum='stack', act=None, **kwargs):
-        super(MultiLinkGCNAggregator, self).__init__(**kwargs)
-        self._src_key = src_key
-        self._dst_key = dst_key
-        self._accum = accum
-        self._num_links = num_links
-        self._units = units
-        if accum == "stack":
-            assert units % num_links == 0, 'units should be divisible by the num_links '
-            self._units = self._units // num_links
-
-        with self.name_scope():
-            self.dropout = nn.Dropout(dropout_rate) ### dropout before feeding the out layer
-            self.act = get_activation(act)
-            self.src_dst_weights = self.params.get('src_dst_weight',
-                                                   shape=(num_links, self._units, src_in_units),
-                                                   dtype=np.float32,
-                                                   allow_deferred_init=True)
-            self.dst_src_weights = self.params.get('dst_dst_weight',
-                                                   shape=(num_links, self._units, dst_in_units),
-                                                   dtype=np.float32,
-                                                   allow_deferred_init=True)
-
-    def forward(self, g):
-        def src_node_update(nodes):
-            Ndata = {}
-            for i in range(self._num_links):
-                w = self.src_dst_weights.data()[i] ## agg_units * #nodes
-                Ndata['fea{}'.format(i)] = mx.nd.dot(self.dropout(nodes.data['fea']), w, transpose_b=True)
-            return Ndata
-        def dst_node_update(nodes):
-            Ndata = {}
-            for i in range(self._num_links):
-                w = self.dst_src_weights.data()[i] ## agg_units * #nodes
-                Ndata['fea{}'.format(i)] = mx.nd.dot(self.dropout(nodes.data['fea']), w, transpose_b=True)
-            return Ndata
-
-        g[self._src_key].apply_nodes(src_node_update)
-        g[self._dst_key].apply_nodes(dst_node_update)
-
-        def accum_node_func(nodes):
-            accums = []
-            for i in range(self._num_links):
-                accums.append(nodes.data['accum{}'.format(i)])
-            if self._accum == "sum":
-                accum = mx.nd.add_n(*accums)
-            elif self._accum == "stack":
-                accum = mx.nd.concat(*accums, dim=1)
-            else:
-                raise NotImplementedError
-            return {'h': self.act(accum)}
-
-        src_dst_g = g[self._src_key, self._dst_key, 'rating']
-        dst_src_g = g[self._dst_key, self._src_key, 'rating']
-
-        for i in range(self._num_links):
-            src_dst_g.send_and_recv(src_dst_g.edges(), ### here we can filter edges
-                                    fn.src_mul_edge('fea{}'.format(i), 'support{}'.format(i), 'msg{}'.format(i)),
-                                    fn.sum('msg{}'.format(i), 'accum{}'.format(i)), None)
-        src_dst_g[self._dst_key].apply_nodes(accum_node_func)
-
-        for i in range(self._num_links):
-            dst_src_g.send_and_recv(dst_src_g.edges(),
-                                    fn.src_mul_edge('fea{}'.format(i), 'support{}'.format(i), 'msg{}'.format(i)),
-                                    fn.sum('msg{}'.format(i), 'accum{}'.format(i)), None)
-        dst_src_g[self._src_key].apply_nodes(accum_node_func)
-
-
-        dst_h = src_dst_g[self._dst_key].ndata.pop('h')
-        src_h = dst_src_g[self._src_key].ndata.pop('h')
-
-        return src_h, dst_h
-
-'''
-class GCMCLayer(Block):
-    def __init__(self, src_key, dst_key, src_in_units, dst_in_units, agg_units, out_units, num_links,
-                 dropout_rate=0.0, agg_accum='stack', agg_act=None, out_act=None,
-                 # agg_ordinal_sharing=False, share_agg_weights=False, share_out_fc_weights=False,
-                 **kwargs):
-        super(GCMCLayer, self).__init__(**kwargs)
-        self._out_act = get_activation(out_act)
-        self._src_key = src_key
-        self._dst_key = dst_key
-        with self.name_scope():
-            self.dropout = nn.Dropout(dropout_rate)
-            self.aggregator = MultiLinkGCNAggregator(src_key=src_key,
-                                                     dst_key=dst_key,
-                                                     units = agg_units,
-                                                     src_in_units=src_in_units,
-                                                     dst_in_units=dst_in_units,
-                                                     num_links=num_links,
-                                                     dropout_rate=dropout_rate,
-                                                     accum=agg_accum,
-                                                     act=agg_act,
-                                                     prefix='agg_')
-            self.user_out_fcs = nn.Dense(out_units, flatten=False, prefix='user_out_')
-            self.item_out_fcs = nn.Dense(out_units, flatten=False, prefix='item_out_')
-            self._out_act = get_activation(out_act)
-
-    def forward(self, graph):
-        user_h, item_h = self.aggregator(graph)
-        out_user = self._out_act(self.user_out_fcs(user_h))
-        out_item = self._out_act(self.item_out_fcs(item_h))
-        return out_user, out_item
-
-'''
 class GCMCLayer(Block):
     def __init__(self,
-                 num_rates,
+                 rating_vals,
                  user_in_units,
                  movie_in_units,
                  msg_units,
@@ -126,17 +18,18 @@ class GCMCLayer(Block):
                  agg_act=None,
                  out_act=None):
         super(GCMCLayer, self).__init__()
-        self.num_rates = num_rates
+        self.rating_vals = rating_vals
         self.agg = agg
         with self.name_scope():
             self.dropout = nn.Dropout(dropout_rate)
             self.W_r = {}
-            for i in range(1, self.num_rates + 1):
-                self.W_r['rate-%d' % i] = self.params.get(
-                    'W_r_%d' % i, shape=(user_in_units, msg_units),
+            for rating in rating_vals:
+                rating = str(rating)
+                self.W_r[rating] = self.params.get(
+                    'W_r_%s' % rating, shape=(user_in_units, msg_units),
                     dtype=np.float32, allow_deferred_init=True)
-                self.W_r['rev-rate-%d' % i] = self.params.get(
-                    'revW_r_%d' % i, shape=(movie_in_units, msg_units),
+                self.W_r['rev-%s' % rating] = self.params.get(
+                    'revW_r_%s' % rating, shape=(movie_in_units, msg_units),
                     dtype=np.float32, allow_deferred_init=True)
             self.ufc = nn.Dense(out_units)
             self.ifc = nn.Dense(out_units)
@@ -148,14 +41,15 @@ class GCMCLayer(Block):
         # left norm
         ufeat = ufeat * graph.nodes['user'].data['cj']
         ifeat = ifeat * graph.nodes['movie'].data['cj']
-        for i in range(1, self.num_rates + 1):
+        for i, rating in enumerate(self.rating_vals):
+            rating = str(rating)
             # W_r * x
             graph.nodes['user'].data['h%d' % i] = mx.nd.dot(
-                self.dropout(ufeat), self.W_r['rate-%d' % i].data())
+                self.dropout(ufeat), self.W_r[rating].data())
             graph.nodes['movie'].data['h%d' % i] = mx.nd.dot(
-                self.dropout(ifeat), self.W_r['rev-rate-%d' % i].data())
-            funcs['rate-%d' % i] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-            funcs['rev-rate-%d' % i] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+                self.dropout(ifeat), self.W_r['rev-%s' % rating].data())
+            funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+            funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
         # message passing
         graph.multi_update_all(funcs, self.agg)
         ufeat = graph.nodes['user'].data.pop('h')
@@ -207,4 +101,3 @@ class InnerProductLayer(HybridBlock):
             data2 = self._mid_map(data2)
         score = F.sum(data1 * data2, axis=1, keepdims=True)
         return score
-

@@ -17,20 +17,7 @@ class Net(Block):
         super(Net, self).__init__(**kwargs)
         self._act = get_activation(args.model_activation)
         with self.name_scope():
-            '''
-            self.encoder = GCMCLayer(src_key=args.src_key,
-                                     dst_key=args.dst_key,
-                                     src_in_units=args.src_in_units,
-                                     dst_in_units=args.dst_in_units,
-                                     agg_units=args.gcn_agg_units,
-                                     out_units=args.gcn_out_units,
-                                     num_links=args.nratings,
-                                     dropout_rate=args.gcn_dropout,
-                                     agg_accum=args.gcn_agg_accum,
-                                     agg_act=args.model_activation,
-                                     prefix='enc_')
-            '''
-            self.encoder = GCMCLayer(args.nratings,
+            self.encoder = GCMCLayer(args.rating_vals,
                                      args.src_in_units,
                                      args.dst_in_units,
                                      args.gcn_agg_units,
@@ -40,7 +27,7 @@ class Net(Block):
                                      agg_act=self._act)
             if args.gen_r_use_classification:
                 self.gen_ratings = BiDecoder(in_units=args.gcn_out_units,
-                                             out_units=args.nratings,
+                                             out_units=len(args.rating_vals),
                                              num_basis_functions=args.gen_r_num_basis_func,
                                              prefix='gen_rating')
             else:
@@ -100,7 +87,7 @@ def train(args):
 
     args.src_in_units = dataset.user_feature.shape[1]
     args.dst_in_units = dataset.movie_feature.shape[1]
-    args.nratings = dataset.possible_rating_values.size
+    args.rating_vals = dataset.possible_rating_values
 
     ### build the net
     net = Net(args=args)

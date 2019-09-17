@@ -177,9 +177,9 @@ class MovieLens(object):
             ridx = np.where(rating_values == rating)
             rrow = rating_row[ridx]
             rcol = rating_col[ridx]
-            bg = dgl.bipartite((rrow, rcol), 'user', 'rate-%d' % rating, 'movie',
+            bg = dgl.bipartite((rrow, rcol), 'user', str(rating), 'movie',
                                card=(self._num_user, self._num_movie))
-            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-rate-%d' % rating, 'user',
+            rev_bg = dgl.bipartite((rcol, rrow), 'movie', 'rev-%s' % str(rating), 'user',
                                card=(self._num_movie, self._num_user))
             rating_graphs.append(bg)
             rating_graphs.append(rev_bg)
@@ -199,11 +199,12 @@ class MovieLens(object):
             movie_ci = []
             movie_cj = []
             for r in self.possible_rating_values:
-                user_ci.append(graph['rev-rate-%d' % r].in_degrees())
-                movie_ci.append(graph['rate-%d' % r].in_degrees())
+                r = str(r)
+                user_ci.append(graph['rev-%s' % r].in_degrees())
+                movie_ci.append(graph[r].in_degrees())
                 if self._symm:
-                    user_cj.append(graph['rate-%d' % r].out_degrees())
-                    movie_cj.append(graph['rev-rate-%d' % r].out_degrees())
+                    user_cj.append(graph[r].out_degrees())
+                    movie_cj.append(graph['rev-%s' % r].out_degrees())
                 else:
                     user_cj.append(mx.nd.zeros((self.num_user,)))
                     movie_cj.append(mx.nd.zeros((self.num_movie,)))
@@ -217,22 +218,6 @@ class MovieLens(object):
                 movie_cj = mx.nd.zeros((self.num_movie,))
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
-
-            '''
-            uv_train_support_l = self.compute_support(user_movie_R, self.num_links, self._symm)
-            for idx, sup in enumerate(uv_train_support_l):
-                graph['user', 'movie', self.name_edge].edges[
-                    np.array(sup.row, dtype=np.int64),
-                    np.array(sup.col, dtype=np.int64)].data['support{}'.format(idx)] = \
-                    mx.nd.array(sup.data, ctx=self._ctx, dtype=np.float32)
-
-            vu_train_support_l = self.compute_support(movie_user_R, self.num_links, self._symm)
-            for idx, sup in enumerate(vu_train_support_l):
-                graph['movie', 'user', self.name_edge].edges[
-                    np.array(sup.row, dtype=np.int64),
-                    np.array(sup.col, dtype=np.int64)].data['support{}'.format(idx)] = \
-                    mx.nd.array(sup.data, ctx=self._ctx, dtype=np.float32)
-            '''
 
         return graph
 
