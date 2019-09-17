@@ -173,7 +173,7 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False,
+    def __init__(self, name, use_pandas=True,
                  hidden_size=10, max_allow_node=None):
 
         self.name = name

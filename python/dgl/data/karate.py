@@ -19,11 +19,12 @@ class KarateClub(object):
         kG = nx.karate_club_graph()
         self.label = np.array(
             [kG.node[i]['club'] != 'Mr. Hi' for i in kG.nodes]).astype(np.int64)
-        g = DGLGraph(G)
+        g = DGLGraph(kG)
         g.ndata['label'] = self.label
         self.data = [g]
 
     def __getitem__(self, idx):
+        assert idx == 0, "This dataset has only one graph"
         return self.data[0]
 
     def __len__(self):

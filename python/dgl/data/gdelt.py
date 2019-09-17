@@ -15,7 +15,7 @@ class GDELT(object):
 
     This Dataset consists of
     events collected from 1/1/2018 to 1/31/2018 (15 minutes time granularity).
-    
+
     Reference:
     - `Recurrent Event Network for Reasoning over Temporal
     Knowledge Graphs <https://arxiv.org/abs/1904.05530>`_
@@ -38,7 +38,7 @@ class GDELT(object):
         assert mode.lower() in self._url, "Mode not valid"
         self.dir = get_download_dir()
         self.mode = mode
-        self.graphs = []
+        # self.graphs = []
         for dname in self._url:
             dpath = os.path.join(
                 self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
@@ -63,24 +63,42 @@ class GDELT(object):
                 [train_data, val_data, test_data], axis=0))
 
     def _load(self, data):
-        num_nodes = 23033
         # The source code is not released, but the paper indicates there're
         # totally 137 samples. The cutoff below has exactly 137 samples.
-        time_index = np.floor(data[:, 3]/15).astype(np.int64)
-        start_time = time_index[time_index != -1].min()
-        end_time = time_index.max()
-        for i in range(start_time, end_time+1):
-            g = DGLGraph()
-            g.add_nodes(num_nodes)
-            row_mask = time_index <= i
-            edges = data[row_mask][:, [0, 2]]
-            rate = data[row_mask][:, 1]
-            g.add_edges(edges[:, 0], edges[:, 1])
-            g.edata['rel_type'] = rate.reshape(-1, 1)
-            self.graphs.append(g)
+        self.data = data
+        self.time_index = np.floor(data[:, 3]/15).astype(np.int64)
+        self.start_time = self.time_index[self.time_index != -1].min()
+        self.end_time = self.time_index.max()
+        # for i in range(start_time, end_time+1):
+        #     g = DGLGraph()
+        #     g.add_nodes(num_nodes)
+        #     row_mask = time_index <= i
+        #     edges = data[row_mask][:, [0, 2]]
+        #     rate = data[row_mask][:, 1]
+        #     g.add_edges(edges[:, 0], edges[:, 1])
+        #     g.edata['rel_type'] = rate.reshape(-1, 1)
+        #     self.graphs.append(g)
 
     def __getitem__(self, idx):
-        return self.graphs[idx]
+        if idx >= len(self):
+            raise IndexError("Index out of range")
+        i = idx + self.start_time
+        g = DGLGraph()
+        g.add_nodes(self.num_nodes)
+        row_mask = self.time_index <= i
+        edges = self.data[row_mask][:, [0, 2]]
+        rate = self.data[row_mask][:, 1]
+        g.add_edges(edges[:, 0], edges[:, 1])
+        g.edata['rel_type'] = rate.reshape(-1, 1)
+        return g
 
     def __len__(self):
-        return len(self.graphs)
+        return self.end_time - self.start_time + 1
+
+    @property
+    def num_nodes(self):
+        return 23033
+
+    @property
+    def is_temporal(self):
+        return True

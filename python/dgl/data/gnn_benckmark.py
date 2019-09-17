@@ -64,6 +64,7 @@ class GNNBenchmarkDataset(object):
         return g     
 
     def __getitem__(self, idx):
+        assert idx == 0, "This dataset has only one graph"
         return self.data[0]
 
     def __len__(self):

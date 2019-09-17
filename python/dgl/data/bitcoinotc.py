@@ -60,3 +60,7 @@ class BitcoinOTC(object):
 
     def __len__(self):
         return len(self.graphs)
+
+    @property
+    def is_temporal(self):
+        return True
