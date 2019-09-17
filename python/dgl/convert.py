@@ -319,11 +319,11 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
                        ' type of nodes and edges.')
 
     num_ntypes = len(ntypes)
-    num_etypes = len(etypes)
 
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
 
+    # relabel nodes to per-type local IDs
     ntype_count = np.bincount(ntype_ids, minlength=num_ntypes)
     ntype_offset = np.insert(np.cumsum(ntype_count), 0, 0)
     ntype_ids_sortidx = np.argsort(ntype_ids)
@@ -343,6 +343,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     dsttype_ids = ntype_ids[dst]
     canon_etype_ids = np.stack([srctype_ids, etype_ids, dsttype_ids], 1)
 
+    # infer metagraph
     if metagraph is None:
         canonical_etids, _, etype_remapped = \
                 utils.make_invmap(list(tuple(_) for _ in canon_etype_ids), False)
@@ -362,17 +363,17 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
     rel_graphs = []
-    for i, (st, et, dt) in enumerate(canonical_etids):
+    for i, (stid, etid, dtid) in enumerate(canonical_etids):
         src_of_etype = src_local[edge_groups[i]]
         dst_of_etype = dst_local[edge_groups[i]]
-        if st == dt:
+        if stid == dtid:
             rel_graph = graph(
-                (src_of_etype, dst_of_etype), ntypes[st], etypes[et],
-                card=ntype_count[st])
+                (src_of_etype, dst_of_etype), ntypes[st]id, etypes[etid],
+                card=ntype_count[stid])
         else:
             rel_graph = bipartite(
-                (src_of_etype, dst_of_etype), ntypes[st], etypes[et], ntypes[dt],
-                card=(ntype_count[st], ntype_count[dt]))
+                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
+                card=(ntype_count[stid], ntype_count[dtid]))
         rel_graphs.append(rel_graph)
 
     hg = hetero_from_relations(rel_graphs)
