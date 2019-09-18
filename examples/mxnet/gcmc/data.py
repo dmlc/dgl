@@ -101,6 +101,7 @@ class MovieLens(object):
         self.train_rating_pairs = train_rating_pairs
         self.train_rating_values = train_rating_values
 
+        '''
         filtered_valid_user = []
         filtered_valid_movie = []
         filtered_valid_values = []
@@ -110,6 +111,10 @@ class MovieLens(object):
                 filtered_valid_user.append(valid_rating_pairs[0][i])
                 filtered_valid_movie.append(valid_rating_pairs[1][i])
                 filtered_valid_values.append(valid_rating_values[i])
+        '''
+        filtered_valid_user = valid_rating_pairs[0]
+        filtered_valid_movie = valid_rating_pairs[1]
+        filtered_valid_values = valid_rating_values
         print("Filtered {} validation node pairs".format(valid_rating_pairs[0].size - len(filtered_valid_user)))
 
         self.valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),

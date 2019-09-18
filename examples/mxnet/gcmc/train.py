@@ -82,6 +82,7 @@ def evaluate(args, net, dataset, segment='valid'):
     return rmse
 
 def train(args):
+    print(args)
     dataset = MovieLens(args.data_name, args.ctx, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm)
     print("Loading data finished ...\n")
 
@@ -217,7 +218,7 @@ def config():
                         help='The dataset name: ml-100k, ml-1m, ml-10m')
     parser.add_argument('--data_test_ratio', type=float, default=0.1) ## for ml-100k the test ration is 0.2
     parser.add_argument('--data_valid_ratio', type=float, default=0.1)
-    parser.add_argument('--use_one_hot_fea', type=bool, default=True)
+    parser.add_argument('--use_one_hot_fea', action='store_true', default=False)
 
     #parser.add_argument('--model_remove_rating', type=bool, default=False)
     parser.add_argument('--model_activation', type=str, default="leaky")
