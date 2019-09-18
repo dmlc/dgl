@@ -17,7 +17,6 @@ GENRES_ML_100K =\
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ['IMAX']
 
-#_word_embedding = nlp.embedding.GloVe('glove.840B.300d')
 _tokenizer = nlp.data.transforms.SpacyTokenizer()
 
 class MovieLens(object):
@@ -99,32 +98,6 @@ class MovieLens(object):
         self.test_graph.nodes['user'].data['feat'] = mx.nd.array(self.user_feature, ctx=ctx, dtype=np.float32)
         self.test_graph.nodes['movie'].data['feat'] = mx.nd.array(self.movie_feature, ctx=ctx, dtype=np.float32)
 
-        '''
-        uv_test_graph = self.test_graph['user', 'movie', self.name_edge]
-        vu_test_graph = self.test_graph['movie', 'user', self.name_edge]
-        self.train_graph = self.test_graph.edge_subgraph(
-            {('user', 'movie', self.name_edge):
-                 uv_test_graph.edge_ids(train_rating_pairs[0], train_rating_pairs[1]),
-             ('movie', 'user', self.name_edge):
-                 vu_test_graph.edge_ids(train_rating_pairs[1], train_rating_pairs[0]) })
-        self.train_graph.copy_from_parent()
-
-        test2train_g_node_id_map = {}
-        for node_type in ['user', 'movie']:
-            test2train_g_node_id_map[node_type] = {}
-            p_nids = self.train_graph.parent_nid(node_type).asnumpy()
-            #print("\t{}: {} nodes".format(node_type, p_nids.size))
-            for idx, p_nid in enumerate(p_nids):
-                test2train_g_node_id_map[node_type][p_nid] = idx
-
-        self.train_rating_pairs = (np.array(list(map(test2train_g_node_id_map['user'].get,
-                                                     list(train_rating_pairs[0]))),
-                                            dtype=np.int64),
-                                   np.array(list(map(test2train_g_node_id_map['movie'].get,
-                                                     list(train_rating_pairs[1]))),
-                                            dtype=np.int64))
-        self.train_rating_values = train_rating_values
-        '''
         self.train_rating_pairs = train_rating_pairs
         self.train_rating_values = train_rating_values
 
@@ -134,8 +107,6 @@ class MovieLens(object):
         for i in range(valid_rating_pairs[0].size):
             if valid_rating_pairs[0][i] in train_rating_pairs[0] and \
                 valid_rating_pairs[1][i] in train_rating_pairs[1]:
-                #filtered_valid_user.append(test2train_g_node_id_map['user'][valid_rating_pairs[0][i]])
-                #filtered_valid_movie.append(test2train_g_node_id_map['movie'][valid_rating_pairs[1][i]])
                 filtered_valid_user.append(valid_rating_pairs[0][i])
                 filtered_valid_movie.append(valid_rating_pairs[1][i])
                 filtered_valid_values.append(valid_rating_values[i])
@@ -144,7 +115,6 @@ class MovieLens(object):
         self.valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),
                                    np.array(filtered_valid_movie, dtype=np.int64))
         self.valid_rating_values = np.array(filtered_valid_values, dtype=np.float32)
-        #self.uv_train_graph = self.uv_test_graph.edge_subgraph(self.train_rating_pairs)
         print("Train graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
             self.train_graph.number_of_nodes('user'), self.train_graph.number_of_nodes('movie'),
             len(train_rating_pairs[0])))
@@ -428,6 +398,7 @@ class MovieLens(object):
         else:
             raise NotImplementedError
 
+        word_embedding = nlp.embedding.GloVe('glove.840B.300d')
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
         release_years = np.zeros(shape=(self.movie_info.shape[0], 1), dtype=np.float32)
         p = re.compile(r'(.+)\s*\((\d+)\)')
@@ -439,7 +410,7 @@ class MovieLens(object):
             else:
                 title_context, year = match_res.groups()
             # We use average of glove
-            title_embedding[i, :] =_word_embedding[_tokenizer(title_context)].asnumpy().mean(axis=0)
+            title_embedding[i, :] = word_embedding[_tokenizer(title_context)].asnumpy().mean(axis=0)
             release_years[i] = float(year)
         movie_features = np.concatenate((title_embedding,
                                          (release_years - 1950.0) / 100.0,

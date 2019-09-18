@@ -263,7 +263,6 @@ if __name__ == '__main__':
     #os.environ['MXNET_GPU_MEM_POOL_TYPE'] = 'Round'
     args = config()
     #logging_config(folder=args.save_dir, name='log', no_console=args.silent)
-    ### TODO save the args
     np.random.seed(args.seed)
     mx.random.seed(args.seed, args.ctx)
     train(args)
