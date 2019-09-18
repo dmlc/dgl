@@ -139,7 +139,6 @@ def train(args):
             else:
                 loss = rating_loss_net(mx.nd.reshape(pred_ratings, shape=(-1,)),
                                        (train_gt_ratings - rating_mean) / rating_std ).mean()
-            #loss.wait_to_read()
             loss.backward()
 
         count_loss += loss.asscalar()

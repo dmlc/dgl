@@ -17,8 +17,6 @@ GENRES_ML_100K =\
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ['IMAX']
 
-_tokenizer = nlp.data.transforms.SpacyTokenizer()
-
 class MovieLens(object):
     def __init__(self, name, ctx, use_one_hot_fea=False, symm=True,
                  test_ratio=0.1, valid_ratio = 0.1):
@@ -404,6 +402,8 @@ class MovieLens(object):
             raise NotImplementedError
 
         word_embedding = nlp.embedding.GloVe('glove.840B.300d')
+        tokenizer = nlp.data.transforms.SpacyTokenizer()
+
         title_embedding = np.zeros(shape=(self.movie_info.shape[0], 300), dtype=np.float32)
         release_years = np.zeros(shape=(self.movie_info.shape[0], 1), dtype=np.float32)
         p = re.compile(r'(.+)\s*\((\d+)\)')
@@ -415,7 +415,7 @@ class MovieLens(object):
             else:
                 title_context, year = match_res.groups()
             # We use average of glove
-            title_embedding[i, :] = word_embedding[_tokenizer(title_context)].asnumpy().mean(axis=0)
+            title_embedding[i, :] = word_embedding[tokenizer(title_context)].asnumpy().mean(axis=0)
             release_years[i] = float(year)
         movie_features = np.concatenate((title_embedding,
                                          (release_years - 1950.0) / 100.0,
