@@ -73,11 +73,11 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = np.eye(self.num_user)
-            self.movie_feature = np.eye(self.num_movie)
+            self.user_feature = mx.nd.array(np.eye(self.num_user), ctx=ctx, dtype=np.float32)
+            self.movie_feature = mx.nd.array(np.eye(self.num_movie), ctx=ctx, dtype=np.float32)
         else:
-            self.user_feature = self._process_user_fea()
-            self.movie_feature = self._process_movie_fea()
+            self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
+            self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)
         info_line = "Feature dim: "
         info_line += "\nuser: {}".format(self.user_feature.shape)
         info_line += "\nmovie: {}".format(self.movie_feature.shape)
@@ -86,18 +86,7 @@ class MovieLens(object):
         all_train_rating_pairs, all_train_rating_values = self._generate_pair_value(self.all_train_rating_info)
         train_rating_pairs, train_rating_values = self._generate_pair_value(self.train_rating_info)
         valid_rating_pairs, valid_rating_values = self._generate_pair_value(self.valid_rating_info)
-        self.test_rating_pairs, self.test_rating_values = self._generate_pair_value(self.test_rating_info)
-
-        self.train_graph = self._generate_graphs(train_rating_pairs, train_rating_values, add_support=True)
-        self.train_graph.nodes['user'].data['feat'] = mx.nd.array(self.user_feature, ctx=ctx, dtype=np.float32)
-        self.train_graph.nodes['movie'].data['feat'] = mx.nd.array(self.movie_feature, ctx=ctx, dtype=np.float32)
-
-        self.test_graph = self._generate_graphs(all_train_rating_pairs, all_train_rating_values, add_support=True)
-        self.test_graph.nodes['user'].data['feat'] = mx.nd.array(self.user_feature, ctx=ctx, dtype=np.float32)
-        self.test_graph.nodes['movie'].data['feat'] = mx.nd.array(self.movie_feature, ctx=ctx, dtype=np.float32)
-
-        self.train_rating_pairs = train_rating_pairs
-        self.train_rating_values = train_rating_values
+        test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
         '''
         filtered_valid_user = []
@@ -113,18 +102,65 @@ class MovieLens(object):
         filtered_valid_user = valid_rating_pairs[0]
         filtered_valid_movie = valid_rating_pairs[1]
         filtered_valid_values = valid_rating_values
+
         print("Filtered {} validation node pairs".format(valid_rating_pairs[0].size - len(filtered_valid_user)))
 
-        self.valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),
+        valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),
                                    np.array(filtered_valid_movie, dtype=np.int64))
-        self.valid_rating_values = np.array(filtered_valid_values, dtype=np.float32)
-        print("Train graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.train_graph.number_of_nodes('user'), self.train_graph.number_of_nodes('movie'),
-            len(train_rating_pairs[0])))
-        print("Test graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-            self.test_graph.number_of_nodes('user'), self.test_graph.number_of_nodes('movie'),
-            len(all_train_rating_pairs[0])))
-        print("Validation: #pairs:{}".format(len(self.valid_rating_pairs[0])))
+        valid_rating_values = np.array(filtered_valid_values, dtype=np.float32)
+
+        def _make_labels(ratings):
+            labels = mx.nd.array(np.searchsorted(self.possible_rating_values, ratings),
+                                 ctx=ctx, dtype=np.int32)
+            return labels
+
+        self.train_enc_graph = self._generate_enc_graph(train_rating_pairs, train_rating_values, add_support=True)
+        self.train_enc_graph.nodes['user'].data['feat'] = self.user_feature
+        self.train_enc_graph.nodes['movie'].data['feat'] = self.movie_feature
+        self.train_dec_graph = self._generate_dec_graph(train_rating_pairs)
+        self.train_labels = _make_labels(train_rating_values)
+        self.train_truths = mx.nd.array(train_rating_values, ctx=ctx, dtype=np.float32)
+
+        self.valid_enc_graph = self.train_enc_graph
+        self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
+        self.valid_labels = _make_labels(valid_rating_values)
+        self.valid_truths = mx.nd.array(valid_rating_values, ctx=ctx, dtype=np.float32)
+
+        self.test_enc_graph = self._generate_enc_graph(all_train_rating_pairs, all_train_rating_values, add_support=True)
+        self.test_enc_graph.nodes['user'].data['feat'] = self.user_feature
+        self.test_enc_graph.nodes['movie'].data['feat'] = self.movie_feature
+        self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)
+        self.test_labels = _make_labels(test_rating_values)
+        self.test_truths = mx.nd.array(test_rating_values, ctx=ctx, dtype=np.float32)
+
+        #self.train_rating_pairs = train_rating_pairs
+        #self.train_rating_values = train_rating_values
+
+        def _npairs(graph):
+            rst = 0
+            for r in self.possible_rating_values:
+                rst += graph.number_of_edges(str(r))
+            return rst
+
+        print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.train_enc_graph.number_of_nodes('user'), self.train_enc_graph.number_of_nodes('movie'),
+            _npairs(self.train_enc_graph)))
+        print("Train dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.train_dec_graph.number_of_nodes('user'), self.train_dec_graph.number_of_nodes('movie'),
+            self.train_dec_graph.number_of_edges()))
+        print("Valid enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.valid_enc_graph.number_of_nodes('user'), self.valid_enc_graph.number_of_nodes('movie'),
+            _npairs(self.valid_enc_graph)))
+        print("Valid dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.valid_dec_graph.number_of_nodes('user'), self.valid_dec_graph.number_of_nodes('movie'),
+            self.valid_dec_graph.number_of_edges()))
+        print("Test enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.test_enc_graph.number_of_nodes('user'), self.test_enc_graph.number_of_nodes('movie'),
+            _npairs(self.test_enc_graph)))
+        print("Test dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
+            self.test_dec_graph.number_of_nodes('user'), self.test_dec_graph.number_of_nodes('movie'),
+            self.test_dec_graph.number_of_edges()))
+        #print("Validation: #pairs:{}".format(len(self.valid_rating_pairs[0])))
 
     def _generate_pair_value(self, rating_info):
         rating_pairs = (np.array([self.global_user_id_map[ele] for ele in rating_info["user_id"]],
@@ -134,12 +170,7 @@ class MovieLens(object):
         rating_values = rating_info["rating"].values.astype(np.float32)
         return rating_pairs, rating_values
 
-    def _generate_graphs(self, rating_pairs, rating_values, add_support=False):
-        user_movie_ratings_coo = sp.coo_matrix(
-            (rating_values, rating_pairs),
-            shape=(self._num_user, self._num_movie),dtype=np.float32)
-        movie_user_ratings_coo = user_movie_ratings_coo.transpose()
-
+    def _generate_enc_graph(self, rating_pairs, rating_values, add_support=False):
         user_movie_R = np.zeros((self._num_user, self._num_movie), dtype=np.float32)
         user_movie_R[rating_pairs] = rating_values
         movie_user_R = user_movie_R.transpose()
@@ -193,6 +224,19 @@ class MovieLens(object):
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 
         return graph
+
+    def _generate_dec_graph(self, rating_pairs):
+        '''
+        user_movie_ratings_coo = sp.coo_matrix(
+            (rating_values, rating_pairs),
+            shape=(self._num_user, self._num_movie),dtype=np.float32)
+        movie_user_ratings_coo = user_movie_ratings_coo.transpose()
+        '''
+        ones = np.ones_like(rating_pairs[0])
+        user_movie_ratings_coo = sp.coo_matrix(
+            (ones, rating_pairs),
+            shape=(self.num_user, self.num_movie), dtype=np.float32)
+        return dgl.bipartite(user_movie_ratings_coo, 'user', 'rate', 'movie')
 
     @property
     def num_links(self):
@@ -422,39 +466,6 @@ class MovieLens(object):
                                          self.movie_info[GENRES]),
                                         axis=1)
         return movie_features
-
-
-    def compute_support(self, adj, num_links, symmetric):
-        adj_unnormalized_l = []
-        adj_train_int = sp.csr_matrix(adj, dtype=np.int32)
-        for i in range(num_links):
-            # build individual binary rating matrices (supports) for each rating
-            adj_unnormalized = sp.csr_matrix(adj_train_int == i + 1, dtype=np.float32)
-            adj_unnormalized_l.append(adj_unnormalized)
-
-        # degree_u and degree_v are row and column sums of adj+I
-        adj_tot = np.sum(adj for adj in adj_unnormalized_l)  ## it is just the original training adj
-        degree_u = np.asarray(adj_tot.sum(1)).flatten()
-        degree_v = np.asarray(adj_tot.sum(0)).flatten()
-        # set zeros to inf to avoid dividing by zero
-        degree_u[degree_u == 0.] = np.inf
-        degree_v[degree_v == 0.] = np.inf
-
-        degree_u_inv_sqrt = 1. / np.sqrt(degree_u)
-        degree_v_inv_sqrt = 1. / np.sqrt(degree_v)
-        degree_u_inv_sqrt_mat = sp.diags([degree_u_inv_sqrt], [0])
-        degree_v_inv_sqrt_mat = sp.diags([degree_v_inv_sqrt], [0])
-
-        degree_u_inv = degree_u_inv_sqrt_mat.dot(degree_u_inv_sqrt_mat)
-        support_sp_l = []
-        for adj in adj_unnormalized_l:
-            if symmetric:
-                sup = sp.coo_matrix(degree_u_inv_sqrt_mat.dot(adj).dot(degree_v_inv_sqrt_mat))
-            else:
-                sup = sp.csr_matrix(degree_u_inv.dot(adj))
-            print("sup.data", sup.nnz)
-            support_sp_l.append(sup)
-        return support_sp_l
 
 if __name__ == '__main__':
     MovieLens("ml-100k", ctx=mx.cpu(), symm=True)

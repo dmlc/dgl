@@ -65,18 +65,52 @@ class GCMCLayer(Block):
         return self.out_act(ufeat), self.out_act(ifeat)
 
 class BiDecoder(HybridBlock):
-    def __init__(self, in_units, out_units, num_basis_functions=2, prefix=None, params=None):
+    def __init__(self,
+                 rating_vals,
+                 in_units,
+                 num_basis_functions=2,
+                 prefix=None, params=None):
         super(BiDecoder, self).__init__(prefix=prefix, params=params)
+        self.rating_vals = rating_vals
         self._num_basis_functions = num_basis_functions
+        self.Ps = []
         with self.name_scope():
             for i in range(num_basis_functions):
-                self.__setattr__('weight{}'.format(i),
-                                 self.params.get('weight{}'.format(i), shape=(in_units, in_units),
-                                                 init=mx.initializer.Orthogonal(scale=1.1,
-                                                                                rand_type='normal'),
-                                                 allow_deferred_init=True))
-            self.rate_out = nn.Dense(units=out_units, flatten=False, use_bias=False, prefix="rate_")
+                self.Ps.append(self.params.get(
+                    'Ps_%d' % i, shape=(in_units, in_units),
+                    init=mx.initializer.Orthogonal(scale=1.1, rand_type='normal'),
+                    allow_deferred_init=True))
+            self.rate_out = nn.Dense(units=len(rating_vals), flatten=False, use_bias=False)
 
+    def forward(self, graph, ufeat, ifeat):
+        """Forward function.
+
+        Parameters
+        ----------
+        graph : DGLHeteroGraph
+            The user-movie rating graph.
+        ufeat : mx.nd.NDArray
+            User embeddings. Shape: (|V_u|, D)
+        ifeat : mx.nd.NDArray
+            Movie embeddings. Shape: (|V_m|, D)
+
+        Returns
+        -------
+        mx.nd.NDArray
+            Predicting scores for each user-movie edge.
+        """
+        graph = graph.local_var()
+        graph.nodes['movie'].data['h'] = ifeat
+        basis_out = []
+        for i in range(self._num_basis_functions):
+            graph.nodes['user'].data['h'] = F.dot(ufeat, self.Ps[i].data())
+            graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
+            basis_out.append(graph.edata['sr'].expand_dims(1))
+        out = F.concat(*basis_out, dim=1)
+        out = self.rate_out(out)
+        return out
+
+'''
     def hybrid_forward(self, F, data1, data2, **kwargs):
         basis_outputs_l = []
         for i in range(self._num_basis_functions):
@@ -86,7 +120,7 @@ class BiDecoder(HybridBlock):
         basis_outputs = F.concat(*basis_outputs_l, dim=1)
         out = self.rate_out(basis_outputs)
         return out
-
+'''
 
 class InnerProductLayer(HybridBlock):
     def __init__(self, mid_units=None, **kwargs):

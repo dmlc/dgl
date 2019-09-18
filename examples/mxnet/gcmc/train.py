@@ -26,48 +26,56 @@ class Net(Block):
                                      args.gcn_agg_accum,
                                      agg_act=self._act)
             if args.gen_r_use_classification:
-                self.gen_ratings = BiDecoder(in_units=args.gcn_out_units,
-                                             out_units=len(args.rating_vals),
-                                             num_basis_functions=args.gen_r_num_basis_func,
-                                             prefix='gen_rating')
+                self.decoder = BiDecoder(args.rating_vals,
+                                         in_units=args.gcn_out_units,
+                                         num_basis_functions=args.gen_r_num_basis_func,
+                                         prefix='gen_rating')
             else:
-                self.gen_ratings = InnerProductLayer(prefix='gen_rating')
+                self.decoder = InnerProductLayer(prefix='gen_rating')
 
 
-    def forward(self, graph, rating_node_pairs):
+    def forward(self, enc_graph, dec_graph):
         # start = time.time()
         user_out, movie_out = self.encoder(
-            graph, graph.nodes['user'].data['feat'], graph.nodes['movie'].data['feat'])
+            enc_graph,
+            enc_graph.nodes['user'].data['feat'],
+            enc_graph.nodes['movie'].data['feat'])
+        pred_ratings = self.decoder(dec_graph, user_out, movie_out)
+        return pred_ratings
         #print("The time for encoder is: {:.1f}s".format(time.time()-start))
         # Generate the predicted ratings
         #start = time.time()
-        rating_user_feat = mx.nd.take(user_out, rating_node_pairs[0])
-        rating_item_feat = mx.nd.take(movie_out, rating_node_pairs[1])
-        pred_ratings = self.gen_ratings(rating_user_feat, rating_item_feat)
+        #rating_user_feat = mx.nd.take(user_out, rating_node_pairs[0])
+        #rating_item_feat = mx.nd.take(movie_out, rating_node_pairs[1])
+        #pred_ratings = self.gen_ratings(rating_user_feat, rating_item_feat)
         #print("The time for decoder is: {:.1f}s".format(time.time()-start))
-        return pred_ratings
+        #return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
     nd_possible_rating_values = mx.nd.array(possible_rating_values, ctx=args.ctx, dtype=np.float32)
 
     if segment == "valid":
-        rating_pairs = dataset.valid_rating_pairs
-        rating_values = dataset.valid_rating_values
-        graph = dataset.train_graph
-    elif segment == "test":
-        rating_pairs = dataset.test_rating_pairs
-        rating_values = dataset.test_rating_values
-        graph = dataset.test_graph
+        #rating_pairs = dataset.valid_rating_pairs
+        #rating_values = dataset.valid_rating_values
+        rating_values = dataset.valid_truths
         #graph = dataset.train_graph
+        enc_graph = dataset.valid_enc_graph
+        dec_graph = dataset.valid_dec_graph
+    elif segment == "test":
+        #rating_pairs = dataset.test_rating_pairs
+        #rating_values = dataset.test_rating_values
+        rating_values = dataset.test_truths
+        enc_graph = dataset.test_enc_graph
+        dec_graph = dataset.test_dec_graph
     else:
         raise NotImplementedError
 
-    rating_pairs = mx.nd.array(rating_pairs, ctx=args.ctx, dtype=np.int64)
-    rating_values = mx.nd.array(rating_values, ctx=args.ctx, dtype=np.float32)
+    #rating_pairs = mx.nd.array(rating_pairs, ctx=args.ctx, dtype=np.int64)
+    #rating_values = mx.nd.array(rating_values, ctx=args.ctx, dtype=np.float32)
 
     # Evaluate RMSE
-    pred_ratings = net(graph, rating_pairs)
+    pred_ratings = net(enc_graph, dec_graph)
     if args.gen_r_use_classification:
         real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
@@ -78,7 +86,7 @@ def evaluate(args, net, dataset, segment='valid'):
         rmse = mx.nd.square(mx.nd.clip(pred_ratings.reshape((-1,)) * rating_std + rating_mean,
                                        possible_rating_values.min(),
                                        possible_rating_values.max()) - rating_values).mean().asscalar()
-    rmse  = np.sqrt(rmse)
+    rmse = np.sqrt(rmse)
     return rmse
 
 def train(args):
@@ -98,6 +106,7 @@ def train(args):
         nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
         rating_loss_net = gluon.loss.SoftmaxCELoss()
     else:
+        assert False
         rating_mean = dataset.train_rating_values.mean()
         rating_std = dataset.train_rating_values.std()
         rating_loss_net = gluon.loss.L2Loss()
@@ -106,8 +115,10 @@ def train(args):
     print("Loading network finished ...\n")
 
     ### perpare training data
-    train_rating_pairs = mx.nd.array(dataset.train_rating_pairs, ctx=args.ctx, dtype=np.int64)
-    train_gt_ratings = mx.nd.array(dataset.train_rating_values, ctx=args.ctx, dtype=np.float32)
+    #train_rating_pairs = mx.nd.array(dataset.train_rating_pairs, ctx=args.ctx, dtype=np.int64)
+    #train_gt_ratings = mx.nd.array(dataset.train_rating_values, ctx=args.ctx, dtype=np.float32)
+    train_gt_labels = dataset.train_labels
+    train_gt_ratings = dataset.train_truths
 
     ### prepare the logger
     train_loss_logger = MetricLogger(['iter', 'loss', 'rmse'], ['%d', '%.4f', '%.4f'],
@@ -128,14 +139,10 @@ def train(args):
 
     print("Start training ...")
     for iter_idx in range(1, args.train_max_iter):
-        if args.gen_r_use_classification:
-            train_gt_label = mx.nd.array(np.searchsorted(
-                dataset.possible_rating_values, dataset.train_rating_values),
-                ctx=args.ctx, dtype=np.int32)
         with mx.autograd.record():
-            pred_ratings = net(dataset.train_graph, train_rating_pairs)
+            pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph)
             if args.gen_r_use_classification:
-                loss = rating_loss_net(pred_ratings, train_gt_label).mean()
+                loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
             else:
                 loss = rating_loss_net(mx.nd.reshape(pred_ratings, shape=(-1,)),
                                        (train_gt_ratings - rating_mean) / rating_std ).mean()
