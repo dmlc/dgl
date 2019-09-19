@@ -34,22 +34,16 @@ class Net(Block):
                 self.decoder = InnerProductLayer(prefix='gen_rating')
 
 
-    def forward(self, enc_graph, dec_graph):
+    def forward(self, enc_graph, dec_graph, ufeat, ifeat):
         # start = time.time()
         user_out, movie_out = self.encoder(
             enc_graph,
-            enc_graph.nodes['user'].data['feat'],
-            enc_graph.nodes['movie'].data['feat'])
-        pred_ratings = self.decoder(dec_graph, user_out, movie_out)
-        return pred_ratings
+            ufeat,
+            ifeat)
         #print("The time for encoder is: {:.1f}s".format(time.time()-start))
-        # Generate the predicted ratings
-        #start = time.time()
-        #rating_user_feat = mx.nd.take(user_out, rating_node_pairs[0])
-        #rating_item_feat = mx.nd.take(movie_out, rating_node_pairs[1])
-        #pred_ratings = self.gen_ratings(rating_user_feat, rating_item_feat)
+        pred_ratings = self.decoder(dec_graph, user_out, movie_out)
         #print("The time for decoder is: {:.1f}s".format(time.time()-start))
-        #return pred_ratings
+        return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
@@ -75,7 +69,9 @@ def evaluate(args, net, dataset, segment='valid'):
     #rating_values = mx.nd.array(rating_values, ctx=args.ctx, dtype=np.float32)
 
     # Evaluate RMSE
-    pred_ratings = net(enc_graph, dec_graph)
+    with mx.autograd.predict_mode():
+        pred_ratings = net(enc_graph, dec_graph,
+                           dataset.user_feature, dataset.movie_feature)
     if args.gen_r_use_classification:
         real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
@@ -140,7 +136,8 @@ def train(args):
     print("Start training ...")
     for iter_idx in range(1, args.train_max_iter):
         with mx.autograd.record():
-            pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph)
+            pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph,
+                               dataset.user_feature, dataset.movie_feature)
             if args.gen_r_use_classification:
                 loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
             else:

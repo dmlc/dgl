@@ -73,8 +73,13 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = mx.nd.array(np.eye(self.num_user), ctx=ctx, dtype=np.float32)
-            self.movie_feature = mx.nd.array(np.eye(self.num_movie), ctx=ctx, dtype=np.float32)
+            #self.user_feature = mx.nd.array(np.eye(self.num_user), ctx=ctx, dtype=np.float32)
+            #self.movie_feature = mx.nd.array(np.eye(self.num_movie), ctx=ctx, dtype=np.float32)
+            identity_feature = sp.eye(self.num_user + self.num_movie, format='csr')
+            self.user_feature = mx.nd.sparse.array(identity_feature[0:self.num_user],
+                                                   ctx=ctx, dtype=np.float32)
+            self.movie_feature = mx.nd.sparse.array(identity_feature[self.num_user:self.num_user+self.num_movie],
+                                                    ctx=ctx, dtype=np.float32)
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
             self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)
@@ -115,8 +120,6 @@ class MovieLens(object):
             return labels
 
         self.train_enc_graph = self._generate_enc_graph(train_rating_pairs, train_rating_values, add_support=True)
-        self.train_enc_graph.nodes['user'].data['feat'] = self.user_feature
-        self.train_enc_graph.nodes['movie'].data['feat'] = self.movie_feature
         self.train_dec_graph = self._generate_dec_graph(train_rating_pairs)
         self.train_labels = _make_labels(train_rating_values)
         self.train_truths = mx.nd.array(train_rating_values, ctx=ctx, dtype=np.float32)
@@ -127,14 +130,9 @@ class MovieLens(object):
         self.valid_truths = mx.nd.array(valid_rating_values, ctx=ctx, dtype=np.float32)
 
         self.test_enc_graph = self._generate_enc_graph(all_train_rating_pairs, all_train_rating_values, add_support=True)
-        self.test_enc_graph.nodes['user'].data['feat'] = self.user_feature
-        self.test_enc_graph.nodes['movie'].data['feat'] = self.movie_feature
         self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)
         self.test_labels = _make_labels(test_rating_values)
         self.test_truths = mx.nd.array(test_rating_values, ctx=ctx, dtype=np.float32)
-
-        #self.train_rating_pairs = train_rating_pairs
-        #self.train_rating_values = train_rating_values
 
         def _npairs(graph):
             rst = 0
@@ -160,7 +158,6 @@ class MovieLens(object):
         print("Test dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
             self.test_dec_graph.number_of_nodes('user'), self.test_dec_graph.number_of_nodes('movie'),
             self.test_dec_graph.number_of_edges()))
-        #print("Validation: #pairs:{}".format(len(self.valid_rating_pairs[0])))
 
     def _generate_pair_value(self, rating_info):
         rating_pairs = (np.array([self.global_user_id_map[ele] for ele in rating_info["user_id"]],
@@ -218,20 +215,14 @@ class MovieLens(object):
                 user_cj = _calc_norm(mx.nd.add_n(*user_cj))
                 movie_cj = _calc_norm(mx.nd.add_n(*movie_cj))
             else:
-                user_cj = mx.nd.zeros((self.num_user,))
-                movie_cj = mx.nd.zeros((self.num_movie,))
+                user_cj = mx.nd.ones((self.num_user,), ctx=self._ctx)
+                movie_cj = mx.nd.ones((self.num_movie,), ctx=self._ctx)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 
         return graph
 
     def _generate_dec_graph(self, rating_pairs):
-        '''
-        user_movie_ratings_coo = sp.coo_matrix(
-            (rating_values, rating_pairs),
-            shape=(self._num_user, self._num_movie),dtype=np.float32)
-        movie_user_ratings_coo = user_movie_ratings_coo.transpose()
-        '''
         ones = np.ones_like(rating_pairs[0])
         user_movie_ratings_coo = sp.coo_matrix(
             (ones, rating_pairs),

@@ -1,10 +1,13 @@
-import mxnet.ndarray as F
-import numpy as np
+import math
 import warnings
-from mxnet.gluon import nn, HybridBlock, Block
-from utils import get_activation
+
+import numpy as np
 import mxnet as mx
+import mxnet.ndarray as F
+from mxnet.gluon import nn, HybridBlock, Block
 import dgl.function as fn
+
+from utils import get_activation
 
 class GCMCLayer(Block):
     def __init__(self,
@@ -16,28 +19,45 @@ class GCMCLayer(Block):
                  dropout_rate=0.0,
                  agg='stack',  # or 'sum'
                  agg_act=None,
-                 out_act=None):
+                 out_act=None,
+                 share_user_item_param=False):
         super(GCMCLayer, self).__init__()
         self.rating_vals = rating_vals
         self.agg = agg
+        self.share_user_item_param = share_user_item_param
         with self.name_scope():
+            if share_user_item_param and user_in_units != movie_in_units:
+                raise ValueError('Sharing user and movie parameters requires the feature '
+                                 'dimensions of users and movies to be the same. Got %d and %d.'
+                                 % (user_in_units, movie_in_units))
             self.dropout = nn.Dropout(dropout_rate)
             self.W_r = {}
             for rating in rating_vals:
                 rating = str(rating)
-                self.W_r[rating] = self.params.get(
-                    'W_r_%s' % rating, shape=(user_in_units, msg_units),
-                    dtype=np.float32, allow_deferred_init=True)
-                self.W_r['rev-%s' % rating] = self.params.get(
-                    'revW_r_%s' % rating, shape=(movie_in_units, msg_units),
-                    dtype=np.float32, allow_deferred_init=True)
+                if share_user_item_param:
+                    self.W_r[rating] = self.params.get(
+                        'W_r_%s' % rating, shape=(user_in_units, msg_units),
+                        dtype=np.float32, allow_deferred_init=True)
+                    self.W_r['rev-%s' % rating] = self.W_r[rating]
+                else:
+                    self.W_r[rating] = self.params.get(
+                        'W_r_%s' % rating, shape=(user_in_units, msg_units),
+                        dtype=np.float32, allow_deferred_init=True)
+                    self.W_r['rev-%s' % rating] = self.params.get(
+                        'revW_r_%s' % rating, shape=(movie_in_units, msg_units),
+                        dtype=np.float32, allow_deferred_init=True)
             self.ufc = nn.Dense(out_units)
-            self.ifc = nn.Dense(out_units)
+            if share_user_item_param:
+                self.ifc = self.ufc
+            else:
+                self.ifc = nn.Dense(out_units)
             self.agg_act = get_activation(agg_act)
             self.out_act = get_activation(out_act)
 
     def forward(self, graph, ufeat, ifeat):
         funcs = {}
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
         # left norm
         ufeat = ufeat * graph.nodes['user'].data['cj']
         ifeat = ifeat * graph.nodes['movie'].data['cj']
@@ -45,15 +65,15 @@ class GCMCLayer(Block):
             rating = str(rating)
             # W_r * x
             graph.nodes['user'].data['h%d' % i] = mx.nd.dot(
-                self.dropout(ufeat), self.W_r[rating].data())
+                ufeat, self.W_r[rating].data())
             graph.nodes['movie'].data['h%d' % i] = mx.nd.dot(
-                self.dropout(ifeat), self.W_r['rev-%s' % rating].data())
+                ifeat, self.W_r['rev-%s' % rating].data())
             funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
             funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
         # message passing
         graph.multi_update_all(funcs, self.agg)
-        ufeat = graph.nodes['user'].data.pop('h')
-        ifeat = graph.nodes['movie'].data.pop('h')
+        ufeat = graph.nodes['user'].data.pop('h').reshape((ufeat.shape[0], -1))
+        ifeat = graph.nodes['movie'].data.pop('h').reshape((ifeat.shape[0], -1))
         # right norm
         ufeat = ufeat * graph.nodes['user'].data['ci']
         ifeat = ifeat * graph.nodes['movie'].data['ci']
@@ -69,16 +89,19 @@ class BiDecoder(HybridBlock):
                  rating_vals,
                  in_units,
                  num_basis_functions=2,
+                 dropout_rate=0.0,
                  prefix=None, params=None):
         super(BiDecoder, self).__init__(prefix=prefix, params=params)
         self.rating_vals = rating_vals
         self._num_basis_functions = num_basis_functions
+        self.dropout = nn.Dropout(dropout_rate)
         self.Ps = []
         with self.name_scope():
             for i in range(num_basis_functions):
                 self.Ps.append(self.params.get(
                     'Ps_%d' % i, shape=(in_units, in_units),
-                    init=mx.initializer.Orthogonal(scale=1.1, rand_type='normal'),
+                    #init=mx.initializer.Orthogonal(scale=1.1, rand_type='normal'),
+                    init=mx.initializer.Xavier(magnitude=math.sqrt(2.0)),
                     allow_deferred_init=True))
             self.rate_out = nn.Dense(units=len(rating_vals), flatten=False, use_bias=False)
 
@@ -100,6 +123,8 @@ class BiDecoder(HybridBlock):
             Predicting scores for each user-movie edge.
         """
         graph = graph.local_var()
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
         graph.nodes['movie'].data['h'] = ifeat
         basis_out = []
         for i in range(self._num_basis_functions):
@@ -109,18 +134,6 @@ class BiDecoder(HybridBlock):
         out = F.concat(*basis_out, dim=1)
         out = self.rate_out(out)
         return out
-
-'''
-    def hybrid_forward(self, F, data1, data2, **kwargs):
-        basis_outputs_l = []
-        for i in range(self._num_basis_functions):
-            basis_out = F.sum(F.dot(data1, kwargs["weight{}".format(i)]) * data2,
-                              axis=1, keepdims=True)
-            basis_outputs_l.append(basis_out)
-        basis_outputs = F.concat(*basis_outputs_l, dim=1)
-        out = self.rate_out(basis_outputs)
-        return out
-'''
 
 class InnerProductLayer(HybridBlock):
     def __init__(self, mid_units=None, **kwargs):
