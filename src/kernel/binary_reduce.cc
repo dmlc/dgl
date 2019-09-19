@@ -10,7 +10,7 @@
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
 #include "../c_api_common.h"
-#include "../graph/bipartite.h"
+#include "../graph/unit_graph.h"
 #include "./csr_interface.h"
 
 using namespace dgl::runtime;
@@ -243,9 +243,9 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
   const ImmutableGraph* gptr_;
 };
 
-class BipartiteCSRWrapper : public CSRWrapper {
+class UnitGraphCSRWrapper : public CSRWrapper {
  public:
-  explicit BipartiteCSRWrapper(const Bipartite* graph) :
+  explicit UnitGraphCSRWrapper(const UnitGraph* graph) :
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
@@ -265,7 +265,7 @@ class BipartiteCSRWrapper : public CSRWrapper {
   }
 
  private:
-  const Bipartite* gptr_;
+  const UnitGraph* gptr_;
 };
 
 }  // namespace
@@ -350,9 +350,9 @@ void BinaryOpReduce(
     {__VA_ARGS__}                                                 \
   } else if (ObjectTypeChecker<HeteroGraphRef>::Check(sptr.get())) { \
     HeteroGraphRef g = argval;                                    \
-    auto bgptr = std::dynamic_pointer_cast<Bipartite>(g.sptr());  \
+    auto bgptr = std::dynamic_pointer_cast<UnitGraph>(g.sptr());  \
     CHECK_NOTNULL(bgptr);                                         \
-    BipartiteCSRWrapper wrapper(bgptr.get());                     \
+    UnitGraphCSRWrapper wrapper(bgptr.get());                     \
     {__VA_ARGS__}                                                 \
   }                                                               \
 } while (0)

@@ -8,6 +8,7 @@
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/c_object_api.h>
 #include <dgl/runtime/object.h>
+#include <dgl/runtime/ndarray.h>
 #include <dgl/packed_func_ext.h>
 #include <vector>
 #include <string>
@@ -62,6 +63,9 @@ struct APIAttrGetter : public AttrVisitor {
       found_object_ref = true;
     }
   }
+  void Visit(const char* key, NDArray* value) final {
+    if (skey == key) *ret = value[0];
+  }
 };
 
 struct APIAttrDir : public AttrVisitor {
@@ -86,6 +90,9 @@ struct APIAttrDir : public AttrVisitor {
     names->push_back(key);
   }
   void Visit(const char* key, ObjectRef* value) final {
+    names->push_back(key);
+  }
+  void Visit(const char* key, NDArray* value) final {
     names->push_back(key);
   }
 };
