@@ -9,7 +9,6 @@ import torch.nn as nn
 import dgl.function as DGLF
 from dgl import DGLGraph, mean_nodes
 
-from .chemutils import get_mol
 from .nnutils import cuda
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na',
@@ -57,16 +56,12 @@ def mol2dgl_single(cand_batch):
     tree_mess_target_edges = []  # these edges on candidate graphs
     tree_mess_target_nodes = []
     n_nodes = 0
-    n_edges = 0
     atom_x = []
     bond_x = []
 
     for mol, mol_tree, ctr_node_id in cand_batch:
         n_atoms = mol.GetNumAtoms()
-        n_bonds = mol.GetNumBonds()
 
-        ctr_node = mol_tree.nodes_dict[ctr_node_id]
-        ctr_bid = ctr_node['idx']
         g = DGLGraph()
 
         for i, atom in enumerate(mol.GetAtoms()):

@@ -1,4 +1,5 @@
 """Utilities for using pretrained models."""
+import os
 import torch
 from rdkit import Chem
 
@@ -8,7 +9,7 @@ from .dgmg import DGMG
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .schnet import SchNet
-from ...data.utils import _get_dgl_url, download, get_download_dir
+from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 
 URL = {
     'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
@@ -122,7 +123,13 @@ def load_pretrained(model_name, log=True):
         model = MPNNModel(output_dim=12)
 
     elif model_name == "JTNN_ZINC":
-        vocab_file = '{}/jtnn/{}.txt'.format(get_download_dir(), 'vocab')
+        default_dir = get_download_dir()
+        vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
+        if not os.path.exists(vocab_file):
+            zip_file_path = '{}/jtnn.zip'.format(default_dir)
+            download('https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip',
+                     path=zip_file_path)
+            extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
         model = DGLJTNNVAE(vocab_file=vocab_file,
                            depth=3,
                            hidden_size=450,

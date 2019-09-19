@@ -1129,10 +1129,13 @@ def from_edge_list(elist, is_multigraph, readonly):
 
     Parameters
     ---------
-    elist : list
-        List of (u, v) edge tuple.
+    elist : list, tuple
+        List of (u, v) edge tuple, or a tuple of src/dst lists
     """
-    src, dst = zip(*elist)
+    if isinstance(elist, tuple):
+        src, dst = elist
+    else:
+        src, dst = zip(*elist)
     src = np.array(src)
     dst = np.array(dst)
     src_ids = utils.toindex(src)
