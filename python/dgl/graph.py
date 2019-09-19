@@ -3337,8 +3337,9 @@ class DGLGraph(DGLBaseGraph):
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
+        return self
+            
     # pylint: enable=invalid-name
-
     def local_var(self):
         """Return a graph object that can be used in a local function scope.
 
