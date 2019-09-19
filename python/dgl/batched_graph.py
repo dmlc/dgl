@@ -6,6 +6,7 @@ import numpy as np
 
 from .base import ALL, is_all, DGLError
 from .frame import FrameRef, Frame
+from .view import GraphLevelDataView
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
@@ -328,6 +329,7 @@ def unbatch(graph):
     # split the frames
     node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
     edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
+    graph_frame = [GraphLevelDataView() for n in range(bsize)]
     for attr, col in graph._node_frame.items():
         col_splits = F.split(col, bnn, dim=0)
         for i in range(bsize):
@@ -336,6 +338,7 @@ def unbatch(graph):
         col_splits = F.split(col, bne, dim=0)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]
+    for attr, gdata in graph._graph_frame
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i],
