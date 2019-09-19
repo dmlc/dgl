@@ -18,6 +18,7 @@ namespace runtime {
 // forward declaration
 class Object;
 class ObjectRef;
+class NDArray;
 
 /*!
  * \brief Visitor class to each object attribute.
@@ -33,6 +34,7 @@ class AttrVisitor {
   virtual void Visit(const char* key, bool* value) = 0;
   virtual void Visit(const char* key, std::string* value) = 0;
   virtual void Visit(const char* key, ObjectRef* value) = 0;
+  virtual void Visit(const char* key, NDArray* value) = 0;
   template<typename ENum,
            typename = typename std::enable_if<std::is_enum<ENum>::value>::type>
   void Visit(const char* key, ENum* ptr) {

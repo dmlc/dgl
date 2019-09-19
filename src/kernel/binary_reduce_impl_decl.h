@@ -37,9 +37,7 @@ struct GData {
   // length along x(feature) dimension
   int64_t x_length{0};
   // size of data, can be single value or a vector
-  int64_t data_len;
-  // number of rows of the output tensor
-  int64_t out_size{0};
+  int64_t data_len{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // output data
@@ -122,9 +120,7 @@ struct BackwardGData {
   // length along x(feature) dimension
   int64_t x_length{0};
   // size of data, can be single value or a vector
-  int64_t data_len;
-  // number of rows of the output tensor
-  int64_t out_size{0};
+  int64_t data_len{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr}, *out_data{nullptr};
   DType *grad_out_data{nullptr};
@@ -227,7 +223,7 @@ struct BcastGData {
   int64_t lhs_shape[NDim]{0}, lhs_stride[NDim]{0};
   int64_t rhs_shape[NDim]{0}, rhs_stride[NDim]{0};
   // size of data, can be single value or a vector
-  int64_t data_len;
+  int64_t data_len{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // input id mappings
@@ -333,7 +329,7 @@ struct BackwardBcastGData {
   int64_t rhs_shape[NDim]{0}, rhs_stride[NDim]{0};
   int64_t out_shape[NDim]{0}, out_stride[NDim]{0};
   // size of data, can be single value or a vector
-  int64_t data_len;
+  int64_t data_len{0};
   // input id mappings
   Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr}, *out_mapping{nullptr};
   // input data
