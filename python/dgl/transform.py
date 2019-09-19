@@ -460,7 +460,7 @@ def remove_self_loop(g):
 
     Examples
     ---------
-    
+
     >>> g = DGLGraph()
     >>> g.add_nodes(5)
     >>> g.add_edges([0, 1, 2], [1, 1, 2])
