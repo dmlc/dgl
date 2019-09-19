@@ -361,7 +361,7 @@ def zerocopy_from_dgl_ndarray(arr):
 def one_hot(t, num_classes):
     if num_classes == -1:
         num_classes = mx.nd.max(t)
-    return mx.nd.one.hot(t, num_classes)
+    return mx.nd.one_hot(t, num_classes)
 
 class BinaryReduce(mx.autograd.Function):
     def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
