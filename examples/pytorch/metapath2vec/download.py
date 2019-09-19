@@ -26,9 +26,10 @@ class AminerDataset(object):
 
         self.url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/aminer.zip'
 
-        if not os.path.exists(os.path.join(path, 'aminer')):
+        if not os.path.exists(os.path.join(path, 'aminer.txt')):
             print('File not found. Downloading from', self.url)
             self._download_and_extract(path, 'aminer.zip')
+        self.fn = os.path.join(path, 'aminer.txt')
 
     def _download_and_extract(self, path, filename):
         import shutil, zipfile, zlib
@@ -36,10 +37,6 @@ class AminerDataset(object):
         import urllib.request
 
         fn = os.path.join(path, filename)
-
-        if os.path.exists(path):
-            shutil.rmtree(path, ignore_errors=True)
-        os.makedirs(path)
         with PBar() as pb:
             urllib.request.urlretrieve(self.url, fn, pb)
         print('Download finished. Unzipping the file...')
@@ -47,4 +44,3 @@ class AminerDataset(object):
         with zipfile.ZipFile(fn) as zf:
             zf.extractall(path)
         print('Unzip finished.')
-        self.fn = fn

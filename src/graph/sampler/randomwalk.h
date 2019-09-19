@@ -4,6 +4,9 @@
  * \brief DGL sampler header.
  */
 
+#ifndef DGL_GRAPH_SAMPLER_RANDOMWALK_H_
+#define DGL_GRAPH_SAMPLER_RANDOMWALK_H_
+
 #include <dgl/runtime/object.h>
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -107,3 +110,5 @@ RandomWalkTracesPtr BipartiteSingleSidedRandomWalkWithRestart(
 };  // namespace sampling
 
 };  // namespace dgl
+
+#endif  // DGL_GRAPH_SAMPLER_RANDOMWALK_H_

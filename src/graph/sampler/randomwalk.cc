@@ -13,6 +13,7 @@
 #include <cmath>
 #include <numeric>
 #include <functional>
+#include <vector>
 #include "randomwalk.h"
 #include "../../c_api_common.h"
 
