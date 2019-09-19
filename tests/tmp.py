@@ -45,11 +45,12 @@ def tree2():
     return g
 
 
-def test_batch_unbatch():
-    t1 = tree1()
-    t2 = tree2()
+# def test_batch_unbatch():
+t1 = tree1()
+t2 = tree2()
 
-    bg = dgl.batch([t1, t2])
+bg = dgl.batch([t1, t2])
+    # return bg
 
 
-test_batch_unbatch()
+# test_batch_unbatch()
