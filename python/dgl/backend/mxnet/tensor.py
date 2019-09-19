@@ -360,7 +360,7 @@ def zerocopy_from_dgl_ndarray(arr):
 
 def one_hot(t, num_classes):
     if num_classes == -1:
-        num_classes = mx.nd.max(t).asscalar()
+        num_classes = mx.nd.max(t).asscalar() + 1
     return mx.nd.one_hot(t, num_classes)
 
 class BinaryReduce(mx.autograd.Function):
