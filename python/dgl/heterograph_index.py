@@ -1008,6 +1008,7 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
 
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
+    """FlattenedHeteroGraph object class in C++ backend."""
     pass
 
 _init_api("dgl.heterograph_index")
