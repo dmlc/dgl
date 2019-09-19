@@ -116,10 +116,10 @@ def get_binary_mask(total_size, indices):
 
 def load_acm(remove_self_loop):
     url = 'dataset/ACM3025.pkl'
-    data_path = get_download_dir() + '/tox21.csv.gz'
+    data_path = get_download_dir() + '/ACM3025.pkl'
     download(_get_dgl_url(url), path=data_path)
 
-    with open('./data/ACM3025.pkl', 'rb') as f:
+    with open(data_path, 'rb') as f:
         data = pickle.load(f)
 
     labels, features = torch.from_numpy(data['label'].todense()).long(), \
