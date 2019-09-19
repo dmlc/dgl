@@ -10,7 +10,8 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop', 'onehot_degree', 'remove_self_loop']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
+           'onehot_degree', 'remove_self_loop']
 
 
 def pairwise_squared_distance(x):
@@ -411,7 +412,7 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
     -----------
     g: DGLGraph
     max_degress: int
-        Maximum degree for one-hot encoding. If it's -1, 
+        Maximum degree for one-hot encoding. If it's -1,
         the maximum degree would be infered from the input graph.
     out_field: str
         Field name for the node feature
@@ -445,7 +446,7 @@ def to_self_loop(g):
     """
     nodes = np.arange(g.number_of_nodes())
     has_self_edges = F.zerocopy_to_numpy(g.has_edges_between(nodes, nodes))
-    remain_nodes_wo_selfloop = np.where(has_self_edges==0)[0]
+    remain_nodes_wo_selfloop = np.where(has_self_edges == 0)[0]
     if g.is_readonly:
         g.readonly(False)
         g.add_edges(remain_nodes_wo_selfloop, remain_nodes_wo_selfloop)
@@ -481,5 +482,6 @@ def remove_self_loop(g):
         g.readonly()
     else:
         g.remove_edges(selfloop_ids)
-    
+
+
 _init_api("dgl.transform")

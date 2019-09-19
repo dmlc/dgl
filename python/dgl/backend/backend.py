@@ -1184,7 +1184,7 @@ def one_hot(t, num_classes):
 
     Parameters
     --------------
-    t: 
+    t: tensor
         class values of any shape.
     num_classes: int
         Total number of classes. If set to -1, the number
