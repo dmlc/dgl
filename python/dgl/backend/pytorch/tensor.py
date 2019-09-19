@@ -281,6 +281,9 @@ def zerocopy_to_dgl_ndarray(input):
 def zerocopy_from_dgl_ndarray(input):
     return dlpack.from_dlpack(input.to_dlpack())
 
+def one_hot(t, num_classes):
+    return th.nn.functional.one_hot(t, num_classes)
+
 
 class BinaryReduce(th.autograd.Function):
     @staticmethod

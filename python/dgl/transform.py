@@ -10,7 +10,7 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop', 'onehot_degree', 'remove_self_loop']
 
 
 def pairwise_squared_distance(x):
@@ -403,4 +403,83 @@ def laplacian_lambda_max(g):
                                       return_eigenvectors=False)[0].real)
     return rst
 
+
+def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
+    """Inplace add one-hot degree vector as node feature
+
+    Parameters
+    -----------
+    g: DGLGraph
+    max_degress: int
+        Maximum degree for one-hot encoding. If it's -1, 
+        the maximum degree would be infered from the input graph.
+    out_field: str
+        Field name for the node feature
+    direction: str
+        Either "in" or "out". Specify whether to use in degrees or out degrees.
+    """
+    if direction == "in":
+        degrees = g.in_degrees()
+    elif direction == "out":
+        degrees = g.out_degrees()
+    else:
+        raise RuntimeError("Invalid Direction")
+    g.ndata[out_field] = F.one_hot(degrees, max_degree)
+
+def to_self_loop(g):
+    """Make graph contains exactly one self loop for each node.
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> g.edges()
+    (tensor([0, 1, 2, 0, 3, 4]), tensor([1, 1, 2, 0, 3, 4]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+    """
+    nodes = np.arange(g.number_of_nodes())
+    has_self_edges = F.zerocopy_to_numpy(g.has_edges_between(nodes, nodes))
+    remain_nodes_wo_selfloop = np.where(has_self_edges==0)[0]
+    if g.is_readonly:
+        g.readonly(False)
+        g.add_edges(remain_nodes_wo_selfloop, remain_nodes_wo_selfloop)
+        g.readonly()
+    else:
+        g.add_edges(remain_nodes_wo_selfloop, remain_nodes_wo_selfloop)
+
+
+def remove_self_loop(g):
+    """Make graph contains exactly one self loop.
+
+    Examples
+    ---------
+    
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
+    >>> g.edges()
+    (tensor([0]), tensor([1]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+    """
+    nodes = np.arange(g.number_of_nodes())
+    has_self_edges = F.zerocopy_to_numpy(g.has_edges_between(nodes, nodes))
+    nodes_w_selfloop = np.where(has_self_edges == 1)[0]
+    selfloop_ids = g.edge_ids(nodes_w_selfloop, nodes_w_selfloop)
+    if g.is_readonly:
+        g.readonly(False)
+        g.remove_edges(selfloop_ids)
+        g.readonly()
+    else:
+        g.remove_edges(selfloop_ids)
+    
 _init_api("dgl.transform")

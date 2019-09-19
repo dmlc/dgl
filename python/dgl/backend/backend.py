@@ -1177,6 +1177,27 @@ def zerocopy_from_dgl_ndarray(input):
     """
     pass
 
+
+def one_hot(t, num_classes):
+    """
+    Conver tensor to one-hot tensor
+
+    Parameters
+    --------------
+    t: 
+        class values of any shape.
+    num_classes: int
+        Total number of classes. If set to -1, the number
+        of classes will be inferred as one greater than the largest class
+        value in the input tensor.
+    
+    Returns
+    -------
+    Tensor
+    """
+    pass
+
+
 ###############################################################################
 # Custom Operators for graph level computations.
 
