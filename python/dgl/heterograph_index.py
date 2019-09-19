@@ -76,8 +76,8 @@ class HeteroGraphIndex(ObjectBase):
 
         Returns
         -------
-        HeteroGraphIndex
-            The unitgraph graph.
+        FlattenedHeteroGraph
+            A flattened heterograph object
         """
         return _CAPI_DGLHeteroGetFlattenedGraph(self, etypes)
 
@@ -1005,5 +1005,9 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+
+@register_object("graph.FlattenedHeteroGraph")
+class FlattenedHeteroGraph(ObjectBase):
+    pass
 
 _init_api("dgl.heterograph_index")

@@ -4,7 +4,6 @@
  * \brief DGL sampler implementation
  */
 
-#include <dgl/sampler.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
@@ -14,11 +13,14 @@
 #include <cmath>
 #include <numeric>
 #include <functional>
-#include "../c_api_common.h"
+#include "randomwalk.h"
+#include "../../c_api_common.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
+
+namespace sampling {
 
 using Walker = std::function<dgl_id_t(const GraphInterface *, dgl_id_t)>;
 
@@ -92,7 +94,7 @@ IdArray GenericRandomWalk(
   return traces;
 }
 
-RandomWalkTraces GenericRandomWalkWithRestart(
+RandomWalkTracesPtr GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -144,37 +146,32 @@ RandomWalkTraces GenericRandomWalkWithRestart(
     trace_counts.push_back(num_traces);
   }
 
-  RandomWalkTraces traces;
-  traces.trace_counts = IdArray::Empty(
+  RandomWalkTraces *traces = new RandomWalkTraces;
+  traces->trace_counts = IdArray::Empty(
       {static_cast<int64_t>(trace_counts.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
-  traces.trace_lengths = IdArray::Empty(
+  traces->trace_lengths = IdArray::Empty(
       {static_cast<int64_t>(trace_lengths.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
-  traces.vertices = IdArray::Empty(
+  traces->vertices = IdArray::Empty(
       {static_cast<int64_t>(vertices.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
 
-  dgl_id_t *trace_counts_data = static_cast<dgl_id_t *>(traces.trace_counts->data);
-  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces.trace_lengths->data);
-  dgl_id_t *vertices_data = static_cast<dgl_id_t *>(traces.vertices->data);
+  dgl_id_t *trace_counts_data = static_cast<dgl_id_t *>(traces->trace_counts->data);
+  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces->trace_lengths->data);
+  dgl_id_t *vertices_data = static_cast<dgl_id_t *>(traces->vertices->data);
 
   std::copy(trace_counts.begin(), trace_counts.end(), trace_counts_data);
   std::copy(trace_lengths.begin(), trace_lengths.end(), trace_lengths_data);
   std::copy(vertices.begin(), vertices.end(), vertices_data);
 
-  return traces;
+  return RandomWalkTracesPtr(traces);
 }
 
 };  // namespace
-
-PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
-  return ConvertNDArrayVectorToPackedFunc({
-      t.trace_counts, t.trace_lengths, t.vertices});
-}
 
 IdArray RandomWalk(
     const GraphInterface *gptr,
@@ -184,7 +181,7 @@ IdArray RandomWalk(
   return GenericRandomWalk(gptr, seeds, num_traces, num_hops, WalkMultipleHops<1>);
 }
 
-RandomWalkTraces RandomWalkWithRestart(
+RandomWalkTracesPtr RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -196,7 +193,7 @@ RandomWalkTraces RandomWalkWithRestart(
       max_frequent_visited_nodes, WalkMultipleHops<1>);
 }
 
-RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
+RandomWalkTracesPtr BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -208,7 +205,7 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
       max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
+DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     const IdArray seeds = args[1];
@@ -218,7 +215,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
     *rv = RandomWalk(g.sptr().get(), seeds, num_traces, num_hops);
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     const IdArray seeds = args[1];
@@ -227,12 +224,12 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
 
-    *rv = ConvertRandomWalkTracesToPackedFunc(
+    *rv = RandomWalkTracesRef(
         RandomWalkWithRestart(g.sptr().get(), seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     const IdArray seeds = args[1];
@@ -241,10 +238,12 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
 
-    *rv = ConvertRandomWalkTracesToPackedFunc(
+    *rv = RandomWalkTracesRef(
         BipartiteSingleSidedRandomWalkWithRestart(
           g.sptr().get(), seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
+
+};  // namespace sampling
 
 };  // namespace dgl

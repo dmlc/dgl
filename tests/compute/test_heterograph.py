@@ -49,8 +49,8 @@ def get_redfn(name):
 def test_create():
     g0 = create_test_heterograph()
     g1 = create_test_heterograph1()
-    assert set(g0.ntypes) == set(g1.ntypes)
-    assert set(g0.canonical_etypes) == set(g1.canonical_etypes)
+    assert g0.ntypes == g1.ntypes
+    assert g0.canonical_etypes == g1.canonical_etypes
 
     # create from nx complete bipartite graph
     nxg = nx.complete_bipartite_graph(3, 4)
@@ -598,59 +598,33 @@ def test_convert():
         assert np.asscalar(F.asnumpy(src_i)) == nid[src[i]]
         assert np.asscalar(F.asnumpy(dst_i)) == nid[dst[i]]
 
-    mg = nx.MultiDiGraph([
-        ('user', 'user', 'follows'),
-        ('user', 'game', 'plays'),
-        ('user', 'game', 'wishes'),
-        ('developer', 'game', 'develops')])
-
-    for _mg in [None, mg]:
-        hg2 = dgl.to_hetero(
-                g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
-                ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
-        assert set(hg.ntypes) == set(hg2.ntypes)
-        assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
-        for ntype in hg.ntypes:
-            assert hg.number_of_nodes(ntype) == hg2.number_of_nodes(ntype)
-            assert F.array_equal(hg.nodes[ntype].data['h'], hg2.nodes[ntype].data['h'])
-        for canonical_etype in hg.canonical_etypes:
-            src, dst = hg.all_edges(etype=canonical_etype, order='eid')
-            src2, dst2 = hg2.all_edges(etype=canonical_etype, order='eid')
-            assert F.array_equal(src, src2)
-            assert F.array_equal(dst, dst2)
-            assert F.array_equal(hg.edges[canonical_etype].data['w'], hg2.edges[canonical_etype].data['w'])
+    hg2 = dgl.to_hetero(
+            g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
+            ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE)
+    assert set(hg.ntypes) == set(hg2.ntypes)
+    assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
+    for ntype in hg.ntypes:
+        assert hg.number_of_nodes(ntype) == hg2.number_of_nodes(ntype)
+        assert F.array_equal(hg.nodes[ntype].data['h'], hg2.nodes[ntype].data['h'])
+    for canonical_etype in hg.canonical_etypes:
+        src, dst = hg.all_edges(etype=canonical_etype, order='eid')
+        src2, dst2 = hg2.all_edges(etype=canonical_etype, order='eid')
+        assert F.array_equal(src, src2)
+        assert F.array_equal(dst, dst2)
+        assert F.array_equal(hg.edges[canonical_etype].data['w'], hg2.edges[canonical_etype].data['w'])
 
     # hetero_from_homo test case 2
     g = dgl.graph([(0, 2), (1, 2), (2, 3), (0, 3)])
     g.ndata[dgl.NTYPE] = F.tensor([0, 0, 1, 2])
     g.edata[dgl.ETYPE] = F.tensor([0, 0, 1, 2])
     hg = dgl.to_hetero(g, ['l0', 'l1', 'l2'], ['e0', 'e1', 'e2'])
-    assert set(hg.canonical_etypes) == set(
-        [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')])
+    assert hg.canonical_etypes == [('l0', 'e0', 'l1'), ('l1', 'e1', 'l2'), ('l0', 'e2', 'l2')]
     assert hg.number_of_nodes('l0') == 2
     assert hg.number_of_nodes('l1') == 1
     assert hg.number_of_nodes('l2') == 1
     assert hg.number_of_edges('e0') == 2
     assert hg.number_of_edges('e1') == 1
     assert hg.number_of_edges('e2') == 1
-
-    # hetero_from_homo test case 3
-    mg = nx.MultiDiGraph([
-        ('user', 'movie', 'watches'),
-        ('user', 'TV', 'watches')])
-    g = dgl.graph([(0, 1), (0, 2)])
-    g.ndata[dgl.NTYPE] = F.tensor([0, 1, 2])
-    g.edata[dgl.ETYPE] = F.tensor([0, 0])
-    for _mg in [None, mg]:
-        hg = dgl.to_hetero(g, ['user', 'TV', 'movie'], ['watches'], metagraph=_mg)
-        assert set(hg.canonical_etypes) == set(
-            [('user', 'watches', 'movie'), ('user', 'watches', 'TV')])
-        assert hg.number_of_nodes('user') == 1
-        assert hg.number_of_nodes('TV') == 1
-        assert hg.number_of_nodes('movie') == 1
-        assert hg.number_of_edges(('user', 'watches', 'TV')) == 1
-        assert hg.number_of_edges(('user', 'watches', 'movie')) == 1
-        assert len(hg.etypes) == 2
 
 def test_subgraph():
     g = create_test_heterograph()
