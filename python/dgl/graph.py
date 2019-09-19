@@ -13,7 +13,7 @@ from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from . import graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
-from .view import NodeView, EdgeView
+from .view import NodeView, EdgeView, GraphLevelDataView
 from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph']
@@ -912,6 +912,7 @@ class DGLGraph(DGLBaseGraph):
                  graph_data=None,
                  node_frame=None,
                  edge_frame=None,
+                 graph_frame=None,
                  multigraph=None,
                  readonly=False):
         # graph
@@ -930,6 +931,9 @@ class DGLGraph(DGLBaseGraph):
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
+            
+        self._graph_frame = GraphLevelDataView(graph_frame)
+            
         # message indicator:
         # if self._msg_index[eid] == 1, then edge eid has message
         self._msg_index = None
@@ -950,6 +954,10 @@ class DGLGraph(DGLBaseGraph):
 
     def _set_msg_index(self, index):
         self._msg_index = index
+    
+    @property
+    def gdata(self):
+        return self._graph_frame
 
     @property
     def _src_frame(self):

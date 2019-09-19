@@ -137,7 +137,7 @@ class BatchedDGLGraph(DGLGraph):
     tensor([[0., 0.],
             [0., 0.]])}
     """
-    def __init__(self, graph_list, node_attrs, edge_attrs):
+    def __init__(self, graph_list, node_attrs, edge_attrs, graph_attrs):
 
         def _get_num_item_and_attr_types(g, mode):
             if mode == 'node':
@@ -146,6 +146,9 @@ class BatchedDGLGraph(DGLGraph):
             elif mode == 'edge':
                 num_items = g.number_of_edges()
                 attr_types = set(g.edge_attr_schemes().keys())
+            elif mode == 'graph':
+                num_items = 1
+                attr_types = set(g.gdata.keys())
             return num_items, attr_types
 
         def _init_attrs(attrs, mode):
@@ -178,8 +181,11 @@ class BatchedDGLGraph(DGLGraph):
                 raise ValueError('Expected {} attrs to be of type None str or Iterable, '
                                  'got type {}'.format(mode, type(attrs)))
 
+        import ipdb
+        ipdb.set_trace()
         node_attrs = _init_attrs(node_attrs, 'node')
         edge_attrs = _init_attrs(edge_attrs, 'edge')
+        graph_attrs = _init_attrs(graph_attrs, 'graph')
 
         # create batched graph index
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
@@ -201,9 +207,17 @@ class BatchedDGLGraph(DGLGraph):
                     for key in edge_attrs}
             batched_edge_frame = FrameRef(Frame(cols))
 
+        if len(graph_attrs) == 0:
+            batched_gdata = {}
+        else:
+            batched_gdata = {key: F.cat([gr.gdata[key] for gr in graph_list], dim=0)
+                             for key in graph_attrs}
+
+
         super(BatchedDGLGraph, self).__init__(graph_data=batched_index,
                                               node_frame=batched_node_frame,
-                                              edge_frame=batched_edge_frame)
+                                              edge_frame=batched_edge_frame,
+                                              graph_frame=batched_gdata)
 
         # extra members
         self._batch_size = 0
@@ -324,9 +338,10 @@ def unbatch(graph):
             edge_frames[i][attr] = col_splits[i]
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
-                     edge_frame=edge_frames[i]) for i in range(bsize)]
+                     edge_frame=edge_frames[i],
+                     graph_frame=graph.gdata[i]) for i in range(bsize)]
 
-def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
+def batch(graph_list, node_attrs=ALL, edge_attrs=ALL, graph_attrs=ALL):
     """Batch a collection of :class:`~dgl.DGLGraph` and return a
     :class:`BatchedDGLGraph` object that is independent of the :attr:`graph_list`.
 
@@ -352,7 +367,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     BatchedDGLGraph
     unbatch
     """
-    return BatchedDGLGraph(graph_list, node_attrs, edge_attrs)
+    return BatchedDGLGraph(graph_list, node_attrs, edge_attrs, graph_attrs)
 
 
 READOUT_ON_ATTRS = {
