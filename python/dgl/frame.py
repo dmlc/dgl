@@ -172,6 +172,49 @@ class Column(object):
         else:
             return Column(data)
 
+class GraphLevelFrame(MutableMapping):
+    """The data view class when G.gdata[...] is called.
+    Guard value has to be backend tensor
+
+    Naming as GraphLevelDataView to distinguish from graph_data
+    """
+    __slots__ = ['_gdata']
+
+    def __init__(self, init_kv=None):
+        self._gdata = {}
+        if init_kv is not None:
+            self._gdata.update(init_kv)
+
+    def __getitem__(self, key):
+        return self._gdata[key]
+
+    def __setitem__(self, key, val):
+        if isinstance(val, np.ndarray):
+            val = F.zerocopy_from_numpy(val)
+        assert F.is_tensor(val), "Value has to be backend tensor"
+        self._gdata[key] = val
+
+    def __delitem__(self, key):
+        self._gdata.pop(key)
+
+    def __len__(self):
+        return len(self._gdata)
+
+    def __iter__(self):
+        return iter(self._gdata)
+
+    def __repr__(self):
+        return repr(self._gdata)
+    
+    @property
+    def schemes(self):
+        schemes = {}
+        for key, value in self._gdata.items():
+            schemes[key] = Scheme(tuple(F.shape(value)), F.dtype(value))
+        return schemes
+
+
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 

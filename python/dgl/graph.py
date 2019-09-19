@@ -9,11 +9,11 @@ import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
-from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
+from .frame import FrameRef, Frame, Scheme, sync_frame_initializer, GraphLevelFrame
 from . import graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
-from .view import NodeView, EdgeView, GraphLevelDataView
+from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph']
@@ -932,7 +932,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = edge_frame
             
-        self._graph_frame = GraphLevelDataView(graph_frame)
+        self._graph_frame = GraphLevelFrame(graph_frame)
             
         # message indicator:
         # if self._msg_index[eid] == 1, then edge eid has message
@@ -1512,6 +1512,34 @@ class DGLGraph(DGLBaseGraph):
         {'y': Scheme(shape=(4,), dtype=torch.float32)}
         """
         return self._edge_frame.schemes
+
+    def graph_attr_schemes(self):
+        """Return the edge feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of edge feature columns.
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+        >>> G.gdata['y'] = th.zeros((2, 4))
+        >>> G.graph_attr_schemes()
+        {'y': Scheme(shape=(4,), dtype=torch.float32)}
+        """
+        return self._graph_frame.schemes
 
     def set_n_initializer(self, initializer, field=None):
         """Set the initializer for empty node features.
@@ -3342,10 +3370,12 @@ class DGLGraph(DGLBaseGraph):
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'
                '         ndata_schemes={ndata}\n'
-               '         edata_schemes={edata})')
+               '         edata_schemes={edata})\n'
+               '         gdata_schemes={gdata}')
         return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                           ndata=str(self.node_attr_schemes()),
-                          edata=str(self.edge_attr_schemes()))
+                          edata=str(self.edge_attr_schemes()),
+                          gdata=str(self.graph_attr_schemes()))
 
     # pylint: disable=invalid-name
     def to(self, ctx):

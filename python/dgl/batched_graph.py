@@ -5,8 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from .base import ALL, is_all, DGLError
-from .frame import FrameRef, Frame
-from .view import GraphLevelDataView
+from .frame import FrameRef, Frame, GraphLevelFrame
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
@@ -182,8 +181,6 @@ class BatchedDGLGraph(DGLGraph):
                 raise ValueError('Expected {} attrs to be of type None str or Iterable, '
                                  'got type {}'.format(mode, type(attrs)))
 
-        import ipdb
-        ipdb.set_trace()
         node_attrs = _init_attrs(node_attrs, 'node')
         edge_attrs = _init_attrs(edge_attrs, 'edge')
         graph_attrs = _init_attrs(graph_attrs, 'graph')
@@ -211,7 +208,7 @@ class BatchedDGLGraph(DGLGraph):
         if len(graph_attrs) == 0:
             batched_gdata = {}
         else:
-            batched_gdata = {key: F.cat([gr.gdata[key] for gr in graph_list], dim=0)
+            batched_gdata = {key: F.stack([gr.gdata[key] for gr in graph_list], dim=0)
                              for key in graph_attrs}
 
 
@@ -329,7 +326,7 @@ def unbatch(graph):
     # split the frames
     node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
     edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
-    graph_frame = [GraphLevelDataView() for n in range(bsize)]
+    graph_frames = [GraphLevelFrame() for n in range(bsize)]
     for attr, col in graph._node_frame.items():
         col_splits = F.split(col, bnn, dim=0)
         for i in range(bsize):
@@ -338,11 +335,14 @@ def unbatch(graph):
         col_splits = F.split(col, bne, dim=0)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]
-    for attr, gdata in graph._graph_frame
+    for attr, col in graph._graph_frame.items():
+        col_splits = F.split(col, 1, dim=0)
+        for i in range(bsize):
+            graph_frames[i][attr] = col_splits[i]
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i],
-                     graph_frame=graph.gdata[i]) for i in range(bsize)]
+                     graph_frame=graph_frames[i]) for i in range(bsize)]
 
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL, graph_attrs=ALL):
     """Batch a collection of :class:`~dgl.DGLGraph` and return a
