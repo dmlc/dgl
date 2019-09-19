@@ -68,7 +68,7 @@ def test_metapath_random_walk():
         assert len(traces_per_seed) == 3
         for trace in traces_per_seed:
             assert len(trace) == 8
-            trace = np.insert(trace.numpy(), 0, seed)
+            trace = np.insert(F.asnumpy(trace), 0, seed)
             for i in range(4):
                 assert g1.has_edge_between(trace[2 * i], trace[2 * i + 1])
                 assert g2.has_edge_between(trace[2 * i + 1], trace[2 * i + 2])
