@@ -25,6 +25,11 @@ class GCMCLayer(Block):
         self.rating_vals = rating_vals
         self.agg = agg
         self.share_user_item_param = share_user_item_param
+        if agg == 'stack':
+            # divide the original msg unit size by number of ratings to keep
+            # the dimensionality
+            assert msg_units % len(rating_vals) == 0
+            msg_units = msg_units // len(rating_vals)
         with self.name_scope():
             if share_user_item_param and user_in_units != movie_in_units:
                 raise ValueError('Sharing user and movie parameters requires the feature '
@@ -80,6 +85,8 @@ class GCMCLayer(Block):
         # fc and non-linear
         ufeat = self.agg_act(ufeat)
         ifeat = self.agg_act(ifeat)
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
         ufeat = self.ufc(ufeat)
         ifeat = self.ifc(ifeat)
         return self.out_act(ufeat), self.out_act(ifeat)

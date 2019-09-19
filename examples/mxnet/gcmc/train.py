@@ -1,4 +1,4 @@
-import os
+import os, time
 import argparse
 import logging
 import random
@@ -87,7 +87,8 @@ def evaluate(args, net, dataset, segment='valid'):
 
 def train(args):
     print(args)
-    dataset = MovieLens(args.data_name, args.ctx, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm)
+    dataset = MovieLens(args.data_name, args.ctx, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+                        test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     print("Loading data finished ...\n")
 
     args.src_in_units = dataset.user_feature.shape[1]
@@ -102,7 +103,6 @@ def train(args):
         nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
         rating_loss_net = gluon.loss.SoftmaxCELoss()
     else:
-        assert False
         rating_mean = dataset.train_rating_values.mean()
         rating_std = dataset.train_rating_values.std()
         rating_loss_net = gluon.loss.L2Loss()
@@ -111,8 +111,6 @@ def train(args):
     print("Loading network finished ...\n")
 
     ### perpare training data
-    #train_rating_pairs = mx.nd.array(dataset.train_rating_pairs, ctx=args.ctx, dtype=np.int64)
-    #train_gt_ratings = mx.nd.array(dataset.train_rating_values, ctx=args.ctx, dtype=np.float32)
     train_gt_labels = dataset.train_labels
     train_gt_ratings = dataset.train_truths
 
@@ -134,7 +132,10 @@ def train(args):
     count_loss = 0
 
     print("Start training ...")
+    dur = []
     for iter_idx in range(1, args.train_max_iter):
+        if iter_idx > 3:
+            t0 = time.time()
         with mx.autograd.record():
             pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph,
                                dataset.user_feature, dataset.movie_feature)
@@ -149,6 +150,8 @@ def train(args):
         gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
         avg_gnorm += gnorm
         trainer.step(1.0) #, ignore_stale_grad=True)
+        if iter_idx > 3:
+            dur.append(time.time() - t0)
 
         if iter_idx == 1:
             print("Total #Param of net: %d" % (gluon_total_param_num(net)))
@@ -166,8 +169,10 @@ def train(args):
         if iter_idx % args.train_log_interval == 0:
             train_loss_logger.log(iter=iter_idx,
                                   loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
-            logging_str = "Iter={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}".format(
-                iter_idx, avg_gnorm/args.train_log_interval, count_loss/iter_idx, count_rmse/count_num)
+            logging_str = "Iter={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
+                iter_idx, avg_gnorm/args.train_log_interval,
+                count_loss/iter_idx, count_rmse/count_num,
+                np.average(dur))
             avg_gnorm = 0
             count_rmse = 0
             count_num = 0

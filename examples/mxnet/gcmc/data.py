@@ -19,7 +19,7 @@ GENRES_ML_10M = GENRES_ML_100K + ['IMAX']
 
 class MovieLens(object):
     def __init__(self, name, ctx, use_one_hot_fea=False, symm=True,
-                 test_ratio=0.1, valid_ratio = 0.1):
+                 test_ratio=0.1, valid_ratio=0.1):
         self._name = name
         self._ctx = ctx
         self._symm = symm
@@ -73,12 +73,9 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            #self.user_feature = mx.nd.array(np.eye(self.num_user), ctx=ctx, dtype=np.float32)
-            #self.movie_feature = mx.nd.array(np.eye(self.num_movie), ctx=ctx, dtype=np.float32)
-            identity_feature = sp.eye(self.num_user + self.num_movie, format='csr')
-            self.user_feature = mx.nd.sparse.array(identity_feature[0:self.num_user],
+            self.user_feature = mx.nd.sparse.array(sp.eye(self.num_user, format='csr'),
                                                    ctx=ctx, dtype=np.float32)
-            self.movie_feature = mx.nd.sparse.array(identity_feature[self.num_user:self.num_user+self.num_movie],
+            self.movie_feature = mx.nd.sparse.array(sp.eye(self.num_movie, format='csr'),
                                                     ctx=ctx, dtype=np.float32)
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
