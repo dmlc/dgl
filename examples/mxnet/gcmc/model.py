@@ -60,25 +60,28 @@ class GCMCLayer(Block):
             self.out_act = get_activation(out_act)
 
     def forward(self, graph, ufeat, ifeat):
+        num_u = graph.number_of_nodes('user')
+        num_i = graph.number_of_nodes('movie')
         funcs = {}
-        ufeat = self.dropout(ufeat)
-        ifeat = self.dropout(ifeat)
-        # left norm
-        ufeat = ufeat * graph.nodes['user'].data['cj']
-        ifeat = ifeat * graph.nodes['movie'].data['cj']
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating)
             # W_r * x
-            graph.nodes['user'].data['h%d' % i] = mx.nd.dot(
-                ufeat, self.W_r[rating].data())
-            graph.nodes['movie'].data['h%d' % i] = mx.nd.dot(
-                ifeat, self.W_r['rev-%s' % rating].data())
+            x_u = dot_or_identity(ufeat, self.W_r[rating].data())
+            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating].data())
+            # left norm
+            x_u = x_u * graph.nodes['user'].data['cj']
+            x_i = x_i * graph.nodes['movie'].data['cj']
+            # dropout (TODO: row dropout)
+            x_u = self.dropout(x_u)
+            x_i = self.dropout(x_i)
+            graph.nodes['user'].data['h%d' % i] = x_u
+            graph.nodes['movie'].data['h%d' % i] = x_i
             funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
             funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
         # message passing
         graph.multi_update_all(funcs, self.agg)
-        ufeat = graph.nodes['user'].data.pop('h').reshape((ufeat.shape[0], -1))
-        ifeat = graph.nodes['movie'].data.pop('h').reshape((ifeat.shape[0], -1))
+        ufeat = graph.nodes['user'].data.pop('h').reshape((num_u, -1))
+        ifeat = graph.nodes['movie'].data.pop('h').reshape((num_i, -1))
         # right norm
         ufeat = ufeat * graph.nodes['user'].data['ci']
         ifeat = ifeat * graph.nodes['movie'].data['ci']
@@ -155,3 +158,10 @@ class InnerProductLayer(HybridBlock):
             data2 = self._mid_map(data2)
         score = F.sum(data1 * data2, axis=1, keepdims=True)
         return score
+
+def dot_or_identity(A, B):
+    # if A is None, treat as identity matrix
+    if A is None:
+        return B
+    else:
+        return mx.nd.dot(A, B)

@@ -47,5 +47,7 @@ Results: RMSE=0.8377 (0.832 reported)
 ml-10m, no feature
 ```bash
 DGLBACKEND=mxnet python train.py --data_name=ml-10m --gcn_agg_accum=stack --gcn_dropout=0.3 \
-                                 --train_lr=0.001 --train_min_lr=0.0001 --train_max_iter=15000
+                                 --train_lr=0.001 --train_min_lr=0.0001 --train_max_iter=15000 \
+                                 --use_one_hot_fea
 ```
+Results: RMSE= (0.777 reported)

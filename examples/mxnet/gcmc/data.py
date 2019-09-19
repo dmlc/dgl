@@ -73,16 +73,24 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = mx.nd.sparse.array(sp.eye(self.num_user, format='csr'),
-                                                   ctx=ctx, dtype=np.float32)
-            self.movie_feature = mx.nd.sparse.array(sp.eye(self.num_movie, format='csr'),
-                                                    ctx=ctx, dtype=np.float32)
+            #self.user_feature = mx.nd.sparse.array(sp.eye(self.num_user, format='csr'),
+            #                                       ctx=ctx, dtype=np.float32)
+            #self.movie_feature = mx.nd.sparse.array(sp.eye(self.num_movie, format='csr'),
+            #                                        ctx=ctx, dtype=np.float32)
+            self.user_feature = None
+            self.movie_feature = None
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
             self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)
+        if self.user_feature is None:
+            self.user_feature_shape = (self.num_user, self.num_user)
+            self.movie_feature_shape = (self.num_movie, self.num_movie)
+        else:
+            self.user_feature_shape = self.user_feature.shape
+            self.movie_feature_shape = self.movie_feature.shape
         info_line = "Feature dim: "
-        info_line += "\nuser: {}".format(self.user_feature.shape)
-        info_line += "\nmovie: {}".format(self.movie_feature.shape)
+        info_line += "\nuser: {}".format(self.user_feature_shape)
+        info_line += "\nmovie: {}".format(self.movie_feature_shape)
         print(info_line)
 
         all_train_rating_pairs, all_train_rating_values = self._generate_pair_value(self.all_train_rating_info)

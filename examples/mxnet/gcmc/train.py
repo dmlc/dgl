@@ -50,23 +50,15 @@ def evaluate(args, net, dataset, segment='valid'):
     nd_possible_rating_values = mx.nd.array(possible_rating_values, ctx=args.ctx, dtype=np.float32)
 
     if segment == "valid":
-        #rating_pairs = dataset.valid_rating_pairs
-        #rating_values = dataset.valid_rating_values
         rating_values = dataset.valid_truths
-        #graph = dataset.train_graph
         enc_graph = dataset.valid_enc_graph
         dec_graph = dataset.valid_dec_graph
     elif segment == "test":
-        #rating_pairs = dataset.test_rating_pairs
-        #rating_values = dataset.test_rating_values
         rating_values = dataset.test_truths
         enc_graph = dataset.test_enc_graph
         dec_graph = dataset.test_dec_graph
     else:
         raise NotImplementedError
-
-    #rating_pairs = mx.nd.array(rating_pairs, ctx=args.ctx, dtype=np.int64)
-    #rating_values = mx.nd.array(rating_values, ctx=args.ctx, dtype=np.float32)
 
     # Evaluate RMSE
     with mx.autograd.predict_mode():
@@ -91,8 +83,8 @@ def train(args):
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     print("Loading data finished ...\n")
 
-    args.src_in_units = dataset.user_feature.shape[1]
-    args.dst_in_units = dataset.movie_feature.shape[1]
+    args.src_in_units = dataset.user_feature_shape[1]
+    args.dst_in_units = dataset.movie_feature_shape[1]
     args.rating_vals = dataset.possible_rating_values
 
     ### build the net
