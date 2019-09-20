@@ -11,9 +11,9 @@ def test_node_batch():
     g.ndata['x'] = feat
 
     # test all
-    v = ALL
+    v = utils.toindex(slice(0, g.number_of_nodes()))
     n_repr = g.get_n_repr(v)
-    nbatch = NodeBatch(g, v, n_repr)
+    nbatch = NodeBatch(v, n_repr)
     assert F.allclose(nbatch.data['x'], feat)
     assert nbatch.mailbox is None
     assert F.allclose(nbatch.nodes(), g.nodes())
@@ -23,7 +23,7 @@ def test_node_batch():
     # test partial
     v = utils.toindex(F.tensor([0, 3, 5, 7, 9]))
     n_repr = g.get_n_repr(v)
-    nbatch = NodeBatch(g, v, n_repr)
+    nbatch = NodeBatch(v, n_repr)
     assert F.allclose(nbatch.data['x'], F.gather_row(feat, F.tensor([0, 3, 5, 7, 9])))
     assert nbatch.mailbox is None
     assert F.allclose(nbatch.nodes(), F.tensor([0, 3, 5, 7, 9]))
@@ -39,13 +39,13 @@ def test_edge_batch():
     g.edata['x'] = efeat
 
     # test all
-    eid = ALL
+    eid = utils.toindex(slice(0, g.number_of_edges()))
     u, v, _ = g._graph.edges('eid')
 
     src_data = g.get_n_repr(u)
     edge_data = g.get_e_repr(eid)
     dst_data = g.get_n_repr(v)
-    ebatch = EdgeBatch(g, (u, v, eid), src_data, edge_data, dst_data)
+    ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
     assert F.shape(ebatch.src['x'])[0] == g.number_of_edges() and\
         F.shape(ebatch.src['x'])[1] == d
     assert F.shape(ebatch.dst['x'])[0] == g.number_of_edges() and\
@@ -64,7 +64,7 @@ def test_edge_batch():
     src_data = g.get_n_repr(u)
     edge_data = g.get_e_repr(eid)
     dst_data = g.get_n_repr(v)
-    ebatch = EdgeBatch(g, (u, v, eid), src_data, edge_data, dst_data)
+    ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
     assert F.shape(ebatch.src['x'])[0] == 8 and\
         F.shape(ebatch.src['x'])[1] == d
     assert F.shape(ebatch.dst['x'])[0] == 8 and\
