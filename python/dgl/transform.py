@@ -403,4 +403,55 @@ def laplacian_lambda_max(g):
                                       return_eigenvectors=False)[0].real)
     return rst
 
+def coalesce_metapath(g, metapath):
+    """Transform a heterogeneous graph into either a homogeneous graph or a unidirectional
+    bipartite graph so that metapaths are coalesced into edges.
+
+    If the beginning node type ``s`` and ending node type ``t`` are the same, it will return
+    a homogeneous graph with node type ``s = t``.  Otherwise, a unidirectional bipartite graph
+    with source node type ``s`` and destination node type ``t`` is returned.
+
+    In both cases, two nodes ``u`` and ``v`` will be connected with an edge ``(u, v)`` if
+    there exists one path matching the metapath from ``u`` to ``v``.
+
+    Even if a node of type ``s`` does not have any outbound path matching the given metapath, it
+    will still show up in the returned graph.  Similarly, a node of type ``t`` will still
+    show up even if it does not have any inbound path matching the given metapath.
+
+    The features of the source/destination node type in the original graph would be copied to
+    the new graph.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    metapath : list[str or tuple of str]
+        Metapath in the form of a list of edge types
+
+    Returns
+    -------
+    DGLHeteroGraph
+        A homogeneous or bipartite graph.
+    """
+    adj = 1
+    for etype in metapath:
+        adj = g.adj(etype=etype) * adj
+
+    adj = (adj != 0).tocsr()
+    srctype = g.to_canonical_etype(metapath[0])[0]
+    dsttype = g.to_canonical_etype(metapath[-1])[2]
+    if srctype == dsttype:
+        assert np.array_equal(src_map, dst_map)
+        new_g = graph(adj, ntype=srctype)
+    else:
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype)
+
+    for key, value in g.nodes[srctype].data.items():
+        new_g.nodes[srctype].data[key] = value
+    if srctype != dsttype:
+        for key, value in g.nodes[dsttype].data.items():
+            new_g.nodes[dsttype].data[key] = value
+
+    return new_g
+
 _init_api("dgl.transform")

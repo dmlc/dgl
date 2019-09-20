@@ -652,6 +652,16 @@ def test_convert():
         assert hg.number_of_edges(('user', 'watches', 'movie')) == 1
         assert len(hg.etypes) == 2
 
+def test_transform():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    g.nodes['user'].data['h'] = x
+
+    new_g = coalesce_metapath(g, ['follows', 'plays'])
+
+    assert new_g.number_of_edges() == 3
+    assert F.asnumpy(new_g.has_edge_between([0, 0, 1], [0, 1, 1])).all()
+
 def test_subgraph():
     g = create_test_heterograph()
     x = F.randn((3, 5))

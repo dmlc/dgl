@@ -112,7 +112,7 @@ def setup_for_sampling(args):
 def get_binary_mask(total_size, indices):
     mask = torch.zeros(total_size)
     mask[indices] = 1
-    return mask.bool()
+    return mask.byte()
 
 def load_acm(remove_self_loop):
     url = 'dataset/ACM3025.pkl'
@@ -157,6 +157,27 @@ def load_acm(remove_self_loop):
 
     return g, features, labels, num_classes, train_idx, val_idx, test_idx, \
            train_mask, val_mask, test_mask
+
+def load_acm_raw(remove_self_loop):
+    url = 'dataset/ACM.mat'
+    data_path = get_download_dir() + '/ACM.mat'
+    download(_get_dgl_url(url), path=data_path)
+
+    data = sio.loadmat(data_path)
+    p_vs_l = data['PvsL']       # paper-field?
+    p_vs_a = data['PvsA']       # paper-author
+    p_vs_t = data['PvsT']       # paper-term, bag of words
+    p_vs_c = data['PvsC']       # paper-conference
+    p_vs_v = data['PvsV']       # paper-venue
+
+    p_vs_c_filter = p_vs_c[:, [0, 1, 9, 10, 13]]    # KDD, SIGMOD, SIGCOMM, MOBICOMM, VLDB
+    p_selected = (p_vs_c_filter.sum(1) != 0).A1.nonzero()[0]
+    p_vs_l = p_vs_l[p_selected]
+    p_vs_a = p_vs_a[p_selected]
+    p_vs_t = p_vs_t[p_selected]
+    p_vs_v = p_vs_v[p_selected]
+
+    # TODO
 
 def load_data(dataset, remove_self_loop=False):
     if dataset == 'ACM':

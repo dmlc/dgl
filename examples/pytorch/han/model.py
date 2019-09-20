@@ -21,23 +21,22 @@ class SemanticAttention(nn.Module):
         return (beta * z).sum(1)
 
 class HANLayer(nn.Module):
-    def __init__(self, num_meta_paths, in_size, out_size, layer_num_heads, dropout):
+    def __init__(self, meta_paths, in_size, out_size, layer_num_heads, dropout):
         super(HANLayer, self).__init__()
 
         # One GAT layer for each meta path based adjacency matrix
         self.gat_layers = nn.ModuleList()
-        for i in range(num_meta_paths):
+        for i in range(len(meta_paths)):
             self.gat_layers.append(GATConv(in_size, out_size, layer_num_heads,
                                            dropout, dropout, activation=F.elu))
         self.semantic_attention = SemanticAttention(in_size=out_size * layer_num_heads)
+        self.meta_paths = meta_paths
 
     def forward(self, g, h):
-        etypes = g.etypes
-        num_etypes = len(etypes)
-
         semantic_embeddings = []
-        for i in range(num_etypes):
-            semantic_embeddings.append(self.gat_layers[i](g[etypes[i]], h).flatten(1))
+        for meta_path in range(self.meta_paths):
+            new_g = coalesce_metapath(g, meta_path)
+            semantic_embeddings.append(self.gat_layers[i](new_g, h).flatten(1))
         semantic_embeddings = torch.stack(semantic_embeddings, dim=1)                  # (N, M, D * K)
 
         return self.semantic_attention(semantic_embeddings)                            # (N, D * K)
