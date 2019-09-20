@@ -434,7 +434,7 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
     return g
 
 def to_self_loop(g):
-    """Return a new graph contains exactly one self loop for each node.
+    """Return a new graph which contains exactly one self loop for each node.
     Self-loop edges id are not preserved. All self-loop edges would be added at the end.
 
     Examples
