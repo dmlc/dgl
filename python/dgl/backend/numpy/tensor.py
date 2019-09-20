@@ -204,7 +204,7 @@ def zerocopy_to_numpy(input):
 def zerocopy_from_numpy(np_array):
     return np_array
 
-def one_hot(t, num_classes):
+def one_hot(t, num_classes=-1):
     if num_classes == -1:
         num_classes = np.max(t) + 1
 
