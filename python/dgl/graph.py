@@ -957,6 +957,8 @@ class DGLGraph(DGLBaseGraph):
     
     @property
     def gdata(self):
+        """Get graph-level data
+        """
         return self._graph_frame
 
     @property

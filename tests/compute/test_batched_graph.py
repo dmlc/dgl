@@ -204,12 +204,33 @@ def test_batch_no_edge():
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+
+def test_batch_unbatch_gdata():
+    t1 = tree1()
+    t2 = tree2()
+    t1.gdata['label'] = F.tensor([0, 0, 1])
+    t2.gdata['label'] = F.tensor([0, 1, 0])
+
+    bg = dgl.batch([t1, t2])
+
+    assert F.allclose(bg.gdata['label'],
+                      F.tensor([
+                          [0, 0, 1],
+                          [0, 1, 0]])
+                      )
+
+    tt1, tt2 = dgl.unbatch(bg)
+    assert F.allclose(t1.gdata['label'], tt1.gdata['label'])
+    assert F.allclose(t2.gdata['label'], tt2.gdata['label'])
+
+
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
-    #test_batch_unbatch2()
-    #test_batched_edge_ordering()
-    #test_batch_send_then_recv()
-    #test_batch_send_and_recv()
-    #test_batch_propagate()
-    #test_batch_no_edge()
+    test_batch_unbatch2()
+    test_batched_edge_ordering()
+    test_batch_send_then_recv()
+    test_batch_send_and_recv()
+    test_batch_propagate()
+    test_batch_no_edge()
+    test_batch_unbatch_gdata()
