@@ -1539,7 +1539,7 @@ class DGLGraph(DGLBaseGraph):
         >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
         >>> G.gdata['y'] = th.zeros((2, 4))
         >>> G.graph_attr_schemes()
-        {'y': Scheme(shape=(4,), dtype=torch.float32)}
+        {'y': Scheme(shape=(2, 4), dtype=torch.float32)}
         """
         return self._graph_frame.schemes
 
