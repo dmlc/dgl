@@ -205,9 +205,12 @@ class GraphLevelFrame(MutableMapping):
 
     def __repr__(self):
         return repr(self._gdata)
-    
+
     @property
     def schemes(self):
+        """Scheme for graph-level data
+        This is different from node frame and edge frame, the first dimension is not ignored
+        """
         schemes = {}
         for key, value in self._gdata.items():
             schemes[key] = Scheme(tuple(F.shape(value)), F.dtype(value))
