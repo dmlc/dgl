@@ -482,7 +482,7 @@ def remove_self_loop(g):
     Parameters
     ------------
     g: DGLGraph
-        
+
     Returns
     --------
     DGLGraph
@@ -493,7 +493,6 @@ def remove_self_loop(g):
     src = F.zerocopy_to_numpy(src)
     dst = F.zerocopy_to_numpy(dst)
     non_self_edges_idx = src != dst
-    nodes = np.arange(g.number_of_nodes())
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
 
