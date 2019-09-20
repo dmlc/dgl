@@ -215,3 +215,6 @@ if __name__ == '__main__':
     test_khop_adj()
     test_khop_graph()
     test_laplacian_lambda_max()
+    test_onehot_degree()
+    test_remove_self_loop()
+    test_to_self_loop()
