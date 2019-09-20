@@ -336,9 +336,8 @@ def unbatch(graph):
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]
     for attr, col in graph._graph_frame.items():
-        col_splits = F.split(col, 1, dim=0)
         for i in range(bsize):
-            graph_frames[i][attr] = col_splits[i].squeeze(0)
+            graph_frames[i][attr] = F.squeeze(F.take(col, F.tensor([i]), 0), 0)
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i],
