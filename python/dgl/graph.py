@@ -1516,15 +1516,15 @@ class DGLGraph(DGLBaseGraph):
         return self._edge_frame.schemes
 
     def graph_attr_schemes(self):
-        """Return the edge feature schemes.
+        """Return the graph-level feature schemes.
 
         Each feature scheme is a named tuple that stores the shape and data type
-        of the node feature
+        of the graph-level feature
 
         Returns
         -------
         dict of str to schemes
-            The schemes of edge feature columns.
+            The schemes of graph-level features.
 
         Examples
         --------
