@@ -281,7 +281,7 @@ def zerocopy_to_dgl_ndarray(input):
 def zerocopy_from_dgl_ndarray(input):
     return dlpack.from_dlpack(input.to_dlpack())
 
-def one_hot(t, num_classes):
+def one_hot(t, num_classes=-1):
     return th.nn.functional.one_hot(t, num_classes)
 
 

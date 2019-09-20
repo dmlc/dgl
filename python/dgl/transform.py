@@ -411,9 +411,9 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
     Parameters
     -----------
     g: DGLGraph
-    max_degress: int
+    max_degree: int
         Maximum degree for one-hot encoding. If it's -1,
-        the maximum degree would be infered from the input graph.
+        the maximum degree would be inferred from the input graph.
     out_field: str
         Field name for the node feature
     direction: str
@@ -428,7 +428,7 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
     g.ndata[out_field] = F.one_hot(degrees, max_degree)
 
 def to_self_loop(g):
-    """Make graph contains exactly one self loop for each node.
+    """Make graph contain exactly one self loop for each node.
 
     Examples
     ---------
@@ -456,7 +456,7 @@ def to_self_loop(g):
 
 
 def remove_self_loop(g):
-    """Make graph contains exactly one self loop.
+    """Make graph contain exactly one self loop.
 
     Examples
     ---------
