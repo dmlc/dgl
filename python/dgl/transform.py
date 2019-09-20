@@ -418,6 +418,11 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
         Field name for the node feature
     direction: str
         Either "in" or "out". Specify whether to use in degrees or out degrees.
+
+    Returns
+    -------
+    g: DGLGraph
+        Returns the input graph with added feature
     """
     if direction == "in":
         degrees = g.in_degrees()
@@ -426,9 +431,11 @@ def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
     else:
         raise RuntimeError("Invalid Direction")
     g.ndata[out_field] = F.one_hot(degrees, max_degree)
+    return g
 
 def to_self_loop(g):
-    """Make graph contain exactly one self loop for each node.
+    """Return a new graph contains exactly one self loop for each node.
+    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
 
     Examples
     ---------
@@ -436,27 +443,31 @@ def to_self_loop(g):
     >>> g = DGLGraph()
     >>> g.add_nodes(5)
     >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
-    >>> g.edges()
-    (tensor([0, 1, 2, 0, 3, 4]), tensor([1, 1, 2, 0, 3, 4]))
+    >>> new_g = dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g.edges()
+    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
 
     Parameters
     ------------
     g: DGLGraph
-    """
-    nodes = np.arange(g.number_of_nodes())
-    has_self_edges = F.zerocopy_to_numpy(g.has_edges_between(nodes, nodes))
-    remain_nodes_wo_selfloop = np.where(has_self_edges == 0)[0]
-    if g.is_readonly:
-        g.readonly(False)
-        g.add_edges(remain_nodes_wo_selfloop, remain_nodes_wo_selfloop)
-        g.readonly()
-    else:
-        g.add_edges(remain_nodes_wo_selfloop, remain_nodes_wo_selfloop)
 
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    nodes = np.arange(g.number_of_nodes())
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    new_g.add_edges(nodes, nodes)
+    return new_g
 
 def remove_self_loop(g):
-    """Make graph contain exactly one self loop.
+    """Return a new graph with all self-loop edges removed
 
     Examples
     ---------
@@ -464,24 +475,27 @@ def remove_self_loop(g):
     >>> g = DGLGraph()
     >>> g.add_nodes(5)
     >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
-    >>> g.edges()
+    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
+    >>> new_g.edges()
     (tensor([0]), tensor([1]))
 
     Parameters
     ------------
     g: DGLGraph
+        
+    Returns
+    --------
+    DGLGraph
     """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
     nodes = np.arange(g.number_of_nodes())
-    has_self_edges = F.zerocopy_to_numpy(g.has_edges_between(nodes, nodes))
-    nodes_w_selfloop = np.where(has_self_edges == 1)[0]
-    selfloop_ids = g.edge_ids(nodes_w_selfloop, nodes_w_selfloop)
-    if g.is_readonly:
-        g.readonly(False)
-        g.remove_edges(selfloop_ids)
-        g.readonly()
-    else:
-        g.remove_edges(selfloop_ids)
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    return new_g
 
 
 _init_api("dgl.transform")

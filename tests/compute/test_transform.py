@@ -180,18 +180,18 @@ def test_to_self_loop():
     g = dgl.DGLGraph()
     g.add_nodes(5)
     g.add_edges([0, 1, 2], [1, 1, 2])
-    dgl.transform.to_self_loop(g)  # Nodes 0, 3, 4 don't have self-loop
-    assert F.allclose(g.edges()[0], F.tensor([0, 1, 2, 0, 3, 4]))
-    assert F.allclose(g.edges()[1], F.tensor([1, 1, 2, 0, 3, 4]))
+    new_g = dgl.transform.to_self_loop(g)  # Nodes 0, 3, 4 don't have self-loop
+    assert F.allclose(new_g.edges()[0], F.tensor([0, 0, 1, 2, 3, 4]))
+    assert F.allclose(new_g.edges()[1], F.tensor([1, 0, 1, 2, 3, 4]))
 
 
 def test_remove_self_loop():
     g = dgl.DGLGraph()
     g.add_nodes(5)
     g.add_edges([0, 1, 2], [1, 1, 2])
-    dgl.transform.remove_self_loop(g)
-    assert F.allclose(g.edges()[0], F.tensor([0]))
-    assert F.allclose(g.edges()[1], F.tensor([1]))
+    new_g = dgl.transform.remove_self_loop(g)
+    assert F.allclose(new_g.edges()[0], F.tensor([0]))
+    assert F.allclose(new_g.edges()[1], F.tensor([1]))
 
 
 def test_onehot_degree():
