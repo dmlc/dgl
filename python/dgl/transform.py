@@ -11,7 +11,8 @@ from .convert import graph, bipartite
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'coalesce_metapath']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
+           'onehot_degree', 'remove_self_loop', 'coalesce_metapath']
 
 
 def pairwise_squared_distance(x):
@@ -453,6 +454,97 @@ def coalesce_metapath(g, metapath):
         for key, value in g.nodes[dsttype].data.items():
             new_g.nodes[dsttype].data[key] = value
 
+    return new_g
+
+def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
+    """Inplace add one-hot degree vector as node feature
+
+    Parameters
+    -----------
+    g: DGLGraph
+    max_degree: int
+        Maximum degree for one-hot encoding. If it's -1,
+        the maximum degree would be inferred from the input graph.
+    out_field: str
+        Field name for the node feature
+    direction: str
+        Either "in" or "out". Specify whether to use in degrees or out degrees.
+
+    Returns
+    -------
+    g: DGLGraph
+        Returns the input graph with added feature
+    """
+    if direction == "in":
+        degrees = g.in_degrees()
+    elif direction == "out":
+        degrees = g.out_degrees()
+    else:
+        raise RuntimeError("Invalid Direction")
+    g.ndata[out_field] = F.one_hot(degrees, max_degree)
+    return g
+
+def to_self_loop(g):
+    """Return a new graph which contains exactly one self loop for each node.
+    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g.edges()
+    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    nodes = np.arange(g.number_of_nodes())
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    new_g.add_edges(nodes, nodes)
+    return new_g
+
+def remove_self_loop(g):
+    """Return a new graph with all self-loop edges removed
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
+    >>> new_g.edges()
+    (tensor([0]), tensor([1]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
 
 _init_api("dgl.transform")
