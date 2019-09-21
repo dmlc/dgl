@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import networkx as nx
 
 import dgl
-from .base import ALL, is_all, DGLError
+from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme, sync_frame_initializer

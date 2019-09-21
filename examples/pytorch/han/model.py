@@ -32,12 +32,11 @@ class HANLayer(nn.Module):
         self.semantic_attention = SemanticAttention(in_size=out_size * layer_num_heads)
         self.num_meta_paths = num_meta_paths
 
-    def forward(self, g, h):
-        etypes = g.etypes
+    def forward(self, gs, h):
         semantic_embeddings = []
 
-        for i in range(self.num_meta_paths):
-            semantic_embeddings.append(self.gat_layers[i](g[etypes[i]], h).flatten(1))
+        for i, g in enumerate(gs):
+            semantic_embeddings.append(self.gat_layers[i](g, h).flatten(1))
         semantic_embeddings = torch.stack(semantic_embeddings, dim=1)                  # (N, M, D * K)
 
         return self.semantic_attention(semantic_embeddings)                            # (N, D * K)

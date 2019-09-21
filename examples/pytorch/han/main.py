@@ -24,6 +24,8 @@ def evaluate(model, g, features, labels, mask, loss_func):
     return loss, accuracy, micro_f1, macro_f1
 
 def main(args):
+    # If args['hetero'] is True, g would be a heterogeneous graph.
+    # Otherwise, it will be a list of homogeneous graphs.
     g, features, labels, num_classes, train_idx, val_idx, test_idx, train_mask, \
     val_mask, test_mask = load_data(args['dataset'])
 
@@ -43,7 +45,7 @@ def main(args):
                     dropout=args['dropout']).to(args['device'])
     else:
         from model import HAN
-        model = HAN(num_meta_paths=len(g.etypes),
+        model = HAN(num_meta_paths=len(g),
                     in_size=features.shape[1],
                     hidden_size=args['hidden_units'],
                     out_size=num_classes,

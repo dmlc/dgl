@@ -138,13 +138,13 @@ def load_acm(remove_self_loop):
     # (Mufei): I verified both of them are binary adjacency matrices with self loops
     author_g = dgl.graph(data['PAP'], ntype='paper', etype='author')
     subject_g = dgl.graph(data['PLP'], ntype='paper', etype='subject')
-    g = dgl.hetero_from_relations([author_g, subject_g])
+    gs = [author_g, subject_g]
 
     train_idx = torch.from_numpy(data['train_idx']).long().squeeze(0)
     val_idx = torch.from_numpy(data['val_idx']).long().squeeze(0)
     test_idx = torch.from_numpy(data['test_idx']).long().squeeze(0)
 
-    num_nodes = g.number_of_nodes()
+    num_nodes = author_g.number_of_nodes()
     train_mask = get_binary_mask(num_nodes, train_idx)
     val_mask = get_binary_mask(num_nodes, val_idx)
     test_mask = get_binary_mask(num_nodes, test_idx)
@@ -157,7 +157,7 @@ def load_acm(remove_self_loop):
         'test': test_mask.sum().item() / num_nodes
     })
 
-    return g, features, labels, num_classes, train_idx, val_idx, test_idx, \
+    return gs, features, labels, num_classes, train_idx, val_idx, test_idx, \
            train_mask, val_mask, test_mask
 
 def load_acm_raw(remove_self_loop):
