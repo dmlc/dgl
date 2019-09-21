@@ -7,10 +7,11 @@ from .graph import DGLGraph
 from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
+from .convert import graph, bipartite
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'coalesce_metapath']
 
 
 def pairwise_squared_distance(x):
@@ -435,13 +436,13 @@ def coalesce_metapath(g, metapath):
     """
     adj = 1
     for etype in metapath:
-        adj = g.adj(etype=etype) * adj
+        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
     dsttype = g.to_canonical_etype(metapath[-1])[2]
     if srctype == dsttype:
-        assert np.array_equal(src_map, dst_map)
+        assert adj.shape[0] == adj.shape[1]
         new_g = graph(adj, ntype=srctype)
     else:
         new_g = bipartite(adj, utype=srctype, vtype=dsttype)

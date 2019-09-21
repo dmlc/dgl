@@ -1,7 +1,6 @@
 import torch
 from sklearn.metrics import f1_score
 
-from model import HAN
 from utils import load_data, EarlyStopping
 
 def score(logits, labels):
@@ -34,12 +33,23 @@ def main(args):
     val_mask = val_mask.to(args['device'])
     test_mask = test_mask.to(args['device'])
 
-    model = HAN(num_meta_paths=len(g.etypes),
-                in_size=features.shape[1],
-                hidden_size=args['hidden_units'],
-                out_size=num_classes,
-                num_heads=args['num_heads'],
-                dropout=args['dropout']).to(args['device'])
+    if args['hetero']:
+        from model_hetero import HAN
+        model = HAN(meta_paths=[['pa', 'ap'], ['pf', 'fp']],
+                    in_size=features.shape[1],
+                    hidden_size=args['hidden_units'],
+                    out_size=num_classes,
+                    num_heads=args['num_heads'],
+                    dropout=args['dropout']).to(args['device'])
+    else:
+        from model import HAN
+        model = HAN(num_meta_paths=len(g.etypes),
+                    in_size=features.shape[1],
+                    hidden_size=args['hidden_units'],
+                    out_size=num_classes,
+                    num_heads=args['num_heads'],
+                    dropout=args['dropout']).to(args['device'])
+
     stopper = EarlyStopping(patience=args['patience'])
     loss_fcn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'],
@@ -80,9 +90,10 @@ if __name__ == '__main__':
                         help='Random seed')
     parser.add_argument('-ld', '--log-dir', type=str, default='results',
                         help='Dir for saving training results')
-    parser.add_argument('-d', '--dataset', default='ACM',
-                        help='Dataset to use')
+    parser.add_argument('--hetero', action='store_true',
+                        help='Use metapath coalescing with DGL\'s own dataset')
     args = parser.parse_args().__dict__
+
     args = setup(args)
 
     main(args)

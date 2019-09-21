@@ -657,10 +657,17 @@ def test_transform():
     x = F.randn((3, 5))
     g.nodes['user'].data['h'] = x
 
-    new_g = coalesce_metapath(g, ['follows', 'plays'])
+    new_g = dgl.coalesce_metapath(g, ['follows', 'plays'])
 
+    assert new_g.ntypes == ['user', 'game']
     assert new_g.number_of_edges() == 3
-    assert F.asnumpy(new_g.has_edge_between([0, 0, 1], [0, 1, 1])).all()
+    assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
+
+    new_g = dgl.coalesce_metapath(g, ['follows'])
+
+    assert new_g.ntypes == ['user']
+    assert new_g.number_of_edges() == 2
+    assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
 
 def test_subgraph():
     g = create_test_heterograph()
@@ -1147,6 +1154,7 @@ if __name__ == '__main__':
     test_view1()
     test_flatten()
     test_convert()
+    test_transform()
     test_subgraph()
     test_apply()
     test_level1()

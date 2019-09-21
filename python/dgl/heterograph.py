@@ -1403,6 +1403,13 @@ class DGLHeteroGraph(object):
         SparseTensor or scipy.sparse.spmatrix
             Adjacency matrix.
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
+
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
             return self._graph.adjacency_matrix(etid, transpose, ctx)[0]

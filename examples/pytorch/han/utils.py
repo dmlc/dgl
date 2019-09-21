@@ -10,6 +10,7 @@ import torch
 from dgl.data.utils import download, get_download_dir, _get_dgl_url
 from pprint import pprint
 from scipy import sparse
+from scipy import io as sio
 
 def set_random_seed(seed=0):
     """Set random seed.
@@ -97,6 +98,7 @@ sampling_configure = {
 def setup(args):
     args.update(default_configure)
     set_random_seed(args['seed'])
+    args['dataset'] = 'ACMRaw' if args['hetero'] else 'ACM'
     args['device'] = 'cuda: 0' if torch.cuda.is_available() else 'cpu'
     args['log_dir'] = setup_log_dir(args)
     return args
@@ -159,6 +161,7 @@ def load_acm(remove_self_loop):
            train_mask, val_mask, test_mask
 
 def load_acm_raw(remove_self_loop):
+    assert not remove_self_loop
     url = 'dataset/ACM.mat'
     data_path = get_download_dir() + '/ACM.mat'
     download(_get_dgl_url(url), path=data_path)
@@ -167,21 +170,59 @@ def load_acm_raw(remove_self_loop):
     p_vs_l = data['PvsL']       # paper-field?
     p_vs_a = data['PvsA']       # paper-author
     p_vs_t = data['PvsT']       # paper-term, bag of words
-    p_vs_c = data['PvsC']       # paper-conference
-    p_vs_v = data['PvsV']       # paper-venue
+    p_vs_c = data['PvsC']       # paper-conference, labels come from that
 
-    p_vs_c_filter = p_vs_c[:, [0, 1, 9, 10, 13]]    # KDD, SIGMOD, SIGCOMM, MOBICOMM, VLDB
+    # We assign
+    # (1) KDD papers as class 0 (data mining),
+    # (2) SIGMOD and VLDB papers as class 1 (database),
+    # (3) SIGCOMM and MOBICOMM papers as class 2 (communication)
+    conf_ids = [0, 1, 9, 10, 13]
+    label_ids = [0, 1, 2, 2, 1]
+
+    p_vs_c_filter = p_vs_c[:, conf_ids]
     p_selected = (p_vs_c_filter.sum(1) != 0).A1.nonzero()[0]
     p_vs_l = p_vs_l[p_selected]
     p_vs_a = p_vs_a[p_selected]
     p_vs_t = p_vs_t[p_selected]
-    p_vs_v = p_vs_v[p_selected]
+    p_vs_c = p_vs_c[p_selected]
 
-    # TODO
+    pa = dgl.bipartite(p_vs_a, 'paper', 'pa', 'author')
+    ap = dgl.bipartite(p_vs_a.transpose(), 'author', 'ap', 'paper')
+    pl = dgl.bipartite(p_vs_l, 'paper', 'pf', 'field')
+    lp = dgl.bipartite(p_vs_l.transpose(), 'field', 'fp', 'paper')
+    hg = dgl.hetero_from_relations([pa, ap, pl, lp])
+
+    features = torch.FloatTensor(p_vs_t.toarray())
+
+    pc_p, pc_c = p_vs_c.nonzero()
+    labels = np.zeros(len(p_selected), dtype=np.int64)
+    for conf_id, label_id in zip(conf_ids, label_ids):
+        labels[pc_p[pc_c == conf_id]] = label_id
+    labels = torch.LongTensor(labels)
+
+    num_classes = 3
+
+    float_mask = np.zeros(len(pc_p))
+    for conf_id in conf_ids:
+        pc_c_mask = (pc_c == conf_id)
+        float_mask[pc_c_mask] = np.random.permutation(np.linspace(0, 1, pc_c_mask.sum()))
+    train_idx = np.where(float_mask <= 0.2)[0]
+    val_idx = np.where((float_mask > 0.2) & (float_mask <= 0.3))[0]
+    test_idx = np.where(float_mask > 0.3)[0]
+
+    num_nodes = hg.number_of_nodes('paper')
+    train_mask = get_binary_mask(num_nodes, train_idx)
+    val_mask = get_binary_mask(num_nodes, val_idx)
+    test_mask = get_binary_mask(num_nodes, test_idx)
+
+    return hg, features, labels, num_classes, train_idx, val_idx, test_idx, \
+            train_mask, val_mask, test_mask
 
 def load_data(dataset, remove_self_loop=False):
     if dataset == 'ACM':
         return load_acm(remove_self_loop)
+    elif dataset == 'ACMRaw':
+        return load_acm_raw(remove_self_loop)
     else:
         return NotImplementedError('Unsupported dataset {}'.format(dataset))
 
