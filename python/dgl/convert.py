@@ -362,7 +362,6 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     else:
         ntypes_invmap = {nt: i for i, nt in enumerate(ntypes)}
         etypes_invmap = {et: i for i, et in enumerate(etypes)}
-        # a 2D tensor 
         canonical_etids = []
         for i, (srctype, dsttype, etype) in enumerate(metagraph.edges(keys=True)):
             srctype_id = ntypes_invmap[srctype]
