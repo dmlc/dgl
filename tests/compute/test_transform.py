@@ -7,6 +7,8 @@ import backend as F
 D = 5
 
 # line graph related
+
+
 def test_line_graph():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
@@ -29,6 +31,7 @@ def test_line_graph():
     L.ndata['w'] = data
     assert F.allclose(G.edata['w'], data)
 
+
 def test_no_backtracking():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
@@ -41,6 +44,8 @@ def test_no_backtracking():
         assert not L.has_edge_between(e2, e1)
 
 # reverse graph related
+
+
 def test_reverse():
     g = dgl.DGLGraph()
     g.add_nodes(5)
@@ -54,10 +59,12 @@ def test_reverse():
 
     assert g.number_of_nodes() == rg.number_of_nodes()
     assert g.number_of_edges() == rg.number_of_edges()
-    assert F.allclose(F.astype(rg.has_edges_between([1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
+    assert F.allclose(F.astype(rg.has_edges_between(
+        [1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
     assert g.edge_id(0, 1) == rg.edge_id(1, 0)
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
+
 
 def test_reverse_shared_frames():
     g = dgl.DGLGraph()
@@ -84,6 +91,7 @@ def test_reverse_shared_frames():
     rg.update_all(src_msg, sum_reduce)
     assert F.allclose(g.ndata['h'], rg.ndata['h'])
 
+
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
     g = dgl.DGLGraph(elist, readonly=True)
@@ -95,9 +103,11 @@ def test_simple_graph():
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist)
 
+
 def test_bidirected_graph():
     def _test(in_readonly, out_readonly):
-        elist = [(0, 0), (0, 1), (0, 1), (1, 0), (1, 1), (2, 1), (2, 2), (2, 2)]
+        elist = [(0, 0), (0, 1), (0, 1), (1, 0),
+                 (1, 1), (2, 1), (2, 2), (2, 2)]
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
@@ -111,6 +121,7 @@ def test_bidirected_graph():
     _test(True, False)
     _test(False, True)
     _test(False, False)
+
 
 def test_khop_graph():
     N = 20
@@ -129,6 +140,7 @@ def test_khop_graph():
         h_1 = g_k.ndata.pop('h')
         assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
+
 def test_khop_adj():
     N = 20
     feat = F.randn((N, 5))
@@ -143,6 +155,7 @@ def test_khop_adj():
         # use k-hop adj to do message passing for one time.
         h_1 = F.matmul(adj, feat)
         assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
+
 
 def test_laplacian_lambda_max():
     N = 20
@@ -162,6 +175,36 @@ def test_laplacian_lambda_max():
     for l_max in l_max_arr:
         assert l_max < 2 + eps
 
+
+def test_to_self_loop():
+    g = dgl.DGLGraph()
+    g.add_nodes(5)
+    g.add_edges([0, 1, 2], [1, 1, 2])
+    new_g = dgl.transform.to_self_loop(g)  # Nodes 0, 3, 4 don't have self-loop
+    assert F.allclose(new_g.edges()[0], F.tensor([0, 0, 1, 2, 3, 4]))
+    assert F.allclose(new_g.edges()[1], F.tensor([1, 0, 1, 2, 3, 4]))
+
+
+def test_remove_self_loop():
+    g = dgl.DGLGraph()
+    g.add_nodes(5)
+    g.add_edges([0, 1, 2], [1, 1, 2])
+    new_g = dgl.transform.remove_self_loop(g)
+    assert F.allclose(new_g.edges()[0], F.tensor([0]))
+    assert F.allclose(new_g.edges()[1], F.tensor([1]))
+
+
+def test_onehot_degree():
+    g = dgl.DGLGraph()
+    g.add_nodes(3)
+    g.add_edges([0, 1, 2], [1, 1, 2])
+    dgl.transform.onehot_degree(g, out_field="xd")
+
+    assert F.allclose(g.ndata['xd'], F.tensor([[1, 0, 0],
+                                               [0, 0, 1],
+                                               [0, 1, 0]]))
+
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
@@ -172,3 +215,6 @@ if __name__ == '__main__':
     test_khop_adj()
     test_khop_graph()
     test_laplacian_lambda_max()
+    test_onehot_degree()
+    test_remove_self_loop()
+    test_to_self_loop()
