@@ -440,9 +440,11 @@ def to_homo(G):
     eids = []
     ntype_ids = []
     nids = []
+    total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
+        total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes))
 
@@ -455,7 +457,7 @@ def to_homo(G):
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
+    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), card=total_num_nodes)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)
