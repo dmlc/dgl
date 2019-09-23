@@ -406,7 +406,7 @@ def laplacian_lambda_max(g):
 
 
 def add_self_loop(g):
-    """Return a new graph containing all the edges in the input graph plus self loops 
+    """Return a new graph containing all the edges in the input graph plus self loops
     of every nodes.
     No duplicate self loop will be added for nodes already having self loops.
     Self-loop edges id are not preserved. All self-loop edges would be added at the end.
