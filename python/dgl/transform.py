@@ -10,8 +10,8 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
-           'onehot_degree', 'remove_self_loop']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
+           'remove_self_loop']
 
 
 def pairwise_squared_distance(x):
@@ -406,7 +406,8 @@ def laplacian_lambda_max(g):
 
 
 def add_self_loop(g):
-    """Return a new graph containing all the edges in the input graph plus self loops of every nodes.
+    """Return a new graph containing all the edges in the input graph plus self loops 
+    of every nodes.
     No duplicate self loop will be added for nodes already having self loops.
     Self-loop edges id are not preserved. All self-loop edges would be added at the end.
 
