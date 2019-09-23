@@ -372,6 +372,10 @@ struct Subgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(Subgraph, runtime::Object);
 };
 
+struct NegSubgraph: public Subgraph {
+  IdArray exist;
+};
+
 // Define SubgraphRef
 DGL_DEFINE_OBJECT_REF(SubgraphRef, Subgraph);
 
