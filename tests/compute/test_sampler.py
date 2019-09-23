@@ -220,7 +220,7 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
-def check_negative_sampler(mode, exclude_positive):
+def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
     g.edata['etype'] = F.tensor(etype)
@@ -233,7 +233,6 @@ def check_negative_sampler(mode, exclude_positive):
         pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
-    neg_size = 10
     # Test the homogeneous graph.
     for pos_edges, neg_edges in EdgeSampler(g, 50,
                                             negative_mode=mode,
@@ -282,8 +281,10 @@ def check_negative_sampler(mode, exclude_positive):
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
 def test_negative_sampler():
-    check_negative_sampler('head', True)
-    check_negative_sampler('PBG-head', False)
+    check_negative_sampler('PBG-head', False, 10)
+    check_negative_sampler('head', True, 10)
+    check_negative_sampler('head', False, 10)
+    check_negative_sampler('head', False, 100)
 
 
 if __name__ == '__main__':

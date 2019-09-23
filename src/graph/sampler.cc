@@ -107,12 +107,19 @@ class ArrayHeap {
  * Uniformly sample integers from [0, set_size) without replacement.
  */
 void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
-  std::unordered_set<size_t> sampled_idxs;
-  while (sampled_idxs.size() < num) {
-    sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
-  }
   out->clear();
-  out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+  if (num < set_size) {
+    std::unordered_set<size_t> sampled_idxs;
+    while (sampled_idxs.size() < num) {
+      sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
+    }
+    out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+  } else {
+    // If we need to sample all elements in the set, we don't need to
+    // generate random numbers.
+    for (size_t i = 0; i < set_size; i++)
+      out->push_back(i);
+  }
 }
 
 void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
@@ -121,14 +128,25 @@ void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclud
   for (auto v : exclude) {
     sampled_idxs.insert(std::pair<size_t, int>(v, 0));
   }
-  while (sampled_idxs.size() < num + exclude.size()) {
-    size_t rand = RandomEngine::ThreadLocal()->RandInt(set_size);
-    sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
-  }
   out->clear();
-  for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
-    if (it->second) {
-      out->push_back(it->first);
+  if (num + exclude.size() < set_size) {
+    while (sampled_idxs.size() < num + exclude.size()) {
+      size_t rand = RandomEngine::ThreadLocal()->RandInt(set_size);
+      sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
+    }
+    for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
+      if (it->second) {
+        out->push_back(it->first);
+      }
+    }
+  } else {
+    // If we need to sample all elements in the set, we don't need to
+    // generate random numbers.
+    for (size_t i = 0; i < set_size; i++) {
+      // If the element doesn't exist in exclude.
+      if (sampled_idxs.find(i) == sampled_idxs.end()) {
+        out->push_back(i);
+      }
     }
   }
 }
@@ -988,40 +1006,58 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
+  const dgl_id_t *unchanged;
+  dgl_id_t *neg_unchanged;
+  dgl_id_t *neg_changed;
+  if (is_neg_head_mode(neg_mode)) {
+    unchanged = dst_data;
+    neg_unchanged = neg_dst_data;
+    neg_changed = neg_src_data;
+  } else {
+    unchanged = src_data;
+    neg_unchanged = neg_src_data;
+    neg_changed = neg_dst_data;
+  }
+
   dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
+  // If we don't exclude positive edges, we are actually sampling more than
+  // the total number of nodes in the graph.
+  if (!exclude_positive && neg_sample_size >= num_tot_nodes) {
+    // We add all nodes as negative nodes.
+    for (int64_t i = 0; i < num_tot_nodes; i++) {
+      neg_vids.push_back(i);
+    }
+  }
+
   for (int64_t i = 0; i < num_pos_edges; i++) {
     size_t neg_idx = i * neg_sample_size;
-    neg_vids.clear();
 
     std::vector<size_t> neighbors;
     DGLIdIters neigh_it;
-    const dgl_id_t *unchanged;
-    dgl_id_t *neg_unchanged;
-    dgl_id_t *neg_changed;
     if (is_neg_head_mode(neg_mode)) {
-      unchanged = dst_data;
-      neg_unchanged = neg_dst_data;
-      neg_changed = neg_src_data;
       neigh_it = gptr->PredVec(induced_vid_data[unchanged[i]]);
     } else {
-      unchanged = src_data;
-      neg_unchanged = neg_src_data;
-      neg_changed = neg_dst_data;
       neigh_it = gptr->SuccVec(induced_vid_data[unchanged[i]]);
     }
 
-    if (exclude_positive) {
+    // If the number of negative nodes is smaller than the number of total nodes
+    // in the graph.
+    if (exclude_positive && neg_sample_size < num_tot_nodes) {
       std::vector<size_t> exclude;
       for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
         dgl_id_t global_vid = *it;
         exclude.push_back(global_vid);
       }
+      neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
-    } else {
+    } else if(neg_sample_size < num_tot_nodes) {
+      neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
+    } else if (exclude_positive) {
+      LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
     }
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
