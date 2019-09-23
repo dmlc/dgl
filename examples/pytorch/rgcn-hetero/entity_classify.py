@@ -21,7 +21,7 @@ import dgl.function as fn
 from functools import partial
 
 from model import BaseRGCN
-from data import load_aifb, load_bgs
+from data import load_aifb, load_bgs, load_am
 
 class RelGraphConvHetero(nn.Module):
     r"""Relational graph convolution layer.
@@ -304,6 +304,8 @@ def main(args):
         g, category, num_classes, train_idx, test_idx, labels = load_aifb()
     elif args.dataset == 'bgs':
         g, category, num_classes, train_idx, test_idx, labels = load_bgs()
+    elif args.dataset == 'am':
+        g, category, num_classes, train_idx, test_idx, labels = load_am()
     else:
         raise ValueError()
     category_id = len(g.ntypes)
