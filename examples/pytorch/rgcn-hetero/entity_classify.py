@@ -312,15 +312,6 @@ def main(args):
     for i, ntype in enumerate(g.ntypes):
         if ntype == category:
             category_id = i
-    '''
-    data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
-    num_nodes = data.num_nodes
-    num_rels = data.num_rels
-    num_classes = data.num_classes
-    labels = data.labels
-    train_idx = data.train_idx
-    test_idx = data.test_idx
-    '''
 
     # split dataset into train, validate, test
     if args.validation:
@@ -330,9 +321,9 @@ def main(args):
         val_idx = train_idx
 
     # edge type and normalization factor
-    #edge_type = th.from_numpy(data.edge_type)
-    #edge_norm = th.from_numpy(data.edge_norm).unsqueeze(1)
-    #labels = th.from_numpy(labels).view(-1)
+    train_idx = th.tensor(train_idx)
+    test_idx = th.tensor(test_idx)
+    labels = th.tensor(labels)
 
     # check cuda
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
@@ -370,11 +361,6 @@ def main(args):
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
-        #gnorm = 0.
-        #for p in model.embed_layer.parameters():
-            #if p.grad is not None:
-                #gnorm += (p.grad * p.grad).sum()
-        #print('gnorm:', gnorm)
         optimizer.step()
         t2 = time.time()
 

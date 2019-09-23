@@ -7,7 +7,9 @@ import numpy as np
 import dgl
 import torch
 
-objectCategory = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
+dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'am-hetero')
+
+objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
 material = rdf.term.URIRef("http://purl.org/collections/nl/am/material")
 
 Entity = namedtuple('Entity', ['id', 'cls', 'attrs'])
@@ -184,10 +186,56 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
     print('#Training samples:', len(train_idx))
     print('#Testing samples:', len(test_idx))
 
+    # cache preprocessed graph
+    np.save(os.path.join(dir_path, 'cached_train_idx.npy'), train_idx)
+    np.save(os.path.join(dir_path, 'cached_test_idx.npy'), test_idx)
+    np.save(os.path.join(dir_path, 'cached_labels.npy'), labels)
+    np.save(os.path.join(dir_path, 'cached_src.npy'), src)
+    np.save(os.path.join(dir_path, 'cached_dst.npy'), dst)
+    np.save(os.path.join(dir_path, 'cached_ntid.npy'), ntid)
+    np.save(os.path.join(dir_path, 'cached_etid.npy'), etid)
+    save_strlist(os.path.join(dir_path, 'cached_ntypes.txt'), ntypes)
+    save_strlist(os.path.join(dir_path, 'cached_etypes.txt'), etypes)
+    nx.write_gpickle(mg, os.path.join(dir_path, 'cached_mg.gpickle'))
+
     return hg, train_idx, test_idx, labels
 
-def parse_idx_file(filename):
-    labels = {}
+def save_strlist(filename, strlist):
+    with open(filename, 'w') as f:
+        for s in strlist:
+            f.write(s + '\n')
+
+def load_strlist(filename):
+    with open(filename, 'r') as f:
+        ret = []
+        for line in f:
+            ret.append(line.strip())
+        return ret
+
+def load_preprocessed(mg, src, dst, ntid, etid, ntypes, etypes):
+    # create homo graph
+    print('Creating one whole graph ...')
+    g = dgl.graph((src, dst))
+    g.ndata[dgl.NTYPE] = torch.tensor(ntid)
+    g.edata[dgl.ETYPE] = torch.tensor(etid)
+    print('Total #nodes:', g.number_of_nodes())
+    print('Total #edges:', g.number_of_edges())
+
+    # convert to heterograph
+    print('Convert to heterograph ...')
+    hg = dgl.to_hetero(g,
+                       ntypes,
+                       etypes,
+                       metagraph=mg)
+    print('#Node types:', len(hg.ntypes))
+    print('#Canonical edge types:', len(hg.etypes))
+    print('#Unique edge type names:', len(set(hg.etypes)))
+    #print(hg.canonical_etypes)
+    nx.drawing.nx_pydot.write_dot(mg, 'meta.dot')
+
+    return hg
+
+def parse_idx_file(filename, labels):
     proxy2label = {}
     with open(filename, 'r') as f:
         for i, line in enumerate(f):
@@ -198,27 +246,45 @@ def parse_idx_file(filename):
             category, pid = sp[6].split('-')
             pid = '%s/%s' % (category, pid)
             proxy2label[pid] = _get_id(labels, label)
-    return proxy2label, category, len(labels)
+    return proxy2label, category
 
 def load_am():
-    dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'am-hetero')
-    training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
-    testing_set, _, num_classes = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'))
+    if os.path.exists(os.path.join(dir_path, 'cached_train_idx.npy')):
+        training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
+        # load cache
+        train_idx = np.load(os.path.join(dir_path, 'cached_train_idx.npy'))
+        test_idx = np.load(os.path.join(dir_path, 'cached_test_idx.npy'))
+        labels = np.load(os.path.join(dir_path, 'cached_labels.npy'))
+        src = np.load(os.path.join(dir_path, 'cached_src.npy'))
+        dst = np.load(os.path.join(dir_path, 'cached_dst.npy'))
+        ntid = np.load(os.path.join(dir_path, 'cached_ntid.npy'))
+        etid = np.load(os.path.join(dir_path, 'cached_etid.npy'))
+        mg = nx.read_gpickle(os.path.join(dir_path, 'cached_mg.gpickle'))
+        ntypes = load_strlist(os.path.join(dir_path, 'cached_ntypes.txt'))
+        etypes = load_strlist(os.path.join(dir_path, 'cached_etypes.txt'))
+        hg = load_preprocessed(mg, src, dst, ntid, etid, ntypes, etypes)
+        print('#Training samples:', len(train_idx))
+        print('#Testing samples:', len(test_idx))
+    else:
+        labels = {}
+        training_set, category = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'), labels)
+        testing_set, _ = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'), labels)
+        num_classes = len(labels)
 
-    rdf_graphs = []
-    for i, filename in enumerate(os.listdir(dir_path)):
-        if filename.endswith('nt'):
-            g = rdf.Graph()
-            print('Parsing file %s ...' % filename)
-            g.parse(os.path.join(dir_path, filename), format='nt')
-            rdf_graphs.append(g)
+        rdf_graphs = []
+        for i, filename in enumerate(os.listdir(dir_path)):
+            if filename.endswith('nt'):
+                g = rdf.Graph()
+                print('Parsing file %s ...' % filename)
+                g.parse(os.path.join(dir_path, filename), format='nt')
+                rdf_graphs.append(g)
 
-    parser = RDFParser()
-    hg, train_idx, test_idx, labels = parse_rdf(
-        itertools.chain(*rdf_graphs), parser, category, training_set, testing_set)
+        parser = RDFParser()
+        hg, train_idx, test_idx, labels = parse_rdf(
+            itertools.chain(*rdf_graphs), parser, category, training_set, testing_set)
 
-    for g in rdf_graphs:
-        g.close()
+        for g in rdf_graphs:
+            g.close()
 
     print('#Classes:', num_classes)
     return hg, category, num_classes, train_idx, test_idx, labels

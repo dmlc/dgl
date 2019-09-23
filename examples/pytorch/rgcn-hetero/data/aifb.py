@@ -156,8 +156,7 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
     print('#Testing samples:', len(test_idx))
     return hg, train_idx, test_idx, labels
 
-def parse_idx_file(filename):
-    labels = {}
+def parse_idx_file(filename, labels):
     person2affil = {}
     with open(filename, 'r') as f:
         for i, line in enumerate(f):
@@ -168,12 +167,14 @@ def parse_idx_file(filename):
             category = sp[3]
             pid = '%s/%s' % (sp[3], sp[5])
             person2affil[pid] = _get_id(labels, label)
-    return person2affil, category, len(labels)
+    return person2affil, category
 
 def load_aifb():
     dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'aifb-hetero')
-    training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
-    testing_set, _, num_classes = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'))
+    labels = {}
+    training_set, category = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'), labels)
+    testing_set, _ = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'), labels)
+    num_classes = len(labels)
     g = rdf.Graph()
     n3path = os.path.join(dir_path, 'aifbfixed_complete.n3')
     g.parse(n3path, format='n3')

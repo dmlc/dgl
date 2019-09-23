@@ -190,8 +190,7 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
 
     return hg, train_idx, test_idx, labels
 
-def parse_idx_file(filename):
-    labels = {}
+def parse_idx_file(filename, labels):
     rock2label = {}
     with open(filename, 'r') as f:
         for i, line in enumerate(f):
@@ -202,12 +201,14 @@ def parse_idx_file(filename):
             category = '%s/%s' % (sp[4], sp[5])
             rid = '%s/%s' % (category, sp[6])
             rock2label[rid] = _get_id(labels, label)
-    return rock2label, category, len(labels)
+    return rock2label, category
 
 def load_bgs():
     dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bgs-hetero')
-    training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
-    testing_set, _, num_classes = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'))
+    labels = {}
+    training_set, category = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'), labels)
+    testing_set, _ = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'), labels)
+    num_classes = len(labels)
 
     rdf_graphs = []
     for i, filename in enumerate(os.listdir(dir_path)):
