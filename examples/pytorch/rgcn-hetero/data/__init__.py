@@ -9,4 +9,5 @@ def load_data(dataset, bfs_level=3, relabel=False):
     else:
         raise ValueError('Unknown dataset: {}'.format(dataset))
 
-from .hetero_data import load_hetero
+from .aifb import load_aifb
+from .bgs import load_bgs

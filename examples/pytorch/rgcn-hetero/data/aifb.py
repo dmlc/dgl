@@ -170,7 +170,7 @@ def parse_idx_file(filename):
             person2affil[pid] = _get_id(labels, label)
     return person2affil, category, len(labels)
 
-def load_hetero():
+def load_aifb():
     dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'aifb-hetero')
     training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
     testing_set, _, num_classes = parse_idx_file(os.path.join(dir_path, 'testSet.tsv'))

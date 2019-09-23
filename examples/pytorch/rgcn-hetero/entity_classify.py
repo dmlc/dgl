@@ -21,7 +21,7 @@ import dgl.function as fn
 from functools import partial
 
 from model import BaseRGCN
-from data import load_hetero
+from data import load_aifb, load_bgs
 
 class RelGraphConvHetero(nn.Module):
     r"""Relational graph convolution layer.
@@ -168,7 +168,7 @@ class RelGraphConvHetero(nn.Module):
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
             g.nodes[srctype].data['h%d' % i] = th.matmul(
                 g.nodes[srctype].data['x'], ws[etype])
-            funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+            funcs[(srctype, etype, dsttype)] = (fn.copy_u('h%d' % i, 'm'), fn.mean('m', 'h'))
         # message passing
         g.multi_update_all(funcs, 'sum')
 
@@ -176,10 +176,10 @@ class RelGraphConvHetero(nn.Module):
         for i in range(len(hs)):
             h = hs[i]
             # apply bias and activation
+            if self.self_loop:
+                h = h + th.matmul(xs[i], self.loop_weight)
             if self.bias:
                 h = h + self.h_bias
-            if self.self_loop:
-                h = h + loop_message
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
@@ -210,7 +210,7 @@ class RelGraphConvHeteroEmbed(nn.Module):
         for srctype, etype, dsttype in g.canonical_etypes:
             embeds = nn.Parameter(th.Tensor(g.number_of_nodes(srctype), self.embed_size))
             nn.init.xavier_uniform_(embeds, gain=nn.init.calculate_gain('relu'))
-            self.embeds[(srctype, etype)] = embeds
+            self.embeds[(srctype, etype, dsttype)] = embeds
 
         # bias
         if self.bias:
@@ -218,10 +218,13 @@ class RelGraphConvHeteroEmbed(nn.Module):
             nn.init.zeros_(self.h_bias)
 
         # weight for self loop
-        #if self.self_loop:
-        #    self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-        #    nn.init.xavier_uniform_(self.loop_weight,
-        #                            gain=nn.init.calculate_gain('relu'))
+        if self.self_loop:
+            self.self_embeds = []
+            for ntype in g.ntypes:
+                embeds = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
+                nn.init.xavier_uniform_(embeds,
+                                        gain=nn.init.calculate_gain('relu'))
+                self.self_embeds.append(embeds)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -236,18 +239,18 @@ class RelGraphConvHeteroEmbed(nn.Module):
         g = self.g.local_var()
         funcs = {}
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['embed-%s' % etype] = self.embeds[(srctype, etype)]
-            funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%s' % etype, 'm'), fn.sum('m', 'h'))
+            g.nodes[srctype].data['embed-%d' % i] = self.embeds[(srctype, etype, dsttype)]
+            funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
         g.multi_update_all(funcs, 'sum')
         
         hs = [g.nodes[ntype].data['h'] for ntype in g.ntypes]
         for i in range(len(hs)):
             h = hs[i]
             # apply bias and activation
+            if self.self_loop:
+                h = h + self.self_embeds[i]
             if self.bias:
                 h = h + self.h_bias
-            if self.self_loop:
-                h = h + loop_message
             if self.activation:
                 h = self.activation(h)
             h = self.dropout(h)
@@ -285,7 +288,7 @@ class EntityClassify(BaseRGCN):
                 dropout=self.dropout))
         # h2o
         self.layers.append(RelGraphConvHetero(
-            self.h_dim, self.h_dim, self.rel_names, "basis",
+            self.h_dim, self.out_dim, self.rel_names, "basis",
             self.num_bases, activation=partial(F.softmax, dim=1),
             self_loop=False))
 
@@ -297,7 +300,12 @@ class EntityClassify(BaseRGCN):
 
 def main(args):
     # load graph data
-    g, category, num_classes, train_idx, test_idx, labels = load_hetero()
+    if args.dataset == 'aifb':
+        g, category, num_classes, train_idx, test_idx, labels = load_aifb()
+    elif args.dataset == 'bgs':
+        g, category, num_classes, train_idx, test_idx, labels = load_bgs()
+    else:
+        raise ValueError()
     category_id = len(g.ntypes)
     for i, ntype in enumerate(g.ntypes):
         if ntype == category:
@@ -328,9 +336,8 @@ def main(args):
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
-        feats = feats.cuda()
-        edge_type = edge_type.cuda()
-        edge_norm = edge_norm.cuda()
+        #edge_type = edge_type.cuda()
+        #edge_norm = edge_norm.cuda()
         labels = labels.cuda()
 
     # create model
@@ -361,6 +368,11 @@ def main(args):
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
+        #gnorm = 0.
+        #for p in model.embed_layer.parameters():
+            #if p.grad is not None:
+                #gnorm += (p.grad * p.grad).sum()
+        #print('gnorm:', gnorm)
         optimizer.step()
         t2 = time.time()
 
