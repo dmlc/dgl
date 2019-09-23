@@ -279,7 +279,7 @@ def check_negative_sampler(mode, exclude_positive):
                 eid = g.edge_id(u, v)
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
-                assert exists[i] == exist
+                assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
 def test_negative_sampler():
     check_negative_sampler('head', True)
