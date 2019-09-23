@@ -206,11 +206,11 @@ class RelGraphConvHeteroEmbed(nn.Module):
         self.self_loop = self_loop
 
         # create weight embeddings for each node for each relation
-        self.embeds = {}
+        self.embeds = nn.ParameterList()
         for srctype, etype, dsttype in g.canonical_etypes:
-            embeds = nn.Parameter(th.Tensor(g.number_of_nodes(srctype), self.embed_size))
-            nn.init.xavier_uniform_(embeds, gain=nn.init.calculate_gain('relu'))
-            self.embeds[(srctype, etype, dsttype)] = embeds
+            embed = nn.Parameter(th.Tensor(g.number_of_nodes(srctype), self.embed_size))
+            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
+            self.embeds.append(embed)
 
         # bias
         if self.bias:
@@ -219,12 +219,12 @@ class RelGraphConvHeteroEmbed(nn.Module):
 
         # weight for self loop
         if self.self_loop:
-            self.self_embeds = []
+            self.self_embeds = nn.ParameterList()
             for ntype in g.ntypes:
-                embeds = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
-                nn.init.xavier_uniform_(embeds,
+                embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
+                nn.init.xavier_uniform_(embed,
                                         gain=nn.init.calculate_gain('relu'))
-                self.self_embeds.append(embeds)
+                self.self_embeds.append(embed)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -239,7 +239,7 @@ class RelGraphConvHeteroEmbed(nn.Module):
         g = self.g.local_var()
         funcs = {}
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['embed-%d' % i] = self.embeds[(srctype, etype, dsttype)]
+            g.nodes[srctype].data['embed-%d' % i] = self.embeds[i]
             funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
         g.multi_update_all(funcs, 'sum')
         
