@@ -5,6 +5,7 @@ Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutio
 
 Dependencies
 ------------
+- Python 3.7+(for string formatting features)
 - PyTorch 1.1.0+
 - metis
 - sklearn
@@ -41,6 +42,7 @@ quick test to see whether you install metis correctly:
 ./run_reddit.sh
 ```
 You should be able to see the final test F1 is around `Test F1-mic0.9612, Test F1-mac0.9399`.
+Note that the first run of provided script is considerably slow than reported in the paper, which is presumably due to dataloader used. After caching the partition allocation, the running speed would be in a normal scale.
 
 * For PPI data, you may run the following scripts
 
