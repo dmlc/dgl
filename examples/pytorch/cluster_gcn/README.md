@@ -1,0 +1,51 @@
+Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks
+============
+- Paper link: [Cluster-GCN: An Efficient Algorithm for Training Deep and Large Graph Convolutional Networks](https://arxiv.org/abs/1905.07953)
+- Author's code repo: [https://github.com/google-research/google-research/blob/master/cluster_gcn/](https://github.com/google-research/google-research/blob/master/cluster_gcn/). 
+
+Dependencies
+------------
+- PyTorch 1.1.0+
+- metis
+- sklearn
+
+
+* install clustering toolkit: metis and its Python interface.
+
+  download and install metis: http://glaros.dtc.umn.edu/gkhome/metis/metis/download
+
+  METIS - Serial Graph Partitioning and Fill-reducing Matrix Ordering ([official website](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview))
+
+```
+1) Download metis-5.1.0.tar.gz from http://glaros.dtc.umn.edu/gkhome/metis/metis/download and unpack it
+2) cd metis-5.1.0
+3) make config shared=1 prefix=~/.local/
+4) make install
+5) export METIS_DLL=~/.local/lib/libmetis.so
+```
+
+quick test to see whether you install metis correctly:
+
+```
+>>> import networkx as nx
+>>> import metis
+>>> G = metis.example_networkx()
+>>> (edgecuts, parts) = metis.part_graph(G, 3)
+```
+
+
+## Run Experiments.
+* For reddit data, you may run the following scripts
+
+```
+./run_reddit.sh
+```
+You should be able to see the final test F1 is around `Test F1-mic0.9612, Test F1-mac0.9399`.
+
+* For PPI data, you may run the following scripts
+
+```
+./run_ppi.sh
+```
+You should be able to see the final test F1 is around `Test F1-mic0.9765, Test F1-mac0.9735`.
+
