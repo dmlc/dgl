@@ -274,15 +274,39 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
   return DGLIdIters(eid_data + start, eid_data + end);
 }
 
+struct shuffle_ele {
+  dgl_id_t col_idx;
+  dgl_id_t eid;
+};
+
 void CSR::SortAdj() {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(adj_.indptr->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(adj_.indices->data);
   size_t num_rows = adj_.num_rows;
-#pragma omp parallel for
-  for (size_t row = 0; row < num_rows; row++) {
-    dgl_id_t *start = indices_data + indptr_data[row];
-    dgl_id_t *end = indices_data + indptr_data[row + 1];
-    std::sort(start, end);
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr()->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices()->data);
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids()->data);
+#pragma omp parallel
+  {
+    std::vector<shuffle_ele> reorder_vec;
+#pragma omp for
+    for (size_t row = 0; row < num_rows; row++) {
+      size_t num_cols = indptr_data[row + 1] - indptr_data[row];
+      dgl_id_t *col = indices_data + indptr_data[row];
+      dgl_id_t *eid = eid_data + indptr_data[row];
+
+      reorder_vec.resize(num_cols);
+      for (size_t i = 0; i < num_cols; i++) {
+        reorder_vec[i].col_idx = col[i];
+        reorder_vec[i].eid = eid[i];
+      }
+      std::sort(reorder_vec.begin(), reorder_vec.end(),
+                [](const shuffle_ele &e1, const shuffle_ele &e2) {
+                  return e1.col_idx < e2.col_idx;
+                });
+      for (size_t i = 0; i < num_cols; i++) {
+        col[i] = reorder_vec[i].col_idx;
+        eid[i] = reorder_vec[i].eid;
+      }
+    }
   }
   sorted_ = true;
 }
