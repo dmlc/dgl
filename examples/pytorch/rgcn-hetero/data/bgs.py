@@ -76,6 +76,7 @@ class RDFParser:
             cls = '%s/%s' % (sp[4], sp[5])
             return Relation(cls=cls, attrs=None)
         else:
+            relstr = relstr.replace('.', '_')
             return Relation(cls=relstr, attrs=None)
 
 def _get_id(dict, key):
@@ -174,6 +175,7 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
     print('#Node types:', len(hg.ntypes))
     print('#Canonical edge types:', len(hg.etypes))
     print('#Unique edge type names:', len(set(hg.etypes)))
+    print(set(hg.etypes))
     #print(hg.canonical_etypes)
     nx.drawing.nx_pydot.write_dot(mg, 'meta.dot')
 

@@ -21,7 +21,7 @@ import dgl.function as fn
 from functools import partial
 
 from model import BaseRGCN
-from data import load_aifb, load_bgs, load_am
+from data import load_aifb, load_mutag, load_bgs, load_am
 
 class RelGraphConvHetero(nn.Module):
     r"""Relational graph convolution layer.
@@ -61,6 +61,7 @@ class RelGraphConvHetero(nn.Module):
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.rel_names = rel_names
+        print(self.rel_names)
         self.num_rels = len(rel_names)
         self.regularizer = regularizer
         self.num_bases = num_bases
@@ -257,6 +258,83 @@ class RelGraphConvHeteroEmbed(nn.Module):
             hs[i] = h
         return hs
 
+class RelGraphConvHeteroEmbed2(nn.Module):
+    r"""Relational graph convolution layer.
+    """
+    def __init__(self,
+                 embed_size,
+                 g,
+                 bias=True,
+                 activation=None,
+                 self_loop=False,
+                 dropout=0.0):
+        super(RelGraphConvHeteroEmbed2, self).__init__()
+        self.embed_size = embed_size
+        self.g = g
+        #self.rel_names = rel_names
+        #self.num_rels = len(rel_names)
+        self.bias = bias
+        self.activation = activation
+        self.self_loop = self_loop
+
+        # create weight embeddings for each node for each relation
+        self.ntype_embeds = nn.ParameterDict()
+        for ntype in g.ntypes:
+            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
+            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
+            self.ntype_embeds[ntype] = embed
+
+        self.etype_embeds = nn.ParameterDict()
+        for etype in set(g.etypes):
+            embed = nn.Parameter(th.Tensor(self.embed_size, self.embed_size))
+            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
+            self.etype_embeds[etype] = embed
+
+        # bias
+        if self.bias:
+            self.h_bias = nn.Parameter(th.Tensor(embed_size))
+            nn.init.zeros_(self.h_bias)
+
+        # weight for self loop
+        if self.self_loop:
+            self.self_embeds = nn.ParameterList()
+            for ntype in g.ntypes:
+                embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
+                nn.init.xavier_uniform_(embed,
+                                        gain=nn.init.calculate_gain('relu'))
+                self.self_embeds.append(embed)
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, norm=None):
+        """ Forward computation
+
+        Returns
+        -------
+        torch.Tensor
+            New node features.
+        """
+        g = self.g.local_var()
+        funcs = {}
+        for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
+            g.nodes[srctype].data['embed-%d' % i] = th.matmul(self.ntype_embeds[srctype], self.etype_embeds[etype])
+            funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
+        g.multi_update_all(funcs, 'sum')
+        
+        hs = [g.nodes[ntype].data['h'] for ntype in g.ntypes]
+        for i in range(len(hs)):
+            h = hs[i]
+            # apply bias and activation
+            if self.self_loop:
+                h = h + self.self_embeds[i]
+            if self.bias:
+                h = h + self.h_bias
+            if self.activation:
+                h = self.activation(h)
+            h = self.dropout(h)
+            hs[i] = h
+        return hs
+
 class EntityClassify(BaseRGCN):
     def __init__(self,
                  g,
@@ -275,7 +353,7 @@ class EntityClassify(BaseRGCN):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
 
-        self.embed_layer = RelGraphConvHeteroEmbed(
+        self.embed_layer = RelGraphConvHeteroEmbed2(
             self.h_dim, g, 
             activation=F.relu, self_loop=False,
             dropout=self.dropout)
@@ -302,6 +380,8 @@ def main(args):
     # load graph data
     if args.dataset == 'aifb':
         g, category, num_classes, train_idx, test_idx, labels = load_aifb()
+    elif args.dataset == 'mutag':
+        g, category, num_classes, train_idx, test_idx, labels = load_mutag()
     elif args.dataset == 'bgs':
         g, category, num_classes, train_idx, test_idx, labels = load_bgs()
     elif args.dataset == 'am':
