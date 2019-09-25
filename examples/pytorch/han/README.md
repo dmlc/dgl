@@ -17,4 +17,7 @@ Reference performance numbers for the ACM dataset:
 | ------------------- | -------------- | -------------- |
 | Paper               | 89.22          | 89.40          |
 | DGL                 | 88.99          | 89.02          |
+| Softmax regression (own dataset) | 89.66  | 89.62     |
 | DGL (own dataset)   | 91.51          | 91.66          |
+
+We ran a softmax regression to check the easiness of our own dataset.  HAN did show some improvements.
