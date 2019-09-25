@@ -12,12 +12,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
-from dgl.data import load_data, register_data_args
+from dgl.data import register_data_args
 from torch.utils.tensorboard import SummaryWriter
 
 from modules import GCNCluster, GraphSAGE
 from sampler import ClusterIter
-from utils import Logger, evaluate, save_log_dir
+from utils import Logger, evaluate, save_log_dir, load_data
 
 
 def main(args):

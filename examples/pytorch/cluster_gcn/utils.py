@@ -93,7 +93,8 @@ def load_data(args):
     PPIDataType = namedtuple('PPIDataset', ['train_mask', 'test_mask',
                                             'val_mask', 'features', 'labels', 'num_labels', 'graph'])
     G = dgl.BatchedDGLGraph(
-        [train_dataset.graph, val_dataset.graph, test_dataset.graph]).to_networkx()
+        [train_dataset.graph, val_dataset.graph, test_dataset.graph], edge_attrs=None, node_attrs=None)
+    G = G.to_networkx()
     # hack to dodge the potential bugs of to_networkx
     for (n1, n2, d) in G.edges(data=True):
         d.clear()
@@ -102,7 +103,6 @@ def load_data(args):
     val_nodes_num = val_dataset.graph.number_of_nodes()
     nodes_num = G.number_of_nodes()
     assert(nodes_num == (train_nodes_num + test_nodes_num + val_nodes_num))
-
     # construct mask
     mask = np.zeros((nodes_num,), dtype=bool)
     train_mask = mask.copy()
