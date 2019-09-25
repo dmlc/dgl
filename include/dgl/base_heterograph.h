@@ -21,7 +21,9 @@ namespace dgl {
 
 // Forward declaration
 class BaseHeteroGraph;
+class FlattenedHeteroGraph;
 typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
+typedef std::shared_ptr<FlattenedHeteroGraph> FlattenedHeteroGraphPtr;
 struct HeteroSubgraph;
 
 /*!
@@ -46,10 +48,14 @@ class BaseHeteroGraph : public runtime::Object {
   ////////////////////////// query/operations on meta graph ////////////////////////
 
   /*! \return the number of vertex types */
-  virtual uint64_t NumVertexTypes() const = 0;
+  virtual uint64_t NumVertexTypes() const {
+    return meta_graph_->NumVertices();
+  }
 
   /*! \return the number of edge types */
-  virtual uint64_t NumEdgeTypes() const = 0;
+  virtual uint64_t NumEdgeTypes() const {
+    return meta_graph_->NumEdges();
+  }
 
   /*! \return the meta graph */
   virtual GraphPtr meta_graph() const {
@@ -351,6 +357,17 @@ class BaseHeteroGraph : public runtime::Object {
   virtual HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const = 0;
 
+  /*!
+   * \brief Convert the list of requested unitgraph graphs into a single unitgraph graph.
+   *
+   * \param etypes The list of edge type IDs.
+   * \return The flattened graph, with induced source/edge/destination types/IDs.
+   */
+  virtual FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const {
+    LOG(FATAL) << "Flatten operation unsupported";
+    return nullptr;
+  }
+
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
@@ -380,6 +397,62 @@ struct HeteroSubgraph : public runtime::Object {
   static constexpr const char* _type_key = "graph.HeteroSubgraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
+
+/*! \brief The flattened heterograph */
+struct FlattenedHeteroGraph : public runtime::Object {
+  /*! \brief The graph */
+  HeteroGraphRef graph;
+  /*!
+   * \brief Mapping from source node ID to node type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
+  IdArray induced_srctype;
+  /*!
+   * \brief The set of node types in parent graph appearing in source nodes.
+   */
+  IdArray induced_srctype_set;
+  /*! \brief Mapping from source node ID to local node ID in parent graph */
+  IdArray induced_srcid;
+  /*!
+   * \brief Mapping from edge ID to edge type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
+  IdArray induced_etype;
+  /*!
+   * \brief The set of edge types in parent graph appearing in edges.
+   */
+  IdArray induced_etype_set;
+  /*! \brief Mapping from edge ID to local edge ID in parent graph */
+  IdArray induced_eid;
+  /*!
+   * \brief Mapping from destination node ID to node type in parent graph
+   * \note The induced type array guarantees that the same type always appear contiguously.
+   */
+  IdArray induced_dsttype;
+  /*!
+   * \brief The set of node types in parent graph appearing in destination nodes.
+   */
+  IdArray induced_dsttype_set;
+  /*! \brief Mapping from destination node ID to local node ID in parent graph */
+  IdArray induced_dstid;
+
+  void VisitAttrs(runtime::AttrVisitor *v) final {
+    v->Visit("graph", &graph);
+    v->Visit("induced_srctype", &induced_srctype);
+    v->Visit("induced_srctype_set", &induced_srctype_set);
+    v->Visit("induced_srcid", &induced_srcid);
+    v->Visit("induced_etype", &induced_etype);
+    v->Visit("induced_etype_set", &induced_etype_set);
+    v->Visit("induced_eid", &induced_eid);
+    v->Visit("induced_dsttype", &induced_dsttype);
+    v->Visit("induced_dsttype_set", &induced_dsttype_set);
+    v->Visit("induced_dstid", &induced_dstid);
+  }
+
+  static constexpr const char* _type_key = "graph.FlattenedHeteroGraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(FlattenedHeteroGraph, runtime::Object);
+};
+DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
 // Define HeteroSubgraphRef
 DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);

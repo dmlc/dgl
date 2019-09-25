@@ -1,17 +1,11 @@
 """User-defined function related data structures."""
 from __future__ import absolute_import
 
-from .base import is_all
-from . import backend as F
-from . import utils
-
 class EdgeBatch(object):
     """The class that can represent a batch of edges.
 
     Parameters
     ----------
-    g : DGLGraph
-        The graph object.
     edges : tuple of utils.Index
         The edge tuple (u, v, eid). eid can be ALL
     src_data : dict
@@ -24,8 +18,7 @@ class EdgeBatch(object):
         The dst node features, in the form of ``dict``
         with ``str`` keys and ``tensor`` values
     """
-    def __init__(self, g, edges, src_data, edge_data, dst_data):
-        self._g = g
+    def __init__(self, edges, src_data, edge_data, dst_data):
         self._edges = edges
         self._src_data = src_data
         self._edge_data = edge_data
@@ -75,9 +68,6 @@ class EdgeBatch(object):
             destination node and the edge id for the ith edge
             in the batch.
         """
-        if is_all(self._edges[2]):
-            self._edges = self._edges[:2] + (utils.toindex(F.arange(
-                0, self._g.number_of_edges())),)
         u, v, eid = self._edges
         return (u.tousertensor(), v.tousertensor(), eid.tousertensor())
 
@@ -104,9 +94,7 @@ class NodeBatch(object):
 
     Parameters
     ----------
-    g : DGLGraph
-        The graph object.
-    nodes : utils.Index or ALL
+    nodes : utils.Index
         The node ids.
     data : dict
         The node features, in the form of ``dict``
@@ -115,8 +103,7 @@ class NodeBatch(object):
         The messages, , in the form of ``dict``
         with ``str`` keys and ``tensor`` values
     """
-    def __init__(self, g, nodes, data, msgs=None):
-        self._g = g
+    def __init__(self, nodes, data, msgs=None):
         self._nodes = nodes
         self._data = data
         self._msgs = msgs
@@ -154,9 +141,6 @@ class NodeBatch(object):
         tensor
             The nodes.
         """
-        if is_all(self._nodes):
-            self._nodes = utils.toindex(F.arange(
-                0, self._g.number_of_nodes()))
         return self._nodes.tousertensor()
 
     def batch_size(self):
@@ -166,10 +150,7 @@ class NodeBatch(object):
         -------
         int
         """
-        if is_all(self._nodes):
-            return self._g.number_of_nodes()
-        else:
-            return len(self._nodes)
+        return len(self._nodes)
 
     def __len__(self):
         """Return the number of nodes in this node batch.

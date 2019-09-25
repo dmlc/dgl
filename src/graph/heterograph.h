@@ -20,14 +20,6 @@ class HeteroGraph : public BaseHeteroGraph {
  public:
   HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
 
-  uint64_t NumVertexTypes() const override {
-    return meta_graph_->NumVertices();
-  }
-
-  uint64_t NumEdgeTypes() const override {
-    return meta_graph_->NumEdges();
-  }
-
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
     CHECK_LT(etype, meta_graph_->NumEdges()) << "Invalid edge type: " << etype;
     return relation_graphs_[etype];
@@ -172,8 +164,10 @@ class HeteroGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
+  FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
+
  private:
-  /*! \brief A map from edge type to bipartite graph */
+  /*! \brief A map from edge type to unit graph */
   std::vector<HeteroGraphPtr> relation_graphs_;
 
   /*! \brief A map from vert type to the number of verts in the type */
