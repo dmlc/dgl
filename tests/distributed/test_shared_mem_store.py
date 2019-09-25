@@ -101,7 +101,6 @@ def server_func(num_workers, graph_name, server_init):
     server_init.value = True
     g.run()
 
-@unittest.skip
 def test_init():
     manager = Manager()
     return_dict = manager.dict()
@@ -171,8 +170,6 @@ def check_compute_func(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
-
-@unittest.skip
 def test_compute():
     manager = Manager()
     return_dict = manager.dict()
@@ -221,7 +218,6 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
         print(e, file=sys.stderr)
         traceback.print_exc()
 
-@unittest.skip
 def test_sync_barrier():
     manager = Manager()
     return_dict = manager.dict()
