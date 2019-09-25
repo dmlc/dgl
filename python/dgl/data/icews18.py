@@ -3,8 +3,9 @@ import numpy as np
 from dgl import DGLGraph
 import os
 import datetime
+import warnings
 
-from .utils import get_download_dir, download, extract_archive
+from .utils import get_download_dir, download, extract_archive, loadtxt
 
 
 class ICEWS18(object):
@@ -43,19 +44,19 @@ class ICEWS18(object):
             dpath = os.path.join(
                 self.dir, 'ICEWS18', self._url[dname.lower()].split('/')[-1])
             download(self._url[dname.lower()], path=dpath)
-        train_data = np.loadtxt(os.path.join(
+        train_data = loadtxt(os.path.join(
             self.dir, 'ICEWS18', 'train.txt'), delimiter='\t').astype(np.int64)
         if self.mode == 'train':
             self._load(train_data)
         elif self.mode == 'valid':
-            val_data = np.loadtxt(os.path.join(
+            val_data = loadtxt(os.path.join(
                 self.dir, 'ICEWS18', 'valid.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             self._load(np.concatenate([train_data, val_data], axis=0))
         elif self.mode == 'test':
-            val_data = np.loadtxt(os.path.join(
+            val_data = loadtxt(os.path.join(
                 self.dir, 'ICEWS18', 'valid.txt'), delimiter='\t').astype(np.int64)
-            test_data = np.loadtxt(os.path.join(
+            test_data = loadtxt(os.path.join(
                 self.dir, 'ICEWS18', 'test.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             val_data[:, 3] = -1

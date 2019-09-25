@@ -4,7 +4,7 @@ from dgl import DGLGraph
 import os
 import datetime
 
-from .utils import get_download_dir, download, extract_archive
+from .utils import get_download_dir, download, extract_archive, loadtxt
 
 
 class GDELT(object):
@@ -43,19 +43,19 @@ class GDELT(object):
             dpath = os.path.join(
                 self.dir, 'GDELT', self._url[dname.lower()].split('/')[-1])
             download(self._url[dname.lower()], path=dpath)
-        train_data = np.loadtxt(os.path.join(
+        train_data = loadtxt(os.path.join(
             self.dir, 'GDELT', 'train.txt'), delimiter='\t').astype(np.int64)
         if self.mode == 'train':
             self._load(train_data)
         elif self.mode == 'valid':
-            val_data = np.loadtxt(os.path.join(
+            val_data = loadtxt(os.path.join(
                 self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             self._load(np.concatenate([train_data, val_data], axis=0))
         elif self.mode == 'test':
-            val_data = np.loadtxt(os.path.join(
+            val_data = loadtxt(os.path.join(
                 self.dir, 'GDELT', 'valid.txt'), delimiter='\t').astype(np.int64)
-            test_data = np.loadtxt(os.path.join(
+            test_data = loadtxt(os.path.join(
                 self.dir, 'GDELT', 'test.txt'), delimiter='\t').astype(np.int64)
             train_data[:, 3] = -1
             val_data[:, 3] = -1
@@ -69,18 +69,9 @@ class GDELT(object):
         self.time_index = np.floor(data[:, 3]/15).astype(np.int64)
         self.start_time = self.time_index[self.time_index != -1].min()
         self.end_time = self.time_index.max()
-        # for i in range(start_time, end_time+1):
-        #     g = DGLGraph()
-        #     g.add_nodes(num_nodes)
-        #     row_mask = time_index <= i
-        #     edges = data[row_mask][:, [0, 2]]
-        #     rate = data[row_mask][:, 1]
-        #     g.add_edges(edges[:, 0], edges[:, 1])
-        #     g.edata['rel_type'] = rate.reshape(-1, 1)
-        #     self.graphs.append(g)
 
     def __getitem__(self, idx):
-        if idx >= len(self):
+        if idx >= len(self) or idx < 0:
             raise IndexError("Index out of range")
         i = idx + self.start_time
         g = DGLGraph()

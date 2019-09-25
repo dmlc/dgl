@@ -266,13 +266,13 @@ class PPIDataset(object):
         if self.mode == 'train':
             g = self.train_graphs[item]
             g.ndata['feat'] = self.features[self.train_mask_list[item]]
-            g.gdata = {'label': self.train_labels[item]}
+            label =  self.train_labels[item]
         elif self.mode == 'valid':
             g = self.valid_graphs[item]
             g.ndata['feat'] = self.features[self.valid_mask_list[item]]
-            g.gdata = {'label': self.valid_labels[item]}
+            label =  self.valid_labels[item]
         elif self.mode == 'test':
             g = self.test_graphs[item]
             g.ndata['feat'] = self.features[self.test_mask_list[item]]
-            g.gdata = {'label': self.test_labels[item]}
+            label =  self.test_labels[item]
         return g

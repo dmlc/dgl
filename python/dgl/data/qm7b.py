@@ -30,6 +30,7 @@ class QM7b(object):
         labels = data['T']
         feats = data['X']
         num_graphs = labels.shape[0]
+        self.label = labels
         for i in range(num_graphs):
             g = DGLGraph()
             edge_list = feats[i].nonzero()
@@ -37,11 +38,10 @@ class QM7b(object):
             g.add_nodes(num_nodes)
             g.add_edges(edge_list[0], edge_list[1])
             g.edata['h'] = feats[i][edge_list[0], edge_list[1]].reshape(-1, 1)
-            g.gdata = {'label': labels[i]} # Should be changed to g.gdata['label'] = labels[i] later
             self.graphs.append(g)
         
     def __getitem__(self, idx):
-        return self.graphs[idx]
+        return self.graphs[idx], self.label[idx]
     
     def __len__(self):
         return len(self.graphs)
