@@ -342,11 +342,6 @@ def main(args):
             category_id = i
 
     # split dataset into train, validate, test
-    #train_idx = np.hstack([train_idx, test_idx])
-    #train_idx = np.random.permutation(train_idx)
-    #test_idx = train_idx[0:len(test_idx)]
-    #train_idx = train_idx[len(test_idx):]
-    #print(train_idx.shape)
     if args.validation:
         val_idx = train_idx[:len(train_idx) // 5]
         train_idx = train_idx[len(train_idx) // 5:]
@@ -377,6 +372,8 @@ def main(args):
 
     if use_cuda:
         model.cuda()
+
+    print(sum([np.prod(p.size()) for p in model.parameters()]))
 
     # optimizer
     optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
