@@ -222,6 +222,8 @@ def test_setseed():
 
 def check_negative_sampler(mode, exclude_positive):
     g = generate_rand_graph(100)
+    etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
+    g.edata['etype'] = F.tensor(etype)
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
@@ -232,31 +234,52 @@ def check_negative_sampler(mode, exclude_positive):
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     neg_size = 10
+    # Test the homogeneous graph.
     for pos_edges, neg_edges in EdgeSampler(g, 50,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=exclude_positive):
-        pos_nid = pos_edges.parent_nid
-        pos_eid = pos_edges.parent_eid
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        pos_src = pos_nid[pos_lsrc]
-        pos_dst = pos_nid[pos_ldst]
-        pos_eid = pos_eid[pos_leid]
-        assert_array_equal(F.asnumpy(pos_eid), F.asnumpy(g.edge_ids(pos_src, pos_dst)))
+        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
+                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
+                                                pos_edges.parent_nid[pos_ldst])))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
-        neg_nid = neg_edges.parent_nid
-        neg_eid = neg_edges.parent_eid
-        neg_src = neg_nid[neg_lsrc]
-        neg_dst = neg_nid[neg_ldst]
-        neg_eid = neg_eid[neg_leid]
-
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
         for i in range(len(neg_eid)):
             neg_d = int(F.asnumpy(neg_dst[i]))
             neg_e = int(F.asnumpy(neg_eid[i]))
             assert (neg_d, neg_e) in pos_map
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+
+        exist = neg_edges.edata['exist']
+        if exclude_positive:
+            assert np.sum(F.asnumpy(exist) == 0) == len(exist)
+        else:
+            assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
+
+    # Test the knowledge graph.
+    for _, neg_edges in EdgeSampler(g, 50,
+                                    negative_mode=mode,
+                                    neg_sample_size=neg_size,
+                                    exclude_positive=exclude_positive,
+                                    relations=g.edata['etype']):
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
+        exists = neg_edges.edata['exist']
+        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        for i in range(len(neg_eid)):
+            u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
+            if g.has_edge_between(u, v):
+                eid = g.edge_id(u, v)
+                etype = g.edata['etype'][eid]
+                exist = neg_edges.edata['etype'][i] == etype
+                assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
 def test_negative_sampler():
     check_negative_sampler('head', True)

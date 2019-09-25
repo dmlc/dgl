@@ -6,8 +6,7 @@ from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import GraphIndex
-from ..heterograph_index import HeteroGraphIndex, create_bipartite_from_coo
+from ..heterograph_index import create_unitgraph_from_coo
 
 from . import ir
 from .ir import var
@@ -129,8 +128,8 @@ def build_gidx_and_mapping_graph(graph):
 
     Parameters
     ----------
-    graph : DGLGraph or DGLHeteroGraph
-        The homogeneous graph, or a bipartite view of the heterogeneous graph.
+    graph : GraphAdapter
+        Graph
 
     Returns
     -------
@@ -142,30 +141,21 @@ def build_gidx_and_mapping_graph(graph):
     nbits : int
         Number of ints needed to represent the graph
     """
-    gidx = graph._graph
-    if isinstance(gidx, GraphIndex):
-        return gidx.get_immutable_gidx, None, gidx.bits_needed()
-    elif isinstance(gidx, HeteroGraphIndex):
-        return (partial(gidx.get_bipartite, graph._current_etype_idx),
-                None,
-                gidx.bits_needed(graph._current_etype_idx))
-    else:
-        raise TypeError('unknown graph index type %s' % type(gidx))
-
+    return graph.get_immutable_gidx, None, graph.bits_needed()
 
 def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
     """Build immutable graph index and mapping using the given (u, v) edges
 
-    The matrix is of shape (len(reduce_nodes), n), where n is the number of
-    nodes in the graph. Therefore, when doing SPMV, the src node data should be
-    all the node features.
+    The matrix is of shape (num_src, num_dst).
 
     Parameters
     ---------
     edge_tuples : tuple of three utils.Index
         A tuple of (u, v, eid)
-    num_src, num_dst : int
-        The number of source and destination nodes.
+    num_src : int
+        Number of source nodes.
+    num_dst : int
+        Number of destination nodes.
 
     Returns
     -------
@@ -178,7 +168,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
         Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
-    gidx = create_bipartite_from_coo(num_src, num_dst, u, v)
+    gidx = create_unitgraph_from_coo(2, num_src, num_dst, u, v)
     forward, backward = gidx.get_csr_shuffle_order(0)
     eid = eid.tousertensor()
     nbits = gidx.bits_needed(0)
@@ -189,8 +179,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
     edge_map = utils.CtxCachedObject(
         lambda ctx: (nd.array(forward_map, ctx=ctx),
                      nd.array(backward_map, ctx=ctx)))
-    return partial(gidx.get_bipartite, None), edge_map, nbits
-
+    return partial(gidx.get_unitgraph, 0), edge_map, nbits
 
 def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
     """Build immutable graph index and mapping for node flow
