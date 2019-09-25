@@ -84,13 +84,6 @@ QM7b dataset
     :members: __getitem__, __len__
 
 
-QM9 dataset
-```````````````````````````````````
-
-.. autoclass:: QM9
-    :members: __getitem__, __len__
-
-
 
 GDELT dataset
 ```````````````````````````````````

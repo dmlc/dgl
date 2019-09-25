@@ -9,16 +9,16 @@ from dgl.data.bitcoinotc import BitcoinOTC
 from dgl.data.gdelt import GDELT
 from dgl.data.icews18 import ICEWS18
 from dgl.data.qm7b import QM7b
-from dgl.data.qm9 import QM9
+# from dgl.data.qm9 import QM9
 from dgl.data import CitationGraphDataset, CoraDataset, PPIDataset, RedditDataset, TUDataset
 
 ds_list = {
-    # "BitcoinOTC": "BitcoinOTC()",
-    # "Cora": "CoraDataset()",
-    # "Citeseer": "CitationGraphDataset('citeseer')",
-    # "PubMed": "CitationGraphDataset('pubmed')",
-    # "QM7b": "QM7b()",
-    # "Reddit": "RedditDataset()",
+    "BitcoinOTC": "BitcoinOTC()",
+    "Cora": "CoraDataset()",
+    "Citeseer": "CitationGraphDataset('citeseer')",
+    "PubMed": "CitationGraphDataset('pubmed')",
+    "QM7b": "QM7b()",
+    "Reddit": "RedditDataset()",
     "ENZYMES": "TUDataset('ENZYMES')",
     "DD": "TUDataset('DD')",
     "COLLAB": "TUDataset('COLLAB')",
@@ -36,8 +36,8 @@ ds_list = {
     "CoraFull": "CoraFull()",
 }
 
-# writer = RstGridTableWriter()
-writer = MarkdownTableWriter()
+writer = RstGridTableWriter()
+# writer = MarkdownTableWriter()
 
 extract_graph = lambda g: g if isinstance(g, DGLGraph) else g[0]
 stat_list=[]
