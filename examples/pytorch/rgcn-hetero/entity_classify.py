@@ -261,52 +261,18 @@ class RelGraphConvHeteroEmbed(nn.Module):
 class RelGraphConvHeteroEmbed2(nn.Module):
     r"""Relational graph convolution layer.
     """
-    def __init__(self,
-                 embed_size,
-                 g,
-                 bias=True,
-                 activation=None,
-                 self_loop=False,
-                 dropout=0.0):
+    def __init__(self, embed_size, g):
         super(RelGraphConvHeteroEmbed2, self).__init__()
         self.embed_size = embed_size
         self.g = g
-        #self.rel_names = rel_names
-        #self.num_rels = len(rel_names)
-        self.bias = bias
-        self.activation = activation
-        self.self_loop = self_loop
-
-        # create weight embeddings for each node for each relation
+        # create weight embeddings for each node type
         self.ntype_embeds = nn.ParameterDict()
         for ntype in g.ntypes:
             embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
             self.ntype_embeds[ntype] = embed
 
-        self.etype_embeds = nn.ParameterDict()
-        for etype in set(g.etypes):
-            embed = nn.Parameter(th.Tensor(self.embed_size, self.embed_size))
-            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
-            self.etype_embeds[etype] = embed
-
-        # bias
-        if self.bias:
-            self.h_bias = nn.Parameter(th.Tensor(embed_size))
-            nn.init.zeros_(self.h_bias)
-
-        # weight for self loop
-        if self.self_loop:
-            self.self_embeds = nn.ParameterList()
-            for ntype in g.ntypes:
-                embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), embed_size))
-                nn.init.xavier_uniform_(embed,
-                                        gain=nn.init.calculate_gain('relu'))
-                self.self_embeds.append(embed)
-
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, norm=None):
+    def forward(self):
         """ Forward computation
 
         Returns
@@ -314,26 +280,7 @@ class RelGraphConvHeteroEmbed2(nn.Module):
         torch.Tensor
             New node features.
         """
-        g = self.g.local_var()
-        funcs = {}
-        for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
-            g.nodes[srctype].data['embed-%d' % i] = th.matmul(self.ntype_embeds[srctype], self.etype_embeds[etype])
-            funcs[(srctype, etype, dsttype)] = (fn.copy_u('embed-%d' % i, 'm'), fn.mean('m', 'h'))
-        g.multi_update_all(funcs, 'sum')
-        
-        hs = [g.nodes[ntype].data['h'] for ntype in g.ntypes]
-        for i in range(len(hs)):
-            h = hs[i]
-            # apply bias and activation
-            if self.self_loop:
-                h = h + self.self_embeds[i]
-            if self.bias:
-                h = h + self.h_bias
-            if self.activation:
-                h = self.activation(h)
-            h = self.dropout(h)
-            hs[i] = h
-        return hs
+        return [self.ntype_embeds[ntype] for ntype in self.g.ntypes]
 
 class EntityClassify(BaseRGCN):
     def __init__(self,
@@ -353,22 +300,23 @@ class EntityClassify(BaseRGCN):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
 
-        self.embed_layer = RelGraphConvHeteroEmbed2(
-            self.h_dim, g, 
-            activation=F.relu, self_loop=False,
+        #self.embed_layer = RelGraphConvHeteroEmbed2(self.h_dim, g)
+        #self.num_hidden_layers += 1
+        self.embed_layer = RelGraphConvHeteroEmbed(
+            self.h_dim, g, activation=F.relu, self_loop=self.use_self_loop,
             dropout=self.dropout)
         self.layers = nn.ModuleList()
         # h2h
         for i in range(self.num_hidden_layers):
             self.layers.append(RelGraphConvHetero(
                 self.h_dim, self.h_dim, self.rel_names, "basis",
-                self.num_bases, activation=F.relu, self_loop=False,
+                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
                 dropout=self.dropout))
         # h2o
         self.layers.append(RelGraphConvHetero(
             self.h_dim, self.out_dim, self.rel_names, "basis",
             self.num_bases, activation=partial(F.softmax, dim=1),
-            self_loop=False))
+            self_loop=self.use_self_loop))
 
     def forward(self):
         h = self.embed_layer()
@@ -394,6 +342,11 @@ def main(args):
             category_id = i
 
     # split dataset into train, validate, test
+    #train_idx = np.hstack([train_idx, test_idx])
+    #train_idx = np.random.permutation(train_idx)
+    #test_idx = train_idx[0:len(test_idx)]
+    #train_idx = train_idx[len(test_idx):]
+    #print(train_idx.shape)
     if args.validation:
         val_idx = train_idx[:len(train_idx) // 5]
         train_idx = train_idx[len(train_idx) // 5:]
@@ -430,41 +383,34 @@ def main(args):
 
     # training loop
     print("start training...")
-    forward_time = []
-    backward_time = []
+    dur = []
     model.train()
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
-        t0 = time.time()
+        if epoch > 5:
+            t0 = time.time()
         #logits = model(g, feats, edge_type, edge_norm)
         logits = model()[category_id]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
-        t1 = time.time()
         loss.backward()
         optimizer.step()
-        t2 = time.time()
+        t1 = time.time()
 
-        forward_time.append(t1 - t0)
-        backward_time.append(t2 - t1)
-        print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
-              format(epoch, forward_time[-1], backward_time[-1]))
+        if epoch > 5:
+            dur.append(t1 - t0)
         train_acc = th.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
         val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
         val_acc = th.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
-        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-              format(train_acc, loss.item(), val_acc, val_loss.item()))
+        print("Epoch {:05d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
+              format(epoch, train_acc, loss.item(), val_acc, val_loss.item(), np.average(dur)))
     print()
 
     model.eval()
     logits = model.forward()[category_id]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
-    print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+    print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
-
-    print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
-    print("Mean backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')

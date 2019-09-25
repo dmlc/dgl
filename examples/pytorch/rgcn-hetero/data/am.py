@@ -74,6 +74,7 @@ class RDFParser:
             cls = sp[6]
             return Relation(cls=cls, attrs=None)
         else:
+            relstr = relstr.replace('.', '_')
             return Relation(cls=relstr, attrs=None)
 
 def _get_id(dict, key):
@@ -250,7 +251,9 @@ def parse_idx_file(filename, labels):
 
 def load_am():
     if os.path.exists(os.path.join(dir_path, 'cached_train_idx.npy')):
-        training_set, category, num_classes = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'))
+        labels = {}
+        training_set, category = parse_idx_file(os.path.join(dir_path, 'trainingSet.tsv'), labels)
+        num_classes = len(labels)
         # load cache
         train_idx = np.load(os.path.join(dir_path, 'cached_train_idx.npy'))
         test_idx = np.load(os.path.join(dir_path, 'cached_test_idx.npy'))

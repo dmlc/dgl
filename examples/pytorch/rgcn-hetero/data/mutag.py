@@ -10,9 +10,10 @@ import torch
 
 dir_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mutag-hetero')
 
-pat = re.compile("([a-zA-Z_]+)(.*)")
-is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
+d_entity = re.compile("d[0-9]")
+bond_entity = re.compile("bond[0-9]")
 
+is_mutagenic = rdf.term.URIRef("http://dl-learner.org/carcinogenesis#isMutagenic")
 rdf_type = rdf.term.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
 rdf_subclassof = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf")
 rdf_domain = rdf.term.URIRef("http://www.w3.org/2000/01/rdf-schema#domain")
@@ -21,11 +22,6 @@ Entity = namedtuple('Entity', ['id', 'cls', 'attrs'])
 Relation = namedtuple('Relation', ['cls', 'attrs'])
 
 class RDFParser:
-    """AM namespace convention:
-
-    Instance: http://dl-learner.org/carcinogenesis#<type><id>
-    Relation: http://dl-learner.org/carcinogenesis#<type>
-    """
     def __init__(self):
         self._entity_prefix = 'http://dl-learner.org/carcinogenesis#'
         self._relation_prefix = self._entity_prefix
@@ -37,21 +33,33 @@ class RDFParser:
         entstr = str(term)
         if entstr.startswith(self._entity_prefix):
             inst = entstr[len(self._entity_prefix):]
-            return Entity(id=inst, cls=None, attrs=None)
+            if d_entity.match(inst):
+                cls = 'd'
+            elif bond_entity.match(inst):
+                cls = 'bond'
+            else:
+                cls = None
+            return Entity(id=inst, cls=cls, attrs=None)
         else:
             return None
 
     def parse_object(self, term):
         if isinstance(term, rdf.Literal):
-            #return Entity(id=str(term), cls='_Literal', attrs=None)
-            return None
+            return Entity(id=str(term), cls="_Literal", attrs=None)
+            #return None
         elif isinstance(term, rdf.BNode):
             assert False
             return None
         entstr = str(term)
         if entstr.startswith(self._entity_prefix):
             inst = entstr[len(self._entity_prefix):]
-            return Entity(id=inst, cls=None, attrs=None)
+            if d_entity.match(inst):
+                cls = 'd'
+            elif bond_entity.match(inst):
+                cls = 'bond'
+            else:
+                cls = None
+            return Entity(id=inst, cls=cls, attrs=None)
         else:
             return None
 
@@ -63,6 +71,7 @@ class RDFParser:
             cls = relstr[len(self._relation_prefix):]
             return Relation(cls=cls, attrs=None)
         else:
+            relstr = relstr.split('/')[-1]
             return Relation(cls=relstr, attrs=None)
 
 def _get_id(dict, key):
@@ -90,9 +99,21 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
         objent = parser.parse_object(obj)
         if sbjent is None or rel is None or objent is None:
             continue
-        if pred == rdf_type:
-            clsid = _get_id(ent_classes, objent.id)
+
+        if sbjent.cls is not None:
+            clsid = _get_id(ent_classes, sbjent.cls)
             _get_id(entities, sbjent.id)
+            if len(entities) > len(ntid):  # found new entity
+                ntid.append(clsid)
+
+        objentcls = objent.cls
+        if not pred.startswith('http://dl-learner.org/carcinogenesis#'):
+            objentcls = 'SCHEMA'
+        if objentcls is None:
+            objentcls = rel.cls
+        if objentcls is not None:
+            clsid = _get_id(ent_classes, objentcls)
+            _get_id(entities, objent.id)
             if len(entities) > len(ntid):  # found new entity
                 ntid.append(clsid)
 
@@ -101,8 +122,6 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
     for i, (sbj, pred, obj) in enumerate(g):
         if i % 1000 == 0:
             print('Processed %d tuples, found %d valid tuples.' % (i, len(src)))
-        if not str(pred).startswith("http://dl-learner.org/carcinogenesis#"):
-            continue
         sbjent = parser.parse_subject(sbj)
         rel = parser.parse_predicate(pred)
         objent = parser.parse_object(obj)
@@ -181,8 +200,10 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
                        etypes,
                        metagraph=mg)
     print('#Node types:', len(hg.ntypes))
+    print(hg.ntypes)
     print('#Canonical edge types:', len(hg.etypes))
     print('#Unique edge type names:', len(set(hg.etypes)))
+    print(set(hg.etypes))
     #print(hg.canonical_etypes)
     nx.drawing.nx_pydot.write_dot(mg, 'meta.dot')
 
@@ -249,7 +270,7 @@ def load_preprocessed(mg, src, dst, ntid, etid, ntypes, etypes):
 def parse_idx_file(filename, labels):
     bond2label = {}
     prefix = 'http://dl-learner.org/carcinogenesis#'
-    category = 'Compound'
+    category = 'd'
     with open(filename, 'r') as f:
         for i, line in enumerate(f):
             if i == 0:
