@@ -31,7 +31,7 @@ ds_list = {
     "Amazon photo": "AmazonCoBuy('photo')",
     "Coauthor cs": "Coauthor('cs')",
     "Coauthor physics": "Coauthor('physics')",
-    "GDELT": "GDELT('tr/ain')/GDELT('valid')/GDELT('test')",
+    "GDELT": "GDELT('train')/GDELT('valid')/GDELT('test')",
     "ICEWS18": "ICEWS18('train')/ICEWS18('valid')/ICEWS18('test')",
     "CoraFull": "CoraFull()",
 }
