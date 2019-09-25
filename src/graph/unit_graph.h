@@ -1,11 +1,11 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file graph/bipartite.h
- * \brief Bipartite graph
+ * \file graph/unit_graph.h
+ * \brief UnitGraph graph
  */
 
-#ifndef DGL_GRAPH_BIPARTITE_H_
-#define DGL_GRAPH_BIPARTITE_H_
+#ifndef DGL_GRAPH_UNIT_GRAPH_H_
+#define DGL_GRAPH_UNIT_GRAPH_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
@@ -19,55 +19,56 @@
 namespace dgl {
 
 /*!
- * \brief Bipartite graph
+ * \brief UnitGraph graph
  *
- * Bipartite graph is a special type of heterograph which has two types
- * of nodes: "Src" and "Dst". All the edges are from "Src" type nodes to
- * "Dst" type nodes, so there is no edge among nodes of the same type.
+ * UnitGraph graph is a special type of heterograph which
+ * (1) Have two types of nodes: "Src" and "Dst". All the edges are
+ *     from "Src" type nodes to "Dst" type nodes, so there is no edge among
+ *     nodes of the same type. Thus, its metagraph has two nodes and one edge
+ *     between them.
+ * (2) Have only one type of nodes and edges. Thus, its metagraph has one node
+ *     and one self-loop edge.
  */
-class Bipartite : public BaseHeteroGraph {
+class UnitGraph : public BaseHeteroGraph {
  public:
-  /*! \brief source node group type */
-  static constexpr dgl_type_t kSrcVType = 0;
-  /*! \brief destination node group type */
-  static constexpr dgl_type_t kDstVType = 1;
-  /*! \brief edge group type */
-  static constexpr dgl_type_t kEType = 0;
-
   // internal data structure
   class COO;
   class CSR;
   typedef std::shared_ptr<COO> COOPtr;
   typedef std::shared_ptr<CSR> CSRPtr;
 
-  uint64_t NumVertexTypes() const override {
-    return 2;
+  inline dgl_type_t SrcType() const {
+    return 0;
   }
 
-  uint64_t NumEdgeTypes() const override {
-    return 1;
+  inline dgl_type_t DstType() const {
+    return NumVertexTypes() == 1? 0 : 1;
+  }
+
+  inline dgl_type_t EdgeType() const {
+    return 0;
   }
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
-    LOG(FATAL) << "The method shouldn't be called for Bipartite graph. "
+    LOG(FATAL) << "The method shouldn't be called for UnitGraph graph. "
       << "The relation graph is simply this graph itself.";
     return {};
   }
 
   void AddVertices(dgl_type_t vtype, uint64_t num_vertices) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdge(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void AddEdges(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   void Clear() override {
-    LOG(FATAL) << "Bipartite graph is not mutable.";
+    LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
   DLContext Context() const override;
@@ -139,13 +140,14 @@ class Bipartite : public BaseHeteroGraph {
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
   // creators
-  /*! \brief Create a bipartite graph from COO arrays */
-  static HeteroGraphPtr CreateFromCOO(int64_t num_src, int64_t num_dst,
+  /*! \brief Create a graph from COO arrays */
+  static HeteroGraphPtr CreateFromCOO(
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray row, IdArray col);
 
-  /*! \brief Create a bipartite graph from (out) CSR arrays */
+  /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
-      int64_t num_src, int64_t num_dst,
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
@@ -173,7 +175,14 @@ class Bipartite : public BaseHeteroGraph {
   aten::COOMatrix GetCOOMatrix() const;
 
  private:
-  Bipartite(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
+  /*!
+   * \brief constructor
+   * \param metagraph metagraph
+   * \param in_csr in edge csr
+   * \param out_csr out edge csr
+   * \param coo coo
+   */
+  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -190,4 +199,4 @@ class Bipartite : public BaseHeteroGraph {
 
 };  // namespace dgl
 
-#endif  // DGL_GRAPH_BIPARTITE_H_
+#endif  // DGL_GRAPH_UNIT_GRAPH_H_

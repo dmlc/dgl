@@ -2,7 +2,7 @@ import numpy as np
 import sys
 
 from .csv_dataset import CSVDataset
-from .utils import smile2graph
+from .utils import smile_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
 
 try:
@@ -11,9 +11,6 @@ except ImportError:
     pass
 
 class Tox21(CSVDataset):
-    
-    _url = 'dataset/tox21.csv.gz'
-
     """Tox21 dataset.
 
     The Toxicology in the 21st Century (https://tripod.nih.gov/tox21/challenge/)
@@ -32,15 +29,16 @@ class Tox21(CSVDataset):
 
     Parameters
     ----------
-    smile2graph: callable, str -> DGLGraph
-    A function turns smiles into a DGLGraph. Default one can be found 
-    at python/dgl/data/chem/utils.py named with smile2graph.
+    smile_to_graph: callable, str -> DGLGraph
+        A function turns smiles into a DGLGraph. Default one can be found
+        at python/dgl/data/chem/utils.py named with smile_to_bigraph.
     """
-    def __init__(self, smile2graph=smile2graph):
+    def __init__(self, smile_to_graph=smile_to_bigraph):
         if 'pandas' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning("Please install pandas")
 
+        self._url = 'dataset/tox21.csv.gz'
         data_path = get_download_dir() + '/tox21.csv.gz'
         download(_get_dgl_url(self._url), path=data_path)
         df = pd.read_csv(data_path)
@@ -48,7 +46,7 @@ class Tox21(CSVDataset):
 
         df = df.drop(columns=['mol_id'])
 
-        super().__init__(df, smile2graph, cache_file_path="tox21_dglgraph.pkl")
+        super().__init__(df, smile_to_graph, cache_file_path="tox21_dglgraph.pkl")
         self._weight_balancing()
 
     
@@ -80,7 +78,7 @@ class Tox21(CSVDataset):
 
         Returns
         -------
-        list
+        numpy.ndarray
             numpy array gives the weight of positive samples on all tasks
         """
         return self._task_pos_weights

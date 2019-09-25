@@ -629,6 +629,8 @@ def dgmg_message_weight_init(m):
 class DGMG(nn.Module):
     """DGMG model
 
+    `Learning Deep Generative Models of Graphs <https://arxiv.org/abs/1803.03324>`__
+
     Users only need to initialize an instance of this class.
 
     Parameters

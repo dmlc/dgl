@@ -1,13 +1,12 @@
-"""GCN using DGL nn package
+"""TAGCN using DGL nn package
 
 References:
-- Semi-Supervised Classification with Graph Convolutional Networks
-- Paper: https://arxiv.org/abs/1609.02907
-- Code: https://github.com/tkipf/gcn
+- Topology Adaptive Graph Convolutional Networks
+- Paper: https://arxiv.org/abs/1710.10370
 """
 import torch
 import torch.nn as nn
-from dgl.nn.pytorch.conv import TGConv
+from dgl.nn.pytorch.conv import TAGConv
 
 class TAGCN(nn.Module):
     def __init__(self,
@@ -22,12 +21,12 @@ class TAGCN(nn.Module):
         self.g = g
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(TGConv(in_feats, n_hidden, activation=activation))
+        self.layers.append(TAGConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(TGConv(n_hidden, n_hidden, activation=activation))
+            self.layers.append(TAGConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.append(TGConv(n_hidden, n_classes)) #activation=None
+        self.layers.append(TAGConv(n_hidden, n_classes)) #activation=None
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, features):
@@ -35,5 +34,5 @@ class TAGCN(nn.Module):
         for i, layer in enumerate(self.layers):
             if i != 0:
                 h = self.dropout(h)
-            h = layer(h, self.g)
+            h = layer(self.g, h)
         return h

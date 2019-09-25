@@ -12,10 +12,12 @@ from ... import kernel as K
 from ...function.base import TargetCode 
 
 MX_VERSION = LooseVersion(mx.__version__)
+if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
+    raise Exception("DGL has to work with MXNet version >= 1.5")
+
 # After MXNet 1.5, empty tensors aren't supprted by default.
-# after we turn on the numpy compatible flag, MXNet supports empty NDArray.
-if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
-    mx.set_np_shape(True)
+# After we turn on the numpy compatible flag, MXNet supports empty NDArray.
+mx.set_np_shape(True)
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -114,8 +116,8 @@ def asnumpy(input):
 def copy_to(input, ctx):
     return input.as_in_context(ctx)
 
-def sum(input, dim):
-    return nd.sum(input, axis=dim)
+def sum(input, dim, keepdims=False):
+    return nd.sum(input, axis=dim, keepdims=keepdims)
 
 def reduce_sum(input):
     return input.sum()
@@ -140,6 +142,10 @@ def reduce_min(input):
 
 def topk(input, k, dim, descending=True):
     return nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending)
+
+def argtopk(input, k, dim, descending=True):
+    idx = nd.argsort(input, dim, is_ascend=not descending)
+    return nd.slice_axis(input, dim, 0, k)
 
 def argsort(input, dim, descending):
     idx = nd.argsort(input, dim, is_ascend=not descending)
@@ -220,6 +226,9 @@ def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
 
+def swapaxes(input, axis1, axis2):
+    return nd.swapaxes(input, axis1, axis2)
+
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
 
@@ -228,6 +237,9 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
+
+def uniform(shape, dtype, ctx, low, high):
+    return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
@@ -346,6 +358,10 @@ def zerocopy_to_dgl_ndarray_for_write(arr):
 def zerocopy_from_dgl_ndarray(arr):
     return nd.from_dlpack(arr.to_dlpack())
 
+def one_hot(t, num_classes=-1):
+    if num_classes == -1:
+        num_classes = mx.nd.max(t).asscalar() + 1
+    return mx.nd.one_hot(t, num_classes)
 
 class BinaryReduce(mx.autograd.Function):
     def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
@@ -364,8 +380,11 @@ class BinaryReduce(mx.autograd.Function):
     def forward(self, lhs_data, rhs_data):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = nd.empty((self.out_size,) + feat_shape,
+        feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if self.binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = nd.empty((self.out_size,) + out_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
@@ -390,10 +409,10 @@ class BinaryReduce(mx.autograd.Function):
             in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
-                'sum', self.graph, target, in_ones_nd, degs_nd, 
+                'sum', self.graph, target, in_ones_nd, degs_nd,
                 in_map, self.out_map[0])
             # reshape
-            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
             out_data = out_data / degs
         else:
             degs = None

@@ -165,7 +165,7 @@ class IterAdapter {
  * values, try use the constructor to create the list at once (for example
  * from an existing vector).
  *
- * operator[] only provide const acces, use Set to mutate the content.
+ * operator[] only provide const access, use Set to mutate the content.
  *
  * \tparam T The content ObjectRef type.
  */

@@ -29,6 +29,7 @@ struct BackwardBinaryReduce {
     const int64_t D = gdata->x_length;
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -41,26 +42,46 @@ struct BackwardBinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * D;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * D;
+    DType* gradlhsoff = gdata->grad_lhs_data + lid * D * len;
+    DType* gradrhsoff = gdata->grad_rhs_data + rid * D * len;
     DType* gradoutoff = gdata->grad_out_data + oid * D;
     while (tx < D) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhs, rhs);
+      DType e = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
-        AtomicAdd(gradlhsoff + tx, grad_lhs);
-      }
-      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
-        AtomicAdd(gradrhsoff + tx, grad_rhs);
+
+      DType* lhs_base = lhsoff + tx * len;
+      DType* rhs_base = rhsoff + tx * len;
+      if (Mode == binary_op::kGradBoth) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad = grad_lhs + grad_rhs;
+          AtomicAdd(gradlhsoff + tx * len + i, grad);
+        }
+      } else if (Mode == binary_op::kGradLhs) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
+        }
+      } else if (Mode == binary_op::kGradRhs) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          AtomicAdd(gradrhsoff + tx * len + i, grad_rhs);
+        }
       }
       tx += stride_x;
     }
@@ -78,6 +99,7 @@ struct BackwardBinaryReduceBcast {
       Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -90,30 +112,51 @@ struct BackwardBinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len;
+    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len * len;
+    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len * len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhs, rhs);
+      DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
-        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
-        AtomicAdd(gradlhsoff + tx, grad_lhs);
-      }
-      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
-        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
-        AtomicAdd(gradrhsoff + tx, grad_rhs);
+
+      DType* lhs_base = lhsoff + lhs_add * len;
+      DType* rhs_base = rhsoff + rhs_add * len;
+      if (Mode == binary_op::kGradBoth) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad = grad_lhs + grad_rhs;
+          AtomicAdd(gradlhsoff + tx * len + i, grad);
+        }
+      } else if (Mode == binary_op::kGradLhs) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
+        }
+      } else if (Mode == binary_op::kGradRhs) {
+#pragma unroll
+        for (int64_t i = 0; i < len; ++i) {
+          DType lhs = Functors::Read(lhs_base + i);
+          DType rhs = Functors::Read(rhs_base + i);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          AtomicAdd(gradrhsoff + tx * len + i, grad_rhs);
+        }
       }
       tx += stride_x;
     }
@@ -138,8 +181,8 @@ struct BackwardFunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
+  static __device__ __forceinline__ DType Op(DType* lhs, DType* rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ DType Read(DType* addr) {
     return LDGReader<DType>::Call(addr);

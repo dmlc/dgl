@@ -7,7 +7,7 @@ import pickle
 import sys
 
 from dgl import DGLGraph
-from .utils import smile2graph
+from .utils import smile_to_bigraph
 
 
 class CSVDataset(object):
@@ -24,22 +24,18 @@ class CSVDataset(object):
     Parameters
     ----------
     df: pandas.DataFrame
-    Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
-    One column includes smiles and other columns for labels.
-    Column names other than smiles column would be considered as task names.
-
-    smile2graph: callable, str -> DGLGraph
-    A function turns smiles into a DGLGraph. Default one can be found 
-    at python/dgl/data/chem/utils.py named with smile2graph.
-
+        Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
+        One column includes smiles and other columns for labels.
+        Column names other than smiles column would be considered as task names.
+    smile_to_graph: callable, str -> DGLGraph
+        A function turns smiles into a DGLGraph. Default one can be found
+        at python/dgl/data/chem/utils.py named with smile_to_bigraph.
     smile_column: str
-    Column name that including smiles
-
+        Column name that including smiles
     cache_file_path: str
-    Path to store the preprocessed data
+        Path to store the preprocessed data
     """
-
-    def __init__(self, df, smile2graph=smile2graph, smile_column='smiles',
+    def __init__(self, df, smile_to_graph=smile_to_bigraph, smile_column='smiles',
                  cache_file_path="csvdata_dglgraph.pkl"):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
@@ -50,15 +46,20 @@ class CSVDataset(object):
         self.task_names = self.df.columns.drop([smile_column]).tolist()
         self.n_tasks = len(self.task_names)
         self.cache_file_path = cache_file_path
-        self._pre_process(smile2graph)
+        self._pre_process(smile_to_graph)
 
-    def _pre_process(self, smile2graph):
+    def _pre_process(self, smile_to_graph):
         """Pre-process the dataset
 
         * Convert molecules from smiles format into DGLGraphs
           and featurize their atoms
         * Set missing labels to be 0 and use a binary masking
           matrix to mask them
+
+        Parameters
+        ----------
+        smile_to_graph : callable, SMILES -> DGLGraph
+            Function for converting a SMILES (str) into a DGLGraph
         """
         if os.path.exists(self.cache_file_path):
             # DGLGraphs have been constructed before, reload them
@@ -66,7 +67,7 @@ class CSVDataset(object):
             with open(self.cache_file_path, 'rb') as f:
                 self.graphs = pickle.load(f)
         else:
-            self.graphs = [smile2graph(s) for s in self.smiles]
+            self.graphs = [smile_to_graph(s) for s in self.smiles]
             with open(self.cache_file_path, 'wb') as f:
                 pickle.dump(self.graphs, f)
 
@@ -76,7 +77,12 @@ class CSVDataset(object):
         self.mask = (~np.isnan(_label_values)).astype(np.float32)
 
     def __getitem__(self, item):
-        """Get the ith datapoint
+        """Get datapoint with index
+
+        Parameters
+        ----------
+        item : int
+            Datapoint index
 
         Returns
         -------
@@ -87,17 +93,17 @@ class CSVDataset(object):
         Tensor of dtype float32
             Labels of the datapoint for all tasks
         Tensor of dtype float32
-            Weights of the datapoint for all tasks
+            Binary masks indicating the existence of labels for all tasks
         """
         return self.smiles[item], self.graphs[item], \
                F.zerocopy_from_numpy(self.labels[item]),  \
                F.zerocopy_from_numpy(self.mask[item])
 
     def __len__(self):
-        """Length of Dataset
+        """Length of the dataset
 
-        Return
-        ------
+        Returns
+        -------
         int
             Length of Dataset
         """

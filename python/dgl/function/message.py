@@ -147,12 +147,17 @@ def copy_e(e, out):
 
 ###############################################################################
 # Generate all following  builtin message functions:
+# element-wise message functions:
 # u_add_v, u_sub_v, u_mul_v, u_div_v
 # u_add_e, u_sub_e, u_mul_e, u_div_e
 # v_add_u, v_sub_u, v_mul_u, v_div_u
 # v_add_e, v_sub_e, v_mul_e, v_div_e
 # e_add_u, e_sub_u, e_mul_u, e_div_u
 # e_add_v, e_sub_v, e_mul_v, e_div_v
+#
+# dot message functions:
+# u_dot_v, u_dot_e, v_dot_e
+# v_dot_u, e_dot_u, e_dot_v
 
 _TARGET_MAP = {
     "u": TargetCode.SRC,
@@ -200,11 +205,10 @@ def _register_builtin_message_func():
     target = ["u", "v", "e"]
     for lhs, rhs in product(target, target):
         if lhs != rhs:
-            for binary_op in ["add", "sub", "mul", "div"]:
+            for binary_op in ["add", "sub", "mul", "div", "dot"]:
                 func = _gen_message_builtin(lhs, rhs, binary_op)
                 setattr(sys.modules[__name__], func.__name__, func)
                 __all__.append(func.__name__)
-
 
 _register_builtin_message_func()
 

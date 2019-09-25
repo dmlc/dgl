@@ -372,6 +372,12 @@ struct Subgraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(Subgraph, runtime::Object);
 };
 
+/*! \brief Subgraph data structure for negative subgraph */
+struct NegSubgraph: public Subgraph {
+  /*! \brief The existence of the negative edges in the parent graph. */
+  IdArray exist;
+};
+
 // Define SubgraphRef
 DGL_DEFINE_OBJECT_REF(SubgraphRef, Subgraph);
 

@@ -20,12 +20,12 @@ How to run
 An experiment on the GIN in default settings can be run with
 
 ```bash
-python3 main.py
+python main.py
 ```
 
 An experiment on the GIN in customized settings can be run with
 ```bash
-python3 main.py [--device 0 | --disable-cuda] --dataset COLLAB \
+python main.py [--device 0 | --disable-cuda] --dataset COLLAB \
                --graph_pooling_type max --neighbor_pooling_type sum
 ```
 
@@ -35,7 +35,7 @@ Results
 Run with following with the double SUM pooling way:
 (tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI")
 ```bash
-python3 train.py --dataset MUTAB --device 0  \
+python main.py --dataset MUTAG --device 0  \
                 --graph_pooling_type sum --neighbor_pooling_type sum
 ```
 

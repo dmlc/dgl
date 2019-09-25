@@ -18,3 +18,5 @@ API Reference
    subgraph
    graph_store
    nodeflow
+   random
+   model_zoo
