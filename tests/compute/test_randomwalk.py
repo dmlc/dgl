@@ -63,7 +63,7 @@ def test_metapath_random_walk():
     g2 = dgl.bipartite(([0, 0, 1, 1, 2, 2, 3, 3], [1, 3, 2, 0, 3, 1, 0, 2]), 'b', 'ba', 'a')
     G = dgl.hetero_from_relations([g1, g2])
     seeds = [0, 1]
-    traces = dgl.contrib.sampling.metapath_cycle_random_walk(G, ['ab', 'ba'], seeds, 3, 4)
+    traces = dgl.contrib.sampling.metapath_random_walk(G, ['ab', 'ba'] * 4, seeds, 3)
     for seed, traces_per_seed in zip(seeds, traces):
         assert len(traces_per_seed) == 3
         for trace in traces_per_seed:

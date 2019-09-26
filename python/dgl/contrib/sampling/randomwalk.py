@@ -9,7 +9,7 @@ from ... import ndarray
 __all__ = ['random_walk',
            'random_walk_with_restart',
            'bipartite_single_sided_random_walk_with_restart',
-           'metapath_cycle_random_walk',
+           'metapath_random_walk',
            ]
 
 @register_object('sampler.RandomWalkTraces')
@@ -170,9 +170,9 @@ def bipartite_single_sided_random_walk_with_restart(
     return _split_traces(traces)
 
 
-def metapath_cycle_random_walk(hg, etypes, seeds, num_traces, max_cycles):
+def metapath_random_walk(hg, etypes, seeds, num_traces):
     """Generate random walk traces from an array of seed nodes (or starting nodes),
-    based on an indefinite cycle of the given metapath.
+    based on the given metapath.
 
     For a single seed node, ``num_traces`` traces would be generated.  A trace would
 
@@ -191,8 +191,6 @@ def metapath_cycle_random_walk(hg, etypes, seeds, num_traces, max_cycles):
         The seed nodes.  Node type is the same as the beginning node type of metapath.
     num_traces : int
         The number of traces
-    max_cycles : int
-        Maximum number of metapath cycles to traverse.
 
     Returns
     -------
@@ -213,8 +211,7 @@ def metapath_cycle_random_walk(hg, etypes, seeds, num_traces, max_cycles):
         return []
     etype_array = ndarray.array(np.array([hg.get_etype_id(et) for et in etypes], dtype='int64'))
     seed_array = utils.toindex(seeds).todgltensor()
-    traces = _CAPI_DGLMetapathCycleRandomWalk(
-            hg._graph, etype_array, seed_array, num_traces, max_cycles)
+    traces = _CAPI_DGLMetapathRandomWalk(hg._graph, etype_array, seed_array, num_traces)
     return _split_traces(traces)
 
 _init_api('dgl.sampler.randomwalk', __name__)
