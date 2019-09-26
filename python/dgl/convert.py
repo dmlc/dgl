@@ -272,6 +272,13 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     the type id, which which can be used to retrieve the type names stored
     in the given ``ntypes`` and ``etypes`` arguments.
 
+    The function will automatically distinguish edge types that have the same given
+    type IDs but different src and dst type IDs. For example, we allow both edges A and B
+    to have the same type ID 3, but one has (0, 1) and the other as (2, 3) as the
+    (src, dst) type IDs. In this case, the function will "split" edge type 3 into two types:
+    (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
+    type name, but can be distinguished by a canonical edge type tuple.
+
     Examples
     --------
     TBD
@@ -339,27 +346,30 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     dst = F.asnumpy(dst)
     src_local = ntype_local_ids[src]
     dst_local = ntype_local_ids[dst]
-    srctype_ids = ntype_ids[src]
-    dsttype_ids = ntype_ids[dst]
-    canon_etype_ids = np.stack([srctype_ids, etype_ids, dsttype_ids], 1)
+    # a 2D tensor of shape (E, 3). Each row represents the (stid, etid, dtid) tuple.
+    edge_ctids = np.stack([ntype_ids[src], etype_ids, ntype_ids[dst]], 1)
 
-    # infer metagraph
+    # infer metagraph and canonical edge types
+    # No matter which branch it takes, the code will generate a 2D tensor of shape (E_m, 3),
+    # E_m is the set of all possible canonical edge tuples. Each row represents the
+    # (stid, dtid, dtid) tuple. We then compute a 2D tensor of shape (E, E_m) using the
+    # above ``edge_ctids`` matrix. Each element i,j indicates whether the edge i is of the
+    # canonical edge type j. We can then group the edges of the same type together.
     if metagraph is None:
         canonical_etids, _, etype_remapped = \
-                utils.make_invmap(list(tuple(_) for _ in canon_etype_ids), False)
+                utils.make_invmap(list(tuple(_) for _ in edge_ctids), False)
         etype_mask = (etype_remapped[None, :] == np.arange(len(canonical_etids))[:, None])
     else:
         ntypes_invmap = {nt: i for i, nt in enumerate(ntypes)}
         etypes_invmap = {et: i for i, et in enumerate(etypes)}
         canonical_etids = []
-        etype_remapped = np.zeros(etype_ids)
         for i, (srctype, dsttype, etype) in enumerate(metagraph.edges(keys=True)):
             srctype_id = ntypes_invmap[srctype]
             etype_id = etypes_invmap[etype]
             dsttype_id = ntypes_invmap[dsttype]
             canonical_etids.append((srctype_id, etype_id, dsttype_id))
         canonical_etids = np.array(canonical_etids)
-        etype_mask = (canon_etype_ids[None, :] == canonical_etids[:, None]).all(2)
+        etype_mask = (edge_ctids[None, :] == canonical_etids[:, None]).all(2)
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
     rel_graphs = []
@@ -430,9 +440,11 @@ def to_homo(G):
     eids = []
     ntype_ids = []
     nids = []
+    total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
+        total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes))
 
@@ -445,7 +457,7 @@ def to_homo(G):
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
+    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), card=total_num_nodes)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)

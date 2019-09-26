@@ -30,6 +30,29 @@ class SemanticAttention(nn.Module):
         return (beta * z).sum(1)
 
 class HANLayer(nn.Module):
+    """
+    HAN layer.
+
+    Arguments
+    ---------
+    meta_paths : list of metapaths, each as a list of edge types
+    in_size : input feature dimension
+    out_size : output feature dimension
+    layer_num_heads : number of attention heads
+    dropout : Dropout probability
+
+    Inputs
+    ------
+    g : DGLHeteroGraph
+        The heterogeneous graph
+    h : tensor
+        Input features
+
+    Outputs
+    -------
+    tensor
+        The output feature
+    """
     def __init__(self, meta_paths, in_size, out_size, layer_num_heads, dropout):
         super(HANLayer, self).__init__()
 

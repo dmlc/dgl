@@ -406,8 +406,8 @@ def laplacian_lambda_max(g):
     return rst
 
 def coalesce_metapath(g, metapath):
-    """Transform a heterogeneous graph into either a homogeneous graph or a unidirectional
-    bipartite graph so that metapaths are coalesced into edges.
+    """Return a graph where the successors of any node ``u`` are nodes reachable from ``u`` by
+    the given metapath.
 
     If the beginning node type ``s`` and ending node type ``t`` are the same, it will return
     a homogeneous graph with node type ``s = t``.  Otherwise, a unidirectional bipartite graph
@@ -416,9 +416,8 @@ def coalesce_metapath(g, metapath):
     In both cases, two nodes ``u`` and ``v`` will be connected with an edge ``(u, v)`` if
     there exists one path matching the metapath from ``u`` to ``v``.
 
-    Even if a node of type ``s`` does not have any outbound path matching the given metapath, it
-    will still show up in the returned graph.  Similarly, a node of type ``t`` will still
-    show up even if it does not have any inbound path matching the given metapath.
+    The result graph keeps the node set of type ``s`` and ``t`` in the original graph even if
+    they might have no neighbor.
 
     The features of the source/destination node type in the original graph would be copied to
     the new graph.

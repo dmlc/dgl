@@ -652,6 +652,11 @@ def test_convert():
         assert hg.number_of_edges(('user', 'watches', 'movie')) == 1
         assert len(hg.etypes) == 2
 
+    # hetero_to_homo test case 2
+    hg = dgl.bipartite([(0, 0), (1, 1)], card=(2, 3))
+    g = dgl.to_homo(hg)
+    assert g.number_of_nodes() == 5
+
 def test_transform():
     g = create_test_heterograph()
     x = F.randn((3, 5))
