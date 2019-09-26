@@ -1,4 +1,5 @@
-"""This model shows an example of using dgl.coalesce_metapath on the original heterogeneous graph.
+"""This model shows an example of using dgl.metapath_reachable_graph on the original heterogeneous
+graph.
 
 Because the original HAN implementation only gives the preprocessed homogeneous graph, this model
 could not reproduce the result in HAN as they did not provide the preprocessing code, and we
@@ -74,7 +75,8 @@ class HANLayer(nn.Module):
             self._cached_graph = g
             self._cached_coalesced_graph.clear()
             for meta_path in self.meta_paths:
-                self._cached_coalesced_graph[meta_path] = dgl.coalesce_metapath(g, meta_path)
+                self._cached_coalesced_graph[meta_path] = dgl.metapath_reachable_graph(
+                        g, meta_path)
 
         for i, meta_path in enumerate(self.meta_paths):
             new_g = self._cached_coalesced_graph[meta_path]

@@ -12,7 +12,7 @@ from .convert import graph, bipartite
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
            'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
-           'onehot_degree', 'remove_self_loop', 'coalesce_metapath']
+           'onehot_degree', 'remove_self_loop', 'metapath_reachable_graph']
 
 
 def pairwise_squared_distance(x):
@@ -405,7 +405,7 @@ def laplacian_lambda_max(g):
                                       return_eigenvectors=False)[0].real)
     return rst
 
-def coalesce_metapath(g, metapath):
+def metapath_reachable_graph(g, metapath):
     """Return a graph where the successors of any node ``u`` are nodes reachable from ``u`` by
     the given metapath.
 
