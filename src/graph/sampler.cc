@@ -921,7 +921,7 @@ dgl_id_t global2local_map(dgl_id_t global_id,
   }
 }
 
-inline bool is_neg_head_mode(const std::string &mode) {
+inline bool IsNegativeHeadMode(const std::string &mode) {
   return mode == "head";
 }
 
@@ -1010,7 +1010,7 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   const dgl_id_t *unchanged;
   dgl_id_t *neg_unchanged;
   dgl_id_t *neg_changed;
-  if (is_neg_head_mode(neg_mode)) {
+  if (IsNegativeHeadMode(neg_mode)) {
     unchanged = dst_data;
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
@@ -1039,7 +1039,7 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
 
     std::vector<size_t> neighbors;
     DGLIdIters neigh_it;
-    if (is_neg_head_mode(neg_mode)) {
+    if (IsNegativeHeadMode(neg_mode)) {
       neigh_it = gptr->PredVec(induced_vid_data[unchanged[i]]);
     } else {
       neigh_it = gptr->SuccVec(induced_vid_data[unchanged[i]]);
@@ -1151,7 +1151,7 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   dgl_id_t *neg_changed;
 
   // corrupt head nodes.
-  if (is_neg_head_mode(neg_mode)) {
+  if (IsNegativeHeadMode(neg_mode)) {
     unchanged = dst_data;
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
