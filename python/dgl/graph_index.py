@@ -60,13 +60,15 @@ class GraphIndex(ObjectBase):
         self._readonly = readonly
         if multigraph is None:
             multigraph = BoolFlag.BOOL_UNKNOWN
+        # TODO(zhengda) should we enable sort_csr after pickling?
         self.__init_handle_by_constructor__(
             _CAPI_DGLGraphCreate,
             src.todgltensor(),
             dst.todgltensor(),
             int(multigraph),
             int(num_nodes),
-            readonly)
+            readonly,
+            False)
 
     def add_nodes(self, num):
         """Add nodes.
@@ -965,7 +967,7 @@ class SubgraphIndex(ObjectBase):
 ###############################################################
 # Conversion functions
 ###############################################################
-def from_coo(num_nodes, src, dst, is_multigraph, readonly):
+def from_coo(num_nodes, src, dst, is_multigraph, readonly, sort_csr):
     """Convert from coo arrays.
 
     Parameters
@@ -980,6 +982,8 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
         True if the graph is a multigraph. None means determined by data.
     readonly : bool
         True if the returned graph is readonly.
+    sort_csr : bool
+        Whether to sort the columns of the CSR matrix that stores the graph index.
 
     Returns
     -------
@@ -996,7 +1000,7 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
             dst.todgltensor(),
             int(is_multigraph),
             int(num_nodes),
-            readonly)
+            readonly, sort_csr)
     else:
         if is_multigraph is BoolFlag.BOOL_UNKNOWN:
             # TODO(minjie): better behavior in the future
@@ -1007,7 +1011,7 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     return gidx
 
 def from_csr(indptr, indices, is_multigraph,
-             direction, shared_mem_name=""):
+             direction, sort_csr, shared_mem_name=""):
     """Load a graph from CSR arrays.
 
     Parameters
@@ -1020,6 +1024,8 @@ def from_csr(indptr, indices, is_multigraph,
         True if the graph is a multigraph. None means determined by data.
     direction : str
         the edge direction. Either "in" or "out".
+    sort_csr : bool
+        Whether to sort the columns of the CSR matrix that stores the graph index.
     shared_mem_name : str
         the name of shared memory
     """
@@ -1032,7 +1038,8 @@ def from_csr(indptr, indices, is_multigraph,
         indices.todgltensor(),
         shared_mem_name,
         int(is_multigraph),
-        direction)
+        direction,
+        sort_csr)
     return gidx
 
 def from_shared_mem_csr_matrix(shared_mem_name,
@@ -1058,7 +1065,7 @@ def from_shared_mem_csr_matrix(shared_mem_name,
         edge_dir)
     return gidx
 
-def from_networkx(nx_graph, readonly):
+def from_networkx(nx_graph, readonly, sort_csr):
     """Convert from networkx graph.
 
     If 'id' edge attribute exists, the edge will be added follows
@@ -1070,6 +1077,8 @@ def from_networkx(nx_graph, readonly):
         The nx graph or any graph that can be converted to nx.DiGraph
     readonly : bool
         True if the returned graph is readonly.
+    sort_csr : bool
+        Whether to sort the columns of the CSR matrix that stores the graph index.
 
     Returns
     -------
@@ -1111,9 +1120,9 @@ def from_networkx(nx_graph, readonly):
     # We store edge Ids as an edge attribute.
     src = utils.toindex(src)
     dst = utils.toindex(dst)
-    return from_coo(num_nodes, src, dst, is_multigraph, readonly)
+    return from_coo(num_nodes, src, dst, is_multigraph, readonly, sort_csr)
 
-def from_scipy_sparse_matrix(adj, readonly):
+def from_scipy_sparse_matrix(adj, readonly, sort_csr):
     """Convert from scipy sparse matrix.
 
     Parameters
@@ -1121,6 +1130,8 @@ def from_scipy_sparse_matrix(adj, readonly):
     adj : scipy sparse matrix
     readonly : bool
         True if the returned graph is readonly.
+    sort_csr : bool
+        Whether to sort the columns of the CSR matrix that stores the graph index.
 
     Returns
     -------
@@ -1130,17 +1141,23 @@ def from_scipy_sparse_matrix(adj, readonly):
     if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
-        return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly)
+        return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly, sort_csr)
     else:
-        return from_csr(adj.indptr, adj.indices, False, "out")
+        return from_csr(adj.indptr, adj.indices, False, "out", sort_csr)
 
-def from_edge_list(elist, is_multigraph, readonly):
+def from_edge_list(elist, is_multigraph, readonly, sort_csr):
     """Convert from an edge list.
 
     Parameters
     ---------
     elist : list, tuple
         List of (u, v) edge tuple, or a tuple of src/dst lists
+    multigraph : bool
+        Whether the graph would be a multigraph.
+    readonly : bool
+        True if the returned graph is readonly.
+    sort_csr : bool
+        Whether to sort the columns of the CSR matrix that stores the graph index.
     """
     if isinstance(elist, tuple):
         src, dst = elist
@@ -1154,7 +1171,7 @@ def from_edge_list(elist, is_multigraph, readonly):
     min_nodes = min(src.min(), dst.min())
     if min_nodes != 0:
         raise DGLError('Invalid edge list. Nodes must start from 0.')
-    return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly)
+    return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly, sort_csr)
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
@@ -1244,7 +1261,7 @@ def disjoint_partition(graph, num_or_size_splits):
             int(num_or_size_splits))
     return rst
 
-def create_graph_index(graph_data, multigraph, readonly):
+def create_graph_index(graph_data, multigraph, readonly, sort_csr):
     """Create a graph index object.
 
     Parameters
@@ -1256,6 +1273,8 @@ def create_graph_index(graph_data, multigraph, readonly):
         by the data.
     readonly : bool
         Whether the graph structure is read-only.
+    sort_csr : bool, optional
+        Whether to sort the columns of the CSR matrix that stores the graph index.
     """
     if isinstance(graph_data, GraphIndex):
         # FIXME(minjie): this return is not correct for mutable graph index
@@ -1269,14 +1288,14 @@ def create_graph_index(graph_data, multigraph, readonly):
         return _CAPI_DGLGraphCreateMutable(multigraph)
     elif isinstance(graph_data, (list, tuple)):
         # edge list
-        return from_edge_list(graph_data, multigraph, readonly)
+        return from_edge_list(graph_data, multigraph, readonly, sort_csr)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         # scipy format
-        return from_scipy_sparse_matrix(graph_data, readonly)
+        return from_scipy_sparse_matrix(graph_data, readonly, sort_csr)
     else:
         # networkx - any format
         try:
-            gidx = from_networkx(graph_data, readonly)
+            gidx = from_networkx(graph_data, readonly, sort_csr)
         except Exception:  # pylint: disable=broad-except
             raise DGLError('Error while creating graph from input of type "%s".'
                            % type(graph_data))

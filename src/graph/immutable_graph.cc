@@ -434,13 +434,19 @@ BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
 CSRPtr ImmutableGraph::GetInCSR() const {
   if (!in_csr_) {
     if (out_csr_) {
-      const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
+      auto in_csr = out_csr_->Transpose();
+      if (sort_csr_)
+        in_csr->SortCSR();
+      const_cast<ImmutableGraph*>(this)->in_csr_ = in_csr;
       if (out_csr_->IsSharedMem())
         LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
                      << "It may dramatically increase memory consumption.";
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
+      auto in_csr = coo_->Transpose()->ToCSR();
+      if (sort_csr_)
+        in_csr->SortCSR();
+      const_cast<ImmutableGraph*>(this)->in_csr_ = in_csr;
     }
   }
   return in_csr_;
@@ -450,13 +456,19 @@ CSRPtr ImmutableGraph::GetInCSR() const {
 CSRPtr ImmutableGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
-      const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
+      auto out_csr = in_csr_->Transpose();
+      if (sort_csr_)
+        out_csr->SortCSR();
+      const_cast<ImmutableGraph*>(this)->out_csr_ = out_csr;
       if (in_csr_->IsSharedMem())
         LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
                      << "It may dramatically increase memory consumption.";
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
-      const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
+      auto out_csr = coo_->ToCSR();
+      if (sort_csr_)
+        out_csr->SortCSR();
+      const_cast<ImmutableGraph*>(this)->out_csr_ = out_csr;
     }
   }
   return out_csr_;
@@ -531,8 +543,11 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
-    IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir) {
-    CSRPtr csr(new CSR(indptr, indices, edge_ids));
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    const std::string &edge_dir, bool sort_csr) {
+  CSRPtr csr(new CSR(indptr, indices, edge_ids));
+  // TODO(zhengda) we are sorting on the original memory.
+  csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
@@ -545,8 +560,10 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    bool multigraph, const std::string &edge_dir) {
+    bool multigraph, const std::string &edge_dir, bool sort_csr) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
+  // TODO(zhengda) we are sorting on the original memory.
+  csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
@@ -559,9 +576,11 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    const std::string &edge_dir,
+    const std::string &edge_dir, bool sort_csr,
     const std::string &shared_mem_name) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
+  // TODO(zhengda) we are sorting on the original memory.
+  csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
@@ -574,10 +593,12 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    bool multigraph, const std::string &edge_dir,
+    bool multigraph, const std::string &edge_dir, bool sort_csr,
     const std::string &shared_mem_name) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
                      GetSharedMemName(shared_mem_name, edge_dir)));
+  // TODO(zhengda) we are sorting on the original memory.
+  csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
@@ -605,15 +626,16 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
-    int64_t num_vertices, IdArray src, IdArray dst) {
+    int64_t num_vertices, IdArray src, IdArray dst, bool sort_csr) {
   COOPtr coo(new COO(num_vertices, src, dst));
-  return std::make_shared<ImmutableGraph>(coo);
+  // TODO(zhengda) add the flag.
+  return std::make_shared<ImmutableGraph>(coo, sort_csr);
 }
 
 ImmutableGraphPtr ImmutableGraph::CreateFromCOO(
-    int64_t num_vertices, IdArray src, IdArray dst, bool multigraph) {
+    int64_t num_vertices, IdArray src, IdArray dst, bool multigraph, bool sort_csr) {
   COOPtr coo(new COO(num_vertices, src, dst, multigraph));
-  return std::make_shared<ImmutableGraph>(coo);
+  return std::make_shared<ImmutableGraph>(coo, sort_csr);
 }
 
 ImmutableGraphPtr ImmutableGraph::ToImmutable(GraphPtr graph) {
@@ -623,7 +645,7 @@ ImmutableGraphPtr ImmutableGraph::ToImmutable(GraphPtr graph) {
   } else {
     const auto& adj = graph->GetAdj(true, "csr");
     CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
-    return ImmutableGraph::CreateFromCSR(adj[0], adj[1], adj[2], "out");
+    return ImmutableGraph::CreateFromCSR(adj[0], adj[1], adj[2], "out", false);
   }
 }
 

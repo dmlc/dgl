@@ -161,7 +161,7 @@ def test_load_csr():
 
     # Load CSR normally.
     idx = dgl.graph_index.from_csr(
-            utils.toindex(csr.indptr), utils.toindex(csr.indices), False, 'out')
+            utils.toindex(csr.indptr), utils.toindex(csr.indices), False, 'out', False)
     assert idx.number_of_nodes() == n
     assert idx.number_of_edges() == csr.nnz
     src, dst, eid = idx.edges()
@@ -175,7 +175,7 @@ def test_load_csr():
     if os.name is not 'nt':
         idx = dgl.graph_index.from_csr(
                 utils.toindex(csr.indptr), utils.toindex(csr.indices),
-                False, 'out', '/test_graph_struct')
+                False, 'out', False, '/test_graph_struct')
         assert idx.number_of_nodes() == n
         assert idx.number_of_edges() == csr.nnz
         src, dst, eid = idx.edges()

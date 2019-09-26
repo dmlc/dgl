@@ -213,7 +213,8 @@ def khop_graph(g, k):
     col = np.repeat(adj_k.col, multiplicity)
     # TODO(zihao): we should support creating multi-graph from scipy sparse matrix
     # in the future.
-    return DGLGraph(from_coo(n, row, col, True, True))
+    # The created graph index has sorted CSRs.
+    return DGLGraph(from_coo(n, row, col, True, True, True))
 
 def reverse(g, share_ndata=False, share_edata=False):
     """Return the reverse of a graph

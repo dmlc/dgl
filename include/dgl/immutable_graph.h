@@ -241,6 +241,12 @@ class CSR : public GraphInterface {
   IdArray edge_ids() const { return adj_.data; }
 
   void SortCSR();
+  /*!
+   * \brief the columns in each row is sorted.
+   */
+  bool Sorted() const {
+    return sorted_;
+  }
 
  private:
   /*! \brief prive default constructor */
@@ -257,6 +263,7 @@ class CSR : public GraphInterface {
   // If it's empty, data isn't stored in shared memory.
   std::string shared_mem_name_;
 
+  // Indicate that the columns in each row is sorted.
   bool sorted_;
 };
 
@@ -515,7 +522,9 @@ class COO : public GraphInterface {
 class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
-  explicit ImmutableGraph(COOPtr coo): coo_(coo) { }
+  explicit ImmutableGraph(COOPtr coo, bool sort_csr): coo_(coo) {
+    sort_csr_ = sort_csr;
+  }
 
   /*!
    * \brief Construct an immutable graph from the CSR format.
@@ -533,10 +542,20 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr)
     : in_csr_(in_csr), out_csr_(out_csr) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
+    if (in_csr && out_csr) {
+      assert (in_csr->Sorted() == out_csr->Sorted());
+      sort_csr_ = in_csr->Sorted();
+    } else if (in_csr) {
+      sort_csr_ = in_csr->Sorted();
+    } else {
+      sort_csr_ = out_csr->Sorted();
+    }
   }
 
   /*! \brief Construct an immutable graph from one CSR. */
-  explicit ImmutableGraph(CSRPtr csr): out_csr_(csr) { }
+  explicit ImmutableGraph(CSRPtr csr): out_csr_(csr) {
+    sort_csr_ = csr->Sorted();
+  }
 
   /*! \brief default copy constructor */
   ImmutableGraph(const ImmutableGraph& other) = default;
@@ -549,6 +568,7 @@ class ImmutableGraph: public GraphInterface {
     this->in_csr_ = other.in_csr_;
     this->out_csr_ = other.out_csr_;
     this->coo_ = other.coo_;
+    this->sort_csr_ = other.sort_csr_;
     other.in_csr_ = nullptr;
     other.out_csr_ = nullptr;
     other.coo_ = nullptr;
@@ -885,19 +905,20 @@ class ImmutableGraph: public GraphInterface {
 
   /*! \brief Create an immutable graph from CSR. */
   static ImmutableGraphPtr CreateFromCSR(
-      IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir);
+      IdArray indptr, IdArray indices, IdArray edge_ids, const std::string &edge_dir,
+      bool sort_csr);
 
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir);
+      bool multigraph, const std::string &edge_dir, bool sort_csr);
 
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      const std::string &edge_dir, const std::string &shared_mem_name);
+      const std::string &edge_dir, bool sort_csr, const std::string &shared_mem_name);
 
   static ImmutableGraphPtr CreateFromCSR(
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      bool multigraph, const std::string &edge_dir,
+      bool multigraph, const std::string &edge_dir, bool sort_csr,
       const std::string &shared_mem_name);
 
   static ImmutableGraphPtr CreateFromCSR(
@@ -907,10 +928,10 @@ class ImmutableGraph: public GraphInterface {
 
   /*! \brief Create an immutable graph from COO. */
   static ImmutableGraphPtr CreateFromCOO(
-      int64_t num_vertices, IdArray src, IdArray dst);
+      int64_t num_vertices, IdArray src, IdArray dst, bool sort_csr);
 
   static ImmutableGraphPtr CreateFromCOO(
-      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph);
+      int64_t num_vertices, IdArray src, IdArray dst, bool multigraph, bool sort_csr);
 
   /*!
    * \brief Convert the given graph to an immutable graph.
@@ -962,18 +983,36 @@ class ImmutableGraph: public GraphInterface {
 
  protected:
   /* !\brief internal default constructor */
-  ImmutableGraph() {}
+  ImmutableGraph() {sort_csr_ = false;}
 
   /* !\brief internal constructor for all the members */
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
     : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
+    if (in_csr && out_csr) {
+      assert (in_csr->Sorted() == out_csr->Sorted());
+      sort_csr_ = in_csr->Sorted();
+    } else if (in_csr) {
+      sort_csr_ = in_csr->Sorted();
+    } else if (out_csr) {
+      sort_csr_ = out_csr->Sorted();
+    } else {
+      sort_csr_ = false;
+    }
   }
 
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, const std::string shared_mem_name)
     : in_csr_(in_csr), out_csr_(out_csr) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
     this->shared_mem_name_ = shared_mem_name;
+    if (in_csr && out_csr) {
+      assert (in_csr->Sorted() == out_csr->Sorted());
+      sort_csr_ = in_csr->Sorted();
+    } else if (in_csr) {
+      sort_csr_ = in_csr->Sorted();
+    } else {
+      sort_csr_ = out_csr->Sorted();
+    }
   }
 
   /* !\brief return pointer to any available graph structure */
@@ -993,6 +1032,9 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
   COOPtr coo_;
+
+  // Indicate that the CSRs in the graph index should be sorted.
+  bool sort_csr_;
 
   // The name of shared memory for this graph.
   // If it's empty, the graph isn't stored in shared memory.

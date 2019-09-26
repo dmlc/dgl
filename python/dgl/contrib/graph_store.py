@@ -326,8 +326,9 @@ class SharedMemoryStoreServer(object):
             self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
         else:
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
+            # For a large graph, it's better that we sort the edges in advance.
             graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
-                                 multigraph, edge_dir, _get_graph_path(graph_name))
+                                 multigraph, edge_dir, True, _get_graph_path(graph_name))
             self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
 
         self._num_workers = num_workers

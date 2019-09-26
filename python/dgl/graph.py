@@ -774,6 +774,10 @@ class DGLGraph(DGLBaseGraph):
         by scanning the whole graph. (default: None)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
+    sort_csr : bool, optional
+        Whether to sort the columns of the CSR matrix that stores the graph index.
+        By default, they aren't sorted. When they are sorted, some of the computation
+        on the graph can be accelerated.
 
     Examples
     --------
@@ -901,12 +905,13 @@ class DGLGraph(DGLBaseGraph):
                  node_frame=None,
                  edge_frame=None,
                  multigraph=None,
-                 readonly=False):
+                 readonly=False,
+                 sort_csr=False):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
         else:
-            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly, sort_csr)
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
@@ -1365,7 +1370,7 @@ class DGLGraph(DGLBaseGraph):
             nx_graph = nx_graph.to_directed()
 
         self.clear()
-        self._graph = graph_index.from_networkx(nx_graph, self.is_readonly)
+        self._graph = graph_index.from_networkx(nx_graph, self.is_readonly, False)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
@@ -1431,7 +1436,7 @@ class DGLGraph(DGLBaseGraph):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly)
+        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly, False)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())

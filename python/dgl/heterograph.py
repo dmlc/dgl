@@ -1332,7 +1332,7 @@ class DGLHeteroGraph(object):
                 induced_etypes.append(self.etypes[i])
                 edge_frames.append(self._edge_frames[i])
 
-        metagraph = graph_index.from_edge_list(meta_edges, True, True)
+        metagraph = graph_index.from_edge_list(meta_edges, True, True, False)
         hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
         hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
         return hg
@@ -1372,7 +1372,7 @@ class DGLHeteroGraph(object):
         induced_ntypes = [self._ntypes[i] for i in induced_ntype_ids]
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
 
-        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
+        metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True, False)
         hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg

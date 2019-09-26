@@ -35,11 +35,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const int multigraph = args[2];
     const int64_t num_nodes = args[3];
     const bool readonly = args[4];
+    const bool sort_csr = args[5];
     if (readonly) {
       if (multigraph == kBoolUnknown) {
-        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids));
+        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids, sort_csr));
       } else {
-        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids, multigraph));
+        *rv = GraphRef(ImmutableGraph::CreateFromCOO(num_nodes, src_ids, dst_ids,
+                                                     multigraph, sort_csr));
       }
     } else {
       CHECK_NE(multigraph, kBoolUnknown);
@@ -54,26 +56,28 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string shared_mem_name = args[2];
     const int multigraph = args[3];
     const std::string edge_dir = args[4];
+    const bool sort_csr = args[5];
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
-    for (size_t i = 0; i < edge_ids->shape[0]; i++)
+    for (int64_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
     if (shared_mem_name.empty()) {
       if (multigraph == kBoolUnknown) {
-        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, edge_dir));
+        *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                     edge_dir, sort_csr));
       } else {
         *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-            indptr, indices, edge_ids, multigraph, edge_dir));
+            indptr, indices, edge_ids, multigraph, edge_dir, sort_csr));
       }
     } else {
       if (multigraph == kBoolUnknown) {
         *rv = GraphRef(ImmutableGraph::CreateFromCSR(
-            indptr, indices, edge_ids, edge_dir, shared_mem_name));
+            indptr, indices, edge_ids, edge_dir, sort_csr, shared_mem_name));
       } else {
         *rv = GraphRef(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
-            multigraph, edge_dir, shared_mem_name));
+            multigraph, edge_dir, sort_csr, shared_mem_name));
       }
     }
   });
