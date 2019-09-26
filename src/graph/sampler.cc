@@ -1055,7 +1055,7 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
       }
       neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
-    } else if(neg_sample_size < num_tot_nodes) {
+    } else if (neg_sample_size < num_tot_nodes) {
       neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
     } else if (exclude_positive) {
