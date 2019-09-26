@@ -216,7 +216,28 @@ template NDArray CSRGetRowData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t);
 ///////////////////////////// CSRGetData /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
+void CollectDataFromSorted(const IdType *indices_data, const DType *data,
+                           const IdType start, const IdType end, const IdType col,
+                           std::vector<DType> *ret_vec) {
+  const IdType *start_ptr = indices_data + start;
+  const IdType *end_ptr = indices_data + end;
+  auto it = std::lower_bound(start_ptr, end_ptr, col);
+  // This might be a multi-graph. We need to collect all of the matched
+  // columns.
+  for (; it != end_ptr; it++) {
+    // If the col exist
+    if (*it == col) {
+      IdType idx = it - indices_data;
+      ret_vec->push_back(data[idx]);
+    } else {
+      // If we find a column that is different, we can stop searching now.
+      break;
+    }
+  }
+}
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): use more efficient binary search when the column indices is sorted
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
@@ -225,19 +246,25 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
-  for (IdType i = indptr_data[row]; i < indptr_data[row+1]; ++i) {
-    if (indices_data[i] == col) {
-      ret_vec.push_back(data[i]);
+  if (sorted) {
+    CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
+                                              indptr_data[row], indptr_data[row + 1],
+                                              col, &ret_vec);
+  } else {
+    for (IdType i = indptr_data[row]; i < indptr_data[row+1]; ++i) {
+      if (indices_data[i] == col) {
+        ret_vec.push_back(data[i]);
+      }
     }
   }
   return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
-template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
-template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_t);
+template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t, bool sorted);
+template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_t, bool sorted);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
@@ -261,9 +288,15 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     const IdType row_id = row_data[i], col_id = col_data[j];
     CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
-      if (indices_data[i] == col_id) {
+    if (sorted) {
+      CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
+                                                indptr_data[row_id], indptr_data[row_id + 1],
+                                                col_id, &ret_vec);
+    } else {
+      for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
+        if (indices_data[i] == col_id) {
           ret_vec.push_back(data[i]);
+        }
       }
     }
   }
@@ -271,8 +304,10 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
-template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
-template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
+template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols,
+                                                      bool sorted);
+template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols,
+                                                      bool sorted);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 

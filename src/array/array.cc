@@ -289,18 +289,18 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
+NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   NDArray ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetData<XPU, IdType, DType>(csr, row, col);
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, row, col, sorted);
   });
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
   NDArray ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols);
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, sorted);
   });
   return ret;
 }

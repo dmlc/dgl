@@ -68,10 +68,11 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
+runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+                            bool sorted);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
