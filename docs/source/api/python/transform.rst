@@ -17,3 +17,6 @@ Transform -- Graph Transformation
     laplacian_lambda_max
     knn_graph
     segmented_knn_graph
+    to_self_loop
+    remove_self_loop
+    onehot_degree

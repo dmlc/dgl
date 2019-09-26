@@ -264,13 +264,20 @@ def hetero_from_relations(rel_graphs):
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
 
-def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
+def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None):
     """Convert the given graph to a heterogeneous graph.
 
     The input graph should have only one type of nodes and edges. Each node and edge
     stores an integer feature (under ``ntype_field`` and ``etype_field``), representing
     the type id, which which can be used to retrieve the type names stored
     in the given ``ntypes`` and ``etypes`` arguments.
+
+    The function will automatically distinguish edge types that have the same given
+    type IDs but different src and dst type IDs. For example, we allow both edges A and B
+    to have the same type ID 3, but one has (0, 1) and the other as (2, 3) as the
+    (src, dst) type IDs. In this case, the function will "split" edge type 3 into two types:
+    (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
+    type name, but can be distinguished by a canonical edge type tuple.
 
     Examples
     --------
@@ -288,6 +295,11 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
         The feature field used to store node type. (Default: dgl.NTYPE)
     etype_field : str, optional
         The feature field used to store edge type. (Default: dgl.ETYPE)
+    metagraph : networkx MultiDiGraph, optional
+        Metagraph of the returned heterograph.
+        If provided, DGL assumes that G can indeed be described with the given metagraph.
+        If None, DGL will infer the metagraph from the given inputs, which would be
+        potentially slower for large graphs.
 
     Returns
     -------
@@ -313,64 +325,69 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE):
         raise DGLError('The input graph should be homogenous and have only one '
                        ' type of nodes and edges.')
 
+    num_ntypes = len(ntypes)
+
     ntype_ids = F.asnumpy(G.ndata[ntype_field])
     etype_ids = F.asnumpy(G.edata[etype_field])
 
-    num_ntypes = np.max(ntype_ids) + 1
-    num_etypes = np.max(etype_ids) + 1
-
-    def _group_by(ids, val_range):
-        return [np.where(ids == v)[0] for v in range(val_range)]
-
-    node_groups = _group_by(ntype_ids, num_ntypes)
-    edge_groups = _group_by(etype_ids, num_etypes)
+    # relabel nodes to per-type local IDs
+    ntype_count = np.bincount(ntype_ids, minlength=num_ntypes)
+    ntype_offset = np.insert(np.cumsum(ntype_count), 0, 0)
+    ntype_ids_sortidx = np.argsort(ntype_ids)
+    ntype_local_ids = np.zeros_like(ntype_ids)
+    node_groups = []
+    for i in range(num_ntypes):
+        node_group = ntype_ids_sortidx[ntype_offset[i]:ntype_offset[i+1]]
+        node_groups.append(node_group)
+        ntype_local_ids[node_group] = np.arange(ntype_count[i])
 
     src, dst = G.all_edges(order='eid')
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
+    src_local = ntype_local_ids[src]
+    dst_local = ntype_local_ids[dst]
+    # a 2D tensor of shape (E, 3). Each row represents the (stid, etid, dtid) tuple.
+    edge_ctids = np.stack([ntype_ids[src], etype_ids, ntype_ids[dst]], 1)
 
-    # relabel nodes and edges
-    def _make_invmap(ids, invmap):
-        invmap[ids] = np.arange(len(ids))
+    # infer metagraph and canonical edge types
+    # No matter which branch it takes, the code will generate a 2D tensor of shape (E_m, 3),
+    # E_m is the set of all possible canonical edge tuples. Each row represents the
+    # (stid, dtid, dtid) tuple. We then compute a 2D tensor of shape (E, E_m) using the
+    # above ``edge_ctids`` matrix. Each element i,j indicates whether the edge i is of the
+    # canonical edge type j. We can then group the edges of the same type together.
+    if metagraph is None:
+        canonical_etids, _, etype_remapped = \
+                utils.make_invmap(list(tuple(_) for _ in edge_ctids), False)
+        etype_mask = (etype_remapped[None, :] == np.arange(len(canonical_etids))[:, None])
+    else:
+        ntypes_invmap = {nt: i for i, nt in enumerate(ntypes)}
+        etypes_invmap = {et: i for i, et in enumerate(etypes)}
+        canonical_etids = []
+        for i, (srctype, dsttype, etype) in enumerate(metagraph.edges(keys=True)):
+            srctype_id = ntypes_invmap[srctype]
+            etype_id = etypes_invmap[etype]
+            dsttype_id = ntypes_invmap[dsttype]
+            canonical_etids.append((srctype_id, etype_id, dsttype_id))
+        canonical_etids = np.array(canonical_etids)
+        etype_mask = (edge_ctids[None, :] == canonical_etids[:, None]).all(2)
+    edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
-    node_invmap = np.zeros((G.number_of_nodes(),), dtype=src.dtype) - 1
-    edge_invmap = np.zeros((G.number_of_edges(),), dtype=src.dtype) - 1
-    for grp in node_groups:
-        _make_invmap(grp, node_invmap)
-    for grp in edge_groups:
-        _make_invmap(grp, edge_invmap)
-
-    # infer metagraph
-    canonical_etids = []
-    for etid in range(num_etypes):
-        egrp = edge_groups[etid]
-        if len(egrp) == 0:
-            raise DGLError('Edge type id "%d" does not have any edge.' % etid)
-        one_edge = egrp[0]
-        stid = ntype_ids[src[one_edge]]
-        dtid = ntype_ids[dst[one_edge]]
-        canonical_etids.append((stid, etid, dtid))
-
-    # construct relation graphs
     rel_graphs = []
-    for stid, etid, dtid in canonical_etids:
-        egrp = edge_groups[etid]
-        rel_graph_src = node_invmap[src[egrp]]
-        rel_graph_dst = node_invmap[dst[egrp]]
+    for i, (stid, etid, dtid) in enumerate(canonical_etids):
+        src_of_etype = src_local[edge_groups[i]]
+        dst_of_etype = dst_local[edge_groups[i]]
         if stid == dtid:
-            rel_graph = graph((rel_graph_src, rel_graph_dst), ntypes[stid], etypes[etid],
-                              card=len(node_groups[stid]))
+            rel_graph = graph(
+                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid],
+                card=ntype_count[stid])
         else:
-            rel_graph = bipartite((rel_graph_src, rel_graph_dst),
-                                  ntypes[stid], etypes[etid], ntypes[dtid],
-                                  card=(len(node_groups[stid]), len(node_groups[dtid])))
+            rel_graph = bipartite(
+                (src_of_etype, dst_of_etype), ntypes[stid], etypes[etid], ntypes[dtid],
+                card=(ntype_count[stid], ntype_count[dtid]))
         rel_graphs.append(rel_graph)
 
     hg = hetero_from_relations(rel_graphs)
 
-    # TODO(minjie): Unfortunately, hetero_from_relations could only guarantee the order
-    #   of etypes but NOT the ntypes. Therefore, we cannot simply iterate over
-    #   the node type list. Might need to fix this.
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntid, ntype in enumerate(hg.ntypes):
         hg._node_frames[ntid][NID] = F.tensor(ntype2ngrp[ntype])
@@ -423,9 +440,11 @@ def to_homo(G):
     eids = []
     ntype_ids = []
     nids = []
+    total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
         num_nodes = G.number_of_nodes(ntype)
+        total_num_nodes += num_nodes
         ntype_ids.append(F.full_1d(num_nodes, ntype_id, F.int64, F.cpu()))
         nids.append(F.arange(0, num_nodes))
 
@@ -438,7 +457,7 @@ def to_homo(G):
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
-    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)))
+    retg = graph((F.cat(srcs, 0), F.cat(dsts, 0)), card=total_num_nodes)
     retg.ndata[NTYPE] = F.cat(ntype_ids, 0)
     retg.ndata[NID] = F.cat(nids, 0)
     retg.edata[ETYPE] = F.cat(etype_ids, 0)
