@@ -181,7 +181,7 @@ IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
-  return aten::CSRGetData(adj_, src, dst);
+  return aten::CSRGetData(adj_, src, dst, sorted_);
 }
 
 EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {

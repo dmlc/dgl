@@ -957,6 +957,7 @@ class ImmutableGraph: public GraphInterface {
 
   void SortCSR() {
     GetInCSR()->SortCSR();
+    GetOutCSR()->SortCSR();
   }
 
  protected:
