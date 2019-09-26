@@ -346,7 +346,13 @@ class GraphInterface : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
-  virtual void SortAdj() {
+  /*!
+   * \brief Sort the columns in CSR.
+   *
+   * This sorts the columns in each row based on the column Ids.
+   * The edge ids should be sorted accordingly.
+   */
+  virtual void SortCSR() {
   }
 
   static constexpr const char* _type_key = "graph.Graph";
