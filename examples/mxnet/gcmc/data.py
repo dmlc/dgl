@@ -1,13 +1,22 @@
+"""MovieLens dataset"""
 import numpy as np
 import os
 import re
 import pandas as pd
 import scipy.sparse as sp
 import gluonnlp as nlp
-import dgl
 import mxnet as mx
 
-READ_DATASET_PATH = os.path.join("data_set")
+import dgl
+from dgl.data.utils import download, extract_archive, get_download_dir
+
+_urls = {
+    'ml-100k' : 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
+    'ml-1m' : 'http://files.grouplens.org/datasets/movielens/ml-1m.zip',
+    'ml-10m' : 'http://files.grouplens.org/datasets/movielens/ml-10m.zip',
+}
+
+READ_DATASET_PATH = get_download_dir()
 GENRES_ML_100K =\
     ['unknown', 'Action', 'Adventure', 'Animation',
      'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy',
@@ -17,6 +26,75 @@ GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ['IMAX']
 
 class MovieLens(object):
+    """MovieLens dataset used by GCMC model
+
+    TODO(minjie): make this dataset more general
+
+    The dataset stores MovieLens ratings in two types of graphs. The encoder graph
+    contains rating value information in the form of edge types. The decoder graph
+    stores plain user-movie pairs in the form of a bipartite graph with no rating
+    information. All graphs have two types of nodes: "user" and "movie".
+
+    The training, validation and test set can be summarized as follows:
+
+    training_enc_graph : training user-movie pairs + rating info
+    training_dec_graph : training user-movie pairs
+    valid_enc_graph : training user-movie pairs + rating info
+    valid_dec_graph : validation user-movie pairs
+    test_enc_graph : training user-movie pairs + validation user-movie pairs + rating info
+    test_dec_graph : test user-movie pairs
+
+    Attributes
+    ----------
+    train_enc_graph : dgl.DGLHeteroGraph
+        Encoder graph for training.
+    train_dec_graph : dgl.DGLHeteroGraph
+        Decoder graph for training.
+    train_labels : mx.nd.NDArray
+        The categorical label of each user-movie pair
+    train_truths : mx.nd.NDArray
+        The actual rating values of each user-movie pair
+    valid_enc_graph : dgl.DGLHeteroGraph
+        Encoder graph for validation.
+    valid_dec_graph : dgl.DGLHeteroGraph
+        Decoder graph for validation.
+    valid_labels : mx.nd.NDArray
+        The categorical label of each user-movie pair
+    valid_truths : mx.nd.NDArray
+        The actual rating values of each user-movie pair
+    test_enc_graph : dgl.DGLHeteroGraph
+        Encoder graph for test.
+    test_dec_graph : dgl.DGLHeteroGraph
+        Decoder graph for test.
+    test_labels : mx.nd.NDArray
+        The categorical label of each user-movie pair
+    test_truths : mx.nd.NDArray
+        The actual rating values of each user-movie pair
+    user_feature : mx.nd.NDArray
+        User feature tensor. If None, representing an identity matrix.
+    movie_feature : mx.nd.NDArray
+        Movie feature tensor. If None, representing an identity matrix.
+    possible_rating_values : np.ndarray
+        Available rating values in the dataset
+
+    Parameters
+    ----------
+    name : str
+        Dataset name. Could be "ml-100k", "ml-1m", "ml-10m"
+    ctx : mx.context.Context
+        Device context
+    use_one_hot_fea : bool, optional
+        If true, the ``user_feature`` attribute is None, representing an one-hot identity
+        matrix. (Default: False)
+    symm : bool, optional
+        If true, the use symmetric normalize constant. Otherwise, use left normalize
+        constant. (Default: True)
+    test_ratio : float, optional
+        Ratio of test data
+    valid_ratio : float, optional
+        Ratio of validation data
+
+    """
     def __init__(self, name, ctx, use_one_hot_fea=False, symm=True,
                  test_ratio=0.1, valid_ratio=0.1):
         self._name = name
@@ -24,16 +102,26 @@ class MovieLens(object):
         self._symm = symm
         self._test_ratio = test_ratio
         self._valid_ratio = valid_ratio
+        # download and extract
+        download_dir = get_download_dir()
+        zip_file_path = '{}/{}.zip'.format(download_dir, name)
+        download(_urls[name], path=zip_file_path)
+        extract_archive(zip_file_path, '{}/{}'.format(download_dir, name))
+        if name == 'ml-10m':
+            root_folder = 'ml-10M100K'
+        else:
+            root_folder = name
+        self._dir = os.path.join(download_dir, name, root_folder)
         print("Starting processing {} ...".format(self._name))
         self._load_raw_user_info()
         self._load_raw_movie_info()
         print('......')
         if self._name == 'ml-100k':
-            self.all_train_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'u1.base'), '\t')
-            self.test_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'u1.test'), '\t')
+            self.all_train_rating_info = self._load_raw_rates(os.path.join(self._dir, 'u1.base'), '\t')
+            self.test_rating_info = self._load_raw_rates(os.path.join(self._dir, 'u1.test'), '\t')
             self.all_rating_info = pd.concat([self.all_train_rating_info, self.test_rating_info])
         elif self._name == 'ml-1m' or self._name == 'ml-10m':
-            self.all_rating_info = self._load_raw_rates(os.path.join(READ_DATASET_PATH, self._name, 'ratings.dat'), '::')
+            self.all_rating_info = self._load_raw_rates(os.path.join(self._dir, 'ratings.dat'), '::')
             num_test = int(np.ceil(self.all_rating_info.shape[0] * self._test_ratio))
             shuffled_idx = np.random.permutation(self.all_rating_info.shape[0])
             self.test_rating_info = self.all_rating_info.iloc[shuffled_idx[: num_test]]
@@ -72,10 +160,6 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            #self.user_feature = mx.nd.sparse.array(sp.eye(self.num_user, format='csr'),
-            #                                       ctx=ctx, dtype=np.float32)
-            #self.movie_feature = mx.nd.sparse.array(sp.eye(self.num_movie, format='csr'),
-            #                                        ctx=ctx, dtype=np.float32)
             self.user_feature = None
             self.movie_feature = None
         else:
@@ -96,27 +180,6 @@ class MovieLens(object):
         train_rating_pairs, train_rating_values = self._generate_pair_value(self.train_rating_info)
         valid_rating_pairs, valid_rating_values = self._generate_pair_value(self.valid_rating_info)
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
-
-        '''
-        filtered_valid_user = []
-        filtered_valid_movie = []
-        filtered_valid_values = []
-        for i in range(valid_rating_pairs[0].size):
-            if valid_rating_pairs[0][i] in train_rating_pairs[0] and \
-                valid_rating_pairs[1][i] in train_rating_pairs[1]:
-                filtered_valid_user.append(valid_rating_pairs[0][i])
-                filtered_valid_movie.append(valid_rating_pairs[1][i])
-                filtered_valid_values.append(valid_rating_values[i])
-        '''
-        filtered_valid_user = valid_rating_pairs[0]
-        filtered_valid_movie = valid_rating_pairs[1]
-        filtered_valid_values = valid_rating_values
-
-        print("Filtered {} validation node pairs".format(valid_rating_pairs[0].size - len(filtered_valid_user)))
-
-        valid_rating_pairs = (np.array(filtered_valid_user, dtype=np.int64),
-                                   np.array(filtered_valid_movie, dtype=np.int64))
-        valid_rating_values = np.array(filtered_valid_values, dtype=np.float32)
 
         def _make_labels(ratings):
             labels = mx.nd.array(np.searchsorted(self.possible_rating_values, ratings),
@@ -308,14 +371,14 @@ class MovieLens(object):
         user_info : pd.DataFrame
         """
         if self._name == 'ml-100k':
-            self.user_info = pd.read_csv(os.path.join(READ_DATASET_PATH, self._name, 'u.user'), sep='|', header=None,
+            self.user_info = pd.read_csv(os.path.join(self._dir, 'u.user'), sep='|', header=None,
                                     names=['id', 'age', 'gender', 'occupation', 'zip_code'], engine='python')
         elif self._name == 'ml-1m':
-            self.user_info = pd.read_csv(os.path.join(READ_DATASET_PATH, self._name, 'users.dat'), sep='::', header=None,
+            self.user_info = pd.read_csv(os.path.join(self._dir, 'users.dat'), sep='::', header=None,
                                     names=['id', 'gender', 'age', 'occupation', 'zip_code'], engine='python')
         elif self._name == 'ml-10m':
             rating_info = pd.read_csv(
-                os.path.join(READ_DATASET_PATH, self._name, 'ratings.dat'), sep='::', header=None,
+                os.path.join(self._dir, 'ratings.dat'), sep='::', header=None,
                 names=['user_id', 'movie_id', 'rating', 'timestamp'],
                 dtype={'user_id': np.int32, 'movie_id': np.int32, 'ratings': np.float32,
                        'timestamp': np.int64}, engine='python')
@@ -391,12 +454,12 @@ class MovieLens(object):
             raise NotImplementedError
 
         if self._name == 'ml-100k':
-            file_path = os.path.join(READ_DATASET_PATH, self._name, 'u.item')
+            file_path = os.path.join(self._dir, 'u.item')
             self.movie_info = pd.read_csv(file_path, sep='|', header=None,
                                           names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES,
                                           engine='python')
         elif self._name == 'ml-1m' or self._name == 'ml-10m':
-            file_path = os.path.join(READ_DATASET_PATH, self._name, 'movies.dat')
+            file_path = os.path.join(self._dir, 'movies.dat')
             movie_info = pd.read_csv(file_path, sep='::', header=None,
                                      names=['id', 'title', 'genres'], engine='python')
             genre_map = {ele: i for i, ele in enumerate(GENRES)}
@@ -464,7 +527,3 @@ class MovieLens(object):
 
 if __name__ == '__main__':
     MovieLens("ml-100k", ctx=mx.cpu(), symm=True)
-    #MovieLens("ml-100k", ctx=mx.gpu(0), symm=True)
-    #MovieLens("ml-100k", ctx=mx.gpu(0), symm=False)
-    #MovieLens("ml-1m", ctx=mx.gpu(0), symm=True)
-    #MovieLens("ml-1m", ctx=mx.gpu(0), symm=False)
