@@ -47,45 +47,24 @@ For CPU builds, one can simply run the following command to install via ``pip``:
 
    pip install dgl
    
-For CUDA builds, one needs to specify the URL:
+For CUDA builds, one needs to specify the CUDA version:
 
 .. code:: bash
 
-   pip install https://s3.us-east-2.amazonaws.com/dgl.ai/<BUILD-DIR>/dgl-0.3-<PYTHON-ABI>-<PLATFORM>.whl
-   
-where ``<BUILD-DIR>``, ``<PYTHON-ABI>`` and ``<PLATFORM>`` can take either of the following values:
+   pip install dgl           # For CPU Build
+   pip install dgl-cu90      # For CUDA 9.0 Build
+   pip install dgl-cu92      # For CUDA 9.2 Build
+   pip install dgl-cu100     # For CUDA 10.0 Build
 
-+------------+---------------------+
-| Build Type | ``<BUILD>``         |
-+============+=====================+
-| CUDA 9.0   | ``wheels/cuda9.0``  |
-+------------+---------------------+
-| CUDA 10.0  | ``wheels/cuda10.0`` |
-+------------+---------------------+
-
-+------------------+------------------+
-| Python Version   | ``<PYTHON-ABI>`` |
-+==================+==================+
-| Python 3.5       | ``cp35-cp35m``   |
-+------------------+------------------+
-| Python 3.6       | ``cp36-cp36m``   |
-+------------------+------------------+
-| Python 3.7       | ``cp37-cp37m``   |
-+------------------+------------------+
-
-+-------------+-----------------------+
-| OS/Arch     | ``<PLATFORM>``        |
-+=============+=======================+
-| Linux x64   | ``manylinux1_x86_64`` |
-+-------------+-----------------------+
-| Windows x64 | ``win_amd64``         |
-+-------------+-----------------------+
-
-For instance, if one wants to install the CUDA 9.0 build on Linux, Python 3.5, then the command is
+We also provides nightly build from master branch, you can install it by:
 
 .. code:: bash
 
-   pip install https://s3.us-east-2.amazonaws.com/dgl.ai/wheels/cuda9.0/dgl-0.3-cp35-cp35m-manylinux1_x86_64.whl
+   pip install --pre dgl           # For CPU Build
+   pip install --pre dgl-cu90      # For CUDA 9.0 Build
+   pip install --pre dgl-cu92      # For CUDA 9.2 Build
+   pip install --pre dgl-cu100     # For CUDA 10.0 Build
+
 
 Working with different backends
 -------------------------------
