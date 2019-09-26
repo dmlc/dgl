@@ -15,13 +15,6 @@ Credit: Jiani Zhang ([@jennyzhang0215](https://github.com/jennyzhang0215))
 
 ## Data
 
-Download the MovieLens datasets and unzip into `data_set/ml-?` directory.
-
-```bash
-wget http://files.grouplens.org/datasets/movielens/ml-100k.zip
-unzip ml-100k.zip -d data_set
-```
-
 Supported datasets: ml-100k, ml-1m, ml-10m
 
 ## How to run
@@ -50,7 +43,7 @@ ml-10m, no feature
 ```bash
 DGLBACKEND=mxnet python train.py --data_name=ml-10m --gcn_agg_accum=stack --gcn_dropout=0.3 \
                                  --train_lr=0.001 --train_min_lr=0.0001 --train_max_iter=15000 \
-                                 --use_one_hot_fea
+                                 --use_one_hot_fea --gen_r_num_basis_func=4
 ```
 Results: RMSE=0.7875 (0.777 reported)
 Speed: 0.6480s/epoch (vanilla implementation: OOM)
