@@ -25,7 +25,8 @@ class Net(Block):
                                      args.gcn_out_units,
                                      args.gcn_dropout,
                                      args.gcn_agg_accum,
-                                     agg_act=self._act)
+                                     agg_act=self._act,
+                                     share_user_item_param=args.share_param)
             self.decoder = BiDecoder(args.rating_vals,
                                      in_units=args.gcn_out_units,
                                      num_basis_functions=args.gen_r_num_basis_func)
@@ -216,6 +217,7 @@ def config():
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
     parser.add_argument('--train_decay_patience', type=int, default=50)
     parser.add_argument('--train_early_stopping_patience', type=int, default=100)
+    parser.add_argument('--share_param', default=False, action='store_true')
 
     args = parser.parse_args()
     args.ctx = parse_ctx(args.ctx)[0]

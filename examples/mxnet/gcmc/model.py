@@ -75,15 +75,11 @@ class GCMCLayer(Block):
             assert msg_units % len(rating_vals) == 0
             msg_units = msg_units // len(rating_vals)
         with self.name_scope():
-            if share_user_item_param and user_in_units != movie_in_units:
-                raise ValueError('Sharing user and movie parameters requires the feature '
-                                 'dimensions of users and movies to be the same. Got %d and %d.'
-                                 % (user_in_units, movie_in_units))
             self.dropout = nn.Dropout(dropout_rate)
             self.W_r = {}
             for rating in rating_vals:
                 rating = str(rating)
-                if share_user_item_param:
+                if share_user_item_param and user_in_units == movie_in_units:
                     self.W_r[rating] = self.params.get(
                         'W_r_%s' % rating, shape=(user_in_units, msg_units),
                         dtype=np.float32, allow_deferred_init=True)
