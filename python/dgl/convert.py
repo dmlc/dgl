@@ -15,6 +15,7 @@ __all__ = [
     'graph',
     'bipartite',
     'hetero_from_relations',
+    'hetero_from_dict',
     'to_hetero',
     'to_homo',
     'to_networkx',
@@ -263,6 +264,68 @@ def hetero_from_relations(rel_graphs):
             retg.nodes[ntype].data.update(rgrh.nodes[ntype].data)
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
+
+def hetero_from_dict(edge_dict, num_nodes_dict=None):
+    """Create a heterogeneous graph from a dictionary between edge types and edge lists.
+
+    Parameters
+    ----------
+    edge_dict : dict
+        The dictionary between edge types and edge lists.
+
+        The edge types are specified as a triplet of (source node type name, edge type
+        name, destination node type name).
+
+        The edge lists can be either a pair of source and destination node ID lists,
+        a list of source-destination pairs, or a scipy sparse matrix.  See
+        :func:`dgl.graph` or :func:`dgl.bipartite` for examples.
+    num_nodes_dict : dict[str, int]
+        The number of nodes for each node type.
+
+        By default DGL infers the number of nodes for each node type from ``edge_dict``
+        by taking the maximum node ID plus one for each node type.
+
+    Returns
+    -------
+    DGLHeteroGraph
+    """
+    rel_graphs = []
+
+    # infer number of nodes for each node type
+    if num_nodes_dict is None:
+        num_nodes_dict = defaultdict(int)
+        for (srctype, etype, dsttype), edges in edge_dict.items():
+            if isinstance(edges, tuple):
+                nsrc = max(edges[0]) + 1
+                ndst = max(edges[1]) + 1
+            elif isinstance(edges, list):
+                src, dst = zip(*edges)
+                nsrc = max(src) + 1
+                ndst = max(dst) + 1
+            elif isinstance(edges, sp.sparse.spmatrix):
+                nsrc = edges.shape[0]
+                ndst = edges.shape[1]
+            elif isinstance(edges, nx.Graph):
+                if srctype == dsttype:
+                    nsrc = ndst = edges.number_of_nodes()
+                else:
+                    nsrc = len({n for n, d in edges.nodes(data=True) if d['bipartite'] == 0})
+                    ndst = edges.number_of_nodes() - nsrc
+            if srctype == dsttype:
+                ndst = nsrc = max(nsrc, ndst)
+
+            num_nodes_dict[srctype] = max(num_nodes_dict[srctype], nsrc)
+            num_nodes_dict[dsttype] = max(num_nodes_dict[dsttype], ndst)
+
+    for (srctype, etype, dsttype), edges in edge_dict.items():
+        if srctype == dsttype:
+            rel_graphs.append(graph(edges, srctype, etype, card=num_nodes_dict[srctype]))
+        else:
+            rel_graphs.append(bipartite(
+                edges, srctype, etype, dsttype,
+                card=(num_nodes_dict[srctype], num_nodes_dict[dsttype])))
+
+    return hetero_from_relations(rel_graphs)
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None):
     """Convert the given graph to a heterogeneous graph.
