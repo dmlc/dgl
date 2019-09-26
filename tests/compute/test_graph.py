@@ -50,8 +50,10 @@ def gen_by_mutation():
     g.add_edges(src, dst)
     return g
 
-def gen_from_data(data, readonly):
+def gen_from_data(data, readonly, sort):
     g = dgl.DGLGraph(data, readonly=readonly)
+    if readonly and sort:
+        g._graph.sort_adj()
     return g
 
 def test_query():
@@ -72,7 +74,6 @@ def test_query():
         for u, v in zip(src, dst):
             assert g.has_edge_between(u, v)
         assert not g.has_edge_between(0, 0)
-        g._graph.sort_adj()
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
         assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
         assert set(F.asnumpy(g.successors(2))) == set([7,3])
@@ -202,15 +203,16 @@ def test_query():
         _test_csr_one(g)
 
     _test(gen_by_mutation())
-    _test(gen_from_data(elist_input(), False))
-    _test(gen_from_data(elist_input(), True))
-    _test(gen_from_data(nx_input(), False))
-    _test(gen_from_data(nx_input(), True))
-    _test(gen_from_data(scipy_coo_input(), False))
-    _test(gen_from_data(scipy_coo_input(), True))
+    _test(gen_from_data(elist_input(), False, False))
+    _test(gen_from_data(elist_input(), True, False))
+    _test(gen_from_data(elist_input(), True, True))
+    _test(gen_from_data(nx_input(), False, False))
+    _test(gen_from_data(nx_input(), True, False))
+    _test(gen_from_data(scipy_coo_input(), False, False))
+    _test(gen_from_data(scipy_coo_input(), True, False))
 
-    _test_csr(gen_from_data(scipy_csr_input(), False))
-    _test_csr(gen_from_data(scipy_csr_input(), True))
+    _test_csr(gen_from_data(scipy_csr_input(), False, False))
+    _test_csr(gen_from_data(scipy_csr_input(), True, False))
 
 def test_mutation():
     g = dgl.DGLGraph()
