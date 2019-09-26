@@ -107,12 +107,19 @@ class ArrayHeap {
  * Uniformly sample integers from [0, set_size) without replacement.
  */
 void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out) {
-  std::unordered_set<size_t> sampled_idxs;
-  while (sampled_idxs.size() < num) {
-    sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
-  }
   out->clear();
-  out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+  if (num < set_size) {
+    std::unordered_set<size_t> sampled_idxs;
+    while (sampled_idxs.size() < num) {
+      sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
+    }
+    out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+  } else {
+    // If we need to sample all elements in the set, we don't need to
+    // generate random numbers.
+    for (size_t i = 0; i < set_size; i++)
+      out->push_back(i);
+  }
 }
 
 void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
@@ -121,14 +128,25 @@ void RandomSample(size_t set_size, size_t num, const std::vector<size_t> &exclud
   for (auto v : exclude) {
     sampled_idxs.insert(std::pair<size_t, int>(v, 0));
   }
-  while (sampled_idxs.size() < num + exclude.size()) {
-    size_t rand = RandomEngine::ThreadLocal()->RandInt(set_size);
-    sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
-  }
   out->clear();
-  for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
-    if (it->second) {
-      out->push_back(it->first);
+  if (num + exclude.size() < set_size) {
+    while (sampled_idxs.size() < num + exclude.size()) {
+      size_t rand = RandomEngine::ThreadLocal()->RandInt(set_size);
+      sampled_idxs.insert(std::pair<size_t, int>(rand, 1));
+    }
+    for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
+      if (it->second) {
+        out->push_back(it->first);
+      }
+    }
+  } else {
+    // If we need to sample all elements in the set, we don't need to
+    // generate random numbers.
+    for (size_t i = 0; i < set_size; i++) {
+      // If the element doesn't exist in exclude.
+      if (sampled_idxs.find(i) == sampled_idxs.end()) {
+        out->push_back(i);
+      }
     }
   }
 }
@@ -903,7 +921,7 @@ dgl_id_t global2local_map(dgl_id_t global_id,
   }
 }
 
-inline bool is_neg_head_mode(const std::string &mode) {
+inline bool IsNegativeHeadMode(const std::string &mode) {
   return mode == "head";
 }
 
@@ -963,7 +981,8 @@ IdArray CheckExistence(GraphPtr gptr, IdArray relations,
 
 NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &pos_subg,
                             const std::string &neg_mode,
-                            int neg_sample_size, bool exclude_positive) {
+                            int neg_sample_size, bool exclude_positive,
+                            bool check_false_neg) {
   int64_t num_tot_nodes = gptr->NumVertices();
   bool is_multigraph = gptr->IsMultigraph();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
@@ -988,40 +1007,64 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
+  const dgl_id_t *unchanged;
+  dgl_id_t *neg_unchanged;
+  dgl_id_t *neg_changed;
+  if (IsNegativeHeadMode(neg_mode)) {
+    unchanged = dst_data;
+    neg_unchanged = neg_dst_data;
+    neg_changed = neg_src_data;
+  } else {
+    unchanged = src_data;
+    neg_unchanged = neg_src_data;
+    neg_changed = neg_dst_data;
+  }
+
   dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
+  // If we don't exclude positive edges, we are actually sampling more than
+  // the total number of nodes in the graph.
+  if (!exclude_positive && neg_sample_size >= num_tot_nodes) {
+    // We add all nodes as negative nodes.
+    for (int64_t i = 0; i < num_tot_nodes; i++) {
+      neg_vids.push_back(i);
+      neg_map[i] = i;
+    }
+  }
+
   for (int64_t i = 0; i < num_pos_edges; i++) {
     size_t neg_idx = i * neg_sample_size;
-    neg_vids.clear();
 
     std::vector<size_t> neighbors;
     DGLIdIters neigh_it;
-    const dgl_id_t *unchanged;
-    dgl_id_t *neg_unchanged;
-    dgl_id_t *neg_changed;
-    if (is_neg_head_mode(neg_mode)) {
-      unchanged = dst_data;
-      neg_unchanged = neg_dst_data;
-      neg_changed = neg_src_data;
+    if (IsNegativeHeadMode(neg_mode)) {
       neigh_it = gptr->PredVec(induced_vid_data[unchanged[i]]);
     } else {
-      unchanged = src_data;
-      neg_unchanged = neg_src_data;
-      neg_changed = neg_dst_data;
       neigh_it = gptr->SuccVec(induced_vid_data[unchanged[i]]);
     }
 
-    if (exclude_positive) {
+    // If the number of negative nodes is smaller than the number of total nodes
+    // in the graph.
+    if (exclude_positive && neg_sample_size < num_tot_nodes) {
       std::vector<size_t> exclude;
       for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
         dgl_id_t global_vid = *it;
         exclude.push_back(global_vid);
       }
+      neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
-    } else {
+    } else if (neg_sample_size < num_tot_nodes) {
+      neg_vids.clear();
       RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
+    } else if (exclude_positive) {
+      LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
+    } else {
+      // We don't need to do anything here.
+      // In this case, every edge has the same negative edges. That is,
+      // neg_vids contains all nodes of the graph. They have been generated
+      // before the for loop.
     }
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
@@ -1053,11 +1096,13 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
-  if (relations->shape[0] == 0) {
-    neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
-  } else {
-    neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
-                                    induced_neg_vid, induced_neg_eid);
+  if (check_false_neg) {
+    if (relations->shape[0] == 0) {
+      neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
+    } else {
+      neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
+                                      induced_neg_vid, induced_neg_eid);
+    }
   }
   return neg_subg;
 }
@@ -1065,7 +1110,7 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
 NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &pos_subg,
                             const std::string &neg_mode,
                             int neg_sample_size, bool is_multigraph,
-                            bool exclude_positive) {
+                            bool exclude_positive, bool check_false_neg) {
   int64_t num_tot_nodes = gptr->NumVertices();
   std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
   IdArray coo = adj[0];
@@ -1111,7 +1156,7 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   dgl_id_t *neg_changed;
 
   // corrupt head nodes.
-  if (is_neg_head_mode(neg_mode)) {
+  if (IsNegativeHeadMode(neg_mode)) {
     unchanged = dst_data;
     neg_unchanged = neg_dst_data;
     neg_changed = neg_src_data;
@@ -1176,11 +1221,13 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
-  if (relations->shape[0] == 0) {
-    neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
-  } else {
-    neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
-                                    induced_neg_vid, induced_neg_eid);
+  if (check_false_neg) {
+    if (relations->shape[0] == 0) {
+      neg_subg.exist = CheckExistence(gptr, neg_src, neg_dst, induced_neg_vid);
+    } else {
+      neg_subg.exist = CheckExistence(gptr, relations, neg_src, neg_dst,
+                                      induced_neg_vid, induced_neg_eid);
+    }
   }
   return neg_subg;
 }
@@ -1206,7 +1253,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const std::string neg_mode = args[5];
     const int neg_sample_size = args[6];
     const bool exclude_positive = args[7];
-    IdArray relations = args[8];
+    const bool check_false_neg = args[8];
+    IdArray relations = args[9];
     // process args
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
@@ -1240,11 +1288,12 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       if (neg_mode.substr(0, 3) == "PBG") {
         NegSubgraph neg_subg = PBGNegEdgeSubgraph(gptr, relations, subg,
                                                   neg_mode.substr(4), neg_sample_size,
-                                                  gptr->IsMultigraph(), exclude_positive);
+                                                  gptr->IsMultigraph(), exclude_positive,
+                                                  check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       } else if (neg_mode.size() > 0) {
         NegSubgraph neg_subg = NegEdgeSubgraph(gptr, relations, subg, neg_mode, neg_sample_size,
-                                               exclude_positive);
+                                               exclude_positive, check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
     }
