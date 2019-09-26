@@ -633,6 +633,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
 
+  /*! \brief indicate that the edges are stored in the sorted order. */
   bool sorted_;
 };
 
