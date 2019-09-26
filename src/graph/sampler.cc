@@ -1060,6 +1060,11 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
       RandomSample(num_tot_nodes, neg_sample_size, &neg_vids);
     } else if (exclude_positive) {
       LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
+    } else {
+      // We don't need to do anything here.
+      // In this case, every edge has the same negative edges. That is,
+      // neg_vids contains all nodes of the graph. They have been generated
+      // before the for loop.
     }
 
     dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
