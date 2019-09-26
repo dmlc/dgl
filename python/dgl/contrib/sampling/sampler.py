@@ -7,6 +7,7 @@ from numbers import Integral
 import traceback
 
 from ..._ffi.function import _init_api
+from ..._ffi.ndarray import empty
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
@@ -496,10 +497,19 @@ class EdgeSampler(object):
             prefetch=False,
             negative_mode="",
             neg_sample_size=0,
-            exclude_positive=False):
+            exclude_positive=False,
+            relations=None):
         self._g = g
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
+
+        if relations is None:
+            relations = empty((0,), 'int64')
+        else:
+            relations = utils.toindex(relations)
+            relations = relations.todgltensor()
+            assert g.number_of_edges() == len(relations)
+        self._relations = relations
 
         self._batch_size = int(batch_size)
 
@@ -544,7 +554,8 @@ class EdgeSampler(object):
             self._num_workers,      # num batches
             self._negative_mode,
             self._neg_sample_size,
-            self._exclude_positive)
+            self._exclude_positive,
+            self._relations)
 
         if len(subgs) == 0:
             return []
@@ -559,6 +570,8 @@ class EdgeSampler(object):
             for i in range(num_pos):
                 pos_subg = subgraph.DGLSubGraph(self.g, subgs[i])
                 neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + num_pos])
+                exist = _CAPI_GetNegEdgeExistence(subgs[i + num_pos]);
+                neg_subg.edata['exist'] = utils.toindex(exist).tousertensor()
                 rets.append((pos_subg, neg_subg))
             return rets
 
