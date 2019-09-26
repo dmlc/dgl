@@ -42,6 +42,7 @@ RandomWalkTracesPtr MetapathRandomWalk(
   std::vector<dgl_id_t> vertices;
   std::vector<size_t> trace_lengths, trace_counts;
 
+  // TODO(quan): use omp to parallelize this loop
   for (uint64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
     int curr_num_traces = 0;
 
