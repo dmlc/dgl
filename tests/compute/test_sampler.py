@@ -220,7 +220,7 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
-def check_negative_sampler(mode, exclude_positive):
+def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
     g.edata['etype'] = F.tensor(etype)
@@ -233,12 +233,12 @@ def check_negative_sampler(mode, exclude_positive):
         pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
-    neg_size = 10
     # Test the homogeneous graph.
     for pos_edges, neg_edges in EdgeSampler(g, 50,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
-                                            exclude_positive=exclude_positive):
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
         assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
                            F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
@@ -255,7 +255,7 @@ def check_negative_sampler(mode, exclude_positive):
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
-        exist = neg_edges.edata['exist']
+        exist = neg_edges.edata['false_neg']
         if exclude_positive:
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
@@ -266,12 +266,13 @@ def check_negative_sampler(mode, exclude_positive):
                                     negative_mode=mode,
                                     neg_sample_size=neg_size,
                                     exclude_positive=exclude_positive,
-                                    relations=g.edata['etype']):
+                                    relations=g.edata['etype'],
+                                    return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
-        exists = neg_edges.edata['exist']
+        exists = neg_edges.edata['false_neg']
         neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
@@ -282,8 +283,10 @@ def check_negative_sampler(mode, exclude_positive):
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
 def test_negative_sampler():
-    check_negative_sampler('head', True)
-    check_negative_sampler('PBG-head', False)
+    check_negative_sampler('PBG-head', False, 10)
+    check_negative_sampler('head', True, 10)
+    check_negative_sampler('head', False, 10)
+    check_negative_sampler('head', False, 100)
 
 
 if __name__ == '__main__':
