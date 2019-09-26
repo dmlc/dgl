@@ -279,7 +279,7 @@ struct shuffle_ele {
   dgl_id_t eid;
 };
 
-void CSR::SortAdj() {
+void CSR::SortCSR() {
   size_t num_rows = adj_.num_rows;
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr()->data);
   dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices()->data);

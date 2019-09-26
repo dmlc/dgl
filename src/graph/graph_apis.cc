@@ -349,7 +349,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedEdges")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSortAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-    g->SortAdj();
+    g->SortCSR();
   });
 
 }  // namespace dgl

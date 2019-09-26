@@ -240,7 +240,7 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
-  void SortAdj();
+  void SortCSR();
 
  private:
   /*! \brief prive default constructor */
@@ -955,8 +955,8 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraphPtr Reverse() const;
 
-  void SortAdj() {
-    GetInCSR()->SortAdj();
+  void SortCSR() {
+    GetInCSR()->SortCSR();
   }
 
  protected:
