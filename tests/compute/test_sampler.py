@@ -237,7 +237,8 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
     for pos_edges, neg_edges in EdgeSampler(g, 50,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
-                                            exclude_positive=exclude_positive):
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
         assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
                            F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
@@ -254,7 +255,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
-        exist = neg_edges.edata['exist']
+        exist = neg_edges.edata['false_neg']
         if exclude_positive:
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
@@ -265,12 +266,13 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                                     negative_mode=mode,
                                     neg_sample_size=neg_size,
                                     exclude_positive=exclude_positive,
-                                    relations=g.edata['etype']):
+                                    relations=g.edata['etype'],
+                                    return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
-        exists = neg_edges.edata['exist']
+        exists = neg_edges.edata['false_neg']
         neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
