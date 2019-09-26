@@ -80,11 +80,11 @@ aten::COOMatrix COO2() {
 template <typename IDX>
 void _TestCSRIsNonZero() {
   auto csr = CSR1<IDX>();
-  ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1));
-  ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0));
+  ASSERT_TRUE(aten::CSRIsNonZero(csr, 0, 1, false));
+  ASSERT_FALSE(aten::CSRIsNonZero(csr, 0, 0, false));
   IdArray r = aten::VecToIdArray(std::vector<IDX>({2, 2, 0, 0}), sizeof(IDX)*8, CTX);
   IdArray c = aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 3}), sizeof(IDX)*8, CTX);
-  IdArray x = aten::CSRIsNonZero(csr, r, c);
+  IdArray x = aten::CSRIsNonZero(csr, r, c, false);
   IdArray tx = aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 0}), sizeof(IDX)*8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
@@ -151,16 +151,16 @@ TEST(SpmatTest, TestCSRGetRowData) {
 template <typename IDX>
 void _TestCSRGetData() {
   auto csr = CSR2<IDX>();
-  auto x = aten::CSRGetData(csr, 0, 0);
+  auto x = aten::CSRGetData(csr, 0, 0, false);
   auto tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
-  x = aten::CSRGetData(csr, 0, 2);
+  x = aten::CSRGetData(csr, 0, 2, false);
   tx = aten::VecToIdArray(std::vector<IDX>({2, 5}), sizeof(IDX)*8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, CTX);
   auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
-  x = aten::CSRGetData(csr, r, c);
+  x = aten::CSRGetData(csr, r, c, false);
   tx = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 }
