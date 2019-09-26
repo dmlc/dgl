@@ -1,3 +1,4 @@
+"""Training script"""
 import os, time
 import argparse
 import logging
@@ -7,10 +8,10 @@ import numpy as np
 import mxnet as mx
 from mxnet import gluon
 from data import MovieLens
-from model import GCMCLayer, BiDecoder, InnerProductLayer
-from utils import get_activation, parse_ctx, gluon_net_info, gluon_total_param_num, params_clip_global_norm, \
-    logging_config, MetricLogger
-from mxnet.gluon import nn, HybridBlock, Block
+from model import GCMCLayer, BiDecoder
+from utils import get_activation, parse_ctx, gluon_net_info, gluon_total_param_num, \
+                  params_clip_global_norm, MetricLogger
+from mxnet.gluon import Block
 
 class Net(Block):
     def __init__(self, args, **kwargs):
@@ -25,24 +26,16 @@ class Net(Block):
                                      args.gcn_dropout,
                                      args.gcn_agg_accum,
                                      agg_act=self._act)
-            if args.gen_r_use_classification:
-                self.decoder = BiDecoder(args.rating_vals,
-                                         in_units=args.gcn_out_units,
-                                         num_basis_functions=args.gen_r_num_basis_func,
-                                         prefix='gen_rating')
-            else:
-                self.decoder = InnerProductLayer(prefix='gen_rating')
-
+            self.decoder = BiDecoder(args.rating_vals,
+                                     in_units=args.gcn_out_units,
+                                     num_basis_functions=args.gen_r_num_basis_func)
 
     def forward(self, enc_graph, dec_graph, ufeat, ifeat):
-        # start = time.time()
         user_out, movie_out = self.encoder(
             enc_graph,
             ufeat,
             ifeat)
-        #print("The time for encoder is: {:.1f}s".format(time.time()-start))
         pred_ratings = self.decoder(dec_graph, user_out, movie_out)
-        #print("The time for decoder is: {:.1f}s".format(time.time()-start))
         return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
@@ -64,16 +57,9 @@ def evaluate(args, net, dataset, segment='valid'):
     with mx.autograd.predict_mode():
         pred_ratings = net(enc_graph, dec_graph,
                            dataset.user_feature, dataset.movie_feature)
-    if args.gen_r_use_classification:
-        real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
-                             nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-        rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
-    else:
-        rating_mean = dataset.train_rating_values.mean()
-        rating_std = dataset.train_rating_values.std()
-        rmse = mx.nd.square(mx.nd.clip(pred_ratings.reshape((-1,)) * rating_std + rating_mean,
-                                       possible_rating_values.min(),
-                                       possible_rating_values.max()) - rating_values).mean().asscalar()
+    real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
+                         nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+    rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
     rmse = np.sqrt(rmse)
     return rmse
 
@@ -91,13 +77,8 @@ def train(args):
     net = Net(args=args)
     net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
     net.hybridize()
-    if args.gen_r_use_classification:
-        nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
-        rating_loss_net = gluon.loss.SoftmaxCELoss()
-    else:
-        rating_mean = dataset.train_rating_values.mean()
-        rating_std = dataset.train_rating_values.std()
-        rating_loss_net = gluon.loss.L2Loss()
+    nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
+    rating_loss_net = gluon.loss.SoftmaxCELoss()
     rating_loss_net.hybridize()
     trainer = gluon.Trainer(net.collect_params(), args.train_optimizer, {'learning_rate': args.train_lr})
     print("Loading network finished ...\n")
@@ -131,17 +112,13 @@ def train(args):
         with mx.autograd.record():
             pred_ratings = net(dataset.train_enc_graph, dataset.train_dec_graph,
                                dataset.user_feature, dataset.movie_feature)
-            if args.gen_r_use_classification:
-                loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
-            else:
-                loss = rating_loss_net(mx.nd.reshape(pred_ratings, shape=(-1,)),
-                                       (train_gt_ratings - rating_mean) / rating_std ).mean()
+            loss = rating_loss_net(pred_ratings, train_gt_labels).mean()
             loss.backward()
 
         count_loss += loss.asscalar()
         gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
         avg_gnorm += gnorm
-        trainer.step(1.0) #, ignore_stale_grad=True)
+        trainer.step(1.0)
         if iter_idx > 3:
             dur.append(time.time() - t0)
 
@@ -149,12 +126,9 @@ def train(args):
             print("Total #Param of net: %d" % (gluon_total_param_num(net)))
             print(gluon_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
 
-        if args.gen_r_use_classification:
-            real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
-                                 nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-            rmse = mx.nd.square(real_pred_ratings - train_gt_ratings).sum()
-        else:
-            rmse = mx.nd.square(pred_ratings.reshape((-1,)) * rating_std + rating_mean - train_gt_ratings).sum()
+        real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
+                             nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+        rmse = mx.nd.square(real_pred_ratings - train_gt_ratings).sum()
         count_rmse += rmse.asscalar()
         count_num += pred_ratings.shape[0]
 
@@ -229,7 +203,6 @@ def config():
     parser.add_argument('--gcn_agg_accum', type=str, default="sum")
     parser.add_argument('--gcn_out_units', type=int, default=75)
 
-    parser.add_argument('--gen_r_use_classification', type=bool, default=True)
     parser.add_argument('--gen_r_num_basis_func', type=int, default=2)
 
     # parser.add_argument('--train_rating_batch_size', type=int, default=10000)
@@ -261,9 +234,7 @@ def config():
 
 
 if __name__ == '__main__':
-    #os.environ['MXNET_GPU_MEM_POOL_TYPE'] = 'Round'
     args = config()
-    #logging_config(folder=args.save_dir, name='log', no_console=args.silent)
     np.random.seed(args.seed)
     mx.random.seed(args.seed, args.ctx)
     train(args)

@@ -4,7 +4,6 @@ import re
 import pandas as pd
 import scipy.sparse as sp
 import gluonnlp as nlp
-import networkx as nx
 import dgl
 import mxnet as mx
 
