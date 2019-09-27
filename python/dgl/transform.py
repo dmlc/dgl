@@ -10,7 +10,8 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
+           'remove_self_loop']
 
 
 def pairwise_squared_distance(x):
@@ -402,5 +403,72 @@ def laplacian_lambda_max(g):
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
                                       return_eigenvectors=False)[0].real)
     return rst
+
+
+def add_self_loop(g):
+    """Return a new graph containing all the edges in the input graph plus self loops
+    of every nodes.
+    No duplicate self loop will be added for nodes already having self loops.
+    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g.edges()
+    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    nodes = np.arange(g.number_of_nodes())
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    new_g.add_edges(nodes, nodes)
+    return new_g
+
+def remove_self_loop(g):
+    """Return a new graph with all self-loop edges removed
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
+    >>> new_g.edges()
+    (tensor([0]), tensor([1]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    return new_g
+
 
 _init_api("dgl.transform")
