@@ -1,3 +1,9 @@
+"""RDF datasets
+
+Dataset from "A Collection of Benchmark Datasets for
+Systematic Evaluations of Machine Learning on
+the Semantic Web"
+"""
 import os, sys
 from collections import namedtuple, OrderedDict
 import itertools
@@ -8,8 +14,12 @@ import re
 
 import networkx as nx
 import numpy as np
+
 import dgl
 import dgl.backend as F
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+
+__all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
 
 class Entity:
     def __init__(self, id, cls):
@@ -38,11 +48,15 @@ class RDFGraphDataset:
     test_idx
     labels
     """
-    def __init__(self, directory,
+    def __init__(self, url, name,
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        self._dir = directory
+        download_dir = get_download_dir()
+        zip_file_path = os.path.join(download_dir, '{}.zip'.format(name))
+        download(url, path=zip_file_path)
+        self._dir = os.path.join(download_dir, name)
+        extract_archive(zip_file_path, self._dir)
         self._print_every = print_every
         self._insert_reverse = insert_reverse
         if not force_reload and self.has_cache():
@@ -281,9 +295,17 @@ class AIFB(RDFGraphDataset):
     entity_prefix = 'http://www.aifb.uni-karlsruhe.de/'
     relation_prefix = 'http://swrc.ontoware.org/'
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 force_reload=False,
+                 print_every=10000,
+                 insert_reverse=True):
         directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'aifb-hetero')
-        super(AIFB, self).__init__(directory, **kwargs)
+        url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
+        name = 'aifb-hetero'
+        super(AIFB, self).__init__(url, name,
+                                   force_reload=force_reload,
+                                   print_every=print_every,
+                                   insert_reverse=insert_reverse)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -333,9 +355,17 @@ class MUTAG(RDFGraphDataset):
     entity_prefix = 'http://dl-learner.org/carcinogenesis#'
     relation_prefix = entity_prefix
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 force_reload=False,
+                 print_every=10000,
+                 insert_reverse=True):
         directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mutag-hetero')
-        super(MUTAG, self).__init__(directory, **kwargs)
+        url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
+        name = 'mutag-hetero'
+        super(MUTAG, self).__init__(url, name,
+                                   force_reload=force_reload,
+                                   print_every=print_every,
+                                   insert_reverse=insert_reverse)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -402,9 +432,17 @@ class BGS(RDFGraphDataset):
     status_prefix = 'http://data.bgs.ac.uk/ref/CurrentStatus'
     relation_prefix = 'http://data.bgs.ac.uk/ref'
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 force_reload=False,
+                 print_every=10000,
+                 insert_reverse=True):
         directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bgs-hetero')
-        super(BGS, self).__init__(directory, **kwargs)
+        url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
+        name = 'bgs-hetero'
+        super(BGS, self).__init__(url, name,
+                                   force_reload=force_reload,
+                                   print_every=print_every,
+                                   insert_reverse=insert_reverse)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
@@ -466,9 +504,17 @@ class AM(RDFGraphDataset):
     entity_prefix = 'http://purl.org/collections/nl/am/'
     relation_prefix = entity_prefix
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 force_reload=False,
+                 print_every=10000,
+                 insert_reverse=True):
         directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'am-hetero')
-        super(AM, self).__init__(directory, **kwargs)
+        url = _get_dgl_url('dataset/rdf/am-hetero.zip')
+        name = 'am-hetero'
+        super(AM, self).__init__(url, name,
+                                   force_reload=force_reload,
+                                   print_every=print_every,
+                                   insert_reverse=insert_reverse)
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):

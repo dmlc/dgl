@@ -14,13 +14,12 @@ import time
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from functools import partial
+
 import dgl
 from dgl import DGLGraph
 import dgl.function as fn
-from functools import partial
-
-from data import load_aifb, load_mutag, load_bgs, load_am
-from data import AIFB, MUTAG, BGS, AM
+from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
 class RelGraphConvHetero(nn.Module):
     r"""Relational graph convolution layer.
@@ -327,15 +326,11 @@ def main(args):
     # load graph data
     if args.dataset == 'aifb':
         dataset = AIFB()
-        #g, category, num_classes, train_idx, test_idx, labels = load_aifb()
     elif args.dataset == 'mutag':
-        #g, category, num_classes, train_idx, test_idx, labels = load_mutag()
         dataset = MUTAG()
     elif args.dataset == 'bgs':
-        #g, category, num_classes, train_idx, test_idx, labels = load_bgs()
         dataset = BGS()
     elif args.dataset == 'am':
-        #g, category, num_classes, train_idx, test_idx, labels = load_am()
         dataset = AM()
     else:
         raise ValueError()
@@ -381,8 +376,6 @@ def main(args):
 
     if use_cuda:
         model.cuda()
-
-    print(sum([np.prod(p.size()) for p in model.parameters()]))
 
     # optimizer
     optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
@@ -438,8 +431,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("--relabel", default=False, action='store_true',
-            help="remove untouched nodes and relabel")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
     fp = parser.add_mutually_exclusive_group(required=False)
@@ -449,5 +440,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args)
-    args.bfs_level = args.n_layers + 1 # pruning used nodes for memory
     main(args)

@@ -4,11 +4,27 @@
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
+The preprocessing is slightly different from the author's code. We directly load and preprocess
+raw RDF data. For AIFB, BGS and AM,
+all literal nodes are pruned from the graph. For AIFB, some training/testing nodes
+thus become orphan and are excluded from the training/testing set. The resulting graph
+has fewer entites and relations. As a reference (numbers include reverse edges and relations):
+
+| Dataset | #Nodes | #Edges | #Relations | #Labeled |
+| --- | --- | --- | --- | --- |
+| AIFB | 8,285 | 58,086 | 90 | 176 |
+| AIFB-hetero | 1711 | 31,400 | 32 | 135 |
+| MUTAG | 23,644 | 148,454 | 46 | 340 |
+| MUTAG-hetero | 27,163 | 148,100 | 46 | 340 |
+| BGS | 333,845 | 1,832,398 | 206 | 146 |
+| BGS-hetero | 94,806 | 672,884 | 96 | 146 |
+| AM | 1,666,764 | 11,976,642 | 266 | 1000 |
+| AM-hetero | | | |
+
 ### Dependencies
-* PyTorch 0.4.1+
+* PyTorch 1.0+
 * requests
 * rdflib
-* pandas
 
 ```
 pip install requests torch rdflib pandas
@@ -17,23 +33,22 @@ pip install requests torch rdflib pandas
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 
 ### Entity Classification
-AIFB: accuracy 97.22% (DGL), 95.83% (paper)
+AIFB: accuracy 100.0% (DGL), 95.83% (paper)
 ```
 python3 entity_classify.py -d aifb --testing --gpu 0
 ```
 
-MUTAG: accuracy 75% (DGL), 73.23% (paper)
+MUTAG: accuracy 73.53% (DGL), 73.23% (paper)
 ```
 python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0
 ```
 
-BGS: accuracy 82.76% (DGL), 83.10% (paper)
+BGS: accuracy 93.10% (DGL), 83.10% (paper)
 ```
-python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --relabel
+python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
-### Link Prediction
-FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
+AM: accuracy 90.02% (DGL), 89.29% (paper)
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0
+python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
