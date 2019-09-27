@@ -662,13 +662,13 @@ def test_transform():
     x = F.randn((3, 5))
     g.nodes['user'].data['h'] = x
 
-    new_g = dgl.coalesce_metapath(g, ['follows', 'plays'])
+    new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
 
     assert new_g.ntypes == ['user', 'game']
     assert new_g.number_of_edges() == 3
     assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
 
-    new_g = dgl.coalesce_metapath(g, ['follows'])
+    new_g = dgl.metapath_reachable_graph(g, ['follows'])
 
     assert new_g.ntypes == ['user']
     assert new_g.number_of_edges() == 2
