@@ -51,7 +51,7 @@ def create_test_heterograph2():
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
 
-    g = dgl.hetero_from_dict({
+    g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): plays_spmat,
         ('user', 'wishes', 'game'): wishes_nx,
@@ -82,8 +82,8 @@ def test_create():
     assert g.number_of_nodes() == 4
     assert g.number_of_edges() == 3
 
-    # test inferring number of nodes for hetero_from_dict
-    g = dgl.hetero_from_dict({
+    # test inferring number of nodes for heterograph
+    g = dgl.heterograph({
         ('l0', 'e0', 'l1'): [(0, 1), (0, 2)],
         ('l0', 'e1', 'l2'): [(2, 2)],
         ('l2', 'e2', 'l2'): [(1, 1), (3, 3)],

@@ -15,7 +15,7 @@ __all__ = [
     'graph',
     'bipartite',
     'hetero_from_relations',
-    'hetero_from_dict',
+    'heterograph',
     'to_hetero',
     'to_homo',
     'to_networkx',
@@ -265,7 +265,7 @@ def hetero_from_relations(rel_graphs):
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
 
-def hetero_from_dict(edge_dict, num_nodes_dict=None):
+def heterograph(edge_dict, num_nodes_dict=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
 
     Parameters
