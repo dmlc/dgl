@@ -17,11 +17,10 @@ import torch.nn.functional as F
 import dgl
 from dgl import DGLGraph
 import dgl.function as fn
-#from dgl.nn.pytorch import RelGraphConv
 from functools import partial
 
-from model import BaseRGCN
 from data import load_aifb, load_mutag, load_bgs, load_am
+from data import AIFB, MUTAG, BGS, AM
 
 class RelGraphConvHetero(nn.Module):
     r"""Relational graph convolution layer.
@@ -282,7 +281,7 @@ class RelGraphConvHeteroEmbed2(nn.Module):
         """
         return [self.ntype_embeds[ntype] for ntype in self.g.ntypes]
 
-class EntityClassify(BaseRGCN):
+class EntityClassify(nn.Module):
     def __init__(self,
                  g,
                  h_dim, out_dim,
@@ -290,7 +289,7 @@ class EntityClassify(BaseRGCN):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False):
-        super(BaseRGCN, self).__init__()
+        super(EntityClassify, self).__init__()
         self.g = g
         self.h_dim = h_dim
         self.out_dim = out_dim
@@ -327,15 +326,25 @@ class EntityClassify(BaseRGCN):
 def main(args):
     # load graph data
     if args.dataset == 'aifb':
-        g, category, num_classes, train_idx, test_idx, labels = load_aifb()
+        dataset = AIFB()
+        #g, category, num_classes, train_idx, test_idx, labels = load_aifb()
     elif args.dataset == 'mutag':
-        g, category, num_classes, train_idx, test_idx, labels = load_mutag()
+        #g, category, num_classes, train_idx, test_idx, labels = load_mutag()
+        dataset = MUTAG()
     elif args.dataset == 'bgs':
-        g, category, num_classes, train_idx, test_idx, labels = load_bgs()
+        #g, category, num_classes, train_idx, test_idx, labels = load_bgs()
+        dataset = BGS()
     elif args.dataset == 'am':
-        g, category, num_classes, train_idx, test_idx, labels = load_am()
+        #g, category, num_classes, train_idx, test_idx, labels = load_am()
+        dataset = AM()
     else:
         raise ValueError()
+    g = dataset.graph
+    category = dataset.predict_category
+    num_classes = dataset.num_classes
+    train_idx = dataset.train_idx
+    test_idx = dataset.test_idx
+    labels = dataset.labels
     category_id = len(g.ntypes)
     for i, ntype in enumerate(g.ntypes):
         if ntype == category:

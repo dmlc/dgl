@@ -201,18 +201,6 @@ def parse_rdf(g, parser, category, training_set, testing_set, insert_reverse=Tru
 
     return hg, train_idx, test_idx, labels
 
-def save_strlist(filename, strlist):
-    with open(filename, 'w') as f:
-        for s in strlist:
-            f.write(s + '\n')
-
-def load_strlist(filename):
-    with open(filename, 'r') as f:
-        ret = []
-        for line in f:
-            ret.append(line.strip())
-        return ret
-
 def load_preprocessed(mg, src, dst, ntid, etid, ntypes, etypes):
     # create homo graph
     print('Creating one whole graph ...')

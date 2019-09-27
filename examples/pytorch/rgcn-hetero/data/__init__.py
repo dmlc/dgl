@@ -13,3 +13,4 @@ from .aifb import load_aifb
 from .bgs import load_bgs
 from .am import load_am
 from .mutag import load_mutag
+from .rdf_graph import AIFB, MUTAG, BGS, AM
