@@ -19,7 +19,7 @@ has fewer entites and relations. As a reference (numbers include reverse edges a
 | BGS | 333,845 | 1,832,398 | 206 | 146 |
 | BGS-hetero | 94,806 | 672,884 | 96 | 146 |
 | AM | 1,666,764 | 11,976,642 | 266 | 1000 |
-| AM-hetero | | | |
+| AM-hetero | 881,680 | 5,668,682 | 96 | 1000 |
 
 ### Dependencies
 * PyTorch 1.0+
@@ -48,7 +48,7 @@ BGS: accuracy 93.10% (DGL), 83.10% (paper)
 python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
 
-AM: accuracy 90.02% (DGL), 89.29% (paper)
+AM: accuracy 91.41% (DGL), 89.29% (paper)
 ```
 python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```

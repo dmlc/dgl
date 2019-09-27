@@ -2,7 +2,6 @@
 Paper: https://arxiv.org/abs/1703.06103
 Reference Code: https://github.com/tkipf/relational-gcn
 """
-
 import argparse
 import numpy as np
 import time
@@ -25,8 +24,8 @@ class RelGraphConvHetero(nn.Module):
         Input feature size.
     out_feat : int
         Output feature size.
-    num_rels : int
-        Number of relations.
+    rel_names : int
+        Relation names.
     regularizer : str
         Which weight regularizer to use "basis" or "bdd"
     num_bases : int, optional
@@ -54,7 +53,6 @@ class RelGraphConvHetero(nn.Module):
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.rel_names = rel_names
-        print(self.rel_names)
         self.num_rels = len(rel_names)
         self.regularizer = regularizer
         self.num_bases = num_bases
@@ -75,8 +73,8 @@ class RelGraphConvHetero(nn.Module):
                 nn.init.xavier_uniform_(self.w_comp,
                                         gain=nn.init.calculate_gain('relu'))
         elif regularizer == "bdd":
-            assert False
-            if in_feat % num_bases != 0 or out_feat % num_bases != 0:
+            raise NotImplementedError('BDD regularizer has not been supported yet.')
+            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
                 raise ValueError('Feature size must be a multiplier of num_bases.')
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
@@ -86,8 +84,6 @@ class RelGraphConvHetero(nn.Module):
             self.weight = nn.Parameter(th.Tensor(
                 self.num_rels, self.num_bases * self.submat_in * self.submat_out))
             nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
-            # message func
-            self.message_func = self.bdd_message_func
         else:
             raise ValueError("Regularizer must be either 'basis' or 'bdd'")
 
@@ -116,10 +112,8 @@ class RelGraphConvHetero(nn.Module):
             weight = self.weight
         return {self.rel_names[i] : w.squeeze(0) for i, w in enumerate(th.split(weight, 1, dim=0))}
 
-    def bdd_message_func(self, edges):
+    def bdd_weight(self):
         """Message function for block-diagonal-decomposition regularizer"""
-        if edges.src['h'].dtype == th.int64 and len(edges.src['h'].shape) == 1:
-            raise TypeError('Block decomposition does not allow integer ID feature.')
         weight = self.weight.index_select(0, edges.data['type']).view(
             -1, self.submat_in, self.submat_out)
         node = edges.src['h'].view(-1, 1, self.submat_in)
@@ -128,32 +122,28 @@ class RelGraphConvHetero(nn.Module):
             msg = msg * edges.data['norm']
         return {'msg': msg}
 
-    def forward(self, g, xs, norm=None):
+    def forward(self, g, xs):
         """ Forward computation
 
         Parameters
         ----------
-        g : DGLGraph
-            The graph.
-        x : torch.Tensor
-            Input node features. Could be either
-                * :math:`(|V|, D)` dense tensor
-                * :math:`(|V|,)` int64 vector, representing the categorical values of each
-                  node. We then treat the input feature as an one-hot encoding feature.
-        etypes : torch.Tensor
-            Edge type tensor. Shape: :math:`(|E|,)`
-        norm : torch.Tensor
-            Optional edge normalizer tensor. Shape: :math:`(|E|, 1)`
+        g : DGLHeteroGraph
+            Input graph.
+        xs : list of torch.Tensor
+            Node feature for each node type.
 
         Returns
         -------
-        torch.Tensor
-            New node features.
+        list of torch.Tensor
+            New node features for each node type.
         """
         g = g.local_var()
         for i, ntype in enumerate(g.ntypes):
             g.nodes[ntype].data['x'] = xs[i]
-        ws = self.basis_weight()
+        if self.regularizer == 'basis':
+            ws = self.basis_weight()
+        else:
+            ws = self.bdd_weight()
         funcs = {}
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
             g.nodes[srctype].data['h%d' % i] = th.matmul(
@@ -177,8 +167,7 @@ class RelGraphConvHetero(nn.Module):
         return hs
 
 class RelGraphConvHeteroEmbed(nn.Module):
-    r"""Relational graph convolution layer.
-    """
+    r"""Embedding layer for featureless heterograph."""
     def __init__(self,
                  embed_size,
                  g,
@@ -216,7 +205,7 @@ class RelGraphConvHeteroEmbed(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, norm=None):
+    def forward(self):
         """ Forward computation
 
         Returns
