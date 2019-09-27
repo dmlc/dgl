@@ -1,19 +1,11 @@
-import json
 import os
-import time
 from functools import namedtuple
 
 import dgl
 import numpy as np
-import scipy.sparse as sp
-import sklearn.metrics
-import sklearn.preprocessing
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from dgl.data import PPIDataset
 from dgl.data import load_data as _load_data
-from networkx.readwrite import json_graph
 from sklearn.metrics import f1_score
 
 

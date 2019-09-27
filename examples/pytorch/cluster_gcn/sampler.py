@@ -1,11 +1,10 @@
 import os
 import random
 
-import numpy as np
-
-import dgl
 import dgl.function as fn
+import numpy as np
 import torch
+
 from partition_utils import *
 
 

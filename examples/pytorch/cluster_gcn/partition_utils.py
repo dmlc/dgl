@@ -1,18 +1,9 @@
-import json
-import os
-import pickle as pkl
-import random
-import sys
 from time import time
 
 import metis
-import networkx as nx
 import numpy as np
-import scipy.sparse as sp
-from networkx.readwrite import json_graph
 
 from utils import arg_list
-
 
 
 def get_partition_list(g, psize):
