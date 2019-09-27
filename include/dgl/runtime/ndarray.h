@@ -440,8 +440,10 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
       << "Invalid DLTensor file format";
   CHECK(data_byte_size == num_elems * elem_bytes)
       << "Invalid DLTensor file format";
-  CHECK(strm->Read(ret->data, data_byte_size))
-      << "Invalid DLTensor file format";
+  if (data_byte_size != 0)  {
+    CHECK(strm->Read(ret->data, data_byte_size))
+        << "Invalid DLTensor file format";
+  }
   if (!DMLC_IO_NO_ENDIAN_SWAP) {
     dmlc::ByteSwap(ret->data, elem_bytes, num_elems);
   }
