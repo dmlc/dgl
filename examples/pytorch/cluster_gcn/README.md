@@ -23,6 +23,7 @@ Dependencies
 3) make config shared=1 prefix=~/.local/
 4) make install
 5) export METIS_DLL=~/.local/lib/libmetis.so
+6) `pip install metis`
 ```
 
 quick test to see whether you install metis correctly:

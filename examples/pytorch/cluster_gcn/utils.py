@@ -53,13 +53,6 @@ def save_log_dir(args):
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
-
-def get_sqrt_norm(g):
-    norm = 1. / g.in_degrees().float().unsqueeze(1).sqrt()
-    norm[torch.isinf(norm)] = 0
-    return norm
-
-
 def calc_f1(y_true, y_pred, multitask):
     if multitask:
         y_pred[y_pred > 0] = 1
