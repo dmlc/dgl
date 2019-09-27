@@ -158,6 +158,8 @@ def main(args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            # in PPI case, `log_every` is chosen to log one time per epoch. 
+            # Choose your log freq dynamically when you want more info within one epoch
             if j % args.log_every == 0:
                 print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/{len(cluster_iterator)}:training loss", loss.item())
                 writer.add_scalar('train/loss', loss.item(),
