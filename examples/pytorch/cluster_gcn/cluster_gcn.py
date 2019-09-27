@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import random
 
 import numpy as np
 import sklearn.preprocessing
@@ -18,6 +19,8 @@ from utils import Logger, evaluate, save_log_dir, load_data
 
 def main(args):
     torch.manual_seed(args.rnd_seed)
+    np.random.seed(args.rnd_seed)
+    random.seed(args.rnd_seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
