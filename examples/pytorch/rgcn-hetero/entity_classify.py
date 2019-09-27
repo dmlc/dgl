@@ -1,11 +1,6 @@
-"""
-Modeling Relational Data with Graph Convolutional Networks
+"""Modeling Relational Data with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1703.06103
-Code: https://github.com/tkipf/relational-gcn
-
-Difference compared to tkipf/relation-gcn
-* l2norm applied to all weights
-* remove nodes that won't be touched
+Reference Code: https://github.com/tkipf/relational-gcn
 """
 
 import argparse
@@ -120,10 +115,6 @@ class RelGraphConvHetero(nn.Module):
         else:
             weight = self.weight
         return {self.rel_names[i] : w.squeeze(0) for i, w in enumerate(th.split(weight, 1, dim=0))}
-        #msg = utils.bmm_maybe_select(edges.src['h'], weight, edges.data['type'])
-        #if 'norm' in edges.data:
-            #msg = msg * edges.data['norm']
-        #return {'msg': msg}
 
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
@@ -198,8 +189,6 @@ class RelGraphConvHeteroEmbed(nn.Module):
         super(RelGraphConvHeteroEmbed, self).__init__()
         self.embed_size = embed_size
         self.g = g
-        #self.rel_names = rel_names
-        #self.num_rels = len(rel_names)
         self.bias = bias
         self.activation = activation
         self.self_loop = self_loop
@@ -256,30 +245,6 @@ class RelGraphConvHeteroEmbed(nn.Module):
             hs[i] = h
         return hs
 
-class RelGraphConvHeteroEmbed2(nn.Module):
-    r"""Relational graph convolution layer.
-    """
-    def __init__(self, embed_size, g):
-        super(RelGraphConvHeteroEmbed2, self).__init__()
-        self.embed_size = embed_size
-        self.g = g
-        # create weight embeddings for each node type
-        self.ntype_embeds = nn.ParameterDict()
-        for ntype in g.ntypes:
-            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
-            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
-            self.ntype_embeds[ntype] = embed
-
-    def forward(self):
-        """ Forward computation
-
-        Returns
-        -------
-        torch.Tensor
-            New node features.
-        """
-        return [self.ntype_embeds[ntype] for ntype in self.g.ntypes]
-
 class EntityClassify(nn.Module):
     def __init__(self,
                  g,
@@ -298,8 +263,6 @@ class EntityClassify(nn.Module):
         self.dropout = dropout
         self.use_self_loop = use_self_loop
 
-        #self.embed_layer = RelGraphConvHeteroEmbed2(self.h_dim, g)
-        #self.num_hidden_layers += 1
         self.embed_layer = RelGraphConvHeteroEmbed(
             self.h_dim, g, activation=F.relu, self_loop=self.use_self_loop,
             dropout=self.dropout)
@@ -334,6 +297,7 @@ def main(args):
         dataset = AM()
     else:
         raise ValueError()
+
     g = dataset.graph
     category = dataset.predict_category
     num_classes = dataset.num_classes
@@ -352,17 +316,13 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # edge type and normalization factor
-    train_idx = th.tensor(train_idx)
-    test_idx = th.tensor(test_idx)
-    labels = th.tensor(labels)
-
     # check cuda
     use_cuda = args.gpu >= 0 and th.cuda.is_available()
     if use_cuda:
         th.cuda.set_device(args.gpu)
-        #edge_type = edge_type.cuda()
-        #edge_norm = edge_norm.cuda()
+        labels = labels.cuda()
+        train_idx = train_idx.cuda()
+        test_idx = test_idx.cuda()
         labels = labels.cuda()
 
     # create model
