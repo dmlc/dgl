@@ -310,6 +310,29 @@ template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray row
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
+void CollectDataIndicesFromSorted(const IdType *indices_data, const DType *data,
+                                  const IdType start, const IdType end, const IdType col,
+                                  std::vector<IdType> *col_vec,
+                                  std::vector<DType> *ret_vec) {
+  const IdType *start_ptr = indices_data + start;
+  const IdType *end_ptr = indices_data + end;
+  auto it = std::lower_bound(start_ptr, end_ptr, col);
+  // This might be a multi-graph. We need to collect all of the matched
+  // columns.
+  for (; it != end_ptr; it++) {
+    // If the col exist
+    if (*it == col) {
+      IdType idx = it - indices_data;
+      col_vec->push_back(indices_data[idx]);
+      ret_vec->push_back(data[idx]);
+    } else {
+      // If we find a column that is different, we can stop searching now.
+      break;
+    }
+  }
+}
+
+template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): more efficient implementation for matrix without duplicate entries
@@ -336,11 +359,24 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     const IdType row_id = row_data[i], col_id = col_data[j];
     CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
-      if (indices_data[i] == col_id) {
+    if (csr.sorted) {
+      // Here we collect col indices and data.
+      CollectDataIndicesFromSorted<XPU, IdType, DType>(indices_data, data,
+                                                       indptr_data[row_id],
+                                                       indptr_data[row_id + 1],
+                                                       col_id, &ret_cols,
+                                                       &ret_data);
+      // We need to add row Ids.
+      while (ret_rows.size() < ret_data.size()) {
+        ret_rows.push_back(row_id);
+      }
+    } else {
+      for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
+        if (indices_data[i] == col_id) {
           ret_rows.push_back(row_id);
           ret_cols.push_back(col_id);
           ret_data.push_back(data[i]);
+        }
       }
     }
   }
