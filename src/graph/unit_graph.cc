@@ -916,7 +916,7 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
   if (in_csr && out_csr) {
-    assert (in_csr->Sorted() == out_csr->Sorted());
+    assert(in_csr->Sorted() == out_csr->Sorted());
     sort_csr_ = in_csr->Sorted();
   } else if (in_csr) {
     sort_csr_ = in_csr->Sorted();
