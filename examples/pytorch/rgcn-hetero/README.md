@@ -8,7 +8,7 @@ The preprocessing is slightly different from the author's code. We directly load
 raw RDF data. For AIFB, BGS and AM,
 all literal nodes are pruned from the graph. For AIFB, some training/testing nodes
 thus become orphan and are excluded from the training/testing set. The resulting graph
-has fewer entites and relations. As a reference (numbers include reverse edges and relations):
+has fewer entities and relations. As a reference (numbers include reverse edges and relations):
 
 | Dataset | #Nodes | #Edges | #Relations | #Labeled |
 | --- | --- | --- | --- | --- |
@@ -33,6 +33,9 @@ pip install requests torch rdflib pandas
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 
 ### Entity Classification
+
+(all experiments use one-hot encoding as featureless input)
+
 AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 ```
 python3 entity_classify.py -d aifb --testing --gpu 0

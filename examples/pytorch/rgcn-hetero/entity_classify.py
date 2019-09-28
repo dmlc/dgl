@@ -10,8 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from functools import partial
 
-import dgl
-from dgl import DGLGraph
 import dgl.function as fn
 from dgl.data.rdf import AIFB, MUTAG, BGS, AM
 
@@ -72,20 +70,8 @@ class RelGraphConvHetero(nn.Module):
             if self.num_bases < self.num_rels:
                 nn.init.xavier_uniform_(self.w_comp,
                                         gain=nn.init.calculate_gain('relu'))
-        elif regularizer == "bdd":
-            raise NotImplementedError('BDD regularizer has not been supported yet.')
-            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
-                raise ValueError('Feature size must be a multiplier of num_bases.')
-            # add block diagonal weights
-            self.submat_in = in_feat // self.num_bases
-            self.submat_out = out_feat // self.num_bases
-
-            # assuming in_feat and out_feat are both divisible by num_bases
-            self.weight = nn.Parameter(th.Tensor(
-                self.num_rels, self.num_bases * self.submat_in * self.submat_out))
-            nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         else:
-            raise ValueError("Regularizer must be either 'basis' or 'bdd'")
+            raise ValueError("Only basis regularizer is supported.")
 
         # bias
         if self.bias:
@@ -112,16 +98,6 @@ class RelGraphConvHetero(nn.Module):
             weight = self.weight
         return {self.rel_names[i] : w.squeeze(0) for i, w in enumerate(th.split(weight, 1, dim=0))}
 
-    def bdd_weight(self):
-        """Message function for block-diagonal-decomposition regularizer"""
-        weight = self.weight.index_select(0, edges.data['type']).view(
-            -1, self.submat_in, self.submat_out)
-        node = edges.src['h'].view(-1, 1, self.submat_in)
-        msg = th.bmm(node, weight).view(-1, self.out_feat)
-        if 'norm' in edges.data:
-            msg = msg * edges.data['norm']
-        return {'msg': msg}
-
     def forward(self, g, xs):
         """ Forward computation
 
@@ -140,10 +116,7 @@ class RelGraphConvHetero(nn.Module):
         g = g.local_var()
         for i, ntype in enumerate(g.ntypes):
             g.nodes[ntype].data['x'] = xs[i]
-        if self.regularizer == 'basis':
-            ws = self.basis_weight()
-        else:
-            ws = self.bdd_weight()
+        ws = self.basis_weight()
         funcs = {}
         for i, (srctype, etype, dsttype) in enumerate(g.canonical_etypes):
             g.nodes[srctype].data['h%d' % i] = th.matmul(
@@ -337,7 +310,6 @@ def main(args):
         optimizer.zero_grad()
         if epoch > 5:
             t0 = time.time()
-        #logits = model(g, feats, edge_type, edge_norm)
         logits = model()[category_id]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()

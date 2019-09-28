@@ -4,11 +4,10 @@ Dataset from "A Collection of Benchmark Datasets for
 Systematic Evaluations of Machine Learning on
 the Semantic Web"
 """
-import os, sys
-from collections import namedtuple, OrderedDict
+import os
+from collections import OrderedDict
 import itertools
 import rdflib as rdf
-import pickle
 import abc
 import re
 
@@ -172,8 +171,6 @@ class RDFGraphDataset:
         print('#Node types:', len(hg.ntypes))
         print('#Canonical edge types:', len(hg.etypes))
         print('#Unique edge type names:', len(set(hg.etypes)))
-        #print(hg.canonical_etypes)
-        #nx.drawing.nx_pydot.write_dot(mg, 'meta.dot')
         self.graph = hg
 
     def save_cache(self, mg, src, dst, ntid, etid, ntypes, etypes):
@@ -299,7 +296,6 @@ class AIFB(RDFGraphDataset):
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'aifb-hetero')
         url = _get_dgl_url('dataset/rdf/aifb-hetero.zip')
         name = 'aifb-hetero'
         super(AIFB, self).__init__(url, name,
@@ -359,7 +355,6 @@ class MUTAG(RDFGraphDataset):
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mutag-hetero')
         url = _get_dgl_url('dataset/rdf/mutag-hetero.zip')
         name = 'mutag-hetero'
         super(MUTAG, self).__init__(url, name,
@@ -436,7 +431,6 @@ class BGS(RDFGraphDataset):
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bgs-hetero')
         url = _get_dgl_url('dataset/rdf/bgs-hetero.zip')
         name = 'bgs-hetero'
         super(BGS, self).__init__(url, name,
@@ -456,7 +450,6 @@ class BGS(RDFGraphDataset):
             sp = entstr.split('/')
             if len(sp) != 7:
                 return None
-            #assert len(sp) == 7, entstr
             # instance
             cls = '%s/%s' % (sp[4], sp[5])
             inst = sp[6]
@@ -508,7 +501,6 @@ class AM(RDFGraphDataset):
                  force_reload=False,
                  print_every=10000,
                  insert_reverse=True):
-        directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'am-hetero')
         url = _get_dgl_url('dataset/rdf/am-hetero.zip')
         name = 'am-hetero'
         super(AM, self).__init__(url, name,
