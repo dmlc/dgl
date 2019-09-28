@@ -191,6 +191,7 @@ StorageMetaData LoadDGLGraphs(const std::string &filename,
                               std::vector<dgl_id_t> idx_list,
                               bool onlyMeta) {
   SeekStream *fs = SeekStream::CreateForRead(filename.c_str(), true);
+  CHECK(fs) << "Filename is invalid";
   StorageMetaData metadata = StorageMetaData::Create();
   // Read DGL MetaData
   uint64_t magicNum, graphType, version;
