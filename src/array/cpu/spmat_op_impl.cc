@@ -587,6 +587,42 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t, int32_t>(
 template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
+template <DLDeviceType XPU, typename IdType, typename DType>
+void CSRSort(CSRMatrix csr) {
+  typedef std::pair<IdType, DType> shuffle_ele;
+  size_t num_rows = csr.num_rows;
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  DType* eid_data = static_cast<DType*>(csr.data->data);
+#pragma omp parallel
+  {
+    std::vector<shuffle_ele> reorder_vec;
+#pragma omp for
+    for (size_t row = 0; row < num_rows; row++) {
+      size_t num_cols = indptr_data[row + 1] - indptr_data[row];
+      IdType *col = indices_data + indptr_data[row];
+      DType *eid = eid_data + indptr_data[row];
+
+      reorder_vec.resize(num_cols);
+      for (size_t i = 0; i < num_cols; i++) {
+        reorder_vec[i].first = col[i];
+        reorder_vec[i].second = eid[i];
+      }
+      std::sort(reorder_vec.begin(), reorder_vec.end(),
+                [](const shuffle_ele &e1, const shuffle_ele &e2) {
+                  return e1.first < e2.first;
+                });
+      for (size_t i = 0; i < num_cols; i++) {
+        col[i] = reorder_vec[i].first;
+        eid[i] = reorder_vec[i].second;
+      }
+    }
+  }
+}
+
+template void CSRSort<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
+template void CSRSort<kDLCPU, int32_t, int32_t>(CSRMatrix csr);
+
 ///////////////////////////// COOHasDuplicate /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
