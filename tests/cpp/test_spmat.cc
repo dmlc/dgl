@@ -20,6 +20,7 @@ aten::CSRMatrix CSR1() {
   csr.indptr = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, CTX);
   csr.indices = aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
   csr.data = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 1, 4}), sizeof(IDX)*8, CTX);
+  csr.sorted = false;
   return csr;
 }
 
@@ -37,6 +38,7 @@ aten::CSRMatrix CSR2() {
   csr.indptr = aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX);
   csr.indices = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
   csr.data = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX);
+  csr.sorted = false;
   return csr;
 }
 
