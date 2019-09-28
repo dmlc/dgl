@@ -901,12 +901,17 @@ class DGLGraph(DGLBaseGraph):
                  node_frame=None,
                  edge_frame=None,
                  multigraph=None,
-                 readonly=False):
+                 readonly=False,
+                 sort_csr=False):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
+            if sort_csr:
+                gidx.sort_adj()
         else:
             gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            if sort_csr:
+                gidx.sort_adj()
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame

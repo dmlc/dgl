@@ -51,10 +51,7 @@ def gen_by_mutation():
     return g
 
 def gen_from_data(data, readonly, sort):
-    g = dgl.DGLGraph(data, readonly=readonly)
-    if readonly and sort:
-        g._graph.sort_adj()
-    return g
+    return dgl.DGLGraph(data, readonly=readonly, sort_csr=True)
 
 def test_query():
     def _test_one(g):
