@@ -90,12 +90,12 @@ inline bool COOHasData(COOMatrix csr) {
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  if (sorted) {
+  if (csr.sorted) {
     const IdType *start = indices_data + indptr_data[row];
     const IdType *end = indices_data + indptr_data[row + 1];
     return std::binary_search(start, end, col);
@@ -109,11 +109,11 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   return false;
 }
 
-template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t, bool sorted);
-template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t, bool sorted);
+template bool CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
+template bool CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
-NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col, bool sorted) {
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   const auto rowlen = row->shape[0];
   const auto collen = col->shape[0];
   const auto rstlen = std::max(rowlen, collen);
@@ -124,13 +124,13 @@ NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col, bool sorted) {
   const int64_t row_stride = (rowlen == 1 && collen != 1) ? 0 : 1;
   const int64_t col_stride = (collen == 1 && rowlen != 1) ? 0 : 1;
   for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
-    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j], sorted)? 1 : 0;
+    *(rst_data++) = CSRIsNonZero<XPU, IdType>(csr, row_data[i], col_data[j])? 1 : 0;
   }
   return rst;
 }
 
-template NDArray CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, NDArray, NDArray, bool sorted);
-template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray, bool sorted);
+template NDArray CSRIsNonZero<kDLCPU, int32_t>(CSRMatrix, NDArray, NDArray);
+template NDArray CSRIsNonZero<kDLCPU, int64_t>(CSRMatrix, NDArray, NDArray);
 
 ///////////////////////////// CSRHasDuplicate /////////////////////////////
 
@@ -237,7 +237,7 @@ void CollectDataFromSorted(const IdType *indices_data, const DType *data,
 }
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
+NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): use more efficient binary search when the column indices is sorted
   CHECK(row >= 0 && row < csr.num_rows) << "Invalid row index: " << row;
@@ -246,7 +246,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
-  if (sorted) {
+  if (csr.sorted) {
     CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
                                               indptr_data[row], indptr_data[row + 1],
                                               col, &ret_vec);
@@ -260,11 +260,11 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
   return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
-template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t, bool sorted);
-template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_t, bool sorted);
+template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
+template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
@@ -288,7 +288,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
     const IdType row_id = row_data[i], col_id = col_data[j];
     CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    if (sorted) {
+    if (csr.sorted) {
       CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
                                                 indptr_data[row_id], indptr_data[row_id + 1],
                                                 col_id, &ret_vec);
@@ -304,10 +304,8 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
   return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
-template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols,
-                                                      bool sorted);
-template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols,
-                                                      bool sorted);
+template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
+template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
 
