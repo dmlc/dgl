@@ -97,7 +97,7 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
       ret.induced_vertices[src_vtype]->shape[0],
       ret.induced_vertices[dst_vtype]->shape[0],
       subedges[etype].src,
-      subedges[etype].dst);
+      subedges[etype].dst, false);
   }
   ret.graph = HeteroGraphPtr(new HeteroGraph(hg->meta_graph(), subrels));
   return ret;
@@ -278,7 +278,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
       src_nodes,
       dst_nodes,
       aten::VecToIdArray(result_src),
-      aten::VecToIdArray(result_dst));
+      aten::VecToIdArray(result_dst), false);
 
   FlattenedHeteroGraph* result = new FlattenedHeteroGraph;
   result->graph = HeteroGraphRef(gptr);
@@ -309,7 +309,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    auto hgptr = UnitGraph::CreateFromCOO(nvtypes, num_src, num_dst, row, col);
+    // TODO(zhengda) let's use unsorted for now.
+    auto hgptr = UnitGraph::CreateFromCOO(nvtypes, num_src, num_dst, row, col, false);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -321,8 +322,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indptr = args[3];
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
+    // TODO(zhengda) let's use unsorted for now.
     auto hgptr = UnitGraph::CreateFromCSR(
-        nvtypes, num_src, num_dst, indptr, indices, edge_ids);
+        nvtypes, num_src, num_dst, indptr, indices, edge_ids, false);
     *rv = HeteroGraphRef(hgptr);
   });
 

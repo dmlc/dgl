@@ -240,17 +240,20 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
-  void SortCSR();
+  void SortCSR() {
+    aten::CSRSort(adj_);
+  }
+
   /*!
    * \brief the columns in each row is sorted.
    */
   bool Sorted() const {
-    return sorted_;
+    return adj_.sorted;
   }
 
  private:
   /*! \brief prive default constructor */
-  CSR() {sorted_ = false;}
+  CSR() {adj_.sorted = false;}
 
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
@@ -262,9 +265,6 @@ class CSR : public GraphInterface {
   // The name of the shared memory to store data.
   // If it's empty, data isn't stored in shared memory.
   std::string shared_mem_name_;
-
-  // Indicate that the columns in each row is sorted.
-  bool sorted_;
 };
 
 class COO : public GraphInterface {

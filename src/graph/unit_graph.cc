@@ -21,7 +21,7 @@ inline GraphPtr CreateUnitGraphMetaGraph1() {
   std::vector<int64_t> col_vec(1, 0);
   IdArray row = aten::VecToIdArray(row_vec);
   IdArray col = aten::VecToIdArray(col_vec);
-  GraphPtr g = ImmutableGraph::CreateFromCOO(1, row, col);
+  GraphPtr g = ImmutableGraph::CreateFromCOO(1, row, col, false);
   return g;
 }
 
@@ -32,7 +32,7 @@ inline GraphPtr CreateUnitGraphMetaGraph2() {
   std::vector<int64_t> col_vec(1, 1);
   IdArray row = aten::VecToIdArray(row_vec);
   IdArray col = aten::VecToIdArray(col_vec);
-  GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col);
+  GraphPtr g = ImmutableGraph::CreateFromCOO(2, row, col, false);
   return g;
 }
 
@@ -338,7 +338,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
+    adj_.sorted = false;
   }
 
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
@@ -350,12 +350,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
+    adj_.sorted = false;
   }
 
   explicit CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
     : BaseHeteroGraph(metagraph), adj_(csr) {
-    sorted_ = false;
+    adj_.sorted = false;
   }
 
   inline dgl_type_t SrcType() const {
@@ -467,13 +467,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::CSRIsNonZero(adj_, src, dst, sorted_);
+    return aten::CSRIsNonZero(adj_, src, dst, adj_.sorted);
   }
 
   BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
     CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-    return aten::CSRIsNonZero(adj_, src_ids, dst_ids, sorted_);
+    return aten::CSRIsNonZero(adj_, src_ids, dst_ids, adj_.sorted);
   }
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
@@ -489,7 +489,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::CSRGetData(adj_, src, dst, sorted_);
+    return aten::CSRGetData(adj_, src, dst, adj_.sorted);
   }
 
   EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
@@ -626,15 +626,22 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_;
   }
 
+  void SortCSR() {
+    aten::CSRSort(adj_);
+  }
+  /*!
+   * \brief the columns in each row is sorted.
+   */
+  bool Sorted() const {
+    return adj_.sorted;
+  }
+
  private:
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
 
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
-
-  /*! \brief indicate that the edges are stored in the sorted order. */
-  bool sorted_;
 };
 
 //////////////////////////////////////////////////////////
@@ -833,7 +840,7 @@ HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const
   auto sg = GetOutCSR()->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
@@ -844,31 +851,34 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
   auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
+  // In this case, we can disable sorting on the subgraph.
+  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), subcoo, false));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
 }
 
-HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
+HeteroGraphPtr UnitGraph::CreateFromCOO(int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+                                        IdArray row, IdArray col, bool sort_csr) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, coo, sort_csr));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids) {
+    IdArray indptr, IdArray indices, IdArray edge_ids, bool sort_csr) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr));
+  if (sort_csr)
+    csr->SortCSR();
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -883,7 +893,7 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     CHECK_NOTNULL(bg);
     CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
     CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
-    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
+    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr));
   }
 }
 
@@ -899,25 +909,39 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   CHECK_NOTNULL(bg);
   CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
+  return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr));
 }
 
-UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
-  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr)
+  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
+  if (in_csr && out_csr) {
+    assert (in_csr->Sorted() == out_csr->Sorted());
+    sort_csr_ = in_csr->Sorted();
+  } else if (in_csr) {
+    sort_csr_ = in_csr->Sorted();
+  } else {
+    sort_csr_ = out_csr->Sorted();
+  }
 }
 
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   if (!in_csr_) {
     if (out_csr_) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      auto in_csr = std::make_shared<CSR>(meta_graph(), newadj);
+      if (sort_csr_)
+        in_csr->SortCSR();
+      const_cast<UnitGraph*>(this)->in_csr_ = in_csr;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& adj = coo_->adj();
       const auto& newadj = aten::COOToCSR(
           aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      auto in_csr = std::make_shared<CSR>(meta_graph(), newadj);
+      if (sort_csr_)
+        in_csr->SortCSR();
+      const_cast<UnitGraph*>(this)->in_csr_ = in_csr;
     }
   }
   return in_csr_;
@@ -928,11 +952,17 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRTranspose(in_csr_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      auto out_csr = std::make_shared<CSR>(meta_graph(), newadj);
+      if (sort_csr_)
+        out_csr->SortCSR();
+      const_cast<UnitGraph*>(this)->out_csr_ = out_csr;
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& newadj = aten::COOToCSR(coo_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      auto out_csr = std::make_shared<CSR>(meta_graph(), newadj);
+      if (sort_csr_)
+        out_csr->SortCSR();
+      const_cast<UnitGraph*>(this)->out_csr_ = out_csr;
     }
   }
   return out_csr_;

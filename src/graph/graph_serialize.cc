@@ -291,7 +291,8 @@ bool GraphDataObject::Load(dmlc::Stream *fs) {
   fs->Read(&indptr);
   fs->Read(&indices);
   fs->Read(&edge_ids);
-  this->gptr = ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, "in");
+  // TODO(zhengda) do we need to check if the graph structure is sorted?
+  this->gptr = ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids, "in", false);
 
   fs->Read(&this->node_tensors);
   fs->Read(&this->edge_tensors);
@@ -320,7 +321,7 @@ ImmutableGraphPtr ToImmutableGraph(GraphPtr g) {
     IdArray srcs_array = earray.src;
     IdArray dsts_array = earray.dst;
     ImmutableGraphPtr imgptr = ImmutableGraph::CreateFromCOO(mgr->NumVertices(), srcs_array,
-                                                             dsts_array);
+                                                             dsts_array, false);
     return imgptr;
   }
 }

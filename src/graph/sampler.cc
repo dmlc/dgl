@@ -1092,7 +1092,7 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
   COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
-  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
+  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo, false));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
@@ -1218,7 +1218,7 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   // We sample negative vertices without replacement.
   // There shouldn't be duplicated edges.
   COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
-  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
+  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo, false));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (check_false_neg) {

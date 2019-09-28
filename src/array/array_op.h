@@ -98,6 +98,9 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
+template <DLDeviceType XPU, typename IdType, typename DType>
+void CSRSort(CSRMatrix csr);
+
 template <DLDeviceType XPU, typename IdType>
 bool COOHasDuplicate(COOMatrix coo);
 

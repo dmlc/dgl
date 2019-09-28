@@ -143,12 +143,12 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col);
+      IdArray row, IdArray col, bool sort_csr);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray indptr, IdArray indices, IdArray edge_ids);
+      IdArray indptr, IdArray indices, IdArray edge_ids, bool sort_csr);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -180,9 +180,16 @@ class UnitGraph : public BaseHeteroGraph {
    * \param metagraph metagraph
    * \param in_csr in edge csr
    * \param out_csr out edge csr
-   * \param coo coo
    */
-  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
+  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr);
+
+  /*!
+   * \brief constructor
+   * \param metagraph metagraph
+   * \param coo coo
+   * \param sort_csr the flag to sort csr.
+   */
+  UnitGraph(GraphPtr metagraph, COOPtr coo, bool sort_csr);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -195,6 +202,9 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr out_csr_;
   /*! \brief COO representation */
   COOPtr coo_;
+
+  // Indicate that the CSRs in the graph index should be sorted.
+  bool sort_csr_;
 };
 
 };  // namespace dgl

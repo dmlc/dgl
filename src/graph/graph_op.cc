@@ -134,7 +134,8 @@ GraphPtr GraphOp::DisjointUnion(std::vector<GraphPtr> graphs) {
       cum_num_edges += g_num_edges;
     }
 
-    return ImmutableGraph::CreateFromCSR(indptr_arr, indices_arr, edge_ids_arr, "in");
+    // TODO(zhengda) do we need to sort the CSR in this case?
+    return ImmutableGraph::CreateFromCSR(indptr_arr, indices_arr, edge_ids_arr, "in", false);
   }
 }
 
@@ -241,8 +242,9 @@ std::vector<GraphPtr> GraphOp::DisjointPartitionBySizes(
       }
 
       cum_sum_edges += g_num_edges;
+      // TODO(zhengda) do we need to sort the CSR in this case?
       rst.push_back(ImmutableGraph::CreateFromCSR(
-          indptr_arr, indices_arr, edge_ids_arr, "in"));
+          indptr_arr, indices_arr, edge_ids_arr, "in", false));
     }
   }
   return rst;
@@ -395,8 +397,9 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
 
   IdArray srcs_array = aten::VecToIdArray(srcs);
   IdArray dsts_array = aten::VecToIdArray(dsts);
+  // TODO(zhengda) do we need to sort the CSR in this case?
   return ImmutableGraph::CreateFromCOO(
-      g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph());
+      g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph(), false);
 }
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")

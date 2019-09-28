@@ -56,7 +56,7 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
                          aten::NewIdArray(num_vertices + 1),
                          aten::NewIdArray(num_edges),
                          aten::NewIdArray(num_edges)};
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
@@ -66,7 +66,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
@@ -77,7 +77,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -96,7 +96,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
@@ -116,7 +116,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 CSR::CSR(const std::string &shared_mem_name,
@@ -127,7 +127,7 @@ CSR::CSR(const std::string &shared_mem_name,
   adj_.num_cols = num_verts;
   std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, false);
-  sorted_ = false;
+  adj_.sorted = false;
 }
 
 bool CSR::IsMultigraph() const {
@@ -163,13 +163,13 @@ DegreeArray CSR::OutDegrees(IdArray vids) const {
 bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
   CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
-  return aten::CSRIsNonZero(adj_, src, dst, sorted_);
+  return aten::CSRIsNonZero(adj_, src, dst, adj_.sorted);
 }
 
 BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
   CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-  return aten::CSRIsNonZero(adj_, src_ids, dst_ids, sorted_);
+  return aten::CSRIsNonZero(adj_, src_ids, dst_ids, adj_.sorted);
 }
 
 IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
@@ -181,7 +181,7 @@ IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
-  return aten::CSRGetData(adj_, src, dst, sorted_);
+  return aten::CSRGetData(adj_, src, dst, adj_.sorted);
 }
 
 EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
@@ -202,7 +202,7 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
   const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
   IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
   CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
-  subcsr->sorted_ = this->sorted_;
+  subcsr->adj_.sorted = this->adj_.sorted;
   Subgraph subg;
   subg.graph = subcsr;
   subg.induced_vertices = vids;
@@ -272,46 +272,6 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
   const dgl_id_t start = indptr_data[vid];
   const dgl_id_t end = indptr_data[vid + 1];
   return DGLIdIters(eid_data + start, eid_data + end);
-}
-
-struct shuffle_ele {
-  dgl_id_t col_idx;
-  dgl_id_t eid;
-};
-
-void CSR::SortCSR() {
-  if (sorted_)
-    return;
-
-  size_t num_rows = adj_.num_rows;
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr()->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices()->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids()->data);
-#pragma omp parallel
-  {
-    std::vector<shuffle_ele> reorder_vec;
-#pragma omp for
-    for (size_t row = 0; row < num_rows; row++) {
-      size_t num_cols = indptr_data[row + 1] - indptr_data[row];
-      dgl_id_t *col = indices_data + indptr_data[row];
-      dgl_id_t *eid = eid_data + indptr_data[row];
-
-      reorder_vec.resize(num_cols);
-      for (size_t i = 0; i < num_cols; i++) {
-        reorder_vec[i].col_idx = col[i];
-        reorder_vec[i].eid = eid[i];
-      }
-      std::sort(reorder_vec.begin(), reorder_vec.end(),
-                [](const shuffle_ele &e1, const shuffle_ele &e2) {
-                  return e1.col_idx < e2.col_idx;
-                });
-      for (size_t i = 0; i < num_cols; i++) {
-        col[i] = reorder_vec[i].col_idx;
-        eid[i] = reorder_vec[i].eid;
-      }
-    }
-  }
-  sorted_ = true;
 }
 
 //////////////////////////////////////////////////////////
@@ -520,7 +480,7 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
-  sg.graph = GraphPtr(new ImmutableGraph(subcoo));
+  sg.graph = GraphPtr(new ImmutableGraph(subcoo, false));
   return sg;
 }
 
@@ -547,7 +507,8 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     const std::string &edge_dir, bool sort_csr) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids));
   // TODO(zhengda) we are sorting on the original memory.
-  csr->SortCSR();
+  if (sort_csr)
+    csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
@@ -563,7 +524,8 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     bool multigraph, const std::string &edge_dir, bool sort_csr) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
   // TODO(zhengda) we are sorting on the original memory.
-  csr->SortCSR();
+  if (sort_csr)
+    csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr));
   } else if (edge_dir == "out") {
@@ -580,7 +542,8 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
     const std::string &shared_mem_name) {
   CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
   // TODO(zhengda) we are sorting on the original memory.
-  csr->SortCSR();
+  if (sort_csr)
+    csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
@@ -598,7 +561,8 @@ ImmutableGraphPtr ImmutableGraph::CreateFromCSR(
   CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
                      GetSharedMemName(shared_mem_name, edge_dir)));
   // TODO(zhengda) we are sorting on the original memory.
-  csr->SortCSR();
+  if (sort_csr)
+    csr->SortCSR();
   if (edge_dir == "in") {
     return ImmutableGraphPtr(new ImmutableGraph(csr, nullptr, shared_mem_name));
   } else if (edge_dir == "out") {
