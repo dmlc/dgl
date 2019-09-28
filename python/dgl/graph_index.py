@@ -423,16 +423,6 @@ class GraphIndex(ObjectBase):
         eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
-    def sort_adj(self):
-        """Sort the adjacency matrix.
-
-        By default, when the adjacency matrix is created, the edges may be stored
-        in an arbitrary order. Sometimes, we want to sort them to accelerate
-        some computation. For example, `has_edges_between` can be much faster
-        on a giant adjacency matrix if the edges in the matrix is sorted.
-        """
-        _CAPI_DGLSortAdj(self)
-
     @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, order=None):
         """Return all the edges
