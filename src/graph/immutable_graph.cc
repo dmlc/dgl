@@ -163,13 +163,13 @@ DegreeArray CSR::OutDegrees(IdArray vids) const {
 bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
   CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
-  return aten::CSRIsNonZero(adj_, src, dst, sorted_);
+  return aten::CSRIsNonZero(adj_, src, dst);
 }
 
 BoolArray CSR::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
   CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-  return aten::CSRIsNonZero(adj_, src_ids, dst_ids, sorted_);
+  return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
 }
 
 IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
@@ -181,7 +181,7 @@ IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
-  return aten::CSRGetData(adj_, src, dst, sorted_);
+  return aten::CSRGetData(adj_, src, dst);
 }
 
 EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {

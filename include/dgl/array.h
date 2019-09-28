@@ -164,12 +164,12 @@ struct COOMatrix {
 ///////////////////////// CSR routines //////////////////////////
 
 /*! \brief Return true if the value (row, col) is non-zero */
-bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col, bool sorted);
+bool CSRIsNonZero(CSRMatrix , int64_t row, int64_t col);
 /*!
  * \brief Batched implementation of CSRIsNonZero.
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
-runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col, bool sorted);
+runtime::NDArray CSRIsNonZero(CSRMatrix, runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
 int64_t CSRGetRowNNZ(CSRMatrix , int64_t row);
@@ -182,13 +182,13 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
-runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col, bool sorted);
+runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 /*!
  * \brief Batched implementation of CSRGetData.
  * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
  */
 
-runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols, bool sorted);
+runtime::NDArray CSRGetData(CSRMatrix, runtime::NDArray rows, runtime::NDArray cols);
 
 /*!
  * \brief Get the data and the row,col indices for each returned entries.

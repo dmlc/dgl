@@ -233,18 +233,18 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
 
 ///////////////////////// CSR routines //////////////////////////
 
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   bool ret = false;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col, sorted);
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
 }
 
-NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col, bool sorted) {
+NDArray CSRIsNonZero(CSRMatrix csr, NDArray row, NDArray col) {
   NDArray ret;
   ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, {
-    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col, sorted);
+    ret = impl::CSRIsNonZero<XPU, IdType>(csr, row, col);
   });
   return ret;
 }
@@ -289,18 +289,18 @@ NDArray CSRGetRowData(CSRMatrix csr, int64_t row) {
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted) {
+NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   NDArray ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetData<XPU, IdType, DType>(csr, row, col, sorted);
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, row, col);
   });
   return ret;
 }
 
-NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols, bool sorted) {
+NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
   NDArray ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
-    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols, sorted);
+    ret = impl::CSRGetData<XPU, IdType, DType>(csr, rows, cols);
   });
   return ret;
 }

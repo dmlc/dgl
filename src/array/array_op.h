@@ -46,11 +46,10 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
 // sparse arrays
 
 template <DLDeviceType XPU, typename IdType>
-bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col, bool sorted);
+bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray CSRIsNonZero(CSRMatrix csr, runtime::NDArray row, runtime::NDArray col,
-                              bool sorted);
+runtime::NDArray CSRIsNonZero(CSRMatrix csr, runtime::NDArray row, runtime::NDArray col);
 
 template <DLDeviceType XPU, typename IdType>
 bool CSRHasDuplicate(CSRMatrix csr);
@@ -68,11 +67,10 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col, bool sorted);
+runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
-                            bool sorted);
+runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(

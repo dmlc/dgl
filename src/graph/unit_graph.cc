@@ -467,13 +467,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::CSRIsNonZero(adj_, src, dst, sorted_);
+    return aten::CSRIsNonZero(adj_, src, dst);
   }
 
   BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
     CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-    return aten::CSRIsNonZero(adj_, src_ids, dst_ids, sorted_);
+    return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
   }
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
@@ -489,7 +489,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::CSRGetData(adj_, src, dst, sorted_);
+    return aten::CSRGetData(adj_, src, dst);
   }
 
   EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
