@@ -543,7 +543,7 @@ class ImmutableGraph: public GraphInterface {
     : in_csr_(in_csr), out_csr_(out_csr) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
     if (in_csr && out_csr) {
-      assert (in_csr->Sorted() == out_csr->Sorted());
+      assert(in_csr->Sorted() == out_csr->Sorted());
       sort_csr_ = in_csr->Sorted();
     } else if (in_csr) {
       sort_csr_ = in_csr->Sorted();
@@ -990,7 +990,7 @@ class ImmutableGraph: public GraphInterface {
     : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
     if (in_csr && out_csr) {
-      assert (in_csr->Sorted() == out_csr->Sorted());
+      assert(in_csr->Sorted() == out_csr->Sorted());
       sort_csr_ = in_csr->Sorted();
     } else if (in_csr) {
       sort_csr_ = in_csr->Sorted();
@@ -1006,7 +1006,7 @@ class ImmutableGraph: public GraphInterface {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
     this->shared_mem_name_ = shared_mem_name;
     if (in_csr && out_csr) {
-      assert (in_csr->Sorted() == out_csr->Sorted());
+      assert(in_csr->Sorted() == out_csr->Sorted());
       sort_csr_ = in_csr->Sorted();
     } else if (in_csr) {
       sort_csr_ = in_csr->Sorted();
