@@ -80,7 +80,7 @@ def test_pickling_index():
     _assert_is_identical_index(i, i2)
 
 def test_pickling_graph_index():
-    gi = create_graph_index(None, False, False)
+    gi = create_graph_index(None, False, False, False)
     gi.add_nodes(3)
     src_idx = toindex([0, 0])
     dst_idx = toindex([1, 2])

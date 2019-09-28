@@ -12,20 +12,20 @@ def generate_from_networkx():
     edges = [[2, 3], [2, 5], [3, 0], [1, 0], [4, 3], [4, 5]]
     nx_graph = nx.DiGraph()
     nx_graph.add_edges_from(edges)
-    g = create_graph_index(nx_graph, multigraph=False, readonly=False)
-    ig = create_graph_index(nx_graph, multigraph=False, readonly=True)
+    g = create_graph_index(nx_graph, multigraph=False, readonly=False, sort_csr=False)
+    ig = create_graph_index(nx_graph, multigraph=False, readonly=True, sort_csr=True)
     return g, ig
 
 def generate_from_edgelist():
     edges = [[2, 3], [2, 5], [3, 0], [6, 10], [10, 3], [10, 15]]
-    g = create_graph_index(edges, multigraph=False, readonly=False)
-    ig = create_graph_index(edges, multigraph=False, readonly=True)
+    g = create_graph_index(edges, multigraph=False, readonly=False, sort_csr=False)
+    ig = create_graph_index(edges, multigraph=False, readonly=True, sort_csr=True)
     return g, ig
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    g = create_graph_index(arr, multigraph=False, readonly=False)
-    ig = create_graph_index(arr, multigraph=False, readonly=True)
+    g = create_graph_index(arr, multigraph=False, readonly=False, sort_csr=False)
+    ig = create_graph_index(arr, multigraph=False, readonly=True, sort_csr=True)
     return g, ig
 
 def check_graph_equal(g1, g2):
