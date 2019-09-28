@@ -309,7 +309,7 @@ class AIFB(RDFGraphDataset):
 
     def parse_entity(self, term):
         if isinstance(term, rdf.Literal):
-            return None
+            return Entity(id=str(term), cls="_Literal")
         if isinstance(term, rdf.BNode):
             return None
         entstr = str(term)

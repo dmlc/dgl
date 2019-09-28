@@ -13,7 +13,7 @@ has fewer entites and relations. As a reference (numbers include reverse edges a
 | Dataset | #Nodes | #Edges | #Relations | #Labeled |
 | --- | --- | --- | --- | --- |
 | AIFB | 8,285 | 58,086 | 90 | 176 |
-| AIFB-hetero | 1711 | 31,400 | 32 | 135 |
+| AIFB-hetero | 7,262 | 48,810 | 78 | 176 |
 | MUTAG | 23,644 | 148,454 | 46 | 340 |
 | MUTAG-hetero | 27,163 | 148,100 | 46 | 340 |
 | BGS | 333,845 | 1,832,398 | 206 | 146 |
@@ -33,7 +33,7 @@ pip install requests torch rdflib pandas
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 
 ### Entity Classification
-AIFB: accuracy 100.0% (DGL), 95.83% (paper)
+AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 ```
 python3 entity_classify.py -d aifb --testing --gpu 0
 ```
