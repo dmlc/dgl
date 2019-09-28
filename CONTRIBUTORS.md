@@ -18,6 +18,7 @@ Contributors
 * [Jun Chen](https://github.com/kitaev-chen): GIN in Pytorch
 * [Aymen Waheb](https://github.com/aymenwah): APPNP in Pytorch
 * [Chengqiang Lu](https://github.com/geekinglcq): MGCN, SchNet and MPNN in PyTorch
+* [Gongze Cao](https://github.com/Zardinality): Cluster GCN
 
 Other improvement
 * [Brett Koonce](https://github.com/brettkoonce)
