@@ -441,6 +441,8 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
   CHECK(data_byte_size == num_elems * elem_bytes)
       << "Invalid DLTensor file format";
   if (data_byte_size != 0)  {
+    // strm->Read will return the total number of elements successfully read.
+    // Therefore if data_byte_size is zero, the CHECK below would fail.
     CHECK(strm->Read(ret->data, data_byte_size))
         << "Invalid DLTensor file format";
   }
