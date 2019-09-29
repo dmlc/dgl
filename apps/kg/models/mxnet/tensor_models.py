@@ -170,40 +170,6 @@ class PBGKEModel(gluon.Block):
                 'HITS@10': 1.0 if ranking <= 10 else 0.0
             })
 
-    '''
-    def forward_test(self, pos_g, neg_g, neg_head, neg_sample_size, logs, gpu_id=-1):
-        pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
-        pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
-        neg_g.ndata['emb'] = self.entity_emb(neg_g.ndata['id'], gpu_id, False)
-        neg_g.edata['emb'] = self.relation_emb(neg_g.edata['id'], gpu_id, False)
-
-        batch_size = pos_g.number_of_edges()
-        pos_scores = self.test_basic_model.predict_score(pos_g)
-        pos_scores = logsigmoid(pos_scores).reshape(batch_size, -1)
-        neg_scores = self.test_basic_model.predict_score(neg_g)
-        neg_scores = logsigmoid(neg_scores).reshape(batch_size, -1)
-
-        # We need to filter the positive edges in the negative graph.
-        filter_bias = neg_g.edata['bias'].reshape(batch_size, -1)
-        filter_bias = filter_bias.as_in_context(neg_scores.context)
-        neg_scores += filter_bias
-        # To compute the rank of a positive edge among all negative edges,
-        # we need to know how many negative edges have higher scores than
-        # the positive edge.
-        rankings = nd.sum(neg_scores > pos_scores, axis=1) + 1
-        rankings = rankings.asnumpy()
-        for i in range(batch_size):
-            ranking = rankings[i]
-            logs.append({
-                'MRR': 1.0 / ranking,
-                'MR': float(ranking),
-                'HITS@1': 1.0 if ranking <= 1 else 0.0,
-                'HITS@3': 1.0 if ranking <= 3 else 0.0,
-                'HITS@10': 1.0 if ranking <= 10 else 0.0
-            })
-
-    '''
-
     # @profile
     def forward(self, pos_g, neg_g, neg_head, gpu_id=-1):
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
