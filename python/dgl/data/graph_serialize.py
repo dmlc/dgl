@@ -135,9 +135,9 @@ def load_graphs(filename, idx_list=None):
     >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
 
     """
-    assert isinstance(idx_list, list)
     if idx_list is None:
         idx_list = []
+    assert isinstance(idx_list, list)
     metadata = _CAPI_DGLLoadGraphs(filename, idx_list, False)
     label_dict = {}
     for k, v in metadata.labels.items():

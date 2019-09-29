@@ -240,9 +240,16 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
+  void SortCSR() {
+    if (adj_.sorted)
+      return;
+    aten::CSRSort(adj_);
+    adj_.sorted = true;
+  }
+
  private:
   /*! \brief prive default constructor */
-  CSR() {}
+  CSR() {adj_.sorted = false;}
 
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
@@ -950,6 +957,11 @@ class ImmutableGraph: public GraphInterface {
    * \return the reversed graph
    */
   ImmutableGraphPtr Reverse() const;
+
+  void SortCSR() {
+    GetInCSR()->SortCSR();
+    GetOutCSR()->SortCSR();
+  }
 
  protected:
   /* !\brief internal default constructor */
