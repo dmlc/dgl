@@ -176,11 +176,12 @@ def test_laplacian_lambda_max():
         assert l_max < 2 + eps
 
 
-def test_to_self_loop():
+def test_add_self_loop():
     g = dgl.DGLGraph()
     g.add_nodes(5)
     g.add_edges([0, 1, 2], [1, 1, 2])
-    new_g = dgl.transform.to_self_loop(g)  # Nodes 0, 3, 4 don't have self-loop
+    # Nodes 0, 3, 4 don't have self-loop
+    new_g = dgl.transform.add_self_loop(g)
     assert F.allclose(new_g.edges()[0], F.tensor([0, 0, 1, 2, 3, 4]))
     assert F.allclose(new_g.edges()[1], F.tensor([1, 0, 1, 2, 3, 4]))
 
@@ -194,16 +195,6 @@ def test_remove_self_loop():
     assert F.allclose(new_g.edges()[1], F.tensor([1]))
 
 
-def test_onehot_degree():
-    g = dgl.DGLGraph()
-    g.add_nodes(3)
-    g.add_edges([0, 1, 2], [1, 1, 2])
-    dgl.transform.onehot_degree(g, out_field="xd")
-
-    assert F.allclose(g.ndata['xd'], F.tensor([[1, 0, 0],
-                                               [0, 0, 1],
-                                               [0, 1, 0]]))
-
 
 if __name__ == '__main__':
     test_line_graph()
@@ -215,6 +206,5 @@ if __name__ == '__main__':
     test_khop_adj()
     test_khop_graph()
     test_laplacian_lambda_max()
-    test_onehot_degree()
     test_remove_self_loop()
-    test_to_self_loop()
+    test_add_self_loop()

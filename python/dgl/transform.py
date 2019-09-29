@@ -10,8 +10,8 @@ from .batched_graph import BatchedDGLGraph, unbatch
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
-           'onehot_degree', 'remove_self_loop']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
+           'remove_self_loop']
 
 
 def pairwise_squared_distance(x):
@@ -405,36 +405,10 @@ def laplacian_lambda_max(g):
     return rst
 
 
-def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
-    """Inplace add one-hot degree vector as node feature
-
-    Parameters
-    -----------
-    g: DGLGraph
-    max_degree: int
-        Maximum degree for one-hot encoding. If it's -1,
-        the maximum degree would be inferred from the input graph.
-    out_field: str
-        Field name for the node feature
-    direction: str
-        Either "in" or "out". Specify whether to use in degrees or out degrees.
-
-    Returns
-    -------
-    g: DGLGraph
-        Returns the input graph with added feature
-    """
-    if direction == "in":
-        degrees = g.in_degrees()
-    elif direction == "out":
-        degrees = g.out_degrees()
-    else:
-        raise RuntimeError("Invalid Direction")
-    g.ndata[out_field] = F.one_hot(degrees, max_degree)
-    return g
-
-def to_self_loop(g):
-    """Return a new graph which contains exactly one self loop for each node.
+def add_self_loop(g):
+    """Return a new graph containing all the edges in the input graph plus self loops
+    of every nodes.
+    No duplicate self loop will be added for nodes already having self loops.
     Self-loop edges id are not preserved. All self-loop edges would be added at the end.
 
     Examples
@@ -443,7 +417,7 @@ def to_self_loop(g):
     >>> g = DGLGraph()
     >>> g.add_nodes(5)
     >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
     >>> new_g.edges()
     (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
 
