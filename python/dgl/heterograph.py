@@ -707,7 +707,7 @@ class DGLHeteroGraph(object):
         return self._graph.is_readonly()
 
     def has_node(self, vid, ntype=None):
-        """Return True if the graph contains node `vid` of type `ntype`.
+        """Whether the graph has a node with a particular id and type.
 
         Parameters
         ----------
@@ -736,9 +736,7 @@ class DGLHeteroGraph(object):
         return self._graph.has_node(self.get_ntype_id(ntype), vid)
 
     def has_nodes(self, vids, ntype=None):
-        """Return a 0-1 array ``a`` given the node ID array ``vids``.
-
-        ``a[i]`` is 1 if the graph contains node ``vids[i]`` of type ``ntype``, 0 otherwise.
+        """Whether the graph has nodes with ids and a particular type.
 
         Parameters
         ----------
@@ -751,7 +749,8 @@ class DGLHeteroGraph(object):
         Returns
         -------
         a : tensor
-            0-1 array indicating existence
+            Binary tensor indicating the existence of nodes with the specified ids and type.
+            ``a[i]=1`` if the graph contains node ``vids[i]`` of type ``ntype``, 0 otherwise.
 
         Examples
         --------
@@ -769,7 +768,7 @@ class DGLHeteroGraph(object):
         return rst.tousertensor()
 
     def has_edge_between(self, u, v, etype=None):
-        """Return True if the edge (u, v) of type ``etype`` is in the graph.
+        """Whether the graph has an edge (u, v) of type ``etype``.
 
         Parameters
         ----------
@@ -788,11 +787,9 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        Check whether Alice plays Tetris
+
         >>> g.has_edge_between(0, 1, ('user', 'plays', 'game'))
         True
-
-        And whether Alice plays Minecraft
         >>> g.has_edge_between(0, 2, ('user', 'plays', 'game'))
         False
 
@@ -803,10 +800,7 @@ class DGLHeteroGraph(object):
         return self._graph.has_edge_between(self.get_etype_id(etype), u, v)
 
     def has_edges_between(self, u, v, etype=None):
-        """Return a 0-1 array ``a`` given the source node ID array ``u`` and
-        destination node ID array ``v``.
-
-        ``a[i]`` is 1 if the graph contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
+        """Whether the graph has edges of type ``etype``.
 
         Parameters
         ----------
@@ -821,7 +815,8 @@ class DGLHeteroGraph(object):
         Returns
         -------
         a : tensor
-            0-1 array indicating existence.
+            Binary tensor indicating the existence of edges. ``a[i]=1`` if the graph
+            contains edge ``(u[i], v[i])`` of type ``etype``, 0 otherwise.
 
         Examples
         --------
@@ -840,7 +835,7 @@ class DGLHeteroGraph(object):
         return rst.tousertensor()
 
     def predecessors(self, v, etype=None):
-        """Return the predecessors of node `v` in the graph with the same
+        """Return the predecessors of node `v` in the graph with the specified
         edge type.
 
         Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
@@ -849,25 +844,27 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node of destination type.
+            The destination node.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         tensor
-            Array of predecessor node IDs of source node type.
+            Array of predecessor node IDs with the specified edge type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Query who plays Tetris:
-        >>> g.predecessors(0, ('user', 'plays', 'game'))
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+        >>> g = dgl.hetero_from_relations([plays_g, devs_g])
+        >>> g.predecessors(0, 'plays')
         tensor([0, 1])
-
-        This indicates User #0 (Alice) and User #1 (Bob).
+        >>> g.predecessors(0, 'develops')
+        tensor([0])
 
         See Also
         --------
