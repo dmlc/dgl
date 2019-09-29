@@ -42,6 +42,20 @@ Karate Club dataset
     :members: __getitem__, __len__
 
 
+Citation Network dataset
+```````````````````````````````````
+
+.. autoclass:: CitationGraphDataset
+    :members: __getitem__, __len__
+
+
+Cora Citation Network dataset
+```````````````````````````````````
+
+.. autoclass:: CoraDataset
+    :members: __getitem__, __len__
+
+
 CoraFull dataset
 ```````````````````````````````````
 
