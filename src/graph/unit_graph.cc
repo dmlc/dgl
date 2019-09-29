@@ -338,6 +338,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
+    sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
@@ -349,10 +350,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
+    sorted_ = false;
   }
 
   explicit CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
-    : BaseHeteroGraph(metagraph), adj_(csr) {}
+    : BaseHeteroGraph(metagraph), adj_(csr) {
+    sorted_ = false;
+  }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -628,6 +632,9 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
+
+  /*! \brief indicate that the edges are stored in the sorted order. */
+  bool sorted_;
 };
 
 //////////////////////////////////////////////////////////

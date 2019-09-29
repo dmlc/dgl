@@ -12,7 +12,7 @@ from . import init
 from .runtime import ir, scheduler, Runtime, GraphAdapter
 from .frame import Frame, FrameRef, frame_like, sync_frame_initializer
 from .view import HeteroNodeView, HeteroNodeDataView, HeteroEdgeView, HeteroEdgeDataView
-from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError
+from .base import ALL, SLICE_FULL, NTYPE, NID, ETYPE, EID, is_all, DGLError, dgl_warning
 
 __all__ = ['DGLHeteroGraph', 'combine_names']
 
@@ -1403,6 +1403,13 @@ class DGLHeteroGraph(object):
         SparseTensor or scipy.sparse.spmatrix
             Adjacency matrix.
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
+
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
             return self._graph.adjacency_matrix(etid, transpose, ctx)[0]

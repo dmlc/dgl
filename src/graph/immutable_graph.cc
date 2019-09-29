@@ -56,6 +56,7 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
                          aten::NewIdArray(num_vertices + 1),
                          aten::NewIdArray(num_edges),
                          aten::NewIdArray(num_edges)};
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
@@ -65,6 +66,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids) {
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
@@ -75,6 +77,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t N = indptr->shape[0] - 1;
   adj_ = aten::CSRMatrix{N, N, indptr, indices, edge_ids};
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -93,6 +96,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
+  adj_.sorted = false;
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
@@ -112,6 +116,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   adj_.indptr.CopyFrom(indptr);
   adj_.indices.CopyFrom(indices);
   adj_.data.CopyFrom(edge_ids);
+  adj_.sorted = false;
 }
 
 CSR::CSR(const std::string &shared_mem_name,
@@ -122,6 +127,7 @@ CSR::CSR(const std::string &shared_mem_name,
   adj_.num_cols = num_verts;
   std::tie(adj_.indptr, adj_.indices, adj_.data) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, false);
+  adj_.sorted = false;
 }
 
 bool CSR::IsMultigraph() const {
@@ -196,6 +202,7 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
   const auto& submat = aten::CSRSliceMatrix(adj_, vids, vids);
   IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
   CSRPtr subcsr(new CSR(submat.indptr, submat.indices, sub_eids));
+  subcsr->adj_.sorted = this->adj_.sorted;
   Subgraph subg;
   subg.graph = subcsr;
   subg.induced_vertices = vids;
@@ -230,6 +237,7 @@ CSR CSR::CopyToSharedMem(const std::string &name) const {
     CHECK(name == shared_mem_name_);
     return *this;
   } else {
+    // TODO(zhengda) we need to set sorted_ properly.
     return CSR(adj_.indptr, adj_.indices, adj_.data, name);
   }
 }

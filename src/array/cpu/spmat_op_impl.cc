@@ -95,9 +95,15 @@ bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(col >= 0 && col < csr.num_cols) << "Invalid col index: " << col;
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
-    if (indices_data[i] == col) {
-      return true;
+  if (csr.sorted) {
+    const IdType *start = indices_data + indptr_data[row];
+    const IdType *end = indices_data + indptr_data[row + 1];
+    return std::binary_search(start, end, col);
+  } else {
+    for (IdType i = indptr_data[row]; i < indptr_data[row + 1]; ++i) {
+      if (indices_data[i] == col) {
+        return true;
+      }
     }
   }
   return false;
@@ -210,6 +216,27 @@ template NDArray CSRGetRowData<kDLCPU, int64_t, int64_t>(CSRMatrix, int64_t);
 ///////////////////////////// CSRGetData /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
+void CollectDataFromSorted(const IdType *indices_data, const DType *data,
+                           const IdType start, const IdType end, const IdType col,
+                           std::vector<DType> *ret_vec) {
+  const IdType *start_ptr = indices_data + start;
+  const IdType *end_ptr = indices_data + end;
+  auto it = std::lower_bound(start_ptr, end_ptr, col);
+  // This might be a multi-graph. We need to collect all of the matched
+  // columns.
+  for (; it != end_ptr; it++) {
+    // If the col exist
+    if (*it == col) {
+      IdType idx = it - indices_data;
+      ret_vec->push_back(data[idx]);
+    } else {
+      // If we find a column that is different, we can stop searching now.
+      break;
+    }
+  }
+}
+
+template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   CHECK(CSRHasData(csr)) << "missing data array";
   // TODO(minjie): use more efficient binary search when the column indices is sorted
@@ -219,9 +246,15 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   const DType* data = static_cast<DType*>(csr.data->data);
-  for (IdType i = indptr_data[row]; i < indptr_data[row+1]; ++i) {
-    if (indices_data[i] == col) {
-      ret_vec.push_back(data[i]);
+  if (csr.sorted) {
+    CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
+                                              indptr_data[row], indptr_data[row + 1],
+                                              col, &ret_vec);
+  } else {
+    for (IdType i = indptr_data[row]; i < indptr_data[row+1]; ++i) {
+      if (indices_data[i] == col) {
+        ret_vec.push_back(data[i]);
+      }
     }
   }
   return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
@@ -255,9 +288,15 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     const IdType row_id = row_data[i], col_id = col_data[j];
     CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
-      if (indices_data[i] == col_id) {
+    if (csr.sorted) {
+      CollectDataFromSorted<XPU, IdType, DType>(indices_data, data,
+                                                indptr_data[row_id], indptr_data[row_id + 1],
+                                                col_id, &ret_vec);
+    } else {
+      for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
+        if (indices_data[i] == col_id) {
           ret_vec.push_back(data[i]);
+        }
       }
     }
   }
@@ -269,6 +308,29 @@ template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray row
 template NDArray CSRGetData<kDLCPU, int64_t, int64_t>(CSRMatrix csr, NDArray rows, NDArray cols);
 
 ///////////////////////////// CSRGetDataAndIndices /////////////////////////////
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+void CollectDataIndicesFromSorted(const IdType *indices_data, const DType *data,
+                                  const IdType start, const IdType end, const IdType col,
+                                  std::vector<IdType> *col_vec,
+                                  std::vector<DType> *ret_vec) {
+  const IdType *start_ptr = indices_data + start;
+  const IdType *end_ptr = indices_data + end;
+  auto it = std::lower_bound(start_ptr, end_ptr, col);
+  // This might be a multi-graph. We need to collect all of the matched
+  // columns.
+  for (; it != end_ptr; it++) {
+    // If the col exist
+    if (*it == col) {
+      IdType idx = it - indices_data;
+      col_vec->push_back(indices_data[idx]);
+      ret_vec->push_back(data[idx]);
+    } else {
+      // If we find a column that is different, we can stop searching now.
+      break;
+    }
+  }
+}
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray cols) {
@@ -297,11 +359,24 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     const IdType row_id = row_data[i], col_id = col_data[j];
     CHECK(row_id >= 0 && row_id < csr.num_rows) << "Invalid row index: " << row_id;
     CHECK(col_id >= 0 && col_id < csr.num_cols) << "Invalid col index: " << col_id;
-    for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
-      if (indices_data[i] == col_id) {
+    if (csr.sorted) {
+      // Here we collect col indices and data.
+      CollectDataIndicesFromSorted<XPU, IdType, DType>(indices_data, data,
+                                                       indptr_data[row_id],
+                                                       indptr_data[row_id + 1],
+                                                       col_id, &ret_cols,
+                                                       &ret_data);
+      // We need to add row Ids.
+      while (ret_rows.size() < ret_data.size()) {
+        ret_rows.push_back(row_id);
+      }
+    } else {
+      for (IdType i = indptr_data[row_id]; i < indptr_data[row_id+1]; ++i) {
+        if (indices_data[i] == col_id) {
           ret_rows.push_back(row_id);
           ret_cols.push_back(col_id);
           ret_data.push_back(data[i]);
+        }
       }
     }
   }
@@ -547,6 +622,42 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int32_t, int32_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+void CSRSort(CSRMatrix csr) {
+  typedef std::pair<IdType, DType> shuffle_ele;
+  int64_t num_rows = csr.num_rows;
+  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
+  IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+  DType* eid_data = static_cast<DType*>(csr.data->data);
+#pragma omp parallel
+  {
+    std::vector<shuffle_ele> reorder_vec;
+#pragma omp for
+    for (int64_t row = 0; row < num_rows; row++) {
+      int64_t num_cols = indptr_data[row + 1] - indptr_data[row];
+      IdType *col = indices_data + indptr_data[row];
+      DType *eid = eid_data + indptr_data[row];
+
+      reorder_vec.resize(num_cols);
+      for (int64_t i = 0; i < num_cols; i++) {
+        reorder_vec[i].first = col[i];
+        reorder_vec[i].second = eid[i];
+      }
+      std::sort(reorder_vec.begin(), reorder_vec.end(),
+                [](const shuffle_ele &e1, const shuffle_ele &e2) {
+                  return e1.first < e2.first;
+                });
+      for (int64_t i = 0; i < num_cols; i++) {
+        col[i] = reorder_vec[i].first;
+        eid[i] = reorder_vec[i].second;
+      }
+    }
+  }
+}
+
+template void CSRSort<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
+template void CSRSort<kDLCPU, int32_t, int32_t>(CSRMatrix csr);
 
 ///////////////////////////// COOHasDuplicate /////////////////////////////
 
