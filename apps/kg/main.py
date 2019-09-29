@@ -91,9 +91,9 @@ class ArgParser(argparse.ArgumentParser):
                           help='if test a model')
         self.add_argument('--load', type=int, default=None,
                           help='if need to load checkpoint and load which checkpoint')
-        self.add_argument('-rc', '--regularization_coef', type=float, default=0.0,
+        self.add_argument('-rc', '--regularization_coef', type=float, default=0.000002,
                           help='set value > 0.0 if regularization is used')
-        self.add_argument('-rn', '--regularization_norm', type=int, default=2,
+        self.add_argument('-rn', '--regularization_norm', type=int, default=3,
                           help='norm used in regularization')
         self.add_argument('--num_worker', type=int, default=16,
                           help='number of workers used for loading data')
