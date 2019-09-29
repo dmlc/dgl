@@ -76,7 +76,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='set random seed fro reproducibility')
         self.add_argument('-log', '--log_interval', type=int, default=100,
                           help='do evaluation after every x steps')
-        self.add_argument('--eval_interval', type=int, default=50000,
+        self.add_argument('--eval_interval', type=int, default=10000,
                           help='do evaluation after every x steps')
         self.add_argument('-adv', '--neg_adversarial_sampling', action='store_true',
                           help='if use negative adversarial sampling')
