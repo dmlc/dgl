@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import networkx as nx
 
 import dgl
-from .base import ALL, is_all, DGLError
+from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
@@ -901,12 +901,17 @@ class DGLGraph(DGLBaseGraph):
                  node_frame=None,
                  edge_frame=None,
                  multigraph=None,
-                 readonly=False):
+                 readonly=False,
+                 sort_csr=False):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
+            if sort_csr:
+                gidx.sort_csr()
         else:
             gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            if sort_csr:
+                gidx.sort_csr()
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
@@ -3034,7 +3039,7 @@ class DGLGraph(DGLBaseGraph):
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
         return subgraph.DGLSubGraph(self, sgi)
 
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
+    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -3060,6 +3065,12 @@ class DGLGraph(DGLBaseGraph):
             The scipy representation of adjacency matrix.
 
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
         return self._graph.adjacency_matrix_scipy(transpose, fmt, return_edge_ids)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
@@ -3083,6 +3094,12 @@ class DGLGraph(DGLBaseGraph):
         SparseTensor
             The adjacency matrix.
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
         return self._graph.adjacency_matrix(transpose, ctx)[0]
 
     def incidence_matrix(self, typestr, ctx=F.cpu()):
