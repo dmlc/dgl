@@ -31,7 +31,7 @@ To reproduce reported results, you can run the model using commands in `config/b
 Train with sparse embeddings.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.1 --max_step 10000 --batch_size_eval 16 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 \
     --opt RowAdagrad --neg_sample_size_valid 1000 --num_proc 1
@@ -43,7 +43,7 @@ Test average HITS@3 at [9999/10000]: 0.7931895515566014
 Test average HITS@10 at [9999/10000]: 0.8793655093023649
 
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
     --train --valid --test -adv --uni_weight --eval_interval 2000 \
     --opt RowAdagrad --neg_sample_size_valid 1000 --log_interval 1000
@@ -55,7 +55,7 @@ Test average HITS@3 at [19999/20000]: 0.8112271673071388
 Test average HITS@10 at [19999/20000]: 0.8815070000507863
 
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
     --train --valid --test -adv --uni_weight --eval_interval 20000 \
     --opt RowAdagrad --neg_sample_size_valid 1000 --num_proc 1
@@ -67,7 +67,7 @@ Test average HITS@3 at [19999/20000]: 0.7559546985830611
 Test average HITS@10 at [19999/20000]: 0.8616072184320563
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 --opt RowAdagrad \
     --neg_sample_size_valid 1000  --num_proc 1
@@ -78,7 +78,7 @@ Test average HITS@3 at [9999/10000]: 0.7109326065243521
 Test average HITS@10 at [9999/10000]: 0.8047942306715647
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 --opt RowAdagrad \
     --neg_sample_size_valid 1000  --num_proc 1
@@ -89,7 +89,7 @@ Test average HITS@3 at [9999/10000]: 0.6406697025613245
 Test average HITS@10 at [9999/10000]: 0.7617781991163176
 
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 30000 --batch_size_eval 16 --train --test -adv --uni_weight \
     --eval_interval 2000 --opt RowAdagrad --neg_sample_size_valid 10000 \
     --gpu 2 --log_interval 1000 --regularization_coef 0.000001
@@ -104,7 +104,7 @@ Test average HITS@10 at [29999/30000]: 0.870164717035432
 Train with sparse embeddings with mixed CPUs and GPUs.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.1 --max_step 10000 --batch_size_eval 16 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 \
     --opt RowAdagrad --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
@@ -116,7 +116,7 @@ Test average HITS@3 at [9999/10000]: 0.8018316940630766
 Test average HITS@10 at [9999/10000]: 0.8789422897868666
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
      --train --valid --test -adv --uni_weight --eval_interval 5000 --opt RowAdagrad \
      --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
@@ -132,7 +132,7 @@ Test average HITS@1 at [9999/10000]: 0.484569416464932
 Train embeddings and verify it later.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.001 --max_step 10000 --batch_size_eval 16 --gpu 0 \
     --train --valid -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000 \
     --save_emb
@@ -144,7 +144,7 @@ DGLBACKEND=pytorch python3 eval.py --model_name DistMult --dataset FB15k --hidde
 Train embeddings with multi-processing
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 --lr 0.07 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 \
     --max_step 3000 --batch_size_eval 16 --regularization_coef 0.000001 --train --valid --test -adv \
     --uni_weight --num_proc 8 --eval_interval 5000 --opt RowAdagrad
 
@@ -203,7 +203,7 @@ Test average HITS@10 at [0/3000]: 0.8813651137594799
 Train with dense model weights.
 ```bash
 DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
       --lr 0.001 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.0015 --gpu 0 \
       --train --valid --test -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -214,7 +214,7 @@ Test average MRR at [9999/10000]: 0.721805054329181
 Test average HITS@10 at [9999/10000]: 0.8771309102605339
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --gpu 0 --train --valid --test -adv --uni_weight \
      --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -228,7 +228,7 @@ Test average MRR at [19999/20000]: 0.5127131081156031
 Train with sparse model weights.
 ```bash
 DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-      --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0  \
+      --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
       --lr 0.001 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 \
       --train --valid --test -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -239,7 +239,7 @@ Test average MRR at [19999/20000]: 0.6543895352041291
 Test average HITS@3 at [19999/20000]: 0.7696077601530362
 
 DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -250,7 +250,7 @@ Test average MR at [9999/10000]: 72.41542381202282
 Test average HITS@3 at [9999/10000]: 0.6962299605559411
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
      --train --valid --test -adv --uni_weight --eval_interval 5000 \
      --neg_sample_size_valid 1000 --log_interval 1000
@@ -262,7 +262,7 @@ Test average HITS@10 at [9999/10000]: 0.8101801679761582
 Test average HITS@3 at [9999/10000]: 0.709081211053915
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
      --train --valid --test -adv --uni_weight --eval_interval 5000 \
      --neg_sample_size_valid 1000 --log_interval 1000
@@ -278,7 +278,7 @@ To test the model performance on Freebase, you can run the script `config/debug_
 Train embeddings on Freebase with multi-processing on X1.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset Freebase --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.1 --max_step 50000 --batch_size_eval 128 --train --test -adv --uni_weight \
     --eval_interval 300000 --opt RowAdagrad \
     --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64 --log_interval 10000
@@ -295,7 +295,7 @@ test time: 7678.401087999344
 Train with sparse model weights.
 ```bash
 DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-      --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --adversarial_temperature 1.0  \
+      --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
       --lr 0.001 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 \
       --train --valid --test -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -306,7 +306,7 @@ Test average MRR at [19999/20000]: 0.6543895352041291
 Test average HITS@3 at [19999/20000]: 0.7696077601530362
 
 DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --adversarial_temperature 1.0 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 \
     --train --valid --test -adv --uni_weight --eval_interval 5000 --neg_sample_size_valid 1000
 
@@ -317,7 +317,7 @@ Test average MR at [9999/10000]: 72.41542381202282
 Test average HITS@3 at [9999/10000]: 0.6962299605559411
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
      --train --valid --test -adv --uni_weight --eval_interval 5000 \
      --neg_sample_size_valid 1000 --log_interval 1000
@@ -329,7 +329,7 @@ Test average MRR at [9999/10000]: 0.49837393189051155
 Test average HITS@3 at [9999/10000]: 0.6580301670870647
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --adversarial_temperature 1.0 \
+     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
      --train --valid --test -adv --uni_weight --eval_interval 5000 \
      --neg_sample_size_valid 1000 --log_interval 1000
