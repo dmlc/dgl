@@ -9,7 +9,7 @@ from . import heterograph_index
 from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID
+from .base import NTYPE, ETYPE, NID, EID, DGLError
 
 __all__ = [
     'graph',
@@ -21,9 +21,7 @@ __all__ = [
 ]
 
 def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
-    """Create a graph.
-
-    The graph has only one type of nodes and edges.
+    """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
     whose adjacency matrix must be square while :func:`dgl.bipartite`
@@ -220,8 +218,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
 def hetero_from_relations(rel_graphs):
     """Create a heterograph from per-relation graphs.
 
-    TODO(minjie): this API can be generalized as a union operation of
-    the input graphs
+    TODO(minjie): this API can be generalized as a union operation of the input graphs
 
     TODO(minjie): handle node/edge data
 
@@ -265,7 +262,7 @@ def hetero_from_relations(rel_graphs):
     return retg
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None):
-    """Convert the given graph to a heterogeneous graph.
+    """Convert the given homogeneous graph to a heterogeneous graph.
 
     The input graph should have only one type of nodes and edges. Each node and edge
     stores an integer feature (under ``ntype_field`` and ``etype_field``), representing
@@ -521,7 +518,7 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None):
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None):
-    """Internal function to create a graph from a list of edge tuples with types.
+    """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
 
@@ -559,7 +556,7 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None):
     return create_from_edges(u, v, utype, etype, vtype, urange, vrange)
 
 def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
-    """Internal function to create a graph from a scipy sparse matrix with types.
+    """Internal function to create a heterograph from a scipy sparse matrix with types.
 
     Parameters
     ----------
@@ -606,7 +603,7 @@ def create_from_networkx(nx_graph,
                          edge_id_attr_name='id',
                          node_attrs=None,
                          edge_attrs=None):
-    """Create graph that has only one set of nodes and edges.
+    """Create a heterograph that has only one set of nodes and edges.
     """
     if not nx_graph.is_directed():
         nx_graph = nx_graph.to_directed()
@@ -689,7 +686,7 @@ def create_from_networkx_bipartite(nx_graph,
                                    edge_id_attr_name='id',
                                    node_attrs=None,
                                    edge_attrs=None):
-    """Create graph that has only one set of nodes and edges.
+    """Create a heterograph that has only one set of nodes and edges.
 
     The input graph must follow the bipartite graph convention of networkx.
     Each node has an attribute ``bipartite`` with values 0 and 1 indicating which

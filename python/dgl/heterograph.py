@@ -19,8 +19,8 @@ __all__ = ['DGLHeteroGraph', 'combine_names']
 class DGLHeteroGraph(object):
     """Base heterogeneous graph class.
 
-    Do NOT instantiate from this class directly; use :mod:`conversion methods
-    <dgl.convert>` instead.
+    **Do NOT instantiate from this class directly; use** :mod:`conversion methods
+    <dgl.convert>` **instead.**
 
     A Heterogeneous graph is defined as a graph with node types and edge
     types.
@@ -61,25 +61,40 @@ class DGLHeteroGraph(object):
     Suppose that one maps the users, games and developers to the following
     IDs:
 
-        User name   Alice   Bob     Carol
-        User ID     0       1       2
+    =========  =====  ===  =====
+    User name  Alice  Bob  Carol
+    =========  =====  ===  =====
+    User ID    0      1    2
+    =========  =====  ===  =====
 
-        Game name   Tetris  Minecraft
-        Game ID     0       1
+    =========  ======  =========
+    Game name  Tetris  Minecraft
+    =========  ======  =========
+    Game ID    0       1
+    =========  ======  =========
 
-        Developer name  Nintendo    Mojang
-        Developer ID    0           1
+    ==============  ========  ======
+    Developer name  Nintendo  Mojang
+    ==============  ========  ======
+    Developer ID    0         1
+    ==============  ========  ======
 
     One can construct the graph as follows:
 
     >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
     >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
-    >>> dev_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
-    >>> g = dgl.hetero_from_relations([follows_g, plays_g, dev_g])
+    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
 
     :func:`dgl.graph` and :func:`dgl.bipartite` can create a graph from a variety of
-    data types including: edge list, edge tuples, networkx graph and scipy sparse matrix.
-    Click the function name for more details.
+    data types including:
+
+    * edge list
+    * edge tuples
+    * networkx graph
+    * scipy sparse matrix
+
+    Click the function names for more details.
 
     Then one can query the graph structure by specifying the ``ntype`` or ``etype`` arguments:
 
@@ -99,6 +114,7 @@ class DGLHeteroGraph(object):
     >>> g['develops'].out_degrees()
     tensor([1, 1])
     >>> g['develops'].in_edges(0)
+    (tensor([0]), tensor([0]))
 
     Node type names must be distinct (no two types have the same name). Edge types could
     have the same name but they must be distinguishable by the ``(src_type, edge_type, dst_type)``
