@@ -50,9 +50,8 @@ def gen_by_mutation():
     g.add_edges(src, dst)
     return g
 
-def gen_from_data(data, readonly):
-    g = dgl.DGLGraph(data, readonly=readonly)
-    return g
+def gen_from_data(data, readonly, sort):
+    return dgl.DGLGraph(data, readonly=readonly, sort_csr=True)
 
 def test_query():
     def _test_one(g):
@@ -201,15 +200,16 @@ def test_query():
         _test_csr_one(g)
 
     _test(gen_by_mutation())
-    _test(gen_from_data(elist_input(), False))
-    _test(gen_from_data(elist_input(), True))
-    _test(gen_from_data(nx_input(), False))
-    _test(gen_from_data(nx_input(), True))
-    _test(gen_from_data(scipy_coo_input(), False))
-    _test(gen_from_data(scipy_coo_input(), True))
+    _test(gen_from_data(elist_input(), False, False))
+    _test(gen_from_data(elist_input(), True, False))
+    _test(gen_from_data(elist_input(), True, True))
+    _test(gen_from_data(nx_input(), False, False))
+    _test(gen_from_data(nx_input(), True, False))
+    _test(gen_from_data(scipy_coo_input(), False, False))
+    _test(gen_from_data(scipy_coo_input(), True, False))
 
-    _test_csr(gen_from_data(scipy_csr_input(), False))
-    _test_csr(gen_from_data(scipy_csr_input(), True))
+    _test_csr(gen_from_data(scipy_csr_input(), False, False))
+    _test_csr(gen_from_data(scipy_csr_input(), True, False))
 
 def test_mutation():
     g = dgl.DGLGraph()
