@@ -1,6 +1,6 @@
 import torch as th
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as functional
 import torch.nn.init as INIT
 
 class TransEScore(nn.Module):
@@ -65,7 +65,7 @@ class TransHScore(nn.Module):
 
     def edge_func(self, edges):
         def _transfer(e, norm):
-            norm = F.normalize(norm, p=2, dim=-1)
+            norm = functional.normalize(norm, p=2, dim=-1)
             return e - th.sum(e * norm, -1, True) * norm
 
         rel = edges.data['emb']
@@ -136,7 +136,7 @@ class TransDScore(nn.Module):
     def edge_func(self, edges):
         def _transfer(e, e_transfer, r_transfer):
             e = e + th.sum(e * e_transfer, -1, True) * r_transfer
-            e_norm = F.normalize(e, p=2, dim=-1)
+            e_norm = functional.normalize(e, p=2, dim=-1)
             return e_norm
 
         head = edges.src['emb']

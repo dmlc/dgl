@@ -1,4 +1,4 @@
-from models.mxnet import PBGKEModel
+from models import PBGKEModel
 
 import mxnet as mx
 from mxnet import gluon
@@ -19,11 +19,6 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
             model.load_parameters(ckpt, ctx=mx.gpu(args.gpu))
         else:
             model.load_parameters(ckpt, ctx=mx.cpu())
-    else:
-        if args.gpu >= 0:
-            model.initialize(ctx=mx.gpu(args.gpu))
-        else:
-            model.initialize(ctx=mx.cpu())
 
     logger.info('Load model {}'.format(args.model_name))
     return model
@@ -83,7 +78,7 @@ def train(args, model, train_sampler, valid_samplers=None):
 
         args.step = step
         with mx.autograd.record():
-            loss, log = model(pos_g, neg_g, neg_head, args.gpu)
+            loss, log = model.forward(pos_g, neg_g, neg_head, args.gpu)
         loss.backward()
         logs.append(log)
         model.update()
@@ -91,7 +86,7 @@ def train(args, model, train_sampler, valid_samplers=None):
         if step % args.log_interval == 0:
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
-                print('[Train]({}/{}) average {}: {}'.format(step, args.max_step, k, v.asnumpy()))
+                print('[Train]({}/{}) average {}: {}'.format(step, args.max_step, k, v))
             logs = []
             print(time.time() - start)
             start = time.time()

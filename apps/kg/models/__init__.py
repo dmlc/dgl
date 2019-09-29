@@ -1,1 +1,1 @@
-from .general_models import BasePBGKEModel, BaseKEModel
+from .general_models import PBGKEModel

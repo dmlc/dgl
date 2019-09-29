@@ -1,5 +1,4 @@
-from models.pytorch import PBGKEModel
-from models.pytorch.row_adagrad import RowAdagrad
+from models import PBGKEModel
 
 from torch.utils.data import DataLoader
 import torch.optim as optim
@@ -17,8 +16,6 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
     if ckpt is not None:
         # TODO: loading model emb only work for genernal Embedding, not for ExternalEmbedding
         model.load_state_dict(ckpt['model_state_dict'])
-    if args.gpu >=0 and th.cuda.is_available():
-        model = model.cuda(args.gpu)
     return model
 
 
@@ -52,7 +49,6 @@ def train(args, model, train_sampler, valid_samplers=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
     logs = []
-    model.train()
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
@@ -70,7 +66,7 @@ def train(args, model, train_sampler, valid_samplers=None):
         args.step = step
 
         start1 = time.time()
-        loss, log = model(pos_g, neg_g, neg_head)
+        loss, log = model.forward(pos_g, neg_g, neg_head)
         forward_time += time.time() - start1
 
         start1 = time.time()
@@ -101,7 +97,6 @@ def train(args, model, train_sampler, valid_samplers=None):
             start = time.time()
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
-            model.train()
         if args.save_interval > 0 and step != args.init_step and (step+1) % args.save_interval == 0:
             save_checkpoint(args, model)
 
@@ -119,7 +114,6 @@ def test(args, model, test_samplers, mode='Test'):
                 g.pop_e_repr(key)
     start = time.time()
     with th.no_grad():
-        model.eval()
         logs = []
         for sampler in test_samplers:
             #print('Number of tests: ' + len(sampler))
@@ -130,8 +124,9 @@ def test(args, model, test_samplers, mode='Test'):
                 if pos_g.number_of_edges() != args.batch_size_eval:
                     continue
 
-                model.forward_test(pos_g, neg_g, sampler.neg_head,
-                                   sampler.neg_sample_size, logs, args.gpu)
+                with th.no_grad():
+                    model.forward_test(pos_g, neg_g, sampler.neg_head,
+                                       sampler.neg_sample_size, logs, args.gpu)
                 clear(pos_g, [], [])
                 # TODO move bias to CPU.
                 clear(neg_g, [], ['bias'])
