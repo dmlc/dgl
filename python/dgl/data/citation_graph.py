@@ -29,6 +29,14 @@ def _pickle_load(pkl_file):
         return pkl.load(pkl_file)
 
 class CitationGraphDataset(object):
+    r"""The citation graph dataset, including citeseer and pubmeb.
+    Nodes mean authors and edges mean citation relationships.
+
+    Parameters
+    -----------
+    name: str
+      name can be 'citeseer' or 'pubmed'.
+    """
     def __init__(self, name):
         assert name.lower() in ['citeseer', 'pubmed']
         self.name = name
@@ -346,6 +354,9 @@ class CoraBinary(object):
         return batched_graphs, batched_pmpds, batched_labels
 
 class CoraDataset(object):
+    r"""Cora citation network dataset. Nodes mean author and edges mean citation
+    relationships.
+    """
     def __init__(self):
         self.name = 'cora'
         self.dir = get_download_dir()
