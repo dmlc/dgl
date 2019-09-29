@@ -288,6 +288,10 @@ class DGLHeteroGraph(object):
     def ntypes(self):
         """Return the list of node types of this graph.
 
+        Returns
+        -------
+        list of str
+
         Examples
         --------
 
@@ -296,16 +300,16 @@ class DGLHeteroGraph(object):
         >>> g = dgl.hetero_from_relations([follows_g, plays_g])
         >>> g.ntypes
         ['user', 'game']
-
-        Returns
-        -------
-        list of str
         """
         return self._ntypes
 
     @property
     def etypes(self):
         """Return the list of edge types of this graph.
+
+        Returns
+        -------
+        list of str
 
         Examples
         --------
@@ -315,10 +319,6 @@ class DGLHeteroGraph(object):
         >>> g = dgl.hetero_from_relations([follows_g, plays_g])
         >>> g.etypes
         ['follows', 'plays']
-
-        Returns
-        -------
-        list of str
         """
         return self._etypes
 
@@ -328,6 +328,10 @@ class DGLHeteroGraph(object):
 
         A canonical edge type is a tuple of string (src_type, edge_type, dst_type).
 
+        Returns
+        -------
+        list of 3-tuples
+
         Examples
         --------
 
@@ -336,10 +340,6 @@ class DGLHeteroGraph(object):
         >>> g = dgl.hetero_from_relations([follows_g, plays_g])
         >>> g.canonical_etypes
         [('user', 'follows', 'user'), ('user', 'plays', 'game')]
-
-        Returns
-        -------
-        list of 3-tuples
         """
         return self._canonical_etypes
 
@@ -349,6 +349,10 @@ class DGLHeteroGraph(object):
 
         The nodes are labeled with node type names.
         The edges have their keys holding the edge type names.
+
+        Returns
+        -------
+        networkx.MultiDiGraph
 
         Examples
         --------
@@ -368,10 +372,6 @@ class DGLHeteroGraph(object):
         OutMultiEdgeDataView([('user', 'user'), ('user', 'game')])
         >>> meta_g.number_of_edges()
         2
-
-        Returns
-        -------
-        networkx.MultiDiGraph
         """
         if self._nx_metagraph is None:
             nx_graph = self._graph.metagraph.to_networkx()
@@ -385,6 +385,15 @@ class DGLHeteroGraph(object):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
 
         The input can already be a canonical tuple.
+
+        Parameters
+        ----------
+        etype : str or tuple of str
+            Edge type
+
+        Returns
+        -------
+        tuple of str
 
         Examples
         --------
@@ -405,15 +414,6 @@ class DGLHeteroGraph(object):
         >>> g.to_canonical_etype('follows')
         DGLError: Edge type "follows" is ambiguous.
         Please use canonical etype type in the form of (srctype, etype, dsttype)
-
-        Parameters
-        ----------
-        etype : str or tuple of str
-            Edge type
-
-        Returns
-        -------
-        tuple of str
         """
         if isinstance(etype, tuple):
             return etype
@@ -633,15 +633,6 @@ class DGLHeteroGraph(object):
     def number_of_nodes(self, ntype=None):
         """Return the number of nodes of the given type in the heterograph.
 
-        Examples
-        --------
-
-        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-        >>> g.number_of_nodes('user')
-        3
-        >>> g.number_of_nodes()
-        3
-
         Parameters
         ----------
         ntype : str, optional
@@ -652,21 +643,20 @@ class DGLHeteroGraph(object):
         -------
         int
             The number of nodes
-        """
-        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
-
-    def number_of_edges(self, etype=None):
-        """Return the number of edges of the given type in the heterograph.
 
         Examples
         --------
 
         >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
-        >>> g.number_of_edges(('user', 'follows', 'user'))
-        >>> g.number_of_edges('follows')
-        2
-        >>> g.number_of_edges()
-        2
+        >>> g.number_of_nodes('user')
+        3
+        >>> g.number_of_nodes()
+        3
+        """
+        return self._graph.number_of_nodes(self.get_ntype_id(ntype))
+
+    def number_of_edges(self, etype=None):
+        """Return the number of edges of the given type in the heterograph.
 
         Parameters
         ----------
@@ -678,6 +668,16 @@ class DGLHeteroGraph(object):
         -------
         int
             The number of edges
+
+        Examples
+        --------
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g.number_of_edges(('user', 'follows', 'user'))
+        >>> g.number_of_edges('follows')
+        2
+        >>> g.number_of_edges()
+        2
         """
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
@@ -715,12 +715,12 @@ class DGLHeteroGraph(object):
             The node ID.
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         bool
-            True if the node exists
+            True if the node exists, False otherwise
 
         Examples
         --------
@@ -1342,10 +1342,6 @@ class DGLHeteroGraph(object):
 
         Features are copied from the original graph.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         nodes : dict[str, list or iterable]
@@ -1364,6 +1360,10 @@ class DGLHeteroGraph(object):
             One can retrieve the mapping from subgraph node/edge ID to parent
             node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
             subgraph.
+
+        Examples
+        --------
+        TBD
         """
         induced_nodes = [utils.toindex(nodes.get(ntype, [])) for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1377,10 +1377,6 @@ class DGLHeteroGraph(object):
         The metagraph of the returned subgraph is the same as the parent graph.
 
         Features are copied from the original graph.
-
-        Examples
-        --------
-        TBD
 
         Parameters
         ----------
@@ -1401,6 +1397,10 @@ class DGLHeteroGraph(object):
             One can retrieve the mapping from subgraph node/edge ID to parent
             node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
             subgraph.
+
+        Examples
+        --------
+        TBD
         """
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
@@ -1419,10 +1419,6 @@ class DGLHeteroGraph(object):
 
         Features are shared with the original graph.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         ntypes : list[str]
@@ -1432,6 +1428,10 @@ class DGLHeteroGraph(object):
         -------
         G : DGLHeteroGraph
             The subgraph.
+
+        Examples
+        --------
+        TBD
         """
         rel_graphs = []
         meta_edges = []
@@ -1464,10 +1464,6 @@ class DGLHeteroGraph(object):
 
         Features are shared with the original graph.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         etypes : list[str or tuple]
@@ -1477,6 +1473,10 @@ class DGLHeteroGraph(object):
         -------
         G : DGLHeteroGraph
             The subgraph.
+
+        Examples
+        --------
+        TBD
         """
         etype_ids = [self.get_etype_id(etype) for etype in etypes]
         meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids))
@@ -1505,6 +1505,24 @@ class DGLHeteroGraph(object):
         When transpose is True, a row represents the source and a column
         represents a destination.
 
+        Parameters
+        ----------
+        transpose : bool, optional
+            A flag to transpose the returned adjacency matrix. (Default: False)
+        ctx : context, optional
+            The context of returned adjacency matrix. (Default: cpu)
+        scipy_fmt : str, optional
+            If specified, return a scipy sparse matrix in the given format.
+            Otherwise, return a backend dependent sparse tensor. (Default: None)
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph. (Default: None)
+
+        Returns
+        -------
+        SparseTensor or scipy.sparse.spmatrix
+            Adjacency matrix.
+
         Examples
         --------
 
@@ -1527,24 +1545,6 @@ class DGLHeteroGraph(object):
         >>> g.adjacency_matrix(scipy_fmt='coo', etype='develops')
         <3x2 sparse matrix of type '<class 'numpy.int64'>'
         with 2 stored elements in COOrdinate format>
-
-        Parameters
-        ----------
-        transpose : bool, optional
-            A flag to transpose the returned adjacency matrix. (Default: False)
-        ctx : context, optional
-            The context of returned adjacency matrix. (Default: cpu)
-        scipy_fmt : str, optional
-            If specified, return a scipy sparse matrix in the given format.
-            Otherwise, return a backend dependent sparse tensor. (Default: None)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph. (Default: None)
-
-        Returns
-        -------
-        SparseTensor or scipy.sparse.spmatrix
-            Adjacency matrix.
         """
         if transpose is None:
             dgl_warning(
@@ -1591,6 +1591,21 @@ class DGLHeteroGraph(object):
             - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
             - :math:`I[v, e] = 0` otherwise (including self-loop).
 
+        Parameters
+        ----------
+        typestr : str
+            Can be either ``in``, ``out`` or ``both``
+        ctx : context, optional
+            The context of returned incidence matrix. (Default: cpu)
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+
+        Returns
+        -------
+        Framework SparseTensor
+            The incidence matrix.
+
         Examples
         --------
 
@@ -1610,21 +1625,6 @@ class DGLHeteroGraph(object):
                                [1, 1]]),
                values=tensor([-1.,  1.]),
                size=(3, 2), nnz=2, layout=torch.sparse_coo)
-
-        Parameters
-        ----------
-        typestr : str
-            Can be either ``in``, ``out`` or ``both``
-        ctx : context, optional
-            The context of returned incidence matrix. (Default: cpu)
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-
-        Returns
-        -------
-        Framework SparseTensor
-            The incidence matrix.
         """
         etid = self.get_etype_id(etype)
         return self._graph.incidence_matrix(etid, typestr, ctx)[0]
@@ -1719,7 +1719,6 @@ class DGLHeteroGraph(object):
         -----
         User defined initializer must follow the signature of
         :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
-
         """
         ntid = self.get_ntype_id(ntype)
         self._node_frames[ntid].set_initializer(initializer, field)
@@ -2191,6 +2190,22 @@ class DGLHeteroGraph(object):
           and aggregate those who write to the **same** fields. If None is provided,
           the default behavior is overwrite.
 
+        Parameters
+        ----------
+        v : int, container or tensor
+            The node(s) to be updated. Default is receiving all the nodes.
+        reduce_func : callable
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        etype : str, optional
+            The edge type. Can be omitted if there is only one edge type
+            in the graph.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+
         Examples
         --------
         Only one type of nodes in the graph:
@@ -2213,22 +2228,6 @@ class DGLHeteroGraph(object):
         >>> ...    {('user', 'follows', 'user') : fn.sum('m', 'h'),
         >>> ...     ('user', 'plays', 'game') : fn.max('m', 'h')},
         >>> ...    'sum')
-
-        Parameters
-        ----------
-        v : int, container or tensor
-            The node(s) to be updated. Default is receiving all the nodes.
-        reduce_func : callable
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
-        apply_node_func : callable
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
-        etype : str, optional
-            The edge type. Can be omitted if there is only one edge type
-            in the graph.
-        inplace: bool, optional
-            If True, update will be done in place, but autograd will break.
         """
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -2259,10 +2258,6 @@ class DGLHeteroGraph(object):
         * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
         * ``apply_func`` specifies :math:`\sigma`.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         v : int, container or tensor
@@ -2277,6 +2272,10 @@ class DGLHeteroGraph(object):
             a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
+
+        Examples
+        --------
+        TBD
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, reducer_dict)
@@ -2395,10 +2394,6 @@ class DGLHeteroGraph(object):
         * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
         * ``apply_func`` specifies :math:`\sigma`.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         v : int, container or tensor
@@ -2412,6 +2407,10 @@ class DGLHeteroGraph(object):
             a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
+
+        Examples
+        --------
+        TBD
         """
         # infer receive node type
         ntype = infer_ntype_from_dict(self, etype_dict)
@@ -2531,10 +2530,6 @@ class DGLHeteroGraph(object):
         * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
         * ``apply_func`` specifies :math:`\sigma`.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         v : int, container or tensor
@@ -2548,8 +2543,11 @@ class DGLHeteroGraph(object):
             a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
-        """
 
+        Examples
+        --------
+        TBD
+        """
         v = utils.toindex(v)
         if len(v) == 0:
             return
@@ -2693,10 +2691,6 @@ class DGLHeteroGraph(object):
         * ``cross_reducer`` specifies :math:`\prod_{t\inT_e}`
         * ``apply_func`` specifies :math:`\sigma`.
 
-        Examples
-        --------
-        TBD
-
         Parameters
         ----------
         v : int, container or tensor
@@ -2710,8 +2704,11 @@ class DGLHeteroGraph(object):
             a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
-        """
 
+        Examples
+        --------
+        TBD
+        """
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = defaultdict(list)
@@ -3004,6 +3001,19 @@ class DGLHeteroGraph(object):
         If set, the local graph object will use same initializers for node features and
         edge features.
 
+        Returns
+        -------
+        DGLGraph
+            The graph object that can be used as a local variable.
+
+        Notes
+        -----
+        Internally, the returned graph shares the same feature tensors, but construct a new
+        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
+        graph will not reflect to the original graph. However, inplace operations do change
+        the shared tensor values, so will be reflected to the original graph. This function
+        also has little overhead when the number of feature tensors in this graph is small.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3035,22 +3045,9 @@ class DGLHeteroGraph(object):
         >>> print('xxx' in g.ndata)
         False
 
-        Notes
-        -----
-        Internally, the returned graph shares the same feature tensors, but construct a new
-        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
-        graph will not reflect to the original graph. However, inplace operations do change
-        the shared tensor values, so will be reflected to the original graph. This function
-        also has little overhead when the number of feature tensors in this graph is small.
-
         See Also
         --------
         local_var
-
-        Returns
-        -------
-        DGLGraph
-            The graph object that can be used as a local variable.
         """
         local_node_frames = [FrameRef(Frame(fr._frame)) for fr in self._node_frames]
         local_edge_frames = [FrameRef(Frame(fr._frame)) for fr in self._edge_frames]

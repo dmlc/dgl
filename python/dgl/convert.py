@@ -27,6 +27,39 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
     whose adjacency matrix must be square while :func:`dgl.bipartite`
     creates a graph that does not necessarily have square adjacency matrix.
 
+    Parameters
+    ----------
+    data : graph data
+        Data to initialize graph structure. Supported data formats are
+
+        (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
+        (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
+        (3) scipy sparse matrix
+        (4) networkx graph
+
+    ntype : str, optional
+        Node type name. (Default: _N)
+    etype : str, optional
+        Edge type name. (Default: _E)
+    card : int, optional
+        Cardinality (number of nodes in the graph). If None, infer from input data, i.e.
+        the largest node ID plus 1. (Default: None)
+    kwargs : key-word arguments, optional
+        Other key word arguments. Only comes into effect when we are using a NetworkX
+        graph. It can consist of:
+
+        * edge_id_attr_name
+            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
+            will consider the graph not to have pre-specified edge ids.
+        * node_attrs
+            ``List of str``, names for node features to retrieve from the NetworkX graph
+        * edge_attrs
+            ``List of str``, names for edge features to retrieve from the NetworkX graph
+
+    Returns
+    -------
+    DGLHeteroGraph
+
     Examples
     --------
     Create from pairs of edges with form (src, dst)
@@ -67,39 +100,6 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
     ['follows']
     >>> g.canonical_etypes
     [('user', 'follows', 'user')]
-
-    Parameters
-    ----------
-    data : graph data
-        Data to initialize graph structure. Supported data formats are
-
-        (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
-        (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
-        (3) scipy sparse matrix
-        (4) networkx graph
-
-    ntype : str, optional
-        Node type name. (Default: _N)
-    etype : str, optional
-        Edge type name. (Default: _E)
-    card : int, optional
-        Cardinality (number of nodes in the graph). If None, infer from input data, i.e.
-        the largest node ID plus 1. (Default: None)
-    kwargs : key-word arguments, optional
-        Other key word arguments. Only comes into effect when we are using a NetworkX
-        graph. It can consist of:
-
-        * edge_id_attr_name
-            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
-            will consider the graph not to have pre-specified edge ids.
-        * node_attrs
-            ``List of str``, names for node features to retrieve from the NetworkX graph
-        * edge_attrs
-            ``List of str``, names for edge features to retrieve from the NetworkX graph
-
-    Returns
-    -------
-    DGLHeteroGraph
     """
     if card is not None:
         urange, vrange = card, card
@@ -126,6 +126,37 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
     whose adjacency matrix must be square while :func:`dgl.bipartite`
     creates a graph that does not necessarily have square adjacency matrix.
+
+    Parameters
+    ----------
+    data : graph data
+        Data to initialize graph structure. Supported data formats are
+
+        (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
+        (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
+        (3) scipy sparse matrix
+        (4) networkx graph
+
+    utype : str, optional
+        Source node type name. (Default: _U)
+    etype : str, optional
+        Edge type name. (Default: _E)
+    vtype : str, optional
+        Destination node type name. (Default: _V)
+    card : pair of int, optional
+        Cardinality (number of nodes in the source and destination group). If None,
+        infer from input data, i.e. the largest node ID plus 1 for each type. (Default: None)
+    kwargs : key-word arguments, optional
+        Other key word arguments. Only comes into effect when we are using a NetworkX
+        graph. It can consist of:
+
+        * edge_id_attr_name
+            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
+            will consider the graph not to have pre-specified edge ids.
+
+    Returns
+    -------
+    DGLHeteroGraph
 
     Examples
     --------
@@ -183,37 +214,6 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
     4
     >>> g.edges()
     (tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]), tensor([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]))
-
-    Parameters
-    ----------
-    data : graph data
-        Data to initialize graph structure. Supported data formats are
-
-        (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
-        (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
-        (3) scipy sparse matrix
-        (4) networkx graph
-
-    utype : str, optional
-        Source node type name. (Default: _U)
-    etype : str, optional
-        Edge type name. (Default: _E)
-    vtype : str, optional
-        Destination node type name. (Default: _V)
-    card : pair of int, optional
-        Cardinality (number of nodes in the source and destination group). If None,
-        infer from input data, i.e. the largest node ID plus 1 for each type. (Default: None)
-    kwargs : key-word arguments, optional
-        Other key word arguments. Only comes into effect when we are using a NetworkX
-        graph. It can consist of:
-
-        * edge_id_attr_name
-            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
-            will consider the graph not to have pre-specified edge ids.
-
-    Returns
-    -------
-    DGLHeteroGraph
     """
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
@@ -292,6 +292,40 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     (0, ty_A, 1) and (2, ty_B, 3). In another word, these two edges share the same edge
     type name, but can be distinguished by a canonical edge type tuple.
 
+    Parameters
+    ----------
+    G : DGLHeteroGraph
+        Input homogeneous graph.
+    ntypes : list of str
+        The node type names.
+    etypes : list of str
+        The edge type names.
+    ntype_field : str, optional
+        The feature field used to store node type. (Default: ``dgl.NTYPE``)
+    etype_field : str, optional
+        The feature field used to store edge type. (Default: ``dgl.ETYPE``)
+    metagraph : networkx MultiDiGraph, optional
+        Metagraph of the returned heterograph.
+        If provided, DGL assumes that G can indeed be described with the given metagraph.
+        If None, DGL will infer the metagraph from the given inputs, which would be
+        potentially slower for large graphs.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        A heterograph. The parent node and edge ID are stored in the column
+        ``dgl.NID`` and ``dgl.EID`` respectively for all node/edge types.
+
+    Notes
+    -----
+    The returned node and edge types may not necessarily be in the same order as
+    ``ntypes`` and ``etypes``.  And edge types may be duplicated if the source
+    and destination types differ.
+
+    The node IDs of a single type in the returned heterogeneous graph is ordered
+    the same as the nodes with the same ``ntype_field`` feature. Edge IDs of
+    a single type is similar.
+
     Examples
     --------
 
@@ -326,40 +360,6 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
         num_edges={'develops': 2},
         metagraph=[('user', 'activity'), ('developer', 'game')])
-
-    Parameters
-    ----------
-    G : DGLHeteroGraph
-        Input homogeneous graph.
-    ntypes : list of str
-        The node type names.
-    etypes : list of str
-        The edge type names.
-    ntype_field : str, optional
-        The feature field used to store node type. (Default: ``dgl.NTYPE``)
-    etype_field : str, optional
-        The feature field used to store edge type. (Default: ``dgl.ETYPE``)
-    metagraph : networkx MultiDiGraph, optional
-        Metagraph of the returned heterograph.
-        If provided, DGL assumes that G can indeed be described with the given metagraph.
-        If None, DGL will infer the metagraph from the given inputs, which would be
-        potentially slower for large graphs.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        A heterograph. The parent node and edge ID are stored in the column
-        ``dgl.NID`` and ``dgl.EID`` respectively for all node/edge types.
-
-    Notes
-    -----
-    The returned node and edge types may not necessarily be in the same order as
-    ``ntypes`` and ``etypes``.  And edge types may be duplicated if the source
-    and destination types differ.
-
-    The node IDs of a single type in the returned heterogeneous graph is ordered
-    the same as the nodes with the same ``ntype_field`` feature. Edge IDs of
-    a single type is similar.
 
     See Also
     --------
@@ -463,6 +463,17 @@ def to_homo(G):
     is an integer representing the type id, which can be used to retrieve the type
     names stored in ``G.ntypes`` and ``G.etypes`` arguments.
 
+    Parameters
+    ----------
+    G : DGLHeteroGraph
+        Input heterogeneous graph.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        A homogeneous graph. The parent node and edge type/ID are stored in
+        columns ``dgl.NTYPE/dgl.NID`` and ``dgl.ETYPE/dgl.EID`` respectively.
+
     Examples
     --------
 
@@ -476,17 +487,6 @@ def to_homo(G):
     >>> homo_g.edata
     {'_TYPE': tensor([0, 0, 1, 1]), '_ID': tensor([0, 1, 0, 1])}
     First two edges for 'follows', next two for 'develops'
-
-    Parameters
-    ----------
-    G : DGLHeteroGraph
-        Input heterogeneous graph.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        A homogeneous graph. The parent node and edge type/ID are stored in
-        columns ``dgl.NTYPE/dgl.NID`` and ``dgl.ETYPE/dgl.EID`` respectively.
 
     See Also
     --------
