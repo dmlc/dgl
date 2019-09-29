@@ -33,7 +33,7 @@ Train with sparse embeddings.
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.1 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MR at [9999/10000]: 48.060655820961216
 Test average MRR at [9999/10000]: 0.720459233368271
@@ -55,7 +55,7 @@ Test average HITS@10 at [19999/20000]: 0.8815070000507863
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
-    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MR at [19999/20000]: 55.74326657750842
 Test average MRR at [19999/20000]: 0.6739109335294652
@@ -66,7 +66,7 @@ Test average HITS@10 at [19999/20000]: 0.8616072184320563
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000  --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 Test average MR at [9999/10000]: 67.90176228606254
 Test average MRR at [9999/10000]: 0.6450653824918221
 Test average HITS@1 at [9999/10000]: 0.5480523437896768
@@ -76,7 +76,7 @@ Test average HITS@10 at [9999/10000]: 0.8047942306715647
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000  --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 Test average MR at [9999/10000]: 97.97447986321545
 Test average MRR at [9999/10000]: 0.5183488023519718
 Test average HITS@1 at [9999/10000]: 0.36015980768905215
@@ -100,7 +100,7 @@ Train with sparse embeddings with mixed CPUs and GPUs.
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv --uni_weight \
-    --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
+    --neg_sample_size_valid 1000 --mix_cpu_gpu
 
 Test average MR at [9999/10000]: 47.51687799427807
 Test average MRR at [9999/10000]: 0.7439476664953767
@@ -111,7 +111,7 @@ Test average HITS@10 at [9999/10000]: 0.8789422897868666
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --mix_cpu_gpu
 
 Test average HITS@10 at [9999/10000]: 0.7888727124985188
 Test average MRR at [9999/10000]: 0.6022999231772103

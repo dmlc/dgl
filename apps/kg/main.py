@@ -102,7 +102,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='DONT SET MANUALLY, track current step')
         self.add_argument('--pickle_graph', action='store_true',
                           help='pickle built graph, building a huge graph is slow.')
-        self.add_argument('--num_proc', type=int, default=0,
+        self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
