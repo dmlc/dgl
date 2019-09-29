@@ -391,6 +391,21 @@ class DGLHeteroGraph(object):
 
         Instantiate a heterograph.
 
+        >>> g1 = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g2 = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> g3 = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'follows', 'game')
+        >>> g = dgl.hetero_from_relations([g1, g2, g3])
+
+        Get canonical edge types.
+
+        >>> g.to_canonical_etype('plays')
+        ('user', 'plays', 'game')
+        >>> g.to_canonical_etype(('user', 'plays', 'game'))
+        ('user', 'plays', 'game')
+        >>> g.to_canonical_etype('follows')
+        DGLError: Edge type "follows" is ambiguous.
+        Please use canonical etype type in the form of (srctype, etype, dsttype)
+
         Parameters
         ----------
         etype : str or tuple of str
@@ -618,26 +633,40 @@ class DGLHeteroGraph(object):
     def number_of_nodes(self, ntype=None):
         """Return the number of nodes of the given type in the heterograph.
 
+        Examples
+        --------
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g.number_of_nodes('user')
+        3
+        >>> g.number_of_nodes()
+        3
+
         Parameters
         ----------
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         int
             The number of nodes
-
-        Examples
-        --------
-        >>> g['user'].number_of_nodes()
-        3
         """
         return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_edges(self, etype=None):
         """Return the number of edges of the given type in the heterograph.
+
+        Examples
+        --------
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g.number_of_edges(('user', 'follows', 'user'))
+        >>> g.number_of_edges('follows')
+        2
+        >>> g.number_of_edges()
+        2
 
         Parameters
         ----------
@@ -649,17 +678,18 @@ class DGLHeteroGraph(object):
         -------
         int
             The number of edges
-
-        Examples
-        --------
-        >>> g.number_of_edges(('user', 'plays', 'game'))
-        4
         """
         return self._graph.number_of_edges(self.get_etype_id(etype))
 
     @property
     def is_multigraph(self):
-        """True if the graph is a multigraph, False otherwise."""
+        """Whether the graph is a multigraph
+
+        Returns
+        -------
+        bool
+            True if the graph is a multigraph, False otherwise.
+        """
         if self._is_multigraph is None:
             return self._graph.is_multigraph()
         else:
@@ -667,7 +697,13 @@ class DGLHeteroGraph(object):
 
     @property
     def is_readonly(self):
-        """True if the graph is readonly, False otherwise."""
+        """Whether the graph is readonly
+
+        Returns
+        -------
+        bool
+            True if the graph is readonly, False otherwise.
+        """
         return self._graph.is_readonly()
 
     def has_node(self, vid, ntype=None):
