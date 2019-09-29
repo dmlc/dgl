@@ -1,4 +1,4 @@
-from models.pytorch import PBGKEModel, KEModel
+from models.pytorch import PBGKEModel
 from models.pytorch.row_adagrad import RowAdagrad
 
 from torch.utils.data import DataLoader
