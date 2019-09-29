@@ -22,7 +22,7 @@ else:
     from .pytorch.tensor_models import ExternalEmbedding
     from .pytorch.score_fun import *
 
-class BasePBGKEModel(object):
+class BaseKEModel(object):
     def __init__(self, score_func, batch_size, neg_sample_size, hidden_dim, n_entities):
         self.score_func = score_func
         head_neg_score, tail_neg_score = self.create_neg(batch_size,
@@ -97,10 +97,10 @@ class BasePBGKEModel(object):
 
         return neg_score
 
-class PBGKEModel(object):
+class KEModel(object):
     def __init__(self, args, model_name, n_entities, n_relations, hidden_dim, gamma,
                  double_entity_emb=False, double_relation_emb=False):
-        super(PBGKEModel, self).__init__()
+        super(KEModel, self).__init__()
         self.args = args
         self.n_entities = n_entities
         self.model_name = model_name
@@ -130,18 +130,18 @@ class PBGKEModel(object):
 
         self.test_basic_models = {}
         if args.train:
-            self.train_basic_model = BasePBGKEModel(self.score_func,
-                                                    self.args.batch_size,
-                                                    self.args.neg_sample_size,
-                                                    hidden_dim,
-                                                    n_entities)
+            self.train_basic_model = BaseKEModel(self.score_func,
+                                                 self.args.batch_size,
+                                                 self.args.neg_sample_size,
+                                                 hidden_dim,
+                                                 n_entities)
         if args.valid:
-            self.test_basic_models[self.args.neg_sample_size_valid] = BasePBGKEModel(
+            self.test_basic_models[self.args.neg_sample_size_valid] = BaseKEModel(
                 self.score_func, self.args.batch_size_eval,
                 self.args.neg_sample_size_valid,
                 hidden_dim, n_entities)
         if args.test:
-            self.test_basic_models[self.args.neg_sample_size_test] = BasePBGKEModel(
+            self.test_basic_models[self.args.neg_sample_size_test] = BaseKEModel(
                 self.score_func, self.args.batch_size_eval,
                 self.args.neg_sample_size_test,
                 hidden_dim, n_entities)

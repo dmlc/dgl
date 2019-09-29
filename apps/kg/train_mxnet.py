@@ -1,4 +1,4 @@
-from models import PBGKEModel
+from models import KEModel
 
 import mxnet as mx
 from mxnet import gluon
@@ -10,9 +10,9 @@ import time
 import json
 
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
-    model = PBGKEModel(args, args.model_name, n_entities, n_relations,
-                       args.hidden_dim, args.gamma,
-                       double_entity_emb=args.double_ent, double_relation_emb=args.double_rel)
+    model = KEModel(args, args.model_name, n_entities, n_relations,
+                    args.hidden_dim, args.gamma,
+                    double_entity_emb=args.double_ent, double_relation_emb=args.double_rel)
     if ckpt is not None:
         # TODO: loading model emb only work for genernal Embedding, not for ExternalEmbedding
         if args.gpu >= 0:
