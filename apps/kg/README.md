@@ -44,7 +44,7 @@ Test average HITS@10 at [9999/10000]: 0.8793655093023649
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
-    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MR at [19999/20000]: 52.41770919740651
 Test average MRR at [19999/20000]: 0.7520510504495108
@@ -86,7 +86,7 @@ Test average HITS@10 at [9999/10000]: 0.7617781991163176
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 30000 --batch_size_eval 16 --train --test -adv --uni_weight \
-    --neg_sample_size_valid 10000 --gpu 2 --log_interval 1000 --regularization_coef 0.000001
+    --neg_sample_size_valid 10000 --gpu 2 --regularization_coef 0.000001
 
 Test average MR at [29999/30000]: 92.11875539604883
 Test average MRR at [29999/30000]: 0.7668106483736371
@@ -244,7 +244,7 @@ Test average HITS@3 at [9999/10000]: 0.6962299605559411
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
-     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MRR at [9999/10000]: 0.6209599205127202
 Test average HITS@1 at [9999/10000]: 0.5025145624492008
@@ -255,7 +255,7 @@ Test average HITS@3 at [9999/10000]: 0.709081211053915
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
-     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MR at [9999/10000]: 145.42419292038394
 Test average HITS@3 at [9999/10000]: 0.5686208122428942
@@ -271,7 +271,7 @@ DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset Freebase --batch_si
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.1 --max_step 50000 --batch_size_eval 128 --train --test -adv --uni_weight \
     --eval_interval 300000 \
-    --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64 --log_interval 10000
+    --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64
 Test average MR at [0/50000]: 754.5566055566055
 Test average MRR at [0/50000]: 0.7333319016877765
 Test average HITS@1 at [0/50000]: 0.7182952182952183
@@ -309,7 +309,7 @@ Test average HITS@3 at [9999/10000]: 0.6962299605559411
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
-     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average HITS@1 at [9999/10000]: 0.3090348902168577
 Test average MR at [9999/10000]: 126.96384858898614
@@ -320,7 +320,7 @@ Test average HITS@3 at [9999/10000]: 0.6580301670870647
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.0002 --max_step 10000 --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 \
-     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000
 
 Test average MR at [9999/10000]: 145.42419292038394
 Test average HITS@3 at [9999/10000]: 0.5686208122428942
