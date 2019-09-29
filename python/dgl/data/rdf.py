@@ -1,6 +1,6 @@
 """RDF datasets
 
-Dataset from "A Collection of Benchmark Datasets for
+Datasets from "A Collection of Benchmark Datasets for
 Systematic Evaluations of Machine Learning on
 the Semantic Web"
 """
@@ -21,6 +21,15 @@ from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 __all__ = ['AIFB', 'MUTAG', 'BGS', 'AM']
 
 class Entity:
+    """Class for entities
+
+    Parameters
+    ----------
+    id : str
+        ID of this entity
+    cls : str
+        Type of this entity
+    """
     def __init__(self, id, cls):
         self.id = id
         self.cls = cls
@@ -29,6 +38,13 @@ class Entity:
         return '{}/{}'.format(self.cls, self.id)
 
 class Relation:
+    """Class for relations
+
+    Parameters
+    ----------
+    cls : str
+        Type of this relation
+    """
     def __init__(self, cls):
         self.cls = cls
 
@@ -36,16 +52,48 @@ class Relation:
         return str(self.cls)
 
 class RDFGraphDataset:
-    """
+    """Base graph dataset class from RDF tuples.
+
+    To derive from this, implement the following abstract methods:
+    * ``parse_entity``
+    * ``parse_relation``
+    * ``process_tuple``
+    * ``process_idx_file_line``
+    * ``predict_category``
+
+    Preprocessed graph and other data will be cached in the download folder
+    to speedup data loading.
+
+    The dataset should contain a "trainingSet.tsv" and a "testSet.tsv" file
+    for training and testing samples.
 
     Attributes
     ----------
-    graph
-    num_classes
-    predict_category
-    train_idx
-    test_idx
-    labels
+    graph : dgl.DGLHeteroGraph
+        Graph structure
+    num_classes : int
+        Number of classes to predict
+    predict_category : str
+        The entity category (node type) that has labels for prediction
+    train_idx : Tensor
+        Entity IDs for training. All IDs are local IDs w.r.t. to ``predict_category``.
+    test_idx : Tensor
+        Entity IDs for testing. All IDs are local IDs w.r.t. to ``predict_category``.
+    labels : Tensor
+        All the labels of the entities in ``predict_category``
+
+    Parameters
+    ----------
+    url : str or path
+        URL to download the raw dataset.
+    name : str
+        Name of the dataset
+    force_reload : bool, optional
+        If true, force load and process from raw data. Ignore cached pre-processed data.
+    print_every : int, optional
+        Log for every X tuples.
+    insert_reverse : bool, optional
+        If true, add reverse edge and reverse relations to the final graph.
     """
     def __init__(self, url, name,
                  force_reload=False,
@@ -247,23 +295,87 @@ class RDFGraphDataset:
 
     @abc.abstractmethod
     def parse_entity(self, term):
+        """Parse one entity from an RDF term.
+
+        Return None if the term does not represent a valid entity and the
+        whole tuple should be ignored.
+
+        Parameters
+        ----------
+        term : rdflib.term.Identifier
+            RDF term
+
+        Returns
+        -------
+        Entity or None
+            An entity.
+        """
         pass
 
     @abc.abstractmethod
     def parse_relation(self, term):
+        """Parse one relation from an RDF term.
+
+        Return None if the term does not represent a valid relation and the
+        whole tuple should be ignored.
+
+        Parameters
+        ----------
+        term : rdflib.term.Identifier
+            RDF term
+
+        Returns
+        -------
+        Relation or None
+            A relation
+        """
         pass
 
     @abc.abstractmethod
     def process_tuple(self, raw_tuple, sbj, rel, obj):
+        """Process the tuple.
+
+        Return (Entity, Relation, Entity) tuple for as the final tuple.
+        Return None if the tuple should be ignored.
+        
+        Parameters
+        ----------
+        raw_tuple : tuple of rdflib.term.Identifier
+            (subject, predicate, object) tuple
+        sbj : Entity
+            Subject entity
+        rel : Relation
+            Relation
+        obj : Entity
+            Object entity
+
+        Returns
+        -------
+        (Entity, Relation, Entity)
+            The final tuple or None if should be ignored
+        """
         pass
 
     @abc.abstractmethod
     def process_idx_file_line(self, line):
+        """Process one line of ``trainingSet.tsv`` or ``testSet.tsv``.
+
+        Parameters
+        ----------
+        line : str
+            One line of the file
+
+        Returns
+        -------
+        (str, str)
+            One sample and its label
+        """
         pass
 
     @property
-    @abc.abstractproperty
+    @abc.abstractmethod
     def predict_category(self):
+        """Return the category name that has labels."""
         pass
 
 def _get_id(dict, key):
@@ -286,6 +398,13 @@ def load_strlist(filename):
         return ret
 
 class AIFB(RDFGraphDataset):
+    """AIFB dataset.
+    
+    Examples
+    --------
+    >>> dataset = dgl.data.rdf.AIFB()
+    >>> print(dataset.graph)
+    """
 
     employs = rdf.term.URIRef("http://swrc.ontoware.org/ontology#employs")
     affiliation = rdf.term.URIRef("http://swrc.ontoware.org/ontology#affiliation")
@@ -339,6 +458,13 @@ class AIFB(RDFGraphDataset):
         return 'Personen'
 
 class MUTAG(RDFGraphDataset):
+    """MUTAG dataset.
+    
+    Examples
+    --------
+    >>> dataset = dgl.data.rdf.MUTAG()
+    >>> print(dataset.graph)
+    """
 
     d_entity = re.compile("d[0-9]")
     bond_entity = re.compile("bond[0-9]")
@@ -415,11 +541,19 @@ class MUTAG(RDFGraphDataset):
         return 'd'
 
 class BGS(RDFGraphDataset):
-    """BGS namespace convention:
+    """BGS dataset.
 
+    BGS namespace convention:
     http://data.bgs.ac.uk/(ref|id)/<Major Concept>/<Sub Concept>/INSTANCE
 
-    Only tuples of valid instances are kept.
+    We ignored all literal nodes and the relations connecting them in the
+    output graph. We also ignored the relation used to mark whether a
+    term is CURRENT or DEPRECATED.
+
+    Examples
+    --------
+    >>> dataset = dgl.data.rdf.BGS()
+    >>> print(dataset.graph)
     """
 
     lith = rdf.term.URIRef("http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesis")
@@ -486,10 +620,19 @@ class BGS(RDFGraphDataset):
         return 'Lexicon/NamedRockUnit'
 
 class AM(RDFGraphDataset):
-    """AM namespace convention:
+    """AM dataset.
 
+    Namespace convention:
     Instance: http://purl.org/collections/nl/am/<type>-<id>
     Relation: http://purl.org/collections/nl/am/<name>
+
+    We ignored all literal nodes and the relations connecting them in the
+    output graph.
+
+    Examples
+    --------
+    >>> dataset = dgl.data.rdf.AM()
+    >>> print(dataset.graph)
     """
 
     objectCategory = rdf.term.URIRef("http://purl.org/collections/nl/am/objectCategory")
