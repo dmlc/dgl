@@ -94,7 +94,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='norm used in regularization')
         self.add_argument('--num_worker', type=int, default=16,
                           help='number of workers used for loading data')
-        self.add_argument('--uni_weight', action='store_true',
+        self.add_argument('--non_uni_weight', action='store_true',
                           help='if use uniform weight when computing loss')
         self.add_argument('--init_step', type=int, default=0,
                           help='DONT SET MANUALLY, used for resume')

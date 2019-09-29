@@ -192,14 +192,14 @@ class PBGKEModel(gluon.Block):
             neg_score = logsigmoid(-neg_score).mean(axis=1)
 
         # subsampling weight
-        # TODO: add subsampling to new sampler (after that, set default value of args.uni_weight)
-        if self.args.uni_weight:
-            pos_score = pos_score.mean()
-            neg_score = neg_score.mean()
-        else:
+        # TODO: add subsampling to new sampler
+        if self.args.non_uni_weight:
             subsampling_weight = pos_g.edata['weight']
             pos_score = (pos_score * subsampling_weight).sum() / subsampling_weight.sum()
             neg_score = (neg_score * subsampling_weight).sum() / subsampling_weight.sum()
+        else:
+            pos_score = pos_score.mean()
+            neg_score = neg_score.mean()
 
         log = {'pos_loss': - pos_score.detach(),
                'neg_loss': - neg_score.detach()}

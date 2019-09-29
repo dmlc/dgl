@@ -229,14 +229,14 @@ class PBGKEModel(nn.Module):
             neg_score = F.logsigmoid(-neg_score).mean(dim=1)
 
         # subsampling weight
-        # TODO: add subsampling to new sampler (after that, set default value of args.uni_weight)
-        if self.args.uni_weight:
-            pos_score = pos_score.mean()
-            neg_score = neg_score.mean()
-        else:
+        # TODO: add subsampling to new sampler
+        if self.args.non_uni_weight:
             subsampling_weight = pos_g.edata['weight']
             pos_score = (pos_score * subsampling_weight).sum() / subsampling_weight.sum()
             neg_score = (neg_score * subsampling_weight).sum() / subsampling_weight.sum()
+        else:
+            pos_score = pos_score.mean()
+            neg_score = neg_score.mean()
 
         # compute loss
         loss = -(pos_score + neg_score) / 2
