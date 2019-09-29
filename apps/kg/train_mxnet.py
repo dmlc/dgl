@@ -28,23 +28,6 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
     logger.info('Load model {}'.format(args.model_name))
     return model
 
-def load_optimizer(args, model, ckpt=None):
-    params = model.collect_params()
-    if params is None or len(params.keys()) == 0:
-        return None
-
-    # gluon.nn.Embedding with parse_grad set will use row_sparse opt
-    if args.opt == 'Adam':
-        optimizer = gluon.Trainer(params, 'adam', {'learning_rate': args.lr})
-    elif args.opt == 'Adagrad':
-        optimizer = gluon.Trainer(params, 'AdaGrad', {'learning_rate': args.lr})
-    else:
-        raise Exception('Unknown optimizer: ' + args.opt)
-
-    if ckpt is not None:
-        optimizer.load_states(ckpt)
-    return optimizer
-
 def load_train_info(args, ckpt=None):
     if ckpt is not None:
         with open(ckpt, 'r') as f:
@@ -63,25 +46,14 @@ def load_from_checkpoint(logger, args, n_entities, n_relations):
     state_path = os.path.join(args.save_path, 'model.states')
     model = load_model(logger, args, n_entities, n_relations, state_path)
 
-    optimizer_path = os.path.join(args.save_path, 'opt.states')
-    if os.path.exists(optimizer_path):
-        optimizer = load_optimizer(args, model, optimizer_path)
-    else:
-        optimizer = None
-
     train_info_path = os.path.join(args.save_path, 'train.info')
     load_train_info(args, train_info_path)
-    return model, optimizer
+    return model
 
-def save_checkpoint(args, model, optimizer):
+def save_checkpoint(args, model):
     # Save params
     state_path = os.path.join(args.save_path, 'model.states')
     model.save_parameters(state_path)
-
-    # Save optimizer status
-    if optimizer is not None:
-        optimizer.save_states(optimizer_path)
-        optimizer_path = os.path.join(args.save_path, 'opt.states')
 
     # Save train info
     train_info_path = os.path.join(args.save_path, 'train.info')
@@ -93,7 +65,7 @@ def save_checkpoint(args, model, optimizer):
     with open(train_info_path, 'w') as f:
         f.write(json.dumps(train_info))
 
-def train(args, model, optimizer, train_sampler, valid_samplers=None):
+def train(args, model, train_sampler, valid_samplers=None):
     if args.num_proc > 1:
         os.environ['OMP_NUM_THREADS'] = '1'
     logs = []
@@ -113,19 +85,9 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
         with mx.autograd.record():
             loss, log = model(pos_g, neg_g, neg_head, args.gpu)
         loss.backward()
-        if optimizer is not None:
-            optimizer.step(batch_size=1)
         logs.append(log)
         model.update()
 
-        if args.warm_up_step and step >= args.warm_up_step:
-            logging.info(
-                '({}/{}) Change learning rate from {} to {}'.format(step, args.max_step, args.lr, args.lr / 10))
-            args.lr /= 10
-            optimizer = load_optimizer(args, model.collect_params())
-            args.warm_up_step *= 3
-        # if step % 10 == 0:
-        #     print(step)
         if step % args.log_interval == 0:
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
@@ -140,7 +102,7 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
             print('test:', time.time() - start)
 
         if args.save_interval > 0 and step != args.init_step and (step+1) % args.save_interval == 0:
-            save_checkpoint(args, model, optimizer)
+            save_checkpoint(args, model)
     # clear cache
     logs = []
 

@@ -33,8 +33,7 @@ Train with sparse embeddings.
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.1 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight \
-    --opt RowAdagrad --neg_sample_size_valid 1000 --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --num_proc 1
 
 Test average MR at [9999/10000]: 48.060655820961216
 Test average MRR at [9999/10000]: 0.720459233368271
@@ -45,8 +44,7 @@ Test average HITS@10 at [9999/10000]: 0.8793655093023649
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
-    --train --valid --test -adv --uni_weight \
-    --opt RowAdagrad --neg_sample_size_valid 1000 --log_interval 1000
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --log_interval 1000
 
 Test average MR at [19999/20000]: 52.41770919740651
 Test average MRR at [19999/20000]: 0.7520510504495108
@@ -57,8 +55,7 @@ Test average HITS@10 at [19999/20000]: 0.8815070000507863
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 20000 --batch_size_eval 16 --gpu 1 \
-    --train --valid --test -adv --uni_weight \
-    --opt RowAdagrad --neg_sample_size_valid 1000 --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --num_proc 1
 
 Test average MR at [19999/20000]: 55.74326657750842
 Test average MRR at [19999/20000]: 0.6739109335294652
@@ -69,8 +66,7 @@ Test average HITS@10 at [19999/20000]: 0.8616072184320563
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight --opt RowAdagrad \
-    --neg_sample_size_valid 1000  --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000  --num_proc 1
 Test average MR at [9999/10000]: 67.90176228606254
 Test average MRR at [9999/10000]: 0.6450653824918221
 Test average HITS@1 at [9999/10000]: 0.5480523437896768
@@ -80,8 +76,7 @@ Test average HITS@10 at [9999/10000]: 0.8047942306715647
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 \
     --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight --opt RowAdagrad \
-    --neg_sample_size_valid 1000  --num_proc 1
+    --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000  --num_proc 1
 Test average MR at [9999/10000]: 97.97447986321545
 Test average MRR at [9999/10000]: 0.5183488023519718
 Test average HITS@1 at [9999/10000]: 0.36015980768905215
@@ -91,8 +86,7 @@ Test average HITS@10 at [9999/10000]: 0.7617781991163176
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.2 --max_step 30000 --batch_size_eval 16 --train --test -adv --uni_weight \
-    --opt RowAdagrad --neg_sample_size_valid 10000 \
-    --gpu 2 --log_interval 1000 --regularization_coef 0.000001
+    --neg_sample_size_valid 10000 --gpu 2 --log_interval 1000 --regularization_coef 0.000001
 
 Test average MR at [29999/30000]: 92.11875539604883
 Test average MRR at [29999/30000]: 0.7668106483736371
@@ -104,10 +98,9 @@ Test average HITS@10 at [29999/30000]: 0.870164717035432
 Train with sparse embeddings with mixed CPUs and GPUs.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 \
-    --lr 0.1 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-    --train --valid --test -adv --uni_weight \
-    --opt RowAdagrad --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --uni_weight \
+    --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
 
 Test average MR at [9999/10000]: 47.51687799427807
 Test average MRR at [9999/10000]: 0.7439476664953767
@@ -118,8 +111,7 @@ Test average HITS@10 at [9999/10000]: 0.8789422897868666
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
      --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 \
      --lr 0.01 --max_step 10000 --batch_size_eval 16 --gpu 0 \
-     --train --valid --test -adv --uni_weight --opt RowAdagrad \
-     --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
+     --train --valid --test -adv --uni_weight --neg_sample_size_valid 1000 --mix_cpu_gpu --num_proc 1
 
 Test average HITS@10 at [9999/10000]: 0.7888727124985188
 Test average MRR at [9999/10000]: 0.6022999231772103
@@ -146,7 +138,7 @@ Train embeddings with multi-processing
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 \
     --max_step 3000 --batch_size_eval 16 --regularization_coef 0.000001 --train --valid --test -adv \
-    --uni_weight --num_proc 8 --opt RowAdagrad
+    --uni_weight --num_proc 8
 
 Test average MR at [0/3000]: 62.4907908992416
 Test average MRR at [0/3000]: 0.75353530039047
@@ -278,7 +270,7 @@ Train embeddings on Freebase with multi-processing on X1.
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset Freebase --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.1 --max_step 50000 --batch_size_eval 128 --train --test -adv --uni_weight \
-    --eval_interval 300000 --opt RowAdagrad \
+    --eval_interval 300000 \
     --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64 --log_interval 10000
 Test average MR at [0/50000]: 754.5566055566055
 Test average MRR at [0/50000]: 0.7333319016877765

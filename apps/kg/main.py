@@ -9,14 +9,12 @@ import logging
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
     from train_mxnet import load_model
-    from train_mxnet import load_optimizer
     from train_mxnet import load_train_info
     from train_mxnet import save_checkpoint
     from train_mxnet import train
     from train_mxnet import test
 else:
     from train_pytorch import load_model
-    from train_pytorch import load_optimizer
     from train_pytorch import load_train_info
     from train_pytorch import save_checkpoint
     from train_pytorch import train
@@ -81,7 +79,6 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('-adv', '--neg_adversarial_sampling', action='store_true',
                           help='if use negative adversarial sampling')
         self.add_argument('-a', '--adversarial_temperature', default=1.0, type=float)
-        self.add_argument('--opt', type=str, default='Adam', help='The name of the optimizer')
 
         self.add_argument('--train', action='store_true',
                           help='if train a model')
@@ -251,17 +248,15 @@ def run(args, logger):
         # We need to free all memory referenced by dataset.
         eval_dataset = None
         dataset = None
-        # load model and optimizer
+        # load model
         if args.load is not None:
             try:
-                model, optimizer = load_from_checkpoint(logger, args, n_entities, n_relations)
+                model = load_from_checkpoint(logger, args, n_entities, n_relations)
             except Exception as e:
                 print('Load checkpoint failed. Will retrain the model...')
                 model = load_model(logger, args, n_entities, n_relations)
-                optimizer = load_optimizer(args, model)
         else:
             model = load_model(logger, args, n_entities, n_relations)
-            optimizer = load_optimizer(args, model)
 
         # train
         if args.num_proc > 1:
@@ -271,14 +266,14 @@ def run(args, logger):
                 procs = []
                 for i in range(args.num_proc):
                     valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-                    proc = mp.Process(target=train, args=(args, model, optimizer, train_samplers[i], valid_samplers))
+                    proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
                     procs.append(proc)
                     proc.start()
                 for proc in procs:
                     proc.join()
             else:
                 valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-                train(args, model, optimizer, train_sampler, valid_samplers)
+                train(args, model, train_sampler, valid_samplers)
 
         if args.save_emb:
             model.save_emb(args.save_path, args.dataset)
@@ -298,7 +293,7 @@ def run(args, logger):
     except KeyboardInterrupt as e:
         if args.save_interval > 0:
             print('Saving checkpoint before exit...')
-            save_checkpoint(args, model, optimizer)
+            save_checkpoint(args, model)
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()

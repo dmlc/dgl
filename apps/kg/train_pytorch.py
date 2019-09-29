@@ -22,23 +22,6 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
     return model
 
 
-def load_optimizer(args, model):
-    param = model.parameters()
-    try:
-        if args.opt == 'Adam':
-            optimizer = optim.Adam(param, lr=args.lr)
-        elif args.opt == 'RowAdagrad':
-            optimizer = RowAdagrad(param, lr=args.lr)
-        else:
-            raise Exception('Unknown optimizer: ' + args.opt)
-    except ValueError:
-        return None
-
-    # TODO: using .share_memory() will fail the training. find the reason.
-    if args.num_proc > 1:
-        optimizer.share_memory()
-    return optimizer
-
 def load_train_info(args, ckpt=None):
     if ckpt is not None:
         args.init_step = checkpoint['step']
@@ -54,20 +37,18 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
 def load_from_checkpoint(logger, args, n_entities, n_relations):
     checkpoint = th.load(os.path.join(args.save_path, 'model.ckpt'))
     model = load_model(logger, args, n_entities, n_relations, checkpoint)
-    optimizer = load_optimizer(args, model)
     load_train_info(args, checkpoint)
-    return model, optimizer
+    return model
 
-def save_checkpoint(args, model, optimizer):
+def save_checkpoint(args, model):
     th.save({
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict() if optimizer is not None else None,
         'step': args.step,
         'lr': args.lr,
         'warm_up_step': args.warm_up_step
     }, os.path.join(args.save_path, 'model.ckpt'))
 
-def train(args, model, optimizer, train_sampler, valid_samplers=None):
+def train(args, model, train_sampler, valid_samplers=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
     logs = []
@@ -79,7 +60,6 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
     update_time = 0
     forward_time = 0
     backward_time = 0
-    step_time = 0
     for step in range(args.init_step, args.max_step):
         (pos_g, neg_g), neg_head = next(train_sampler)
         # TODO If the batch isn't divisible by negative sample size,
@@ -89,8 +69,6 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
 
         args.step = step
 
-        if optimizer is not None:
-            optimizer.zero_grad()
         start1 = time.time()
         loss, log = model(pos_g, neg_g, neg_head)
         forward_time += time.time() - start1
@@ -100,21 +78,10 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
         backward_time += time.time() - start1
 
         start1 = time.time()
-        if optimizer is not None:
-            optimizer.step()
-        step_time += time.time() - start1
-
-        start1 = time.time()
         model.update()
         update_time += time.time() - start1
         logs.append(log)
 
-        if args.warm_up_step and step >= args.warm_up_step:
-            logging.info(
-                '({}/{}) Change learning rate from {} to {}'.format(step, args.max_step, args.lr, args.lr / 10))
-            args.lr /= 10
-            optimizer = load_optimizer(args, model.parameters())
-            args.warm_up_step *= 3
         if step % args.log_interval == 0:
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
@@ -122,14 +89,12 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
             logs = []
             print('[Train] {} steps take {:.3f} seconds'.format(args.log_interval,
                                                             time.time() - start))
-            print('forward: {:.3f}, backward: {:.3f}, optimize: {:.3f}, update: {:.3f}'.format(forward_time,
-                                                                               backward_time,
-                                                                               step_time,
-                                                                               update_time))
+            print('forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(forward_time,
+                                                                             backward_time,
+                                                                             update_time))
             update_time = 0
             forward_time = 0
             backward_time = 0
-            step_time = 0
             start = time.time()
 
         if args.valid and step % args.eval_interval == 0 and step > 1 and valid_samplers is not None:
@@ -138,7 +103,7 @@ def train(args, model, optimizer, train_sampler, valid_samplers=None):
             print('test:', time.time() - start)
             model.train()
         if args.save_interval > 0 and step != args.init_step and (step+1) % args.save_interval == 0:
-            save_checkpoint(args, model, optimizer)
+            save_checkpoint(args, model)
 
 def test(args, model, test_samplers, mode='Test'):
     if args.num_proc > 1:
