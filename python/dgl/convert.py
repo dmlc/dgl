@@ -29,11 +29,11 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
 
     Examples
     --------
-    Create from edges pairs:
+    Create from pairs of edges with form (src, dst)
 
     >>> g = dgl.graph([(0, 2), (0, 3), (1, 2)])
 
-    Creat from pair of vertex IDs lists
+    Create from source and destination vertex ID lists
 
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
@@ -72,19 +72,30 @@ def graph(data, ntype='_N', etype='_E', card=None, **kwargs):
     ----------
     data : graph data
         Data to initialize graph structure. Supported data formats are
+
         (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
         (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
         (3) scipy sparse matrix
         (4) networkx graph
+
     ntype : str, optional
         Node type name. (Default: _N)
     etype : str, optional
         Edge type name. (Default: _E)
     card : int, optional
-        Cardinality (number of nodes in the graph). If None, infer from input data.
-        (Default: None)
+        Cardinality (number of nodes in the graph). If None, infer from input data, i.e.
+        the largest node ID plus 1. (Default: None)
     kwargs : key-word arguments, optional
-        Other key word arguments.
+        Other key word arguments. Only comes into effect when we are using a networkx
+        graph. It can consist of:
+
+        * edge_id_attr_name
+            ``Str``, key name for edge ids in the NetworkX graph. If not found, we
+            will consider the graph not to have pre-specified edge ids.
+        * node_attrs
+            ``List of str``, names for node features to retrieve from the NetworkX graph
+        * edge_attrs
+            ``List of str``, names for edge features to retrieve from the NetworkX graph
 
     Returns
     -------
@@ -118,7 +129,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
 
     Examples
     --------
-    Create from edges pairs:
+    Create from pairs of edges
 
     >>> g = dgl.bipartite([(0, 2), (0, 3), (1, 2)], 'user', 'plays', 'game')
     >>> g.ntypes
@@ -134,7 +145,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
     >>> g.number_of_edges('plays')  # 'plays' could be omitted here
     3
 
-    Creat from pair of vertex IDs lists
+    Create from source and destination vertex ID lists
 
     >>> u = [0, 0, 1]
     >>> v = [2, 3, 2]
@@ -165,7 +176,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
 
     >>> import networkx as nx
     >>> nxg = nx.complete_bipartite_graph(3, 4)
-    >>> g = dgl.graph(nxg, 'user', 'plays', 'game')
+    >>> g = dgl.bipartite(nxg, 'user', 'plays', 'game')
     >>> g.number_of_nodes('user')
     3
     >>> g.number_of_nodes('game')
@@ -177,10 +188,12 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
     ----------
     data : graph data
         Data to initialize graph structure. Supported data formats are
+
         (1) list of edge pairs (e.g. [(0, 2), (3, 1), ...])
         (2) pair of vertex IDs representing end nodes (e.g. ([0, 3, ...],  [2, 1, ...]))
         (3) scipy sparse matrix
         (4) networkx graph
+
     utype : str, optional
         Source node type name. (Default: _U)
     etype : str, optional
@@ -189,7 +202,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
         Destination node type name. (Default: _V)
     card : pair of int, optional
         Cardinality (number of nodes in the source and destination group). If None,
-        infer from input data.  (Default: None)
+        infer from input data, i.e. the largest node ID plus 1 for each type. (Default: None)
     kwargs : key-word arguments, optional
         Other key word arguments.
 
@@ -499,7 +512,7 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None):
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
 
     Returns
-    ------
+    -------
     DGLHeteroGraph
     """
     u = utils.toindex(u)
@@ -521,10 +534,6 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None):
     """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
-
-    Examples
-    --------
-    TBD
 
     Parameters
     ----------
@@ -604,6 +613,21 @@ def create_from_networkx(nx_graph,
                          node_attrs=None,
                          edge_attrs=None):
     """Create a heterograph that has only one set of nodes and edges.
+
+    Parameters
+    ----------
+    nx_graph : NetworkX graph
+    ntype : str
+        Type name for both source and destination nodes
+    etype : str
+        Type name for edges
+    edge_id_attr_name : str, optional
+        Key name for edge ids in the NetworkX graph. If not found, we
+        will consider the graph not to have pre-specified edge ids. (Default: 'id')
+    node_attrs : list of str
+        Names for node features to retrieve from the NetworkX graph (Default: None)
+    edge_attrs : list of str
+        Names for edge features to retrieve from the NetworkX graph (Default: None)
     """
     if not nx_graph.is_directed():
         nx_graph = nx_graph.to_directed()
@@ -686,7 +710,8 @@ def create_from_networkx_bipartite(nx_graph,
                                    edge_id_attr_name='id',
                                    node_attrs=None,
                                    edge_attrs=None):
-    """Create a heterograph that has only one set of nodes and edges.
+    """Create a heterograph that has one set of source nodes, one set of
+    destination nodes and one set of edges.
 
     The input graph must follow the bipartite graph convention of networkx.
     Each node has an attribute ``bipartite`` with values 0 and 1 indicating which
@@ -734,10 +759,5 @@ def create_from_networkx_bipartite(nx_graph,
     return g
 
 def to_networkx(g, node_attrs=None, edge_attrs=None):
-    """Convert to networkx graph.
-
-    See Also
-    --------
-    DGLHeteroGraph.to_networkx
-    """
+    """Convert to networkx graph."""
     return g.to_networkx(node_attrs, edge_attrs)
