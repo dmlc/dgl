@@ -260,8 +260,8 @@ class PPIDataset(object):
 
         Returns
         -------
-        (dgl.DGLGraph, ndarray, ndarray)
-            The graph, features and its label.
+        (dgl.DGLGraph, ndarray)
+            The graph, and its label.
         """
         if self.mode == 'train':
             g = self.train_graphs[item]
@@ -275,4 +275,4 @@ class PPIDataset(object):
             g = self.test_graphs[item]
             g.ndata['feat'] = self.features[self.test_mask_list[item]]
             label =  self.test_labels[item]
-        return g
+        return g, label
