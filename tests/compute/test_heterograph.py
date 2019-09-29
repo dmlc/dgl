@@ -652,6 +652,28 @@ def test_convert():
         assert hg.number_of_edges(('user', 'watches', 'movie')) == 1
         assert len(hg.etypes) == 2
 
+    # hetero_to_homo test case 2
+    hg = dgl.bipartite([(0, 0), (1, 1)], card=(2, 3))
+    g = dgl.to_homo(hg)
+    assert g.number_of_nodes() == 5
+
+def test_transform():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    g.nodes['user'].data['h'] = x
+
+    new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
+
+    assert new_g.ntypes == ['user', 'game']
+    assert new_g.number_of_edges() == 3
+    assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
+
+    new_g = dgl.metapath_reachable_graph(g, ['follows'])
+
+    assert new_g.ntypes == ['user']
+    assert new_g.number_of_edges() == 2
+    assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
+
 def test_subgraph():
     g = create_test_heterograph()
     x = F.randn((3, 5))
@@ -1137,6 +1159,7 @@ if __name__ == '__main__':
     test_view1()
     test_flatten()
     test_convert()
+    test_transform()
     test_subgraph()
     test_apply()
     test_level1()
