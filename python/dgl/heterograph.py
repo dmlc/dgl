@@ -125,7 +125,7 @@ class DGLHeteroGraph(object):
 
     >>> g0 = dgl.bipartite([(0, 1), (1, 0), (1, 1)], 'user', 'watches', 'movie')
     >>> g1 = dgl.bipartite([(0, 0), (1, 1)], 'user', 'watches', 'TV')
-    >>> GG = dgl.hetero_from_relations([g0, g1])
+    >>> GG = dgl.hetero_from_relations([g0, g1]) # Merge the two graphs
 
     To distinguish between the two "watches" edge type, one must specify a full triplet:
 
@@ -154,26 +154,23 @@ class DGLHeteroGraph(object):
     gidx : HeteroGraphIndex
         Graph index object.
     ntypes : list of str
-        Node type list. The i^th element stores the type name
-        of node type i.
+        Node type list. ``ntypes[i]`` stores the name of node type i.
     etypes : list of str
-        Edge type list. The i^th element stores the type name
-        of edge type i.
+        Edge type list. ``etypes[i]`` stores the name of edge type i.
     node_frames : list of FrameRef, optional
-        Node feature storage. The i^th element stores the node features
-        of node type i. If None, empty frame is created.  (default: None)
+        Node feature storage. If None, empty frame is created.
+        Otherwise, ``node_frames[i]`` stores the node features
+        of node type i. (default: None)
     edge_frames : list of FrameRef, optional
-        Edge feature storage. The i^th element stores the edge features
-        of edge type i. If None, empty frame is created.  (default: None)
+        Edge feature storage. If None, empty frame is created.
+        Otherwise, ``edge_frames[i]`` stores the edge features
+        of edge type i. (default: None)
     multigraph : bool, optional
-        Whether the graph would be a multigraph. If none, the flag will be determined
-        by scanning the whole graph. (default: None)
+        Whether the graph would be a multigraph. If none, the flag will be
+        determined by scanning the whole graph. (default: None)
     readonly : bool, optional
-        Whether the graph structure is read-only (default: True).
-
-    Notes
-    -----
-    Currently, all heterogeneous graphs are readonly.
+        Whether the graph structure is read-only. Currently, only readonly
+        is allowed. (default: True).
     """
     # pylint: disable=unused-argument
     def __init__(self,
@@ -224,6 +221,8 @@ class DGLHeteroGraph(object):
             frame = FrameRef(Frame(num_rows=self._graph.number_of_edges(i)))
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
+
+        self._is_multigraph = multigraph
 
     def _get_msg_index(self, etid):
         if self._msg_indices[etid] is None:
@@ -596,7 +595,10 @@ class DGLHeteroGraph(object):
     @property
     def is_multigraph(self):
         """True if the graph is a multigraph, False otherwise."""
-        return self._graph.is_multigraph()
+        if self._is_multigraph is None:
+            return self._graph.is_multigraph()
+        else:
+            return self._is_multigraph
 
     @property
     def is_readonly(self):
