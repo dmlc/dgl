@@ -437,6 +437,27 @@ class LayerSampler(NodeFlowSampler):
         return nflows
 
 
+class NegEdgeSubgraph(subgraph.DGLSubGraph):
+    def __init__(self, parent, sgi, return_false_neg):
+        super(NegEdgeSubgraph, self).__init__(parent, sgi)
+        self.sgi = sgi
+
+    @property
+    def false_neg(self):
+        exist = _CAPI_GetNegEdgeExistence(self.sgi)
+        return utils.toindex(exist).tousertensor()
+
+    @property
+    def head_nid(self):
+        exist = _CAPI_GetEdgeSubgraphHead(self.sgi)
+        return utils.toindex(exist).tousertensor()
+
+    @property
+    def tail_nid(self):
+        exist = _CAPI_GetEdgeSubgraphTail(self.sgi)
+        return utils.toindex(exist).tousertensor()
+
+
 class EdgeSampler(object):
     '''Edge sampler for link prediction.
 
@@ -593,10 +614,7 @@ class EdgeSampler(object):
             num_pos = int(len(subgs) / 2)
             for i in range(num_pos):
                 pos_subg = subgraph.DGLSubGraph(self.g, subgs[i])
-                neg_subg = subgraph.DGLSubGraph(self.g, subgs[i + num_pos])
-                if self._return_false_neg:
-                    exist = _CAPI_GetNegEdgeExistence(subgs[i + num_pos]);
-                    neg_subg.edata['false_neg'] = utils.toindex(exist).tousertensor()
+                neg_subg = NegEdgeSubgraph(self.g, subgs[i + num_pos], self._return_false_neg)
                 rets.append((pos_subg, neg_subg))
             return rets
 

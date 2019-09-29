@@ -53,8 +53,9 @@ def verify_subgraph(g, subg, seed_id):
     assert(is_sorted(child_src))
 
     # a neighbor in the subgraph must also exist in parent graph.
+    src = F.asnumpy(src)
     for i in subg.map_to_parent_nid(child_src):
-        assert i in src
+        assert F.asnumpy(i) in src
 
 def test_1neighbor_sampler():
     g = generate_rand_graph(100)
@@ -186,7 +187,7 @@ def test_nonuniform_neighbor_sampler():
     assert nf.num_layers == 100
     for i in range(nf.num_layers):
         assert nf.layer_size(i) == 1
-        assert nf.layer_parent_nid(i)[0] == i
+        assert F.asnumpy(nf.layer_parent_nid(i)[0]) == i
 
     # Test the reverse direction
     sampler = dgl.contrib.sampling.NeighborSampler(
@@ -196,7 +197,7 @@ def test_nonuniform_neighbor_sampler():
     assert nf.num_layers == 100
     for i in range(nf.num_layers):
         assert nf.layer_size(i) == 1
-        assert nf.layer_parent_nid(i)[0] == 99 - i
+        assert F.asnumpy(nf.layer_parent_nid(i)[0]) == 99 - i
 
 def test_setseed():
     g = generate_rand_graph(100)
@@ -245,6 +246,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                                                 pos_edges.parent_nid[pos_ldst])))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
@@ -255,7 +257,17 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
-        exist = neg_edges.edata['false_neg']
+        neg_lsrc = np.unique(F.asnumpy(neg_lsrc))
+        head_nid = np.unique(F.asnumpy(neg_edges.head_nid))
+        assert len(head_nid) == len(neg_edges.head_nid)
+        np.testing.assert_equal(neg_lsrc, head_nid)
+
+        neg_ldst = np.unique(F.asnumpy(neg_ldst))
+        tail_nid = np.unique(F.asnumpy(neg_edges.tail_nid))
+        assert len(tail_nid) == len(neg_edges.tail_nid)
+        np.testing.assert_equal(tail_nid, neg_ldst)
+
+        exist = neg_edges.false_neg
         if exclude_positive:
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
@@ -272,7 +284,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
-        exists = neg_edges.edata['false_neg']
+        exists = neg_edges.false_neg
         neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
