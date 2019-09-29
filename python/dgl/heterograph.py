@@ -286,12 +286,40 @@ class DGLHeteroGraph(object):
 
     @property
     def ntypes(self):
-        """Return the list of node types of this graph."""
+        """Return the list of node types of this graph.
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g.ntypes
+        ['user', 'game']
+
+        Returns
+        -------
+        list of str
+        """
         return self._ntypes
 
     @property
     def etypes(self):
-        """Return the list of edge types of this graph."""
+        """Return the list of edge types of this graph.
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g.etypes
+        ['follows', 'plays']
+
+        Returns
+        -------
+        list of str
+        """
         return self._etypes
 
     @property
@@ -299,6 +327,19 @@ class DGLHeteroGraph(object):
         """Return the list of canonical edge types of this graph.
 
         A canonical edge type is a tuple of string (src_type, edge_type, dst_type).
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> g.canonical_etypes
+        [('user', 'follows', 'user'), ('user', 'plays', 'game')]
+
+        Returns
+        -------
+        list of 3-tuples
         """
         return self._canonical_etypes
 
@@ -308,6 +349,25 @@ class DGLHeteroGraph(object):
 
         The nodes are labeled with node type names.
         The edges have their keys holding the edge type names.
+
+        Examples
+        --------
+
+        >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, plays_g])
+        >>> meta_g = g.metagraph
+
+        The metagraph then has two nodes and two edges.
+
+        >>> meta_g.nodes()
+        NodeView(('user', 'game'))
+        >>> meta_g.number_of_nodes()
+        2
+        >>> meta_g.edges()
+        OutMultiEdgeDataView([('user', 'user'), ('user', 'game')])
+        >>> meta_g.number_of_edges()
+        2
 
         Returns
         -------
@@ -325,6 +385,11 @@ class DGLHeteroGraph(object):
         """Convert edge type to canonical etype: (srctype, etype, dsttype).
 
         The input can already be a canonical tuple.
+
+        Examples
+        --------
+
+        Instantiate a heterograph.
 
         Parameters
         ----------
@@ -1404,17 +1469,41 @@ class DGLHeteroGraph(object):
         When transpose is True, a row represents the source and a column
         represents a destination.
 
+        Examples
+        --------
+
+        Instantiate a heterogeneous graph.
+
+        >>> follows_g = dgl.graph([(0, 0), (1, 1)], 'user', 'follows')
+        >>> devs_g = dgl.bipartite([(0, 0), (1, 2)], 'developer', 'develops', 'game')
+        >>> g = dgl.hetero_from_relations([follows_g, devs_g])
+
+        Get a backend dependent sparse tensor. Here we use PyTorch for example.
+
+        >>> g.adjacency_matrix(etype='develops')
+        tensor(indices=tensor([[0, 2],
+                               [0, 1]]),
+               values=tensor([1., 1.]),
+               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+
+        Get a scipy coo sparse matrix.
+
+        >>> g.adjacency_matrix(scipy_fmt='coo', etype='develops')
+        <3x2 sparse matrix of type '<class 'numpy.int64'>'
+        with 2 stored elements in COOrdinate format>
+
         Parameters
         ----------
-        transpose : bool, optional (default=False)
-            A flag to transpose the returned adjacency matrix.
-        ctx : context, optional (default=cpu)
-            The context of returned adjacency matrix.
-        scipy_fmt : str, optional (default=None)
+        transpose : bool, optional
+            A flag to transpose the returned adjacency matrix. (Default: False)
+        ctx : context, optional
+            The context of returned adjacency matrix. (Default: cpu)
+        scipy_fmt : str, optional
             If specified, return a scipy sparse matrix in the given format.
+            Otherwise, return a backend dependent sparse tensor. (Default: None)
         etype : str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
@@ -1441,12 +1530,12 @@ class DGLHeteroGraph(object):
         """Return the incidence matrix representation of edges with the given
         edge type.
 
-        An incidence matrix is an n x m sparse matrix, where n is
+        An incidence matrix is an n-by-m sparse matrix, where n is
         the number of nodes and m is the number of edges. Each nnz
         value indicating whether the edge is incident to the node
         or not.
 
-        There are three types of an incidence matrix :math:`I`:
+        There are three types of incidence matrices :math:`I`:
 
         * ``in``:
 
@@ -1466,19 +1555,39 @@ class DGLHeteroGraph(object):
             - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
             - :math:`I[v, e] = 0` otherwise (including self-loop).
 
+        Examples
+        --------
+
+        >>> g = dgl.graph([(0, 0), (1, 2)], 'user', 'follows')
+        >>> g.incidence_matrix('in')
+        tensor(indices=tensor([[0, 2],
+                               [0, 1]]),
+               values=tensor([1., 1.]),
+               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+        >>> g.incidence_matrix('out')
+        tensor(indices=tensor([[0, 1],
+                               [0, 1]]),
+               values=tensor([1., 1.]),
+               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+        >>> g.incidence_matrix('both')
+        tensor(indices=tensor([[1, 2],
+                               [1, 1]]),
+               values=tensor([-1.,  1.]),
+               size=(3, 2), nnz=2, layout=torch.sparse_coo)
+
         Parameters
         ----------
         typestr : str
             Can be either ``in``, ``out`` or ``both``
-        ctx : context, optional (default=cpu)
-            The context of returned incidence matrix.
+        ctx : context, optional
+            The context of returned incidence matrix. (Default: cpu)
         etype : str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
 
         Returns
         -------
-        SparseTensor
+        Framework SparseTensor
             The incidence matrix.
         """
         etid = self.get_etype_id(etype)
