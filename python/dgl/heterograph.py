@@ -1360,6 +1360,8 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
+        Instantiate a heterograph.
+
         >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
@@ -1409,31 +1411,69 @@ class DGLHeteroGraph(object):
         """Return the subgraph induced on given nodes.
 
         The metagraph of the returned subgraph is the same as the parent graph.
-
         Features are copied from the original graph.
 
         Parameters
         ----------
-        nodes : dict[str, list or iterable]
-            A dictionary of node types to node ID array to construct
-            subgraph.
-            All nodes must exist in the graph.
+        nodes : dict[str->list or iterable]
+            A dictionary mapping node types to node ID array for constructing
+            subgraph. All nodes must exist in the graph.
 
         Returns
         -------
         G : DGLHeteroGraph
             The subgraph.
-            The nodes are relabeled so that node `i` of type `t` in the
-            subgraph is mapped to the ``nodes[i]`` of type `t` in the
-            original graph.
-            The edges are also relabeled.
+
+            The nodes and edges in the subgraph are relabeled using consecutive
+            integers from 0.
+
             One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
+            node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
             subgraph.
 
         Examples
         --------
-        TBD
+        The following example uses PyTorch backend.
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> # Set node features
+        >>> g[('user', 'follows', 'user')].ndata['h'] = torch.tensor([[0.], [1.], [2.]])
+
+        Get subgraphs.
+
+        >>> g.subgraph({'user': [4, 5]})
+        An error occurs as these nodes do not exist.
+        >>> sub_g = g.subgraph({'user': [1, 2]})
+        >>> print(sub_g)
+        Graph(num_nodes={'user': 2, 'game': 0},
+            num_edges={'plays': 0, 'follows': 2},
+            metagraph=[('user', 'game'), ('user', 'user')])
+
+        Get the original node/edge indices.
+
+        >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
+        tensor([1, 2])
+        >>> sub_g['follows'].edata[dgl.EID] # Get the edge indices in the raw graph
+        tensor([1, 2])
+
+        Get the copied node features.
+
+        >>> sub_g['follows'].ndata['h']
+        tensor([[1.],
+                [2.]])
+        >>> sub_g['follows'].ndata['h'] += 1
+        >>> g['follows'].ndata['h']           # Features are not shared.
+        tensor([[0.],
+                [1.],
+                [2.]])
+
+        See Also
+        --------
+        edge_subgraph
         """
         induced_nodes = [utils.toindex(nodes.get(ntype, [])) for ntype in self.ntypes]
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1450,27 +1490,71 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        edges : dict[etype, list or iterable]
-            A dictionary of edge types to edge ID array to construct
-            subgraph.
-            All edges must exist in the subgraph.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
+        edges : dict[str->list or iterable]
+            A dictionary mapping edge types to edge ID array for constructing
+            subgraph. All edges must exist in the subgraph.
+
+            The edge types are characterized by triplets of
+            ``(src type, etype, dst type)``.
+        preserve_nodes : bool
+            Whether to preserve all nodes or not. If false, all nodes
+            without edges will be removed. (Default: False)
 
         Returns
         -------
         G : DGLHeteroGraph
             The subgraph.
-            The edges are relabeled so that edge `i` of type `t` in the
-            subgraph is mapped to the ``edges[i]`` of type `t` in the
-            original graph.
+
+            The nodes and edges are relabeled using consecutive integers from 0.
+
             One can retrieve the mapping from subgraph node/edge ID to parent
-            node/edge ID via `dgl.NID` and `dgl.EID` node/edge features of the
+            node/edge ID via ``dgl.NID`` and ``dgl.EID`` node/edge features of the
             subgraph.
 
         Examples
         --------
-        TBD
+        The following example uses PyTorch backend.
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> # Set edge features
+        >>> g[('user', 'follows', 'user')].edata['h'] = torch.tensor([[0.], [1.], [2.]])
+
+        Get subgraphs.
+
+        >>> g.edge_subgraph({('user', 'follows', 'user'): [5, 6]})
+        An error occurs as these edges do not exist.
+        >>> sub_g = g.edge_subgraph({('user', 'follows', 'user'): [1, 2],
+        >>>                          ('user', 'plays', 'game'): [2]})
+        >>> print(sub_g)
+        Graph(num_nodes={'user': 2, 'game': 1},
+            num_edges={'plays': 1, 'follows': 2},
+            metagraph=[('user', 'game'), ('user', 'user')])
+
+        Get the original node/edge indices.
+
+        >>> sub_g['follows'].ndata[dgl.NID] # Get the node indices in the raw graph
+        tensor([1, 2])
+        >>> sub_g['plays'].edata[dgl.EID]   # Get the edge indices in the raw graph
+        tensor([2])
+
+        Get the copied node features.
+
+        >>> sub_g['follows'].edata['h']
+        tensor([[1.],
+                [2.]])
+        >>> sub_g['follows'].edata['h'] += 1
+        >>> g['follows'].edata['h']          # Features are not shared.
+        tensor([[0.],
+                [1.],
+                [2.]])
+
+        See Also
+        --------
+        subgraph
         """
         edges = {self.to_canonical_etype(etype): e for etype, e in edges.items()}
         induced_edges = [
@@ -1484,8 +1568,8 @@ class DGLHeteroGraph(object):
     def node_type_subgraph(self, ntypes):
         """Return the subgraph induced on given node types.
 
-        The metagraph of the returned subgraph is the subgraph of the original metagraph
-        induced from the node types.
+        The metagraph of the returned subgraph is the subgraph of the original
+        metagraph induced from the node types.
 
         Features are shared with the original graph.
 
@@ -1501,7 +1585,39 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        TBD
+        The following example uses PyTorch backend.
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> # Set node features
+        >>> g[('user', 'follows', 'user')].ndata['h'] = torch.tensor([[0.], [1.], [2.]])
+
+        Get subgraphs.
+
+        >>> sub_g = g.node_type_subgraph(['user'])
+        >>> print(sub_g)
+        Graph(num_nodes=3, num_edges=3,
+            ndata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)}
+            edata_schemes={})
+
+        Get the shared node features.
+
+        >>> sub_g['follows'].ndata['h']
+        tensor([[0.],
+                [1.],
+                [2.]])
+        >>> sub_g['follows'].ndata['h'] += 1
+        >>> g['follows'].ndata['h']          # Features are shared.
+        tensor([[1.],
+                [2.],
+                [3.]])
+
+        See Also
+        --------
+        edge_type_subgraph
         """
         rel_graphs = []
         meta_edges = []
@@ -1546,7 +1662,39 @@ class DGLHeteroGraph(object):
 
         Examples
         --------
-        TBD
+        The following example uses PyTorch backend.
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> # Set edge features
+        >>> g[('user', 'follows', 'user')].edata['h'] = torch.tensor([[0.], [1.], [2.]])
+
+        Get subgraphs.
+
+        >>> sub_g = g.edge_type_subgraph(['follows'])
+        >>> print(sub_g)
+        Graph(num_nodes=3, num_edges=3,
+            ndata_schemes={}
+            edata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)})
+
+        Get the shared edge features.
+
+        >>> sub_g['follows'].edata['h']
+        tensor([[0.],
+                [1.],
+                [2.]])
+        >>> sub_g['follows'].edata['h'] += 1
+        >>> g['follows'].edata['h']          # Features are shared.
+        tensor([[1.],
+                [2.],
+                [3.]])
+
+        See Also
+        --------
+        node_type_subgraph
         """
         etype_ids = [self.get_etype_id(etype) for etype in etypes]
         meta_src, meta_dst, _ = self._graph.metagraph.find_edges(utils.toindex(etype_ids))
