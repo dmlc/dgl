@@ -5,6 +5,7 @@ import torch.multiprocessing as mp
 import argparse
 import os
 import logging
+import time
 
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
@@ -243,6 +244,7 @@ def run(args, logger):
     if args.num_proc > 1:
         model.share_memory()
     if args.train:
+        start = time.time()
         if args.num_proc > 1:
             procs = []
             for i in range(args.num_proc):
@@ -255,6 +257,7 @@ def run(args, logger):
         else:
             valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
             train(args, model, train_sampler, valid_samplers)
+        print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb:
         model.save_emb(args.save_path, args.dataset)
