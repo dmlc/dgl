@@ -1,15 +1,11 @@
 # pylint: disable=C0111, C0103, E1101, W0611, W0612, C0200
 import copy
-import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import rdkit
 import rdkit.Chem as Chem
-from rdkit import DataStructs
-from rdkit.Chem import AllChem
 
 from dgl import batch, unbatch
 from dgl.data.utils import get_download_dir
@@ -23,22 +19,23 @@ from .jtnn_enc import DGLJTNNEncoder
 from .mol_tree import Vocab
 from .mpn import DGLMPN
 from .mpn import mol2dgl_single as mol2dgl_enc
-from .nnutils import create_var, cuda, move_dgl_to_cuda
+from .nnutils import cuda, move_dgl_to_cuda
 
 
 class DGLJTNNVAE(nn.Module):
-
+    """
+    `Junction Tree Variational Autoencoder for Molecular Graph Generation
+    <https://arxiv.org/abs/1802.04364>`__
+    """
     def __init__(self, hidden_size, latent_size, depth, vocab=None, vocab_file=None):
         super(DGLJTNNVAE, self).__init__()
         if vocab is None:
             if vocab_file is None:
                 vocab_file = '{}/jtnn/{}.txt'.format(
                     get_download_dir(), 'vocab')
-                self.vocab = Vocab([x.strip("\r\n ")
-                                    for x in open(vocab_file)])
-            else:
-                self.vocab = Vocab([x.strip("\r\n ")
-                                    for x in open(vocab_file)])
+
+            self.vocab = Vocab([x.strip("\r\n ")
+                                for x in open(vocab_file)])
         else:
             self.vocab = vocab
 
@@ -122,7 +119,6 @@ class DGLJTNNVAE(nn.Module):
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 
-        all_vec = torch.cat([tree_vec, mol_vec], dim=1)
         loss = word_loss + topo_loss + assm_loss + 2 * stereo_loss + beta * kl_loss
 
         return loss, kl_loss, word_acc, topo_acc, assm_acc, stereo_acc

@@ -114,6 +114,11 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
+# For serialization
+add_subdirectory("third_party/dmlc-core")
+list(APPEND DGL_LINKER_LIBS dmlc)
+set(GOOGLE_TEST 0) # Turn off dmlc-core test
+
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
 # Installation rules

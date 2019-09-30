@@ -12,10 +12,12 @@ from ... import kernel as K
 from ...function.base import TargetCode 
 
 MX_VERSION = LooseVersion(mx.__version__)
+if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
+    raise Exception("DGL has to work with MXNet version >= 1.5")
+
 # After MXNet 1.5, empty tensors aren't supprted by default.
-# after we turn on the numpy compatible flag, MXNet supports empty NDArray.
-if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
-    mx.set_np_shape(True)
+# After we turn on the numpy compatible flag, MXNet supports empty NDArray.
+mx.set_np_shape(True)
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -235,6 +237,9 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
+
+def uniform(shape, dtype, ctx, low, high):
+    return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
