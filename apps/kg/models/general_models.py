@@ -159,8 +159,8 @@ class KEModel(object):
         self.score_func.save(path, dataset)
 
     def load_emb(self, path, dataset):
-        self.entity_emb.load(path, dataset+'_'+self.model_name+'_entity.npy')
-        self.relation_emb.load(path, dataset+'_'+self.model_name+'_relation.npy')
+        self.entity_emb.load(path, dataset+'_'+self.model_name+'_entity')
+        self.relation_emb.load(path, dataset+'_'+self.model_name+'_relation')
         self.score_func.load(path, dataset)
 
     def reset_parameters(self):
@@ -177,7 +177,7 @@ class KEModel(object):
         pos_scores = reshape(logsigmoid(pos_scores), batch_size, -1)
 
         neg_scores = self.test_basic_models[neg_sample_size].predict_neg_score(
-            pos_g, neg_g, self.entity_emb, neg_head, gpu_id=gpu_id, trace=False)
+            pos_g, neg_g, self.entity_emb, neg_head, to_device=cuda, gpu_id=gpu_id, trace=False)
         neg_scores = reshape(logsigmoid(neg_scores), batch_size, -1)
 
         # We need to filter the positive edges in the negative graph.

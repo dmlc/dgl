@@ -100,5 +100,5 @@ class ExternalEmbedding:
         np.save(file_name, self.emb.cpu().detach().numpy())
 
     def load(self, path, name):
-        file_name = os.path.join(path, name)
+        file_name = os.path.join(path, name+'.npy')
         self.emb = th.Tensor(np.load(file_name))

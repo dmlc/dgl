@@ -4,7 +4,7 @@
 ## Models
 
 DGL-KE now support knowledge graph embedding models including:
- 
+
 - [x] TransE
 - [x] TransH
 - [x] TransR
@@ -16,7 +16,7 @@ DGL-KE now support knowledge graph embedding models including:
 
 ## Datasets
 
-DGL-KE is tested on datasets including: 
+DGL-KE is tested on datasets including:
 
 - [x] FB15k
 - [x] FB15k-237
@@ -40,6 +40,7 @@ Test average HITS@1 at [9999/10000]: 0.6240879619441012
 Test average HITS@3 at [9999/10000]: 0.7931895515566014
 Test average HITS@10 at [9999/10000]: 0.8793655093023649
 
+
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 20000 \
     --batch_size_eval 16 --gpu 1 --train --valid --test -adv
@@ -50,9 +51,21 @@ Test average HITS@1 at [19999/20000]: 0.6723011291496673
 Test average HITS@3 at [19999/20000]: 0.8112271673071388
 Test average HITS@10 at [19999/20000]: 0.8815070000507863
 
+
+DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+
+Test average MR at [9999/10000]: 67.90176228606254
+Test average MRR at [9999/10000]: 0.6450653824918221
+Test average HITS@1 at [9999/10000]: 0.5480523437896768
+Test average HITS@3 at [9999/10000]: 0.7109326065243521
+Test average HITS@10 at [9999/10000]: 0.8047942306715647
+
+
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 20000 \
-    --batch_size_eval 16 --gpu 1 --train --valid --test -adv
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
 Test average MR at [19999/20000]: 55.74326657750842
 Test average MRR at [19999/20000]: 0.6739109335294652
@@ -60,33 +73,27 @@ Test average HITS@1 at [19999/20000]: 0.5618662287755413
 Test average HITS@3 at [19999/20000]: 0.7559546985830611
 Test average HITS@10 at [19999/20000]: 0.8616072184320563
 
-DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
-Test average MR at [9999/10000]: 67.90176228606254
-Test average MRR at [9999/10000]: 0.6450653824918221
-Test average HITS@1 at [9999/10000]: 0.5480523437896768
-Test average HITS@3 at [9999/10000]: 0.7109326065243521
-Test average HITS@10 at [9999/10000]: 0.8047942306715647
+
+DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 30000 \
+    --batch_size_eval 16 --train --test -adv --gpu 2 --regularization_coef 0.000001
+Test average MR at [29999/30000]: 92.11875539604883
+Test average MRR at [29999/30000]: 0.7668106483736371
+Test average HITS@1 at [29999/30000]: 0.7040933791538996
+Test average HITS@3 at [29999/30000]: 0.812699971221073
+Test average HITS@10 at [29999/30000]: 0.870164717035432
+
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.01 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+
 Test average MR at [9999/10000]: 97.97447986321545
 Test average MRR at [9999/10000]: 0.5183488023519718
 Test average HITS@1 at [9999/10000]: 0.36015980768905215
 Test average HITS@3 at [9999/10000]: 0.6406697025613245
 Test average HITS@10 at [9999/10000]: 0.7617781991163176
 
-DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 30000 \
-    --batch_size_eval 16 --train --test -adv --gpu 2 --regularization_coef 0.000001
-
-Test average MR at [29999/30000]: 92.11875539604883
-Test average MRR at [29999/30000]: 0.7668106483736371
-Test average HITS@1 at [29999/30000]: 0.7040933791538996
-Test average HITS@3 at [29999/30000]: 0.812699971221073
-Test average HITS@10 at [29999/30000]: 0.870164717035432
 ```
 
 Train with sparse embeddings with mixed CPUs and GPUs.
@@ -101,26 +108,32 @@ Test average HITS@1 at [9999/10000]: 0.6638367388397014
 Test average HITS@3 at [9999/10000]: 0.8018316940630766
 Test average HITS@10 at [9999/10000]: 0.8789422897868666
 
-DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
-
-Test average HITS@10 at [9999/10000]: 0.7888727124985188
-Test average MRR at [9999/10000]: 0.6022999231772103
-Test average MR at [9999/10000]: 105.2224441773459
-Test average HITS@3 at [9999/10000]: 0.6906434629513636
-Test average HITS@1 at [9999/10000]: 0.484569416464932
-
 ```
 
 Train embeddings and verify it later.
 ```bash
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
 
 DGLBACKEND=pytorch python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
     --gamma 500.0 --batch_size 16 --gpu 0 --model_path ckpts/DistMult_FB15k_xx/
+
+
+DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
+
+DGLBACKEND=pytorch python3 eval.py --model_name ComplEx --dataset FB15k --hidden_dim 2000 \
+    --gamma 500.0 --batch_size 16 --gpu 0 --model_path ckpts/ComplEx_FB15k_xx/
+
+
+DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
+
+DGLBACKEND=pytorch python3 eval.py --model_name TransE --dataset FB15k --hidden_dim 2000 \
+    --gamma 24.0 --batch_size 16 --gpu 0 --model_path ckpts/TransE_FB15k_xx/
 ```
 
 Train embeddings with multi-processing
@@ -181,72 +194,95 @@ Test average HITS@10 at [0/3000]: 0.8813651137594799
 
 
 ### MXNet
-Train with dense model weights.
+Train with sparse embeddings.
 ```bash
 DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.0015 --gpu 0 --train --valid --test -adv
-
-Test average MR at [9999/10000]: 60.27311201774136
-Test average HITS@3 at [9999/10000]: 0.808696314604459
-Test average HITS@1 at [9999/10000]: 0.616156828223663
-Test average MRR at [9999/10000]: 0.721805054329181
-Test average HITS@10 at [9999/10000]: 0.8771309102605339
-
-DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.0002 --max_step 10000 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
-Test average MR at [19999/20000]: 150.78540231247143
-Test average HITS@3 at [19999/20000]: 0.6181374955561951
-Test average HITS@10 at [19999/20000]: 0.7406595452929525
-Test average HITS@1 at [19999/20000]: 0.37245856680943273
-Test average MRR at [19999/20000]: 0.5127131081156031
+Test average MRR at [9999/10000]: 0.7146810716281126
+Test average HITS@10 at [9999/10000]: 0.8762953806556488
+Test average MR at [9999/10000]: 49.36298597940937
+Test average HITS@3 at [9999/10000]: 0.7883872934164183
+Test average HITS@1 at [9999/10000]: 0.6161355323760499
+
+
+DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+
+Test average HITS@3 at [9999/10000]: 0.7070238417772962
+Test average HITS@1 at [9999/10000]: 0.5244429016526686
+Test average MR at [9999/10000]: 67.70047073963696
+Test average HITS@10 at [9999/10000]: 0.8050748442156597
+Test average MRR at [9999/10000]: 0.6311273723585298
+
+
+DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+
+Test average MRR at [9999/10000]: 0.5972367796993037
+Test average HITS@1 at [9999/10000]: 0.479722636141967
+Test average MR at [9999/10000]: 82.75723889189922
+Test average HITS@3 at [9999/10000]: 0.6754013140070442
+Test average HITS@10 at [9999/10000]: 0.8039487943646708
+
+
+DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+
+Test average MRR at [9999/10000]: 0.43204399210506417
+Test average HITS@1 at [9999/10000]: 0.24382789217014358
+Test average HITS@10 at [9999/10000]: 0.7209259008398808
+Test average MR at [9999/10000]: 117.35780445678678
+Test average HITS@3 at [9999/10000]: 0.5790944188566785
 ```
 
-Train with sparse model weights.
+Train with sparse embeddings with mixed CPUs and GPUs.
 ```bash
-DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 --train --valid --test -adv
+DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
 
-Test average HITS@10 at [19999/20000]: 0.8702324321579117
-Test average HITS@1 at [19999/20000]: 0.5143386771850823
-Test average MR at [19999/20000]: 68.11709637554807
-Test average MRR at [19999/20000]: 0.6543895352041291
-Test average HITS@3 at [19999/20000]: 0.7696077601530362
+Test average HITS@3 at [9999/10000]: 0.7857457328637226
+Test average MRR at [9999/10000]: 0.7118503745011753
+Test average HITS@10 at [9999/10000]: 0.875575724735844
+Test average HITS@1 at [9999/10000]: 0.6129267136277432
+Test average MR at [9999/10000]: 47.41050020319697
 
-DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 --train --valid --test -adv
-
-Test average MRR at [9999/10000]: 0.5789892546035429
-Test average HITS@1 at [9999/10000]: 0.42664759357383486
-Test average HITS@10 at [9999/10000]: 0.8271825430414247
-Test average MR at [9999/10000]: 72.41542381202282
-Test average HITS@3 at [9999/10000]: 0.6962299605559411
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.0002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 --train --valid --test -adv
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
 
-Test average MRR at [9999/10000]: 0.6209599205127202
-Test average HITS@1 at [9999/10000]: 0.5025145624492008
-Test average MR at [9999/10000]: 68.5889748713086
-Test average HITS@10 at [9999/10000]: 0.8101801679761582
-Test average HITS@3 at [9999/10000]: 0.709081211053915
-
-DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.0002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 --train --valid --test -adv
-
-Test average MR at [9999/10000]: 145.42419292038394
-Test average HITS@3 at [9999/10000]: 0.5686208122428942
-Test average HITS@1 at [9999/10000]: 0.22887711398147992
-Test average MRR at [9999/10000]: 0.41974998201318703
-Test average HITS@10 at [9999/10000]: 0.7235445480862014
+Test average HITS@1 at [9999/10000]: 0.5229781901923598
+Test average MR at [9999/10000]: 68.7329399214305
+Test average HITS@3 at [9999/10000]: 0.7054575318341912
+Test average MRR at [9999/10000]: 0.629640060618377
+Test average HITS@10 at [9999/10000]: 0.8033561365483609
 ```
 
+Train embeddings and verify it later.
+```bash
+DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
+
+DGLBACKEND=mxnet python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
+    --gamma 500.0 --batch_size 16 --gpu 0 --model_path ckpts/DistMult_FB15k_xx/
+
+
+DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
+    --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
+
+DGLBACKEND=mxnet python3 eval.py --model_name TransE --dataset FB15k --hidden_dim 2000 \
+    --gamma 24.0 --batch_size 16 --gpu 0 --model_path ckpts/TransE_FB15k_xx/
+```
+
+## Freebase
 To test the model performance on Freebase, you can run the script `config/debug_fb.sh`:
 Train embeddings on Freebase with multi-processing on X1.
 ```bash
@@ -260,49 +296,4 @@ Test average HITS@1 at [0/50000]: 0.7182952182952183
 Test average HITS@3 at [0/50000]: 0.7409752409752409
 Test average HITS@10 at [0/50000]: 0.7587412587412588
 test time: 7678.401087999344
-```
-
-### MXNet
-
-Train with sparse model weights.
-```bash
-DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 --train --valid --test -adv
-
-Test average HITS@10 at [19999/20000]: 0.8702324321579117
-Test average HITS@1 at [19999/20000]: 0.5143386771850823
-Test average MR at [19999/20000]: 68.11709637554807
-Test average MRR at [19999/20000]: 0.6543895352041291
-Test average HITS@3 at [19999/20000]: 0.7696077601530362
-
-DGLBACKEND=mxnet  python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.0000001 --gpu 0 --train --valid --test -adv
-
-Test average MRR at [9999/10000]: 0.5789892546035429
-Test average HITS@1 at [9999/10000]: 0.42664759357383486
-Test average HITS@10 at [9999/10000]: 0.8271825430414247
-Test average MR at [9999/10000]: 72.41542381202282
-Test average HITS@3 at [9999/10000]: 0.6962299605559411
-
-DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.0002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 --train --valid --test -adv
-
-Test average HITS@1 at [9999/10000]: 0.3090348902168577
-Test average MR at [9999/10000]: 126.96384858898614
-Test average HITS@10 at [9999/10000]: 0.7800528177955341
-Test average MRR at [9999/10000]: 0.49837393189051155
-Test average HITS@3 at [9999/10000]: 0.6580301670870647
-
-DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.0002 --max_step 10000 \
-    --batch_size_eval 16 --regularization_coef 0.00001  --gpu 0 --train --valid --test -adv
-
-Test average MR at [9999/10000]: 145.42419292038394
-Test average HITS@3 at [9999/10000]: 0.5686208122428942
-Test average HITS@1 at [9999/10000]: 0.22887711398147992
-Test average MRR at [9999/10000]: 0.41974998201318703
-Test average HITS@10 at [9999/10000]: 0.7235445480862014
 ```

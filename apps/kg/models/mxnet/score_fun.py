@@ -15,6 +15,15 @@ class TransEScore(nn.Block):
         score = head + rel - tail
         return {'score': self.gamma - nd.norm(score, ord=1, axis=-1)}
 
+    def reset_parameters(self):
+        pass
+
+    def save(self, path, name):
+        pass
+
+    def load(self, path, name):
+        pass
+
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
@@ -60,6 +69,12 @@ class DistMultScore(nn.Block):
         return {'score': nd.sum(score, axis=-1)}
 
     def reset_parameters(self):
+        pass
+
+    def save(self, path, name):
+        pass
+
+    def load(self, path, name):
         pass
 
     def forward(self, g):
