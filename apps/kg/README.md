@@ -42,14 +42,14 @@ Test average HITS@10 at [9999/10000]: 0.8793655093023649
 
 
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 10000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 20000 \
+    --batch_size_eval 16 --gpu 1 --train --valid --test -adv
 
-Test average HITS@10 at [9999/10000]: 0.85456177187754
-Test average HITS@3 at [9999/10000]: 0.7738248442156597
-Test average MRR at [9999/10000]: 0.715834589219438
-Test average MR at [9999/10000]: 87.72186568680574
-Test average HITS@1 at [9999/10000]: 0.6333480086697372
+Test average MR at [19999/20000]: 52.41770919740651
+Test average MRR at [19999/20000]: 0.7520510504495108
+Test average HITS@1 at [19999/20000]: 0.6723011291496673
+Test average HITS@3 at [19999/20000]: 0.8112271673071388
+Test average HITS@10 at [19999/20000]: 0.8815070000507863
 
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
@@ -64,14 +64,14 @@ Test average HITS@10 at [9999/10000]: 0.8047942306715647
 
 
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 10000 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 20000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
-Test average MR at [9999/10000]: 77.8360285153075
-Test average HITS@3 at [9999/10000]: 0.7113248442156597
-Test average MRR at [9999/10000]: 0.6317390642641796
-Test average HITS@1 at [9999/10000]: 0.5169838797073963
-Test average HITS@10 at [9999/10000]: 0.8303220671904633
+Test average MR at [19999/20000]: 55.74326657750842
+Test average MRR at [19999/20000]: 0.6739109335294652
+Test average HITS@1 at [19999/20000]: 0.5618662287755413
+Test average HITS@3 at [19999/20000]: 0.7559546985830611
+Test average HITS@10 at [19999/20000]: 0.8616072184320563
 
 
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
@@ -88,11 +88,11 @@ DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1
     --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.01 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
-Test average HITS@1 at [9999/10000]: 0.3604460173394744
-Test average HITS@10 at [9999/10000]: 0.759685722026551
-Test average MRR at [9999/10000]: 0.5171090122873108
-Test average MR at [9999/10000]: 96.8555523570848
-Test average HITS@3 at [9999/10000]: 0.6376236114874018
+Test average MR at [9999/10000]: 97.97447986321545
+Test average MRR at [9999/10000]: 0.5183488023519718
+Test average HITS@1 at [9999/10000]: 0.36015980768905215
+Test average HITS@3 at [9999/10000]: 0.6406697025613245
+Test average HITS@10 at [9999/10000]: 0.7617781991163176
 
 ```
 
@@ -108,25 +108,6 @@ Test average HITS@1 at [9999/10000]: 0.6638367388397014
 Test average HITS@3 at [9999/10000]: 0.8018316940630766
 Test average HITS@10 at [9999/10000]: 0.8789422897868666
 
-DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 10000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
-
-Test average HITS@1 at [9999/10000]: 0.5751574776483338
-Test average MRR at [9999/10000]: 0.6809614106013072
-Test average MR at [9999/10000]: 93.60952316445407
-Test average HITS@10 at [9999/10000]: 0.8503539013817394
-Test average HITS@3 at [9999/10000]: 0.7622002844757518
-
-DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 10000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
-
-Test average HITS@1 at [9999/10000]: 0.5516628285017611
-Test average HITS@3 at [9999/10000]: 0.7171413573557301
-Test average MRR at [9999/10000]: 0.6488753519183479
-Test average HITS@10 at [9999/10000]: 0.8089017204009753
-Test average MR at [9999/10000]: 64.82082260904903
 ```
 
 Train embeddings and verify it later.
