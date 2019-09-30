@@ -2226,25 +2226,31 @@ class DGLHeteroGraph(object):
 
         Parameters
         ----------
-        func : callable
+        func : callable or None
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : int or iterable of int or tensor, optional
-            The (type-specific) node (ids) on which to apply ``func``.
+            The (type-specific) node (ids) on which to apply ``func``. (Default: ALL)
         ntype : str, optional
             The node type. Can be omitted if there is only one node type
-            in the graph.
+            in the graph. (Default: None)
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
+            (Default: False)
 
         Examples
         --------
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
         >>> g.nodes['user'].data['h'] = torch.ones(3, 5)
         >>> g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * 2}, ntype='user')
         >>> g.nodes['user'].data['h']
         tensor([[2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
+
+        See Also
+        --------
+        apply_edges
         """
         ntid = self.get_ntype_id(ntype)
         if is_all(v):
@@ -2267,17 +2273,19 @@ class DGLHeteroGraph(object):
         func : callable or None
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        edges : edges data, optional
+        edges : optional
             Edges on which to apply ``func``. See :func:`send` for valid
-            edge specification.
+            edge specification. (Default: ALL)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
+            (Default: False)
 
         Examples
         --------
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.edges[('user', 'plays', 'game')].data['h'] = torch.ones(4, 5)
         >>> g.apply_edges(lambda edges: {'h': edges.data['h'] * 2})
         >>> g.edges[('user', 'plays', 'game')].data['h']
@@ -2285,6 +2293,10 @@ class DGLHeteroGraph(object):
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.],
                 [2., 2., 2., 2., 2.]])
+
+        See Also
+        --------
+        apply_nodes
         """
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
@@ -2315,20 +2327,33 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         group_by : str
-            Specify how to group edges. Expected to be either 'src' or 'dst'
+            Specify how to group edges. Expected to be either ``'src'`` or ``'dst'``
         func : callable
-            Apply function on the edge.  The function should be
-            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
-            be (bucket_size, degrees, *feature_shape), and
-            return the dict with values of the same shapes.
-        edges : edges data, optional
+            Apply function on the edge. The function should be an
+            :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should be
+            (bucket_size, degrees, *feature_shape), and return the dict
+            with values of the same shapes.
+        edges : optional
             Edges on which to group and apply ``func``. See :func:`send` for valid
-            edges type. Default is all the edges.
+            edge specification. Default is all the edges.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
+            (Default: False)
+
+        Examples
+        --------
+        >>> g = dgl.graph([(0, 1), (0, 2), (1, 2)], 'user', 'follows')
+        >>> g.edata['feat'] = torch.randn((g.number_of_edges(), 1))
+        >>> def softmax_feat(edges):
+        >>>     return {'norm_feat': th.softmax(edges.data['feat'], dim=1)}
+        >>> g.group_apply_edges(group_by='src', func=softmax_feat)
+        >>> g.edata['norm_feat']
+        tensor([[0.3796],
+                [0.6204],
+                [1.0000]])
         """
         if group_by not in ('src', 'dst'):
             raise DGLError("Group_by should be either src or dst")
@@ -2368,8 +2393,7 @@ class DGLHeteroGraph(object):
         * ``pair of int iterable`` / ``pair of tensors`` :
           Specify multiple edges using their endpoints.
 
-        Only works if the graph has one edge type.  For multiple types,
-        use
+        **Only works if the graph has one edge type.** For multiple types, use
 
         .. code::
 
@@ -2440,7 +2464,8 @@ class DGLHeteroGraph(object):
         where :math:`\mathcal{N}_t(v)` defines the predecessors of node(s) ``v`` connected by
         edge type :math:`t`, and :math:`m_{uv}` is the message on edge (u,v).
 
-        * ``reduce_func`` specifies :math:`\sum`.
+        * ``reduce_func`` specifies :math:`\sum`, which can be arbitrary function other than
+          summation like taking average or multiplication.
         * ``apply_func`` specifies :math:`\sigma`.
 
         Other notes:
@@ -2452,7 +2477,7 @@ class DGLHeteroGraph(object):
           dtypes will be inferred.
         * The node features will be updated by the result of the ``reduce_func``.
         * Messages are consumed once received.
-        * The provided UDF maybe called multiple times so it is recommended to provide
+        * The provided UDF may be called multiple times so it is recommended to provide
           function with no side effect.
         * The cross-type reducer will check the output field of each per-type reducer
           and aggregate those who write to the **same** fields. If None is provided,
