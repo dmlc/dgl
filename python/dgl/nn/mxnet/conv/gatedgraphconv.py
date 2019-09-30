@@ -90,5 +90,5 @@ class GatedGraphConv(nn.Block):
                     )
             graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
             a = graph.ndata.pop('a')
-            feat = self.gru(a, feat)
+            feat = self.gru(a, [feat])[0]
         return feat

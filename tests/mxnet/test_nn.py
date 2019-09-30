@@ -112,6 +112,59 @@ def test_tagconv():
     h1 = conv(g, h0)
     assert h1.shape[-1] == 2
 
+def test_gat_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gat = nn.GATConv(10, 20, 5) # n_heads = 5
+    gat.initialize(ctx=ctx)
+    print(gat)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = gat(g, h0)
+    assert h1.shape == (20, 5, 20)
+
+def test_sage_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    graphsage = nn.SAGEConv(10, 20)
+    graphsage.initialize(ctx=ctx)
+    print(graphsage)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = graphsage(g, h0)
+    assert h1.shape == (20, 20)
+
+def test_gg_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gg_conv = nn.GatedGraphConv(10, 20, 3, 4) # n_step = 3, n_etypes = 4
+    gg_conv.initialize(ctx=ctx)
+    print(gg_conv)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    etypes = nd.random.randint(0, 4, g.number_of_edges())
+    h1 = gg_conv(g, h0, etypes)
+    assert h1.shape == (20, 20)
+
+def test_cheb_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    cheb = nn.ChebConv(10, 20, 3) # k = 3
+    cheb.initialize(ctx=ctx)
+    print(cheb)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = cheb(g, h0)
+    assert h1.shape == (20, 20)
+
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
     ctx = F.ctx()
@@ -306,6 +359,10 @@ def test_rgcn():
 
 if __name__ == '__main__':
     test_graph_conv()
+    test_gat_conv()
+    test_sage_conv()
+    test_gg_conv()
+    test_cheb_conv()
     test_edge_softmax()
     test_partial_edge_softmax()
     test_set2set()

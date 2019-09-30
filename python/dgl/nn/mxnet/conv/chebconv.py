@@ -48,7 +48,7 @@ class ChebConv(nn.Block):
             self.fc = nn.Sequential() # it's NOT sequential
             for _ in range(k):
                 self.fc.add(
-                    nn.Dense(out_feats, bias=False,
+                    nn.Dense(out_feats, use_bias=False,
                              weight_initializer=mx.init.Xavier(),
                              in_units=in_feats)
                 )
@@ -84,7 +84,7 @@ class ChebConv(nn.Block):
         with graph.local_scope():
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
-            norm = norm.as_in_context(feat.context)
+            norm = norm.expand_dims(-1).as_in_context(feat.context)
             if lambda_max is None:
                 lambda_max = laplacian_lambda_max(graph)
             if isinstance(lambda_max, list):
