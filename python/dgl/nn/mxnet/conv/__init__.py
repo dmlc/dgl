@@ -4,5 +4,9 @@
 from .graphconv import GraphConv
 from .relgraphconv import RelGraphConv
 from .tagconv import TAGConv
+from .gatconv import GATConv
+from .sageconv import SAGEConv
+from .gatedgraphconv import GatedGraphConv
 
-__all__ = ['GraphConv', 'TAGConv', 'RelGraphConv']
+__all__ = ['GraphConv', 'TAGConv', 'RelGraphConv', 'GATConv',
+           'SAGEConv', 'GatedGraphConv']
