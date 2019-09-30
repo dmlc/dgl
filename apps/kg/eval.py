@@ -89,12 +89,14 @@ def main(args):
     args.valid = False
     args.test = True
     args.batch_size_eval = args.batch_size
-    args.neg_sample_size_test = args.neg_sample_size
 
     logger = get_logger(args)
     # Here we want to use the regualr negative sampler because we need to ensure that
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
+    args.neg_sample_size_test = args.neg_sample_size
+    if args.neg_sample_size < 0:
+        args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
     if args.num_proc > 1:
         test_sampler_tails = []
         test_sampler_heads = []
@@ -102,12 +104,12 @@ def main(args):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             mode='head',
-                                                            num_workers=args.num_worker, cached=False,
+                                                            num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             mode='tail',
-                                                            num_workers=args.num_worker, cached=False,
+                                                            num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
             test_sampler_tails.append(test_sampler_tail)
@@ -115,12 +117,12 @@ def main(args):
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
                                                         mode='head',
-                                                        num_workers=args.num_worker, cached=False,
+                                                        num_workers=args.num_worker,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
                                                         mode='tail',
-                                                        num_workers=args.num_worker, cached=False,
+                                                        num_workers=args.num_worker,
                                                         rank=0, ranks=1)
 
     # load model
