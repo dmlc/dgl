@@ -160,9 +160,10 @@ class TUDataset(object):
     """
     TUDataset contains lots of graph kernel datasets for graph classification.
     Graphs may have node labels, node attributes, edge labels, and edge attributes,
-    varing from different dataset
+    varing from different dataset.
 
-    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`
+    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
+    datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
     """
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
