@@ -19,31 +19,10 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
     return model
 
 
-def load_train_info(args, ckpt=None):
-    if ckpt is not None:
-        args.init_step = checkpoint['step']
-        args.step = args.init_step
-        args.warm_up_step = checkpoint['warm_up_step']
-        args.lr = checkpoint['lr']
-
 def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path):
     model = load_model(logger, args, n_entities, n_relations)
     model.load_emb(ckpt_path, args.dataset)
     return model
-
-def load_from_checkpoint(logger, args, n_entities, n_relations):
-    checkpoint = th.load(os.path.join(args.save_path, 'model.ckpt'))
-    model = load_model(logger, args, n_entities, n_relations, checkpoint)
-    load_train_info(args, checkpoint)
-    return model
-
-def save_checkpoint(args, model):
-    th.save({
-        'model_state_dict': model.state_dict(),
-        'step': args.step,
-        'lr': args.lr,
-        'warm_up_step': args.warm_up_step
-    }, os.path.join(args.save_path, 'model.ckpt'))
 
 def train(args, model, train_sampler, valid_samplers=None):
     if args.num_proc > 1:
@@ -97,8 +76,6 @@ def train(args, model, train_sampler, valid_samplers=None):
             start = time.time()
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
-        if args.save_interval > 0 and step != args.init_step and (step+1) % args.save_interval == 0:
-            save_checkpoint(args, model)
 
 def test(args, model, test_samplers, mode='Test'):
     if args.num_proc > 1:
@@ -116,7 +93,6 @@ def test(args, model, test_samplers, mode='Test'):
     with th.no_grad():
         logs = []
         for sampler in test_samplers:
-            #print('Number of tests: ' + len(sampler))
             count = 0
             for pos_g, neg_g in sampler:
                 # The last batch may not have the batch size expected.

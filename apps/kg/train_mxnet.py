@@ -23,42 +23,10 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
     logger.info('Load model {}'.format(args.model_name))
     return model
 
-def load_train_info(args, ckpt=None):
-    if ckpt is not None:
-        with open(ckpt, 'r') as f:
-            info = json.loads(f)
-            args.init_step = info['step']
-            args.step = args.init_step
-            args.warm_up_step = info['warm_up_step']
-            args.lr = info['lr']
-
 def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path):
     model = load_model(logger, args, n_entities, n_relations)
     model.load_emb(ckpt_path, args.dataset)
     return model
-
-def load_from_checkpoint(logger, args, n_entities, n_relations):
-    state_path = os.path.join(args.save_path, 'model.states')
-    model = load_model(logger, args, n_entities, n_relations, state_path)
-
-    train_info_path = os.path.join(args.save_path, 'train.info')
-    load_train_info(args, train_info_path)
-    return model
-
-def save_checkpoint(args, model):
-    # Save params
-    state_path = os.path.join(args.save_path, 'model.states')
-    model.save_parameters(state_path)
-
-    # Save train info
-    train_info_path = os.path.join(args.save_path, 'train.info')
-    train_info = {
-        'step': args.step,
-        'warm_up_step': args.warm_up_step,
-        'lr': args.lr
-    }
-    with open(train_info_path, 'w') as f:
-        f.write(json.dumps(train_info))
 
 def train(args, model, train_sampler, valid_samplers=None):
     if args.num_proc > 1:
@@ -95,9 +63,6 @@ def train(args, model, train_sampler, valid_samplers=None):
             start = time.time()
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
-
-        if args.save_interval > 0 and step != args.init_step and (step+1) % args.save_interval == 0:
-            save_checkpoint(args, model)
     # clear cache
     logs = []
 

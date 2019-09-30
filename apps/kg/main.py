@@ -9,14 +9,10 @@ import logging
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
     from train_mxnet import load_model
-    from train_mxnet import load_train_info
-    from train_mxnet import save_checkpoint
     from train_mxnet import train
     from train_mxnet import test
 else:
     from train_pytorch import load_model
-    from train_pytorch import load_train_info
-    from train_pytorch import save_checkpoint
     from train_pytorch import train
     from train_pytorch import test
 
@@ -41,8 +37,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='train xx steps')
         self.add_argument('--warm_up_step', type=int, default=None,
                           help='for learning rate decay')
-        self.add_argument('--save_interval', type=int, default=-1,
-                          help='interval for saving checkpoint')
         self.add_argument('--batch_size', type=int, default=1024,
                           help='batch size')
         self.add_argument('--batch_size_eval', type=int, default=8,
@@ -86,8 +80,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='if valid a model')
         self.add_argument('--test', action='store_true',
                           help='if test a model')
-        self.add_argument('--load', type=int, default=None,
-                          help='if need to load checkpoint and load which checkpoint')
         self.add_argument('-rc', '--regularization_coef', type=float, default=0.000002,
                           help='set value > 0.0 if regularization is used')
         self.add_argument('-rn', '--regularization_norm', type=int, default=3,
@@ -113,10 +105,7 @@ def get_logger(args):
         os.mkdir(args.save_path)
 
     folder = '{}_{}_'.format(args.model_name, args.dataset)
-    if args.load is None:
-        n = len([x for x in os.listdir(args.save_path) if x.startswith(folder)])
-    else:
-        n = args.load
+    n = len([x for x in os.listdir(args.save_path) if x.startswith(folder)])
     folder += str(n)
     args.save_path = os.path.join(args.save_path, folder)
 
@@ -143,157 +132,145 @@ def get_logger(args):
 
 
 def run(args, logger):
-    try:
-        # load dataset and samplers
-        dataset = get_dataset(args.data_path, args.dataset)
-        n_entities = dataset.n_entities
-        n_relations = dataset.n_relations
-        if args.neg_sample_size_test < 0:
-            args.neg_sample_size_test = n_entities
+    # load dataset and samplers
+    dataset = get_dataset(args.data_path, args.dataset)
+    n_entities = dataset.n_entities
+    n_relations = dataset.n_relations
+    if args.neg_sample_size_test < 0:
+        args.neg_sample_size_test = n_entities
 
-        if args.train:
-            train_data = TrainDataset(dataset, args, ranks=args.num_proc)
-            if args.num_proc > 1:
-                train_samplers = []
-                for i in range(args.num_proc):
-                    train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                                   mode='PBG-head',
-                                                                   num_workers=args.num_worker,
-                                                                   shuffle=True,
-                                                                   exclude_positive=True,
-                                                                   rank=i)
-                    train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                                   mode='PBG-tail',
-                                                                   num_workers=args.num_worker,
-                                                                   shuffle=True,
-                                                                   exclude_positive=True,
-                                                                   rank=i)
-                    train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail))
-            else:
+    if args.train:
+        train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+        if args.num_proc > 1:
+            train_samplers = []
+            for i in range(args.num_proc):
                 train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                                mode='PBG-head',
                                                                num_workers=args.num_worker,
                                                                shuffle=True,
-                                                               exclude_positive=True)
+                                                               exclude_positive=True,
+                                                               rank=i)
                 train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                                mode='PBG-tail',
                                                                num_workers=args.num_worker,
                                                                shuffle=True,
-                                                               exclude_positive=True)
-                train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail)
+                                                               exclude_positive=True,
+                                                               rank=i)
+                train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail))
+        else:
+            train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           mode='PBG-head',
+                                                           num_workers=args.num_worker,
+                                                           shuffle=True,
+                                                           exclude_positive=True)
+            train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           mode='PBG-tail',
+                                                           num_workers=args.num_worker,
+                                                           shuffle=True,
+                                                           exclude_positive=True)
+            train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail)
 
-        if args.valid or args.test:
-            eval_dataset = EvalDataset(dataset, args)
-        if args.valid:
-            # Here we want to use the regualr negative sampler because we need to ensure that
-            # all positive edges are excluded.
-            if args.num_proc > 1:
-                valid_sampler_heads = []
-                valid_sampler_tails = []
-                for i in range(args.num_proc):
-                    valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                                     args.neg_sample_size_valid,
-                                                                     mode='PBG-head',
-                                                                     num_workers=args.num_worker,
-                                                                     rank=i, ranks=args.num_proc)
-                    valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                                     args.neg_sample_size_valid,
-                                                                     mode='PBG-tail',
-                                                                     num_workers=args.num_worker,
-                                                                     rank=i, ranks=args.num_proc)
-                    valid_sampler_heads.append(valid_sampler_head)
-                    valid_sampler_tails.append(valid_sampler_tail)
-            else:
+    if args.valid or args.test:
+        eval_dataset = EvalDataset(dataset, args)
+    if args.valid:
+        # Here we want to use the regualr negative sampler because we need to ensure that
+        # all positive edges are excluded.
+        if args.num_proc > 1:
+            valid_sampler_heads = []
+            valid_sampler_tails = []
+            for i in range(args.num_proc):
                 valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
                                                                  mode='PBG-head',
                                                                  num_workers=args.num_worker,
-                                                                 rank=0, ranks=1)
+                                                                 rank=i, ranks=args.num_proc)
                 valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
                                                                  mode='PBG-tail',
                                                                  num_workers=args.num_worker,
-                                                                 rank=0, ranks=1)
-        if args.test:
-            # Here we want to use the regualr negative sampler because we need to ensure that
-            # all positive edges are excluded.
-            if args.num_proc > 1:
-                test_sampler_tails = []
-                test_sampler_heads = []
-                for i in range(args.num_proc):
-                    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                    args.neg_sample_size_test,
-                                                                    mode='head',
-                                                                    num_workers=args.num_worker,
-                                                                    rank=i, ranks=args.num_proc)
-                    test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                    args.neg_sample_size_test,
-                                                                    mode='tail',
-                                                                    num_workers=args.num_worker,
-                                                                    rank=i, ranks=args.num_proc)
-                    test_sampler_heads.append(test_sampler_head)
-                    test_sampler_tails.append(test_sampler_tail)
-            else:
+                                                                 rank=i, ranks=args.num_proc)
+                valid_sampler_heads.append(valid_sampler_head)
+                valid_sampler_tails.append(valid_sampler_tail)
+        else:
+            valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
+                                                             args.neg_sample_size_valid,
+                                                             mode='PBG-head',
+                                                             num_workers=args.num_worker,
+                                                             rank=0, ranks=1)
+            valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
+                                                             args.neg_sample_size_valid,
+                                                             mode='PBG-tail',
+                                                             num_workers=args.num_worker,
+                                                             rank=0, ranks=1)
+    if args.test:
+        # Here we want to use the regualr negative sampler because we need to ensure that
+        # all positive edges are excluded.
+        if args.num_proc > 1:
+            test_sampler_tails = []
+            test_sampler_heads = []
+            for i in range(args.num_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 mode='head',
                                                                 num_workers=args.num_worker,
-                                                                rank=0, ranks=1)
+                                                                rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 mode='tail',
                                                                 num_workers=args.num_worker,
-                                                                rank=0, ranks=1)
-
-        # We need to free all memory referenced by dataset.
-        eval_dataset = None
-        dataset = None
-        # load model
-        if args.load is not None:
-            try:
-                model = load_from_checkpoint(logger, args, n_entities, n_relations)
-            except Exception as e:
-                print('Load checkpoint failed. Will retrain the model...')
-                model = load_model(logger, args, n_entities, n_relations)
+                                                                rank=i, ranks=args.num_proc)
+                test_sampler_heads.append(test_sampler_head)
+                test_sampler_tails.append(test_sampler_tail)
         else:
-            model = load_model(logger, args, n_entities, n_relations)
+            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='head',
+                                                            num_workers=args.num_worker,
+                                                            rank=0, ranks=1)
+            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='tail',
+                                                            num_workers=args.num_worker,
+                                                            rank=0, ranks=1)
 
-        # train
+    # We need to free all memory referenced by dataset.
+    eval_dataset = None
+    dataset = None
+    # load model
+    model = load_model(logger, args, n_entities, n_relations)
+
+    # train
+    if args.num_proc > 1:
+        model.share_memory()
+    if args.train:
         if args.num_proc > 1:
-            model.share_memory()
-        if args.train:
-            if args.num_proc > 1:
-                procs = []
-                for i in range(args.num_proc):
-                    valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-                    proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
-                    procs.append(proc)
-                    proc.start()
-                for proc in procs:
-                    proc.join()
-            else:
-                valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-                train(args, model, train_sampler, valid_samplers)
+            procs = []
+            for i in range(args.num_proc):
+                valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
+                proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
+                procs.append(proc)
+                proc.start()
+            for proc in procs:
+                proc.join()
+        else:
+            valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
+            train(args, model, train_sampler, valid_samplers)
 
-        if args.save_emb:
-            model.save_emb(args.save_path, args.dataset)
+    if args.save_emb:
+        model.save_emb(args.save_path, args.dataset)
 
-        # test
-        if args.test:
-            if args.num_proc > 1:
-                procs = []
-                for i in range(args.num_proc):
-                    proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
-                    procs.append(proc)
-                    proc.start()
-                for proc in procs:
-                    proc.join()
-            else:
-                test(args, model, [test_sampler_head, test_sampler_tail])
-    except KeyboardInterrupt as e:
-        if args.save_interval > 0:
-            print('Saving checkpoint before exit...')
-            save_checkpoint(args, model)
+    # test
+    if args.test:
+        if args.num_proc > 1:
+            procs = []
+            for i in range(args.num_proc):
+                proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
+                procs.append(proc)
+                proc.start()
+            for proc in procs:
+                proc.join()
+        else:
+            test(args, model, [test_sampler_head, test_sampler_tail])
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()
