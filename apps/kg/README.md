@@ -216,14 +216,14 @@ Test average HITS@10 at [0/3000]: 0.8813651137594799
 Train with sparse embeddings.
 ```bash
 DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
-Test average MR at [9999/10000]: 60.27311201774136
-Test average HITS@3 at [9999/10000]: 0.808696314604459
-Test average HITS@1 at [9999/10000]: 0.616156828223663
-Test average MRR at [9999/10000]: 0.721805054329181
-Test average HITS@10 at [9999/10000]: 0.8771309102605339
+Test average MRR at [9999/10000]: 0.7146810716281126
+Test average HITS@10 at [9999/10000]: 0.8762953806556488
+Test average MR at [9999/10000]: 49.36298597940937
+Test average HITS@3 at [9999/10000]: 0.7883872934164183
+Test average HITS@1 at [9999/10000]: 0.6161355323760499
 
 
 DGLBACKEND=mxnet python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
@@ -286,7 +286,7 @@ Test average HITS@10 at [9999/10000]: 0.8033561365483609
 Train embeddings and verify it later.
 ```bash
 DGLBACKEND=mxnet python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.001 --max_step 10000 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 10000 \
     --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
 
 DGLBACKEND=mxnet python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
