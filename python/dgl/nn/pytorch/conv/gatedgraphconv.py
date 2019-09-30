@@ -54,6 +54,7 @@ class GatedGraphConv(nn.Module):
         self.gru.reset_parameters()
         for linear in self.linears:
             init.xavier_normal_(linear.weight, gain=gain)
+            init.zeros_(linear.bias)
 
     def forward(self, graph, feat, etypes):
         """Compute Gated Graph Convolution layer.

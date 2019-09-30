@@ -1,7 +1,6 @@
 """MXNet modules for graph attention networks(GAT)."""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
-from mxnet import gluon, nd
 from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
@@ -101,9 +100,8 @@ class GATConv(nn.Block):
         graph = graph.local_var()
         h = self.feat_drop(feat)
         feat = self.fc(h).reshape(-1, self._num_heads, self._out_feats)
-        with feat.context:
-            el = (feat * self.attn_l.data()).sum(axis=-1).expand_dims(-1)
-            er = (feat * self.attn_r.data()).sum(axis=-1).expand_dims(-1)
+        el = (feat * self.attn_l.data(feat.context)).sum(axis=-1).expand_dims(-1)
+        er = (feat * self.attn_r.data(feat.context)).sum(axis=-1).expand_dims(-1)
         graph.ndata.update({'ft': feat, 'el': el, 'er': er})
         # compute edge attention
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
