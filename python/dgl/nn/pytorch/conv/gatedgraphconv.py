@@ -1,5 +1,5 @@
 """Torch Module for Gated Graph Convolution layer"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, cell-var-from-loop
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -87,7 +87,7 @@ class GatedGraphConv(nn.Module):
                 eids = (etypes == i).nonzero().view(-1)
                 if len(eids) > 0:
                     graph.apply_edges(
-                        lambda edges, linear=self.linears[i]: {'W_e*h': linear(edges.src['h'])},
+                        lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
                         eids
                     )
             graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))

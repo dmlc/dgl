@@ -120,4 +120,3 @@ class ChebConv(nn.Block):
             if self.bias is not None:
                 rst = rst + self.bias.data(feat.context)
             return rst
-

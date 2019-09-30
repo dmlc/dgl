@@ -1,5 +1,5 @@
 """MXNet Module for Gated Graph Convolution layer"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, cell-var-from-loop
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon import nn
@@ -88,7 +88,7 @@ class GatedGraphConv(nn.Block):
                 eids = nd.from_numpy(eids, zero_copy=True)
                 if len(eids) > 0:
                     graph.apply_edges(
-                        lambda edges, linear=self.linears[i]: {'W_e*h': linear(edges.src['h'])},
+                        lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
                         eids
                     )
             graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
