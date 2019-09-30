@@ -912,7 +912,7 @@ class DGLHeteroGraph(object):
 
     def edge_id(self, u, v, force_multi=False, etype=None):
         """Return the edge ID, or an array of edge IDs, between source node
-        `u` and destination node `v`.
+        `u` and destination node `v`, with the specified edge type
 
         Parameters
         ----------
@@ -937,9 +937,14 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
+        Instantiate a heterograph.
+
         >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for edge id.
+
         >>> plays_g.edge_id(1, 2, etype=('user', 'plays', 'game'))
         2
         >>> g.edge_id(1, 2, force_multi=True, etype=('user', 'follows', 'user'))
@@ -954,7 +959,7 @@ class DGLHeteroGraph(object):
 
     def edge_ids(self, u, v, force_multi=False, etype=None):
         """Return all edge IDs between source node array `u` and destination
-        node array `v`.
+        node array `v` with the specified edge type.
 
         Parameters
         ----------
@@ -963,7 +968,8 @@ class DGLHeteroGraph(object):
         v : list, tensor
             The node ID array of destination type.
         force_multi : bool, optional
-            Whether to always treat the graph as a multigraph. (Default: False)
+            Whether to always treat the graph as a multigraph. See the
+            "Returns" for their effects. (Default: False)
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
             in the graph.
@@ -971,25 +977,39 @@ class DGLHeteroGraph(object):
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
-            If the graph is a simple graph and `force_multi` is False, return
-            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
-            and `v[i]`.
-            Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
-            of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
-            and `v[i]` are returned.
+
+            * If the graph is a simple graph and ``force_multi=False``, return
+            a single edge ID array ``e``.  ``e[i]`` is the edge ID between ``u[i]``
+            and ``v[i]``.
+
+            * Otherwise, return three arrays ``(eu, ev, e)``.  ``e[i]`` is the ID
+            of an edge between ``eu[i]`` and ``ev[i]``.  All edges between ``u[i]``
+            and ``v[i]`` are returned.
 
         Notes
         -----
-        If the graph is a simple graph, `force_multi` is False, and no edge
-        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+        If the graph is a simple graph, ``force_multi=False``, and no edge
+        exists between some pairs of ``u[i]`` and ``v[i]``, the result is undefined
+        and an empty tensor is returned.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find the edge IDs of "Alice plays Tetris" and "Bob plays Minecraft".
-        >>> g.edge_ids([0, 1], [0, 1], etype=('user', 'plays', 'game'))
-        tensor([0, 2])
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for edge ids.
+
+        >>> plays_g.edge_ids([0], [2], etype=('user', 'plays', 'game'))
+        tensor([], dtype=torch.int64)
+        >>> plays_g.edge_ids([1], [2], etype=('user', 'plays', 'game'))
+        tensor([2])
+        >>> g.edge_ids([1], [2], force_multi=True, etype=('user', 'follows', 'user'))
+        (tensor([1, 1]), tensor([2, 2]), tensor([1, 2]))
 
         See Also
         --------
