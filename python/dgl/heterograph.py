@@ -838,8 +838,8 @@ class DGLHeteroGraph(object):
         """Return the predecessors of node `v` in the graph with the specified
         edge type.
 
-        Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
-        graph.
+        Node `u` is a predecessor of `v` if an edge `(u, v)` with type `etype`
+        exists in the graph.
 
         Parameters
         ----------
@@ -873,34 +873,36 @@ class DGLHeteroGraph(object):
         return self._graph.predecessors(self.get_etype_id(etype), v).tousertensor()
 
     def successors(self, v, etype=None):
-        """Return the successors of node `v` in the graph with the same edge
+        """Return the successors of node `v` in the graph with the specified edge
         type.
 
-        Node `u` is a successor of `v` if an edge `(v, u)` exist in the
-        graph.
+        Node `u` is a successor of `v` if an edge `(v, u)` with type `etype` exists
+        in the graph.
 
         Parameters
         ----------
         v : int
-            The node of source type.
+            The source node.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         tensor
-            Array of successor node IDs of destination node type.
+            Array of successor node IDs with the specified edge type.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Asks which game Alice plays:
-        >>> g.successors(0, ('user', 'plays', 'game'))
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 1), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> g.successors(0, 'plays')
         tensor([0])
-
-        This indicates Game #0 (Tetris).
+        >>> g.successors(0, 'follows')
+        tensor([1])
 
         See Also
         --------
@@ -928,16 +930,20 @@ class DGLHeteroGraph(object):
         Returns
         -------
         int or tensor
-            The edge ID if force_multi == True and the graph is a simple graph.
+            The edge ID if ``force_multi == True`` and the graph is a simple graph.
             The edge ID array otherwise.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find the edge ID of "Bob plays Tetris"
-        >>> g.edge_id(1, 0, etype=('user', 'plays', 'game'))
-        1
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+        >>> plays_g.edge_id(1, 2, etype=('user', 'plays', 'game'))
+        2
+        >>> g.edge_id(1, 2, force_multi=True, etype=('user', 'follows', 'user'))
+        tensor([1, 2])
 
         See Also
         --------
