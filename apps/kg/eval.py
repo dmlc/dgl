@@ -134,8 +134,8 @@ def main(args):
     if args.num_proc > 1:
         model.share_memory()
     # test
-    args.step = -1
-    args.max_step = -1
+    args.step = 0
+    args.max_step = 0
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):

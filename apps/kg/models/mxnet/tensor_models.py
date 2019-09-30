@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import mxnet as mx
 from mxnet import gluon
@@ -86,13 +87,8 @@ class ExternalEmbedding:
 
     def save(self, path, name):
         emb_fname = os.path.join(path, name+'.emb')
-        state_fname = os.path.join(path, name+'.state')
         nd.save(emb_fname, self.emb)
-        nd.save(state_fname, self.state_sum)
 
     def load(self, path, name):
         emb_fname = os.path.join(path, name+'.emb')
-        state_fname = os.path.join(path, name+'.state')
-
-        self.emb = nd.load(emb_fname)
-        self.state_fname = nd.load(state_fname)
+        self.emb = nd.load(emb_fname)[0]
