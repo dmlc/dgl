@@ -1024,9 +1024,9 @@ class DGLHeteroGraph(object):
             return eid.tousertensor()
 
     def find_edges(self, eid, etype=None):
-        """Given an edge ID array, return the source and destination node ID
-        array `s` and `d`.  `s[i]` and `d[i]` are source and destination node
-        ID for edge `eid[i]`.
+        """Given an edge ID array with the specified type, return the source
+        and destination node ID array ``s`` and ``d``.  ``s[i]`` and ``d[i]``
+        are source and destination node ID for edge ``eid[i]``.
 
         Parameters
         ----------
@@ -1034,7 +1034,7 @@ class DGLHeteroGraph(object):
             The edge ID array.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
@@ -1047,49 +1047,57 @@ class DGLHeteroGraph(object):
         --------
         The following example uses PyTorch backend.
 
-        Find the user and game of gameplay #0 and #2:
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
         >>> g.find_edges([0, 2], ('user', 'plays', 'game'))
-        (tensor([0, 1]), tensor([0, 1]))
+        (tensor([0, 1]), tensor([0, 2]))
+        >>> g.find_edges([0, 2])
+        (tensor([0, 1]), tensor([0, 2]))
         """
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(self.get_etype_id(etype), eid)
         return src.tousertensor(), dst.tousertensor()
 
     def in_edges(self, v, form='uv', etype=None):
-        """Return the inbound edges of the node(s).
+        """Return the inbound edges of the node(s) with the specified type.
 
         Parameters
         ----------
         v : int, list, tensor
-            The node(s) of destination type.
+            The node id(s) of destination type.
         form : str, optional
             The return form. Currently support:
 
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
+            - ``'eid'`` : one eid tensor
+            - ``'all'`` : a tuple ``(u, v, eid)``
+            - ``'uv'``  : a pair ``(u, v)``, default
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
-        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an inbound edge to ``ev[i]`` from ``eu[i]``.
+        tensor or (tensor, tensor, tensor) or (tensor, tensor)
             All inbound edges to ``v`` are returned.
-        A pair of Tensors (eu, ev) if form == 'uv'
-            ``eu[i]`` is the source node of an inbound edge to ``ev[i]``.
-            All inbound edges to ``v`` are returned.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is ID of an inbound edge to any of the nodes in ``v``.
+
+            * If ``form='eid'``, return a tensor for the ids of the
+              inbound edges of the nodes with the specified type.
+            * If ``form='all'``, return a 3-tuple of tensors
+              ``(eu, ev, eid)``. ``eid[i]`` gives the ID of the
+              edge from ``eu[i]`` to ``ev[i]``.
+            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
+              ``eu[i]`` is the source node of an edge to ``ev[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find the gameplay IDs of game #0 (Tetris)
-        >>> g.in_edges(0, 'eid', ('user', 'plays', 'game'))
-        tensor([0, 1])
+        >>> g = dgl.bipartite([(0, 0), (1, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.in_edges([0, 2], form='eid')
+        tensor([0, 2])
+        >>> g.in_edges([0, 2], form='all')
+        (tensor([0, 1]), tensor([0, 2]), tensor([0, 2]))
+        >>> g.in_edges([0, 2], form='uv')
+        (tensor([0, 1]), tensor([0, 2]))
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(self.get_etype_id(etype), v)
@@ -1102,44 +1110,48 @@ class DGLHeteroGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def out_edges(self, v, form='uv', etype=None):
-        """Return the outbound edges of the node(s).
+    def out_edges(self, u, form='uv', etype=None):
+        """Return the outbound edges of the node(s) with the specified type.
 
         Parameters
         ----------
-        v : int, list, tensor
-            The node(s) of source type.
+        u : int, list, tensor
+            The node id(s) of source type.
         form : str, optional
             The return form. Currently support:
 
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
+            - ``'eid'`` : one eid tensor
+            - ``'all'`` : a tuple ``(u, v, eid)``
+            - ``'uv'``  : a pair ``(u, v)``, default
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
-        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` to ``ev[i]``.
-            All outbound edges from ``v`` are returned.
-        A pair of Tensors (eu, ev) if form == 'uv'
-            ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
-            All outbound edges from ``v`` are returned.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is ID of an outbound edge from any of the nodes in ``v``.
+        tensor or (tensor, tensor, tensor) or (tensor, tensor)
+            All outbound edges from ``u`` are returned.
+
+            * If ``form='eid'``, return a tensor for the ids of the outbound edges
+              of the nodes with the specified type.
+            * If ``form='all'``, return a 3-tuple of tensors ``(eu, ev, eid)``.
+              ``eid[i]`` gives the ID of the edge from ``eu[i]`` to ``ev[i]``.
+            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
+              ``ev[i]`` is the destination node of the edge from ``eu[i]``.
 
         Examples
         --------
-        The following example uses PyTorch backend.
 
-        Find the gameplay IDs of user #0 (Alice)
-        >>> g.out_edges(0, 'eid', ('user', 'plays', 'game'))
-        tensor([0])
+        >>> g = dgl.bipartite([(0, 0), (1, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.out_edges([0, 1], form='eid')
+        tensor([0, 1, 2])
+        >>> g.out_edges([0, 1], form='all')
+        (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([0, 1, 2]))
+        >>> g.out_edges([0, 1], form='uv')
+        (tensor([0, 1, 1]), tensor([0, 1, 2]))
         """
-        v = utils.toindex(v)
-        src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), v)
+        u = utils.toindex(u)
+        src, dst, eid = self._graph.out_edges(self.get_etype_id(etype), u)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -1150,45 +1162,48 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form:', form)
 
     def all_edges(self, form='uv', order=None, etype=None):
-        """Return all the edges.
+        """Return all edges with the specified type.
 
         Parameters
         ----------
         form : str, optional
             The return form. Currently support:
 
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
-        order : string
+            - ``'eid'`` : one eid tensor
+            - ``'all'`` : a tuple ``(u, v, eid)``
+            - ``'uv'``  : a pair ``(u, v)``, default
+        order : str or None
             The order of the returned edges. Currently support:
 
-            - 'srcdst' : sorted by their src and dst ids.
-            - 'eid'    : sorted by edge Ids.
-            - None     : the arbitrary order.
+            - ``'srcdst'`` : sorted by their src and dst ids.
+            - ``'eid'``    : sorted by edge Ids.
+            - ``None``     : arbitrary order, default
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
-        A tuple of Tensors (u, v, eid) if form == 'all'
-            ``eid[i]`` is the ID of an edge between ``u[i]`` and ``v[i]``.
-            All edges are returned.
-        A pair of Tensors (u, v) if form == 'uv'
-            An edge exists between ``u[i]`` and ``v[i]``.
-            If ``n`` edges exist between ``u`` and ``v``, then ``u`` and ``v`` as a pair
-            will appear ``n`` times.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is the ID of an edge in the graph.
+        tensor or (tensor, tensor, tensor) or (tensor, tensor)
+
+            * If ``form='eid'``, return a tensor for the ids of all edges
+              with the specified type.
+            * If ``form='all'``, return a 3-tuple of tensors ``(eu, ev, eid)``.
+              ``eid[i]`` gives the ID of the edge from ``eu[i]`` to ``ev[i]``.
+            * If ``form='uv'``, return a 2-tuple of tensors ``(eu, ev)``.
+              ``ev[i]`` is the destination node of the edge from ``eu[i]``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find the user-game pairs for all gameplays:
-        >>> g.all_edges('uv', etype=('user', 'plays', 'game'))
-        (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
+        >>> g = dgl.bipartite([(1, 1), (0, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> g.all_edges(form='eid', order='srcdst')
+        tensor([1, 0, 2])
+        >>> g.all_edges(form='all', order='srcdst')
+        (tensor([0, 1, 1]), tensor([0, 1, 2]), tensor([1, 0, 2]))
+        >>> g.all_edges(form='uv', order='eid')
+        (tensor([1, 0, 1]), tensor([1, 0, 2]))
         """
         src, dst, eid = self._graph.edges(self.get_etype_id(etype), order)
         if form == 'all':
@@ -1201,7 +1216,7 @@ class DGLHeteroGraph(object):
             raise DGLError('Invalid form:', form)
 
     def in_degree(self, v, etype=None):
-        """Return the in-degree of node ``v``.
+        """Return the in-degree of node ``v`` with edges of type ``etype``.
 
         Parameters
         ----------
@@ -1209,20 +1224,28 @@ class DGLHeteroGraph(object):
             The node ID of destination type.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
-        etype : (str, str, str)
-            The source-edge-destination type triplet
         int
             The in-degree.
 
         Examples
         --------
-        Find how many users are playing Game #0 (Tetris):
-        >>> g.in_degree(0, ('user', 'plays', 'game'))
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for node degree.
+
+        >>> g.in_degree(0, 'plays')
         2
+        >>> g.in_degree(0, 'follows')
+        0
 
         See Also
         --------
@@ -1231,31 +1254,39 @@ class DGLHeteroGraph(object):
         return self._graph.in_degree(self.get_etype_id(etype), v)
 
     def in_degrees(self, v=ALL, etype=None):
-        """Return the array `d` of in-degrees of the node array `v`.
-
-        `d[i]` is the in-degree of node `v[i]`.
+        """Return the in-degrees of nodes v with edges of type ``etype``.
 
         Parameters
         ----------
         v : list, tensor, optional.
-            The node ID array of destination type. Default is to return the
-            degrees of all the nodes.
-        etype : str or tuple of str, optional
+            The node ID array of the destination type. Default is to return the
+            degrees of all nodes.
+        etype : str or tuple of str or None, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         d : tensor
-            The in-degree array.
+            The in-degree array. ``d[i]`` gives the in-degree of node ``v[i]``
+            with edges of type ``etype``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find how many users are playing Game #0 and #1 (Tetris and Minecraft):
-        >>> g.in_degrees([0, 1], ('user', 'plays', 'game'))
-        tensor([2, 2])
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for node degree.
+
+        >>> g.in_degrees(0, 'plays')
+        tensor([2])
+        >>> g.in_degrees(etype='follows')
+        tensor([0, 1, 2])
 
         See Also
         --------
@@ -1269,60 +1300,76 @@ class DGLHeteroGraph(object):
             v = utils.toindex(v)
         return self._graph.in_degrees(etid, v).tousertensor()
 
-    def out_degree(self, v, etype=None):
-        """Return the out-degree of node `v`.
+    def out_degree(self, u, etype=None):
+        """Return the out-degree of node `u` with edges of type ``etype``.
 
         Parameters
         ----------
-        v : int
+        u : int
             The node ID of source type.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         int
-            The out-degree.
+            The out-degree of node `u` with edges of type ``etype``.
 
         Examples
         --------
-        Find how many games User #0 Alice is playing
-        >>> g.out_degree(0, ('user', 'plays', 'game'))
+
+        Instantiate a heterograph.
+
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for node degree.
+
+        >>> g.out_degree(0, 'plays')
         1
+        >>> g.out_degree(1, 'follows')
+        2
 
         See Also
         --------
         out_degrees
         """
-        return self._graph.out_degree(self.get_etype_id(etype), v)
+        return self._graph.out_degree(self.get_etype_id(etype), u)
 
-    def out_degrees(self, v=ALL, etype=None):
-        """Return the array `d` of out-degrees of the node array `v`.
-
-        `d[i]` is the out-degree of node `v[i]`.
+    def out_degrees(self, u=ALL, etype=None):
+        """Return the out-degrees of nodes u with edges of type ``etype``.
 
         Parameters
         ----------
-        v : list, tensor
+        u : list, tensor
             The node ID array of source type. Default is to return the degrees
             of all the nodes.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         d : tensor
-            The out-degree array.
+            The out-degree array. ``d[i]`` gives the out-degree of node ``u[i]``
+            with edges of type ``etype``.
 
         Examples
         --------
         The following example uses PyTorch backend.
 
-        Find how many games User #0 and #1 (Alice and Bob) are playing
-        >>> g.out_degrees([0, 1], ('user', 'plays', 'game'))
-        tensor([1, 2])
+        >>> plays_g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
+        >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
+        >>> g = dgl.hetero_from_relations([plays_g, follows_g])
+
+        Query for node degree.
+
+        >>> g.out_degrees(0, 'plays')
+        tensor([1])
+        >>> g.out_degrees(etype='follows')
+        tensor([1, 2, 0])
 
         See Also
         --------
@@ -1330,11 +1377,11 @@ class DGLHeteroGraph(object):
         """
         etid = self.get_etype_id(etype)
         stid, _ = self._graph.metagraph.find_edge(etid)
-        if is_all(v):
-            v = utils.toindex(slice(0, self._graph.number_of_nodes(stid)))
+        if is_all(u):
+            u = utils.toindex(slice(0, self._graph.number_of_nodes(stid)))
         else:
-            v = utils.toindex(v)
-        return self._graph.out_degrees(etid, v).tousertensor()
+            u = utils.toindex(u)
+        return self._graph.out_degrees(etid, u).tousertensor()
 
     def _create_hetero_subgraph(self, sgi, induced_nodes, induced_edges):
         """Internal function to create a subgraph."""
