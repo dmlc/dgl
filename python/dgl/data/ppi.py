@@ -11,6 +11,7 @@ from ..graph import DGLGraph
 
 _url = 'dataset/ppi.zip'
 
+
 class PPIDataset(object):
     """A toy Protein-Protein Interaction network dataset.
 
@@ -29,6 +30,7 @@ class PPIDataset(object):
         mode : str
             ('train', 'valid', 'test').
         """
+        assert mode in ['train', 'valid', 'test']
         self.mode = mode
         self._load()
         self._preprocess()
@@ -116,6 +118,38 @@ class PPIDataset(object):
             return len(self.valid_mask_list)
         if self.mode == 'test':
             return len(self.test_mask_list)
+
+    def __getitem__(self, item):
+        """Get the i^th sample.
+
+        Paramters
+        ---------
+        idx : int
+            The sample index.
+
+        Returns
+        -------
+        (dgl.DGLGraph, ndarray)
+            The graph, and its label.
+        """
+        if self.mode == 'train':
+            g = self.train_graphs[item]
+            g.ndata['feat'] = self.features[self.train_mask_list[item]]
+            label =  self.train_labels[item]
+        elif self.mode == 'valid':
+            g = self.valid_graphs[item]
+            g.ndata['feat'] = self.features[self.valid_mask_list[item]]
+            label =  self.valid_labels[item]
+        elif self.mode == 'test':
+            g = self.test_graphs[item]
+            g.ndata['feat'] = self.features[self.test_mask_list[item]]
+            label =  self.test_labels[item]
+        return g, label
+
+
+class LegacyPPIDataset(PPIDataset):
+    """Legacy version of PPI Dataset
+    """
 
     def __getitem__(self, item):
         """Get the i^th sample.
