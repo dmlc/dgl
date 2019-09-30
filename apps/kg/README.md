@@ -75,14 +75,14 @@ Test average HITS@10 at [19999/20000]: 0.8616072184320563
 
 
 DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 10000 \
-    --batch_size_eval 16 --train --test -adv --gpu 0 --regularization_coef 0.000001
+    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 --lr 0.2 --max_step 30000 \
+    --batch_size_eval 16 --train --test -adv --gpu 2 --regularization_coef 0.000001
+Test average MR at [29999/30000]: 92.11875539604883
+Test average MRR at [29999/30000]: 0.7668106483736371
+Test average HITS@1 at [29999/30000]: 0.7040933791538996
+Test average HITS@3 at [29999/30000]: 0.812699971221073
+Test average HITS@10 at [29999/30000]: 0.870164717035432
 
-Test average HITS@3 at [9999/10000]: 0.7175985505283121
-Test average MRR at [9999/10000]: 0.6595120996930349
-Test average MR at [9999/10000]: 148.70467014359252
-Test average HITS@1 at [9999/10000]: 0.5713644676239501
-Test average HITS@10 at [9999/10000]: 0.8155818206448117
 
 DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.01 --max_step 10000 \
