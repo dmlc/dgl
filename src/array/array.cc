@@ -364,6 +364,12 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   return ret;
 }
 
+void CSRSort(CSRMatrix csr) {
+  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
+    impl::CSRSort<XPU, IdType, DType>(csr);
+  });
+}
+
 ///////////////////////// COO routines //////////////////////////
 
 bool COOHasDuplicate(COOMatrix coo) {

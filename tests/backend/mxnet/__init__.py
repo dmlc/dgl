@@ -86,6 +86,9 @@ def prod(x, dim):
 def matmul(a, b):
     return nd.dot(a, b)
 
+def dot(a, b):
+    return nd.sum(mul(a, b), axis=-1)
+
 record_grad = autograd.record
 
 

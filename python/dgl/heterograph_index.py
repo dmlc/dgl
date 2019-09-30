@@ -1,6 +1,9 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
+import numpy as np
+import scipy
+
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from .base import DGLError
@@ -48,7 +51,7 @@ class HeteroGraphIndex(ObjectBase):
         return self.metagraph.number_of_edges()
 
     def get_relation_graph(self, etype):
-        """Get the bipartite graph of the given edge/relation type.
+        """Get the unitgraph graph of the given edge/relation type.
 
         Parameters
         ----------
@@ -58,9 +61,25 @@ class HeteroGraphIndex(ObjectBase):
         Returns
         -------
         HeteroGraphIndex
-            The bipartite graph.
+            The unitgraph graph.
         """
         return _CAPI_DGLHeteroGetRelationGraph(self, int(etype))
+
+    def flatten_relations(self, etypes):
+        """Convert the list of requested unitgraph graphs into a single unitgraph
+        graph.
+
+        Parameters
+        ----------
+        etypes : list[int]
+            The edge/relation types.
+
+        Returns
+        -------
+        FlattenedHeteroGraph
+            A flattened heterograph object
+        """
+        return _CAPI_DGLHeteroGetFlattenedGraph(self, etypes)
 
     def add_nodes(self, ntype, num):
         """Add nodes.
@@ -131,7 +150,7 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroNumBits(self)
 
     def bits_needed(self, etype):
-        """Return the number of integer bits needed to represent the bipartite graph.
+        """Return the number of integer bits needed to represent the unitgraph graph.
 
         Parameters
         ----------
@@ -658,6 +677,146 @@ class HeteroGraphIndex(ObjectBase):
         else:
             raise Exception("unknown format")
 
+    def adjacency_matrix_scipy(self, etype, transpose, fmt, return_edge_ids=None):
+        """Return the scipy adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        fmt : str
+            Indicates the format of returned adjacency matrix.
+        return_edge_ids : bool
+            Indicates whether to return edge IDs or 1 as elements.
+
+        Returns
+        -------
+        scipy.sparse.spmatrix
+            The scipy representation of adjacency matrix.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+
+        if return_edge_ids is None:
+            dgl_warning(
+                "Adjacency matrix by default currently returns edge IDs."
+                "  As a result there is one 0 entry which is not eliminated."
+                "  In the next release it will return 1s by default,"
+                " and 0 will be eliminated otherwise.",
+                FutureWarning)
+            return_edge_ids = True
+
+        rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
+        srctype, dsttype = self.metagraph.find_edge(etype)
+        nrows = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
+        ncols = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
+        nnz = self.number_of_edges(etype)
+        if fmt == "csr":
+            indptr = utils.toindex(rst(0)).tonumpy()
+            indices = utils.toindex(rst(1)).tonumpy()
+            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
+            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(nrows, ncols))
+        elif fmt == 'coo':
+            idx = utils.toindex(rst(0)).tonumpy()
+            row, col = np.reshape(idx, (2, nnz))
+            data = np.arange(0, nnz) if return_edge_ids else np.ones_like(row)
+            return scipy.sparse.coo_matrix((data, (row, col)), shape=(nrows, ncols))
+        else:
+            raise Exception("unknown format")
+
+    def incidence_matrix(self, etype, typestr, ctx):
+        """Return the incidence matrix representation of this graph.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+        typestr : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        src, dst, eid = self.edges(etype)
+        src = src.tousertensor(ctx)  # the index of the ctx will be cached
+        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+        eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
+        srctype, dsttype = self.metagraph.find_edge(etype)
+
+        m = self.number_of_edges(etype)
+        if typestr == 'in':
+            n = self.number_of_nodes(dsttype)
+            row = F.unsqueeze(dst, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'out':
+            n = self.number_of_nodes(srctype)
+            row = F.unsqueeze(src, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'both':
+            assert srctype == dsttype, \
+                    "'both' is supported only if source and destination type are the same"
+            n = self.number_of_nodes(srctype)
+            # first remove entries for self loops
+            mask = F.logical_not(F.equal(src, dst))
+            src = F.boolean_mask(src, mask)
+            dst = F.boolean_mask(dst, mask)
+            eid = F.boolean_mask(eid, mask)
+            n_entries = F.shape(src)[0]
+            # create index
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            dat = F.cat([x, y], dim=0)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        else:
+            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return inc, shuffle_idx
+
     def node_subgraph(self, induced_nodes):
         """Return the induced node subgraph.
 
@@ -696,16 +855,16 @@ class HeteroGraphIndex(ObjectBase):
         eids = [edges.todgltensor() for edges in induced_edges]
         return _CAPI_DGLHeteroEdgeSubgraph(self, eids, preserve_nodes)
 
-    @utils.cached_member(cache='_cache', prefix='bipartite')
-    def get_bipartite(self, etype, ctx):
-        """Create a bipartite graph from given edge type and copy to the given device
+    @utils.cached_member(cache='_cache', prefix='unitgraph')
+    def get_unitgraph(self, etype, ctx):
+        """Create a unitgraph graph from given edge type and copy to the given device
         context.
 
         Note: this internal function is for DGL scheduler use only
 
         Parameters
         ----------
-        etype : int, or None
+        etype : int
             If the graph index is a Bipartite graph index, this argument must be None.
             Otherwise, it represents the edge type.
         ctx : DGLContext
@@ -715,7 +874,7 @@ class HeteroGraphIndex(ObjectBase):
         -------
         HeteroGraphIndex
         """
-        g = self.get_relation_graph(etype) if etype is not None else self
+        g = self.get_relation_graph(etype)
         return g.asbits(self.bits_needed(etype or 0)).copy_to(ctx)
 
     def get_csr_shuffle_order(self, etype):
@@ -778,11 +937,17 @@ class HeteroSubgraphIndex(ObjectBase):
         ret = _CAPI_DGLHeteroSubgraphGetInducedEdges(self)
         return [utils.toindex(v.data) for v in ret]
 
-def create_bipartite_from_coo(num_src, num_dst, row, col):
-    """Create a bipartite graph index from COO format
+#################################################################
+# Creators
+#################################################################
+
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
+    """Create a unitgraph graph index from COO format
 
     Parameters
     ----------
+    num_ntypes : int
+        Number of node types (must be 1 or 2).
     num_src : int
         Number of nodes in the src type.
     num_dst : int
@@ -796,14 +961,16 @@ def create_bipartite_from_coo(num_src, num_dst, row, col):
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateBipartiteFromCOO(
-        int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+    return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
+        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
 
-def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
-    """Create a bipartite graph index from CSR format
+def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
+    """Create a unitgraph graph index from CSR format
 
     Parameters
     ----------
+    num_ntypes : int
+        Number of node types (must be 1 or 2).
     num_src : int
         Number of nodes in the src type.
     num_dst : int
@@ -819,11 +986,11 @@ def create_bipartite_from_csr(num_src, num_dst, indptr, indices, edge_ids):
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateBipartiteFromCSR(
-        int(num_src), int(num_dst),
+    return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
+        int(num_ntypes), int(num_src), int(num_dst),
         indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
 
-def create_heterograph(metagraph, rel_graphs):
+def create_heterograph_from_relations(metagraph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
@@ -838,5 +1005,9 @@ def create_heterograph(metagraph, rel_graphs):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+
+@register_object("graph.FlattenedHeteroGraph")
+class FlattenedHeteroGraph(ObjectBase):
+    """FlattenedHeteroGraph object class in C++ backend."""
 
 _init_api("dgl.heterograph_index")

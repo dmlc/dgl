@@ -346,4 +346,10 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedEdges")
     *rv = subg->induced_edges;
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSortAdj")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    g->SortCSR();
+  });
+
 }  // namespace dgl

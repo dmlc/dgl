@@ -505,3 +505,14 @@ def to_nbits_int(tensor, nbits):
         return F.astype(tensor, F.int32)
     else:
         return F.astype(tensor, F.int64)
+
+def make_invmap(array, use_numpy=True):
+    """Find the unique elements of the array and return another array with indices
+    to the array of unique elements."""
+    if use_numpy:
+        uniques = np.unique(array)
+    else:
+        uniques = list(set(array))
+    invmap = {x: i for i, x in enumerate(uniques)}
+    remapped = np.array([invmap[x] for x in array])
+    return uniques, invmap, remapped
