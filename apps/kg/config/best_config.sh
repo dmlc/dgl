@@ -1,5 +1,7 @@
 #To reproduce reported results on README, you can run the model with the following commands:
 
+# for FB15k
+
 DGLBACKEND=pytorch python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
@@ -12,3 +14,17 @@ DGLBACKEND=pytorch python3 main.py --model TransE --dataset FB15k --batch_size 1
     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 20000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 
+# for wn18
+
+DGLBACKEND=pytorch python3 main.py --model TransE --dataset wn18 --batch_size 1024 \
+	--neg_sample_size 512 --hidden_dim 500 --gamma 12.0 --adversarial_temperature 0.5 \
+	--lr 0.01 --max_step 40000 --batch_size_eval 16 --gpu 0 --train --valid --test -adv \
+	--regularization_coef 0.00001
+
+DGLBACKEND=pytorch python3 main.py --model DistMult --dataset wn18 --batch_size 1024 \
+	--neg_sample_size 1024 --hidden_dim 1000 --gamma 200.0 --lr 0.1 --max_step 10000 \
+	--batch_size_eval 16 --gpu 0 --train --valid --test -adv --regularization_coef 0.00001
+
+DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset wn18 --batch_size 1024 \
+	--neg_sample_size 1024 --hidden_dim 500 --gamma 200.0 --lr 0.1 --max_step 20000 \
+	--batch_size_eval 16 --gpu 0 --train --valid --test -adv --regularization_coef 0.00001
