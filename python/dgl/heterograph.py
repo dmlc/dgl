@@ -482,13 +482,21 @@ class DGLHeteroGraph(object):
 
     @property
     def nodes(self):
-        """Return a node view that can used to set/get feature data of a
-        single node type.
+        """Return a node view that can be used to set/get feature
+        data of a single node type.
 
         Examples
         --------
-        To set features of all Users:
+        The following example uses PyTorch backend.
+
+        To set features of all users
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
         >>> g.nodes['user'].data['h'] = torch.zeros(3, 5)
+
+        See Also
+        --------
+        ndata
         """
         return HeteroNodeView(self)
 
@@ -496,24 +504,41 @@ class DGLHeteroGraph(object):
     def ndata(self):
         """Return the data view of all the nodes.
 
-        Only works if the graph has only one node type.
+        Only works if the graph has one node type.
 
         Examples
         --------
-        To set features of all nodes in a heterogeneous graph with only one node type:
-        >>> g.ndata['h'] = torch.zeros(2, 5)
+        The following example uses PyTorch backend.
+
+        To set features of all nodes in a heterogeneous graph
+        with only one node type:
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+        >>> g.ndata['h'] = torch.zeros(3, 5)
+
+        See Also
+        --------
+        nodes
         """
         return HeteroNodeDataView(self, None, ALL)
 
     @property
     def edges(self):
-        """Return an edges view that can used to set/get feature data of a
-        single edge type.
+        """Return an edge view that can be used to set/get feature
+        data of a single edge type.
 
         Examples
         --------
+        The following example uses PyTorch backend.
+
         To set features of all "play" relationships:
-        >>> g.edges['plays'].data['h'] = torch.zeros(4, 4)
+
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> g.edges['plays'].data['h'] = torch.zeros(3, 4)
+
+        See Also
+        --------
+        edata
         """
         return HeteroEdgeView(self)
 
@@ -521,12 +546,21 @@ class DGLHeteroGraph(object):
     def edata(self):
         """Return the data view of all the edges.
 
-        Only works if the graph has only one edge type
+        Only works if the graph has one edge type.
 
         Examples
         --------
-        To set features of all edges in a heterogeneous graph with only one edge type:
+        The following example uses PyTorch backend.
+
+        To set features of all edges in a heterogeneous graph
+        with only one edge type:
+
+        >>> g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
         >>> g.edata['h'] = torch.zeros(2, 5)
+
+        See Also
+        --------
+        edges
         """
         return HeteroEdgeDataView(self, None, ALL)
 
@@ -1441,7 +1475,7 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
         >>> # Set node features
-        >>> g[('user', 'follows', 'user')].ndata['h'] = torch.tensor([[0.], [1.], [2.]])
+        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Get subgraphs.
 
@@ -1450,8 +1484,8 @@ class DGLHeteroGraph(object):
         >>> sub_g = g.subgraph({'user': [1, 2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 0},
-            num_edges={'plays': 0, 'follows': 2},
-            metagraph=[('user', 'game'), ('user', 'user')])
+              num_edges={'plays': 0, 'follows': 2},
+              metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
 
@@ -1462,11 +1496,11 @@ class DGLHeteroGraph(object):
 
         Get the copied node features.
 
-        >>> sub_g['follows'].ndata['h']
+        >>> sub_g.nodes['user'].data['h']
         tensor([[1.],
                 [2.]])
-        >>> sub_g['follows'].ndata['h'] += 1
-        >>> g['follows'].ndata['h']           # Features are not shared.
+        >>> sub_g.nodes['user'].data['h'] += 1
+        >>> g.nodes['user'].data['h']          # Features are not shared.
         tensor([[0.],
                 [1.],
                 [2.]])
@@ -1521,7 +1555,7 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
         >>> # Set edge features
-        >>> g[('user', 'follows', 'user')].edata['h'] = torch.tensor([[0.], [1.], [2.]])
+        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Get subgraphs.
 
@@ -1531,8 +1565,8 @@ class DGLHeteroGraph(object):
         >>>                          ('user', 'plays', 'game'): [2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 1},
-            num_edges={'plays': 1, 'follows': 2},
-            metagraph=[('user', 'game'), ('user', 'user')])
+              num_edges={'plays': 1, 'follows': 2},
+              metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
 
@@ -1543,11 +1577,11 @@ class DGLHeteroGraph(object):
 
         Get the copied node features.
 
-        >>> sub_g['follows'].edata['h']
+        >>> sub_g.edges['follows'].data['h']
         tensor([[1.],
                 [2.]])
-        >>> sub_g['follows'].edata['h'] += 1
-        >>> g['follows'].edata['h']          # Features are not shared.
+        >>> sub_g.edges['follows'].data['h'] += 1
+        >>> g.edges['follows'].data['h']          # Features are not shared.
         tensor([[0.],
                 [1.],
                 [2.]])
@@ -1593,24 +1627,24 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
         >>> # Set node features
-        >>> g[('user', 'follows', 'user')].ndata['h'] = torch.tensor([[0.], [1.], [2.]])
+        >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Get subgraphs.
 
         >>> sub_g = g.node_type_subgraph(['user'])
         >>> print(sub_g)
         Graph(num_nodes=3, num_edges=3,
-            ndata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)}
-            edata_schemes={})
+              ndata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)}
+              edata_schemes={})
 
         Get the shared node features.
 
-        >>> sub_g['follows'].ndata['h']
+        >>> sub_g.nodes['user'].data['h']
         tensor([[0.],
                 [1.],
                 [2.]])
-        >>> sub_g['follows'].ndata['h'] += 1
-        >>> g['follows'].ndata['h']          # Features are shared.
+        >>> sub_g.nodes['user'].data['h'] += 1
+        >>> g.nodes['user'].data['h']          # Features are shared.
         tensor([[1.],
                 [2.],
                 [3.]])
@@ -1670,24 +1704,24 @@ class DGLHeteroGraph(object):
         >>> follows_g = dgl.graph([(0, 1), (1, 2), (1, 2)], 'user', 'follows')
         >>> g = dgl.hetero_from_relations([plays_g, follows_g])
         >>> # Set edge features
-        >>> g[('user', 'follows', 'user')].edata['h'] = torch.tensor([[0.], [1.], [2.]])
+        >>> g.edges['follows'].data['h'] = torch.tensor([[0.], [1.], [2.]])
 
         Get subgraphs.
 
         >>> sub_g = g.edge_type_subgraph(['follows'])
         >>> print(sub_g)
         Graph(num_nodes=3, num_edges=3,
-            ndata_schemes={}
-            edata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)})
+              ndata_schemes={}
+              edata_schemes={'h': Scheme(shape=(1,), dtype=torch.float32)})
 
         Get the shared edge features.
 
-        >>> sub_g['follows'].edata['h']
+        >>> sub_g.edges['follows'].data['h']
         tensor([[0.],
                 [1.],
                 [2.]])
-        >>> sub_g['follows'].edata['h'] += 1
-        >>> g['follows'].edata['h']          # Features are shared.
+        >>> sub_g.edges['follows'].data['h'] += 1
+        >>> g.edges['follows'].data['h']          # Features are shared.
         tensor([[1.],
                 [2.],
                 [3.]])
@@ -1855,7 +1889,7 @@ class DGLHeteroGraph(object):
     #################################################################
 
     def node_attr_schemes(self, ntype=None):
-        """Return the node feature schemes.
+        """Return the node feature schemes for the specified type.
 
         Each feature scheme is a named tuple that stores the shape and data type
         of the node feature.
@@ -1863,7 +1897,7 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         ntype : str, optional
-            The node type. Could be omitted if there is only one node
+            The node type. Can be omitted if there is only one node
             type in the graph. Error will be raised otherwise.
             (Default: None)
 
@@ -1876,14 +1910,19 @@ class DGLHeteroGraph(object):
         --------
         The following uses PyTorch backend.
 
+        >>> g = dgl.graph([(0, 0), (1, 2)], 'user', 'follows')
         >>> g.nodes['user'].data['h'] = torch.randn(3, 4)
         >>> g.node_attr_schemes('user')
         {'h': Scheme(shape=(4,), dtype=torch.float32)}
+
+        See Also
+        --------
+        edge_attr_schemes
         """
         return self._node_frames[self.get_ntype_id(ntype)].schemes
 
     def edge_attr_schemes(self, etype=None):
-        """Return the edge feature schemes.
+        """Return the edge feature schemes for the specified type.
 
         Each feature scheme is a named tuple that stores the shape and data type
         of the edge feature.
@@ -1892,20 +1931,25 @@ class DGLHeteroGraph(object):
         ----------
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. (Default: None)
 
         Returns
         -------
         dict of str to schemes
-            The schemes of node feature columns.
+            The schemes of edge feature columns.
 
         Examples
         --------
         The following uses PyTorch backend.
 
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.edges['user', 'plays', 'game'].data['h'] = torch.randn(4, 4)
         >>> g.edge_attr_schemes(('user', 'plays', 'game'))
         {'h': Scheme(shape=(4,), dtype=torch.float32)}
+
+        See Also
+        --------
+        node_attr_schemes
         """
         return self._edge_frames[self.get_etype_id(etype)].schemes
 
@@ -1916,27 +1960,28 @@ class DGLHeteroGraph(object):
         and device context.
 
         When a subset of the nodes are assigned a new feature, initializer is
-        used to create feature for rest of the nodes.
+        used to create feature for the rest of the nodes.
 
         Parameters
         ----------
         initializer : callable
-            The initializer.
+            The initializer, mapping (shape, data type, context) to tensor.
         field : str, optional
-            The feature field name. Default is set an initializer for all the
+            The feature field name. Default is to set an initializer for all the
             feature fields.
         ntype : str, optional
-            The node type. Could be omitted if there is only one node
+            The node type. Can be omitted if there is only one node
             type in the graph. Error will be raised otherwise.
             (Default: None)
-
-        Examples
-        --------
 
         Note
         -----
         User defined initializer must follow the signature of
         :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+
+        See Also
+        --------
+        set_e_initializer
         """
         ntid = self.get_ntype_id(ntype)
         self._node_frames[ntid].set_initializer(initializer, field)
@@ -1953,18 +1998,23 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         initializer : callable
-            The initializer.
+            The initializer, mapping (shape, data type, context) to tensor.
         field : str, optional
             The feature field name. Default is set an initializer for all the
             feature fields.
         etype : str or tuple of str, optional
             The edge type. Can be omitted if there is only one edge type
-            in the graph.
+            in the graph. Error will be raised otherwise.
+            (Default: None)
 
         Note
         -----
         User defined initializer must follow the signature of
         :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+
+        See Also
+        --------
+        set_n_initializer
         """
         etid = self.get_etype_id(etype)
         self._edge_frames[etid].set_initializer(initializer, field)
@@ -3210,7 +3260,7 @@ class DGLHeteroGraph(object):
                 self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
 
     def local_var(self):
-        """Return a graph object that can be used in a local function scope.
+        """Return a heterograph object that can be used in a local function scope.
 
         The returned graph object shares the feature data and graph structure of this graph.
         However, any out-place mutation to the feature data will not reflect to this graph,
@@ -3221,7 +3271,7 @@ class DGLHeteroGraph(object):
 
         Returns
         -------
-        DGLGraph
+        DGLHeteroGraph
             The graph object that can be used as a local variable.
 
         Notes
@@ -3241,26 +3291,26 @@ class DGLHeteroGraph(object):
 
         >>> def foo(g):
         >>>     g = g.local_var()
-        >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
-        >>>     return g.ndata['h']
+        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>     return g.edata['h']
         >>>
-        >>> g = ... # some graph
-        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
-        >>> newh = foo(g)  # get tensor of all ones
-        >>> print(g.ndata['h'])  # still get tensor of all zeros
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
+        >>> newh = foo(g)        # get tensor of all ones
+        >>> print(g.edata['h'])  # still get tensor of all zeros
 
         Automatically garbage collect locally-defined tensors without the need to manually
         ``pop`` the tensors.
 
         >>> def foo(g):
         >>>     g = g.local_var()
-        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
-        >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
-        >>>     return g.ndata['xxx']
+        >>>     # This 'h' feature will stay local and be GCed when the function exits
+        >>>     g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>     return g.edata['h']
         >>>
-        >>> g = ... # some graph
-        >>> xxx = foo(g)
-        >>> print('xxx' in g.ndata)
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> h = foo(g)
+        >>> print('h' in g.edata)
         False
 
         See Also
@@ -3299,26 +3349,26 @@ class DGLHeteroGraph(object):
 
         >>> def foo(g):
         >>>     with g.local_scope():
-        >>>         g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
-        >>>         return g.ndata['h']
+        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>         return g.edata['h']
         >>>
-        >>> g = ... # some graph
-        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
-        >>> newh = foo(g)  # get tensor of all ones
-        >>> print(g.ndata['h'])  # still get tensor of all zeros
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> g.edata['h'] = torch.zeros((g.number_of_edges(), 3))
+        >>> newh = foo(g)        # get tensor of all ones
+        >>> print(g.edata['h'])  # still get tensor of all zeros
 
         Automatically garbage collect locally-defined tensors without the need to manually
         ``pop`` the tensors.
 
         >>> def foo(g):
         >>>     with g.local_scope():
-        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
-        >>>         g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
-        >>>         return g.ndata['xxx']
+        >>>         # This 'h' feature will stay local and be GCed when the function exits
+        >>>         g.edata['h'] = torch.ones((g.number_of_edges(), 3))
+        >>>         return g.edata['h']
         >>>
-        >>> g = ... # some graph
-        >>> xxx = foo(g)
-        >>> print('xxx' in g.ndata)
+        >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2)], 'user', 'plays', 'game')
+        >>> h = foo(g)
+        >>> print('h' in g.edata)
         False
 
         See Also
