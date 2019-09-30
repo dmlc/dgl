@@ -87,7 +87,7 @@ class GatedGraphConv(nn.Module):
                 eids = (etypes == i).nonzero().view(-1)
                 if len(eids) > 0:
                     graph.apply_edges(
-                        lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
+                        lambda edges, linear=self.linears[i]: {'W_e*h': linear(edges.src['h'])},
                         eids
                     )
             graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))

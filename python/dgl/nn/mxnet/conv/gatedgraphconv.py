@@ -29,6 +29,7 @@ class GatedGraphConv(nn.Block):
         Number of edge types.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
+        Can only be set to True in MXNet.
     """
     def __init__(self,
                  in_feats,
@@ -41,6 +42,8 @@ class GatedGraphConv(nn.Block):
         self._out_feats = out_feats
         self._n_steps = n_steps
         self._n_etypes = n_etypes
+        if not bias:
+            raise KeyError('MXNet do not support disabling bias in GRUCell.')
         with self.name_scope():
             # this solution(using sequential) is extremely silly but
             # until now our GREAT MXNet still do not support ModuleList.
@@ -85,7 +88,7 @@ class GatedGraphConv(nn.Block):
                 eids = nd.from_numpy(eids, zero_copy=True)
                 if len(eids) > 0:
                     graph.apply_edges(
-                        lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
+                        lambda edges, linear=self.linears[i]: {'W_e*h': linear(edges.src['h'])},
                         eids
                     )
             graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))

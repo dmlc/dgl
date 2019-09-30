@@ -24,6 +24,30 @@ GraphConv
     :members: weight, bias, forward
     :show-inheritance:
 
+GATConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GATConv
+    :show-inheritance:
+
+SAGEConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.SAGEConv
+    :show-inheritance:
+
+GatedGraphConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GatedGraphConv
+    :show-inheritance:
+ 
+ChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.ChebConv
+    :show-inheritance:
+
 RelGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1,9 +1,8 @@
 """MXNet Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
-from mxnet import gluon, nd
+from mxnet import nd
 from mxnet.gluon import nn
-from mxnet.gluon.contrib.nn import Identity
 
 from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
@@ -121,5 +120,4 @@ class ChebConv(nn.Block):
             if self.bias is not None:
                 rst = rst + self.bias.data(feat.context)
             return rst
-
 

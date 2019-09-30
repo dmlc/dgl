@@ -60,10 +60,10 @@ class GATConv(nn.Block):
             self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
                                weight_initializer=mx.init.Xavier(),
                                in_units=in_feats)
-            self.attn_l = self.params.get('attn_l', grad_req='add',
+            self.attn_l = self.params.get('attn_l',
                                           shape=(1, num_heads, out_feats),
                                           init=mx.init.Xavier())
-            self.attn_r = self.params.get('attn_r', grad_req='add',
+            self.attn_r = self.params.get('attn_r',
                                           shape=(1, num_heads, out_feats),
                                           init=mx.init.Xavier())
             self.feat_drop = nn.Dropout(feat_drop)
@@ -119,4 +119,3 @@ class GATConv(nn.Block):
         if self.activation:
             rst = self.activation(rst)
         return rst
-
