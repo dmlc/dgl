@@ -69,6 +69,14 @@ def unit_test_win64(backend, dev) {
   }
 }
 
+def kg_test_linux(backend, dev) {
+  init_git()
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  timeout(time: 20, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_kg_test.sh ${dev}"
+  }
+}
+
 def example_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
@@ -186,6 +194,11 @@ pipeline {
                 unit_test_linux("pytorch", "cpu")
               }
             }
+            stage("Knowledge Graph test") {
+              steps {
+                kg_test_linux("pytorch", "cpu")
+              }
+            }
             stage("Example test") {
               steps {
                 example_test_linux("pytorch", "cpu")
@@ -255,6 +268,11 @@ pipeline {
             stage("Unit test") {
               steps {
                 unit_test_linux("mxnet", "cpu")
+              }
+            }
+            stage("Knowledge Graph test") {
+              steps {
+                kg_test_linux("mxnet", "cpu")
               }
             }
             //stage("Tutorial test") {
