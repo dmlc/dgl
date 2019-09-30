@@ -67,15 +67,6 @@ def train(args, model, train_sampler, valid_samplers=None):
     logs = []
 
 def test(args, model, test_samplers, mode='Test'):
-    def clear(g, node_exclude, edge_exclude):
-        keys = [key for key in g.ndata]
-        for key in keys:
-            if key not in node_exclude:
-                g.pop_n_repr(key)
-        keys = [key for key in g.edata]
-        for key in keys:
-            if key not in edge_exclude:
-                g.pop_e_repr(key)
     logs = []
 
     for sampler in test_samplers:
@@ -89,8 +80,6 @@ def test(args, model, test_samplers, mode='Test'):
 
             model.forward_test(pos_g, neg_g, sampler.neg_head,
                                 sampler.neg_sample_size, logs, args.gpu)
-            clear(pos_g, [], [])
-            clear(neg_g, [], ['bias'])
 
     metrics = {}
     if len(logs) > 0:

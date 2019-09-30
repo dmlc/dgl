@@ -80,15 +80,6 @@ def train(args, model, train_sampler, valid_samplers=None):
 def test(args, model, test_samplers, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
-    def clear(g, node_exclude, edge_exclude):
-        keys = [key for key in g.ndata]
-        for key in keys:
-            if key not in node_exclude:
-                g.pop_n_repr(key)
-        keys = [key for key in g.edata]
-        for key in keys:
-            if key not in edge_exclude:
-                g.pop_e_repr(key)
     start = time.time()
     with th.no_grad():
         logs = []
@@ -103,9 +94,6 @@ def test(args, model, test_samplers, mode='Test'):
                 with th.no_grad():
                     model.forward_test(pos_g, neg_g, sampler.neg_head,
                                        sampler.neg_sample_size, logs, args.gpu)
-                clear(pos_g, [], [])
-                # TODO move bias to CPU.
-                clear(neg_g, [], ['bias'])
 
         metrics = {}
         if len(logs) > 0:
