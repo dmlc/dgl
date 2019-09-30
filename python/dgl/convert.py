@@ -320,7 +320,7 @@ def heterograph(data_dict, num_nodes_dict=None):
                     ndst = data.number_of_nodes() - nsrc
             elif isinstance(data, DGLHeteroGraph):
                 # Do nothing; handled in the next loop
-                pass
+                continue
             else:
                 raise DGLError('Unsupported graph data type %s for %s' % (
                     type(data), (srctype, etype, dsttype)))
