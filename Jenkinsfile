@@ -194,11 +194,6 @@ pipeline {
                 unit_test_linux("pytorch", "cpu")
               }
             }
-            stage("Knowledge Graph test") {
-              steps {
-                kg_test_linux("pytorch", "cpu")
-              }
-            }
             stage("Example test") {
               steps {
                 example_test_linux("pytorch", "cpu")
@@ -207,6 +202,11 @@ pipeline {
             stage("Tutorial test") {
               steps {
                 tutorial_test_linux("pytorch")
+              }
+            }
+            stage("Knowledge Graph test") {
+              steps {
+                kg_test_linux("pytorch", "cpu")
               }
             }
           }
