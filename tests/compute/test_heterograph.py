@@ -50,12 +50,13 @@ def create_test_heterograph2():
     wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
 
     g = dgl.heterograph({
         ('user', 'follows', 'user'): [(0, 1), (1, 2)],
         ('user', 'plays', 'game'): plays_spmat,
         ('user', 'wishes', 'game'): wishes_nx,
-        ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+        ('developer', 'develops', 'game'): develops_g,
         })
     return g
 

@@ -265,64 +265,79 @@ def hetero_from_relations(rel_graphs):
         retg._edge_frames[i].update(rgrh._edge_frames[0])
     return retg
 
-def heterograph(edge_dict, num_nodes_dict=None):
+def heterograph(data_dict, num_nodes_dict=None):
     """Create a heterogeneous graph from a dictionary between edge types and edge lists.
 
     Parameters
     ----------
-    edge_dict : dict
-        The dictionary between edge types and edge lists.
+    data_dict : dict
+        The dictionary between edge types and edge list data.
 
         The edge types are specified as a triplet of (source node type name, edge type
         name, destination node type name).
 
-        The edge lists can be either a pair of source and destination node ID lists,
-        a list of source-destination pairs, or a scipy sparse matrix.  See
-        :func:`dgl.graph` or :func:`dgl.bipartite` for examples.
+        The edge list data can be anything acceptable by :func:`dgl.graph` or
+        :func:`dgl.bipartite`, or objects returned by the two functions themselves.
     num_nodes_dict : dict[str, int]
         The number of nodes for each node type.
 
-        By default DGL infers the number of nodes for each node type from ``edge_dict``
+        By default DGL infers the number of nodes for each node type from ``data_dict``
         by taking the maximum node ID plus one for each node type.
 
     Returns
     -------
     DGLHeteroGraph
+
+    Examples
+    --------
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+    ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+    ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+    ...     })
     """
     rel_graphs = []
 
     # infer number of nodes for each node type
     if num_nodes_dict is None:
         num_nodes_dict = defaultdict(int)
-        for (srctype, etype, dsttype), edges in edge_dict.items():
-            if isinstance(edges, tuple):
-                nsrc = max(edges[0]) + 1
-                ndst = max(edges[1]) + 1
-            elif isinstance(edges, list):
-                src, dst = zip(*edges)
+        for (srctype, etype, dsttype), data in data_dict.items():
+            if isinstance(data, tuple):
+                nsrc = max(data[0]) + 1
+                ndst = max(data[1]) + 1
+            elif isinstance(data, list):
+                src, dst = zip(*data)
                 nsrc = max(src) + 1
                 ndst = max(dst) + 1
-            elif isinstance(edges, sp.sparse.spmatrix):
-                nsrc = edges.shape[0]
-                ndst = edges.shape[1]
-            elif isinstance(edges, nx.Graph):
+            elif isinstance(data, sp.sparse.spmatrix):
+                nsrc = data.shape[0]
+                ndst = data.shape[1]
+            elif isinstance(data, nx.Graph):
                 if srctype == dsttype:
-                    nsrc = ndst = edges.number_of_nodes()
+                    nsrc = ndst = data.number_of_nodes()
                 else:
-                    nsrc = len({n for n, d in edges.nodes(data=True) if d['bipartite'] == 0})
-                    ndst = edges.number_of_nodes() - nsrc
+                    nsrc = len({n for n, d in data.nodes(data=True) if d['bipartite'] == 0})
+                    ndst = data.number_of_nodes() - nsrc
+            elif isinstance(data, DGLHeteroGraph):
+                # Do nothing; handled in the next loop
+                pass
+            else:
+                raise DGLError('Unsupported graph data type %s for %s' % (
+                    type(data), (srctype, etype, dsttype)))
             if srctype == dsttype:
                 ndst = nsrc = max(nsrc, ndst)
 
             num_nodes_dict[srctype] = max(num_nodes_dict[srctype], nsrc)
             num_nodes_dict[dsttype] = max(num_nodes_dict[dsttype], ndst)
 
-    for (srctype, etype, dsttype), edges in edge_dict.items():
-        if srctype == dsttype:
-            rel_graphs.append(graph(edges, srctype, etype, card=num_nodes_dict[srctype]))
+    for (srctype, etype, dsttype), data in data_dict.items():
+        if isinstance(data, DGLHeteroGraph):
+            rel_graphs.append(data)
+        elif srctype == dsttype:
+            rel_graphs.append(graph(data, srctype, etype, card=num_nodes_dict[srctype]))
         else:
             rel_graphs.append(bipartite(
-                edges, srctype, etype, dsttype,
+                data, srctype, etype, dsttype,
                 card=(num_nodes_dict[srctype], num_nodes_dict[dsttype])))
 
     return hetero_from_relations(rel_graphs)
