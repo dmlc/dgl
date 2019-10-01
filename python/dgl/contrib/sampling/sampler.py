@@ -542,6 +542,13 @@ class EdgeSampler(object):
     relations: tensor, optional
         relations of the edges if this is a knowledge graph.
 
+    Examples
+    --------
+    >>> for pos_g, neg_g in EdgeSampler(g, batch_size=10):
+    >>>     print(pos_g.head_nid, pos_g.tail_nid)
+    >>>     print(neg_g.head_nid, pos_g.tail_nid)
+    >>>     print(neg_g.edata['false_neg'])
+
     Class properties
     ----------------
     immutable_only : bool
