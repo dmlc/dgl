@@ -1139,11 +1139,11 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
     neg_vids.resize(it - neg_vids.begin());
   }
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
-    neg_subg.tail_nid = VecToIdArray(local_pos_vids);
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
   } else {
-    neg_subg.head_nid = VecToIdArray(local_pos_vids);
-    neg_subg.tail_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
   }
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
   if (check_false_neg) {
@@ -1285,11 +1285,11 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
-    neg_subg.tail_nid = VecToIdArray(local_pos_vids);
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
   } else {
-    neg_subg.head_nid = VecToIdArray(local_pos_vids);
-    neg_subg.tail_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
   }
   if (check_false_neg) {
     if (relations->shape[0] == 0) {
