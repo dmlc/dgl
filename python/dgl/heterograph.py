@@ -87,6 +87,14 @@ class DGLHeteroGraph(object):
     >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
     >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
 
+    Or equivalently
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+    ...     ('user', 'plays', 'game'): [(0, 0), (1, 0), (1, 1), (2, 1)],
+    ...     ('developer', 'develops', 'game'): [(0, 0), (1, 1)],
+    ...     })
+
     :func:`dgl.graph` and :func:`dgl.bipartite` can create a graph from a variety of
     data types including:
 

@@ -10,6 +10,7 @@ import pickle as pkl
 import networkx as nx
 import scipy.sparse as sp
 import os, sys
+from dgl import DGLGraph
 
 import dgl
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
@@ -28,7 +29,16 @@ def _pickle_load(pkl_file):
         return pkl.load(pkl_file)
 
 class CitationGraphDataset(object):
+    r"""The citation graph dataset, including citeseer and pubmeb.
+    Nodes mean authors and edges mean citation relationships.
+
+    Parameters
+    -----------
+    name: str
+      name can be 'citeseer' or 'pubmed'.
+    """
     def __init__(self, name):
+        assert name.lower() in ['citeseer', 'pubmed']
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
@@ -112,7 +122,14 @@ class CitationGraphDataset(object):
         print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
 
     def __getitem__(self, idx):
-        return self
+        assert idx == 0, "This dataset has only one graph"
+        g = DGLGraph(self.graph)
+        g.ndata['train_mask'] = self.train_mask
+        g.ndata['val_mask'] = self.val_mask
+        g.ndata['test_mask'] = self.test_mask
+        g.ndata['label'] = self.labels
+        g.ndata['feat'] = self.features
+        return g
 
     def __len__(self):
         return 1
@@ -337,6 +354,9 @@ class CoraBinary(object):
         return batched_graphs, batched_pmpds, batched_labels
 
 class CoraDataset(object):
+    r"""Cora citation network dataset. Nodes mean author and edges mean citation
+    relationships.
+    """
     def __init__(self):
         self.name = 'cora'
         self.dir = get_download_dir()
@@ -378,6 +398,21 @@ class CoraDataset(object):
         self.train_mask = _sample_mask(range(140), labels.shape[0])
         self.val_mask = _sample_mask(range(200, 500), labels.shape[0])
         self.test_mask = _sample_mask(range(500, 1500), labels.shape[0])
+    
+    def __getitem__(self, idx):
+        assert idx == 0, "This dataset has only one graph"
+        g = DGLGraph(self.graph)
+        g.ndata['train_mask'] = self.train_mask
+        g.ndata['val_mask'] = self.val_mask
+        g.ndata['test_mask'] = self.test_mask
+        g.ndata['label'] = self.labels
+        g.ndata['feat'] = self.features
+        return g
+    
+    def __len__(self):
+        return 1
+
+
 
 def _normalize(mx):
     """Row-normalize sparse matrix"""

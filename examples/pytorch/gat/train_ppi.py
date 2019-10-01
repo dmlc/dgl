@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import argparse
 from sklearn.metrics import f1_score
 from gat import GAT
-from dgl.data.ppi import PPIDataset
+from dgl.data.ppi import LegacyPPIDataset
 from torch.utils.data import DataLoader
 
 def collate(sample):
@@ -54,9 +54,9 @@ def main(args):
     # define loss function
     loss_fcn = torch.nn.BCEWithLogitsLoss()
     # create the dataset
-    train_dataset = PPIDataset(mode='train')
-    valid_dataset = PPIDataset(mode='valid')
-    test_dataset = PPIDataset(mode='test')
+    train_dataset = LegacyPPIDataset(mode='train')
+    valid_dataset = LegacyPPIDataset(mode='valid')
+    test_dataset = LegacyPPIDataset(mode='test')
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate)
     valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, collate_fn=collate)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate)
