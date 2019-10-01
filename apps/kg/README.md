@@ -57,20 +57,20 @@ The accuracy on wn18
 Train KGE models with GPU.
 
 ```bash
-python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv
 ```
 
 Train KGE models with mixed CPUs and GPUs.
 
-python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
     --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
 
 Train embeddings and verify it later.
 ```bash
-python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
     --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
 
@@ -81,7 +81,7 @@ python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
 
 Train embeddings with multi-processing. This currently doesn't work in MXNet.
 ```bash
-python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
+python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 --max_step 3000 \
     --batch_size_eval 16 --regularization_coef 0.000001 --train --valid --test -adv --num_proc 8
 ```
@@ -89,14 +89,14 @@ python3 main.py --model DistMult --dataset FB15k --batch_size 1024 \
 ## Freebase
 Train embeddings on Freebase with multi-processing on X1.
 ```bash
-DGLBACKEND=pytorch python3 main.py --model ComplEx --dataset Freebase --batch_size 1024 \
+DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset Freebase --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
     --lr 0.1 --max_step 50000 --batch_size_eval 128 --train --test -adv --eval_interval 300000 \
     --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64
+
 Test average MR at [0/50000]: 754.5566055566055
 Test average MRR at [0/50000]: 0.7333319016877765
 Test average HITS@1 at [0/50000]: 0.7182952182952183
 Test average HITS@3 at [0/50000]: 0.7409752409752409
 Test average HITS@10 at [0/50000]: 0.7587412587412588
-test time: 7678.401087999344
 ```

@@ -75,8 +75,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='if use negative adversarial sampling')
         self.add_argument('-a', '--adversarial_temperature', default=1.0, type=float)
 
-        self.add_argument('--train', action='store_true',
-                          help='if train a model')
         self.add_argument('--valid', action='store_true',
                           help='if valid a model')
         self.add_argument('--test', action='store_true',
@@ -240,24 +238,24 @@ def run(args, logger):
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
-    # train
     if args.num_proc > 1:
         model.share_memory()
-    if args.train:
-        start = time.time()
-        if args.num_proc > 1:
-            procs = []
-            for i in range(args.num_proc):
-                valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-                proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
-                procs.append(proc)
-                proc.start()
-            for proc in procs:
-                proc.join()
-        else:
-            valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-            train(args, model, train_sampler, valid_samplers)
-        print('training takes {} seconds'.format(time.time() - start))
+
+    # train
+    start = time.time()
+    if args.num_proc > 1:
+        procs = []
+        for i in range(args.num_proc):
+            valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
+            proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
+            procs.append(proc)
+            proc.start()
+        for proc in procs:
+            proc.join()
+    else:
+        valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
+        train(args, model, train_sampler, valid_samplers)
+    print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb:
         model.save_emb(args.save_path, args.dataset)
