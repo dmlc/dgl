@@ -67,13 +67,8 @@ class BaseKEModel(object):
 
         assert neg_g.number_of_edges() == pos_g.number_of_edges() * neg_sample_size
         if neg_head:
-            neg_head_ids, _ = neg_g.all_edges(order='eid')
-            neg_head_ids = neg_g.ndata['id'][neg_head_ids]
-            # TODO this hack isn't necessary when bipartite graph is supported.
-            neg_head_ids = neg_head_ids.reshape(num_chunks, chunk_size, neg_sample_size)
-            neg_head_ids = neg_head_ids[:,0,:].reshape(num_chunks * neg_sample_size)
+            neg_head_ids = neg_g.ndata['id'][neg_g.head_nid]
             neg_head = entity_emb(neg_head_ids, gpu_id, trace)
-
             _, tail_ids = pos_g.all_edges(order='eid')
             if to_device is not None and gpu_id >= 0:
                 tail_ids = to_device(tail_ids, gpu_id)
@@ -81,13 +76,8 @@ class BaseKEModel(object):
             rel = pos_g.edata['emb']
             neg_score = self.head_neg_score(neg_head, rel, tail)
         else:
-            _, neg_tail_ids = neg_g.all_edges(order='eid')
-            neg_tail_ids = neg_g.ndata['id'][neg_tail_ids]
-            # TODO this hack isn't necessary when bipartite graph is supported.
-            neg_tail_ids = neg_tail_ids.reshape(num_chunks, chunk_size, neg_sample_size)
-            neg_tail_ids = neg_tail_ids[:,0,:].reshape(num_chunks * neg_sample_size)
+            neg_tail_ids = neg_g.ndata['id'][neg_g.tail_nid]
             neg_tail = entity_emb(neg_tail_ids, gpu_id, trace)
-
             head_ids, _ = pos_g.all_edges(order='eid')
             if to_device is not None and gpu_id >= 0:
                 head_ids = to_device(head_ids, gpu_id)
