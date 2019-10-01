@@ -2581,8 +2581,8 @@ class DGLHeteroGraph(object):
             h_v^{new} &= \sigma\left(g\left(\left\{h_{v, t}^{new} | t\in T_e\right\}\right)\right)
             \end{align}
 
-        * ``per_type_reducer`` is a dictionary mapping edge type (str or tuple of str) to reduce functions
-          :math:`f` of each type.
+        * ``per_type_reducer`` is a dictionary mapping edge type (str or tuple of str) to
+          reduce functions :math:`f` of each type.
         * ``cross_reducer`` specifies :math:`g`.
         * ``apply_node_func`` specifies :math:`\sigma`.
 
@@ -2620,7 +2620,8 @@ class DGLHeteroGraph(object):
 
         >>> g.send(g['follows'].edges(), fn.copy_src('h', 'm'), etype='follows')
         >>> g.send(g['attracts'].edges(), fn.copy_src('h', 'm'), etype='attracts')
-        >>> g.multi_recv(g.nodes('user'), {'follows': fn.sum('m', 'h'), 'attracts': fn.sum('m', 'h')}, "sum")
+        >>> g.multi_recv(g.nodes('user'), {'follows': fn.sum('m', 'h'),
+        >>>              'attracts': fn.sum('m', 'h')}, "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [2.]])
@@ -2679,7 +2680,8 @@ class DGLHeteroGraph(object):
 
         .. code::
 
-           g['edgetype'].send_and_recv(edges, message_func, reduce_func, apply_node_func, inplace=inplace)
+           g['edgetype'].send_and_recv(edges, message_func, reduce_func,
+                                       apply_node_func, inplace=inplace)
 
         Parameters
         ----------
@@ -2770,8 +2772,9 @@ class DGLHeteroGraph(object):
         Parameters
         ----------
         etype_dict : dict
-            Mapping an edge type (str or tuple of str) to the type specific configuration (4-tuples).
-            Each 4-tuple represents (edges, msg_func, reduce_func, apply_node_func):
+            Mapping an edge type (str or tuple of str) to the type specific
+            configuration (4-tuples). Each 4-tuple represents
+            (edges, msg_func, reduce_func, apply_node_func):
 
             * edges: See send() for valid edge specification.
                   Edges on which to pass messages.
@@ -2812,7 +2815,8 @@ class DGLHeteroGraph(object):
         >>> g.nodes['game'].data['h'] = torch.tensor([[1.]])
         >>> g.send(g['follows'].edges(), fn.copy_src('h', 'm'), etype='follows')
         >>> g.send(g['attracts'].edges(), fn.copy_src('h', 'm'), etype='attracts')
-        >>> g.multi_recv(g.nodes('user'), {'follows': fn.sum('m', 'h'), 'attracts': fn.sum('m', 'h')}, "sum")
+        >>> g.multi_recv(g.nodes('user'),
+        >>>              {'follows': fn.sum('m', 'h'), 'attracts': fn.sum('m', 'h')}, "sum")
         >>> g.nodes['user'].data['h']
         tensor([[0.],
                 [2.]])
