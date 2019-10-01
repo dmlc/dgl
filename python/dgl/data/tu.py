@@ -4,10 +4,10 @@ import dgl
 import os
 import random
 
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import download, extract_archive, get_download_dir, loadtxt
 
 
-class TUDataset(object):
+class LegacyTUDataset(object):
     """
     TUDataset contains lots of graph kernel datasets for graph classification.
     Use provided node feature by default. If no feature provided, use one-hot node label instead.
@@ -153,4 +153,107 @@ class TUDataset(object):
     def statistics(self):
         return self.graph_lists[0].ndata['feat'].shape[1],\
             self.num_labels,\
+            self.max_num_node
+
+
+class TUDataset(object):
+    """
+    TUDataset contains lots of graph kernel datasets for graph classification.
+    Graphs may have node labels, node attributes, edge labels, and edge attributes,
+    varing from different dataset.
+
+    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`, `MUTAG`, can be the 
+    datasets name on https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets.
+    """
+
+    _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
+
+    def __init__(self, name):
+
+        self.name = name
+        self.extract_dir = self._download()
+
+        DS_edge_list = self._idx_from_zero(
+            loadtxt(self._file_path("A"), delimiter=",").astype(int))
+        DS_indicator = self._idx_from_zero(
+            loadtxt(self._file_path("graph_indicator"), delimiter=",").astype(int))
+        DS_graph_labels = self._idx_from_zero(
+            loadtxt(self._file_path("graph_labels"), delimiter=",").astype(int))
+
+        g = dgl.DGLGraph()
+        g.add_nodes(int(DS_edge_list.max()) + 1)
+        g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
+
+        node_idx_list = []
+        self.max_num_node = 0
+        for idx in range(np.max(DS_indicator) + 1):
+            node_idx = np.where(DS_indicator == idx)
+            node_idx_list.append(node_idx[0])
+            if len(node_idx[0]) > self.max_num_node:
+                self.max_num_node = len(node_idx[0])
+
+        self.num_labels = max(DS_graph_labels) + 1
+        self.graph_labels = DS_graph_labels
+
+        self.attr_dict = {
+            'node_labels': ('ndata', 'node_labels'),
+            'node_attributes': ('ndata', 'node_attr'),
+            'edge_labels': ('edata', 'edge_labels'),
+            'edge_attributes': ('edata', 'node_labels'),
+        }
+
+        for filename, field_name in self.attr_dict.items():
+            try:
+                data = loadtxt(self._file_path(filename),
+                               delimiter=',').astype(int)
+                if 'label' in filename:
+                    data = self._idx_from_zero(data)
+                getattr(g, field_name[0])[field_name[1]] = data
+            except IOError:
+                pass
+
+        self.graph_lists = g.subgraphs(node_idx_list)
+        for g in self.graph_lists:
+            g.copy_from_parent()
+
+    def __getitem__(self, idx):
+        """Get the i^th sample.
+        Paramters
+        ---------
+        idx : int
+            The sample index.
+        Returns
+        -------
+        (dgl.DGLGraph, int)
+            DGLGraph with node feature stored in `feat` field and node label in `node_label` if available.
+            And its label.
+        """
+        g = self.graph_lists[idx]
+        return g, self.graph_labels[idx]
+
+    def __len__(self):
+        return len(self.graph_lists)
+
+    def _download(self):
+        download_dir = get_download_dir()
+        zip_file_path = os.path.join(
+            download_dir,
+            "tu_{}.zip".format(
+                self.name))
+        download(self._url.format(self.name), path=zip_file_path)
+        extract_dir = os.path.join(download_dir, "tu_{}".format(self.name))
+        extract_archive(zip_file_path, extract_dir)
+        return extract_dir
+
+    def _file_path(self, category):
+        return os.path.join(self.extract_dir, self.name,
+                            "{}_{}.txt".format(self.name, category))
+
+    @staticmethod
+    def _idx_from_zero(idx_tensor):
+        return idx_tensor - np.min(idx_tensor)
+
+    def statistics(self):
+        return self.graph_lists[0].ndata['feat'].shape[1], \
+            self.num_labels, \
             self.max_num_node

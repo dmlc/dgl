@@ -8,6 +8,7 @@ import warnings
 import zipfile
 import tarfile
 import numpy as np
+import warnings
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
 
@@ -18,10 +19,19 @@ except ImportError:
         pass
     requests = requests_failed_to_import
 
-__all__ = ['download', 'check_sha1', 'extract_archive',
+__all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
            'save_graphs', "load_graphs", "load_labels"]
 
+def loadtxt(path, delimiter, dtype=None):
+    try:
+        import pandas as pd
+        df = pd.read_csv(path, delimiter=delimiter, header=None)
+        return df.values
+    except ImportError:
+        warnings.warn("Pandas is not installed, now using numpy.loadtxt to load data, "
+                        "which could be extremely slow. Accelerate by installing pandas")
+        return np.loadtxt(path, delimiter=delimiter)
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""

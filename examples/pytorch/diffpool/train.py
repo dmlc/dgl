@@ -123,7 +123,7 @@ def graph_classify_task(prog_args):
     perform graph classification task
     '''
 
-    dataset = tu.TUDataset(name=prog_args.dataset)
+    dataset = tu.LegacyTUDataset(name=prog_args.dataset)
     train_size = int(prog_args.train_ratio * len(dataset))
     test_size = int(prog_args.test_ratio * len(dataset))
     val_size = int(len(dataset) - train_size - test_size)
