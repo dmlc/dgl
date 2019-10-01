@@ -8,25 +8,26 @@ function fail {
 }
 
 function usage {
-    echo "Usage: $0 [cpu|gpu]"
+    echo "Usage: $0 backend device"
 }
 
 # check arguments
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
     usage
-    fail "Error: must specify device"
+    fail "Error: must specify device and bakend"
 fi
 
-if [ "$1" == "cpu" ]; then
+if [ "$2" == "cpu" ]; then
     dev=-1
-elif [ "$1" == "gpu" ]; then
+elif [ "$2" == "gpu" ]; then
     export CUDA_VISIBLE_DEVICES=0
     dev=0
 else
     usage
-    fail "Unknown device $1"
+    fail "Unknown device $2"
 fi
 
+export DGLBACKEND=$1
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=${PWD}/python:$KG_DIR:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}

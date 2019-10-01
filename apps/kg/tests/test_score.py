@@ -5,7 +5,6 @@ import numpy as np
 import dgl.backend as F
 import dgl
 
-
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
     from models.mxnet.score_fun import *

@@ -73,7 +73,7 @@ def kg_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 20, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_kg_test.sh ${dev}"
+    sh "bash tests/scripts/task_kg_test.sh ${backend} ${dev}"
   }
 }
 
