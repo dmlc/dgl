@@ -108,14 +108,9 @@ def get_logger(args):
     folder += str(n)
     args.save_path = os.path.join(args.save_path, folder)
 
-    if args.train:
-        if not os.path.exists(args.save_path):
-            os.makedirs(args.save_path)
-        log_file = os.path.join(args.save_path, 'train.log')
-    else:
-        if not os.path.exists(args.save_path):
-            raise FileNotFoundError('Please check if checkpoint exists:', args.save_path)
-        log_file = os.path.join(args.save_path, 'test.log')
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path)
+    log_file = os.path.join(args.save_path, 'train.log')
 
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -138,36 +133,35 @@ def run(args, logger):
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = n_entities
 
-    if args.train:
-        train_data = TrainDataset(dataset, args, ranks=args.num_proc)
-        if args.num_proc > 1:
-            train_samplers = []
-            for i in range(args.num_proc):
-                train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                               mode='PBG-head',
-                                                               num_workers=args.num_worker,
-                                                               shuffle=True,
-                                                               exclude_positive=True,
-                                                               rank=i)
-                train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                               mode='PBG-tail',
-                                                               num_workers=args.num_worker,
-                                                               shuffle=True,
-                                                               exclude_positive=True,
-                                                               rank=i)
-                train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail))
-        else:
+    train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    if args.num_proc > 1:
+        train_samplers = []
+        for i in range(args.num_proc):
             train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                            mode='PBG-head',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
-                                                           exclude_positive=True)
+                                                           exclude_positive=True,
+                                                           rank=i)
             train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                            mode='PBG-tail',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
-                                                           exclude_positive=True)
-            train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail)
+                                                           exclude_positive=True,
+                                                           rank=i)
+            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail))
+    else:
+        train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       mode='PBG-head',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+        train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       mode='PBG-tail',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail)
 
     if args.valid or args.test:
         eval_dataset = EvalDataset(dataset, args)

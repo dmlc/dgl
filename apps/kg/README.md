@@ -54,25 +54,30 @@ The accuracy on wn18
 
 ## Examples
 
+Here are some examples of using the training script.
+
 Train KGE models with GPU.
 
 ```bash
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv
+    --batch_size_eval 16 --gpu 0 --valid --test -adv
 ```
 
 Train KGE models with mixed CPUs and GPUs.
 
-python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
-    --batch_size_eval 16 --gpu 0 --train --valid --test -adv --mix_cpu_gpu
-
-Train embeddings and verify it later.
 ```bash
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
-    --batch_size_eval 16 --gpu 0 --train --valid -adv --save_emb
+    --batch_size_eval 16 --gpu 0 --valid --test -adv --mix_cpu_gpu
+```
+
+Train embeddings and verify it later.
+
+```bash
+python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
+    --batch_size_eval 16 --gpu 0 --valid -adv --save_emb
 
 python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
     --gamma 500.0 --batch_size 16 --gpu 0 --model_path ckpts/DistMult_FB15k_xx/
@@ -83,7 +88,7 @@ Train embeddings with multi-processing. This currently doesn't work in MXNet.
 ```bash
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 --max_step 3000 \
-    --batch_size_eval 16 --regularization_coef 0.000001 --train --valid --test -adv --num_proc 8
+    --batch_size_eval 16 --regularization_coef 0.000001 --valid --test -adv --num_proc 8
 ```
 
 ## Freebase
@@ -91,7 +96,7 @@ Train embeddings on Freebase with multi-processing on X1.
 ```bash
 DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset Freebase --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
-    --lr 0.1 --max_step 50000 --batch_size_eval 128 --train --test -adv --eval_interval 300000 \
+    --lr 0.1 --max_step 50000 --batch_size_eval 128 --test -adv --eval_interval 300000 \
     --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64
 
 Test average MR at [0/50000]: 754.5566055566055

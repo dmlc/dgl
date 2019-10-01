@@ -128,14 +128,14 @@ class KEModel(object):
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
 
+        self.train_basic_model = BaseKEModel(self.score_func,
+                                             self.args.batch_size,
+                                             self.args.neg_sample_size,
+                                             hidden_dim,
+                                             n_entities)
+
         self.test_basic_models = {}
-        if args.train:
-            self.train_basic_model = BaseKEModel(self.score_func,
-                                                 self.args.batch_size,
-                                                 self.args.neg_sample_size,
-                                                 hidden_dim,
-                                                 n_entities)
-            self.test_basic_models[self.args.neg_sample_size] = self.train_basic_model
+        self.test_basic_models[self.args.neg_sample_size] = self.train_basic_model
         if args.valid:
             self.test_basic_models[self.args.neg_sample_size_valid] = BaseKEModel(
                 self.score_func, self.args.batch_size_eval,
