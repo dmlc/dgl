@@ -29,6 +29,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
+        self.add_argument('--format', type=str, default='1',
+                          help='the format of the dataset.')
         self.add_argument('--model_path', type=str, default='ckpts',
                           help='the place where models are saved')
 
@@ -83,7 +85,7 @@ def get_logger(args):
 
 def main(args):
     # load dataset and samplers
-    dataset = get_dataset(args.data_path, args.dataset)
+    dataset = get_dataset(args.data_path, args.dataset, args.format)
     args.pickle_graph = False
     args.train = False
     args.valid = False

@@ -159,10 +159,12 @@ class KGDataset2:
             cur_l += len(ls)
 
 
-def get_dataset(data_path, data_name):
+def get_dataset(data_path, data_name, format_str):
     if data_name == 'Freebase':
         dataset = KGDataset2(data_path, data_name)
-    else:
+    elif format_str == '1':
         dataset = KGDataset1(data_path, data_name)
+    else:
+        dataset = KGDataset2(data_path, data_name)
 
     return dataset
