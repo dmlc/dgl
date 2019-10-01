@@ -221,6 +221,19 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
+def check_head_tail(g):
+    lsrc, ldst, leid = g.all_edges(form='all', order='eid')
+
+    lsrc = np.unique(F.asnumpy(lsrc))
+    head_nid = np.unique(F.asnumpy(g.head_nid))
+    assert len(head_nid) == len(g.head_nid)
+    np.testing.assert_equal(lsrc, head_nid)
+
+    ldst = np.unique(F.asnumpy(ldst))
+    tail_nid = np.unique(F.asnumpy(g.tail_nid))
+    assert len(tail_nid) == len(g.tail_nid)
+    np.testing.assert_equal(tail_nid, ldst)
+
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
@@ -257,17 +270,14 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
-        neg_lsrc = np.unique(F.asnumpy(neg_lsrc))
-        head_nid = np.unique(F.asnumpy(neg_edges.head_nid))
-        assert len(head_nid) == len(neg_edges.head_nid)
-        np.testing.assert_equal(neg_lsrc, head_nid)
+        check_head_tail(neg_edges)
+        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
+        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
+        pos_tails = np.sort(F.asnumpy(pos_tails))
+        neg_tails = np.sort(F.asnumpy(neg_tails))
+        np.testing.assert_equal(pos_tails, neg_tails)
 
-        neg_ldst = np.unique(F.asnumpy(neg_ldst))
-        tail_nid = np.unique(F.asnumpy(neg_edges.tail_nid))
-        assert len(tail_nid) == len(neg_edges.tail_nid)
-        np.testing.assert_equal(tail_nid, neg_ldst)
-
-        exist = neg_edges.false_neg
+        exist = neg_edges.edata['false_neg']
         if exclude_positive:
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
@@ -284,7 +294,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
-        exists = neg_edges.false_neg
+        exists = neg_edges.edata['false_neg']
         neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
