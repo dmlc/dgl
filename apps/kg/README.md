@@ -27,12 +27,14 @@ DGL-KE is tested on datasets including:
 The speed is measured on an EC2 P3 instance on a Nvidia V100 GPU.
 
 The speed on FB15k
+
 |  Models | TrasnE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 20000  | 100000   | 100000  |
 |TIME     | 411s   | 690s     | 806s    |
 
 The accuracy on FB15k
+
 |  Models  |  MR   |  MRR  | HITS@1 | HITS@3 | HITS@10 |
 |----------|-------|-------|--------|--------|---------|
 | TransE   | 69.12 | 0.656 | 0.567  | 0.718  | 0.802   |
@@ -40,12 +42,14 @@ The accuracy on FB15k
 | ComplEx  | 51.99 | 0.785 | 0.720  | 0.832  | 0.889   |
 
 The speed on wn18
+
 |  Models | TrasnE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 40000  | 10000    | 20000   |
 |TIME     | 719s   | 126s     | 266s    |
 
 The accuracy on wn18
+
 |  Models  |  MR    |  MRR  | HITS@1 | HITS@3 | HITS@10 |
 |----------|--------|-------|--------|--------|---------|
 | TransE   | 321.35 | 0.760 | 0.652  | 0.850  | 0.940   |
