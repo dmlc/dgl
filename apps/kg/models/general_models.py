@@ -22,71 +22,6 @@ else:
     from .pytorch.tensor_models import ExternalEmbedding
     from .pytorch.score_fun import *
 
-class BaseKEModel(object):
-    def __init__(self, score_func, batch_size, neg_sample_size, hidden_dim, n_entities):
-        self.score_func = score_func
-        head_neg_score, tail_neg_score = self.create_neg(batch_size,
-                                                         neg_sample_size,
-                                                         hidden_dim,
-                                                         n_entities)
-        self.head_neg_score = head_neg_score
-        self.tail_neg_score = tail_neg_score
-        self.neg_sample_size = neg_sample_size
-
-    def create_neg(self, batch_size, neg_sample_size, hidden_dim, n_entities):
-        if neg_sample_size > 0:
-            chunk_size = min(neg_sample_size, batch_size)
-            num_chunks = int(batch_size / chunk_size)
-        else:
-            chunk_size = batch_size
-            num_chunks = 1
-            # Here we are using all nodes to create negative edges.
-            neg_sample_size = n_entities
-
-        head_neg_score = self.score_func.create_neg(True, num_chunks,
-                                                    chunk_size,
-                                                    neg_sample_size,
-                                                    hidden_dim)
-        tail_neg_score = self.score_func.create_neg(False, num_chunks,
-                                                    chunk_size,
-                                                    neg_sample_size,
-                                                    hidden_dim)
-        return head_neg_score, tail_neg_score
-
-    def predict_score(self, g):
-        self.score_func(g)
-        return g.edata['score']
-
-    def predict_neg_score(self, pos_g, neg_g, entity_emb, neg_head, to_device=None, gpu_id=-1, trace=False):
-        neg_sample_size = self.head_neg_score.neg_sample_size
-        num_chunks = self.head_neg_score.num_chunks
-        chunk_size = self.head_neg_score.chunk_size
-
-        if pos_g.number_of_edges() != num_chunks * chunk_size:
-            return self.predict_score(neg_g)
-
-        assert neg_g.number_of_edges() == pos_g.number_of_edges() * neg_sample_size
-        if neg_head:
-            neg_head_ids = neg_g.ndata['id'][neg_g.head_nid]
-            neg_head = entity_emb(neg_head_ids, gpu_id, trace)
-            _, tail_ids = pos_g.all_edges(order='eid')
-            if to_device is not None and gpu_id >= 0:
-                tail_ids = to_device(tail_ids, gpu_id)
-            tail = pos_g.ndata['emb'][tail_ids]
-            rel = pos_g.edata['emb']
-            neg_score = self.head_neg_score(neg_head, rel, tail)
-        else:
-            neg_tail_ids = neg_g.ndata['id'][neg_g.tail_nid]
-            neg_tail = entity_emb(neg_tail_ids, gpu_id, trace)
-            head_ids, _ = pos_g.all_edges(order='eid')
-            if to_device is not None and gpu_id >= 0:
-                head_ids = to_device(head_ids, gpu_id)
-            head = pos_g.ndata['emb'][head_ids]
-            rel = pos_g.edata['emb']
-            neg_score = self.tail_neg_score(head, rel, neg_tail)
-
-        return neg_score
-
 class KEModel(object):
     def __init__(self, args, model_name, n_entities, n_relations, hidden_dim, gamma,
                  double_entity_emb=False, double_relation_emb=False):
@@ -117,25 +52,9 @@ class KEModel(object):
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
+        self.head_neg_score = self.score_func.create_neg(True)
+        self.tail_neg_score = self.score_func.create_neg(False)
 
-        self.train_basic_model = BaseKEModel(self.score_func,
-                                             self.args.batch_size,
-                                             self.args.neg_sample_size,
-                                             hidden_dim,
-                                             n_entities)
-
-        self.test_basic_models = {}
-        self.test_basic_models[self.args.neg_sample_size] = self.train_basic_model
-        if args.valid:
-            self.test_basic_models[self.args.neg_sample_size_valid] = BaseKEModel(
-                self.score_func, self.args.batch_size_eval,
-                self.args.neg_sample_size_valid,
-                hidden_dim, n_entities)
-        if args.test:
-            self.test_basic_models[self.args.neg_sample_size_test] = BaseKEModel(
-                self.score_func, self.args.batch_size_eval,
-                self.args.neg_sample_size_test,
-                hidden_dim, n_entities)
         self.reset_parameters()
 
     def share_memory(self):
@@ -158,16 +77,47 @@ class KEModel(object):
         self.relation_emb.init(self.emb_init)
         self.score_func.reset_parameters()
 
-    def forward_test(self, pos_g, neg_g, neg_head, neg_sample_size, logs, gpu_id=-1):
+    def predict_score(self, g):
+        self.score_func(g)
+        return g.edata['score']
+
+    def predict_neg_score(self, pos_g, neg_g, to_device=None, gpu_id=-1, trace=False):
+        num_chunks = neg_g.num_chunks
+        chunk_size = neg_g.chunk_size
+        neg_sample_size = neg_g.neg_sample_size
+        if neg_g.neg_head:
+            neg_head_ids = neg_g.ndata['id'][neg_g.head_nid]
+            neg_head = self.entity_emb(neg_head_ids, gpu_id, trace)
+            _, tail_ids = pos_g.all_edges(order='eid')
+            if to_device is not None and gpu_id >= 0:
+                tail_ids = to_device(tail_ids, gpu_id)
+            tail = pos_g.ndata['emb'][tail_ids]
+            rel = pos_g.edata['emb']
+            neg_score = self.head_neg_score(neg_head, rel, tail,
+                                            num_chunks, chunk_size, neg_sample_size)
+        else:
+            neg_tail_ids = neg_g.ndata['id'][neg_g.tail_nid]
+            neg_tail = self.entity_emb(neg_tail_ids, gpu_id, trace)
+            head_ids, _ = pos_g.all_edges(order='eid')
+            if to_device is not None and gpu_id >= 0:
+                head_ids = to_device(head_ids, gpu_id)
+            head = pos_g.ndata['emb'][head_ids]
+            rel = pos_g.edata['emb']
+            neg_score = self.tail_neg_score(head, rel, neg_tail,
+                                            num_chunks, chunk_size, neg_sample_size)
+
+        return neg_score
+
+    def forward_test(self, pos_g, neg_g, logs, gpu_id=-1):
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
 
         batch_size = pos_g.number_of_edges()
-        pos_scores = self.test_basic_models[neg_sample_size].predict_score(pos_g)
+        pos_scores = self.predict_score(pos_g)
         pos_scores = reshape(logsigmoid(pos_scores), batch_size, -1)
 
-        neg_scores = self.test_basic_models[neg_sample_size].predict_neg_score(
-            pos_g, neg_g, self.entity_emb, neg_head, to_device=cuda, gpu_id=gpu_id, trace=False)
+        neg_scores = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
+                                            gpu_id=gpu_id, trace=False)
         neg_scores = reshape(logsigmoid(neg_scores), batch_size, -1)
 
         # We need to filter the positive edges in the negative graph.
@@ -191,19 +141,19 @@ class KEModel(object):
             })
 
     # @profile
-    def forward(self, pos_g, neg_g, neg_head, gpu_id=-1):
+    def forward(self, pos_g, neg_g, gpu_id=-1):
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
 
-        pos_score = self.train_basic_model.predict_score(pos_g)
+        pos_score = self.predict_score(pos_g)
         pos_score = logsigmoid(pos_score)
         if gpu_id >= 0:
-            neg_score = self.train_basic_model.predict_neg_score(pos_g, neg_g, self.entity_emb, neg_head,
-                                                                 to_device=cuda, gpu_id=gpu_id, trace=True)
+            neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
+                                               gpu_id=gpu_id, trace=True)
         else:
-            neg_score = self.train_basic_model.predict_neg_score(pos_g, neg_g, self.entity_emb, neg_head, trace=True)
+            neg_score = self.predict_neg_score(pos_g, neg_g, trace=True)
 
-        neg_score = reshape(neg_score, -1, self.args.neg_sample_size)
+        neg_score = reshape(neg_score, -1, neg_g.neg_sample_size)
         # Adversarial sampling
         if self.args.neg_adversarial_sampling:
             neg_score = F.sum(F.softmax(neg_score * self.args.adversarial_temperature, dim=1).detach()

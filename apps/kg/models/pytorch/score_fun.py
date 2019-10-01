@@ -27,34 +27,24 @@ class TransEScore(nn.Module):
     def load(self, path, name):
         pass
 
-    def create_neg(self, neg_head, num_chunks, chunk_size, neg_sample_size, hidden_dim):
+    def create_neg(self, neg_head):
         gamma = self.gamma
         if neg_head:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    tails = tails - relations
-                    tails = tails.reshape(num_chunks, chunk_size, hidden_dim)
-                    return gamma - th.cdist(tails, heads, p=1)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                tails = tails - relations
+                tails = tails.reshape(num_chunks, chunk_size, hidden_dim)
+                return gamma - th.cdist(tails, heads, p=1)
+            return fn
         else:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    heads = heads + relations
-                    heads = heads.reshape(num_chunks, chunk_size, hidden_dim)
-                    tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    return gamma - th.cdist(heads, tails, p=1)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads + relations
+                heads = heads.reshape(num_chunks, chunk_size, hidden_dim)
+                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+                return gamma - th.cdist(heads, tails, p=1)
+            return fn
 
 class DistMultScore(nn.Module):
     def __init__(self):
@@ -80,33 +70,23 @@ class DistMultScore(nn.Module):
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
-    def create_neg(self, neg_head, num_chunks, chunk_size, neg_sample_size, hidden_dim):
+    def create_neg(self, neg_head):
         if neg_head:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    heads = th.transpose(heads, 1, 2)
-                    tmp = (tails * relations).reshape(num_chunks, chunk_size, hidden_dim)
-                    return th.bmm(tmp, heads)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                heads = th.transpose(heads, 1, 2)
+                tmp = (tails * relations).reshape(num_chunks, chunk_size, hidden_dim)
+                return th.bmm(tmp, heads)
+            return fn
         else:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    tails = th.transpose(tails, 1, 2)
-                    tmp = (heads * relations).reshape(num_chunks, chunk_size, hidden_dim)
-                    return th.bmm(tmp, tails)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = tails.shape[1]
+                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+                tails = th.transpose(tails, 1, 2)
+                tmp = (heads * relations).reshape(num_chunks, chunk_size, hidden_dim)
+                return th.bmm(tmp, tails)
+            return fn
 
 class ComplExScore(nn.Module):
     def __init__(self):
@@ -136,47 +116,37 @@ class ComplExScore(nn.Module):
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
-    def create_neg(self, neg_head, num_chunks, chunk_size, neg_sample_size, hidden_dim):
+    def create_neg(self, neg_head):
         if neg_head:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    emb_real = tails[..., :hidden_dim // 2]
-                    emb_imag = tails[..., hidden_dim // 2:]
-                    rel_real = relations[..., :hidden_dim // 2]
-                    rel_imag = relations[..., hidden_dim // 2:]
-                    real = emb_real * rel_real + emb_imag * rel_imag
-                    imag = -emb_real * rel_imag + emb_imag * rel_real
-                    emb_complex = th.cat((real, imag), dim=-1)
-                    tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
-                    heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    heads = th.transpose(heads, 1, 2)
-                    return th.bmm(tmp, heads)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real = tails[..., :hidden_dim // 2]
+                emb_imag = tails[..., hidden_dim // 2:]
+                rel_real = relations[..., :hidden_dim // 2]
+                rel_imag = relations[..., hidden_dim // 2:]
+                real = emb_real * rel_real + emb_imag * rel_imag
+                imag = -emb_real * rel_imag + emb_imag * rel_real
+                emb_complex = th.cat((real, imag), dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
+                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                heads = th.transpose(heads, 1, 2)
+                return th.bmm(tmp, heads)
+            return fn
         else:
-            class fn:
-                def __init__(self):
-                    self.num_chunks = num_chunks
-                    self.chunk_size = chunk_size
-                    self.neg_sample_size = neg_sample_size
-
-                def __call__(self, heads, relations, tails):
-                    emb_real = heads[..., :hidden_dim // 2]
-                    emb_imag = heads[..., hidden_dim // 2:]
-                    rel_real = relations[..., :hidden_dim // 2]
-                    rel_imag = relations[..., hidden_dim // 2:]
-                    real = emb_real * rel_real - emb_imag * rel_imag
-                    imag = emb_real * rel_imag + emb_imag * rel_real
-                    emb_complex = th.cat((real, imag), dim=-1)
-                    tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
-                    tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                    tails = th.transpose(tails, 1, 2)
-                    return th.bmm(tmp, tails)
-            return fn()
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real = heads[..., :hidden_dim // 2]
+                emb_imag = heads[..., hidden_dim // 2:]
+                rel_real = relations[..., :hidden_dim // 2]
+                rel_imag = relations[..., hidden_dim // 2:]
+                real = emb_real * rel_real - emb_imag * rel_imag
+                imag = emb_real * rel_imag + emb_imag * rel_real
+                emb_complex = th.cat((real, imag), dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
+                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+                tails = th.transpose(tails, 1, 2)
+                return th.bmm(tmp, tails)
+            return fn
 
 class RESCALScore(nn.Module):
     def __init__(self, relation_dim, entity_dim):

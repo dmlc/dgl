@@ -36,16 +36,11 @@ def train(args, model, train_sampler, valid_samplers=None):
     forward_time = 0
     backward_time = 0
     for step in range(args.init_step, args.max_step):
-        (pos_g, neg_g), neg_head = next(train_sampler)
-        # TODO If the batch isn't divisible by negative sample size,
-        # we need to pad them. Let's ignore them for now.
-        if pos_g.number_of_edges() % args.neg_sample_size > 0:
-            continue
-
+        pos_g, neg_g = next(train_sampler)
         args.step = step
 
         start1 = time.time()
-        loss, log = model.forward(pos_g, neg_g, neg_head)
+        loss, log = model.forward(pos_g, neg_g)
         forward_time += time.time() - start1
 
         start1 = time.time()
@@ -86,14 +81,8 @@ def test(args, model, test_samplers, mode='Test'):
         for sampler in test_samplers:
             count = 0
             for pos_g, neg_g in sampler:
-                # The last batch may not have the batch size expected.
-                # Let's ignore it for now.
-                if pos_g.number_of_edges() != args.batch_size_eval:
-                    continue
-
                 with th.no_grad():
-                    model.forward_test(pos_g, neg_g, sampler.neg_head,
-                                       sampler.neg_sample_size, logs, args.gpu)
+                    model.forward_test(pos_g, neg_g, logs, args.gpu)
 
         metrics = {}
         if len(logs) > 0:
