@@ -977,14 +977,6 @@ IdArray CheckExistence(GraphPtr gptr, IdArray relations,
   return exist;
 }
 
-IdArray CreateArray(const std::vector<dgl_id_t> &ids) {
-  int64_t len = ids.size();
-  IdArray arr = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t *arr_data = static_cast<dgl_id_t *>(arr->data);
-  std::memcpy(arr_data, ids.data(), ids.size() * sizeof(*arr_data));
-  return arr;
-}
-
 std::vector<dgl_id_t> Global2Local(const std::vector<dgl_id_t> &ids,
                                    const std::unordered_map<dgl_id_t, dgl_id_t> &map) {
   std::vector<dgl_id_t> local_ids(ids.size());
@@ -1147,11 +1139,11 @@ NegSubgraph NegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph &po
     neg_vids.resize(it - neg_vids.begin());
   }
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = CreateArray(Global2Local(neg_vids, neg_map));
-    neg_subg.tail_nid = CreateArray(local_pos_vids);
+    neg_subg.head_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = VecToIdArray(local_pos_vids);
   } else {
-    neg_subg.head_nid = CreateArray(local_pos_vids);
-    neg_subg.tail_nid = CreateArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
   }
   // TODO(zhengda) we should provide an array of 1s if exclude_positive
   if (check_false_neg) {
@@ -1293,11 +1285,11 @@ NegSubgraph PBGNegEdgeSubgraph(GraphPtr gptr, IdArray relations, const Subgraph 
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = CreateArray(Global2Local(neg_vids, neg_map));
-    neg_subg.tail_nid = CreateArray(local_pos_vids);
+    neg_subg.head_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = VecToIdArray(local_pos_vids);
   } else {
-    neg_subg.head_nid = CreateArray(local_pos_vids);
-    neg_subg.tail_nid = CreateArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = VecToIdArray(Global2Local(neg_vids, neg_map));
   }
   if (check_false_neg) {
     if (relations->shape[0] == 0) {
