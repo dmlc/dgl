@@ -95,7 +95,7 @@ class KGDataset2:
 
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name, split=None):
+    def __init__(self, path, name):
         url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
@@ -111,8 +111,6 @@ class KGDataset2:
         with open(f_rel2id) as f_rel:
             self.n_relations = int(f_rel.readline()[:-1])
 
-        if split:
-            self._split_fb(self.path, ratio=split)
         self.train = self.read_triple(self.path, 'train')
         self.valid = self.read_triple(self.path, 'valid')
         self.test = self.read_triple(self.path, 'test')
@@ -128,35 +126,6 @@ class KGDataset2:
                 triples.append((int(h), int(r), int(t)))
         print('Finished. Read {} {} triples.'.format(len(triples), mode))
         return triples
-
-    def txt2dict(self, path, filename):
-        d = {}
-        with open(os.path.join(path, '{}.txt'.format(filename))) as f:
-            _ = f.readline()  # neglect the first line, #number
-            for line in f:
-                key, idx = line.split('\t')
-                d[key] = idx
-        return d
-
-    def _split_fb(self, path, ratio=[0.9, 0.05, 0.05]):
-        f = open(os.path.join(path, 'triple2id.txt'), 'r')
-        train = open(os.path.join(path, 'train.txt'), 'w')
-        valid = open(os.path.join(path, 'valid.txt'), 'w')
-        test = open(os.path.join(path, 'test.txt'), 'w')
-
-        all_l, cur_l = 338586277, 0
-        _ = f.readline()
-        while True:
-            ls = f.readlines(128)
-            if ls is None or ls == []:
-                break
-            if all_l * ratio[0] > cur_l:
-                train.write(''.join(ls))
-            elif all_l * (ratio[0] + ratio[1]) > cur_l:
-                valid.write(''.join(ls))
-            else:
-                test.write(''.join(ls))
-            cur_l += len(ls)
 
 
 def get_dataset(data_path, data_name, format_str):
