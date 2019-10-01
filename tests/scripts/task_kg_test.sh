@@ -36,6 +36,6 @@ export DGL_DOWNLOAD_DIR=${PWD}
 
 pushd $KG_DIR> /dev/null
 
-python3 tests/test_score.py || "run test_score.py on $1"
+python3 -m nose -v --with-xunit tests/test_score.py || "run test_score.py on $1"
 
 popd > /dev/null
