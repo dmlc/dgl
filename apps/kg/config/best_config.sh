@@ -16,10 +16,10 @@ DGLBACKEND=pytorch python3 train.py --model TransE --dataset FB15k --batch_size 
 
 # for wn18
 
-DGLBACKEND=pytorch python3 train.py --model TransE --dataset wn18 --batch_size 1024 \
-	--neg_sample_size 512 --hidden_dim 500 --gamma 12.0 --adversarial_temperature 0.5 \
-	--lr 0.01 --max_step 40000 --batch_size_eval 16 --gpu 0 --train --valid --test -adv \
-	--regularization_coef 0.00001
+DGLBACKEND=pytorch python3 main.py --model TransE --dataset wn18 --batch_size 1024 \
+    --neg_sample_size 512 --hidden_dim 500 --gamma 12.0 --adversarial_temperature 0.5 \
+    --lr 0.01 --max_step 40000 --batch_size_eval 16 --gpu 0 --train --valid --test -adv \
+    --regularization_coef 0.00001
 
 DGLBACKEND=pytorch python3 train.py --model DistMult --dataset wn18 --batch_size 1024 \
 	--neg_sample_size 1024 --hidden_dim 1000 --gamma 200.0 --lr 0.1 --max_step 10000 \

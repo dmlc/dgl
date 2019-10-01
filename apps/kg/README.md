@@ -40,13 +40,13 @@ The accuracy on FB15k
 The speed on wn18
 |  Models | TrasnE | DistMult | ComplEx |
 |---------|--------|----------|---------|
-|MAX_STEPS| 20000  | 10000    | 20000   |
-|TIME     | 411s   | 126s     | 266s    |
+|MAX_STEPS| 40000  | 10000    | 20000   |
+|TIME     | 719s   | 126s     | 266s    |
 
 The accuracy on wn18
 |  Models  |  MR    |  MRR  | HITS@1 | HITS@3 | HITS@10 |
 |----------|--------|-------|--------|--------|---------|
-| TransE   | 325.94 | 0.707 | 0.536  | 0.866  | 0.947   |
+| TransE   | 321.35 | 0.760 | 0.652  | 0.850  | 0.940   |
 | DistMult | 271.09 | 0.769 | 0.639  | 0.892  | 0.949   |
 | ComplEx  | 276.37 | 0.935 | 0.916  | 0.950  | 0.960   |
 
