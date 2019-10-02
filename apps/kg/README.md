@@ -69,6 +69,7 @@ The accuracy on wn18
 The package supports two data formats for a knowledge graph.
 
 Format 1:
+
     * entities.dict maps entity Id to entity name.
     * relations.dict maps relation Id to relation name.
     * train.txt stores the triples (head, rel, tail) in the training set.
@@ -76,6 +77,7 @@ Format 1:
     * test.txt stores the triples (head, rel, tail) in the test set.
 
 Format 2:
+
     * entity2id.txt maps entity name to entity Id.
     * relation2id.txt maps relation name to relation Id.
     * train.txt stores the triples (head, tail, rel) in the training set.
