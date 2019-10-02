@@ -3,22 +3,21 @@
 
 ## Introduction
 
-DGL-KE aims to computing knowledge graph embeddings efficiently on giant knowledge graphs.
-It can train knowledge graphs, such as FB15k and wn18, within a few minutes, while it trains
-Freebase, which has hundreds of millions of edges within a couple of hours.
-It supports multiple knowledge graph embeddings. For now, it supports knowledge graph embedding
-models including:
+DGL-KE aims at training embeddings of giant knowledge graphs efficiently.
+It takes a few minutes for small knowledge graphs, such as FB15k and wn18, and
+a couple of hours on Freebase, which has hundreds of millions of edges.
+It supports multiple knowledge graph embedding models. For now, it supports:
  
 - TransE
 - DistMult
 - ComplEx
 
-More models will be supported in a near future.
+It will support other popular models in a near future.
 
 DGL-KE supports multiple training modes:
 
 - CPU & GPU training
-- Mixed CPU & GPU training: node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs.
+- Mixed CPU & GPU training: in this mode, node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs.
 - Multiprocessing training on CPUs: this is designed to train KGE models on large knowledge graphs with many CPU cores.
 
 We will support multi-GPU training and distributed training in a near future.
@@ -26,7 +25,7 @@ We will support multi-GPU training and distributed training in a near future.
 ## Requirements
 
 The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
-For MXNet, it can work with MXNet 1.5 or newer.
+For MXNet, it works with MXNet 1.5 or newer.
 
 ## Datasets
 
