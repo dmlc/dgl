@@ -1,16 +1,22 @@
 # DGL - Knowledge Graph Embedding
 
 
-## Models
+## Introduction
 
-
-DGL-KE now supports knowledge graph embedding models including:
+DGL-KE aims to computing knowledge graph embeddings efficiently on giant knowledge graphs.
+It can train knowledge graphs, such as FB15k and wn18, within a few minutes, while it trains
+Freebase, which has hundreds of millions of edges within a couple of hours.
+It supports multiple knowledge graph embeddings. For now, it supports knowledge graph embedding
+models including:
  
 - [x] TransE
 - [x] DistMult
 - [x] ComplEx
 
 More models will be supported in a near future.
+
+The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
+For MXNet, it can work with MXNet 1.5 or newer.
 
 ## Datasets
 
