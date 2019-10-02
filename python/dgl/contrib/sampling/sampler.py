@@ -582,6 +582,9 @@ class EdgeSampler(object):
             assert g.number_of_edges() == len(relations)
         self._relations = relations
 
+        if batch_size < 0 or neg_sample_size < 0:
+            raise Exception('Invalid arguments')
+
         self._return_false_neg = return_false_neg
         self._batch_size = int(batch_size)
 
