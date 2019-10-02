@@ -1,4 +1,4 @@
-from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
+from dataloader import EvalDataset, TrainDataset
 from dataloader import get_dataset
 
 import argparse
