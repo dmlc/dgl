@@ -151,8 +151,8 @@ def run(args, logger):
                                                            shuffle=True,
                                                            exclude_positive=True,
                                                            rank=i)
-            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head,
-                                                                  train_sampler_tail, True))
+            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                                  True, n_entities))
     else:
         train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                        mode='PBG-head',

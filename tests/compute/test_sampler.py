@@ -308,7 +308,8 @@ def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)
     check_negative_sampler('head', False, 10)
-    check_negative_sampler('head', False, 100)
+    #disable this check for now. It might take too long time.
+    #check_negative_sampler('head', False, 100)
 
 
 if __name__ == '__main__':
