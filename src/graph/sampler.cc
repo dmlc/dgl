@@ -977,7 +977,7 @@ IdArray CheckExistence(GraphPtr gptr, IdArray relations,
   return exist;
 }
 
-std::vector<dgl_id_t> Global2Local(const std::vector<dgl_id_t> &ids,
+std::vector<dgl_id_t> Global2Local(const std::vector<size_t> &ids,
                                    const std::unordered_map<dgl_id_t, dgl_id_t> &map) {
   std::vector<dgl_id_t> local_ids(ids.size());
   for (size_t i = 0; i < ids.size(); i++) {
