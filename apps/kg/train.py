@@ -33,8 +33,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='the format of the dataset.')
         self.add_argument('--save_path', type=str, default='ckpts',
                           help='place to save models and logs')
-        self.add_argument('--save_emb', action='store_true',
-                          help='save the embeddings.')
+        self.add_argument('--save_emb', type=str, default=None,
+                          help='save the embeddings in the specific location.')
 
         self.add_argument('--max_step', type=int, default=80000,
                           help='train xx steps')
@@ -255,8 +255,10 @@ def run(args, logger):
         train(args, model, train_sampler, valid_samplers)
     print('training takes {} seconds'.format(time.time() - start))
 
-    if args.save_emb:
-        model.save_emb(args.save_path, args.dataset)
+    if args.save_emb is not None:
+        if not os.path.exists(args.save_emb):
+            os.mkdir(args.save_emb)
+        model.save_emb(args.save_emb, args.dataset)
 
     # test
     if args.test:

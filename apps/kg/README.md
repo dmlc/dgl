@@ -97,10 +97,10 @@ Train embeddings and verify it later.
 ```bash
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.1 --max_step 100000 \
-    --batch_size_eval 16 --gpu 0 --valid -adv --save_emb
+    --batch_size_eval 16 --gpu 0 --valid -adv --save_emb DistMult_FB15k_emb
 
 python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 2000 \
-    --gamma 500.0 --batch_size 16 --gpu 0 --model_path ckpts/DistMult_FB15k_xx/
+    --gamma 500.0 --batch_size 16 --gpu 0 --model_path DistMult_FB15k_emb/
 
 ```
 
