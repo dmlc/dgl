@@ -9,9 +9,9 @@ Freebase, which has hundreds of millions of edges within a couple of hours.
 It supports multiple knowledge graph embeddings. For now, it supports knowledge graph embedding
 models including:
  
-- [x] TransE
-- [x] DistMult
-- [x] ComplEx
+- TransE
+- DistMult
+- ComplEx
 
 More models will be supported in a near future.
 
@@ -20,13 +20,15 @@ For MXNet, it can work with MXNet 1.5 or newer.
 
 ## Datasets
 
-DGL-KE is tested on datasets including:
+DGL-KE provides five knowledge graphs:
 
-- [x] FB15k
-- [x] FB15k-237
-- [x] wn18
-- [x] wn18rr
-- [x] Freebase
+- FB15k
+- FB15k-237
+- wn18
+- wn18rr
+- Freebase
+
+Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
 
 ## Performance
 
