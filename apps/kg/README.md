@@ -15,6 +15,16 @@ models including:
 
 More models will be supported in a near future.
 
+DGL-KE supports multiple training modes:
+
+- CPU & GPU training
+- Mixed CPU & GPU training: node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs.
+- Multiprocessing training on CPUs: this is designed to train KGE models on large knowledge graphs with many CPU cores.
+
+We will support multi-GPU training and distributed training in a near future.
+
+## Requirements
+
 The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
 For MXNet, it can work with MXNet 1.5 or newer.
 
