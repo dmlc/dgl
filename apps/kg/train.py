@@ -208,12 +208,12 @@ def run(args, logger):
             for i in range(args.num_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                mode='head',
+                                                                mode='PBG-head',
                                                                 num_workers=args.num_worker,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                mode='tail',
+                                                                mode='PBG-tail',
                                                                 num_workers=args.num_worker,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_heads.append(test_sampler_head)
@@ -221,12 +221,12 @@ def run(args, logger):
         else:
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
-                                                            mode='head',
+                                                            mode='PBG-head',
                                                             num_workers=args.num_worker,
                                                             rank=0, ranks=1)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
-                                                            mode='tail',
+                                                            mode='PBG-tail',
                                                             num_workers=args.num_worker,
                                                             rank=0, ranks=1)
 

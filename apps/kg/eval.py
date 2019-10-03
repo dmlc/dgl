@@ -105,12 +105,12 @@ def main(args):
         for i in range(args.num_proc):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
-                                                            mode='head',
+                                                            mode='PBG-head',
                                                             num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
-                                                            mode='tail',
+                                                            mode='PBG-tail',
                                                             num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
@@ -118,12 +118,12 @@ def main(args):
     else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
-                                                        mode='head',
+                                                        mode='PBG-head',
                                                         num_workers=args.num_worker,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
-                                                        mode='tail',
+                                                        mode='PBG-tail',
                                                         num_workers=args.num_worker,
                                                         rank=0, ranks=1)
 
