@@ -92,19 +92,19 @@ using five files.
 
 Format 1:
 
-- entities.dict contains the same number of rows as the number of entities (nodes) in the knowledge graph. A row contains a pair of (entity Id, entity name).
-- relations.dict contains the same number of rows as the number of relations. A row contains a pair of (relation Id, relation name).
-- train.txt stores edges of a knowledge graph used in the training set. Each edge is stored as a triple of (head, rel, tail).
-- valid.txt stores edges of a knowledge graph used in the validation set. Each edge is stored as a triple of (head, rel, tail).
-- test.txt stores edges of a knowledge graph used in the test set. Each edge is stored as a triple of (head, rel, tail).
+- entities.dict contains pairs of (entity Id, entity name). The number of rows is the number of entities (nodes).
+- relations.dict contains pairs of (relation Id, relation name). The number of rows is the number of relations.
+- train.txt stores edges in the training set. They are stored as triples of (head, rel, tail).
+- valid.txt stores edges in the validation set. They are stored as triples of (head, rel, tail).
+- test.txt stores edges in the test set. They are stored as triples of (head, rel, tail).
 
 Format 2:
 
-- entity2id.txt contains the same number of rows as the number of entities (nodes) in the knowledge graph. A row contains a pair of (entity name, entity Id).
-- relation2id.txt contains the same number of rows as the number of relations. A row contains a pair of (relation name, relation Id).
-- train.txt stores edges of a knowledge graph used in the training set. Each edge is stored as a triple of (head, tail, rel).
-- valid.txt stores edges of a knowledge graph used in the validation set. Each edge is stored as a triple of (head, tail, rel).
-- test.txt stores edges of a knowledge graph used in the test set. Each edge is stored as a triple of (head, tail, rel).
+- entity2id.txt contains pairs of (entity name, entity Id). The number of rows is the number of entities (nodes).
+- relation2id.txt contains pairs of (relation name, relation Id). The number of rows is the number of relations.
+- train.txt stores edges in the training set. They are stored as triples of (head, tail, rel).
+- valid.txt stores edges in the validation set. They are stored as a triple of (head, tail, rel).
+- test.txt stores edges in the test set. They are stored as a triple of (head, tail, rel).
 
 ### Command line parameters
 
