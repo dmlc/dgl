@@ -3,46 +3,52 @@
 
 ## Introduction
 
-DGL-KE aims to computing knowledge graph embeddings efficiently on giant knowledge graphs.
-It can train knowledge graphs, such as FB15k and wn18, within a few minutes, while it trains
-Freebase, which has hundreds of millions of edges within a couple of hours.
-It supports multiple knowledge graph embeddings. For now, it supports knowledge graph embedding
-models including:
+DGL-KE is a DGL-based package for computing node embeddings and relation embeddings of
+knowledge graphs efficiently. DGL-KE is fast and scalable. On a single machine,
+it takes only a few minutes for medium-size knowledge graphs, such as FB15k and wn18, and
+takes a couple of hours on Freebase, which has hundreds of millions of edges.
+
+DGL-KE includes the following knowledge graph embedding models:
  
 - TransE
 - DistMult
 - ComplEx
 
-More models will be supported in a near future.
+It will add other popular models in the future.
 
 DGL-KE supports multiple training modes:
 
-- CPU & GPU training
-- Mixed CPU & GPU training: node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs.
-- Multiprocessing training on CPUs: this is designed to train KGE models on large knowledge graphs with many CPU cores.
+- CPU training
+- GPU training
+- Joint CPU & GPU training
+- Multiprocessing training on CPUs
+
+For joint CPU & GPU training, node embeddings are stored on CPU and mini-batches are trained on GPU. This is designed for training KGE models on large knowledge graphs
+
+For multiprocessing training, each process train mini-batches independently and use shared memory for communication between processes. This is designed to train KGE models on large knowledge graphs with many CPU cores.
 
 We will support multi-GPU training and distributed training in a near future.
 
 ## Requirements
 
 The package can run with both Pytorch and MXNet. For Pytorch, it works with Pytorch v1.2 or newer.
-For MXNet, it can work with MXNet 1.5 or newer.
+For MXNet, it works with MXNet 1.5 or newer.
 
 ## Datasets
 
 DGL-KE provides five knowledge graphs:
 
-- FB15k
-- FB15k-237
-- wn18
-- wn18rr
-- Freebase
+- [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k}.zip)
+- [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k-237}.zip)
+- [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18}.zip)
+- [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18rr}.zip)
+- [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{Freebase}.zip)
 
 Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
 
 ## Performance
 
-The speed is measured on an EC2 P3 instance on a Nvidia V100 GPU.
+The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
 The speed on FB15k
 
@@ -76,23 +82,31 @@ The accuracy on wn18
 
 ## Usage
 
-The package supports two data formats for a knowledge graph.
+DGL-KE doesn't require installation. We can run `train.py` to train knowledge graph embeddings
+and run `eval.py` to evaluate the performance of the embeddings.
+
+### Input formats:
+
+DGL-KE supports two knowledge graph input formats. A knowledge graph is stored
+using five files.
 
 Format 1:
 
-- entities.dict maps entity Id to entity name.
-- relations.dict maps relation Id to relation name.
-- train.txt stores the triples (head, rel, tail) in the training set.
-- valid.txt stores the triples (head, rel, tail) in the validation set.
-- test.txt stores the triples (head, rel, tail) in the test set.
+- entities.dict contains pairs of (entity Id, entity name). The number of rows is the number of entities (nodes).
+- relations.dict contains pairs of (relation Id, relation name). The number of rows is the number of relations.
+- train.txt stores edges in the training set. They are stored as triples of (head, rel, tail).
+- valid.txt stores edges in the validation set. They are stored as triples of (head, rel, tail).
+- test.txt stores edges in the test set. They are stored as triples of (head, rel, tail).
 
 Format 2:
 
-- entity2id.txt maps entity name to entity Id.
-- relation2id.txt maps relation name to relation Id.
-- train.txt stores the triples (head, tail, rel) in the training set.
-- valid.txt stores the triples (head, tail, rel) in the validation set.
-- test.txt stores the triples (head, tail, rel) in the test set.
+- entity2id.txt contains pairs of (entity name, entity Id). The number of rows is the number of entities (nodes).
+- relation2id.txt contains pairs of (relation name, relation Id). The number of rows is the number of relations.
+- train.txt stores edges in the training set. They are stored as triples of (head, tail, rel).
+- valid.txt stores edges in the validation set. They are stored as a triple of (head, tail, rel).
+- test.txt stores edges in the test set. They are stored as a triple of (head, tail, rel).
+
+### Command line parameters
 
 Here are some examples of using the training script.
 
