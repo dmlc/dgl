@@ -86,9 +86,9 @@ class ExternalEmbedding:
         return nd.concat(*data, dim=0)
 
     def save(self, path, name):
-        emb_fname = os.path.join(path, name+'.emb')
+        emb_fname = os.path.join(path, name+'.npy')
         nd.save(emb_fname, self.emb)
 
     def load(self, path, name):
-        emb_fname = os.path.join(path, name+'.emb')
+        emb_fname = os.path.join(path, name+'.npy')
         self.emb = nd.load(emb_fname)[0]
