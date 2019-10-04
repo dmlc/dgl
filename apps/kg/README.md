@@ -94,6 +94,8 @@ The accuracy on Freebase (it is tested when 100,000 negative edges are sampled f
 | DistMul  | 6159.1 | 0.716 | 0.690  | 0.729  | 0.760   |
 | ComplEx  | 6888.8 | 0.716 | 0.697  | 0.728  | 0.760   |
 
+The configuration for reproducing the performance results can be found [here](https://github.com/dmlc/dgl/blob/master/apps/kg/config/best_config.sh).
+
 ## Usage
 
 DGL-KE doesn't require installation. The package contains two scripts `train.py` and `eval.py`.
