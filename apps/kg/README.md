@@ -80,6 +80,19 @@ The accuracy on wn18
 | DistMult | 271.09 | 0.769 | 0.639  | 0.892  | 0.949   |
 | ComplEx  | 276.37 | 0.935 | 0.916  | 0.950  | 0.960   |
 
+The speed on Freebase
+
+|  Models | TrasnE | DistMult | ComplEx |
+|---------|--------|----------|---------|
+|MAX_STEPS|        |          | 3200000 |
+|TIME     |        |          | 2.94h   |
+
+The accuracy on Freebase
+
+|  Models  |  MR    |  MRR  | HITS@1 | HITS@3 | HITS@10 |
+|----------|--------|-------|--------|--------|---------|
+| ComplEx  | 6888.8 | 0.716 | 0.697  | 0.728  | 0.760   |
+
 ## Usage
 
 DGL-KE doesn't require installation. We can run `train.py` to train knowledge graph embeddings
@@ -143,19 +156,4 @@ Train embeddings with multi-processing. This currently doesn't work in MXNet.
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 --max_step 3000 \
     --batch_size_eval 16 --regularization_coef 0.000001 --valid --test -adv --num_proc 8
-```
-
-## Freebase
-Train embeddings on Freebase with multi-processing on X1.
-```bash
-DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset Freebase --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
-    --lr 0.1 --max_step 50000 --batch_size_eval 128 --test -adv --eval_interval 300000 \
-    --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64
-
-Test average MR at [0/50000]: 754.5566055566055
-Test average MRR at [0/50000]: 0.7333319016877765
-Test average HITS@1 at [0/50000]: 0.7182952182952183
-Test average HITS@3 at [0/50000]: 0.7409752409752409
-Test average HITS@10 at [0/50000]: 0.7587412587412588
 ```
