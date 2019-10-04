@@ -87,8 +87,8 @@ class ExternalEmbedding:
 
     def save(self, path, name):
         emb_fname = os.path.join(path, name+'.npy')
-        nd.save(emb_fname, self.emb)
+        np.save(emb_fname, self.emb.asnumpy())
 
     def load(self, path, name):
         emb_fname = os.path.join(path, name+'.npy')
-        self.emb = nd.load(emb_fname)[0]
+        self.emb = nd.array(np.load(emb_fname))
