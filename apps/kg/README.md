@@ -82,15 +82,16 @@ The accuracy on wn18
 
 The speed on Freebase
 
-|  Models | ComplEx |
-|---------|---------|
-|MAX_STEPS| 3200000 |
-|TIME     | 2.94h   |
+|  Models | DistMult | ComplEx |
+|---------|----------|---------|
+|MAX_STEPS| 3200000  | 3200000 |
+|TIME     | 2.44h    | 2.94h   |
 
 The accuracy on Freebase (it is tested when 100,000 negative edges are sampled for each positive edge).
 
 |  Models  |  MR    |  MRR  | HITS@1 | HITS@3 | HITS@10 |
 |----------|--------|-------|--------|--------|---------|
+| DistMul  | 6159.1 | 0.716 | 0.690  | 0.729  | 0.760   |
 | ComplEx  | 6888.8 | 0.716 | 0.697  | 0.728  | 0.760   |
 
 ## Usage
