@@ -95,8 +95,14 @@ The accuracy on Freebase (it is tested when 100,000 negative edges are sampled f
 
 ## Usage
 
-DGL-KE doesn't require installation. We can run `train.py` to train knowledge graph embeddings
-and run `eval.py` to evaluate the performance of the embeddings.
+DGL-KE doesn't require installation. The package contains two scripts `train.py` and `eval.py`.
+
+* `train.py` trains knowledge graph embeddings and outputs the trained node embeddings
+and relation embeddings.
+
+* `eval.py` reads the pre-trained node embeddings and relation embeddings and evaluate
+how accurate to predict the tail node when given (head, rel, ?), and predict the head node
+when given (?, rel, tail).
 
 ### Input formats:
 
@@ -118,6 +124,17 @@ Format 2:
 - train.txt stores edges in the training set. They are stored as triples of (head, tail, rel).
 - valid.txt stores edges in the validation set. They are stored as a triple of (head, tail, rel).
 - test.txt stores edges in the test set. They are stored as a triple of (head, tail, rel).
+
+### Output formats:
+
+To save the trained embeddings, users have to provide the path with `--save_emb` when running
+`train.py`. The saved embeddings are stored as numpy ndarrays.
+
+* The node embedding is saved as `XXX_YYY_entity.npy`.
+
+* The relation embedding is saved as `XXX_YYY_relation.npy`.
+
+`XXX` is the dataset name and `YYY` is the model name.
 
 ### Command line parameters
 
