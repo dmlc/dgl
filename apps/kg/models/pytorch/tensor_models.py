@@ -96,7 +96,7 @@ class ExternalEmbedding:
         return th.cat(data, 0)
 
     def save(self, path, name):
-        file_name = os.path.join(path, name)
+        file_name = os.path.join(path, name+'.npy')
         np.save(file_name, self.emb.cpu().detach().numpy())
 
     def load(self, path, name):
