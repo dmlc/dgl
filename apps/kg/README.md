@@ -80,10 +80,32 @@ The accuracy on wn18
 | DistMult | 271.09 | 0.769 | 0.639  | 0.892  | 0.949   |
 | ComplEx  | 276.37 | 0.935 | 0.916  | 0.950  | 0.960   |
 
+The speed on Freebase
+
+|  Models | DistMult | ComplEx |
+|---------|----------|---------|
+|MAX_STEPS| 3200000  | 3200000 |
+|TIME     | 2.44h    | 2.94h   |
+
+The accuracy on Freebase (it is tested when 100,000 negative edges are sampled for each positive edge).
+
+|  Models  |  MR    |  MRR  | HITS@1 | HITS@3 | HITS@10 |
+|----------|--------|-------|--------|--------|---------|
+| DistMul  | 6159.1 | 0.716 | 0.690  | 0.729  | 0.760   |
+| ComplEx  | 6888.8 | 0.716 | 0.697  | 0.728  | 0.760   |
+
+The configuration for reproducing the performance results can be found [here](https://github.com/dmlc/dgl/blob/master/apps/kg/config/best_config.sh).
+
 ## Usage
 
-DGL-KE doesn't require installation. We can run `train.py` to train knowledge graph embeddings
-and run `eval.py` to evaluate the performance of the embeddings.
+DGL-KE doesn't require installation. The package contains two scripts `train.py` and `eval.py`.
+
+* `train.py` trains knowledge graph embeddings and outputs the trained node embeddings
+and relation embeddings.
+
+* `eval.py` reads the pre-trained node embeddings and relation embeddings and evaluate
+how accurate to predict the tail node when given (head, rel, ?), and predict the head node
+when given (?, rel, tail).
 
 ### Input formats:
 
@@ -105,6 +127,17 @@ Format 2:
 - train.txt stores edges in the training set. They are stored as triples of (head, tail, rel).
 - valid.txt stores edges in the validation set. They are stored as a triple of (head, tail, rel).
 - test.txt stores edges in the test set. They are stored as a triple of (head, tail, rel).
+
+### Output formats:
+
+To save the trained embeddings, users have to provide the path with `--save_emb` when running
+`train.py`. The saved embeddings are stored as numpy ndarrays.
+
+* The node embedding is saved as `XXX_YYY_entity.npy`.
+
+* The relation embedding is saved as `XXX_YYY_relation.npy`.
+
+`XXX` is the dataset name and `YYY` is the model name.
 
 ### Command line parameters
 
@@ -143,19 +176,4 @@ Train embeddings with multi-processing. This currently doesn't work in MXNet.
 python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.07 --max_step 3000 \
     --batch_size_eval 16 --regularization_coef 0.000001 --valid --test -adv --num_proc 8
-```
-
-## Freebase
-Train embeddings on Freebase with multi-processing on X1.
-```bash
-DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset Freebase --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 500.0 \
-    --lr 0.1 --max_step 50000 --batch_size_eval 128 --test -adv --eval_interval 300000 \
-    --neg_sample_size_test 10000 --eval_percent 0.2 --num_proc 64
-
-Test average MR at [0/50000]: 754.5566055566055
-Test average MRR at [0/50000]: 0.7333319016877765
-Test average HITS@1 at [0/50000]: 0.7182952182952183
-Test average HITS@3 at [0/50000]: 0.7409752409752409
-Test average HITS@10 at [0/50000]: 0.7587412587412588
 ```
