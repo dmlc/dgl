@@ -117,8 +117,10 @@ def test_query():
         assert g.out_degree(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
-        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
-        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+        assert np.array_equal(
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+        assert np.array_equal(
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
 
     def _test(g):
         # test twice to see whether the cached format works or not
@@ -191,8 +193,10 @@ def test_query():
         assert g.out_degree(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
-        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
-        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+        assert np.array_equal(
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=False)), scipy_coo_input().toarray().T)
+        assert np.array_equal(
+                F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
 
     def _test_csr(g):
         # test twice to see whether the cached format works or not
