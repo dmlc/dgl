@@ -1,4 +1,4 @@
-.. _apigraph:
+.. _apisubgraph:
 
 DGLSubGraph -- Class for subgraph data structure
 ================================================
