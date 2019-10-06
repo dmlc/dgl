@@ -6,7 +6,7 @@ import scipy
 
 from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
 

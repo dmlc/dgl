@@ -280,7 +280,7 @@ class LazyDict(Mapping):
         self._keys = keys
 
     def __getitem__(self, key):
-        if not key in self._keys:
+        if key not in self._keys:
             raise KeyError(key)
         return self._fn(key)
 
@@ -422,7 +422,7 @@ class CtxCachedObject(object):
         self._ctx_dict = {}
 
     def __call__(self, ctx):
-        if not ctx in self._ctx_dict:
+        if ctx not in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
 
@@ -445,7 +445,7 @@ def cached_member(cache, prefix):
         def wrapper(self, *args):
             dic = getattr(self, cache)
             key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
-            if not key in dic:
+            if key not in dic:
                 dic[key] = func(self, *args)
             return dic[key]
         return wrapper

@@ -257,11 +257,11 @@ def hetero_from_relations(rel_graphs):
     for rgrh in rel_graphs:
         assert len(rgrh.etypes) == 1
         stype, etype, dtype = rgrh.canonical_etypes[0]
-        if not stype in ntype_dict:
+        if stype not in ntype_dict:
             ntype_dict[stype] = len(ntypes)
             ntypes.append(stype)
         stid = ntype_dict[stype]
-        if not dtype in ntype_dict:
+        if dtype not in ntype_dict:
             ntype_dict[dtype] = len(ntypes)
             ntypes.append(dtype)
         dtid = ntype_dict[dtype]
