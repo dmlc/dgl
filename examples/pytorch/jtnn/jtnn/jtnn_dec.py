@@ -1,16 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .mol_tree import Vocab
 from .mol_tree_nx import DGLMolTree
 from .chemutils import enum_assemble_nx, get_mol
 from .nnutils import GRUUpdate, cuda
-import copy
-import itertools
 from dgl import batch, dfs_labeled_edges_generator
 import dgl.function as DGLF
-import networkx as nx
-from .line_profiler_integration import profile
 import numpy as np
 
 MAX_NB = 8
@@ -265,7 +260,6 @@ class DGLJTNNDecoder(nn.Module):
         for step in range(MAX_DECODE_LEN):
             u, u_slots = stack[-1]
             udata = mol_tree.nodes[u].data
-            wid = udata['wid']
             x = udata['x']
             h = udata['h']
 

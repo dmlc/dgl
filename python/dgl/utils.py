@@ -280,7 +280,7 @@ class LazyDict(Mapping):
         self._keys = keys
 
     def __getitem__(self, key):
-        if not key in self._keys:
+        if key not in self._keys:
             raise KeyError(key)
         return self._fn(key)
 
@@ -422,7 +422,7 @@ class CtxCachedObject(object):
         self._ctx_dict = {}
 
     def __call__(self, ctx):
-        if not ctx in self._ctx_dict:
+        if ctx not in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
 
@@ -445,7 +445,7 @@ def cached_member(cache, prefix):
         def wrapper(self, *args):
             dic = getattr(self, cache)
             key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
-            if not key in dic:
+            if key not in dic:
                 dic[key] = func(self, *args)
             return dic[key]
         return wrapper
@@ -505,3 +505,14 @@ def to_nbits_int(tensor, nbits):
         return F.astype(tensor, F.int32)
     else:
         return F.astype(tensor, F.int64)
+
+def make_invmap(array, use_numpy=True):
+    """Find the unique elements of the array and return another array with indices
+    to the array of unique elements."""
+    if use_numpy:
+        uniques = np.unique(array)
+    else:
+        uniques = list(set(array))
+    invmap = {x: i for i, x in enumerate(uniques)}
+    remapped = np.array([invmap[x] for x in array])
+    return uniques, invmap, remapped

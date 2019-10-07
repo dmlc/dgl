@@ -38,7 +38,8 @@ TAGConv
     :members: forward
     :show-inheritance:
 
-Global Pooling Layers 
+
+Global Pooling Layers
 ----------------------------------------
 
 .. automodule:: dgl.nn.mxnet.glob

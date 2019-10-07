@@ -1,13 +1,20 @@
 
+import numpy as np
 from ... import utils
 from ... import backend as F
 from ..._ffi.function import _init_api
+from ..._ffi.object import register_object, ObjectBase
+from ... import ndarray
 
 __all__ = ['random_walk',
            'random_walk_with_restart',
            'bipartite_single_sided_random_walk_with_restart',
+           'metapath_random_walk',
            ]
 
+@register_object('sampler.RandomWalkTraces')
+class RandomWalkTraces(ObjectBase):
+    pass
 
 def random_walk(g, seeds, num_traces, num_hops):
     """Batch-generate random walk traces on given graph with the same length.
@@ -46,28 +53,25 @@ def _split_traces(traces):
 
     Parameters
     ----------
-    traces : PackedFunc object of RandomWalkTraces structure
+    traces : RandomWalkTraces
 
     Returns
     -------
     traces : list[list[Tensor]]
         traces[i][j] is the j-th trace generated for i-th seed.
     """
-    trace_counts = F.zerocopy_to_numpy(
-            F.zerocopy_from_dlpack(traces(0).to_dlpack())).tolist()
-    trace_lengths = F.zerocopy_from_dlpack(traces(1).to_dlpack())
-    trace_vertices = F.zerocopy_from_dlpack(traces(2).to_dlpack())
-
+    trace_counts = traces.trace_counts.asnumpy().tolist()
+    trace_vertices = F.zerocopy_from_dgl_ndarray(traces.vertices)
     trace_vertices = F.split(
-            trace_vertices, F.zerocopy_to_numpy(trace_lengths).tolist(), 0)
+            trace_vertices, traces.trace_lengths.asnumpy().tolist(), 0)
 
-    traces = []
+    results = []
     s = 0
     for c in trace_counts:
-        traces.append(trace_vertices[s:s+c])
+        results.append(trace_vertices[s:s+c])
         s += c
 
-    return traces
+    return results
 
 
 def random_walk_with_restart(
@@ -165,4 +169,49 @@ def bipartite_single_sided_random_walk_with_restart(
             int(max_visit_counts), int(max_frequent_visited_nodes))
     return _split_traces(traces)
 
-_init_api('dgl.randomwalk', __name__)
+
+def metapath_random_walk(hg, etypes, seeds, num_traces):
+    """Generate random walk traces from an array of seed nodes (or starting nodes),
+    based on the given metapath.
+
+    For a single seed node, ``num_traces`` traces would be generated.  A trace would
+
+    1. Start from the given seed and set ``t`` to 0.
+    2. Pick and traverse along edge type ``etypes[t % len(etypes)]`` from the current node.
+    3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
+
+    Parameters
+    ----------
+    hg : DGLHeteroGraph
+        The heterogeneous graph.
+    etypes : list[str or tuple of str]
+        Metapath, specified as a list of edge types.
+        The beginning and ending node type must be the same.
+    seeds : Tensor
+        The seed nodes.  Node type is the same as the beginning node type of metapath.
+    num_traces : int
+        The number of traces
+
+    Returns
+    -------
+    traces : list[list[Tensor]]
+        traces[i][j] is the j-th trace generated for i-th seed.
+        traces[i][j][k] would have node type the same as the destination node type of edge
+        type ``etypes[k % len(etypes)]``
+
+    Notes
+    -----
+    The traces does **not** include the seed nodes themselves.
+    """
+    if len(etypes) == 0:
+        raise ValueError('empty metapath')
+    if hg.to_canonical_etype(etypes[0])[0] != hg.to_canonical_etype(etypes[-1])[2]:
+        raise ValueError('beginning and ending node type mismatch')
+    if len(seeds) == 0:
+        return []
+    etype_array = ndarray.array(np.array([hg.get_etype_id(et) for et in etypes], dtype='int64'))
+    seed_array = utils.toindex(seeds).todgltensor()
+    traces = _CAPI_DGLMetapathRandomWalk(hg._graph, etype_array, seed_array, num_traces)
+    return _split_traces(traces)
+
+_init_api('dgl.sampler.randomwalk', __name__)

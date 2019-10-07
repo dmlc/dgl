@@ -156,6 +156,8 @@ class GIN(nn.Module):
 
         for layer in range(self.num_layers - 1):
             h = self.ginlayers[layer](g, h)
+            h = self.batch_norms[layer](h)
+            h = F.relu(h)
             hidden_rep.append(h)
 
         score_over_layer = 0

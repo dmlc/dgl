@@ -238,6 +238,9 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
 
+def uniform(shape, dtype, ctx, low, high):
+    return nd.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
     if isinstance(lengths, nd.NDArray):
@@ -355,6 +358,10 @@ def zerocopy_to_dgl_ndarray_for_write(arr):
 def zerocopy_from_dgl_ndarray(arr):
     return nd.from_dlpack(arr.to_dlpack())
 
+def one_hot(t, num_classes=-1):
+    if num_classes == -1:
+        num_classes = mx.nd.max(t).asscalar() + 1
+    return mx.nd.one_hot(t, num_classes)
 
 class BinaryReduce(mx.autograd.Function):
     def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
@@ -373,8 +380,11 @@ class BinaryReduce(mx.autograd.Function):
     def forward(self, lhs_data, rhs_data):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = nd.empty((self.out_size,) + feat_shape,
+        feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if self.binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = nd.empty((self.out_size,) + out_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
@@ -399,10 +409,10 @@ class BinaryReduce(mx.autograd.Function):
             in_ones = nd.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
             K.copy_reduce(
-                'sum', self.graph, target, in_ones_nd, degs_nd, 
+                'sum', self.graph, target, in_ones_nd, degs_nd,
                 in_map, self.out_map[0])
             # reshape
-            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf')) 
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
             out_data = out_data / degs
         else:
             degs = None

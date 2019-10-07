@@ -3,7 +3,6 @@ import rdkit.Chem as Chem
 from .chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, \
                        set_atommap, enum_assemble_nx, decode_stereo
 import numpy as np
-from .line_profiler_integration import profile
 
 class DGLMolTree(DGLGraph):
     def __init__(self, smiles):

@@ -86,7 +86,6 @@ def check_init_func(worker_id, graph_name, return_dict):
         traceback.print_exc()
 
 def server_func(num_workers, graph_name, server_init):
-    print("server starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
@@ -98,7 +97,7 @@ def server_func(num_workers, graph_name, server_init):
     efeat = np.arange(0, num_edges * 10).astype('float32').reshape((num_edges, 10))
     g.ndata['feat'] = F.tensor(nfeat)
     g.edata['feat'] = F.tensor(efeat)
-    server_init.value = True
+    server_init.value = 1
     g.run()
 
 def test_init():
@@ -108,11 +107,11 @@ def test_init():
     # make server init before worker
     server_init = Value('i', False)
     serv_p = Process(target=server_func, args=(2, 'test_graph1', server_init))
-    while server_init.value is False:
+    serv_p.start()
+    while server_init.value == 0:
       time.sleep(1)
     work_p1 = Process(target=check_init_func, args=(0, 'test_graph1', return_dict))
     work_p2 = Process(target=check_init_func, args=(1, 'test_graph1', return_dict))
-    serv_p.start()
     work_p1.start()
     work_p2.start()
     serv_p.join()
@@ -122,7 +121,6 @@ def test_init():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 def check_compute_func(worker_id, graph_name, return_dict):
-    print("worker starts")
     try:
         g = create_graph_store(graph_name)
         if g is None:
@@ -131,7 +129,6 @@ def check_compute_func(worker_id, graph_name, return_dict):
 
         g._sync_barrier(60)
         in_feats = g.nodes[0].data['feat'].shape[1]
-
         # Test update all.
         g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
         adj = g.adjacency_matrix()
@@ -175,13 +172,13 @@ def test_compute():
     return_dict = manager.dict()
 
     # make server init before worker
-    server_init = Value('i', False)
+    server_init = Value('i', 0)
     serv_p = Process(target=server_func, args=(2, 'test_graph3', server_init))
-    while server_init.value is False:
+    serv_p.start()
+    while server_init.value == 0:
       time.sleep(1)
     work_p1 = Process(target=check_compute_func, args=(0, 'test_graph3', return_dict))
     work_p2 = Process(target=check_compute_func, args=(1, 'test_graph3', return_dict))
-    serv_p.start()
     work_p1.start()
     work_p2.start()
     serv_p.join()
@@ -191,7 +188,6 @@ def test_compute():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 def check_sync_barrier(worker_id, graph_name, return_dict):
-    print("worker starts")
     try:
         g = create_graph_store(graph_name)
         if g is None:
@@ -223,13 +219,13 @@ def test_sync_barrier():
     return_dict = manager.dict()
 
     # make server init before worker
-    server_init = Value('i', False)
+    server_init = Value('i', 0)
     serv_p = Process(target=server_func, args=(2, 'test_graph4', server_init))
-    while server_init.value is False:
+    serv_p.start()
+    while server_init.value == 0:
       time.sleep(1)
     work_p1 = Process(target=check_sync_barrier, args=(0, 'test_graph4', return_dict))
     work_p2 = Process(target=check_sync_barrier, args=(1, 'test_graph4', return_dict))
-    serv_p.start()
     work_p1.start()
     work_p2.start()
     serv_p.join()

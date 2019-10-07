@@ -5,6 +5,7 @@ API Reference
    :maxdepth: 2
 
    graph
+   heterograph
    init
    batch
    function
@@ -19,3 +20,4 @@ API Reference
    graph_store
    nodeflow
    random
+   model_zoo

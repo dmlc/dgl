@@ -28,7 +28,8 @@ struct BinaryReduce {
       Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+    const int64_t stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -41,35 +42,64 @@ struct BinaryReduce {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
     while (tx < D) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Op(lhs, rhs);
+      DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
   }
 };
 
-// Convert flattened index to multi-dimension index (assume row-major).
-__device__ __forceinline__ void Unravel(
-    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
-  for (int d = 0; d < ndim; ++d) {
-    out[d] = (idx / stride[d]) % shape[d];
-  }
-}
+/*
+ * This func do the followings:
+ *   1. Convert flattened index to multi-dimension index
+ *      according to output shape (assume row-major).
+ *   2. Convert multi-dimension index to flattened index for lhs.
+ *   3. Convert multi-dimension index to flattened index for rhs.
+ */
+__device__ __forceinline__ void UnravelRavel(
+    const int64_t idx, const int ndim, const int64_t* out_shape, const int64_t* out_stride,
+    const int64_t* lhs_shape, const int64_t* lhs_stride,
+    const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t *lhs_out, int64_t *rhs_out) {
+  if (out_stride[0] == lhs_stride[0]) {
+#pragma unroll
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t rhs_sh = rhs_shape[d];
+      int64_t rhs_st = rhs_stride[d];
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
+       * rhs_sh be o_sh or 1
+       */
+      if (rhs_sh > i) {
+        *rhs_out += i * rhs_st;
+      }
+    }
+    *lhs_out = idx;
+  } else {
+#pragma unroll
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
 
-// Convert multi-dimension index to flattened index (assume row-major).
-__device__ __forceinline__ int64_t Ravel(
-    const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
-  int64_t out = 0;
-  for (int d = 0; d < ndim; ++d) {
-    out += min(idx[d], shape[d] - 1) * stride[d];
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
+       * lhs_sh be o_sh or 1
+       */
+      if (lhs_sh > i) {
+        *lhs_out += i * lhs_st;
+      }
+    }
+    *rhs_out = idx;
   }
-  return out;
 }
 
 // Minigun UDF to compute binary reduce with broadcasting.
@@ -82,7 +112,8 @@ struct BinaryReduceBcast {
   static __device__ __forceinline__ void ApplyEdge(
       Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+    const int64_t stride_x = blockDim.x * gridDim.x;
+    const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
     Idx oid = Functors::SelectOut(src, eid, dst);
@@ -95,17 +126,17 @@ struct BinaryReduceBcast {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
-    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     while (tx < gdata->out_len) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-      DType lhs = Functors::Read(lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
-      DType rhs = Functors::Read(rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
-      DType out = Functors::Op(lhs, rhs);
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+      DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -129,11 +160,8 @@ struct FunctorsTempl {
       Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ DType Op(DType lhs, DType rhs) {
-    return BinaryOp::Call(lhs, rhs);
-  }
-  static __device__ __forceinline__ DType Read(DType* addr) {
-    return LDGReader<DType>::Call(addr);
+  static __device__ __forceinline__ DType Op(DType *lhs, DType *rhs, int64_t len) {
+    return BinaryOp::Call(lhs, rhs, len);
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
