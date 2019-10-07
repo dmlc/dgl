@@ -182,6 +182,14 @@ Or go through all of them :doc:`here <tutorials/models/index>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Heterogeneous Graph Tutorials
+   :hidden:
+   :glob:
+
+   tutorials/hetero/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: API Reference
    :glob:
 
