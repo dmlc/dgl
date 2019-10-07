@@ -7,10 +7,12 @@ from .graph import DGLGraph
 from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
+from .convert import graph, bipartite
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
+           'remove_self_loop', 'metapath_reachable_graph']
 
 
 def pairwise_squared_distance(x):
@@ -402,5 +404,120 @@ def laplacian_lambda_max(g):
         rst.append(sparse.linalg.eigs(laplacian, 1, which='LM',
                                       return_eigenvectors=False)[0].real)
     return rst
+
+def metapath_reachable_graph(g, metapath):
+    """Return a graph where the successors of any node ``u`` are nodes reachable from ``u`` by
+    the given metapath.
+
+    If the beginning node type ``s`` and ending node type ``t`` are the same, it will return
+    a homogeneous graph with node type ``s = t``.  Otherwise, a unidirectional bipartite graph
+    with source node type ``s`` and destination node type ``t`` is returned.
+
+    In both cases, two nodes ``u`` and ``v`` will be connected with an edge ``(u, v)`` if
+    there exists one path matching the metapath from ``u`` to ``v``.
+
+    The result graph keeps the node set of type ``s`` and ``t`` in the original graph even if
+    they might have no neighbor.
+
+    The features of the source/destination node type in the original graph would be copied to
+    the new graph.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    metapath : list[str or tuple of str]
+        Metapath in the form of a list of edge types
+
+    Returns
+    -------
+    DGLHeteroGraph
+        A homogeneous or bipartite graph.
+    """
+    adj = 1
+    for etype in metapath:
+        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
+
+    adj = (adj != 0).tocsr()
+    srctype = g.to_canonical_etype(metapath[0])[0]
+    dsttype = g.to_canonical_etype(metapath[-1])[2]
+    if srctype == dsttype:
+        assert adj.shape[0] == adj.shape[1]
+        new_g = graph(adj, ntype=srctype)
+    else:
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype)
+
+    for key, value in g.nodes[srctype].data.items():
+        new_g.nodes[srctype].data[key] = value
+    if srctype != dsttype:
+        for key, value in g.nodes[dsttype].data.items():
+            new_g.nodes[dsttype].data[key] = value
+
+    return new_g
+
+def add_self_loop(g):
+    """Return a new graph containing all the edges in the input graph plus self loops
+    of every nodes.
+    No duplicate self loop will be added for nodes already having self loops.
+    Self-loop edges id are not preserved. All self-loop edges would be added at the end.
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g.edges()
+    (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    nodes = np.arange(g.number_of_nodes())
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    new_g.add_edges(nodes, nodes)
+    return new_g
+
+def remove_self_loop(g):
+    """Return a new graph with all self-loop edges removed
+
+    Examples
+    ---------
+
+    >>> g = DGLGraph()
+    >>> g.add_nodes(5)
+    >>> g.add_edges([0, 1, 2], [1, 1, 2])
+    >>> new_g = dgl.transform.remove_self_loop(g) # Nodes 1, 2 have self-loop
+    >>> new_g.edges()
+    (tensor([0]), tensor([1]))
+
+    Parameters
+    ------------
+    g: DGLGraph
+
+    Returns
+    --------
+    DGLGraph
+    """
+    new_g = DGLGraph()
+    new_g.add_nodes(g.number_of_nodes())
+    src, dst = g.all_edges(order="eid")
+    src = F.zerocopy_to_numpy(src)
+    dst = F.zerocopy_to_numpy(dst)
+    non_self_edges_idx = src != dst
+    new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
+    return new_g
 
 _init_api("dgl.transform")

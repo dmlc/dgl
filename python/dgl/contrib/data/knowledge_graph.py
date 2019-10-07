@@ -327,7 +327,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     train_file = os.path.join(dataset_path, 'trainingSet.tsv')
     test_file = os.path.join(dataset_path, 'testSet.tsv')
     if dataset_str == 'am':
-        label_header = 'label_category'
+        label_header = 'label_cateogory'
         nodes_header = 'proxy'
     elif dataset_str == 'aifb':
         label_header = 'label_affiliation'

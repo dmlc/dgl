@@ -3,7 +3,7 @@ package:
   version: "0.4"
 
 source:
-  git_rev: 0.3.x
+  git_rev: 0.4.x
   git_url: https://github.com/dmlc/dgl.git
 
 requirements:

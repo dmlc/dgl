@@ -421,6 +421,16 @@ class GraphIndex(ObjectBase):
         eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
+    def sort_csr(self):
+        """Sort the CSR matrix in the graph index.
+
+        By default, when the CSR matrix is created, the edges may be stored
+        in an arbitrary order. Sometimes, we want to sort them to accelerate
+        some computation. For example, `has_edges_between` can be much faster
+        on a giant adjacency matrix if the edges in the matrix is sorted.
+        """
+        _CAPI_DGLSortAdj(self)
+
     @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, order=None):
         """Return all the edges
@@ -1129,10 +1139,13 @@ def from_edge_list(elist, is_multigraph, readonly):
 
     Parameters
     ---------
-    elist : list
-        List of (u, v) edge tuple.
+    elist : list, tuple
+        List of (u, v) edge tuple, or a tuple of src/dst lists
     """
-    src, dst = zip(*elist)
+    if isinstance(elist, tuple):
+        src, dst = elist
+    else:
+        src, dst = zip(*elist)
     src = np.array(src)
     dst = np.array(dst)
     src_ids = utils.toindex(src)

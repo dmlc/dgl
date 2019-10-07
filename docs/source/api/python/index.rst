@@ -5,6 +5,7 @@ API Reference
    :maxdepth: 2
 
    graph
+   heterograph
    init
    batch
    function
