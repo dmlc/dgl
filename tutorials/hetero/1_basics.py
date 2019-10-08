@@ -101,6 +101,8 @@ In this tutorial, you will learn:
 # Each value of the dictionary is a list of edge tuples.
 # Nodes are integer IDs starting from zero. Nodes IDs of different types have
 # separate countings.
+import dgl
+
 ratings = dgl.heterograph(
     {('user', '+1', 'movie') : [(0, 0), (0, 1), (1, 0)],
      ('user', '-1', 'movie') : [(2, 1)]})
@@ -150,7 +152,7 @@ data_file_path = '/tmp/ACM.mat'
 
 urllib.request.urlretrieve(data_url, data_file_path)
 data = scipy.io.loadmat(data_file_path)
-print(dir(data))
+print(list(data.keys()))
 
 ###############################################################################
 # The dataset stores node information by their types: ``P`` for paper, ``A``
@@ -167,8 +169,6 @@ print('#Links:', data['PvsA'].nnz)
 
 ###############################################################################
 # Converting this scipy matrix to a heterograph in DGL is straightforward:
-
-import dgl
 
 pa_g = dgl.heterograph({('paper', 'written-by', 'author') : data['PvsA']})
 # equivalent (shorter) API for creating heterograph with two node types:
@@ -272,6 +272,10 @@ plot_graph(G.metagraph)
 # the training/validation/testing split.
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 pvc = data['PvsC'].tocsr()
 # find all papers published in KDD, ICML, VLDB
 c_selected = [0, 11, 13]  # KDD, ICML, VLDB
@@ -315,9 +319,6 @@ test_idx = torch.tensor(shuffle[900:]).long()
 #
 # (ii) type wise reduction:
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import dgl.function as fn
 
 class HeteroRGCNLayer(nn.Module):
@@ -437,4 +438,4 @@ for epoch in range(100):
 #     refer to the full metapath2vec implementation
 #     `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/metapath2vec>`_.
 #
-# * :doc:`Full heterograph API reference <../../api/python/heterograph>`_.
+# * :doc:`Full heterograph API reference <../../api/python/heterograph>`.
