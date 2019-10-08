@@ -52,7 +52,7 @@ The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
 The speed on FB15k
 
-|  Models | TrasnE | DistMult | ComplEx |
+|  Models | TransE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 20000  | 100000   | 100000  |
 |TIME     | 411s   | 690s     | 806s    |
@@ -67,7 +67,7 @@ The accuracy on FB15k
 
 The speed on wn18
 
-|  Models | TrasnE | DistMult | ComplEx |
+|  Models | TransE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 40000  | 10000    | 20000   |
 |TIME     | 719s   | 126s     | 266s    |
