@@ -70,6 +70,8 @@ The accuracy on FB15k
 | DistMult | 43.35 | 0.783 | 0.713  | 0.837  | 0.897   |
 | ComplEx  | 51.99 | 0.785 | 0.720  | 0.832  | 0.889   |
 
+In comparison, GraphVite uses 4 GPUs and takes 14 minutes. Thus, DGL-KE trains TransE on FB15k twice as fast as GraphVite while using much few resources. More performance information on GraphVite can be found [here](https://github.com/DeepGraphLearning/graphvite).
+
 The speed on wn18
 
 |  Models | TransE | DistMult | ComplEx |
