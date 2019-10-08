@@ -19,3 +19,4 @@ Transform -- Graph Transformation
     segmented_knn_graph
     add_self_loop
     remove_self_loop
+    metapath_reachable_graph

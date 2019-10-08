@@ -296,7 +296,7 @@ test_idx = torch.tensor(shuffle[900:]).long()
 ###############################################################################
 # Relational-GCN on heterograph
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# We use [Relational-GCN](https://arxiv.org/abs/1703.06103) to learn the
+# We use `Relational-GCN <https://arxiv.org/abs/1703.06103>`_ to learn the
 # representation of nodes in the graph. Its message passing equation is as
 # follows:
 #
@@ -429,7 +429,7 @@ for epoch in range(100):
 #   * `Heterogeneous Graph Attention Network <https://arxiv.org/abs/1903.07293>`_
 #     requires transforming a heterograph into a homogeneous graph according to
 #     a given metapath (i.e. a path template consisting of edge types).  We
-#     provide :func:`dgl.metapath_reachable_graph` to do this.  See full
+#     provide :func:`dgl.transform.metapath_reachable_graph` to do this.  See full
 #     implementation
 #     `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/han>`_.
 #
