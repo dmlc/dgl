@@ -301,12 +301,12 @@ pipeline {
         stage("Knowledge Graph CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu:torch-1.2.0" } }
           stages {
-            stage("Backend Pytorch test") {
+            stage("Pytorch test") {
               steps {
                 kg_test_linux("pytorch", "cpu")
               }
             }
-            stage("Backend MXNet test") {
+            stage("MXNet test") {
               steps {
                 kg_test_linux("mxnet", "cpu")
               }
@@ -321,12 +321,12 @@ pipeline {
         stage("Knowledge Graph GPU") {
           agent { docker { image "dgllib/dgl-ci-gpu:torch-1.2.0" } }
           stages {
-            stage("Backend Pytorch test") {
+            stage("Pytorch test") {
               steps {
                 kg_test_linux("pytorch", "gpu")
               }
             }
-            stage("Backend MXNet test") {
+            stage("MXNet test") {
               steps {
                 kg_test_linux("mxnet", "gpu")
               }
