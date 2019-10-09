@@ -298,6 +298,10 @@ pipeline {
             }
           }
         }
+      }
+    }
+    stage("App") {
+      parallel {
         stage("Knowledge Graph CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu:torch-1.2.0" } }
           stages {
