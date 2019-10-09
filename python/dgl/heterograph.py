@@ -49,17 +49,7 @@ class DGLHeteroGraph(object):
            {rank=sink; Nintendo; Mojang}
        }
 
-    One can analyze the graph and figure out the metagraph as follows:
-
-    .. graphviz::
-
-       digraph G {
-           User -> User [label=follows]
-           User -> Game [label=plays]
-           Developer -> Game [label=develops]
-       }
-
-    Suppose that one maps the users, games and developers to the following
+    And suppose that one maps the users, games and developers to the following
     IDs:
 
     =========  =====  ===  =====
@@ -157,6 +147,24 @@ class DGLHeteroGraph(object):
     3
     >>> g['plays'].number_of_nodes()  # ERROR!! There are two types 'user' and 'game'.
     >>> g['plays'].number_of_edges()  # OK!! because there is only one edge type 'plays'
+
+    Metagraph
+    ---------
+    For each heterogeneous graph, one can often infer the *metagraph*, the template of
+    edge connections showing how many types of nodes and edges exist in the graph, and
+    how each edge type could connect between node types.
+
+    One can analyze the example gameplay graph above and figure out the metagraph as
+    follows:
+
+    .. graphviz::
+
+       digraph G {
+           User -> User [label=follows]
+           User -> Game [label=plays]
+           Developer -> Game [label=develops]
+       }
+
 
     Parameters
     ----------

@@ -194,8 +194,10 @@ intersphinx_mapping = {
 # sphinx gallery configurations
 from sphinx_gallery.sorting import FileNameSortKey
 
-examples_dirs = ['../../tutorials/basics','../../tutorials/models']  # path to find sources
-gallery_dirs = ['tutorials/basics','tutorials/models']  # path to generate docs
+examples_dirs = ['../../tutorials/basics',
+                 '../../tutorials/models',
+                 '../../tutorials/hetero']  # path to find sources
+gallery_dirs = ['tutorials/basics','tutorials/models','tutorials/hetero']  # path to generate docs
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',

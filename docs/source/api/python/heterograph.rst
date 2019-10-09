@@ -18,6 +18,7 @@ Conversion to and from heterogeneous graphs
     graph
     bipartite
     hetero_from_relations
+    heterograph
     to_hetero
     to_homo
     to_networkx
