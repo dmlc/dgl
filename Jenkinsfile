@@ -304,7 +304,7 @@ pipeline {
       stages {
         stage("Knowledge Graph CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu:torch-1.2.0" } }
-          stages {
+          parallel {
             stage("Pytorch test") {
               steps {
                 kg_test_linux("pytorch", "cpu")
@@ -324,7 +324,7 @@ pipeline {
         }
         stage("Knowledge Graph GPU") {
           agent { docker { image "dgllib/dgl-ci-gpu:torch-1.2.0" } }
-          stages {
+          parallel {
             stage("Pytorch test") {
               steps {
                 kg_test_linux("pytorch", "gpu")

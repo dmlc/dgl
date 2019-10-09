@@ -58,7 +58,7 @@ if [ "$2" == "cpu" ]; then
 
     # verify saving training result
     python3 eval.py --model_name TransE --dataset FB15k --hidden_dim 100 \
-        --gamma 24.0 --batch_size 16 --gpu -1 --model_path TransE_FB15k_emb/ \\
+        --gamma 24.0 --batch_size 16 --gpu -1 --model_path TransE_FB15k_emb/ \
         --eval_percent 0.01 --data_path /data/kg || fail "eval TransE on $2"
 
     # verify CPU training ComplEx
