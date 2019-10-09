@@ -47,8 +47,8 @@ if [ "$2" == "cpu" ]; then
 
     # verify saving training result
     python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 100 \
-        --gamma 500.0 --batch_size 16 --gpu 0 --model_path DistMult_FB15k_emb/ \
-        --eval_percent 0.01 || fail "eval DistMult on $2"
+        --gamma 500.0 --batch_size 16 --gpu -1 --model_path DistMult_FB15k_emb/ \
+        --eval_percent 0.01 --data_path /data/kg || fail "eval DistMult on $2"
 
     # verify CPU training TransE
     python3 train.py --model TransE --dataset FB15k --batch_size 128 \
@@ -58,8 +58,8 @@ if [ "$2" == "cpu" ]; then
 
     # verify saving training result
     python3 eval.py --model_name TransE --dataset FB15k --hidden_dim 100 \
-        --gamma 24.0 --batch_size 16 --gpu 0 --model_path TransE_FB15k_emb/ \\
-        --eval_percent 0.01 || fail "eval TransE on $2"
+        --gamma 24.0 --batch_size 16 --gpu -1 --model_path TransE_FB15k_emb/ \\
+        --eval_percent 0.01 --data_path /data/kg || fail "eval TransE on $2"
 
     # verify CPU training ComplEx
     python3 train.py --model ComplEx --dataset FB15k --batch_size 128 \
@@ -69,8 +69,8 @@ if [ "$2" == "cpu" ]; then
 
     # verify saving training result
     python3 eval.py --model_name ComplEx --dataset FB15k --hidden_dim 100 \
-        --gamma 500.0 --batch_size 16 --gpu 0 --model_path ComplEx_FB15k_emb/ \
-        --eval_percent 0.01 || fail "eval ComplEx on $2"
+        --gamma 500.0 --batch_size 16 --gpu -1 --model_path ComplEx_FB15k_emb/ \
+        --eval_percent 0.01 --data_path /data/kg || fail "eval ComplEx on $2"
 
 elif [ "$2" == "gpu" ]; then
     # verify GPU training DistMult
@@ -88,7 +88,7 @@ elif [ "$2" == "gpu" ]; then
     # verify saving training result
     python3 eval.py --model_name DistMult --dataset FB15k --hidden_dim 100 \
         --gamma 500.0 --batch_size 16 --gpu 0 --model_path DistMult_FB15k_emb/ \
-        --eval_percent 0.01 || fail "eval DistMult on $2"
+        --eval_percent 0.01 --data_path /data/kg || fail "eval DistMult on $2"
 
     # verify GPU training TransE
     python3 train.py --model TransE --dataset FB15k --batch_size 128 \
@@ -105,7 +105,7 @@ elif [ "$2" == "gpu" ]; then
     # verify saving training result
     python3 eval.py --model_name TransE --dataset FB15k --hidden_dim 100 \
         --gamma 24.0 --batch_size 16 --gpu 0 --model_path TransE_FB15k_emb/ \
-        --eval_percent 0.01 || fail "eval TransE on $2"
+        --eval_percent 0.01 --data_path /data/kg || fail "eval TransE on $2"
 
     # verify GPU training ComplEx
     python3 train.py --model ComplEx --dataset FB15k --batch_size 128 \
@@ -122,7 +122,7 @@ elif [ "$2" == "gpu" ]; then
     # verify saving training result
     python3 eval.py --model_name ComplEx --dataset FB15k --hidden_dim 100 \
         --gamma 500.0 --batch_size 16 --gpu 0 --model_path ComplEx_FB15k_emb/ \
-        --eval_percent 0.01 || fail "eval ComplEx on $2"
+        --eval_percent 0.01 --data_path /data/kg || fail "eval ComplEx on $2"
 fi
 
 popd > /dev/null
