@@ -94,8 +94,8 @@ class ComplExScore(nn.Block):
 
     def edge_func(self, edges):
         real_head, img_head = nd.split(edges.src['emb'], num_outputs=2, axis=-1)
-        real_tail, img_tail = nd.split(edges.dst['emb'], num_outputs=2, dim=-1)
-        real_rel, img_rel = nd.split(edges.data['emb'], num_outputs=2, dim=-1)
+        real_tail, img_tail = nd.split(edges.dst['emb'], num_outputs=2, axis=-1)
+        real_rel, img_rel = nd.split(edges.data['emb'], num_outputs=2, axis=-1)
 
         score = real_head * real_tail * real_rel \
                 + img_head * img_tail * real_rel \
@@ -120,13 +120,11 @@ class ComplExScore(nn.Block):
         if neg_head:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
                 hidden_dim = heads.shape[1]
-                emb_real = tails[..., :hidden_dim // 2]
-                emb_imag = tails[..., hidden_dim // 2:]
-                rel_real = relations[..., :hidden_dim // 2]
-                rel_imag = relations[..., hidden_dim // 2:]
-                real = emb_real * rel_real + emb_imag * rel_imag
-                imag = -emb_real * rel_imag + emb_imag * rel_real
-                emb_complex = nd.concat((real, imag), dim=-1)
+                emb_real, emb_img = nd.split(tails, num_outputs=2, axis=-1)
+                rel_real, rel_img = nd.split(relations, num_outputs=2, axis=-1)
+                real = emb_real * rel_real + emb_img * rel_img
+                img = -emb_real * rel_img + emb_img * rel_real
+                emb_complex = nd.concat(real, img, dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
                 heads = nd.transpose(heads, axes=(0, 2, 1))
@@ -135,13 +133,11 @@ class ComplExScore(nn.Block):
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
                 hidden_dim = heads.shape[1]
-                emb_real = heads[..., :hidden_dim // 2]
-                emb_imag = heads[..., hidden_dim // 2:]
-                rel_real = relations[..., :hidden_dim // 2]
-                rel_imag = relations[..., hidden_dim // 2:]
-                real = emb_real * rel_real - emb_imag * rel_imag
-                imag = emb_real * rel_imag + emb_imag * rel_real
-                emb_complex = nd.concat((real, imag), dim=-1)
+                emb_real, emb_img = nd.split(heads, num_outputs=2, axis=-1)
+                rel_real, rel_img = nd.split(relations, num_outputs=2, axis=-1)
+                real = emb_real * rel_real - emb_img * rel_img
+                img = emb_real * rel_img + emb_img * rel_real
+                emb_complex = nd.concat(real, img, dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
 
                 tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
