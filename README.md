@@ -38,8 +38,9 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 ## News
 
-v0.3 has just been released! Huge performance improvement (up to 19x). See release note
-[here](https://github.com/dmlc/dgl/releases/tag/v0.3).
+v0.4 has just been released! DGL now support **heterogeneous graphs**, and comes
+with a subpackage **DGL-KE** that computes embeddings for large knowledge graphs.
+See release note [here](https://github.com/dmlc/dgl/releases/tag/v0.4).
 
 We presented DGL at [GTC 2019](https://www.nvidia.com/en-us/gtc/) as an
 instructor-led training session. Check out our slides and tutorial materials
