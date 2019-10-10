@@ -139,7 +139,7 @@ def split(input, sizes_or_sections, dim):
                              ' to %d pieces, but got %d.' % (dim, sizes_or_sections, dimsize))
         idx = np.arange(sizes_or_sections, dimsize, sizes_or_sections)
     else:
-        idx = np.cumsum(sizes_or_sections)[0:-1]
+        idx = np.cumsum(np.array(sizes_or_sections))[0:-1]
     return np.split(input, idx, axis=dim)
 
 def repeat(input, repeats, dim):
@@ -178,11 +178,11 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return np.reshape(input ,shape)
 
-def zeros(shape, dtype):
-    return np.zeros(shape, dtype=dtype)
+def zeros(shape, dtype, ctx):
+    return np.zeros(shape, dtype=dtype, ctx=ctx)
 
-def ones(shape, dtype):
-    return np.ones(shape, dtype=dtype)
+def ones(shape, dtype, ctx):
+    return np.ones(shape, dtype=dtype, ctx=ctx)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     #TODO
@@ -233,7 +233,7 @@ def zerocopy_to_dlpack(arr):
 def zerocopy_from_dlpack(dlpack_arr):
     return mx.nd.from_dlpack(dlpack_arr).as_np_ndarray()
 
-def zerocopy_to_numpy(input):
+def zerocopy_to_numpy(arr):
     # NOTE: not zerocopy
     return arr.asnumpy()
 

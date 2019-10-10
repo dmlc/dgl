@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import numpy as onp
 import mxnet as mx
 from mxnet import numpy as np
-from mxnet import npe
+from mxnet import npx
 import mxnet.autograd as autograd
 
 def cuda():
@@ -55,7 +55,7 @@ def reduce_sum(x):
     return x.sum()
 
 def softmax(x, dim):
-    return npe.softmax(x, dim)
+    return npx.softmax(x, dim)
 
 def spmm(x, y):
     return np.dot(x, y)
