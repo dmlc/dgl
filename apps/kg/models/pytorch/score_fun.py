@@ -179,6 +179,7 @@ class RESCALScore(nn.Module):
     def create_neg(self, neg_head):
         if neg_head:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
                 heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
                 heads = th.transpose(heads, 1, 2)
                 tails = tails.unsqueeze(-1)
@@ -189,6 +190,7 @@ class RESCALScore(nn.Module):
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
                 tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
                 tails = th.transpose(tails, 1, 2)
                 heads = heads.unsqueeze(-1)
