@@ -25,7 +25,8 @@ def generate_rand_graph(n):
     return g, entity_emb, rel_emb
 
 ke_score_funcs = {'TransE': TransEScore(12.0),
-                  'DistMult': DistMultScore()}
+                  'DistMult': DistMultScore(),
+                  'ComplEx': ComplExScore()}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -98,6 +99,6 @@ def check_score_func(func_name):
 def test_score_func():
     for key in ke_score_funcs:
         check_score_func(key)
-    
+
 if __name__ == '__main__':
     test_score_func()
