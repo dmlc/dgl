@@ -4,7 +4,12 @@
 ## Introduction
 
 DGL-KE is a DGL-based package for computing node embeddings and relation embeddings of
-knowledge graphs efficiently. DGL-KE is fast and scalable. On a single machine,
+knowledge graphs efficiently. This package is adapted from
+[KnowledgeGraphEmbedding](https://github.com/DeepGraphLearning/KnowledgeGraphEmbedding).
+We enable fast and scalable training of knowledge graph embedding,
+while still keeping the package as extensible as
+[KnowledgeGraphEmbedding](https://github.com/DeepGraphLearning/KnowledgeGraphEmbedding).
+On a single machine,
 it takes only a few minutes for medium-size knowledge graphs, such as FB15k and wn18, and
 takes a couple of hours on Freebase, which has hundreds of millions of edges.
 
@@ -52,7 +57,7 @@ The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
 The speed on FB15k
 
-|  Models | TrasnE | DistMult | ComplEx |
+|  Models | TransE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 20000  | 100000   | 100000  |
 |TIME     | 411s   | 690s     | 806s    |
@@ -65,9 +70,11 @@ The accuracy on FB15k
 | DistMult | 43.35 | 0.783 | 0.713  | 0.837  | 0.897   |
 | ComplEx  | 51.99 | 0.785 | 0.720  | 0.832  | 0.889   |
 
+In comparison, GraphVite uses 4 GPUs and takes 14 minutes. Thus, DGL-KE trains TransE on FB15k twice as fast as GraphVite while using much few resources. More performance information on GraphVite can be found [here](https://github.com/DeepGraphLearning/graphvite).
+
 The speed on wn18
 
-|  Models | TrasnE | DistMult | ComplEx |
+|  Models | TransE | DistMult | ComplEx |
 |---------|--------|----------|---------|
 |MAX_STEPS| 40000  | 10000    | 20000   |
 |TIME     | 719s   | 126s     | 266s    |
