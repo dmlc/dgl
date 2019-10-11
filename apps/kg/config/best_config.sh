@@ -8,7 +8,7 @@ DGLBACKEND=pytorch python3 train.py --model DistMult --dataset FB15k --batch_siz
 
 DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 500.0 --lr 0.2 --max_step 100000 \
-    --batch_size_eval 16 --gpu 1 --valid --test -adv
+    --batch_size_eval 16 --gpu 0 --valid --test -adv
 
 DGLBACKEND=pytorch python3 train.py --model TransE --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 20000 \
