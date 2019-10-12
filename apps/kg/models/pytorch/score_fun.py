@@ -175,3 +175,27 @@ class RESCALScore(nn.Module):
 
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
+
+    def create_neg(self, neg_head):
+        if neg_head:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                heads = th.transpose(heads, 1, 2)
+                tails = tails.unsqueeze(-1)
+                relations = relations.view(-1, self.relation_dim, self.entity_dim)
+                tmp = th.matmul(relations, tails).squeeze(-1)
+                tmp = tmp.reshape(num_chunks, chunk_size, hidden_dim)
+                return th.bmm(tmp, heads)
+            return fn
+        else:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+                tails = th.transpose(tails, 1, 2)
+                heads = heads.unsqueeze(-1)
+                relations = relations.view(-1, self.relation_dim, self.entity_dim)
+                tmp = th.matmul(relations, heads).squeeze(-1)
+                tmp = tmp.reshape(num_chunks, chunk_size, hidden_dim)
+                return th.bmm(tmp, tails)
+            return fn
