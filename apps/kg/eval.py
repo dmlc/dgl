@@ -7,7 +7,6 @@ import os
 import logging
 import time
 import pickle
-import line_profiler
 
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':

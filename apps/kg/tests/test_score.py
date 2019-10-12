@@ -13,19 +13,23 @@ else:
 from models.general_models import KEModel
 from dataloader.sampler import create_neg_subgraph
 
-def generate_rand_graph(n):
+def generate_rand_graph(n, func_name):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g = dgl.DGLGraph(arr, readonly=True)
     num_rels = 10
     entity_emb = F.uniform((g.number_of_nodes(), 10), F.float32, F.cpu(), 0, 1)
     rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RESCAL':
+        rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
     return g, entity_emb, rel_emb
 
 ke_score_funcs = {'TransE': TransEScore(12.0),
-                  'DistMult': DistMultScore()}
+                  'DistMult': DistMultScore(),
+                  'ComplEx': ComplExScore(),
+                  'RESCAL': RESCALScore(10, 10)}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -71,7 +75,7 @@ class BaseKEModel:
 def check_score_func(func_name):
     batch_size = 10
     neg_sample_size = 10
-    g, entity_emb, rel_emb = generate_rand_graph(100)
+    g, entity_emb, rel_emb = generate_rand_graph(100, func_name)
     hidden_dim = entity_emb.shape[1]
     ke_score_func = ke_score_funcs[func_name]
     model = BaseKEModel(ke_score_func, entity_emb, rel_emb)
@@ -98,6 +102,6 @@ def check_score_func(func_name):
 def test_score_func():
     for key in ke_score_funcs:
         check_score_func(key)
-    
+
 if __name__ == '__main__':
     test_score_func()
