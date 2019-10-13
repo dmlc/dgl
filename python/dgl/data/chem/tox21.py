@@ -4,6 +4,7 @@ import sys
 from .csv_dataset import CSVDataset
 from .utils import smile_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
+from ... import backend as F
 
 try:
     import pandas as pd
@@ -46,7 +47,7 @@ class Tox21(CSVDataset):
 
         df = df.drop(columns=['mol_id'])
 
-        super().__init__(df, smile_to_graph, cache_file_path="tox21_dglgraph.pkl")
+        super().__init__(df, smile_to_graph, cache_file_path="tox21_dglgraph.bin")
         self._weight_balancing()
 
     
@@ -67,8 +68,8 @@ class Tox21(CSVDataset):
         * self._task_pos_weights is set, which is a list of positive sample weights
           for each task.
         """
-        num_pos = np.sum(self.labels, axis=0)
-        num_indices = np.sum(self.mask, axis=0)
+        num_pos = F.sum(self.labels, dim=0)
+        num_indices = F.sum(self.mask, dim=0)
         self._task_pos_weights = (num_indices - num_pos) / num_pos
     
 
