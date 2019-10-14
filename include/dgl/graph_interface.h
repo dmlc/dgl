@@ -346,6 +346,15 @@ class GraphInterface : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
+  /*!
+   * \brief Sort the columns in CSR.
+   *
+   * This sorts the columns in each row based on the column Ids.
+   * The edge ids should be sorted accordingly.
+   */
+  virtual void SortCSR() {
+  }
+
   static constexpr const char* _type_key = "graph.Graph";
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
@@ -376,6 +385,12 @@ struct Subgraph : public runtime::Object {
 struct NegSubgraph: public Subgraph {
   /*! \brief The existence of the negative edges in the parent graph. */
   IdArray exist;
+
+  /*! \brief The Ids of head nodes */
+  IdArray head_nid;
+
+  /*! \brief The Ids of tail nodes */
+  IdArray tail_nid;
 };
 
 // Define SubgraphRef

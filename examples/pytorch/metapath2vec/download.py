@@ -1,9 +1,24 @@
 import os
 import torch as th
 import torch.nn as nn
+import tqdm
 
 
-class AminerDataset:
+class PBar(object):
+    def __enter__(self):
+        self.t = None
+        return self
+
+    def __call__(self, blockno, readsize, totalsize):
+        if self.t is None:
+            self.t = tqdm.tqdm(total=totalsize)
+        self.t.update(readsize)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.t.close()
+
+
+class AminerDataset(object):
     """
     Download Aminer Dataset from Amazon S3 bucket. 
     """
@@ -11,28 +26,21 @@ class AminerDataset:
 
         self.url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/aminer.zip'
 
-        if not os.path.exists(os.path.join(path, 'aminer')):
+        if not os.path.exists(os.path.join(path, 'aminer.txt')):
             print('File not found. Downloading from', self.url)
             self._download_and_extract(path, 'aminer.zip')
+        self.fn = os.path.join(path, 'aminer.txt')
 
     def _download_and_extract(self, path, filename):
         import shutil, zipfile, zlib
         from tqdm import tqdm
-        import requests
+        import urllib.request
 
         fn = os.path.join(path, filename)
-
-        if os.path.exists(path):
-            shutil.rmtree(path, ignore_errors=True)
-        os.makedirs(path)
-        f_remote = requests.get(self.url, stream=True)
-        assert f_remote.status_code == 200, 'fail to open {}'.format(self.url)
-        with open(fn, 'wb') as writer:
-            for chunk in tqdm(f_remote.iter_content(chunk_size=1024*1024*3)):
-                writer.write(chunk)
+        with PBar() as pb:
+            urllib.request.urlretrieve(self.url, fn, pb)
         print('Download finished. Unzipping the file...')
 
         with zipfile.ZipFile(fn) as zf:
             zf.extractall(path)
         print('Unzip finished.')
-        self.fn = fn

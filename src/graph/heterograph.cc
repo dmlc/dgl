@@ -362,8 +362,11 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFlattenedGraph")
     HeteroGraphRef hg = args[0];
     List<Value> etypes = args[1];
     std::vector<dgl_id_t> etypes_vec;
-    for (Value val : etypes)
-      etypes_vec.push_back(val->data);
+    for (Value val : etypes) {
+      // (gq) have to decompose it into two statements because of a weird MSVC internal error
+      dgl_id_t id = val->data;
+      etypes_vec.push_back(id);
+    }
 
     *rv = FlattenedHeteroGraphRef(hg->Flatten(etypes_vec));
   });

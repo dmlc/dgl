@@ -43,14 +43,32 @@ def create_test_heterograph1():
     g0.edata[dgl.ETYPE] = etypes
     return dgl.to_hetero(g0, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'])
 
+def create_test_heterograph2():
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    wishes_nx = nx.DiGraph()
+    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
+    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
+    develops_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+        ('user', 'plays', 'game'): plays_spmat,
+        ('user', 'wishes', 'game'): wishes_nx,
+        ('developer', 'develops', 'game'): develops_g,
+        })
+    return g
+
 def get_redfn(name):
     return getattr(F, name)
 
 def test_create():
     g0 = create_test_heterograph()
     g1 = create_test_heterograph1()
-    assert set(g0.ntypes) == set(g1.ntypes)
-    assert set(g0.canonical_etypes) == set(g1.canonical_etypes)
+    g2 = create_test_heterograph2()
+    assert set(g0.ntypes) == set(g1.ntypes) == set(g2.ntypes)
+    assert set(g0.canonical_etypes) == set(g1.canonical_etypes) == set(g2.canonical_etypes)
 
     # create from nx complete bipartite graph
     nxg = nx.complete_bipartite_graph(3, 4)
@@ -64,6 +82,16 @@ def test_create():
     g = dgl.graph(spmat)
     assert g.number_of_nodes() == 4
     assert g.number_of_edges() == 3
+
+    # test inferring number of nodes for heterograph
+    g = dgl.heterograph({
+        ('l0', 'e0', 'l1'): [(0, 1), (0, 2)],
+        ('l0', 'e1', 'l2'): [(2, 2)],
+        ('l2', 'e2', 'l2'): [(1, 1), (3, 3)],
+        })
+    assert g.number_of_nodes('l0') == 3
+    assert g.number_of_nodes('l1') == 3
+    assert g.number_of_nodes('l2') == 4
 
 def test_query():
     g = create_test_heterograph()
@@ -657,6 +685,23 @@ def test_convert():
     g = dgl.to_homo(hg)
     assert g.number_of_nodes() == 5
 
+def test_transform():
+    g = create_test_heterograph()
+    x = F.randn((3, 5))
+    g.nodes['user'].data['h'] = x
+
+    new_g = dgl.metapath_reachable_graph(g, ['follows', 'plays'])
+
+    assert new_g.ntypes == ['user', 'game']
+    assert new_g.number_of_edges() == 3
+    assert F.asnumpy(new_g.has_edges_between([0, 0, 1], [0, 1, 1])).all()
+
+    new_g = dgl.metapath_reachable_graph(g, ['follows'])
+
+    assert new_g.ntypes == ['user']
+    assert new_g.number_of_edges() == 2
+    assert F.asnumpy(new_g.has_edges_between([0, 1], [1, 2])).all()
+
 def test_subgraph():
     g = create_test_heterograph()
     x = F.randn((3, 5))
@@ -1142,6 +1187,7 @@ if __name__ == '__main__':
     test_view1()
     test_flatten()
     test_convert()
+    test_transform()
     test_subgraph()
     test_apply()
     test_level1()

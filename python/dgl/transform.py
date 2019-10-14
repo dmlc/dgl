@@ -7,11 +7,12 @@ from .graph import DGLGraph
 from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
+from .convert import graph, bipartite
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'to_self_loop',
-           'onehot_degree', 'remove_self_loop']
+           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
+           'remove_self_loop', 'metapath_reachable_graph']
 
 
 def pairwise_squared_distance(x):
@@ -404,37 +405,60 @@ def laplacian_lambda_max(g):
                                       return_eigenvectors=False)[0].real)
     return rst
 
+def metapath_reachable_graph(g, metapath):
+    """Return a graph where the successors of any node ``u`` are nodes reachable from ``u`` by
+    the given metapath.
 
-def onehot_degree(g, max_degree=-1, out_field='d', direction="in"):
-    """Inplace add one-hot degree vector as node feature
+    If the beginning node type ``s`` and ending node type ``t`` are the same, it will return
+    a homogeneous graph with node type ``s = t``.  Otherwise, a unidirectional bipartite graph
+    with source node type ``s`` and destination node type ``t`` is returned.
+
+    In both cases, two nodes ``u`` and ``v`` will be connected with an edge ``(u, v)`` if
+    there exists one path matching the metapath from ``u`` to ``v``.
+
+    The result graph keeps the node set of type ``s`` and ``t`` in the original graph even if
+    they might have no neighbor.
+
+    The features of the source/destination node type in the original graph would be copied to
+    the new graph.
 
     Parameters
-    -----------
-    g: DGLGraph
-    max_degree: int
-        Maximum degree for one-hot encoding. If it's -1,
-        the maximum degree would be inferred from the input graph.
-    out_field: str
-        Field name for the node feature
-    direction: str
-        Either "in" or "out". Specify whether to use in degrees or out degrees.
+    ----------
+    g : DGLHeteroGraph
+        The input graph
+    metapath : list[str or tuple of str]
+        Metapath in the form of a list of edge types
 
     Returns
     -------
-    g: DGLGraph
-        Returns the input graph with added feature
+    DGLHeteroGraph
+        A homogeneous or bipartite graph.
     """
-    if direction == "in":
-        degrees = g.in_degrees()
-    elif direction == "out":
-        degrees = g.out_degrees()
-    else:
-        raise RuntimeError("Invalid Direction")
-    g.ndata[out_field] = F.one_hot(degrees, max_degree)
-    return g
+    adj = 1
+    for etype in metapath:
+        adj = adj * g.adj(etype=etype, scipy_fmt='csr', transpose=True)
 
-def to_self_loop(g):
-    """Return a new graph which contains exactly one self loop for each node.
+    adj = (adj != 0).tocsr()
+    srctype = g.to_canonical_etype(metapath[0])[0]
+    dsttype = g.to_canonical_etype(metapath[-1])[2]
+    if srctype == dsttype:
+        assert adj.shape[0] == adj.shape[1]
+        new_g = graph(adj, ntype=srctype)
+    else:
+        new_g = bipartite(adj, utype=srctype, vtype=dsttype)
+
+    for key, value in g.nodes[srctype].data.items():
+        new_g.nodes[srctype].data[key] = value
+    if srctype != dsttype:
+        for key, value in g.nodes[dsttype].data.items():
+            new_g.nodes[dsttype].data[key] = value
+
+    return new_g
+
+def add_self_loop(g):
+    """Return a new graph containing all the edges in the input graph plus self loops
+    of every nodes.
+    No duplicate self loop will be added for nodes already having self loops.
     Self-loop edges id are not preserved. All self-loop edges would be added at the end.
 
     Examples
@@ -443,7 +467,7 @@ def to_self_loop(g):
     >>> g = DGLGraph()
     >>> g.add_nodes(5)
     >>> g.add_edges([0, 1, 2], [1, 1, 2])
-    >>> new_g = dgl.transform.to_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
+    >>> new_g = dgl.transform.add_self_loop(g) # Nodes 0, 3, 4 don't have self-loop
     >>> new_g.edges()
     (tensor([0, 0, 1, 2, 3, 4]), tensor([1, 0, 1, 2, 3, 4]))
 
@@ -495,6 +519,5 @@ def remove_self_loop(g):
     non_self_edges_idx = src != dst
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
-
 
 _init_api("dgl.transform")
