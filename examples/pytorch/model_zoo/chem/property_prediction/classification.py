@@ -4,60 +4,56 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from dgl import model_zoo
-from dgl.data.utils import split_dataset
 
-from utils import Meter, EarlyStopping, collate_molgraphs_for_classification, set_random_seed
+from utils import Meter, EarlyStopping, collate_molgraphs, set_random_seed, \
+    load_dataset_for_classification
 
 def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer):
     model.train()
     train_meter = Meter()
     for batch_id, batch_data in enumerate(data_loader):
-        smiles, bg, labels, mask = batch_data
+        smiles, bg, labels, masks = batch_data
         atom_feats = bg.ndata.pop(args['atom_data_field'])
-        atom_feats, labels, mask = atom_feats.to(args['device']), \
-                                   labels.to(args['device']), \
-                                   mask.to(args['device'])
+        atom_feats, labels, masks = atom_feats.to(args['device']), \
+                                    labels.to(args['device']), \
+                                    masks.to(args['device'])
         logits = model(bg, atom_feats)
         # Mask non-existing labels
-        loss = (loss_criterion(logits, labels) * (mask != 0).float()).mean()
+        loss = (loss_criterion(logits, labels) * (masks != 0).float()).mean()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         print('epoch {:d}/{:d}, batch {:d}/{:d}, loss {:.4f}'.format(
             epoch + 1, args['num_epochs'], batch_id + 1, len(data_loader), loss.item()))
-        train_meter.update(logits, labels, mask)
-    train_roc_auc = train_meter.roc_auc_averaged_over_tasks()
-    print('epoch {:d}/{:d}, training roc-auc score {:.4f}'.format(
-        epoch + 1, args['num_epochs'], train_roc_auc))
+        train_meter.update(logits, labels, masks)
+    train_score = train_meter.compute_metric_averaged_over_tasks(args['metric_name'])
+    print('epoch {:d}/{:d}, training {} {:.4f}'.format(
+        epoch + 1, args['num_epochs'], args['metric_name'], train_score))
 
 def run_an_eval_epoch(args, model, data_loader):
     model.eval()
     eval_meter = Meter()
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
-            smiles, bg, labels, mask = batch_data
+            smiles, bg, labels, masks = batch_data
             atom_feats = bg.ndata.pop(args['atom_data_field'])
             atom_feats, labels = atom_feats.to(args['device']), labels.to(args['device'])
             logits = model(bg, atom_feats)
-            eval_meter.update(logits, labels, mask)
-    return eval_meter.roc_auc_averaged_over_tasks()
+            eval_meter.update(logits, labels, masks)
+    return eval_meter.compute_metric_averaged_over_tasks(args['metric_name'])
 
 def main(args):
     args['device'] = "cuda" if torch.cuda.is_available() else "cpu"
     set_random_seed()
 
     # Interchangeable with other datasets
-    if args['dataset'] == 'Tox21':
-        from dgl.data.chem import Tox21
-        dataset = Tox21()
-
-    trainset, valset, testset = split_dataset(dataset, args['train_val_test_split'])
-    train_loader = DataLoader(trainset, batch_size=args['batch_size'],
-                              collate_fn=collate_molgraphs_for_classification)
-    val_loader = DataLoader(valset, batch_size=args['batch_size'],
-                            collate_fn=collate_molgraphs_for_classification)
-    test_loader = DataLoader(testset, batch_size=args['batch_size'],
-                             collate_fn=collate_molgraphs_for_classification)
+    dataset, train_set, val_set, test_set = load_dataset_for_classification(args)
+    train_loader = DataLoader(train_set, batch_size=args['batch_size'],
+                              collate_fn=collate_molgraphs)
+    val_loader = DataLoader(val_set, batch_size=args['batch_size'],
+                            collate_fn=collate_molgraphs)
+    test_loader = DataLoader(test_set, batch_size=args['batch_size'],
+                             collate_fn=collate_molgraphs)
 
     if args['pre_trained']:
         args['num_epochs'] = 0
@@ -87,17 +83,18 @@ def main(args):
         run_a_train_epoch(args, epoch, model, train_loader, loss_criterion, optimizer)
 
         # Validation and early stop
-        val_roc_auc = run_an_eval_epoch(args, model, val_loader)
-        early_stop = stopper.step(val_roc_auc, model)
-        print('epoch {:d}/{:d}, validation roc-auc score {:.4f}, best validation roc-auc score {:.4f}'.format(
-            epoch + 1, args['num_epochs'], val_roc_auc, stopper.best_score))
+        val_score = run_an_eval_epoch(args, model, val_loader)
+        early_stop = stopper.step(val_score, model)
+        print('epoch {:d}/{:d}, validation {} {:.4f}, best validation {} {:.4f}'.format(
+            epoch + 1, args['num_epochs'], args['metric_name'],
+            val_score, args['metric_name'], stopper.best_score))
         if early_stop:
             break
 
     if not args['pre_trained']:
         stopper.load_checkpoint(model)
-    test_roc_auc = run_an_eval_epoch(args, model, test_loader)
-    print('test roc-auc score {:.4f}'.format(test_roc_auc))
+    test_score = run_an_eval_epoch(args, model, test_loader)
+    print('test {} {:.4f}'.format(args['metric_name'], test_score))
 
 if __name__ == '__main__':
     import argparse

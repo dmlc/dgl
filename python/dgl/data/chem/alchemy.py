@@ -10,7 +10,8 @@ import pickle
 import zipfile
 from collections import defaultdict
 
-from .utils import mol_to_complete_graph
+from .utils import mol_to_complete_graph, atom_type_one_hot, atom_hybridization_one_hot, \
+    atom_is_aromatic
 from ..utils import download, get_download_dir, _get_dgl_url
 from ... import backend as F
 
@@ -59,25 +60,19 @@ def alchemy_nodes(mol):
     num_atoms = mol.GetNumAtoms()
     for u in range(num_atoms):
         atom = mol.GetAtomWithIdx(u)
-        symbol = atom.GetSymbol()
         atom_type = atom.GetAtomicNum()
-        aromatic = atom.GetIsAromatic()
-        hybridization = atom.GetHybridization()
         num_h = atom.GetTotalNumHs()
         atom_feats_dict['node_type'].append(atom_type)
 
         h_u = []
-        h_u += [int(symbol == x) for x in ['H', 'C', 'N', 'O', 'F', 'S', 'Cl']]
+        h_u += atom_type_one_hot(atom, ['H', 'C', 'N', 'O', 'F', 'S', 'Cl'])
         h_u.append(atom_type)
         h_u.append(is_acceptor[u])
         h_u.append(is_donor[u])
-        h_u.append(int(aromatic))
-        h_u += [
-            int(hybridization == x)
-            for x in (Chem.rdchem.HybridizationType.SP,
-                      Chem.rdchem.HybridizationType.SP2,
-                      Chem.rdchem.HybridizationType.SP3)
-        ]
+        h_u += atom_is_aromatic(atom)
+        h_u += atom_hybridization_one_hot(atom, [Chem.rdchem.HybridizationType.SP,
+                                                 Chem.rdchem.HybridizationType.SP2,
+                                                 Chem.rdchem.HybridizationType.SP3])
         h_u.append(num_h)
         atom_feats_dict['n_feat'].append(F.tensor(np.array(h_u).astype(np.float32)))
 
@@ -155,9 +150,34 @@ class TencentAlchemyDataset(object):
         contest is ongoing.
     from_raw : bool
         Whether to process the dataset from scratch or use a
-        processed one for faster speed. Default to be False.
+        processed one for faster speed. If you use different ways
+        to featurize atoms or bonds, you should set this to be True.
+        Default to be False.
+    mol_to_graph: callable, str -> DGLGraph
+        A function turning an RDKit molecule instance into a DGLGraph.
+        Default to :func:`dgl.data.chem.mol_to_complete_graph`.
+    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for atoms in a molecule, which can be used to update
+        ndata for a DGLGraph. By default, we store the atom atomic numbers
+        under the name ``"node_type"`` and store the atom features under the
+        name ``"n_feat"``. The atom features include:
+        * One hot encoding for atom types
+        * Atomic number of atoms
+        * Whether the atom is a donor
+        * Whether the atom is an acceptor
+        * Whether the atom is aromatic
+        * One hot encoding for atom hybridization
+        * Total number of Hs on the atom
+    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for bonds in a molecule, which can be used to update
+        edata for a DGLGraph. By default, we store the distance between the
+        end atoms under the name ``"distance"`` and store the bond features under
+        the name ``"e_feat"``. The bond features are one-hot encodings of the bond type.
     """
-    def __init__(self, mode='dev', from_raw=False):
+    def __init__(self, mode='dev', from_raw=False,
+                 mol_to_graph=mol_to_complete_graph,
+                 atom_featurizer=alchemy_nodes,
+                 bond_featurizer=alchemy_edges):
         if mode == 'test':
             raise ValueError('The test mode is not supported before '
                              'the Alchemy contest finishes.')
@@ -185,9 +205,9 @@ class TencentAlchemyDataset(object):
             archive.extractall(file_dir)
             archive.close()
 
-        self._load()
+        self._load(mol_to_graph, atom_featurizer, bond_featurizer)
 
-    def _load(self):
+    def _load(self, mol_to_graph, atom_featurizer, bond_featurizer):
         if not self.from_raw:
             with open(osp.join(self.file_dir, "%s_graphs.pkl" % self.mode), "rb") as f:
                 self.graphs = pickle.load(f)
@@ -209,10 +229,10 @@ class TencentAlchemyDataset(object):
             for mol, label in zip(supp, self.target.iterrows()):
                 cnt += 1
                 print('Processing molecule {:d}/{:d}'.format(cnt, dataset_size))
-                graph = mol_to_complete_graph(mol, atom_featurizer=alchemy_nodes,
-                                              bond_featurizer=alchemy_edges)
-                smile = Chem.MolToSmiles(mol)
-                graph.smile = smile
+                graph = mol_to_graph(mol, atom_featurizer=atom_featurizer,
+                                     bond_featurizer=bond_featurizer)
+                smiles = Chem.MolToSmiles(mol)
+                graph.smile = smiles
                 self.graphs.append(graph)
                 label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
                 self.labels.append(label)

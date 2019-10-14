@@ -4,7 +4,8 @@ from torch.utils.data import DataLoader
 
 from dgl import model_zoo
 
-from utils import set_random_seed, collate_molgraphs_for_regression, EarlyStopping
+from utils import Meter, set_random_seed, collate_molgraphs, EarlyStopping, \
+    load_dataset_for_regression
 
 def regress(args, model, bg):
     if args['model'] == 'MPNN':
@@ -20,36 +21,37 @@ def regress(args, model, bg):
         return model(bg, node_types, edge_distances)
 
 def run_a_train_epoch(args, epoch, model, data_loader,
-                      loss_criterion, score_criterion, optimizer):
+                      loss_criterion, optimizer):
     model.train()
-    total_loss, total_score = 0, 0
+    train_meter = Meter()
+    total_loss = 0
     for batch_id, batch_data in enumerate(data_loader):
-        smiles, bg, labels = batch_data
-        labels = labels.to(args['device'])
+        smiles, bg, labels, masks = batch_data
+        labels, masks = labels.to(args['device']), masks.to(args['device'])
         prediction = regress(args, model, bg)
-        loss = loss_criterion(prediction, labels)
-        score = score_criterion(prediction, labels)
+        loss = (loss_criterion(prediction, labels) * (masks != 0).float()).mean()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         total_loss += loss.detach().item() * bg.batch_size
-        total_score += score.detach().item() * bg.batch_size
+        train_meter.update(prediction, labels, masks)
     total_loss /= len(data_loader.dataset)
-    total_score /= len(data_loader.dataset)
-    print('epoch {:d}/{:d}, training loss {:.4f}, training score {:.4f}'.format(
-        epoch + 1, args['num_epochs'], total_loss, total_score))
+    total_score = train_meter.compute_metric_averaged_over_tasks(args['metric_name']) / \
+                  len(data_loader.dataset)
+    print('epoch {:d}/{:d}, training loss {:.4f}, training {} {:.4f}'.format(
+        epoch + 1, args['num_epochs'], total_loss, args['metric_name'], total_score))
 
-def run_an_eval_epoch(args, model, data_loader, score_criterion):
+def run_an_eval_epoch(args, model, data_loader):
     model.eval()
-    total_score = 0
+    eval_meter = Meter()
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
-            smiles, bg, labels = batch_data
+            smiles, bg, labels, masks = batch_data
             labels = labels.to(args['device'])
             prediction = regress(args, model, bg)
-            score = score_criterion(prediction, labels)
-            total_score += score.detach().item() * bg.batch_size
-        total_score /= len(data_loader.dataset)
+            eval_meter.update(prediction, labels, masks)
+        total_score = eval_meter.compute_metric_averaged_over_tasks(args['metric_name']) / \
+                      len(data_loader.datasett)
     return total_score
 
 def main(args):
@@ -57,20 +59,22 @@ def main(args):
     set_random_seed()
 
     # Interchangeable with other datasets
-    if args['dataset'] == 'Alchemy':
-        from dgl.data.chem import TencentAlchemyDataset
-        train_set = TencentAlchemyDataset(mode='dev')
-        val_set = TencentAlchemyDataset(mode='valid')
-
+    train_set, val_set, test_set = load_dataset_for_regression(args)
     train_loader = DataLoader(dataset=train_set,
                               batch_size=args['batch_size'],
-                              collate_fn=collate_molgraphs_for_regression)
+                              collate_fn=collate_molgraphs)
     val_loader = DataLoader(dataset=val_set,
                             batch_size=args['batch_size'],
-                            collate_fn=collate_molgraphs_for_regression)
+                            collate_fn=collate_molgraphs)
+    if test_set is not None:
+        test_loader = DataLoader(dataset=test_set,
+                                 batch_size=args['batch_size'],
+                                 collate_fn=collate_molgraphs)
 
     if args['model'] == 'MPNN':
-        model = model_zoo.chem.MPNNModel(output_dim=args['output_dim'])
+        model = model_zoo.chem.MPNNModel(node_input_dim=args['node_in_feats'],
+                                         edge_input_dim=args['edge_in_feats'],
+                                         output_dim=args['output_dim'])
     elif args['model'] == 'SCHNET':
         model = model_zoo.chem.SchNet(norm=args['norm'], output_dim=args['output_dim'])
         model.set_mean_std(train_set.mean, train_set.std, args['device'])
@@ -79,22 +83,27 @@ def main(args):
         model.set_mean_std(train_set.mean, train_set.std, args['device'])
     model.to(args['device'])
 
-    loss_fn = nn.MSELoss()
-    score_fn = nn.L1Loss()
+    loss_fn = nn.MSELoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
     stopper = EarlyStopping(mode='lower', patience=args['patience'])
 
     for epoch in range(args['num_epochs']):
         # Train
-        run_a_train_epoch(args, epoch, model, train_loader, loss_fn, score_fn, optimizer)
+        run_a_train_epoch(args, epoch, model, train_loader, loss_fn, optimizer)
 
         # Validation and early stop
-        val_score = run_an_eval_epoch(args, model, val_loader, score_fn)
+        val_score = run_an_eval_epoch(args, model, val_loader)
         early_stop = stopper.step(val_score, model)
-        print('epoch {:d}/{:d}, validation score {:.4f}, best validation score {:.4f}'.format(
-            epoch + 1, args['num_epochs'], val_score, stopper.best_score))
+        print('epoch {:d}/{:d}, validation {} {:.4f}, best validation {} {:.4f}'.format(
+            epoch + 1, args['num_epochs'], args['metric_name'], val_score,
+            args['metric_name'], stopper.best_score))
         if early_stop:
             break
+
+    if test_set is not None:
+        stopper.load_checkpoint(model)
+        test_score = run_an_eval_epoch(args, model, test_loader)
+        print('test {} {:.4f}'.format(args['metric_name'], test_score))
 
 if __name__ == "__main__":
     import argparse
