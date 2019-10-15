@@ -106,6 +106,7 @@ def test(args, model, test_samplers, mode='Test'):
 def multi_gpu_test(args, model, graph_name, edges, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
+    model.create_neg()
     graph = dgl.contrib.graph_store.create_graph_from_store("test", store_type="shared_mem")
     test_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
@@ -117,7 +118,7 @@ def multi_gpu_test(args, model, graph_name, edges, mode='Test'):
                                                             mode='PBG-tail',
                                                             num_workers=args.num_worker,
                                                             rank=args.rank, ranks=args.num_proc)
-    samplers = [test_sampler_head, test_sampler_tail]
+    test_samplers = [test_sampler_head, test_sampler_tail]
     start = time.time()
     with th.no_grad():
         logs = []

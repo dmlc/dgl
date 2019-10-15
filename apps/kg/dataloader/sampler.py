@@ -172,7 +172,7 @@ class EvalSampler(object):
                                    num_workers=num_workers,
                                    shuffle=False,
                                    exclude_positive=False,
-                                   relations=g.edata['id'],
+                                   relations=g.edges[:].data['id'],
                                    return_false_neg=True)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
@@ -211,6 +211,7 @@ class EvalDataset(object):
         else:
             src = [t[0] for t in triples]
             etype_id = [t[1] for t in triples]
+            self.etype_id = etype_id
             dst = [t[2] for t in triples]
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[dataset.n_entities, dataset.n_entities])
             g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)

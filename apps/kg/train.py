@@ -1,6 +1,8 @@
 from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
 from dataloader import get_dataset
 
+import dgl
+import dgl.backend as F
 import argparse
 import os
 import logging
@@ -127,7 +129,12 @@ def get_logger(args):
     print("Logs are being recorded at: {}".format(log_file))
     return logger
 
-
+def run_server(num_worker, graph, etype_id):
+    g = dgl.contrib.graph_store.create_graph_store_server(graph, "test", "shared_mem",
+                    num_worker, False, edge_dir='in')
+    g.ndata['id'] = F.arange(0, graph.number_of_nodes())
+    g.edata['id'] = F.tensor(etype_id, F.int64)
+    g.run()
 def run(args, logger):
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
@@ -205,9 +212,8 @@ def run(args, logger):
         # all positive edges are excluded.
         if args.num_proc > 1:
             if args.mix_cpu_gpu:
-                g = dgl.contrib.graph_store.create_graph_store_server(eval_dataset.g, "test", "shared_mem",
-                    1, False, edge_dir='in')
-                g.run()
+                proc = mp.Process(target=run_server, args=(args.num_proc, eval_dataset.g, eval_dataset.etype_id))
+                proc.start()
             else:
                 test_sampler_tails = []
                 test_sampler_heads = []
@@ -252,6 +258,7 @@ def run(args, logger):
 
     # train
     start = time.time()
+    '''
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
@@ -265,7 +272,7 @@ def run(args, logger):
         valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
         train(args, model, train_sampler, valid_samplers)
     print('training takes {} seconds'.format(time.time() - start))
-
+    '''
     if args.save_emb is not None:
         if not os.path.exists(args.save_emb):
             os.mkdir(args.save_emb)
