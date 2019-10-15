@@ -522,6 +522,8 @@ class BaseAtomFeaturizer(object):
 
     Loop over all atoms in a molecule and featurize them with the ``featurizer_funcs``.
 
+    **We assume the resulting DGLGraph will not contain any virtual nodes.**
+
     Parameters
     ----------
     featurizer_funcs : dict
@@ -531,7 +533,6 @@ class BaseAtomFeaturizer(object):
         Mapping feature name to the size of the corresponding feature. If None, they will be
         computed when needed. Default: None.
     """
-
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
         if feat_sizes is None:
@@ -612,12 +613,13 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     * **One hot encoding of the number of total Hs on the atom**. The supported possibilities
       include ``0 - 4``.
 
+    **We assume the resulting DGLGraph will not contain any virtual nodes.**
+
     Parameters
     ----------
     atom_data_field : str
         Name for storing atom features in DGLGraphs, default to be 'h'.
     """
-
     def __init__(self, atom_data_field='h'):
         super(CanonicalAtomFeaturizer, self).__init__(
             featurizer_funcs={atom_data_field: ConcatFeaturizer(
@@ -766,6 +768,10 @@ class BaseBondFeaturizer(object):
     We assume the constructed ``DGLGraph`` is a bi-directed graph where the **i** th bond in the
     molecule, i.e. ``mol.GetBondWithIdx(i)``, corresponds to the **(2i)**-th and **(2i+1)**-th edges
     in the DGLGraph.
+
+    **We assume the resulting DGLGraph will be created with :func:`smiles_to_bigraph` without
+    self loops.**
+
     Parameters
     ----------
     featurizer_funcs : dict
@@ -775,7 +781,6 @@ class BaseBondFeaturizer(object):
         Mapping feature name to the size of the corresponding feature. If None, they will be
         computed when needed. Default: None.
     """
-
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
         if feat_sizes is None:
@@ -836,6 +841,7 @@ class BaseBondFeaturizer(object):
 
 class CanonicalBondFeaturizer(BaseBondFeaturizer):
     """A default featurizer for bonds.
+
     The bond features include:
     * **One hot encoding of the bond type**. The supported bond types include
       ``SINGLE``, ``DOUBLE``, ``TRIPLE``, ``AROMATIC``.
@@ -844,8 +850,10 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
     * **One hot encoding of the stereo configuration of a bond**. The supported bond stereo
       configurations include ``STEREONONE``, ``STEREOANY``, ``STEREOZ``, ``STEREOE``,
       ``STEREOCIS``, ``STEREOTRANS``.
-    """
 
+    **We assume the resulting DGLGraph will be created with :func:`smiles_to_bigraph` without
+    self loops.**
+    """
     def __init__(self, bond_data_field='e'):
         super(CanonicalBondFeaturizer, self).__init__(
             featurizer_funcs={bond_data_field: ConcatFeaturizer(
