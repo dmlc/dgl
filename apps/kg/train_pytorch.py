@@ -1,9 +1,12 @@
 from models import KEModel
+from dataloader import create_test_sampler
 
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
 import torch.multiprocessing as mp
+
+import dgl
 
 from distutils.version import LooseVersion
 TH_VERSION = LooseVersion(th.__version__)
@@ -80,6 +83,41 @@ def train(args, model, train_sampler, valid_samplers=None):
 def test(args, model, test_samplers, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
+    start = time.time()
+    with th.no_grad():
+        logs = []
+        for sampler in test_samplers:
+            count = 0
+            for pos_g, neg_g in sampler:
+                with th.no_grad():
+                    model.forward_test(pos_g, neg_g, logs, args.gpu)
+
+        metrics = {}
+        if len(logs) > 0:
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+
+        for k, v in metrics.items():
+            print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
+    print('test:', time.time() - start)
+    test_samplers[0] = test_samplers[0].reset()
+    test_samplers[1] = test_samplers[1].reset()
+
+def multi_gpu_test(args, model, graph_name, edges, mode='Test'):
+    if args.num_proc > 1:
+        th.set_num_threads(1)
+    graph = dgl.contrib.graph_store.create_graph_from_store("test", store_type="shared_mem")
+    test_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='PBG-head',
+                                                            num_workers=args.num_worker,
+                                                            rank=args.rank, ranks=args.num_proc)
+    test_sampler_tail = create_test_sampler(graph, edges, args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='PBG-tail',
+                                                            num_workers=args.num_worker,
+                                                            rank=args.rank, ranks=args.num_proc)
+    samplers = [test_sampler_head, test_sampler_tail]
     start = time.time()
     with th.no_grad():
         logs = []

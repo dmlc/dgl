@@ -281,6 +281,14 @@ class EvalDataset(object):
         print("eval on {} edges".format(len(edges)))
         return EvalSampler(self.g, edges, batch_size, neg_sample_size, mode, num_workers)
 
+def create_test_sampler(graph, edges, batch_size, neg_sample_size, mode='head',
+                       num_workers=5, rank=0, ranks=1):
+        beg = edges.shape[0] * rank // ranks
+        end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
+        edges = edges[beg: end]
+        print("eval on {} edges".format(len(edges)))
+        return EvalSampler(graph, edges, batch_size, neg_sample_size, mode, num_workers)
+
 class NewBidirectionalOneShotIterator:
     def __init__(self, dataloader_head, dataloader_tail, is_pbg, num_nodes):
         self.sampler_head = dataloader_head

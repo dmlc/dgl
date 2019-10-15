@@ -16,7 +16,7 @@ else:
     import torch.multiprocessing as mp
     from train_pytorch import load_model
     from train_pytorch import train
-    from train_pytorch import test
+    from train_pytorch import test, multi_gpu_test
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
@@ -204,21 +204,26 @@ def run(args, logger):
         # Here we want to use the regualr negative sampler because we need to ensure that
         # all positive edges are excluded.
         if args.num_proc > 1:
-            test_sampler_tails = []
-            test_sampler_heads = []
-            for i in range(args.num_proc):
-                test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                args.neg_sample_size_test,
-                                                                mode='PBG-head',
-                                                                num_workers=args.num_worker,
-                                                                rank=i, ranks=args.num_proc)
-                test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                args.neg_sample_size_test,
-                                                                mode='PBG-tail',
-                                                                num_workers=args.num_worker,
-                                                                rank=i, ranks=args.num_proc)
-                test_sampler_heads.append(test_sampler_head)
-                test_sampler_tails.append(test_sampler_tail)
+            if args.mix_cpu_gpu:
+                g = dgl.contrib.graph_store.create_graph_store_server(eval_dataset.g, "test", "shared_mem",
+                    1, False, edge_dir='in')
+                g.run()
+            else:
+                test_sampler_tails = []
+                test_sampler_heads = []
+                for i in range(args.num_proc):
+                    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                    args.neg_sample_size_test,
+                                                                    mode='PBG-head',
+                                                                    num_workers=args.num_worker,
+                                                                    rank=i, ranks=args.num_proc)
+                    test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                    args.neg_sample_size_test,
+                                                                    mode='PBG-tail',
+                                                                    num_workers=args.num_worker,
+                                                                    rank=i, ranks=args.num_proc)
+                    test_sampler_heads.append(test_sampler_head)
+                    test_sampler_tails.append(test_sampler_tail)
         else:
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
@@ -232,6 +237,11 @@ def run(args, logger):
                                                             rank=0, ranks=1)
 
     # We need to free all memory referenced by dataset.
+    if args.mix_cpu_gpu and args.num_proc > 1:
+        if args.test:
+            test_edges = eval_dataset.get_edges('test')
+        if args.valid:
+            valid_edges = eval_dataset.get_edges('valid')
     eval_dataset = None
     dataset = None
     # load model
@@ -266,7 +276,11 @@ def run(args, logger):
         if args.num_proc > 1:
             procs = []
             for i in range(args.num_proc):
-                proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
+                if args.mix_cpu_gpu and args.num_proc > 1:
+                    args.rank = i
+                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'test', test_edges))
+                else:
+                    proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
                 procs.append(proc)
                 proc.start()
             for proc in procs:
@@ -276,5 +290,7 @@ def run(args, logger):
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()
+    if args.mix_cpu_gpu and args.num_proc > 1:
+        mp.set_start_method('spawn')
     logger = get_logger(args)
     run(args, logger)
