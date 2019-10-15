@@ -14,6 +14,10 @@ DGLBACKEND=pytorch python3 train.py --model TransE --dataset FB15k --batch_size 
     --neg_sample_size 256 --hidden_dim 2000 --gamma 24.0 --lr 0.01 --max_step 20000 \
     --batch_size_eval 16 --gpu 0 --valid --test -adv
 
+DGLBACKEND=pytorch python3 train.py --model RESCAL --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 500 --gamma 24.0 --lr 0.03 --max_step 30000 \
+    --batch_size_eval 16 --gpu 0 --valid --test -adv
+
 # for wn18
 
 DGLBACKEND=pytorch python3 train.py --model TransE --dataset wn18 --batch_size 1024 \
@@ -28,6 +32,10 @@ DGLBACKEND=pytorch python3 train.py --model DistMult --dataset wn18 --batch_size
 DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset wn18 --batch_size 1024 \
     --neg_sample_size 1024 --hidden_dim 500 --gamma 200.0 --lr 0.1 --max_step 20000 \
     --batch_size_eval 16 --gpu 0 --valid --test -adv --regularization_coef 0.00001
+
+DGLBACKEND=pytorch python3 train.py --model RESCAL --dataset wn18 --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 250 --gamma 24.0 --lr 0.03 --max_step 20000 \
+    --batch_size_eval 16 --gpu 0 --valid --test -adv
 
 # for Freebase
 

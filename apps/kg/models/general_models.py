@@ -52,6 +52,9 @@ class KEModel(object):
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
+        elif model_name == 'RESCAL':
+            self.score_func = RESCALScore(relation_dim, entity_dim)
+            
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
 
