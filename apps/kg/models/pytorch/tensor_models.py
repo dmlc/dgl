@@ -53,14 +53,16 @@ class ExternalEmbedding:
 
     def __call__(self, idx, gpu_id=-1, trace=True):
         s = self.emb[idx]
-        if self.gpu >= 0:
+        if gpu_id != -1:
+            s = s.cuda(gpu_id)
+        elif self.gpu >= 0:
             s = s.cuda(self.gpu)
         data = s.clone().detach().requires_grad_(True)
         if trace:
             self.trace.append((idx, data))
         return data
 
-    def update(self):
+    def update(self, gpu_id=-1):
         self.state_step += 1
         with th.no_grad():
             for idx, data in self.trace:
@@ -82,6 +84,8 @@ class ExternalEmbedding:
                 self.state_sum.index_add_(0, grad_indices, grad_sum)
                 std = self.state_sum[grad_indices]  # _sparse_mask
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+                if gpu_id != -1:
+                    std_values = std_values.cuda(gpu_id)
                 if self.gpu >= 0:
                     std_values = std_values.cuda(self.args.gpu)
                 tmp = (-clr * grad_values / std_values)

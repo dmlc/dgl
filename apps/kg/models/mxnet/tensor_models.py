@@ -51,7 +51,7 @@ class ExternalEmbedding:
             self.trace.append((idx, data))
         return data
 
-    def update(self):
+    def update(self, gpu_id=-1):
         self.state_step += 1
         for idx, data in self.trace:
             grad = data.grad

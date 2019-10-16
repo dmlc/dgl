@@ -284,8 +284,7 @@ def run(args, logger):
             procs = []
             for i in range(args.num_proc):
                 if args.mix_cpu_gpu and args.num_proc > 1:
-                    args.rank = i
-                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'test', test_edges))
+                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'test', test_edges, i % args.gpu))
                 else:
                     proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
                 procs.append(proc)

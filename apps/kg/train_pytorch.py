@@ -103,7 +103,7 @@ def test(args, model, test_samplers, mode='Test'):
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
 
-def multi_gpu_test(args, model, graph_name, edges, mode='Test'):
+def multi_gpu_test(args, model, graph_name, edges, gpu_id, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
     model.create_neg()
@@ -126,7 +126,7 @@ def multi_gpu_test(args, model, graph_name, edges, mode='Test'):
             count = 0
             for pos_g, neg_g in sampler:
                 with th.no_grad():
-                    model.forward_test(pos_g, neg_g, logs, args.gpu)
+                    model.forward_test(pos_g, neg_g, logs, gpu_id)
 
         metrics = {}
         if len(logs) > 0:
