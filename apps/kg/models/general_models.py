@@ -48,6 +48,10 @@ class KEModel(object):
 
         if model_name == 'TransE':
             self.score_func = TransEScore(gamma)
+        elif model_name == 'TransR':
+            projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
+                                               F.cpu() if args.mix_cpu_gpu else device)
+            self.score_func = TransRScore(gamma, projection_emb, relation_dim, entity_dim)
         elif model_name == 'DistMult':
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
@@ -109,6 +113,9 @@ class KEModel(object):
         return neg_score
 
     def forward_test(self, pos_g, neg_g, logs, gpu_id=-1):
+        self.score_func.prepare(pos_g, gpu_id, False)
+        self.score_func.prepare(neg_g, gpu_id, False)
+
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
 
@@ -142,6 +149,9 @@ class KEModel(object):
 
     # @profile
     def forward(self, pos_g, neg_g, gpu_id=-1):
+        self.score_func.prepare(pos_g, gpu_id, True)
+        self.score_func.prepare(neg_g, gpu_id, True)
+
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
 

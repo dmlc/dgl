@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
 
+from tensor_models import ExternalEmbedding
+
 class TransEScore(nn.Module):
     def __init__(self, gamma):
         super(TransEScore, self).__init__()
@@ -14,6 +16,61 @@ class TransEScore(nn.Module):
         rel = edges.data['emb']
         score = head + rel - tail
         return {'score': self.gamma - th.norm(score, p=1, dim=-1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        pass
+
+    def forward(self, g):
+        g.apply_edges(lambda edges: self.edge_func(edges))
+
+    def reset_parameters(self):
+        pass
+
+    def save(self, path, name):
+        pass
+
+    def load(self, path, name):
+        pass
+
+    def create_neg(self, neg_head):
+        gamma = self.gamma
+        if neg_head:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                tails = tails - relations
+                tails = tails.reshape(num_chunks, chunk_size, hidden_dim)
+                return gamma - th.cdist(tails, heads, p=1)
+            return fn
+        else:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                heads = heads + relations
+                heads = heads.reshape(num_chunks, chunk_size, hidden_dim)
+                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
+                return gamma - th.cdist(heads, tails, p=1)
+            return fn
+
+class TransRScore(nn.Module):
+    def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
+        super(TransRScore, self).__init__()
+        self.gamma = gamma
+        self.projection = ExternalEmbedding
+        self.projection_emb = projection_emb
+        self.relation_dim = relation_dim
+        self.entity_dim = entity_dim
+
+    def edge_func(self, edges):
+        head = edges.src['emb']
+        tail = edges.dst['emb']
+        rel = edges.data['emb']
+        score = head + rel - tail
+        return {'score': self.gamma - th.norm(score, p=1, dim=-1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        projection = self.projection_emb(g.edata['id'], gpu_id, True)
+        projection.reshape(-1, self.entity_dim, self.relation_dim)
+        g.ndata['emb'] = th.matmul(g.ndata['emb'], projection)
 
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
@@ -57,6 +114,9 @@ class DistMultScore(nn.Module):
         score = head * rel * tail
         # TODO: check if there exists minus sign and if gamma should be used here(jin)
         return {'score': th.sum(score, dim=-1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        pass
 
     def reset_parameters(self):
         pass
@@ -103,6 +163,9 @@ class ComplExScore(nn.Module):
                 - img_head * real_tail * img_rel
         # TODO: check if there exists minus sign and if gamma should be used here(jin)
         return {'score': th.sum(score, -1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        pass
 
     def reset_parameters(self):
         pass
@@ -163,6 +226,9 @@ class RESCALScore(nn.Module):
         # TODO: check if use self.gamma
         return {'score': th.sum(score, dim=-1)}
         # return {'score': self.gamma - th.norm(score, p=1, dim=-1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        pass
 
     def reset_parameters(self):
         pass
