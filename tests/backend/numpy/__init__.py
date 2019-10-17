@@ -24,7 +24,7 @@ def allclose(a, b, rtol=1e-4, atol=1e-4):
     return onp.allclose(a.asnumpy(), b.asnumpy(), rtol=rtol, atol=atol)
 
 def randn(shape):
-    return np.random.randn(*shape)
+    return np.random.normal(0, 1, shape)
 
 def attach_grad(x):
     x.attach_grad()
@@ -83,6 +83,12 @@ def min(x, dim):
 
 def prod(x, dim):
     return x.prod(dim)
+
+def matmul(a, b):
+    return np.dot(a, b)
+
+def dot(a, b):
+    return np.sum(mul(a, b), axis=-1)
 
 record_grad = autograd.record
 

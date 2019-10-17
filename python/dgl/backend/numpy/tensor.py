@@ -170,10 +170,10 @@ def scatter_row_inplace(data, row_index, value):
     data[row_index] = value
 
 def squeeze(input, dim):
-    return np.squeeze(input, dim)
+    return np.squeeze(input, axis=dim)
 
 def unsqueeze(input, dim):
-    return np.unsqueeze(input, dim)
+    return np.expand_dims(input, axis=dim)
 
 def reshape(input, shape):
     return np.reshape(input ,shape)
