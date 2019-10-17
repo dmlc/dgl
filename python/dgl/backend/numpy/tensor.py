@@ -67,6 +67,9 @@ def shape(input):
 def dtype(input):
     return input.dtype
 
+def ndim(input):
+    return input.ndim
+
 def context(input):
     return input.context
 
@@ -210,11 +213,14 @@ def spmm(x, y):
 def unique(input):
     return np.unique(input)
 
-def full_1d(length, fill_value):
-    return np.full((length,), fill_value)
+def full_1d(length, fill_value, dtype, ctx):
+    return np.full((length,), fill_value, dtype=dtype, ctx=ctx)
 
 def nonzero_1d(input):
-    return np.nonzero(input)[0]
+    # TODO: fallback to numpy is unfortunate
+    tmp = input.asnumpy()
+    tmp = onp.nonzero(tmp)[0]
+    return np.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def sort_1d(input):
     return np.sort(input), np.argsort(input)
