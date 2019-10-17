@@ -46,7 +46,7 @@ class GatedGraphConv(nn.Block):
             raise KeyError('MXNet do not support disabling bias in GRUCell.')
         with self.name_scope():
             # NOTE(zihao): MXNet do not support ModuleList, use Sequential as workaround.
-            self.linears = nn.Sequential() 
+            self.linears = nn.Sequential()
             for _ in range(n_etypes):
                 self.linears.add(
                     nn.Dense(out_feats,
