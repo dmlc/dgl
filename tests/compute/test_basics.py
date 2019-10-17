@@ -1,3 +1,4 @@
+import numpy as np
 import backend as F
 import dgl
 import networkx as nx
@@ -200,7 +201,8 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
+    assert F.array_equal(g.get_e_repr()['id'].astype(np.int64),
+                         F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
