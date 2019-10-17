@@ -57,6 +57,9 @@ from dgl.data import RedditDataset
 import mxnet as mx
 from mxnet import gluon
 
+# Load MXNet as backend
+dgl.load_backend('mxnet')
+
 # load dataset
 data = RedditDataset(self_loop=True)
 train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64)

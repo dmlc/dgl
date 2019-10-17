@@ -3073,7 +3073,7 @@ class DGLGraph(DGLBaseGraph):
             transpose = False
         return self._graph.adjacency_matrix_scipy(transpose, fmt, return_edge_ids)
 
-    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
+    def adjacency_matrix(self, transpose=None, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the

@@ -169,7 +169,7 @@ For more realistic, end-to-end examples, please see [model tutorials](https://do
 
 ## New to Deep Learning?
 
-Check out the open source book [*Dive into Deep Learning*](http://en.diveintodeeplearning.org/).
+Check out the open source book [*Dive into Deep Learning*](http://gluon.ai/).
 
 
 ## Contributing

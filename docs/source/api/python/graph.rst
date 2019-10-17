@@ -1,6 +1,6 @@
 .. _apigraph:
 
-DGLGraph -- Graph with node/edge features
+DGLGraph -- Untyped graph with node/edge features
 =========================================
 
 .. currentmodule:: dgl
@@ -79,7 +79,6 @@ Converting from/to other format
     DGLGraph.adjacency_matrix
     DGLGraph.adjacency_matrix_scipy
     DGLGraph.incidence_matrix
-    DGLGraph.to
 
 Using Node/edge features
 ------------------------
@@ -121,3 +120,4 @@ Computing with DGLGraph
     DGLGraph.prop_edges
     DGLGraph.filter_nodes
     DGLGraph.filter_edges
+    DGLGraph.to
