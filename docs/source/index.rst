@@ -140,7 +140,27 @@ python script and jupyter notebook that can be downloaded.
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer">
+
+.. only:: html
+
+    .. figure:: /tutorials/hetero/images/thumb/sphx_glr_1_basics_thumb.png
+
+        :ref:`sphx_glr_tutorials_hetero_1_basics.py`
+
+.. raw:: html
+
+    </div>
+
+.. toctree::
+   :hidden:
+
+   /tutorials/hetero/1_basics
+
+.. raw:: html
+
     <div style='clear:both'></div>
+
 
 .. ================================================================================================
    (end) MANUALLY INCLUDE THE GENERATED TUTORIALS/BASIC/INDEX.RST HERE TO EMBED THE EXAMPLES
