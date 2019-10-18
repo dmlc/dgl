@@ -62,7 +62,7 @@ following user-defined function:
 
 Broadcasting is supported for binary message function, which means the tensor arguments
 can be automatically expanded to be of equal sizes. The supported broadcasting semantic
-is standard as in `Numpy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
+is standard as in `NumPy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
 and `PyTorch's <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. For unfamiliar
 users, we highly suggest reading those documents as broadcasting is very useful. In the
 above example, ``fn.u_mul_e`` will perform broadcasted multiplication automatically because
