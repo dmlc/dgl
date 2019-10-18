@@ -4,7 +4,6 @@ Gated Graph Neural Network module for graph classification tasks
 from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
 import torch
 from torch import nn
-import dgl
 
 
 class GraphClsGGNN(nn.Module):

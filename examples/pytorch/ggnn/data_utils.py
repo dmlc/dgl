@@ -2,13 +2,18 @@
 Data utils for processing bAbI datasets
 """
 
+import os
+
 from torch.utils.data import DataLoader
 import dgl
 import torch
 import string
+from dgl.data.utils import download, get_download_dir, _get_dgl_url, extract_archive
 
 
 def get_babi_dataloaders(batch_size, train_size=50, task_id=4, q_type=0):
+    _download_babi_data()
+
     node_dict = dict(zip(list(string.ascii_uppercase), range(len(string.ascii_uppercase))))
 
     if task_id == 4:
@@ -113,7 +118,8 @@ def _convert_ns_dataset(train_size, node_dict, edge_dict, path, q_type):
                     d['edges'].append((node_dict[line[1]], edge_dict[line[2]], node_dict[line[3]]))
         return dataset
 
-    filename = 'babi_data/' + path + '/data.txt'
+    download_dir = get_download_dir()
+    filename = os.path.join(download_dir, 'babi_data', path, 'data.txt')
     data = convert(filename)
 
     assert len(data) == total_num
@@ -205,7 +211,8 @@ def _convert_gc_dataset(train_size, node_dict, edge_dict, label_dict, path, q_ty
                     d['edges'].append((node_dict[line[1]], edge_dict[line[2]], node_dict[line[3]]))
         return dataset
 
-    filename = 'babi_data/' + path + '/data.txt'
+    download_dir = get_download_dir()
+    filename = os.path.join(download_dir, 'babi_data', path, 'data.txt')
     data = convert(filename)
 
     assert len(data) == total_num
@@ -304,7 +311,8 @@ def _convert_path_finding(train_size, node_dict, edge_dict, path):
                     d['edges'].append((node_dict[line[1]], edge_dict[line[2]], node_dict[line[3]]))
         return dataset
 
-    filename = 'babi_data/' + path + '/data.txt'
+    download_dir = get_download_dir()
+    filename = os.path.join(download_dir, 'babi_data', path, 'data.txt')
     data = convert(filename)
 
     assert len(data) == total_num
@@ -317,3 +325,15 @@ def _convert_path_finding(train_size, node_dict, edge_dict, path):
         test_sets.append(test)
 
     return train_set, dev_set, test_sets
+
+
+def _download_babi_data():
+    download_dir = get_download_dir()
+    zip_file_path = os.path.join(download_dir, 'babi_data.zip')
+
+    data_url = _get_dgl_url('models/ggnn_babi_data.zip')
+    download(data_url, path=zip_file_path)
+
+    extract_dir = os.path.join(download_dir, 'babi_data')
+    if not os.path.exists(extract_dir):
+        extract_archive(zip_file_path, extract_dir)

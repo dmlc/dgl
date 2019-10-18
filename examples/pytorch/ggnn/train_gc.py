@@ -87,9 +87,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Gate Graph Neural Networks for bAbI tasks')
-    parser.add_argument('--gpu', type=int, default=-1,
-                        help='gpu')
+    parser = argparse.ArgumentParser(description='Gated Graph Neural Networks for graph classification tasks in bAbI')
     parser.add_argument('--task_id', type=int, default=18,
                         help='task id from 1 to 20')
     parser.add_argument('--question_id', type=int, default=0,
@@ -106,4 +104,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

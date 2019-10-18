@@ -5,7 +5,6 @@ Gated Graph Sequence Neural Network for sequence outputs
 from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
 import torch
 from torch import nn
-import dgl
 import torch.nn.functional as F
 
 
@@ -88,5 +87,3 @@ def sequence_loss(logits, ground_truth, seq_length=None):
         loss = (loss * mask).sum(-1) / seq_length.float()
         loss = loss.mean()
     return loss
-
-

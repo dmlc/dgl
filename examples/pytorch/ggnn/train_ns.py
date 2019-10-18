@@ -8,6 +8,7 @@ from ggnn_ns import NodeSelectionGGNN
 from torch.optim import Adam
 import torch
 import numpy as np
+import time
 
 
 def main(args):
@@ -83,9 +84,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Gate Graph Neural Networks for bAbI tasks')
-    parser.add_argument('--gpu', type=int, default=-1,
-                        help='gpu')
+    parser = argparse.ArgumentParser(description='Gated Graph Neural Networks for node selection tasks in bAbI')
     parser.add_argument('--task_id', type=int, default=16,
                         help='task id from 1 to 20')
     parser.add_argument('--question_id', type=int, default=1,
@@ -102,4 +101,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
-

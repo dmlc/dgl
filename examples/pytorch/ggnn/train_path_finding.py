@@ -91,21 +91,19 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Gate Graph Neural Networks for bAbI tasks')
-    parser.add_argument('--gpu', type=int, default=-1,
-                        help='gpu')
+    parser = argparse.ArgumentParser(description='Gated Graph Sequence Neural Networks for sequencial output tasks in '
+                                                 'bAbI')
     parser.add_argument('--task_id', type=int, default=19,
                         help='task id from 1 to 20')
-    parser.add_argument('--train_num', type=int, default=50,
+    parser.add_argument('--train_num', type=int, default=250,
                         help='Number of training examples')
     parser.add_argument('--batch_size', type=int, default=10,
                         help='batch size')
     parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate')
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=200,
                         help='number of training epochs')
 
     args = parser.parse_args()
 
     main(args)
-
