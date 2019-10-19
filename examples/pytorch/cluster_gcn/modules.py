@@ -6,7 +6,6 @@ import torch.nn as nn
 
 
 class GCNLayer(nn.Module):
-
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -42,8 +41,8 @@ class GCNLayer(nn.Module):
     def forward(self, g):
         h = g.ndata['h']
 
-        norm = self.get_norm(g)
         if not self.use_pp or not self.training:
+            norm = self.get_norm(g)
             g.ndata['h'] = h
             g.update_all(fn.copy_src(src='h', out='m'),
                          fn.sum(msg='m', out='h'))
@@ -71,9 +70,7 @@ class GCNLayer(nn.Module):
         norm = norm.to(self.weight.device)
         return norm
 
-
 class GCNCluster(nn.Module):
-
     def __init__(self,
                  in_feats,
                  n_hidden,
@@ -88,26 +85,22 @@ class GCNCluster(nn.Module):
         self.layers.append(
             GCNLayer(in_feats, n_hidden, activation=activation, dropout=dropout, use_pp=use_pp, use_lynorm=True))
         # hidden layers
-        for i in range(n_layers):
+        for i in range(n_layers - 1):
             self.layers.append(
-                GCNLayer(n_hidden, n_hidden, activation=activation, dropout=dropout, use_lynorm=True
-                         ))
+                GCNLayer(n_hidden, n_hidden, activation=activation, dropout=dropout,
+                         use_pp=use_pp, use_lynorm=True))
         # output layer
-        self.layers.append(GCNLayer(n_hidden, n_classes,
-                                    activation=None, dropout=dropout, use_lynorm=False))
+        self.layers.append(GCNLayer(n_hidden, n_classes, activation=None,
+                                    dropout=dropout, use_pp=False, use_lynorm=False))
 
     def forward(self, g):
         g.ndata['h'] = g.ndata['features']
-        for i, layer in enumerate(self.layers):
+        for layer in self.layers:
             g.ndata['h'] = layer(g)
         h = g.ndata.pop('h')
         return h
 
-
-
-
 class GCNLayerSAGE(GCNLayer):
-
     def __init__(self, *args, **xargs):
         super(GCNLayerSAGE, self).__init__(*args, **xargs)
         in_feats, out_feats = self.weight.shape
@@ -120,7 +113,6 @@ class GCNLayerSAGE(GCNLayer):
         return h
 
 class GraphSAGE(nn.Module):
-
     def __init__(self,
                  in_feats,
                  n_hidden,
@@ -138,14 +130,14 @@ class GraphSAGE(nn.Module):
         # hidden layers
         for i in range(n_layers - 1):
             self.layers.append(
-                GCNLayerSAGE(n_hidden, n_hidden, activation=activation, dropout=dropout, use_pp=False, use_lynorm=True))
+                GCNLayerSAGE(n_hidden, n_hidden, activation=activation, dropout=dropout,
+                             use_pp=False, use_lynorm=True))
         # output layer
         self.layers.append(GCNLayerSAGE(n_hidden, n_classes, activation=None,
                                         dropout=dropout, use_pp=False, use_lynorm=False))
 
     def forward(self, g):
-        h = g.ndata['features']
-        g.ndata['h'] = h
+        g.ndata['h'] = g.ndata['features']
         for layer in self.layers:
             g.ndata['h'] = layer(g)
         h = g.ndata.pop('h')
