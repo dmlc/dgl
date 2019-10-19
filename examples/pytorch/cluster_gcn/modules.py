@@ -4,8 +4,7 @@ import dgl.function as fn
 import torch
 import torch.nn as nn
 
-
-class GCNLayer(nn.Module):
+class GCNLayerSAGE(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -14,8 +13,10 @@ class GCNLayer(nn.Module):
                  bias=True,
                  use_pp=False,
                  use_lynorm=True):
-        super(GCNLayer, self).__init__()
-        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))
+        super(GCNLayerSAGE, self).__init__()
+        # The input feature size gets doubled as we concatenated the original
+        # features with the new features.
+        self.weight = nn.Parameter(torch.Tensor(2 * in_feats, out_feats))
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_feats))
         else:
@@ -60,54 +61,15 @@ class GCNLayer(nn.Module):
         return h
 
     def concat(self, h, ah, norm):
-        # normalization by square root of dst degree
-        return ah * norm
-
-    def get_norm(self, g):
-        norm = 1. / g.in_degrees().float().unsqueeze(1)
-        # .sqrt()
-        norm[torch.isinf(norm)] = 0
-        norm = norm.to(self.weight.device)
-        return norm
-
-class GCNCluster(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout,
-                 use_pp):
-        super(GCNCluster, self).__init__()
-        self.layers = nn.ModuleList()
-        # input layer
-        self.layers.append(
-            GCNLayer(in_feats, n_hidden, activation=activation, dropout=dropout, use_pp=use_pp, use_lynorm=True))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(
-                GCNLayer(n_hidden, n_hidden, activation=activation, dropout=dropout,
-                         use_pp=use_pp, use_lynorm=True))
-        # output layer
-        self.layers.append(GCNLayer(n_hidden, n_classes, activation=None,
-                                    dropout=dropout, use_pp=False, use_lynorm=False))
-
-    def forward(self, g):
-        g.ndata['h'] = g.ndata['features']
-        for layer in self.layers:
-            g.ndata['h'] = layer(g)
-        h = g.ndata.pop('h')
-        return h
-
-class GCNLayerSAGE(GCNLayer):
-    def __init__(self, *args, **xargs):
-        super(GCNLayerSAGE, self).__init__(*args, **xargs)
-
-    def concat(self, h, ah, norm):
         ah = ah * norm
         h = torch.cat((h, ah), dim=1)
         return h
+
+    def get_norm(self, g):
+        norm = 1. / g.in_degrees().float().unsqueeze(1)
+        norm[torch.isinf(norm)] = 0
+        norm = norm.to(self.weight.device)
+        return norm
 
 class GraphSAGE(nn.Module):
     def __init__(self,

@@ -12,7 +12,7 @@ from dgl import DGLGraph
 from dgl.data import register_data_args
 from torch.utils.tensorboard import SummaryWriter
 
-from modules import GCNCluster, GraphSAGE
+from modules import GraphSAGE
 from sampler import ClusterIter
 from utils import Logger, evaluate, save_log_dir, load_data
 
@@ -101,16 +101,13 @@ def main(args):
 
     print("features shape, ", features.shape)
 
-    model_sel = {'GCN': GCNCluster, 'graphsage': GraphSAGE}
-    model_class = model_sel[args.model_type]
-    print('using model:', model_class)
-
-    model = model_class(2 * in_feats,
-                        args.n_hidden,
-                        n_classes,
-                        args.n_layers,
-                        F.relu,
-                        args.dropout, args.use_pp)
+    model = GraphSAGE(in_feats,
+                      args.n_hidden,
+                      n_classes,
+                      args.n_layers,
+                      F.relu,
+                      args.dropout,
+                      args.use_pp)
 
     if cuda:
         model.cuda()
@@ -230,8 +227,6 @@ if __name__ == '__main__':
                         help="whether to use validated best model to test")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
-    parser.add_argument("--model-type", type=str, default='GCN',
-                        help="model to be used")
     parser.add_argument("--note", type=str, default='none',
                         help="note for log dir")
 
