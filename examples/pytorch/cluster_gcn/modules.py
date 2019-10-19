@@ -62,7 +62,7 @@ class GCNLayerSAGE(nn.Module):
     def get_norm(self, g):
         norm = 1. / g.in_degrees().float().unsqueeze(1)
         norm[torch.isinf(norm)] = 0
-        norm = norm.to(self.weight.device)
+        norm = norm.to(self.linear.weight.device)
         return norm
 
 class GraphSAGE(nn.Module):
