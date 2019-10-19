@@ -33,7 +33,6 @@ def main(args):
     data = load_data(args)
 
     train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
-    test_nid = np.nonzero(data.test_mask)[0].astype(np.int64)
 
     # Normalize features
     if args.normalize:
@@ -106,7 +105,7 @@ def main(args):
     model_class = model_sel[args.model_type]
     print('using model:', model_class)
 
-    model = model_class(in_feats,
+    model = model_class(2 * in_feats,
                         args.n_hidden,
                         n_classes,
                         args.n_layers,
@@ -134,9 +133,6 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=args.lr,
                                  weight_decay=args.weight_decay)
-
-    # initialize graph
-    dur = []
 
     # set train_nids to cuda tensor
     if cuda:
@@ -193,11 +189,9 @@ def main(args):
             log_dir, 'best_model.pkl')))
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multitask)
-    print(
-        "Test F1-mic{:.4f}, Test F1-mac{:.4f}". format(test_f1_mic, test_f1_mac))
+    print("Test F1-mic{:.4f}, Test F1-mac{:.4f}". format(test_f1_mic, test_f1_mac))
     writer.add_scalar('test/f1-mic', test_f1_mic)
     writer.add_scalar('test/f1-mac', test_f1_mac)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')

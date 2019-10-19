@@ -103,9 +103,6 @@ class GCNCluster(nn.Module):
 class GCNLayerSAGE(GCNLayer):
     def __init__(self, *args, **xargs):
         super(GCNLayerSAGE, self).__init__(*args, **xargs)
-        in_feats, out_feats = self.weight.shape
-        self.weight = nn.Parameter(torch.Tensor(2 * in_feats, out_feats))
-        self.reset_parameters()
 
     def concat(self, h, ah, norm):
         ah = ah * norm

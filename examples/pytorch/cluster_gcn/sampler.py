@@ -65,8 +65,7 @@ class ClusterIter(object):
         with torch.no_grad():
             g.update_all(fn.copy_src(src='features', out='m'),
                          fn.sum(msg='m', out='features'),
-                         None
-                         )
+                         None)
             pre_feats = g.ndata['features'] * norm
             # use graphsage embedding aggregation style
             g.ndata['features'] = torch.cat([features, pre_feats], dim=1)
