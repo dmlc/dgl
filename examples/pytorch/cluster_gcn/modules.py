@@ -16,11 +16,7 @@ class GCNLayerSAGE(nn.Module):
         super(GCNLayerSAGE, self).__init__()
         # The input feature size gets doubled as we concatenated the original
         # features with the new features.
-        self.weight = nn.Parameter(torch.Tensor(2 * in_feats, out_feats))
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_feats))
-        else:
-            self.bias = None
+        self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
         self.activation = activation
         self.use_pp = use_pp
         if dropout:
@@ -34,14 +30,13 @@ class GCNLayerSAGE(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+        stdv = 1. / math.sqrt(self.linear.weight.size(1))
+        self.linear.weight.data.uniform_(-stdv, stdv)
+        if self.linear.bias is not None:
+            self.linear.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, g):
-        h = g.ndata['h']
-
+    def forward(self, g, h):
+        g = g.local_var()
         if not self.use_pp or not self.training:
             norm = self.get_norm(g)
             g.ndata['h'] = h
@@ -52,9 +47,8 @@ class GCNLayerSAGE(nn.Module):
 
         if self.dropout:
             h = self.dropout(h)
-        h = torch.mm(h, self.weight)
-        if self.bias is not None:
-            h = h + self.bias
+
+        h = self.linear(h)
         h = self.lynorm(h)
         if self.activation:
             h = self.activation(h)
@@ -96,8 +90,7 @@ class GraphSAGE(nn.Module):
                                         dropout=dropout, use_pp=False, use_lynorm=False))
 
     def forward(self, g):
-        g.ndata['h'] = g.ndata['features']
+        h = g.ndata['features']
         for layer in self.layers:
-            g.ndata['h'] = layer(g)
-        h = g.ndata.pop('h')
+            h = layer(g, h)
         return h

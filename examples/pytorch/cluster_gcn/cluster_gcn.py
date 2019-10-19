@@ -24,9 +24,7 @@ def main(args):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    multitask_data = set(['ppi', 'amazon', 'amazon-0.1',
-                          'amazon-0.3', 'amazon2M', 'amazon2M-47'])
-
+    multitask_data = set(['ppi'])
     multitask = args.dataset in multitask_data
 
     # load and preprocess dataset
@@ -157,7 +155,8 @@ def main(args):
             # in PPI case, `log_every` is chosen to log one time per epoch. 
             # Choose your log freq dynamically when you want more info within one epoch
             if j % args.log_every == 0:
-                print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/{len(cluster_iterator)}:training loss", loss.item())
+                print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/"
+                      f"{len(cluster_iterator)}:training loss", loss.item())
                 writer.add_scalar('train/loss', loss.item(),
                                   global_step=j + epoch * len(cluster_iterator))
         print("current memory:",
