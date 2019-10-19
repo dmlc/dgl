@@ -4,7 +4,7 @@ import dgl.function as fn
 import torch
 import torch.nn as nn
 
-class GCNLayerSAGE(nn.Module):
+class GraphSAGELayer(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -13,7 +13,7 @@ class GCNLayerSAGE(nn.Module):
                  bias=True,
                  use_pp=False,
                  use_lynorm=True):
-        super(GCNLayerSAGE, self).__init__()
+        super(GraphSAGELayer, self).__init__()
         # The input feature size gets doubled as we concatenated the original
         # features with the new features.
         self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
