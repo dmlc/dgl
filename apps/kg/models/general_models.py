@@ -71,12 +71,12 @@ class KEModel(object):
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
         self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
-        self.score_func.save(path, dataset)
+        self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):
         self.entity_emb.load(path, dataset+'_'+self.model_name+'_entity')
         self.relation_emb.load(path, dataset+'_'+self.model_name+'_relation')
-        self.score_func.load(path, dataset)
+        self.score_func.load(path, dataset+'_'+self.model_name)
 
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)

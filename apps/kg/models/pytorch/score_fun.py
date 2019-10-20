@@ -123,10 +123,10 @@ class TransRScore(nn.Module):
         self.projection_emb.update()
 
     def save(self, path, name):
-        pass
+        self.projection_emb.save(path, name+'projection')
 
     def load(self, path, name):
-        pass
+        self.projection_emb.load(path, name+'projection')
 
     def create_neg(self, neg_head):
         gamma = self.gamma
@@ -162,8 +162,10 @@ class DistMultScore(nn.Module):
     def prepare(self, g, gpu_id, trace=False):
         pass
 
-    def neg_prepare(self, g, head, tail, gpu_id, tranc=False):
-        return head, tail
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
 
     def reset_parameters(self):
         pass
@@ -213,6 +215,11 @@ class ComplExScore(nn.Module):
 
     def prepare(self, g, gpu_id, trace=False):
         pass
+
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
 
     def reset_parameters(self):
         pass
@@ -276,6 +283,11 @@ class RESCALScore(nn.Module):
 
     def prepare(self, g, gpu_id, trace=False):
         pass
+
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
 
     def reset_parameters(self):
         pass
