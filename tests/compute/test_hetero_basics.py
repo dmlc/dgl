@@ -213,7 +213,8 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.edata['id'], F.copy_to(F.arange(0, 4), F.cpu()))
+    assert F.array_equal(F.astype(g.edata['id'], 'int64'),
+                         F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     # TODO(minjie): enable after mutation is supported

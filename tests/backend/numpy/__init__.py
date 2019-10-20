@@ -55,10 +55,11 @@ def reduce_sum(x):
     return x.sum()
 
 def softmax(x, dim):
-    return npx.softmax(x, dim)
+    return npx.softmax(x, axis=dim)
 
 def spmm(x, y):
-    return np.dot(x, y)
+    y = y.as_nd_ndarray()
+    return mx.nd.dot(x, y).as_np_ndarray()
 
 def add(a, b):
     return a + b

@@ -5,18 +5,21 @@ from mxnet import numpy as np
 import mxnet as mx
 import scipy.sparse as sp
 import warnings
+import builtins
 from ... import ndarray as dglnd
 from ... import kernel as K
 
+mx.set_np_shape(True)
+
 def data_type_dict():
-    return {'float16' : onp.float16,
-            'float32' : onp.float32,
-            'float64' : onp.float64,
-            'uint8'   : onp.uint8,
-            'int8'    : onp.int8,
-            'int16'   : onp.int16,
-            'int32'   : onp.int32,
-            'int64'   : onp.int64}
+    return {'float16' : onp.dtype('float16'),
+            'float32' : onp.dtype('float32'),
+            'float64' : onp.dtype('float64'),
+            'uint8'   : onp.dtype('uint8'),
+            'int8'    : onp.dtype('int8'),
+            'int16'   : onp.dtype('int16'),
+            'int32'   : onp.dtype('int32'),
+            'int64'   : onp.dtype('int64')}
 
 def cpu():
     return mx.cpu()
@@ -40,13 +43,28 @@ def get_preferred_sparse_format():
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt == 'coo':
-        i = index[1][0,:]
-        j = index[1][1,:]
-        return sp.coo_matrix((data, (i, j)), shape=shape)
+        if force_format:
+            raise TypeError('MXNet backend only supports CSR format,'
+                            ' but COO format is forced.')
+        coord = index[1]
+        # generate convert idx
+        # FIXME: cannot use int64
+        tmp_data = mx.nd.arange(len(coord[0]), dtype=data.dtype, ctx=coord[0].context)
+        tmp_spmat = mx.nd.sparse.csr_matrix((tmp_data, (coord[0], coord[1])),
+                tuple(shape), ctx=data.context)
+        convert_idx = mx.nd.cast(tmp_spmat.data, dtype='int64')
+        # shuffle the data
+        data = data[convert_idx]
+        spmat = mx.nd.sparse.csr_matrix((data, tmp_spmat.indices, tmp_spmat.indptr),
+                tuple(shape), ctx=data.context)
+        return spmat, convert_idx.as_np_ndarray()
     elif fmt == 'csr':
         indices = index[1]
         indptr = index[2]
-        return sp.csr_matrix((data, indices, indptr), shape=shape)
+        spmat = mx.nd.sparse.csr_matrix((data, indices, indptr),
+                tuple(shape), ctx=data.context)
+        # No conversion is required.
+        return spmat, None
     else:
         raise TypeError('Invalid format: %s.' % fmt)
 
@@ -116,10 +134,20 @@ def reduce_min(input):
     dtype = input.dtype
     return np.array(input.min(), dtype=dtype)
 
+def topk(input, k, dim, descending=True):
+    input = input.as_nd_ndarray()
+    return mx.nd.topk(input, axis=dim, k=k, ret_typ='value', is_ascend=not descending).as_np_ndarray()
+
+def argtopk(input, k, dim, descending=True):
+    input = input.as_nd_ndarray()
+    idx = mx.nd.argsort(input, dim, is_ascend=not descending)
+    return mx.nd.slice_axis(input, dim, 0, k).as_np_ndarray()
+
 def argsort(input, dim, descending):
+    input = input.as_nd_ndarray()
     if descending:
-        return np.argsort(-input, axis=dim)
-    return np.argsort(input, axis=dim)
+        return mx.nd.argsort(-input, axis=dim).as_np_ndarray().astype(onp.int64)
+    return mx.nd.argsort(input, axis=dim).as_np_ndarray().astype(onp.int64)
 
 def exp(input):
     return np.exp(input)
@@ -134,6 +162,9 @@ def softmax(input, dim=-1):
 def cat(seq, dim):
     return np.concatenate(seq, axis=dim)
 
+def stack(seq, dim):
+    return np.stack(seq, axis=dim)
+
 def split(input, sizes_or_sections, dim):
     dimsize = input.shape[dim]
     if isinstance(sizes_or_sections, int):
@@ -142,8 +173,8 @@ def split(input, sizes_or_sections, dim):
                              ' to %d pieces, but got %d.' % (dim, sizes_or_sections, dimsize))
         idx = np.arange(sizes_or_sections, dimsize, sizes_or_sections)
     else:
-        idx = np.cumsum(np.array(sizes_or_sections))[0:-1]
-    return np.split(input, idx, axis=dim)
+        idx = np.cumsum(np.array(sizes_or_sections))[0:-1].astype(onp.int64)
+    return np.split(input, tuple(idx.tolist()), axis=dim)
 
 def repeat(input, repeats, dim):
     return np.repeat(input, repeats, axis=dim)
@@ -154,7 +185,7 @@ def gather_row(data, row_index):
 def slice_axis(data, axis, begin, end):
     if begin >= end:
         raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
-    return np.take(data, np.arange(begin, end), axis=axis)
+    return np.take(data, np.arange(begin, end), axis=axis, mode='wrap')
 
 def take(data, indices, dim):
     return np.take(data, indices, axis=dim)
@@ -187,13 +218,68 @@ def zeros(shape, dtype, ctx):
 def ones(shape, dtype, ctx):
     return np.ones(shape, dtype=dtype, ctx=ctx)
 
+def uniform(shape, dtype, ctx, low, high):
+    return np.random.uniform(low, high, ctx=ctx, dtype=dtype, shape=shape)
+
+def pad_packed_tensor(input, lengths, value, l_min=None):
+    old_shape = input.shape
+    if isinstance(lengths, np.ndarray):
+        max_len = as_scalar(input.max())
+    else:
+        max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
+    batch_size = len(lengths)
+    ctx = input.context
+    dtype = input.dtype
+    x = np.full((batch_size * max_len, *old_shape[1:]), value, ctx=ctx, dtype=dtype)
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = np.array(index, ctx=ctx)
+    return scatter_row(x, index, input).reshape(batch_size, max_len, *old_shape[1:])
+
+def pack_padded_tensor(input, lengths):
+    batch_size, max_len = input.shape[:2]
+    ctx = input.context
+    index = []
+    for i, l in enumerate(lengths):
+        index.extend(range(i * max_len, i * max_len + l))
+    index = np.array(index, ctx=ctx)
+    return gather_row(input.reshape(batch_size * max_len, -1), index)
+
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
-    #TODO
-    pass
+    input = input.as_nd_ndarray()
+    seg_id = seg_id.as_nd_ndarray()
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment sum on first dimension'
+
+    # Use SPMV to simulate segment sum
+    ctx = input.context
+    n_inputs = input.shape[0]
+    input_shape_suffix = input.shape[1:]
+    input = input.reshape(n_inputs, -1)
+    n_range = mx.nd.arange(n_inputs, dtype='int64').as_in_context(input.context)
+    w_nnz = mx.nd.ones(n_inputs).as_in_context(input.context)
+    w_nid = mx.nd.stack(seg_id, n_range, axis=0)
+    w = mx.nd.sparse.csr_matrix((w_nnz, (seg_id, n_range)), (n_segs, n_inputs))
+    w = w.as_in_context(input.context)
+    y = mx.nd.dot(w, input)
+    y = mx.nd.reshape(y, (n_segs,) + input_shape_suffix)
+    return y.as_np_ndarray()
 
 def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
-    #TODO
-    pass
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment mean on first dimension'
+
+    n_ones = np.ones_like(seg_id).astype(input.dtype)
+    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
+    w = np.clip(w, a_min=1, a_max=np.inf)
+    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
+    y = y / w.reshape((-1,) + (1,) * (y.ndim - 1))
+    return y
 
 def boolean_mask(input, mask):
     input = input.as_nd_ndarray()
@@ -207,9 +293,6 @@ def equal(x, y):
 def logical_not(input):
     return np.logical_not(input)
 
-def spmm(x, y):
-    return x.dot(y)
-
 def unique(input):
     return np.unique(input)
 
@@ -220,10 +303,12 @@ def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = onp.nonzero(tmp)[0]
-    return np.array(tmp, ctx=input.context, dtype=input.dtype)
+    return np.array(tmp, ctx=input.context, dtype=tmp.dtype)
 
 def sort_1d(input):
-    return np.sort(input), np.argsort(input)
+    input = input.as_nd_ndarray()
+    data, idx = mx.nd.sort(input).as_np_ndarray(), mx.nd.argsort(input).as_np_ndarray().astype(onp.int64)
+    return data, idx
 
 def arange(start, stop):
     return np.arange(start, stop, dtype=np.int64)
@@ -261,7 +346,7 @@ def zerocopy_to_dgl_ndarray_for_write(arr):
     return dglnd.from_dlpack(arr.to_dlpack_for_write())
 
 def zerocopy_from_dgl_ndarray(arr):
-    return np.from_dlpack(arr.to_dlpack())
+    return mx.nd.from_dlpack(arr.to_dlpack()).as_np_ndarray()
 
 class BinaryReduce(mx.autograd.Function):
     def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
@@ -280,25 +365,56 @@ class BinaryReduce(mx.autograd.Function):
     def forward(self, lhs_data, rhs_data):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = np.empty((self.out_size,) + feat_shape,
+        feat_shape = K.infer_binary_feature_shape(self.binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if self.binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = np.empty((self.out_size,) + out_shape,
                             ctx=lhs_data.context, dtype=lhs_data.dtype)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
             self.rhs_map[0], self.out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if self.reducer == 'mean':
+            degs = np.empty((out_data.shape[0],),
+                            ctx=out_data.context, dtype=out_data.dtype)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            if self.lhs != TargetCode.DST:
+                target = self.lhs
+                n = lhs_data.shape[0]
+                in_map = self.lhs_map[0]
+            else:
+                target = self.rhs
+                n = rhs_data.shape[0]
+                in_map = self.rhs_map[0]
+            in_ones = np.ones((n,), ctx=lhs_data.context, dtype=lhs_data.dtype)
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', self.graph, target, in_ones_nd, degs_nd,
+                in_map, self.out_map[0])
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.ndim - 1)).clip(1, float('inf'))
+            out_data = out_data / degs
+        else:
+            degs = None
         self.save_for_backward(lhs_data_nd, rhs_data_nd, out_data_nd,
-                               feat_shape)
+                               feat_shape, degs)
         return out_data
 
     def backward(self, grad_out):
-        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape = self.saved_tensors
+        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape, degs = self.saved_tensors
+        if self.reducer == 'mean':
+            grad_out = grad_out / degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_lhs = np.empty((lhs_data_nd.shape[0],) + feat_shape,
                             ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_lhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_lhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
@@ -306,7 +422,8 @@ class BinaryReduce(mx.autograd.Function):
         grad_rhs = np.empty((rhs_data_nd.shape[0],) + feat_shape,
                              ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_rhs_binary_op_reduce(
-            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            self.reducer if self.reducer != 'mean' else 'sum',
+            self.binary_op, self.graph, self.lhs, self.rhs,
             lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
