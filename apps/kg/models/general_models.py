@@ -58,6 +58,8 @@ class KEModel(object):
             self.score_func = ComplExScore()
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
+        self.head_neg_prepare = self.score_func.create_neg_prepare(True)
+        self.tail_neg_prepare = self.score_func.create_neg_prepare(False)
 
         self.reset_parameters()
 
@@ -97,6 +99,8 @@ class KEModel(object):
                 tail_ids = to_device(tail_ids, gpu_id)
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
+
+            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, gpu_id, False)
             neg_score = self.head_neg_score(neg_head, rel, tail,
                                             num_chunks, chunk_size, neg_sample_size)
         else:
@@ -107,17 +111,18 @@ class KEModel(object):
                 head_ids = to_device(head_ids, gpu_id)
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
+
+            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, gpu_id, False)
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
         return neg_score
 
     def forward_test(self, pos_g, neg_g, logs, gpu_id=-1):
-        self.score_func.prepare(pos_g, gpu_id, False)
-        self.score_func.prepare(neg_g, gpu_id, False)
-
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
+
+        self.score_func.prepare(pos_g, gpu_id, False)
 
         batch_size = pos_g.number_of_edges()
         pos_scores = self.predict_score(pos_g)
@@ -149,11 +154,10 @@ class KEModel(object):
 
     # @profile
     def forward(self, pos_g, neg_g, gpu_id=-1):
-        self.score_func.prepare(pos_g, gpu_id, True)
-        self.score_func.prepare(neg_g, gpu_id, True)
-
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
+
+        self.score_func.prepare(pos_g, gpu_id, True)
 
         pos_score = self.predict_score(pos_g)
         pos_score = logsigmoid(pos_score)
@@ -201,3 +205,4 @@ class KEModel(object):
     def update(self):
         self.entity_emb.update()
         self.relation_emb.update()
+        self.score_func.update()

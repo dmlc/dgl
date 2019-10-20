@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
 
-from tensor_models import ExternalEmbedding
+from .tensor_models import ExternalEmbedding
 
 class TransEScore(nn.Module):
     def __init__(self, gamma):
@@ -20,8 +20,16 @@ class TransEScore(nn.Module):
     def prepare(self, g, gpu_id, trace=False):
         pass
 
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
+
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
+
+    def update(self):
+        pass
 
     def reset_parameters(self):
         pass
@@ -55,28 +63,64 @@ class TransRScore(nn.Module):
     def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
         super(TransRScore, self).__init__()
         self.gamma = gamma
-        self.projection = ExternalEmbedding
         self.projection_emb = projection_emb
         self.relation_dim = relation_dim
         self.entity_dim = entity_dim
 
     def edge_func(self, edges):
-        head = edges.src['emb']
-        tail = edges.dst['emb']
+        head = edges.data['head_emb']
+        tail = edges.data['tail_emb']
         rel = edges.data['emb']
         score = head + rel - tail
         return {'score': self.gamma - th.norm(score, p=1, dim=-1)}
 
     def prepare(self, g, gpu_id, trace=False):
-        projection = self.projection_emb(g.edata['id'], gpu_id, True)
-        projection.reshape(-1, self.entity_dim, self.relation_dim)
-        g.ndata['emb'] = th.matmul(g.ndata['emb'], projection)
+        head_ids, tail_ids = g.all_edges(order='eid')
+        projection = self.projection_emb(g.edata['id'], gpu_id, trace)
+        projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
+        g.edata['head_emb'] = th.einsum('ab,abc->ac', g.ndata['emb'][head_ids], projection)
+        g.edata['tail_emb'] = th.einsum('ab,abc->ac', g.ndata['emb'][tail_ids], projection)
+
+    def create_neg_prepare(self, neg_head):
+        if neg_head:
+            def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+                # pos node, project to its relation
+                projection = self.projection_emb(rel_id, gpu_id, trace)
+                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
+                tail = tail.reshape(num_chunks, -1, 1, self.entity_dim)
+                tail = th.matmul(tail, projection)
+                tail = tail.reshape(num_chunks, -1, self.relation_dim)
+
+                # neg node, each project to all relations
+                head = head.reshape(num_chunks, 1, -1, self.entity_dim)
+                # (num_chunks, num_rel, num_neg_nodes, rel_dim)
+                head = th.matmul(head, projection)
+                return head, tail
+            return fn
+        else:
+            def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+                # pos node, project to its relation
+                projection = self.projection_emb(rel_id, gpu_id, trace)
+                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
+                head = head.reshape(num_chunks, -1, 1, self.entity_dim)
+                head = th.matmul(head, projection)
+                head = head.reshape(num_chunks, -1, self.relation_dim)
+
+                # neg node, each project to all relations
+                tail = tail.reshape(num_chunks, 1, -1, self.entity_dim)
+                # (num_chunks, num_rel, num_neg_nodes, rel_dim)
+                tail = th.matmul(tail, projection)
+                return head, tail
+            return fn
 
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
     def reset_parameters(self):
-        pass
+        self.projection_emb.init(1.0)
+
+    def update(self):
+        self.projection_emb.update()
 
     def save(self, path, name):
         pass
@@ -88,19 +132,19 @@ class TransRScore(nn.Module):
         gamma = self.gamma
         if neg_head:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
-                hidden_dim = heads.shape[1]
-                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
+                relations = relations.reshape(num_chunks, -1, self.relation_dim)
                 tails = tails - relations
-                tails = tails.reshape(num_chunks, chunk_size, hidden_dim)
-                return gamma - th.cdist(tails, heads, p=1)
+                tails = tails.reshape(num_chunks, -1, 1, self.relation_dim)
+                score = heads - tails
+                return gamma - th.norm(score, p=1, dim=-1)
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
-                hidden_dim = heads.shape[1]
-                heads = heads + relations
-                heads = heads.reshape(num_chunks, chunk_size, hidden_dim)
-                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                return gamma - th.cdist(heads, tails, p=1)
+                relations = relations.reshape(num_chunks, -1, self.relation_dim)
+                heads = heads - relations
+                heads = heads.reshape(num_chunks, -1, 1, self.relation_dim)
+                score = heads - tails
+                return gamma - th.norm(score, p=1, dim=-1)
             return fn
 
 class DistMultScore(nn.Module):
@@ -117,6 +161,9 @@ class DistMultScore(nn.Module):
 
     def prepare(self, g, gpu_id, trace=False):
         pass
+
+    def neg_prepare(self, g, head, tail, gpu_id, tranc=False):
+        return head, tail
 
     def reset_parameters(self):
         pass
