@@ -1,5 +1,5 @@
 from models import KEModel
-from dataloader import create_test_sampler
+from dataloader import create_test_sampler, create_train_sampler, NewBidirectionalOneShotIterator
 
 from torch.utils.data import DataLoader
 import torch.optim as optim
@@ -80,10 +80,11 @@ def train(args, model, train_sampler, valid_samplers=None):
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
-def multi_gpu_train(args, model, graph, n_entities, valid_edges, rank):
+def multi_gpu_train(args, model, graph, n_entities, edges, rank):
     if args.num_proc > 1:
         th.set_num_threads(1)
     gpu_id = rank % args.gpu
+    model.create_neg()
     train_sampler_head = create_train_sampler(graph, args.batch_size, args.neg_sample_size,
                                                        mode='PBG-head',
                                                        num_workers=args.num_worker,

@@ -86,7 +86,7 @@ class ExternalEmbedding:
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
                 if gpu_id != -1:
                     std_values = std_values.cuda(gpu_id)
-                if self.gpu >= 0:
+                elif self.gpu >= 0:
                     std_values = std_values.cuda(self.args.gpu)
                 tmp = (-clr * grad_values / std_values)
                 if tmp.device != device:

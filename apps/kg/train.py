@@ -210,7 +210,8 @@ def run(args, logger):
                                                              rank=0, ranks=1)
 
     if args.num_proc > 1 and args.mix_cpu_gpu and (args.valid or args.test):
-        proc = mp.Process(target=run_server, args=(args.num_proc, eval_dataset.g, eval_dataset.etype_id))
+        num_connection = args.num_proc * 2 if args.valid and args.test else args.num_proc
+        proc = mp.Process(target=run_server, args=(num_connection, eval_dataset.g, eval_dataset.etype_id))
         proc.start()
 
     if args.test:
@@ -218,7 +219,7 @@ def run(args, logger):
         # all positive edges are excluded.
         if args.num_proc > 1:
             if args.mix_cpu_gpu:
-                
+                pass
             else:
                 test_sampler_tails = []
                 test_sampler_heads = []
@@ -253,6 +254,8 @@ def run(args, logger):
             test_edges = eval_dataset.get_edges('test')
         if args.valid:
             valid_edges = eval_dataset.get_edges('valid')
+        else:
+            valid_edges = None
     eval_dataset = None
     dataset = None
     # load model
