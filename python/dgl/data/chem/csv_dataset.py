@@ -5,10 +5,8 @@ import numpy as np
 import os
 import sys
 
-from .utils import smile_to_bigraph
 from ..utils import save_graphs, load_graphs
 from ... import backend as F
-from ...graph import DGLGraph
 
 class MoleculeCSVDataset(object):
     """MoleculeCSVDataset
@@ -27,28 +25,33 @@ class MoleculeCSVDataset(object):
         Dataframe including smiles and labels. Can be loaded by pandas.read_csv(file_path).
         One column includes smiles and other columns for labels.
         Column names other than smiles column would be considered as task names.
-    smile_to_graph: callable, str -> DGLGraph
-        A function turns smiles into a DGLGraph. Default one can be found
-        at python/dgl/data/chem/utils.py named with smile_to_bigraph.
-    smile_column: str
-        Column name that including smiles
+    smiles_to_graph: callable, str -> DGLGraph
+        A function turning a SMILES into a DGLGraph.
+    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
+    smiles_column: str
+        Column name that including smiles.
     cache_file_path: str
-        Path to store the preprocessed data
+        Path to store the preprocessed data.
     """
-    def __init__(self, df, smile_to_graph=smile_to_bigraph, smile_column='smiles',
-                 cache_file_path="csvdata_dglgraph.bin"):
+    def __init__(self, df, smiles_to_graph, atom_featurizer, bond_featurizer,
+                 smiles_column, cache_file_path):
         if 'rdkit' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning(
                 "Please install RDKit (Recommended Version is 2018.09.3)")
         self.df = df
-        self.smiles = self.df[smile_column].tolist()
-        self.task_names = self.df.columns.drop([smile_column]).tolist()
+        self.smiles = self.df[smiles_column].tolist()
+        self.task_names = self.df.columns.drop([smiles_column]).tolist()
         self.n_tasks = len(self.task_names)
         self.cache_file_path = cache_file_path
-        self._pre_process(smile_to_graph)
+        self._pre_process(smiles_to_graph, atom_featurizer, bond_featurizer)
 
-    def _pre_process(self, smile_to_graph):
+    def _pre_process(self, smiles_to_graph, atom_featurizer, bond_featurizer):
         """Pre-process the dataset
 
         * Convert molecules from smiles format into DGLGraphs
@@ -58,8 +61,14 @@ class MoleculeCSVDataset(object):
 
         Parameters
         ----------
-        smile_to_graph : callable, SMILES -> DGLGraph
-            Function for converting a SMILES (str) into a DGLGraph
+        smiles_to_graph : callable, SMILES -> DGLGraph
+            Function for converting a SMILES (str) into a DGLGraph.
+        atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+            Featurization for atoms in a molecule, which can be used to update
+            ndata for a DGLGraph.
+        bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+            Featurization for bonds in a molecule, which can be used to update
+            edata for a DGLGraph.
         """
         if os.path.exists(self.cache_file_path):
             # DGLGraphs have been constructed before, reload them
@@ -72,7 +81,8 @@ class MoleculeCSVDataset(object):
             self.graphs = []
             for i, s in enumerate(self.smiles):
                 print('Processing molecule {:d}/{:d}'.format(i+1, len(self)))
-                self.graphs.append(smile_to_graph(s))
+                self.graphs.append(smiles_to_graph(s, atom_featurizer=atom_featurizer,
+                                                   bond_featurizer=bond_featurizer))
             _label_values = self.df[self.task_names].values
             # np.nan_to_num will also turn inf into a very large number
             self.labels = F.zerocopy_from_numpy(np.nan_to_num(_label_values).astype(np.float32))
