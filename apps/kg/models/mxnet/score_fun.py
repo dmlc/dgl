@@ -289,6 +289,14 @@ class RESCALScore(nn.Block):
         return {'score': mx.nd.sum(score, -1)}
         # return {'score': self.gamma - th.norm(score, p=1, dim=-1)}
 
+    def prepare(self, g, gpu_id, trace=False):
+        pass
+
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
+
     def reset_parameters(self):
         pass
 
