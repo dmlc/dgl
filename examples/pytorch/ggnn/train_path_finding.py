@@ -91,7 +91,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Gated Graph Sequence Neural Networks for sequencial output tasks in '
+    parser = argparse.ArgumentParser(description='Gated Graph Sequence Neural Networks for sequential output tasks in '
                                                  'bAbI')
     parser.add_argument('--task_id', type=int, default=19,
                         help='task id from 1 to 20')

@@ -44,7 +44,7 @@ So the explanation of the example is:
 ```
 1 Go east from C, we can reach A
 2 Go east from A, we can reach B
-3 Qustion: where can we reach if we go west from A? Answer: C
+3 Question: where can we reach if we go west from A? Answer: C
 ```
 
 If we represent the conditions using a graph, we can view this task as a `Node Selection` task.
@@ -52,7 +52,7 @@ For different edges in questions, we view them as different question types, we t
  separate models for each question type. The module for solving node selection tasks is
  implemented in `ggnn_ns.py`.
  
-For four question types `n, s, w, e`, we assign a question id for them ranges from 0 to 3. 
+For four question types `n, s, w, e`, we assign a question id for them ranging from 0 to 3. 
 For each question id, run the following commands for training and testing:
 
 ```bash
@@ -62,7 +62,8 @@ python train_ns.py --task_id=4 --question_id=2 --train_num=50 --epochs=10
 python train_ns.py --task_id=4 --question_id=3 --train_num=50 --epochs=10
 ```
 
-The training file name `train_ns` means training node selection.
+The training file name `train_ns` means training node selection. `train_num` means the number of 
+training examples used.
 
 #### Task 15: Basic deduction
 
@@ -159,7 +160,7 @@ An example of task 19 is as follows:
 
 Similar to task 4, there are four types of edges: `n, s, w, e`, which can 
 be viewed as north, south, west, east. The conditions are the same as task 4, the question in 
-line 5 means `Question: find a path from G to A. Answer: first go west, then go north.`. The 
+line 5 means `Question: find a path from G to A. Answer: first go west, then go north`. The 
 output is a sequence of edges. So there is no question type in this task.
 
 The paper uses *Gated Graph Sequence Neural Networks (GGS-NNs)* to solve this kind of problems.
@@ -171,7 +172,7 @@ python train_path_finding.py --train_num=250 --epochs=200
 
 #### Results
 
-Following the paper, we use 10 different test sets for evaluation. The result is the the mean and
+Following the paper, we use 10 different test sets for evaluation. The result is the mean and
 standard deviation of the evaluation performance across the 10 datasets. Numbers in the parentheses
 are the number of training data used.
 
