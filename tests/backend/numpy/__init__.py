@@ -18,7 +18,7 @@ def is_cuda_available():
         return False
 
 def array_equal(a, b):
-    return np.equal(a, b).asnumpy().all()
+    return onp.equal(a.asnumpy(), b.asnumpy()).all()
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
     return onp.allclose(a.asnumpy(), b.asnumpy(), rtol=rtol, atol=atol)
