@@ -27,6 +27,8 @@ def generate_rand_graph(n, func_name):
     num_rels = 10
     entity_emb = F.uniform((g.number_of_nodes(), 10), F.float32, F.cpu(), 0, 1)
     rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RESCAL':
+        rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
@@ -37,14 +39,17 @@ def generate_rand_graph(n, func_name):
         args = dotdict(args)
         projection_emb = ExternalEmbedding(args, 10, 10 * 10, F.cpu())
         return g, entity_emb, rel_emb, (12.0, projection_emb, 10, 10)
-    if (func_name == 'TransE'):
+    elif (func_name == 'TransE'):
         return g, entity_emb, rel_emb, (12.0)
+    elif (func_name == 'RESCAL'):
+        return g, entity_emb, rel_emb, (10, 10)
     else:
         return g, entity_emb, rel_emb, None
 
 ke_score_funcs = {'TransE': TransEScore,
                   'DistMult': DistMultScore,
                   'ComplEx': ComplExScore,
+                  'RESCAL': RESCALScore,
                   'TransR': TransRScore}
 
 class BaseKEModel:
