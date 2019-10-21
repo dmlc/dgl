@@ -8,10 +8,18 @@ import dgl
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
     from models.mxnet.score_fun import *
+    from models.mxnet.tensor_models import ExternalEmbedding
 else:
     from models.pytorch.score_fun import *
+    from models.pytorch.tensor_models import ExternalEmbedding
 from models.general_models import KEModel
 from dataloader.sampler import create_neg_subgraph
+
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
 
 def generate_rand_graph(n, func_name):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
@@ -25,7 +33,9 @@ def generate_rand_graph(n, func_name):
 
     # TransR have additional projection_emb
     if (func_name == 'TransR'):
-        projection_emb = F.uniform((num_rels, 10, 10), F.float32, F.cpu(), 0, 1)
+        args = {'gpu':-1, 'lr':0.1}
+        args = dotdict(args)
+        projection_emb = ExternalEmbedding(args, 10, 10 * 10, F.cpu())
         return g, entity_emb, rel_emb, (12.0, projection_emb, 10, 10)
     if (func_name == 'TransE'):
         return g, entity_emb, rel_emb, (12.0)
@@ -34,7 +44,8 @@ def generate_rand_graph(n, func_name):
 
 ke_score_funcs = {'TransE': TransEScore,
                   'DistMult': DistMultScore,
-                  'ComplEx': ComplExScore}
+                  'ComplEx': ComplExScore,
+                  'TransR': TransRScore}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -49,7 +60,7 @@ class BaseKEModel:
     def predict_score(self, g):
         g.ndata['emb'] = self.entity_emb[g.ndata['id']]
         g.edata['emb'] = self.rel_emb[g.edata['id']]
-        self.score_func.prepare(g, -1, True)
+        self.score_func.prepare(g, -1, False)
         self.score_func(g)
         return g.edata['score']
 
@@ -68,7 +79,7 @@ class BaseKEModel:
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
 
-            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, -1, True)
+            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, -1, False)
             neg_score = self.head_neg_score(neg_head, rel, tail,
                                             num_chunks, chunk_size, neg_sample_size)
         else:
@@ -78,7 +89,7 @@ class BaseKEModel:
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
 
-            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, -1, True)
+            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, -1, False)
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
@@ -92,6 +103,8 @@ def check_score_func(func_name):
     ke_score_func = ke_score_funcs[func_name]
     if args is None:
         ke_score_func = ke_score_func()
+    elif type(args) is tuple:
+        ke_score_func = ke_score_func(*list(args))
     else:
         ke_score_func = ke_score_func(args)
     model = BaseKEModel(ke_score_func, entity_emb, rel_emb)
