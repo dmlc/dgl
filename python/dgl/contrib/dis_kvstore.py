@@ -13,6 +13,16 @@ import numpy as np
 def ReadNetworkConfigure(filename):
     """Read networking configuration from file.
 
+    The config file is like:
+
+        server 172.31.40.143:50050 0
+        client 172.31.40.143:50051 0
+        client 172.31.36.140:50051 1
+        client 172.31.47.147:50051 2
+        client 172.31.30.180:50051 3
+
+    Here we have 1 server node and 4 client nodes.
+
     Parameters
     ----------
     filename : str
@@ -251,14 +261,16 @@ class KVServer(object):
 class KVClient(object):
     """KVClient is used to push/pull tensors to/from KVServer on DGL trainer.
 
-    There are three operations supported by KVClient:
+    There are five operations supported by KVClient:
 
-      * init_data(name, shape, low, high): initialize tensor on KVServer
-      * push(name, id, data): push data to KVServer
-      * pull(name, id): pull data from KVServer
+      * init_data(name, shape, init_type, low, high): initialize tensor on KVServer
+      * push(name, id, data): push sparse data to KVServer given specified IDs
+      * pull(name, id): pull sparse data from KVServer given specified IDs
+      * push_all(name, data): push dense data to KVServer
+      * pull_all(name): pull sense data from KVServer
       * shut_down(): shut down all KVServer nodes
 
-    DO NOT use KVClient in multiple threads!
+    Note that, DO NOT use KVClient in multiple threads!
 
     Parameters
     ----------
@@ -277,9 +289,9 @@ class KVClient(object):
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
     def __init__(self, client_id, server_namebook, client_addr, net_type='socket'):
-        assert client_id >= 0, 'client_id cannot be a nagative number.'
+        assert client_id >= 0, 'client_id (%d) cannot be a nagative number.' % client_id
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
-        assert len(client_addr.split(':')) == 2, 'Incorrect IP format.'
+        assert len(client_addr.split(':')) == 2, 'Incorrect IP format: %s' % client_addr
         # self._data_size is a key-value store where the key is data name 
         # and value is the size of tensor. It is used to partition data into
         # different KVServer nodes.
