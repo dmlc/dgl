@@ -117,7 +117,7 @@ class TrainDataset(object):
                            exclude_positive=exclude_positive,
                            return_false_neg=False)
 
-def create_sampler(graph, batch_size, neg_sample_size=2, mode='head', num_workers=5,
+def create_train_sampler(graph, batch_size, neg_sample_size=2, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     return EdgeSampler(graph,
