@@ -100,7 +100,7 @@ class KEModel(object):
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
 
-            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, gpu_id, False)
+            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, gpu_id, trace)
             neg_score = self.head_neg_score(neg_head, rel, tail,
                                             num_chunks, chunk_size, neg_sample_size)
         else:
@@ -112,7 +112,7 @@ class KEModel(object):
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
 
-            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, gpu_id, False)
+            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, gpu_id, trace)
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
