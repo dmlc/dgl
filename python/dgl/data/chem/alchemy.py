@@ -11,7 +11,7 @@ import zipfile
 from collections import defaultdict
 
 from .utils import mol_to_complete_graph
-from ..utils import download, get_download_dir, _get_dgl_url
+from ..utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
 from ... import backend as F
 
 try:
@@ -172,7 +172,7 @@ class TencentAlchemyDataset(object):
         file_dir = osp.join(get_download_dir(), 'Alchemy_data')
 
         if not from_raw:
-            file_name = "%s_processed" % (mode)
+            file_name = "%s_processed_dgl" % (mode)
         else:
             file_name = "%s_single_sdf" % (mode)
         self.file_dir = pathlib.Path(file_dir, file_name)
@@ -189,10 +189,11 @@ class TencentAlchemyDataset(object):
 
     def _load(self):
         if not self.from_raw:
-            with open(osp.join(self.file_dir, "%s_graphs.pkl" % self.mode), "rb") as f:
-                self.graphs = pickle.load(f)
-            with open(osp.join(self.file_dir, "%s_labels.pkl" % self.mode), "rb") as f:
-                self.labels = pickle.load(f)
+            self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))
+            self.labels = label_dict['labels']
+            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'r') as f:
+                smiles_ = f.readlines()
+                self.smiles = [s.strip() for s in smiles_]
         else:
             print('Start preprocessing dataset...')
             target_file = pathlib.Path(self.file_dir, "%s_target.csv" % self.mode)
@@ -201,7 +202,7 @@ class TencentAlchemyDataset(object):
                 index_col=0,
                 usecols=['gdb_idx',] + ['property_%d' % x for x in range(12)])
             self.target = self.target[['property_%d' % x for x in range(12)]]
-            self.graphs, self.labels = [], []
+            self.graphs, self.labels, self.smiles = [], [], []
 
             supp = Chem.SDMolSupplier(osp.join(self.file_dir, self.mode + ".sdf"))
             cnt = 0
@@ -211,16 +212,17 @@ class TencentAlchemyDataset(object):
                 print('Processing molecule {:d}/{:d}'.format(cnt, dataset_size))
                 graph = mol_to_complete_graph(mol, atom_featurizer=alchemy_nodes,
                                               bond_featurizer=alchemy_edges)
-                smile = Chem.MolToSmiles(mol)
-                graph.smile = smile
+                smiles = Chem.MolToSmiles(mol)
+                self.smiles.append(smiles)
                 self.graphs.append(graph)
                 label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
                 self.labels.append(label)
 
-            with open(osp.join(self.file_dir, "%s_graphs.pkl" % self.mode), "wb") as f:
-                pickle.dump(self.graphs, f)
-            with open(osp.join(self.file_dir, "%s_labels.pkl" % self.mode), "wb") as f:
-                pickle.dump(self.labels, f)
+            save_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode), self.graphs,
+                        labels={'labels': F.stack(self.labels, dim=0)})
+            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'w') as f:
+                for s in self.smiles:
+                    f.write(s + '\n')
 
         self.set_mean_and_std()
         print(len(self.graphs), "loaded!")
@@ -242,8 +244,7 @@ class TencentAlchemyDataset(object):
         Tensor of dtype float32
             Labels of the datapoint for all tasks
         """
-        g, l = self.graphs[item], self.labels[item]
-        return g.smile, g, l
+        return self.smiles[item], self.graphs[item], self.labels[item]
 
     def __len__(self):
         """Length of the dataset
