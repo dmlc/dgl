@@ -22,11 +22,11 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 """
 
 ###############################################################################
-# Step 0: Problem description
+# Tutorial problem description
 # ---------------------------
 #
-# We start with the well-known "Zachary's karate club" problem. The karate club
-# is a social network which captures 34 members and document pairwise links
+# The tutorial is based on the "Zachary's karate club" problem. The karate club
+# is a social network that includes 34 members and documents pairwise links
 # between members who interact outside the club.  The club later divides into
 # two communities led by the instructor (node 0) and the club president (node
 # 33). The network is visualized as follows with the color indicating the
@@ -42,7 +42,7 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 ###############################################################################
 # Step 1: Creating a graph in DGL
 # -------------------------------
-# Creating the graph for Zachary's karate club goes as follows:
+# Create the graph for Zachary's karate club as follows:
 
 import dgl
 
@@ -73,14 +73,14 @@ def build_karate_club_graph():
     return g
 
 ###############################################################################
-# We can print out the number of nodes and edges in our newly constructed graph:
+# Print out the number of nodes and edges in our newly constructed graph:
 
 G = build_karate_club_graph()
 print('We have %d nodes.' % G.number_of_nodes())
 print('We have %d edges.' % G.number_of_edges())
 
 ###############################################################################
-# We can also visualize the graph by converting it to a `networkx
+# Visualize the graph by converting it to a `networkx
 # <https://networkx.github.io/documentation/stable/>`_ graph:
 
 import networkx as nx
@@ -92,15 +92,15 @@ pos = nx.kamada_kawai_layout(nx_G)
 nx.draw(nx_G, pos, with_labels=True, node_color=[[.7, .7, .7]])
 
 ###############################################################################
-# Step 2: assign features to nodes or edges
+# Step 2: Assign features to nodes or edges
 # --------------------------------------------
 # Graph neural networks associate features with nodes and edges for training.
-# For our classification example, we assign each node's an input feature as a one-hot vector:
+# For our classification example, we assign each node an input feature as a one-hot vector:
 # node :math:`v_i`'s feature vector is :math:`[0,\ldots,1,\dots,0]`,
 # where the :math:`i^{th}` position is one.
 #
-# In DGL, we can add features for all nodes at once, using a feature tensor that
-# batches node features along the first dimension. This code below adds the one-hot
+# In DGL, you can add features for all nodes at once, using a feature tensor that
+# batches node features along the first dimension. The code below adds the one-hot
 # feature for all nodes:
 
 import torch
@@ -109,7 +109,7 @@ G.ndata['feat'] = torch.eye(34)
 
 
 ###############################################################################
-# We can print out the node features to verify:
+# Print out the node features to verify:
 
 # print out node 2's input feature
 print(G.nodes[2].data['feat'])
@@ -118,12 +118,12 @@ print(G.nodes[2].data['feat'])
 print(G.nodes[[10, 11]].data['feat'])
 
 ###############################################################################
-# Step 3: define a Graph Convolutional Network (GCN)
+# Step 3: Define a Graph Convolutional Network (GCN)
 # --------------------------------------------------
-# To perform node classification, we use the Graph Convolutional Network
+# To perform node classification, use the Graph Convolutional Network
 # (GCN) developed by `Kipf and Welling <https://arxiv.org/abs/1609.02907>`_. Here
-# we provide the simplest definition of a GCN framework, but we recommend the
-# reader to read the original paper for more details.
+# is the simplest definition of a GCN framework. We recommend that you 
+# read the original paper for more details.
 #
 # - At layer :math:`l`, each node :math:`v_i^l` carries a feature vector :math:`h_i^l`.
 # - Each layer of the GCN tries to aggregate the features from :math:`u_i^{l}` where
@@ -131,7 +131,7 @@ print(G.nodes[[10, 11]].data['feat'])
 #   :math:`v_i^{l+1}`. This is followed by an affine transformation with some
 #   non-linearity.
 #
-# The above definition of GCN fits into a **message-passing** paradigm: each
+# The above definition of GCN fits into a **message-passing** paradigm: Each
 # node will update its own feature with information sent from neighboring
 # nodes. A graphical demonstration is displayed below.
 #
@@ -144,8 +144,8 @@ print(G.nodes[[10, 11]].data['feat'])
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Define the message & reduce function
-# NOTE: we ignore the GCN's normalization constant c_ij for this tutorial.
+# Define the message and reduce function
+# NOTE: We ignore the GCN's normalization constant c_ij for this tutorial.
 def gcn_message(edges):
     # The argument is a batch of edges.
     # This computes a (batch of) message called 'msg' using the source node's feature 'h'.
@@ -177,9 +177,9 @@ class GCNLayer(nn.Module):
 
 ###############################################################################
 # In general, the nodes send information computed via the *message functions*,
-# and aggregates incoming information with the *reduce functions*.
+# and aggregate incoming information with the *reduce functions*.
 #
-# We then define a deeper GCN model that contains two GCN layers:
+# Define a deeper GCN model that contains two GCN layers:
 
 # Define a 2-layer GCN model
 class GCN(nn.Module):
@@ -199,7 +199,7 @@ class GCN(nn.Module):
 net = GCN(34, 5, 2)
 
 ###############################################################################
-# Step 4: data preparation and initialization
+# Step 4: Data preparation and initialization
 # -------------------------------------------
 #
 # We use one-hot vectors to initialize the node features. Since this is a
@@ -211,7 +211,7 @@ labeled_nodes = torch.tensor([0, 33])  # only the instructor and the president n
 labels = torch.tensor([0, 1])  # their labels are different
 
 ###############################################################################
-# Step 5: train then visualize
+# Step 5: Train then visualize
 # ----------------------------
 # The training loop is exactly the same as other PyTorch models.
 # We (1) create an optimizer, (2) feed the inputs to the model,
