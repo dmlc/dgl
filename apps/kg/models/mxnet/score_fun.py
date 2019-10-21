@@ -73,38 +73,56 @@ class TransRScore(nn.Block):
         head_ids, tail_ids = g.all_edges(order='eid')
         projection = self.projection_emb(g.edata['id'], gpu_id, trace)
         projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
-        g.edata['head_emb'] = nd.batch_dot(g.ndata['emb'][head_ids], projection)
-        g.edata['tail_emb'] = nd.batch_dot('ab,abc->ac', g.ndata['emb'][tail_ids], projection)
+        head_emb = g.ndata['emb'][head_ids.as_in_context(g.ndata['emb'].context)].expand_dims(axis=-2)
+        tail_emb = g.ndata['emb'][tail_ids.as_in_context(g.ndata['emb'].context)].expand_dims(axis=-2)
+        g.edata['head_emb'] = nd.batch_dot(head_emb, projection).squeeze()
+        g.edata['tail_emb'] = nd.batch_dot(tail_emb, projection).squeeze()
 
     def create_neg_prepare(self, neg_head):
         if neg_head:
             def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
                 # pos node, project to its relation
                 projection = self.projection_emb(rel_id, gpu_id, trace)
-                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
-                tail = tail.reshape(num_chunks, -1, 1, self.entity_dim)
-                tail = th.dot(tail, projection)
+                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
+                tail = tail.reshape(-1, 1, self.entity_dim)
+                tail = nd.batch_dot(tail, projection)
                 tail = tail.reshape(num_chunks, -1, self.relation_dim)
 
                 # neg node, each project to all relations
-                head = head.reshape(num_chunks, 1, -1, self.entity_dim)
+                projection = projection.reshape(num_chunks, -1, 1, self.entity_dim, self.relation_dim)
+                head = head.reshape(num_chunks, 1, -1, 1, self.entity_dim)
+                num_rels = projection.shape[1]
+                num_nnodes = head.shape[2]
+                projection = nd.broadcast_axis(projection, axis=2, size=num_nnodes)
+                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
+                head = nd.broadcast_axis(head, axis=1, size=num_rels)
+                head = head.reshape(-1, 1, self.entity_dim)
                 # (num_chunks, num_rel, num_neg_nodes, rel_dim)
-                head = th.dot(head, projection)
+                head = nd.batch_dot(head, projection).reshape(num_chunks, num_rels, num_nnodes, self.relation_dim)
                 return head, tail
             return fn
         else:
             def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
                 # pos node, project to its relation
                 projection = self.projection_emb(rel_id, gpu_id, trace)
-                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
-                head = head.reshape(num_chunks, -1, 1, self.entity_dim)
-                head = th.dot(head, projection)
+                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
+                head = head.reshape(-1, 1, self.entity_dim)
+                head = nd.batch_dot(head, projection).squeeze()
                 head = head.reshape(num_chunks, -1, self.relation_dim)
 
+                projection = projection.reshape(num_chunks, -1, 1, self.entity_dim, self.relation_dim)
+                tail = tail.reshape(num_chunks, 1, -1, 1, self.entity_dim)
+                num_rels = projection.shape[1]
+                num_nnodes = tail.shape[2]
+                print(projection.shape)
+                print(num_nnodes)
+                projection = nd.broadcast_axis(projection, axis=2, size=num_nnodes)
+                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
+                tail = nd.broadcast_axis(tail, axis=1, size=num_rels)
+                tail = tail.reshape(-1, 1, self.entity_dim)
                 # neg node, each project to all relations
-                tail = tail.reshape(num_chunks, 1, -1, self.entity_dim)
                 # (num_chunks, num_rel, num_neg_nodes, rel_dim)
-                tail = th.dot(tail, projection)
+                tail = nd.batch_dot(tail, projection).reshape(num_chunks, num_rels, num_nnodes, self.relation_dim)
                 return head, tail
             return fn
 
@@ -131,7 +149,7 @@ class TransRScore(nn.Block):
                 tails = tails - relations
                 tails = tails.reshape(num_chunks, -1, 1, self.relation_dim)
                 score = heads - tails
-                return gamma - th.norm(score, ord=1, axis=-1)
+                return gamma - nd.norm(score, ord=1, axis=-1)
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
@@ -139,7 +157,7 @@ class TransRScore(nn.Block):
                 heads = heads - relations
                 heads = heads.reshape(num_chunks, -1, 1, self.relation_dim)
                 score = heads - tails
-                return gamma - th.norm(score, ord=1, axis=-1)
+                return gamma - nd.norm(score, ord=1, axis=-1)
             return fn
 
 class DistMultScore(nn.Block):
