@@ -114,8 +114,6 @@ class TransRScore(nn.Block):
                 tail = tail.reshape(num_chunks, 1, -1, 1, self.entity_dim)
                 num_rels = projection.shape[1]
                 num_nnodes = tail.shape[2]
-                print(projection.shape)
-                print(num_nnodes)
                 projection = nd.broadcast_axis(projection, axis=2, size=num_nnodes)
                 projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
                 tail = nd.broadcast_axis(tail, axis=1, size=num_rels)

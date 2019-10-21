@@ -49,7 +49,7 @@ class BaseKEModel:
     def predict_score(self, g):
         g.ndata['emb'] = self.entity_emb[g.ndata['id']]
         g.edata['emb'] = self.rel_emb[g.edata['id']]
-        self.score_func.prepare(pos_g, -1, True)
+        self.score_func.prepare(g, -1, True)
         self.score_func(g)
         return g.edata['score']
 
@@ -90,7 +90,7 @@ def check_score_func(func_name):
     g, entity_emb, rel_emb, args = generate_rand_graph(100, func_name)
     hidden_dim = entity_emb.shape[1]
     ke_score_func = ke_score_funcs[func_name]
-    if others is None:
+    if args is None:
         ke_score_func = ke_score_func()
     else:
         ke_score_func = ke_score_func(args)
