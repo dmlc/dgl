@@ -52,7 +52,6 @@ def one_hot_encoding(x, allowable_set, encode_unknown=False):
             x = None
     return list(map(lambda s: x == s, allowable_set))
 
-
 #################################################################
 # Atom featurization
 #################################################################
@@ -86,7 +85,6 @@ def atom_type_one_hot(atom, allowable_set=None, encode_unknown=False):
                          'Ni', 'Cd', 'In', 'Mn', 'Zr', 'Cr', 'Pt', 'Hg', 'Pb']
     return one_hot_encoding(atom.GetSymbol(), allowable_set, encode_unknown)
 
-
 def atomic_number_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the atomic number of an atom.
 
@@ -109,7 +107,6 @@ def atomic_number_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = list(range(1, 101))
     return one_hot_encoding(atom.GetAtomicNum(), allowable_set, encode_unknown)
 
-
 def atomic_number(atom):
     """Get the atomic number for an atom.
 
@@ -124,7 +121,6 @@ def atomic_number(atom):
        List containing one int only.
     """
     return [atom.GetAtomicNum()]
-
 
 def atom_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the degree of an atom.
@@ -155,7 +151,6 @@ def atom_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = list(range(11))
     return one_hot_encoding(atom.GetDegree(), allowable_set, encode_unknown)
 
-
 def atom_degree(atom):
     """Get the degree of an atom.
 
@@ -178,7 +173,6 @@ def atom_degree(atom):
     """
     return [atom.GetDegree()]
 
-
 def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the degree of an atom including Hs.
 
@@ -200,7 +194,6 @@ def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = list(range(6))
     return one_hot_encoding(atom.GetTotalDegree(), allowable_set, encode_unknown)
 
-
 def atom_total_degree(atom):
     """
     See Also
@@ -213,7 +206,6 @@ def atom_total_degree(atom):
         List containing one int only.
     """
     return [atom.GetTotalDegree()]
-
 
 def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the implicit valences of an atom.
@@ -237,7 +229,6 @@ def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False
         allowable_set = list(range(7))
     return one_hot_encoding(atom.GetImplicitValence(), allowable_set, encode_unknown)
 
-
 def atom_implicit_valence(atom):
     """Get the implicit valence of an atom.
 
@@ -252,7 +243,6 @@ def atom_implicit_valence(atom):
         List containing one int only.
     """
     return [atom.GetImplicitValence()]
-
 
 def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the hybridization of an atom.
@@ -282,7 +272,6 @@ def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.HybridizationType.SP3D2]
     return one_hot_encoding(atom.GetHybridization(), allowable_set, encode_unknown)
 
-
 def atom_total_num_H_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the total number of Hs of an atom.
 
@@ -305,7 +294,6 @@ def atom_total_num_H_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = list(range(5))
     return one_hot_encoding(atom.GetTotalNumHs(), allowable_set, encode_unknown)
 
-
 def atom_total_num_H(atom):
     """Get the total number of Hs of an atom.
 
@@ -320,7 +308,6 @@ def atom_total_num_H(atom):
         List containing one int only.
     """
     return [atom.GetTotalNumHs()]
-
 
 def atom_formal_charge_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the formal charge of an atom.
@@ -344,7 +331,6 @@ def atom_formal_charge_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = list(range(-2, 3))
     return one_hot_encoding(atom.GetFormalCharge(), allowable_set, encode_unknown)
 
-
 def atom_formal_charge(atom):
     """Get formal charge for an atom.
 
@@ -359,7 +345,6 @@ def atom_formal_charge(atom):
         List containing one int only.
     """
     return [atom.GetFormalCharge()]
-
 
 def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the number of radical electrons of an atom.
@@ -383,7 +368,6 @@ def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=
         allowable_set = list(range(5))
     return one_hot_encoding(atom.GetNumRadicalElectrons(), allowable_set, encode_unknown)
 
-
 def atom_num_radical_electrons(atom):
     """Get the number of radical electrons for an atom.
 
@@ -398,7 +382,6 @@ def atom_num_radical_electrons(atom):
         List containing one int only.
     """
     return [atom.GetNumRadicalElectrons()]
-
 
 def atom_is_aromatic_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the atom is aromatic.
@@ -422,7 +405,6 @@ def atom_is_aromatic_one_hot(atom, allowable_set=None, encode_unknown=False):
         allowable_set = [False, True]
     return one_hot_encoding(atom.GetIsAromatic(), allowable_set, encode_unknown)
 
-
 def atom_is_aromatic(atom):
     """Get whether the atom is aromatic.
 
@@ -437,7 +419,6 @@ def atom_is_aromatic(atom):
         List containing one bool only.
     """
     return [atom.GetIsAromatic()]
-
 
 def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the chiral tag of an atom.
@@ -459,7 +440,6 @@ def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.ChiralType.CHI_OTHER]
     return one_hot_encoding(atom.GetChiralTag(), allowable_set, encode_unknown)
 
-
 def atom_mass(atom, coef=0.01):
     """Get the mass of an atom and scale it.
 
@@ -477,24 +457,18 @@ def atom_mass(atom, coef=0.01):
     """
     return [atom.GetMass() * coef]
 
-
 class ConcatFeaturizer(object):
     """Concatenate the evaluation results of multiple functions as a single feature.
 
     Parameters
     ----------
-    data_type
-        The type of objects that we want to featurize. E.g. ``rdkit.Chem.rdchem.Atom``
-        or ``rdkit.Chem.rdchem.Bond``.
     func_list : list
-        List of functions for computing molecular descriptors from objects of type
-        ``data_type``. Each function is of signature
+        List of functions for computing molecular descriptors from objects of a same
+        particular data type, e.g. ``rdkit.Chem.rdchem.Atom``. Each function is of signature
         ``func(data_type) -> list of float or bool or int``. The resulting order of
         the features will follow that of the functions in the list.
     """
-
-    def __init__(self, data_type, func_list):
-        self.data_type = data_type
+    def __init__(self, func_list):
         self.func_list = func_list
 
     def __call__(self, x):
@@ -502,7 +476,7 @@ class ConcatFeaturizer(object):
 
         Parameters
         ----------
-        x : self.data_type
+        x :
             Data to featurize.
 
         Returns
@@ -510,12 +484,8 @@ class ConcatFeaturizer(object):
         list
             List of feature values, which can be of type bool, float or int.
         """
-        assert isinstance(x, self.data_type), \
-            'Expect the input data to be of type {}, got {}'.format(
-                self.data_type, type(x))
         return list(itertools.chain.from_iterable(
             [func(x) for func in self.func_list]))
-
 
 class BaseAtomFeaturizer(object):
     """An abstract class for atom featurizers.
@@ -532,6 +502,22 @@ class BaseAtomFeaturizer(object):
     feat_sizes : dict
         Mapping feature name to the size of the corresponding feature. If None, they will be
         computed when needed. Default: None.
+
+    Examples
+    --------
+
+    >>> from dgl.data.chem import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
+    >>> from rdkit import Chem
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> atom_featurizer = BaseAtomFeaturizer({'mass': atom_mass, 'degree': atom_degree_one_hot})
+    >>> atom_featurizer(mol)
+    {'mass': tensor([[0.1201],
+                     [0.1201],
+                     [0.1600]]),
+     'degree': tensor([[0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                       [0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.],
+                       [0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])}
     """
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
@@ -589,7 +575,6 @@ class BaseAtomFeaturizer(object):
 
         return processed_features
 
-
 class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     """A default featurizer for atoms.
 
@@ -623,7 +608,6 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     def __init__(self, atom_data_field='h'):
         super(CanonicalAtomFeaturizer, self).__init__(
             featurizer_funcs={atom_data_field: ConcatFeaturizer(
-                Chem.rdchem.Atom,
                 [atom_type_one_hot,
                  atom_degree_one_hot,
                  atom_implicit_valence_one_hot,
@@ -633,7 +617,6 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
                  atom_is_aromatic,
                  atom_total_num_H_one_hot]
             )})
-
 
 def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the type of a bond.
@@ -662,7 +645,6 @@ def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.BondType.AROMATIC]
     return one_hot_encoding(bond.GetBondType(), allowable_set, encode_unknown)
 
-
 def bond_is_conjugated_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the bond is conjugated.
     Parameters
@@ -683,7 +665,6 @@ def bond_is_conjugated_one_hot(bond, allowable_set=None, encode_unknown=False):
         allowable_set = [False, True]
     return one_hot_encoding(bond.GetIsConjugated(), allowable_set, encode_unknown)
 
-
 def bond_is_conjugated(bond):
     """Get whether the bond is conjugated.
     Parameters
@@ -696,7 +677,6 @@ def bond_is_conjugated(bond):
         List containing one bool only.
     """
     return [bond.GetIsConjugated()]
-
 
 def bond_is_in_ring_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the bond is in a ring of any size.
@@ -718,7 +698,6 @@ def bond_is_in_ring_one_hot(bond, allowable_set=None, encode_unknown=False):
         allowable_set = [False, True]
     return one_hot_encoding(bond.IsInRing(), allowable_set, encode_unknown)
 
-
 def bond_is_in_ring(bond):
     """Get whether the bond is in a ring of any size.
     Parameters
@@ -731,7 +710,6 @@ def bond_is_in_ring(bond):
         List containing one bool only.
     """
     return [bond.IsInRing()]
-
 
 def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the stereo configuration of a bond.
@@ -761,7 +739,6 @@ def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.BondStereo.STEREOTRANS]
     return one_hot_encoding(bond.GetStereo(), allowable_set, encode_unknown)
 
-
 class BaseBondFeaturizer(object):
     """An abstract class for bond featurizers.
     Loop over all bonds in a molecule and featurize them with the ``featurizer_funcs``.
@@ -780,6 +757,21 @@ class BaseBondFeaturizer(object):
     feat_sizes : dict
         Mapping feature name to the size of the corresponding feature. If None, they will be
         computed when needed. Default: None.
+
+    Examples
+    --------
+
+    >>> from dgl.data.chem import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
+    >>> from rdkit import Chem
+
+    >>> mol = Chem.MolFromSmiles('CCO')
+    >>> bond_featurizer = BaseBondFeaturizer({'bond_type': bond_type_one_hot, 'in_ring': bond_is_in_ring})
+    >>> bond_featurizer(mol)
+    {'bond_type': tensor([[1., 0., 0., 0.],
+                          [1., 0., 0., 0.],
+                          [1., 0., 0., 0.],
+                          [1., 0., 0., 0.]]),
+     'in_ring': tensor([[0.], [0.], [0.], [0.]])}
     """
     def __init__(self, featurizer_funcs, feat_sizes=None):
         self.featurizer_funcs = featurizer_funcs
@@ -838,7 +830,6 @@ class BaseBondFeaturizer(object):
 
         return processed_features
 
-
 class CanonicalBondFeaturizer(BaseBondFeaturizer):
     """A default featurizer for bonds.
 
@@ -857,13 +848,11 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
     def __init__(self, bond_data_field='e'):
         super(CanonicalBondFeaturizer, self).__init__(
             featurizer_funcs={bond_data_field: ConcatFeaturizer(
-                Chem.rdchem.Bond,
                 [bond_type_one_hot,
                  bond_is_conjugated,
                  bond_is_in_ring,
                  bond_stereo_one_hot]
             )})
-
 
 #################################################################
 # DGLGraph Construction
@@ -901,7 +890,6 @@ def mol_to_graph(mol, graph_constructor, atom_featurizer, bond_featurizer):
         g.edata.update(bond_featurizer(mol))
 
     return g
-
 
 def construct_bigraph_from_mol(mol, add_self_loop=False):
     """Construct a bi-directed DGLGraph with topology only for the molecule.
@@ -953,7 +941,6 @@ def construct_bigraph_from_mol(mol, add_self_loop=False):
 
     return g
 
-
 def mol_to_bigraph(mol, add_self_loop=False,
                    atom_featurizer=None,
                    bond_featurizer=None):
@@ -980,7 +967,6 @@ def mol_to_bigraph(mol, add_self_loop=False,
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
                         atom_featurizer, bond_featurizer)
 
-
 def smiles_to_bigraph(smiles, add_self_loop=False,
                       atom_featurizer=None,
                       bond_featurizer=None):
@@ -1006,7 +992,6 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
     """
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_bigraph(mol, add_self_loop, atom_featurizer, bond_featurizer)
-
 
 def construct_complete_graph_from_mol(mol, add_self_loop=False):
     """Construct a complete graph with topology only for the molecule
@@ -1046,7 +1031,6 @@ def construct_complete_graph_from_mol(mol, add_self_loop=False):
 
     return g
 
-
 def mol_to_complete_graph(mol, add_self_loop=False,
                           atom_featurizer=None,
                           bond_featurizer=None):
@@ -1072,7 +1056,6 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     """
     return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
                         atom_featurizer, bond_featurizer)
-
 
 def smiles_to_complete_graph(smiles, add_self_loop=False,
                              atom_featurizer=None,

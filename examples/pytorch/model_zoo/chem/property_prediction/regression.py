@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -36,8 +37,7 @@ def run_a_train_epoch(args, epoch, model, data_loader,
         total_loss += loss.detach().item() * bg.batch_size
         train_meter.update(prediction, labels, masks)
     total_loss /= len(data_loader.dataset)
-    total_score = train_meter.compute_metric_averaged_over_tasks(args['metric_name']) / \
-                  len(data_loader.dataset)
+    total_score = np.mean(train_meter.compute_metric(args['metric_name']))
     print('epoch {:d}/{:d}, training loss {:.4f}, training {} {:.4f}'.format(
         epoch + 1, args['num_epochs'], total_loss, args['metric_name'], total_score))
 
@@ -50,8 +50,7 @@ def run_an_eval_epoch(args, model, data_loader):
             labels = labels.to(args['device'])
             prediction = regress(args, model, bg)
             eval_meter.update(prediction, labels, masks)
-        total_score = eval_meter.compute_metric_averaged_over_tasks(args['metric_name']) / \
-                      len(data_loader.datasett)
+        total_score = np.mean(eval_meter.compute_metric(args['metric_name']))
     return total_score
 
 def main(args):

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
@@ -26,7 +27,7 @@ def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer
         print('epoch {:d}/{:d}, batch {:d}/{:d}, loss {:.4f}'.format(
             epoch + 1, args['num_epochs'], batch_id + 1, len(data_loader), loss.item()))
         train_meter.update(logits, labels, masks)
-    train_score = train_meter.compute_metric_averaged_over_tasks(args['metric_name'])
+    train_score = np.mean(train_meter.compute_metric(args['metric_name']))
     print('epoch {:d}/{:d}, training {} {:.4f}'.format(
         epoch + 1, args['num_epochs'], args['metric_name'], train_score))
 
@@ -40,7 +41,7 @@ def run_an_eval_epoch(args, model, data_loader):
             atom_feats, labels = atom_feats.to(args['device']), labels.to(args['device'])
             logits = model(bg, atom_feats)
             eval_meter.update(logits, labels, masks)
-    return eval_meter.compute_metric_averaged_over_tasks(args['metric_name'])
+    return np.mean(eval_meter.compute_metric(args['metric_name']))
 
 def main(args):
     args['device'] = "cuda" if torch.cuda.is_available() else "cpu"

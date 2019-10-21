@@ -6,13 +6,7 @@ import random
 import torch
 import torch.nn.functional as F
 
-from dgl.data.chem import ConcatFeaturizer, BaseAtomFeaturizer, atomic_number_one_hot,\
-    atom_total_degree_one_hot, atom_formal_charge_one_hot, atom_chiral_tag_one_hot,\
-    atom_total_num_H_one_hot, atom_hybridization_one_hot, atom_is_aromatic_one_hot, atom_mass, \
-    CanonicalBondFeaturizer
 from dgl.data.utils import split_dataset
-from functools import partial
-from rdkit import Chem
 from sklearn.metrics import roc_auc_score, mean_squared_error
 
 def set_random_seed(seed=0):
@@ -55,13 +49,13 @@ class Meter(object):
         self.y_true.append(y_true.detach().cpu())
         self.mask.append(mask.detach().cpu())
 
-    def roc_auc_averaged_over_tasks(self):
-        """Compute roc-auc score for each task and return the average.
+    def roc_auc_score(self):
+        """Compute roc-auc score for each task.
 
         Returns
         -------
-        float
-            roc-auc score averaged over all tasks
+        list of float
+            roc-auc score for all tasks
         """
         mask = torch.cat(self.mask, dim=0)
         y_pred = torch.cat(self.y_pred, dim=0)
@@ -70,75 +64,83 @@ class Meter(object):
         # This assumes binary case only
         y_pred = torch.sigmoid(y_pred)
         n_tasks = y_true.shape[1]
-        total_score = 0
+        scores = []
         for task in range(n_tasks):
             task_w = mask[:, task]
             task_y_true = y_true[:, task][task_w != 0].numpy()
             task_y_pred = y_pred[:, task][task_w != 0].numpy()
-            total_score += roc_auc_score(task_y_true, task_y_pred)
-        return total_score / n_tasks
+            scores.append(roc_auc_score(task_y_true, task_y_pred))
+        return scores
 
-    def l1_loss_averaged_over_tasks(self):
-        """Compute l1 loss for each task and return the average.
+    def l1_loss(self, reduction):
+        """Compute l1 loss for each task.
 
         Returns
         -------
-        float
-            l1 loss averaged over all tasks
+        list of float
+            l1 loss for all tasks
+        reduction : str
+            * 'mean': average the metric over all labeled data points for each task
+            * 'sum': sum the metric over all labeled data points for each task
         """
         mask = torch.cat(self.mask, dim=0)
         y_pred = torch.cat(self.y_pred, dim=0)
         y_true = torch.cat(self.y_true, dim=0)
         n_tasks = y_true.shape[1]
-        total_score = 0
+        scores = []
         for task in range(n_tasks):
             task_w = mask[:, task]
             task_y_true = y_true[:, task][task_w != 0]
             task_y_pred = y_pred[:, task][task_w != 0]
-            total_score += F.l1_loss(task_y_true, task_y_pred, reduction='sum').item()
-        return total_score / n_tasks
+            scores.append(F.l1_loss(task_y_true, task_y_pred, reduction=reduction).item())
+        return scores
 
-    def rmse_averaged_over_tasks(self):
-        """Compute RMSE for each task and return the average.
+    def rmse(self):
+        """Compute RMSE for each task.
 
         Returns
         -------
-        float
-            RMSE averaged over all tasks
+        list of float
+            rmse for all tasks
         """
         mask = torch.cat(self.mask, dim=0)
         y_pred = torch.cat(self.y_pred, dim=0)
         y_true = torch.cat(self.y_true, dim=0)
         n_data, n_tasks = y_true.shape
-        total_score = 0
+        scores = []
         for task in range(n_tasks):
             task_w = mask[:, task]
             task_y_true = y_true[:, task][task_w != 0].numpy()
             task_y_pred = y_pred[:, task][task_w != 0].numpy()
-            total_score += math.sqrt(mean_squared_error(task_y_true, task_y_pred))
-        return total_score * n_data / n_tasks
+            scores.append(math.sqrt(mean_squared_error(task_y_true, task_y_pred)))
+        return scores
 
-    def compute_metric_averaged_over_tasks(self, metric_name):
-        """Compute metric for each task and return the average.
+    def compute_metric(self, metric_name, reduction='mean'):
+        """Compute metric for each task.
 
         Parameters
         ----------
         metric_name : str
             Name for the metric to compute.
+        reduction : str
+            Only comes into effect when the metric_name is l1_loss.
+            * 'mean': average the metric over all labeled data points for each task
+            * 'sum': sum the metric over all labeled data points for each task
 
         Returns
         -------
-        float
-            Metric value averaged over all tasks
+        list of float
+            Metric value for each task
         """
         assert metric_name in ['roc_auc', 'l1', 'rmse'], \
             'Expect metric name to be "roc_auc", "l1" or "rmse", got {}'.format(metric_name)
+        assert reduction in ['mean', 'sum']
         if metric_name == 'roc_auc':
-            return self.roc_auc_averaged_over_tasks()
+            return self.roc_auc_score()
         if metric_name == 'l1':
-            return self.l1_loss_averaged_over_tasks()
+            return self.l1_loss(reduction)
         if metric_name == 'rmse':
-            return self.rmse_averaged_over_tasks()
+            return self.rmse()
 
 class EarlyStopping(object):
     """Early stop performing

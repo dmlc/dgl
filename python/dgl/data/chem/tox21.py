@@ -2,7 +2,7 @@ import numpy as np
 import sys
 
 from .csv_dataset import MoleculeCSVDataset
-from .utils import smile_to_bigraph
+from .utils import smiles_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
 from ... import backend as F
 
