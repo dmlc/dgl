@@ -68,7 +68,7 @@ char* ArrayMeta::Serialize(int64_t* size) {
     buffer_size += sizeof(data_shape_.size());
     buffer_size += sizeof(int64_t) * data_shape_.size();
   }
-  // In the future, we should have a better memory management.
+  // In the future, we should have a better memory management as
   // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
@@ -124,7 +124,7 @@ char* KVStoreMsg::Serialize(int64_t* size) {
     buffer_size += sizeof(this->name.size());
     buffer_size += this->name.size();
   }
-  // In the future, we should have a better memory management.
+  // In the future, we should have a better memory management as
   // allocating a large chunk of memory can be very expensive.
   buffer = new char[buffer_size];
   char* pointer = buffer;
@@ -532,9 +532,13 @@ DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
     if (kv_msg->msg_type != kPullMsg) {
       Message recv_data_msg;
       CHECK_EQ(receiver->RecvFrom(&recv_data_msg, send_id), REMOVE_SUCCESS);
-      CHECK_EQ(meta.data_shape_[2], 2);
+      CHECK_GE(meta.data_shape_[2], 1);
+      std::vector<int64_t> vec_shape;
+      for (int i = 3; i < meta.data_shape_.size(); ++i) {
+        vec_shape.push_back(meta.data_shape_[i]);
+      }
       kv_msg->data = CreateNDArrayFromRaw(
-        {meta.data_shape_[3], meta.data_shape_[4]},
+        vec_shape,
         DLDataType{kDLFloat, 32, 1},
         DLContext{kDLCPU, 0},
         recv_data_msg.data);

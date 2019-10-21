@@ -44,11 +44,13 @@ For MXNet, it works with MXNet 1.5 or newer.
 
 DGL-KE provides five knowledge graphs:
 
-- [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k}.zip)
-- [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k-237}.zip)
-- [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18}.zip)
-- [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18rr}.zip)
-- [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{Freebase}.zip)
+| Dataset | #nodes | #edges | #relations |
+|---------|--------|--------|------------|
+| [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k.zip) | 14951 | 592213 | 1345 |
+| [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k-237.zip) | 14541 | 310116 | 237 |
+| [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18.zip) | 40943 | 151442 | 18 |
+| [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18rr.zip) | 40943 | 93003 | 11 |
+| [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/Freebase.zip) | 86054151 | 338586276 | 14824 |
 
 Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
 
