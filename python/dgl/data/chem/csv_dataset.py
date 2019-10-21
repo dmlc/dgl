@@ -3,15 +3,15 @@ from __future__ import absolute_import
 import dgl.backend as F
 import numpy as np
 import os
-import pickle
 import sys
 
-from dgl import DGLGraph
+from ..utils import save_graphs, load_graphs
+from ... import backend as F
 
-class CSVDataset(object):
-    """CSVDataset
+class MoleculeCSVDataset(object):
+    """MoleculeCSVDataset
 
-    This is a general class for loading data from csv or pd.DataFrame.
+    This is a general class for loading molecular data from csv or pd.DataFrame.
 
     In data pre-processing, we set non-existing labels to be 0,
     and returning mask with 1 where label exists.
@@ -73,19 +73,22 @@ class CSVDataset(object):
         if os.path.exists(self.cache_file_path):
             # DGLGraphs have been constructed before, reload them
             print('Loading previously saved dgl graphs...')
-            with open(self.cache_file_path, 'rb') as f:
-                self.graphs = pickle.load(f)
+            self.graphs, label_dict = load_graphs(self.cache_file_path)
+            self.labels = label_dict['labels']
+            self.mask = label_dict['mask']
         else:
-            self.graphs = [smiles_to_graph(s, atom_featurizer=atom_featurizer,
-                                           bond_featurizer=bond_featurizer)
-                           for s in self.smiles]
-            with open(self.cache_file_path, 'wb') as f:
-                pickle.dump(self.graphs, f)
-
-        _label_values = self.df[self.task_names].values
-        # np.nan_to_num will also turn inf into a very large number
-        self.labels = np.nan_to_num(_label_values).astype(np.float32)
-        self.mask = (~np.isnan(_label_values)).astype(np.float32)
+            print('Processing dgl graphs from scratch...')
+            self.graphs = []
+            for i, s in enumerate(self.smiles):
+                print('Processing molecule {:d}/{:d}'.format(i+1, len(self)))
+                self.graphs.append(smiles_to_graph(s, atom_featurizer=atom_featurizer,
+                                                   bond_featurizer=bond_featurizer))
+            _label_values = self.df[self.task_names].values
+            # np.nan_to_num will also turn inf into a very large number
+            self.labels = F.zerocopy_from_numpy(np.nan_to_num(_label_values).astype(np.float32))
+            self.mask = F.zerocopy_from_numpy((~np.isnan(_label_values)).astype(np.float32))
+            save_graphs(self.cache_file_path, self.graphs,
+                        labels={'labels': self.labels, 'mask': self.mask})
 
     def __getitem__(self, item):
         """Get datapoint with index
@@ -106,9 +109,7 @@ class CSVDataset(object):
         Tensor of dtype float32
             Binary masks indicating the existence of labels for all tasks
         """
-        return self.smiles[item], self.graphs[item], \
-               F.zerocopy_from_numpy(self.labels[item]),  \
-               F.zerocopy_from_numpy(self.mask[item])
+        return self.smiles[item], self.graphs[item], self.labels[item], self.mask[item]
 
     def __len__(self):
         """Length of the dataset
