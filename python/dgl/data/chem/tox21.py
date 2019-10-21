@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from .csv_dataset import CSVDataset
+from .csv_dataset import MoleculeCSVDataset
 from .utils import smile_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
 from ... import backend as F
@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-class Tox21(CSVDataset):
+class Tox21(MoleculeCSVDataset):
     """Tox21 dataset.
 
     The Toxicology in the 21st Century (https://tripod.nih.gov/tox21/challenge/)

@@ -10,10 +10,10 @@ from ..utils import save_graphs, load_graphs
 from ... import backend as F
 from ...graph import DGLGraph
 
-class CSVDataset(object):
-    """CSVDataset
+class MoleculeCSVDataset(object):
+    """MoleculeCSVDataset
 
-    This is a general class for loading data from csv or pd.DataFrame.
+    This is a general class for loading molecular data from csv or pd.DataFrame.
 
     In data pre-processing, we set non-existing labels to be 0,
     and returning mask with 1 where label exists.

@@ -191,8 +191,9 @@ class TencentAlchemyDataset(object):
         if not self.from_raw:
             self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))
             self.labels = label_dict['labels']
-            with open(osp.join(self.file_dir, "%s_smiles.pkl" % self.mode), 'rb') as f:
-                self.smiles = pickle.load(f)
+            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'r') as f:
+                smiles_ = f.readlines()
+                self.smiles = [s.strip() for s in smiles_]
         else:
             print('Start preprocessing dataset...')
             target_file = pathlib.Path(self.file_dir, "%s_target.csv" % self.mode)
@@ -219,8 +220,9 @@ class TencentAlchemyDataset(object):
 
             save_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode), self.graphs,
                         labels={'labels': F.stack(self.labels, dim=0)})
-            with open(osp.join(self.file_dir, "%s_smiles.pkl" % self.mode), 'wb') as f:
-                pickle.dump(self.smiles, f)
+            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'w') as f:
+                for s in self.smiles:
+                    f.write(s + '\n')
 
         self.set_mean_and_std()
         print(len(self.graphs), "loaded!")
