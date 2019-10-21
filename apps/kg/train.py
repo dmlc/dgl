@@ -17,7 +17,7 @@ if backend.lower() == 'mxnet':
 else:
     import torch.multiprocessing as mp
     from train_pytorch import load_model
-    from train_pytorch import train
+    from train_pytorch import train, multi_gpu_train
     from train_pytorch import test, multi_gpu_test
 
 class ArgParser(argparse.ArgumentParser):
@@ -130,11 +130,12 @@ def get_logger(args):
     return logger
 
 def run_server(num_worker, graph, etype_id):
-    g = dgl.contrib.graph_store.create_graph_store_server(graph, "test", "shared_mem",
+    g = dgl.contrib.graph_store.create_graph_store_server(graph, "Test", "shared_mem",
                     num_worker, False, edge_dir='in')
     g.ndata['id'] = F.arange(0, graph.number_of_nodes())
     g.edata['id'] = F.tensor(etype_id, F.int64)
     g.run()
+
 def run(args, logger):
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
@@ -207,13 +208,17 @@ def run(args, logger):
                                                              mode='PBG-tail',
                                                              num_workers=args.num_worker,
                                                              rank=0, ranks=1)
+
+    if args.num_proc > 1 and args.mix_cpu_gpu and (args.valid or args.test):
+        proc = mp.Process(target=run_server, args=(args.num_proc, eval_dataset.g, eval_dataset.etype_id))
+        proc.start()
+
     if args.test:
         # Here we want to use the regualr negative sampler because we need to ensure that
         # all positive edges are excluded.
         if args.num_proc > 1:
             if args.mix_cpu_gpu:
-                proc = mp.Process(target=run_server, args=(args.num_proc, eval_dataset.g, eval_dataset.etype_id))
-                proc.start()
+                
             else:
                 test_sampler_tails = []
                 test_sampler_heads = []
@@ -258,12 +263,16 @@ def run(args, logger):
 
     # train
     start = time.time()
-    '''
+    
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
-            valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-            proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
+            if args.mix_cpu_gpu:
+                g = train_data.graphs[i]
+                proc = mp.Process(target=multi_gpu_train, args=(args, model, g, n_entities, valid_edges, i))
+            else:
+                valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
+                proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
             procs.append(proc)
             proc.start()
         for proc in procs:
@@ -272,7 +281,7 @@ def run(args, logger):
         valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
         train(args, model, train_sampler, valid_samplers)
     print('training takes {} seconds'.format(time.time() - start))
-    '''
+    
     if args.save_emb is not None:
         if not os.path.exists(args.save_emb):
             os.mkdir(args.save_emb)
@@ -284,7 +293,7 @@ def run(args, logger):
             procs = []
             for i in range(args.num_proc):
                 if args.mix_cpu_gpu and args.num_proc > 1:
-                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'test', test_edges, i % args.gpu))
+                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'Test', test_edges, i))
                 else:
                     proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
                 procs.append(proc)

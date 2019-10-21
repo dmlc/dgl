@@ -80,6 +80,81 @@ def train(args, model, train_sampler, valid_samplers=None):
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
+def multi_gpu_train(args, model, graph, n_entities, valid_edges, rank):
+    if args.num_proc > 1:
+        th.set_num_threads(1)
+    gpu_id = rank % args.gpu
+    train_sampler_head = create_train_sampler(graph, args.batch_size, args.neg_sample_size,
+                                                       mode='PBG-head',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+    train_sampler_tail = create_train_sampler(graph, args.batch_size, args.neg_sample_size,
+                                                       mode='PBG-tail',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+    train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                        True, n_entities)
+    if args.valid:
+        graph = dgl.contrib.graph_store.create_graph_from_store('Test', store_type="shared_mem")
+        valid_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='PBG-head',
+                                                            num_workers=args.num_worker,
+                                                            rank=rank, ranks=args.num_proc)
+        valid_sampler_tail = create_test_sampler(graph, edges, args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            mode='PBG-tail',
+                                                            num_workers=args.num_worker,
+                                                            rank=rank, ranks=args.num_proc)
+        valid_samplers = [valid_sampler_head, valid_sampler_tail]
+    logs = []
+    for arg in vars(args):
+        logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
+    start = time.time()
+    update_time = 0
+    forward_time = 0
+    backward_time = 0
+    for step in range(args.init_step, args.max_step):
+        pos_g, neg_g = next(train_sampler)
+        args.step = step
+
+        start1 = time.time()
+        loss, log = model.forward(pos_g, neg_g, gpu_id)
+        forward_time += time.time() - start1
+
+        start1 = time.time()
+        loss.backward()
+        backward_time += time.time() - start1
+
+        start1 = time.time()
+        model.update(gpu_id)
+        update_time += time.time() - start1
+        logs.append(log)
+
+        if step % args.log_interval == 0:
+            for k in logs[0].keys():
+                v = sum(l[k] for l in logs) / len(logs)
+                print('[Train]({}/{}) average {}: {}'.format(step, args.max_step, k, v))
+            logs = []
+            print('[Train] {} steps take {:.3f} seconds'.format(args.log_interval,
+                                                            time.time() - start))
+            print('forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(forward_time,
+                                                                             backward_time,
+                                                                             update_time))
+            update_time = 0
+            forward_time = 0
+            backward_time = 0
+            start = time.time()
+
+        if args.valid and step % args.eval_interval == 0 and step > 1 and valid_samplers is not None:
+            start = time.time()
+            args.gpu = gpu_id
+            test(args, model, valid_samplers, mode='Valid')
+            print('test:', time.time() - start)
+
 def test(args, model, test_samplers, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
@@ -103,21 +178,22 @@ def test(args, model, test_samplers, mode='Test'):
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
 
-def multi_gpu_test(args, model, graph_name, edges, gpu_id, mode='Test'):
+def multi_gpu_test(args, model, graph_name, edges, rank, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
+    gpu_id = rank % args.gpu
     model.create_neg()
-    graph = dgl.contrib.graph_store.create_graph_from_store("test", store_type="shared_mem")
+    graph = dgl.contrib.graph_store.create_graph_from_store('Test', store_type="shared_mem")
     test_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             mode='PBG-head',
                                                             num_workers=args.num_worker,
-                                                            rank=args.rank, ranks=args.num_proc)
+                                                            rank=rank, ranks=args.num_proc)
     test_sampler_tail = create_test_sampler(graph, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             mode='PBG-tail',
                                                             num_workers=args.num_worker,
-                                                            rank=args.rank, ranks=args.num_proc)
+                                                            rank=rank, ranks=args.num_proc)
     test_samplers = [test_sampler_head, test_sampler_tail]
     start = time.time()
     with th.no_grad():
