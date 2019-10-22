@@ -167,6 +167,9 @@ class DistMultScore(nn.Module):
             return head, tail
         return fn
 
+    def update(self):
+        pass
+
     def reset_parameters(self):
         pass
 
@@ -220,6 +223,9 @@ class ComplExScore(nn.Module):
         def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
             return head, tail
         return fn
+
+    def update(self):
+        pass
 
     def reset_parameters(self):
         pass
@@ -288,6 +294,9 @@ class RESCALScore(nn.Module):
         def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
             return head, tail
         return fn
+
+    def update(self):
+        pass
 
     def reset_parameters(self):
         pass

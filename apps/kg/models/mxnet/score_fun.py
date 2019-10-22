@@ -23,6 +23,9 @@ class TransEScore(nn.Block):
             return head, tail
         return fn
 
+    def update(self):
+        pass
+
     def reset_parameters(self):
         pass
 
@@ -178,6 +181,9 @@ class DistMultScore(nn.Block):
             return head, tail
         return fn
 
+    def update(self):
+        pass
+
     def reset_parameters(self):
         pass
 
@@ -231,6 +237,9 @@ class ComplExScore(nn.Block):
         def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
             return head, tail
         return fn
+
+    def update(self):
+        pass
 
     def reset_parameters(self):
         pass
@@ -296,6 +305,9 @@ class RESCALScore(nn.Block):
         def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
             return head, tail
         return fn
+
+    def update(self):
+        pass
 
     def reset_parameters(self):
         pass
