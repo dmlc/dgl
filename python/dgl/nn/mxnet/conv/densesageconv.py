@@ -1,9 +1,12 @@
-"""Torch Module for DenseSAGEConv"""
+"""MXNet Module for DenseGraphSAGE"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-from torch import nn
+import mxnet as mx
+import math
+from mxnet import nd
+from mxnet.gluon import nn
 
 
-class DenseSAGEConv(nn.Module):
+class DenseSAGEConv(nn.Block):
     """GraphSAGE layer where the graph structure is given by an
     adjacency matrix.
     We recommend to use this module when inducing GraphSAGE operations
@@ -42,45 +45,29 @@ class DenseSAGEConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self.feat_drop = nn.Dropout(feat_drop)
-        self.activation = activation
-        self.fc = nn.Linear(in_feats, out_feats, bias=bias)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_uniform_(self.fc.weight, gain=gain)
+        with self.name_scope():
+            self.feat_drop = nn.Dropout(feat_drop)
+            self.activation = activation
+            self.fc = nn.Dense(out_feats, in_units=in_feats, bias=bias,
+                               weight_initializer=mx.init.Xavier(math.sqrt(2.0)))
 
     def forward(self, adj, feat):
         r"""compute (dense) graph sage layer.
 
         parameters
         ----------
-        adj : torch.tensor
+        adj : mxnet.NDArray
             the adjacency matrix of the graph to apply graph convolution on,
             should be of shape :math:`(n, n)`, where a row represents the destination
             and a column represents the source.
-        feat : torch.tensor
+        feat : mxnet.NDArray
             the input feature of shape :math:`(n, d_{in})` where :math:`d_{in}`
             is size of input feature, :math:`n` is the number of nodes.
 
         returns
         -------
-        torch.tensor
+        mxnet.NDArray
             the output feature of shape :math:`(n, d_{out})` where :math:`d_{out}`
             is size of output feature.
         """
-        adj = adj.float().to(feat.device)
-        feat = self.feat_drop(feat)
-        in_degrees = adj.sum(dim=1).unsqueeze(-1)
-        h_neigh = (adj @ feat + feat) / (in_degrees + 1)
-        rst = self.fc(h_neigh)
-        # activation
-        if self.activation is not None:
-            rst = self.activation(rst)
-        # normalization
-        if self._norm is not None:
-            rst = self._norm(rst)
-
-        return rst
+        pass

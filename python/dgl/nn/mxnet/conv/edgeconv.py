@@ -1,11 +1,12 @@
-"""Torch Module for EdgeConv Layer"""
+"""MXNet Module for EdgeConv Layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-from torch import nn
+import mxnet as mx
+from mxnet.gluon import nn
 
 from .... import function as fn
 
 
-class EdgeConv(nn.Module):
+class EdgeConv(nn.Block):
     r"""Edgeconv layer.
 
     introduced in "`dynamic graph cnn for learning on point clouds
@@ -34,32 +35,35 @@ class EdgeConv(nn.Module):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
 
-        self.theta = nn.Linear(in_feat, out_feat)
-        self.phi = nn.Linear(in_feat, out_feat)
+        with self.name_scope():
+            self.theta = nn.Dense(out_feat, in_units=in_feat,
+                                  weight_initializer=mx.init.Xavier())
+            self.phi = nn.Dense(out_feat, in_units=in_feat,
+                                weight_initializer=mx.init.Xavier())
 
-        if batch_norm:
-            self.bn = nn.BatchNorm1d(out_feat)
+            if batch_norm:
+                self.bn = nn.BatchNorm(in_channels=out_feat)
 
     def message(self, edges):
-        """The message computation function.
+        r"""The message computation function
         """
         theta_x = self.theta(edges.dst['x'] - edges.src['x'])
         phi_x = self.phi(edges.src['x'])
         return {'e': theta_x + phi_x}
 
     def forward(self, g, h):
-        """Forward computation
+        r"""Forward computation
 
         Parameters
         ----------
         g : DGLGraph
             The graph.
-        h : Tensor
+        h : mxnet.NDArray
             :math:`(N, D)` where :math:`N` is the number of nodes and
             :math:`D` is the number of feature dimensions.
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             New node features.
         """
         with g.local_scope():
@@ -68,25 +72,6 @@ class EdgeConv(nn.Module):
                 g.update_all(self.message, fn.max('e', 'x'))
             else:
                 g.apply_edges(self.message)
-                # Although the official implementation includes a per-edge
-                # batch norm within EdgeConv, I choose to replace it with a
-                # global batch norm for a number of reasons:
-                #
-                # (1) When the point clouds within each batch do not have the
-                #     same number of points, batch norm would not work.
-                #
-                # (2) Even if the point clouds always have the same number of
-                #     points, the points may as well be shuffled even with the
-                #     same (type of) object (and the official implementation
-                #     *does* shuffle the points of the same example for each
-                #     epoch).
-                #
-                #     For example, the first point of a point cloud of an
-                #     airplane does not always necessarily reside at its nose.
-                #
-                #     In this case, the learned statistics of each position
-                #     by batch norm is not as meaningful as those learned from
-                #     images.
                 g.edata['e'] = self.bn(g.edata['e'])
-                g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
+                g.update_all(fn.copy_e('e', 'm'), fn.max('m', 'x'))
             return g.ndata['x']

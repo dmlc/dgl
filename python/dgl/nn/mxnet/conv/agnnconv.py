@@ -1,14 +1,13 @@
-"""Torch Module for Attention-based Graph Neural Network layer"""
+"""MXNet Module for Attention-based Graph Neural Network layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import torch as th
-from torch import nn
-from torch.nn import functional as F
+import mxnet as mx
+from mxnet.gluon import nn
 
 from .... import function as fn
 from ..softmax import edge_softmax
+from ..utils import normalize
 
-
-class AGNNConv(nn.Module):
+class AGNNConv(nn.Block):
     r"""Attention-based Graph Neural Network layer from paper `Attention-based
     Graph Neural Network for Semi-Supervised Learning
     <https://arxiv.org/abs/1803.03735>`__.
@@ -32,35 +31,36 @@ class AGNNConv(nn.Module):
                  init_beta=1.,
                  learn_beta=True):
         super(AGNNConv, self).__init__()
-        if learn_beta:
-            self.beta = nn.Parameter(th.Tensor([init_beta]))
-        else:
-            self.register_buffer('beta', th.Tensor([init_beta]))
+        with self.name_scope():
+            self.params.get('beta',
+                            shape=(1,),
+                            grad_req='write' if learn_beta else 'null',
+                            init=mx.init.Constant(init_beta))
 
     def forward(self, graph, feat):
-        r"""Compute AGNN layer.
+        r"""Compute AGNN Layer.
 
         Parameters
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
-        graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
+        graph.ndata['norm_h'] = normalize(feat, ord=2, axis=-1)
         # compute cosine distance
         graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
         cos = graph.edata.pop('cos')
-        e = self.beta * cos
+        e = self.beta.data(feat.context) * cos
         graph.edata['p'] = edge_softmax(graph, e)
         graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))
         return graph.ndata.pop('h')

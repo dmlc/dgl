@@ -1,6 +1,7 @@
 """MXNet modules for graph attention networks(GAT)."""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
+import math
 from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
@@ -58,21 +59,21 @@ class GATConv(nn.Block):
         self._out_feats = out_feats
         with self.name_scope():
             self.fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                               weight_initializer=mx.init.Xavier(),
+                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                in_units=in_feats)
             self.attn_l = self.params.get('attn_l',
                                           shape=(1, num_heads, out_feats),
-                                          init=mx.init.Xavier())
+                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             self.attn_r = self.params.get('attn_r',
                                           shape=(1, num_heads, out_feats),
-                                          init=mx.init.Xavier())
+                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             self.feat_drop = nn.Dropout(feat_drop)
             self.attn_drop = nn.Dropout(attn_drop)
             self.leaky_relu = nn.LeakyReLU(negative_slope)
             if residual:
                 if in_feats != out_feats:
                     self.res_fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                                           weight_initializer=mx.init.Xavier(),
+                                           weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                            in_units=in_feats)
                 else:
                     self.res_fc = Identity()

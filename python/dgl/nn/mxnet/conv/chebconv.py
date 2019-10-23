@@ -1,6 +1,7 @@
 """MXNet Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
+import math
 from mxnet import nd
 from mxnet.gluon import nn
 
@@ -49,7 +50,7 @@ class ChebConv(nn.Block):
             for _ in range(k):
                 self.fc.add(
                     nn.Dense(out_feats, use_bias=False,
-                             weight_initializer=mx.init.Xavier(),
+                             weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                              in_units=in_feats)
                 )
             if bias:

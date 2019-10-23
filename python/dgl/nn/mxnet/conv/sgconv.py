@@ -1,39 +1,14 @@
-"""Torch Module for Simplifying Graph Convolution layer"""
+"""MXNet Module for Simplifying Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import torch as th
-from torch import nn
+
+import mxnet as mx
+from mxnet import nd, gluon
+from mxnet.gluon import nn
 
 from .... import function as fn
 
 
-class SGConv(nn.Module):
-    r"""Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
-
-    .. math::
-        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} \Theta^{l}
-
-    Parameters
-    ----------
-    in_feats : int
-        Number of input features.
-    out_feats : int
-        Number of output features.
-    k : int
-        Number of hops :math:`K`. Defaults:``1``.
-    cached : bool
-        If True, the module would cache
-
-        .. math::
-            (\hat{D}^{-\frac{1}{2}}\hat{A}\hat{D}^{-\frac{1}{2}})^K X\Theta
-
-        at the first forward call. This parameter should only be set to
-        ``True`` in Transductive Learning setting.
-    bias : bool
-        If True, adds a learnable bias to the output. Default: ``True``.
-    norm : callable activation function/layer or None, optional
-        If not None, applies normalization to the updated node features.
-    """
+class SGConv(nn.Block):
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -42,17 +17,13 @@ class SGConv(nn.Module):
                  bias=True,
                  norm=None):
         super(SGConv, self).__init__()
-        self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
         self._cached_h = None
         self._k = k
-        self.norm = norm
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.fc.weight)
-        if self.fc.bias is not None:
-            nn.init.zeros_(self.fc.bias)
+        with self.name_scope():
+            self.norm = norm
+            self.fc = nn.Dense(out_feats, in_units=in_feats, use_bias=bias,
+                               weight_initializer=mx.init.Xavier())
 
     def forward(self, graph, feat):
         r"""Compute Simplifying Graph Convolution layer.
@@ -61,13 +32,13 @@ class SGConv(nn.Module):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
 
@@ -81,10 +52,10 @@ class SGConv(nn.Module):
             feat = self._cached_h
         else:
             # compute normalization
-            degs = graph.in_degrees().float().clamp(min=1)
-            norm = th.pow(degs, -0.5)
-            norm = norm.to(feat.device).unsqueeze(1)
-            # compute (D^-1 A^k D)^k X
+            degs = nd.clip(graph.in_degrees().float(), 1, float('inf'))
+            norm = nd.power(degs, -0.5).expand_dims(1)
+            norm = norm.as_in_context(feat.context)
+            # compute (D^-1 A D)^k X
             for _ in range(self._k):
                 feat = feat * norm
                 graph.ndata['h'] = feat
@@ -100,3 +71,4 @@ class SGConv(nn.Module):
             if self._cached:
                 self._cached_h = feat
         return self.fc(feat)
+

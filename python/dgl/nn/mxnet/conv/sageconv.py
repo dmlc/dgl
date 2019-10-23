@@ -1,6 +1,7 @@
 """MXNet Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
+import math
 from mxnet.gluon import nn
 
 from .... import function as fn
@@ -55,10 +56,10 @@ class SAGEConv(nn.Block):
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
             self.fc_self = nn.Dense(out_feats, use_bias=bias,
-                                    weight_initializer=mx.init.Xavier(),
+                                    weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                     in_units=in_feats)
             self.fc_neigh = nn.Dense(out_feats, use_bias=bias,
-                                     weight_initializer=mx.init.Xavier(),
+                                     weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                      in_units=in_feats)
 
     def forward(self, graph, feat):

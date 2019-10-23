@@ -1,6 +1,7 @@
 """MXNet Module for Gated Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name, cell-var-from-loop
 import mxnet as mx
+import math
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 
