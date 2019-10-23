@@ -24,30 +24,6 @@ GraphConv
     :members: weight, bias, forward
     :show-inheritance:
 
-GATConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.mxnet.conv.GATConv
-    :show-inheritance:
-
-SAGEConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.mxnet.conv.SAGEConv
-    :show-inheritance:
-
-GatedGraphConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.mxnet.conv.GatedGraphConv
-    :show-inheritance:
- 
-ChebConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.mxnet.conv.ChebConv
-    :show-inheritance:
-
 RelGraphConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -62,6 +38,106 @@ TAGConv
     :members: forward
     :show-inheritance:
 
+GATConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GATConv
+    :members: forward
+    :show-inheritance:
+
+EdgeConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.EdgeConv
+    :members: forward
+    :show-inheritance:
+
+SAGEConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.SAGEConv
+    :members: forward
+    :show-inheritance:
+
+SGConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.SGConv
+    :members: forward
+    :show-inheritance:
+
+APPNPConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.APPNPConv
+    :members: forward
+    :show-inheritance:
+
+GINConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GINConv
+    :members: forward
+    :show-inheritance:
+
+GatedGraphConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GatedGraphConv
+    :members: forward
+    :show-inheritance:
+
+GMMConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.GMMConv
+    :members: forward
+    :show-inheritance:
+ 
+ChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.ChebConv
+    :members: forward
+    :show-inheritance:
+
+AGNNConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.AGNNConv
+    :members: forward
+    :show-inheritance:
+
+NNConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.NNConv
+    :members: forward
+    :show-inheritance
+
+Dense Conv Layers
+----------------------------------------
+
+DenseGraphConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.DenseGraphConv
+    :members: forward
+    :show-inheritance:
+
+DenseSAGEConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.mxnet.conv.DenseSAGEConv
+    :members: forward
+    :show-inheritance
+
+DenseChebConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.DenseChebConv
+    :members: forward
+    :show-inheritance:
 
 Global Pooling Layers
 ----------------------------------------

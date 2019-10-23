@@ -6,26 +6,25 @@ from .... import function as fn
 
 
 class EdgeConv(nn.Module):
-    r"""Edgeconv layer.
+    r"""EdgeConv layer.
 
-    introduced in "`dynamic graph cnn for learning on point clouds
-    <https://arxiv.org/pdf/1801.07829>`__".  can be described as follows:
+    Introduced in "`Dynamic Graph CNN for Learning on Point Clouds
+    <https://arxiv.org/pdf/1801.07829>`__".  Can be described as follows:
 
     .. math::
+       x_i^{(l+1)} = \max_{j \in \mathcal{N}(i)} \mathrm{ReLU}(
+       \Theta \cdot (x_j^{(l)} - x_i^{(l)}) + \Phi \cdot x_i^{(l)})
 
-       x_i^{(l+1)} = \max_{j \in \mathcal{n}(i)} \mathrm{relu}(
-       \theta \cdot (x_j^{(l)} - x_i^{(l)}) + \phi \cdot x_i^{(l)})
+    where :math:`\mathcal{N}(i)` is the neighbor of :math:`i`.
 
-    where :math:`\mathcal{n}(i)` is the neighbor of :math:`i`.
-
-    parameters
+    Parameters
     ----------
     in_feat : int
-        input feature size.
+        Input feature size.
     out_feat : int
-        output feature size.
+        Output feature size.
     batch_norm : bool
-        whether to include batch normalization on messages.
+        Whether to include batch normalization on messages.
     """
     def __init__(self,
                  in_feat,

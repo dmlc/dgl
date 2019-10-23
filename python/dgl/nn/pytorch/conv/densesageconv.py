@@ -53,22 +53,22 @@ class DenseSAGEConv(nn.Module):
         nn.init.xavier_uniform_(self.fc.weight, gain=gain)
 
     def forward(self, adj, feat):
-        r"""compute (dense) graph sage layer.
+        r"""Compute (Dense) Graph SAGE layer.
 
-        parameters
+        Parameters
         ----------
-        adj : torch.tensor
-            the adjacency matrix of the graph to apply graph convolution on,
-            should be of shape :math:`(n, n)`, where a row represents the destination
+        adj : torch.Tensor
+            The adjacency matrix of the graph to apply Graph Convolution on,
+            should be of shape :math:`(N, N)`, where a row represents the destination
             and a column represents the source.
-        feat : torch.tensor
-            the input feature of shape :math:`(n, d_{in})` where :math:`d_{in}`
-            is size of input feature, :math:`n` is the number of nodes.
+        feat : torch.Tensor
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
-        returns
+        Returns
         -------
-        torch.tensor
-            the output feature of shape :math:`(n, d_{out})` where :math:`d_{out}`
+        torch.Tensor
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
         adj = adj.float().to(feat.device)

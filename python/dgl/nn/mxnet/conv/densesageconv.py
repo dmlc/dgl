@@ -52,22 +52,22 @@ class DenseSAGEConv(nn.Block):
                                weight_initializer=mx.init.Xavier(math.sqrt(2.0)))
 
     def forward(self, adj, feat):
-        r"""compute (dense) graph sage layer.
+        r"""Compute (Dense) Graph SAGE layer.
 
-        parameters
+        Parameters
         ----------
         adj : mxnet.NDArray
-            the adjacency matrix of the graph to apply graph convolution on,
-            should be of shape :math:`(n, n)`, where a row represents the destination
+            The adjacency matrix of the graph to apply Graph Convolution on,
+            should be of shape :math:`(N, N)`, where a row represents the destination
             and a column represents the source.
         feat : mxnet.NDArray
-            the input feature of shape :math:`(n, d_{in})` where :math:`d_{in}`
-            is size of input feature, :math:`n` is the number of nodes.
+            The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
+            is size of input feature, :math:`N` is the number of nodes.
 
-        returns
+        Returns
         -------
         mxnet.NDArray
-            the output feature of shape :math:`(n, d_{out})` where :math:`d_{out}`
+            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
         pass
