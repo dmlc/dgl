@@ -55,7 +55,8 @@ class APPNPConv(nn.Module):
         """
         graph = graph.local_var()
         norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-        norm = norm.unsqueeze(-1).to(feat.device)
+        shp = norm.shape + (1,) * (feat.dim() - 1)
+        norm = th.reshape(norm, shp).to(feat.device)
         feat_0 = feat
         for _ in range(self._k):
             # normalization by src node

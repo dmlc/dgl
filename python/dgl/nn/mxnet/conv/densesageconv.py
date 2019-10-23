@@ -49,7 +49,7 @@ class DenseSAGEConv(nn.Block):
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
             self.fc = nn.Dense(out_feats, in_units=in_feats, bias=bias,
-                               weight_initializer=mx.init.Xavier(math.sqrt(2.0)))
+                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
 
     def forward(self, adj, feat):
         r"""Compute (Dense) Graph SAGE layer.
@@ -70,4 +70,16 @@ class DenseSAGEConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        pass
+        adj = adj.astype(float).as_in_context(feat.context)
+        feat = self.feat_drop(feat)
+        in_degrees = adj.sum(axis=1, keepdims=True)
+        h_neigh = (nd.dot(adj, feat) + feat) / (in_degrees + 1)
+        rst = self.fc(h_neigh)
+        # activation
+        if self.activation is not None:
+            rst = self.activation(rst)
+        # normalization
+        if self._norm is not None:
+            rst = self._norm(rst)
+
+        return rst

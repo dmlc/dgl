@@ -73,4 +73,28 @@ class DenseChebConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        pass
+        A = adj.astype(float).as_in_context(feat.context)
+        num_nodes = A.shape[0]
+
+        in_degree = 1. / nd.clip(A.sum(axis=1), 1, float('inf')).sqrt()
+        D_invsqrt = nd.diag(in_degree)
+        I = nd.eye(num_nodes, ctx=A.context)
+        L = I - nd.dot(D_invsqrt, nd.dot(A, D_invsqrt))
+
+        if lambda_max is None:
+            # NOTE(zihao): this only works for directed graph.
+            lambda_max = (nd.linalg.syevd(L)[1]).max()
+
+        L_hat = 2 * L / lambda_max - I
+        Z = [nd.eye(num_nodes, ctx=A.context)]
+        Zh = self.fc[0](feat)
+        for i in range(1, self._k):
+            if i == 1:
+                Z.append(L_hat)
+            else:
+                Z.append(2 * nd.dot(L_hat, Z[-1]) - Z[-2])
+            Zh = Zh + nd.dot(Z[i], self.fc[i](feat))
+
+        if self.bias is not None:
+            Zh = Zh + self.bias
+        return Zh

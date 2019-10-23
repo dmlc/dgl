@@ -82,7 +82,7 @@ class GMMConv(nn.Module):
         if isinstance(self.res_fc, nn.Linear):
             init.xavier_normal_(self.res_fc.weight, gain=gain)
         init.normal_(self.mu.data, 0, 0.1)
-        init.normal_(self.inv_sigma.data, 1, 0.1)
+        init.constant_(self.inv_sigma.data, 1)
         if self.bias is not None:
             init.zeros_(self.bias.data)
 
