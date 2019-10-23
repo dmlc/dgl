@@ -308,7 +308,5 @@ def run(args, logger):
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()
-    if args.mix_cpu_gpu and args.num_proc > 1:
-        mp.set_start_method('spawn')
     logger = get_logger(args)
     run(args, logger)
