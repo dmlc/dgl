@@ -120,7 +120,7 @@ setup(
     install_requires=[
         'numpy>=1.14.0',
         'scipy>=1.1.0',
-        'networkx>=2.1',
+        'networkx>=2.1,<2.4',
     ],
     url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,
