@@ -82,7 +82,7 @@ def test_map_to_subgraph():
     g.add_edges(F.arange(0, 9), F.arange(1, 10))
     h = g.subgraph([0, 1, 2, 5, 8])
     v = h.map_to_subgraph_nid([0, 8, 2])
-    assert F.array_equal(v, F.tensor([0, 4, 2]))
+    assert np.array_equal(F.asnumpy(v), np.array([0, 4, 2]))
 
 def test_merge():
     # FIXME: current impl cannot handle this case!!!
