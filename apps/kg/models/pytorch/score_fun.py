@@ -117,8 +117,7 @@ class TransRScore(nn.Module):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
     def reset_parameters(self):
-        emb_init = (self.gamma + 2.0) / (self.entity_dim * self.relation_dim)
-        self.projection_emb.init(emb_init)
+        self.projection_emb.init(1.0)
 
     def update(self):
         self.projection_emb.update()
