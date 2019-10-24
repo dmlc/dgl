@@ -39,11 +39,20 @@ RandomWalkTracesPtr MetapathRandomWalk(
   const dgl_type_t *etype_data = static_cast<dgl_type_t *>(etypes->data);
   const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
 
+  // vertices[seed][concatenated_traces]
+  std::vector< std::vector<dgl_id_t> > vertices_per_seed(num_seeds);
+  // trace_lengths[seed][trace_counts[seed]]
+  std::vector< std::vector<size_t> > trace_lengths_per_seed(num_seeds);
+  // trace_counts[seed]
+  std::vector<size_t> trace_counts(num_seeds);
   std::vector<dgl_id_t> vertices;
-  std::vector<size_t> trace_lengths, trace_counts;
+  std::vector<size_t> trace_lengths;
 
   // TODO(quan): use omp to parallelize this loop
+#pragma omp parallel for
   for (uint64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
+    std::vector<dgl_id_t> curr_vertices;
+    std::vector<dgl_id_t> curr_trace_lengths;
     int curr_num_traces = 0;
 
     for (; curr_num_traces < num_traces; ++curr_num_traces) {
@@ -56,14 +65,27 @@ RandomWalkTracesPtr MetapathRandomWalk(
         if (succ.size() == 0)
           break;
         curr = succ[RandomEngine::ThreadLocal()->RandInt(succ.size())];
-        vertices.push_back(curr);
+        curr_vertices.push_back(curr);
         ++trace_length;
       }
 
-      trace_lengths.push_back(trace_length);
+      curr_trace_lengths.push_back(trace_length);
     }
 
-    trace_counts.push_back(curr_num_traces);
+    vertices_per_seed[seed_id] = curr_vertices;
+    trace_lengths_per_seed[seed_id] = curr_trace_lengths;
+    trace_counts[seed_id] = curr_num_traces;
+  }
+
+  for (uint64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
+    vertices.insert(
+        vertices.end(),
+        vertices_per_seed[seed_id].begin(),
+        vertices_per_seed[seed_id].end());
+    trace_lengths.insert(
+        trace_lengths.end(),
+        trace_lengths_per_seed[seed_id].begin(),
+        trace_lengths_per_seed[seed_id].end());
   }
 
   RandomWalkTraces *tl = new RandomWalkTraces;
