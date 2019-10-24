@@ -17,7 +17,7 @@ if backend.lower() == 'mxnet':
 else:
     import torch.multiprocessing as mp
     from train_pytorch import load_model
-    from train_pytorch import train, multi_gpu_train
+    from train_pytorch import multi_gpu_train
     from train_pytorch import test, multi_gpu_test
 
 class ArgParser(argparse.ArgumentParser):
@@ -183,7 +183,7 @@ def run(args, logger):
         for proc in procs:
             proc.join()
     else:
-        g = train_data.g
+        g = train_data.graphs[0]
         multi_gpu_train(args, model, g, n_entities, valid_edges, 0)
     print('training takes {} seconds'.format(time.time() - start))
     
@@ -203,7 +203,7 @@ def run(args, logger):
             for proc in procs:
                 proc.join()
         else:
-            mulit_gpu_test(args, model, 'Test', test_edges, 0)
+            multi_gpu_test(args, model, 'Test', test_edges, 0)
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()

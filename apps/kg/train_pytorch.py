@@ -133,6 +133,7 @@ def test(args, model, test_samplers, gpu_id, mode='Test'):
 def multi_gpu_test(args, model, graph_name, edges, rank, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
+    model.create_neg()
     gpu_id = rank % args.gpu if args.mix_cpu_gpu and args.num_proc > 1 else -1
     graph = dgl.contrib.graph_store.create_graph_from_store(graph_name, store_type="shared_mem")
     test_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
