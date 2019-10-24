@@ -52,8 +52,6 @@ class KEModel(object):
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
-        if not (args.mix_cpu_gpu and args.num_proc > 1):
-            self.create_neg()
         self.reset_parameters()
 
     def create_neg(self):

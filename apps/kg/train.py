@@ -145,119 +145,25 @@ def run(args, logger):
         args.neg_sample_size_test = n_entities
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
-    if args.num_proc > 1:
-        train_samplers = []
-        for i in range(args.num_proc):
-            train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           mode='PBG-head',
-                                                           num_workers=args.num_worker,
-                                                           shuffle=True,
-                                                           exclude_positive=True,
-                                                           rank=i)
-            train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           mode='PBG-tail',
-                                                           num_workers=args.num_worker,
-                                                           shuffle=True,
-                                                           exclude_positive=True,
-                                                           rank=i)
-            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                                  True, n_entities))
-    else:
-        train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       mode='PBG-head',
-                                                       num_workers=args.num_worker,
-                                                       shuffle=True,
-                                                       exclude_positive=True)
-        train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       mode='PBG-tail',
-                                                       num_workers=args.num_worker,
-                                                       shuffle=True,
-                                                       exclude_positive=True)
-        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                        True, n_entities)
-
     if args.valid or args.test:
         eval_dataset = EvalDataset(dataset, args)
-    if args.valid:
-        # Here we want to use the regualr negative sampler because we need to ensure that
-        # all positive edges are excluded.
-        if args.num_proc > 1:
-            valid_sampler_heads = []
-            valid_sampler_tails = []
-            for i in range(args.num_proc):
-                valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                                 args.neg_sample_size_valid,
-                                                                 mode='PBG-head',
-                                                                 num_workers=args.num_worker,
-                                                                 rank=i, ranks=args.num_proc)
-                valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                                 args.neg_sample_size_valid,
-                                                                 mode='PBG-tail',
-                                                                 num_workers=args.num_worker,
-                                                                 rank=i, ranks=args.num_proc)
-                valid_sampler_heads.append(valid_sampler_head)
-                valid_sampler_tails.append(valid_sampler_tail)
-        else:
-            valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                             args.neg_sample_size_valid,
-                                                             mode='PBG-head',
-                                                             num_workers=args.num_worker,
-                                                             rank=0, ranks=1)
-            valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                             args.neg_sample_size_valid,
-                                                             mode='PBG-tail',
-                                                             num_workers=args.num_worker,
-                                                             rank=0, ranks=1)
 
-    if args.num_proc > 1 and args.mix_cpu_gpu and (args.valid or args.test):
+    if args.valid or args.test:
         num_connection = args.num_proc * 2 if args.valid and args.test else args.num_proc
         proc = mp.Process(target=run_server, args=(num_connection, eval_dataset.g, eval_dataset.etype_id))
         proc.start()
 
-    if args.test:
-        # Here we want to use the regualr negative sampler because we need to ensure that
-        # all positive edges are excluded.
-        if args.num_proc > 1:
-            if args.mix_cpu_gpu:
-                pass
-            else:
-                test_sampler_tails = []
-                test_sampler_heads = []
-                for i in range(args.num_proc):
-                    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                    args.neg_sample_size_test,
-                                                                    mode='PBG-head',
-                                                                    num_workers=args.num_worker,
-                                                                    rank=i, ranks=args.num_proc)
-                    test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                                    args.neg_sample_size_test,
-                                                                    mode='PBG-tail',
-                                                                    num_workers=args.num_worker,
-                                                                    rank=i, ranks=args.num_proc)
-                    test_sampler_heads.append(test_sampler_head)
-                    test_sampler_tails.append(test_sampler_tail)
-        else:
-            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                            args.neg_sample_size_test,
-                                                            mode='PBG-head',
-                                                            num_workers=args.num_worker,
-                                                            rank=0, ranks=1)
-            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                            args.neg_sample_size_test,
-                                                            mode='PBG-tail',
-                                                            num_workers=args.num_worker,
-                                                            rank=0, ranks=1)
-
     # We need to free all memory referenced by dataset.
-    if args.mix_cpu_gpu and args.num_proc > 1:
-        if args.test:
-            test_edges = eval_dataset.get_edges('test')
-        if args.valid:
-            valid_edges = eval_dataset.get_edges('valid')
-        else:
-            valid_edges = None
+    if args.test:
+        test_edges = eval_dataset.get_edges('test')
+    if args.valid:
+        valid_edges = eval_dataset.get_edges('valid')
+    else:
+        valid_edges = None
+
     eval_dataset = None
     dataset = None
+
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
@@ -270,19 +176,15 @@ def run(args, logger):
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
-            if args.mix_cpu_gpu:
-                g = train_data.graphs[i]
-                proc = mp.Process(target=multi_gpu_train, args=(args, model, g, n_entities, valid_edges, i))
-            else:
-                valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-                proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
+            g = train_data.graphs[i]
+            proc = mp.Process(target=multi_gpu_train, args=(args, model, g, n_entities, valid_edges, i))
             procs.append(proc)
             proc.start()
         for proc in procs:
             proc.join()
     else:
-        valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-        train(args, model, train_sampler, valid_samplers)
+        g = train_data.g
+        multi_gpu_train(args, model, g, n_entities, valid_edges, 0)
     print('training takes {} seconds'.format(time.time() - start))
     
     if args.save_emb is not None:
@@ -295,16 +197,13 @@ def run(args, logger):
         if args.num_proc > 1:
             procs = []
             for i in range(args.num_proc):
-                if args.mix_cpu_gpu and args.num_proc > 1:
-                    proc = mp.Process(target=multi_gpu_test, args=(args, model, 'Test', test_edges, i))
-                else:
-                    proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
+                proc = mp.Process(target=multi_gpu_test, args=(args, model, 'Test', test_edges, i))
                 procs.append(proc)
                 proc.start()
             for proc in procs:
                 proc.join()
         else:
-            test(args, model, [test_sampler_head, test_sampler_tail])
+            mulit_gpu_test(args, model, 'Test', test_edges, 0)
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()
