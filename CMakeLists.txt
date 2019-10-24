@@ -101,6 +101,8 @@ file(GLOB_RECURSE DGL_SRC_1
 )
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
+list(FILTER DGL_SRC EXCLUDE REGEX "src/pybind11/*.cc")
+
 
 # Configure cuda
 if(USE_CUDA)
@@ -121,8 +123,14 @@ set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
+# pybind11
+set(PYTHON_EXECUTABLE /home/ubuntu/.pyenv/versions/csrdev/bin/python3.6)
+add_subdirectory(third_party/pybind11)
+pybind11_add_module(dglpybind src/pybind11/api.cc src/pybind11/pure_pybind11.cc)
+
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
+install(TARGETS dglpybind DESTINATION dglpybind)
 
 # Testing
 if(BUILD_CPP_TEST)

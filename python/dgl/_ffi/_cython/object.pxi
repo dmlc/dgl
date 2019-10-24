@@ -11,6 +11,8 @@ def _register_object(int index, object cls):
         OBJECT_TYPE.append(None)
     OBJECT_TYPE[index] = cls
 
+def _return_pbd_object(long ptr):
+    return make_ret_object(<void *>ptr)
 
 cdef inline object make_ret_object(void* chandle):
     global OBJECT_TYPE
