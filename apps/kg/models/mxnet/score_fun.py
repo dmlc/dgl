@@ -92,16 +92,24 @@ class TransRScore(nn.Block):
                 tail = tail.reshape(num_chunks, -1, self.relation_dim)
 
                 # neg node, each project to all relations
-                projection = projection.reshape(num_chunks, -1, 1, self.entity_dim, self.relation_dim)
-                head = head.reshape(num_chunks, 1, -1, 1, self.entity_dim)
+                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
+                head = head.reshape(num_chunks, -1, 1, self.entity_dim)
                 num_rels = projection.shape[1]
-                num_nnodes = head.shape[2]
-                projection = nd.broadcast_axis(projection, axis=2, size=num_nnodes)
-                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
-                head = nd.broadcast_axis(head, axis=1, size=num_rels)
-                head = head.reshape(-1, 1, self.entity_dim)
-                # (num_chunks, num_rel, num_neg_nodes, rel_dim)
-                head = nd.batch_dot(head, projection).reshape(num_chunks, num_rels, num_nnodes, self.relation_dim)
+                num_nnodes = head.shape[1]
+
+                heads = []
+                for i in range(num_chunks):
+                    head_negs = []
+                    for j in range(num_nnodes):
+                        head_neg = head[i][j]
+                        head_neg = head_neg.reshape(1, 1, self.entity_dim)
+                        head_neg = nd.broadcast_axis(head_neg, axis=0, size=num_rels)
+                        head_neg = nd.batch_dot(head_neg, projection[i])
+                        head_neg = head_neg.squeeze(axis=1)
+                        head_negs.append(head_neg)
+                    head_negs = nd.stack(*head_negs, axis=1)
+                    heads.append(head_negs)
+                head = nd.stack(*heads)
                 return head, tail
             return fn
         else:
@@ -113,17 +121,24 @@ class TransRScore(nn.Block):
                 head = nd.batch_dot(head, projection).squeeze()
                 head = head.reshape(num_chunks, -1, self.relation_dim)
 
-                projection = projection.reshape(num_chunks, -1, 1, self.entity_dim, self.relation_dim)
-                tail = tail.reshape(num_chunks, 1, -1, 1, self.entity_dim)
+                projection = projection.reshape(num_chunks, -1, self.entity_dim, self.relation_dim)
+                tail = tail.reshape(num_chunks, -1, 1, self.entity_dim)
                 num_rels = projection.shape[1]
-                num_nnodes = tail.shape[2]
-                projection = nd.broadcast_axis(projection, axis=2, size=num_nnodes)
-                projection = projection.reshape(-1, self.entity_dim, self.relation_dim)
-                tail = nd.broadcast_axis(tail, axis=1, size=num_rels)
-                tail = tail.reshape(-1, 1, self.entity_dim)
-                # neg node, each project to all relations
-                # (num_chunks, num_rel, num_neg_nodes, rel_dim)
-                tail = nd.batch_dot(tail, projection).reshape(num_chunks, num_rels, num_nnodes, self.relation_dim)
+                num_nnodes = tail.shape[1]
+
+                tails = []
+                for i in range(num_chunks):
+                    tail_negs = []
+                    for j in range(num_nnodes):
+                        tail_neg = tail[i][j]
+                        tail_neg = tail_neg.reshape(1, 1, self.entity_dim)
+                        tail_neg = nd.broadcast_axis(tail_neg, axis=0, size=num_rels)
+                        tail_neg = nd.batch_dot(tail_neg, projection[i])
+                        tail_neg = tail_neg.squeeze(axis=1)
+                        tail_negs.append(tail_neg)
+                    tail_negs = nd.stack(*tail_negs, axis=1)
+                    tails.append(tail_negs)
+                tail = nd.stack(*tails)
                 return head, tail
             return fn
 
