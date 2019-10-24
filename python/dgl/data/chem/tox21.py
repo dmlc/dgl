@@ -1,16 +1,17 @@
 import numpy as np
 import sys
 
-from .csv_dataset import CSVDataset
-from .utils import smile_to_bigraph
+from .csv_dataset import MoleculeCSVDataset
+from .utils import smiles_to_bigraph
 from ..utils import get_download_dir, download, _get_dgl_url
+from ... import backend as F
 
 try:
     import pandas as pd
 except ImportError:
     pass
 
-class Tox21(CSVDataset):
+class Tox21(MoleculeCSVDataset):
     """Tox21 dataset.
 
     The Toxicology in the 21st Century (https://tripod.nih.gov/tox21/challenge/)
@@ -29,11 +30,19 @@ class Tox21(CSVDataset):
 
     Parameters
     ----------
-    smile_to_graph: callable, str -> DGLGraph
-        A function turns smiles into a DGLGraph. Default one can be found
-        at python/dgl/data/chem/utils.py named with smile_to_bigraph.
+    smiles_to_graph: callable, str -> DGLGraph
+        A function turning smiles into a DGLGraph.
+        Default to :func:`dgl.data.chem.smiles_to_bigraph`.
+    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for atoms in a molecule, which can be used to update
+        ndata for a DGLGraph. Default to None.
+    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for bonds in a molecule, which can be used to update
+        edata for a DGLGraph. Default to None.
     """
-    def __init__(self, smile_to_graph=smile_to_bigraph):
+    def __init__(self, smiles_to_graph=smiles_to_bigraph,
+                 atom_featurizer=None,
+                 bond_featurizer=None):
         if 'pandas' not in sys.modules:
             from ...base import dgl_warning
             dgl_warning("Please install pandas")
@@ -46,10 +55,10 @@ class Tox21(CSVDataset):
 
         df = df.drop(columns=['mol_id'])
 
-        super().__init__(df, smile_to_graph, cache_file_path="tox21_dglgraph.pkl")
+        super(Tox21, self).__init__(df, smiles_to_graph, atom_featurizer, bond_featurizer,
+                                    "smiles", "tox21_dglgraph.bin")
         self._weight_balancing()
 
-    
     def _weight_balancing(self):
         """Perform re-balancing for each task.
 
@@ -67,10 +76,9 @@ class Tox21(CSVDataset):
         * self._task_pos_weights is set, which is a list of positive sample weights
           for each task.
         """
-        num_pos = np.sum(self.labels, axis=0)
-        num_indices = np.sum(self.mask, axis=0)
+        num_pos = F.sum(self.labels, dim=0)
+        num_indices = F.sum(self.mask, dim=0)
         self._task_pos_weights = (num_indices - num_pos) / num_pos
-    
 
     @property
     def task_pos_weights(self):
