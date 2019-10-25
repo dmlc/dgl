@@ -52,11 +52,10 @@ class KEModel(object):
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
-        self.reset_parameters()
-
-    def create_neg(self):
+            
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
+        self.reset_parameters()
 
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
