@@ -1,9 +1,12 @@
+# pylint: disable=C0103, W0612
+"""Pushing the Boundaries of Molecular Representation for Drug Discovery
+with the Graph Attention Mechanism"""
 import dgl
-import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ... import function as fn
 from ...nn.pytorch.softmax import edge_softmax
 
 class AttentiveGRU1(nn.Module):

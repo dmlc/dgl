@@ -59,7 +59,11 @@ Regression tasks require assigning continuous labels to a molecule, e.g. molecul
 machine learning models useful for chemistry and materials science. The dataset lists 12 quantum mechanical properties of 130,000+ organic 
 molecules comprising up to 12 heavy atoms (C, N, O, S, F and Cl), sampled from the [GDBMedChem](http://gdb.unibe.ch/downloads/) database. 
 These properties have been calculated using the open-source computational chemistry program Python-based Simulation of Chemistry Framework 
-([PySCF](https://github.com/pyscf/pyscf)). The Alchemy dataset expands on the volume and diversity of existing molecular datasets such as QM9.  
+([PySCF](https://github.com/pyscf/pyscf)). The Alchemy dataset expands on the volume and diversity of existing molecular datasets such as QM9. 
+- **PubChem BioAssay Aromaticity**. The dataset is introduced in 
+[Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph Attention Mechanism](https://www.ncbi.nlm.nih.gov/pubmed/31408336), 
+for the task of predicting the number of aromatic atoms in molecules. The dataset was constructed by sampling 3945 molecules with 0-40 aromatic atoms 
+from the PubChem BioAssay dataset.
 
 ### Models  
 
@@ -70,6 +74,7 @@ without requiring them to lie on grids.
 - **Multilevel Graph Convolutional Neural Network** [5]. Multilevel Graph Convolutional Neural Networks (MGCN) are 
 hierarchical graph neural networks that extract features from the conformation and spatial information followed by the
 multilevel interactions.
+- ****
 
 ### Usage
 
