@@ -34,20 +34,20 @@ We use GPU whenever it is available.
 
 #### GCN on Tox21
 
-| Source           | Averaged ROC-AUC Score |
-| ---------------- | ---------------------- |
-| MoleculeNet [1]  | 0.829                  |
+| Source           | Averaged Test ROC-AUC Score |
+| ---------------- | --------------------------- |
+| MoleculeNet [1]  | 0.829                       |
 | [DeepChem example](https://github.com/deepchem/deepchem/blob/master/examples/tox21/tox21_tensorgraph_graph_conv.py) | 0.813                  |
-| Pretrained model | 0.826                  |
+| Pretrained model | 0.826                       |
 
 Note that the dataset is randomly split so these numbers are only for reference and they do not necessarily suggest
 a real difference.
 
 #### GAT on Tox21
 
-| Source           | Averaged ROC-AUC Score |
-| ---------------- | ---------------------- |
-| Pretrained model | 0.827                  |
+| Source           | Averaged Test ROC-AUC Score |
+| ---------------- | --------------------------- |
+| Pretrained model | 0.827                       |
 
 ## Regression   
 
@@ -100,6 +100,20 @@ on the training and validation set for reference.
 | SchNet [4] | 0.2665       | 0.6139         |
 | MGCN [5]   | 0.2395       | 0.6463         |
 | MPNN [6]   | 0.2452       | 0.6259         |
+
+#### PubChem BioAssay Aromaticity
+
+| Model           | Test RMSE |
+| --------------- | --------- |
+| AttentiveFP [8] | 0.6998    |
+
+## Interpretation
+
+[8] visualizes the weights of atoms in readout for possible interpretations like the figure below. 
+We provide a jupyter notebook for performing the visualization and you can download it with 
+`wget https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/atom_weight_visualization.ipynb`.
+
+![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/vis_example.png)
 
 ## Dataset Customization
 

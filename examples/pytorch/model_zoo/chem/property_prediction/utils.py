@@ -1,6 +1,5 @@
 import datetime
 import dgl
-import math
 import numpy as np
 import random
 import torch
@@ -9,7 +8,7 @@ import torch.nn.functional as F
 from dgl import model_zoo
 from dgl.data.chem import one_hot_encoding
 from dgl.data.utils import split_dataset
-from sklearn.metrics import roc_auc_score, mean_squared_error
+from sklearn.metrics import roc_auc_score
 
 def set_random_seed(seed=0):
     """Set random seed.
