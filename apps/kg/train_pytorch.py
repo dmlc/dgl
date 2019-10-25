@@ -106,6 +106,7 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
             start = time.time()
             test(args, model, valid_samplers, gpu_id, mode='Valid')
             print('test:', time.time() - start)
+    graph.destroy()
 
 def test(args, model, test_samplers, gpu_id, mode='Test'):
     if args.num_proc > 1:
@@ -166,3 +167,4 @@ def multi_gpu_test(args, model, graph_name, edges, rank, mode='Test'):
     print('test:', time.time() - start)
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
+    graph.destroy()
