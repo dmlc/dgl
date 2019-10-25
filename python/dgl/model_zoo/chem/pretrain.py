@@ -71,6 +71,7 @@ def load_pretrained(model_name, log=True):
         * ``'MGCN_Alchemy'``
         * ``'SCHNET_Alchemy'``
         * ``'MPNN_Alchemy'``
+        * ``'AttentiveFP_Aromaticity'``
         * ``'DGMG_ChEMBL_canonical'``
         * ``'DGMG_ChEMBL_random'``
         * ``'DGMG_ZINC_canonical'``
