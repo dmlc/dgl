@@ -1,4 +1,4 @@
-# pylint: disable=C0103, W0612
+# pylint: disable=C0103, W0612, E1101
 """Pushing the Boundaries of Molecular Representation for Drug Discovery
 with the Graph Attention Mechanism"""
 import dgl
