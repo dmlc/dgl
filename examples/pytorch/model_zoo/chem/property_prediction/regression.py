@@ -72,14 +72,17 @@ def main(args):
                                  batch_size=args['batch_size'],
                                  collate_fn=collate_molgraphs)
 
-    model = load_model(args)
-    if args['model'] in ['SCHNET', 'MGCN']:
-        model.set_mean_std(train_set.mean, train_set.std, args['device'])
+    if args['pre_trained']:
+        args['num_epochs'] = 0
+        model = model_zoo.chem.load_pretrained(args['exp'])
+    else:
+        model = load_model(args)
+        if args['model'] in ['SCHNET', 'MGCN']:
+            model.set_mean_std(train_set.mean, train_set.std, args['device'])
+        loss_fn = nn.MSELoss(reduction='none')
+        optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'], weight_decay=args['weight_decay'])
+        stopper = EarlyStopping(mode='lower', patience=args['patience'])
     model.to(args['device'])
-
-    loss_fn = nn.MSELoss(reduction='none')
-    optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'], weight_decay=args['weight_decay'])
-    stopper = EarlyStopping(mode='lower', patience=args['patience'])
 
     for epoch in range(args['num_epochs']):
         # Train
@@ -111,6 +114,8 @@ if __name__ == "__main__":
                         help='Model to use')
     parser.add_argument('-d', '--dataset', type=str, choices=['Alchemy', 'Aromaticity'],
                         help='Dataset to use')
+    parser.add_argument('-p', '--pre-trained', action='store_true',
+                        help='Whether to skip training and use a pre-trained model')
     args = parser.parse_args().__dict__
     args['exp'] = '_'.join([args['model'], args['dataset']])
     args.update(get_exp_configure(args['exp']))

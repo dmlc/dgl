@@ -74,15 +74,19 @@ without requiring them to lie on grids.
 - **Multilevel Graph Convolutional Neural Network** [5]. Multilevel Graph Convolutional Neural Networks (MGCN) are 
 hierarchical graph neural networks that extract features from the conformation and spatial information followed by the
 multilevel interactions.
-- ****
+- **AttentiveFP** [8]. AttentiveFP combines attention and GRU for better model capacity and shows competitive 
+performance across datasetts.
 
 ### Usage
 
 Use `regression.py` with arguments
 ```
--m {MPNN,SCHNET,MGCN}, Model to use
--d {Alchemy}, Dataset to use
+-m {MPNN, SCHNET, MGCN, AttentiveFP}, Model to use
+-d {Alchemy, Aromaticity}, Dataset to use
 ```
+
+If you want to use the pre-trained model, simply add `-p`. Currently we only support pre-trained models of AttentiveFP
+on PubChem BioAssay Aromaticity dataset.
 
 ### Performance    
 
@@ -122,3 +126,6 @@ Machine Learning*, JMLR. 1263-1272.
 
 [7] Veličković et al. (2018) Graph Attention Networks. 
 *The International Conference on Learning Representations (ICLR)*. 
+
+[8] Xiong et al. (2019) Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph 
+Attention Mechanism. *Journal of Medicinal Chemistry*.
