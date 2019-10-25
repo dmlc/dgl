@@ -46,10 +46,12 @@ def one_hot_encoding(x, allowable_set, encode_unknown=False):
         The list is of length ``len(allowable_set)`` if ``encode_unknown=False``
         and ``len(allowable_set) + 1`` otherwise.
     """
-    if encode_unknown:
+    if encode_unknown and (allowable_set[-1] is not None):
         allowable_set.append(None)
-        if x not in allowable_set:
-            x = None
+
+    if encode_unknown and (x not in allowable_set):
+        x = None
+
     return list(map(lambda s: x == s, allowable_set))
 
 #################################################################
