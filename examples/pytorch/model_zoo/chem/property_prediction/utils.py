@@ -6,6 +6,8 @@ import random
 import torch
 import torch.nn.functional as F
 
+from dgl import model_zoo
+from dgl.data.chem import one_hot_encoding
 from dgl.data.utils import split_dataset
 from sklearn.metrics import roc_auc_score, mean_squared_error
 
@@ -22,6 +24,13 @@ def set_random_seed(seed=0):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
+
+def chirality(atom):
+    try:
+        return one_hot_encoding(atom.GetProp('_CIPCode'), ['R', 'S']) + \
+               [atom.HasProp('_ChiralityPossible')]
+    except:
+        return [False, False] + [atom.HasProp('_ChiralityPossible')]
 
 class Meter(object):
     """Track and summarize model performance on a dataset for
@@ -110,9 +119,9 @@ class Meter(object):
         scores = []
         for task in range(n_tasks):
             task_w = mask[:, task]
-            task_y_true = y_true[:, task][task_w != 0].numpy()
-            task_y_pred = y_pred[:, task][task_w != 0].numpy()
-            scores.append(math.sqrt(mean_squared_error(task_y_true, task_y_pred)))
+            task_y_true = y_true[:, task][task_w != 0]
+            task_y_pred = y_pred[:, task][task_w != 0]
+            scores.append(np.sqrt(F.mse_loss(task_y_pred, task_y_true).cpu().item()))
         return scores
 
     def compute_metric(self, metric_name, reduction='mean'):
@@ -292,11 +301,55 @@ def load_dataset_for_regression(args):
     test_set
         Subset for test.
     """
-    assert args['dataset'] in ['Alchemy']
+    assert args['dataset'] in ['Alchemy', 'Aromaticity']
+
     if args['dataset'] == 'Alchemy':
         from dgl.data.chem import TencentAlchemyDataset
         train_set = TencentAlchemyDataset(mode='dev')
         val_set = TencentAlchemyDataset(mode='valid')
         test_set = None
 
+    if args['dataset'] == 'Aromaticity':
+        from dgl.data.chem import PubChemBioAssayAromaticity
+        dataset = PubChemBioAssayAromaticity(atom_featurizer=args['atom_featurizer'],
+                                             bond_featurizer=args['bond_featurizer'])
+        train_set, val_set, test_set = split_dataset(dataset, frac_list=args['train_val_test_split'],
+                                                     shuffle=True, random_state=args['random_seed'])
+
     return train_set, val_set, test_set
+
+def load_model(args):
+    if args['model'] == 'GCN':
+        model = model_zoo.chem.GCNClassifier(in_feats=args['in_feats'],
+                                             gcn_hidden_feats=args['gcn_hidden_feats'],
+                                             classifier_hidden_feats=args['classifier_hidden_feats'],
+                                             n_tasks=args['n_tasks'])
+
+    if args['model'] == 'GAT':
+        model = model_zoo.chem.GATClassifier(in_feats=args['in_feats'],
+                                             gat_hidden_feats=args['gat_hidden_feats'],
+                                             num_heads=args['num_heads'],
+                                             classifier_hidden_feats=args['classifier_hidden_feats'],
+                                             n_tasks=args['n_tasks'])
+
+    if args['model'] == 'MPNN':
+        model = model_zoo.chem.MPNNModel(node_input_dim=args['node_in_feats'],
+                                         edge_input_dim=args['edge_in_feats'],
+                                         output_dim=args['output_dim'])
+
+    if args['model'] == 'SCHNET':
+        model = model_zoo.chem.SchNet(norm=args['norm'], output_dim=args['output_dim'])
+
+    if args['model'] == 'MGCN':
+        model = model_zoo.chem.MGCNModel(norm=args['norm'], output_dim=args['output_dim'])
+
+    if args['model'] == 'AttentiveFP':
+        model = model_zoo.chem.AttentiveFP(node_feat_size=args['node_feat_size'],
+                                           edge_feat_size=args['edge_feat_size'],
+                                           num_layers=args['num_layers'],
+                                           num_timesteps=args['num_timesteps'],
+                                           graph_feat_size=args['graph_feat_size'],
+                                           output_size=args['output_size'],
+                                           dropout=args['dropout'])
+
+    return model
