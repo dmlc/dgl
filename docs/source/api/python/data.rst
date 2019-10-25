@@ -224,13 +224,17 @@ If your dataset is stored in a ``.csv`` file, you may find it helpful to use
 .. autoclass:: dgl.data.chem.CSVDataset
     :members: __getitem__, __len__
 
-Currently two datasets are supported:
+Currently three datasets are supported:
 
 * Tox21
 * TencentAlchemyDataset
+* PubChemBioAssayAromaticity
 
 .. autoclass:: dgl.data.chem.Tox21
     :members: __getitem__, __len__, task_pos_weights
 
 .. autoclass:: dgl.data.chem.TencentAlchemyDataset
     :members: __getitem__, __len__, set_mean_and_std
+
+.. autoclass:: dgl.data.chem.PubChemBioAssayAromaticity
+    :members: __getitem__, __len__
