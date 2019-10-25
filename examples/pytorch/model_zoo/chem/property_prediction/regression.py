@@ -99,7 +99,8 @@ def main(args):
             break
 
     if test_set is not None:
-        stopper.load_checkpoint(model)
+        if not args['pre_trained']:
+            stopper.load_checkpoint(model)
         test_score = run_an_eval_epoch(args, model, test_loader)
         print('test {} {:.4f}'.format(args['metric_name'], test_score))
 
