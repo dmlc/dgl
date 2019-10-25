@@ -7,9 +7,17 @@ import dgl
 
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
+    import mxnet as mx
+    mx.random.seed(42)
+    np.random.seed(42)
+
     from models.mxnet.score_fun import *
     from models.mxnet.tensor_models import ExternalEmbedding
 else:
+    import torch as th
+    th.manual_seed(42)
+    np.random.seed(42)
+
     from models.pytorch.score_fun import *
     from models.pytorch.tensor_models import ExternalEmbedding
 from models.general_models import KEModel
@@ -133,9 +141,24 @@ def check_score_func(func_name):
         np.testing.assert_allclose(F.asnumpy(score1), F.asnumpy(score2),
                                    rtol=1e-5, atol=1e-5)
 
-def test_score_func():
-    for key in ke_score_funcs:
-        check_score_func(key)
+def test_score_func_transe():
+    check_score_func('TransE')
+
+def test_score_func_distmult():
+    check_score_func('DistMult')
+
+def test_score_func_complex():
+    check_score_func('ComplEx')
+
+def test_score_func_rescal():
+    check_score_func('RESCAL')
+
+def test_score_func_transr():
+    check_score_func('TransR')
 
 if __name__ == '__main__':
-    test_score_func()
+    test_score_func_transe()
+    test_score_func_distmult()
+    test_score_func_complex()
+    test_score_func_rescal()
+    test_score_func_transr()
