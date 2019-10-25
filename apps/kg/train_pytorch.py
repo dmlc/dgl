@@ -108,7 +108,7 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
             print('test:', time.time() - start)
     graph.destroy()
 
-def test(args, model, test_samplers, gpu_id, mode='Test'):
+def test(args, model, test_samplers, gpu_id=-1, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
     start = time.time()
