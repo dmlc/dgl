@@ -1,40 +1,26 @@
+
+import torch as th
 import dgl
-from dgl._ffi._cy3.core import _return_pbd_object 
+from build import dglpybind
+import dgl.backend as F
 
-import sys
-sys.path.append("./build/")
-
-import dglpybind
-
-# def main():
-g=dgl.DGLGraph()
-# ad = dglpybind.HasEdgeBetween(g._graph.handle, 0, 1)
-# # ad2= dglpybind.HasEdgeBetween2(g._graph.handle, 0, 1)
-# print("aaa {}".format(ad))
-# # print("aaa2 {}".format(ad2))
-# print(_return_pbd_object(ad))
-
-new_g=dglpybind.new_gindex()
-
-# add = int(input())
+# Compatible way of using pybind11 with current ffi
+new_g = dglpybind.new_gindex()
 print(new_g)
-print(_return_pbd_object(new_g))
+# def main():
+g = dgl.DGLGraph()
+g.add_nodes(10)
+g.add_edge(1, 2)
+th_src = th.tensor([1, 2])
+th_dst = th.tensor([2, 3])
+nd_src = F.zerocopy_to_dgl_ndarray(th_src)
+nd_dst = F.zerocopy_to_dgl_ndarray(th_dst)
+c = dglpybind.HasEdgesBetween(g._graph, nd_src, nd_dst)
+print(c)
 
-
-
-    # input()
-# s
-# main()
-
-# if __name__ == "__main__":
-#     # main()  # Normal invocation; commented out, because we will trace it.
-
-#     # The following (a) imports minimum dependencies, (b) ensures that
-#     # output is immediately flushed (e.g. for segfaults), and (c) traces
-#     # execution of your function, but filtering out any Python code outside
-#     # of the system prefix.
-#     import sys
-#     import trace
-#     sys.stdout = sys.stderr
-#     tracer = trace.Trace(trace=1, count=0, ignoredirs=["/usr", sys.prefix])
-#     tracer.runfunc(main)
+# Pure Pybind11 way
+g = dglpybind.pure.MutableGraph()
+g.add_nodes(10)
+g.add_edges(nd_src, nd_dst)
+earray = g.edges()
+print(earray.src)

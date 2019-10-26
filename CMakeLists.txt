@@ -126,7 +126,7 @@ target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 # pybind11
 set(PYTHON_EXECUTABLE /home/ubuntu/.pyenv/versions/csrdev/bin/python3.6)
 add_subdirectory(third_party/pybind11)
-pybind11_add_module(dglpybind src/pybind11/api.cc src/pybind11/pure_pybind11.cc)
+pybind11_add_module(dglpybind src/pybind11/api.cc src/pybind11/pure_pybind11.cc src/pybind11/convert.h)
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
