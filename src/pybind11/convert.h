@@ -49,7 +49,6 @@ public:
          */
     static handle cast(GraphPtr src, return_value_policy /* policy */, handle /* parent */)
     {
-        // GraphRef is leaked
         GraphRef *holder = new GraphRef(src);
         py::module dgl = py::module::import("dgl");
         auto pbd_object = dgl.attr("_ffi").attr("_cy3").attr("core").attr("_return_pbd_object");
