@@ -1,6 +1,3 @@
-from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
-from dataloader import get_dataset
-
 import dgl
 import dgl.backend as F
 import argparse
@@ -10,10 +7,8 @@ import time
 
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
-    import multiprocessing as mp
     from train_mxnet import run
 else:
-    import torch.multiprocessing as mp
     from train_pytorch import run
 
 class ArgParser(argparse.ArgumentParser):
@@ -124,14 +119,6 @@ def get_logger(args):
     logger = logging.getLogger(__name__)
     print("Logs are being recorded at: {}".format(log_file))
     return logger
-
-def run_server(num_worker, graph, etype_id):
-    g = dgl.contrib.graph_store.create_graph_store_server(graph, "Test", "shared_mem",
-                    num_worker, False, edge_dir='in')
-    g.ndata['id'] = F.arange(0, graph.number_of_nodes())
-    g.edata['id'] = F.tensor(etype_id, F.int64)
-    g.run()
-
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()

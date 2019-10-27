@@ -1,5 +1,7 @@
 from models import KEModel
-from dataloader import create_test_sampler, create_train_sampler, NewBidirectionalOneShotIterator
+from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
+from dataloader import get_dataset
+from dataloader import create_test_sampler, create_train_sampler
 
 from torch.utils.data import DataLoader
 import torch.optim as optim
@@ -7,6 +9,7 @@ import torch as th
 import torch.multiprocessing as mp
 
 import dgl
+import dgl.backend as F
 
 from distutils.version import LooseVersion
 TH_VERSION = LooseVersion(th.__version__)
@@ -16,6 +19,13 @@ if TH_VERSION.version[0] == 1 and TH_VERSION.version[1] < 2:
 import os
 import logging
 import time
+
+def run_server(num_worker, graph, etype_id):
+    g = dgl.contrib.graph_store.create_graph_store_server(graph, "Test", "shared_mem",
+                    num_worker, False, edge_dir='in')
+    g.ndata['id'] = F.arange(0, graph.number_of_nodes())
+    g.edata['id'] = F.tensor(etype_id, F.int64)
+    g.run()
 
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
     model = KEModel(args, args.model_name, n_entities, n_relations,
