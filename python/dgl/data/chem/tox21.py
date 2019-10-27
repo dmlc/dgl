@@ -1,4 +1,3 @@
-import numpy as np
 import sys
 
 from .csv_dataset import MoleculeCSVDataset

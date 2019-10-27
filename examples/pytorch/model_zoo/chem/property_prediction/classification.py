@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from dgl import model_zoo
 
 from utils import Meter, EarlyStopping, collate_molgraphs, set_random_seed, \
-    load_dataset_for_classification
+    load_dataset_for_classification, load_model
 
 def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer):
     model.train()
@@ -60,19 +60,8 @@ def main(args):
         args['num_epochs'] = 0
         model = model_zoo.chem.load_pretrained(args['exp'])
     else:
-        # Interchangeable with other models
-        if args['model'] == 'GCN':
-            model = model_zoo.chem.GCNClassifier(in_feats=args['in_feats'],
-                                                 gcn_hidden_feats=args['gcn_hidden_feats'],
-                                                 classifier_hidden_feats=args['classifier_hidden_feats'],
-                                                 n_tasks=dataset.n_tasks)
-        elif args['model'] == 'GAT':
-            model = model_zoo.chem.GATClassifier(in_feats=args['in_feats'],
-                                                 gat_hidden_feats=args['gat_hidden_feats'],
-                                                 num_heads=args['num_heads'],
-                                                 classifier_hidden_feats=args['classifier_hidden_feats'],
-                                                 n_tasks=dataset.n_tasks)
-
+        args['n_tasks'] = dataset.n_tasks
+        model = load_model(args)
         loss_criterion = BCEWithLogitsLoss(pos_weight=dataset.task_pos_weights.to(args['device']),
                                            reduction='none')
         optimizer = Adam(model.parameters(), lr=args['lr'])
