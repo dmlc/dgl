@@ -11,14 +11,10 @@ import time
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
     import multiprocessing as mp
-    from train_mxnet import load_model
-    from train_mxnet import train
-    from train_mxnet import test
+    from train_mxnet import run
 else:
     import torch.multiprocessing as mp
-    from train_pytorch import load_model
-    from train_pytorch import multi_gpu_train
-    from train_pytorch import test, multi_gpu_test
+    from train_pytorch import run
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
@@ -62,7 +58,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--eval_percent', type=float, default=1,
                           help='sample some percentage for evaluation.')
 
-        self.add_argument('--gpu', type=int, default=-1,
+        self.add_argument('--gpu', type=int, default=[-1], nargs='+', 
                           help='use GPU')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
@@ -137,6 +133,15 @@ def run_server(num_worker, graph, etype_id):
     g.run()
 
 def run_torch(args, logger):
+    if len(args.gpu) > args.num_proc or args.num_proc % len(args.gpu) > 0:
+        raise Exception('Incorrect gpu number')
+    gpu_list = None
+    if len(args.gpu) == 1 and (args.gpu[0] == -1 or args.num_proc == 1):
+        args.gpu = args.gpu[0]
+    else:
+        gpu_list = args.gpu
+        args.gpu = -1
+
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     n_entities = dataset.n_entities
@@ -174,6 +179,8 @@ def run_torch(args, logger):
     start = time.time()
     
     if args.num_proc > 1:
+        if gpu_list:
+            args.gpu = gpu_list
         procs = []
         for i in range(args.num_proc):
             g = train_data.graphs[i]
@@ -206,6 +213,10 @@ def run_torch(args, logger):
             multi_gpu_test(args, model, 'Test', test_edges, 0)
 
 def run_mxnet(args, logger):
+    if len(args.gpu) > 1:
+        raise Exception('Mxnet do not support multi-gpu')
+    else:
+        args.gpu = args.gpu[0]
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     n_entities = dataset.n_entities
