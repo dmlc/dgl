@@ -9,6 +9,7 @@ from .dgmg import DGMG
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .schnet import SchNet
+from .attentive_fp import AttentiveFP
 from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 
 URL = {
@@ -17,6 +18,7 @@ URL = {
     'MGCN_Alchemy': 'pre_trained/mgcn_alchemy.pth',
     'SCHNET_Alchemy': 'pre_trained/schnet_alchemy.pth',
     'MPNN_Alchemy': 'pre_trained/mpnn_alchemy.pth',
+    'AttentiveFP_Aromaticity': 'pre_trained/attentivefp_aromaticity.pth',
     'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
@@ -69,6 +71,7 @@ def load_pretrained(model_name, log=True):
         * ``'MGCN_Alchemy'``
         * ``'SCHNET_Alchemy'``
         * ``'MPNN_Alchemy'``
+        * ``'AttentiveFP_Aromaticity'``
         * ``'DGMG_ChEMBL_canonical'``
         * ``'DGMG_ChEMBL_random'``
         * ``'DGMG_ZINC_canonical'``
@@ -121,6 +124,15 @@ def load_pretrained(model_name, log=True):
 
     elif model_name == 'MPNN_Alchemy':
         model = MPNNModel(output_dim=12)
+
+    elif model_name == 'AttentiveFP_Aromaticity':
+        model = AttentiveFP(node_feat_size=39,
+                            edge_feat_size=10,
+                            num_layers=2,
+                            num_timesteps=2,
+                            graph_feat_size=200,
+                            output_size=1,
+                            dropout=0.2)
 
     elif model_name == "JTNN_ZINC":
         default_dir = get_download_dir()

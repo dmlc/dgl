@@ -6,7 +6,7 @@ Builtin message passing functions
 In DGL, message passing is expressed by two APIs:
 
 - ``send(edges, message_func)`` for computing the messages along the given edges.
-- ``recv(nodes, reduce_func)`` for collecting the in-coming messages, perform aggregation and so on.
+- ``recv(nodes, reduce_func)`` for collecting the incoming messages, perform aggregation and so on.
 
 Although the two-stage abstraction can cover all the models that are defined in the message
 passing paradigm, it is inefficient due to storing explicit messages. See our
@@ -16,7 +16,7 @@ details and performance results.
 Our solution, also explained in the blogpost, is to fuse the two stages into one kernel so no
 explicit messages are generated and stored. To achieve this, we recommend using our builtin
 message/reduce functions so that DGL can analyze and map them to fused dedicated kernels. Here
-are some examples (in pytorch syntax):
+are some examples (in PyTorch syntax):
 
 .. code:: python
    
@@ -62,14 +62,14 @@ following user-defined function:
 
 Broadcasting is supported for binary message function, which means the tensor arguments
 can be automatically expanded to be of equal sizes. The supported broadcasting semantic
-is standard as in `numpy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
-and `pytorch's <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. For unfamiliar
+is standard as in `NumPy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
+and `PyTorch's <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. For unfamiliar
 users, we highly suggest reading those documents as broadcasting is very useful. In the
 above example, ``fn.u_mul_e`` will perform broadcasted multiplication automatically because
-the node feature ``'h'`` and the edge feature ``'w'`` are of different, but broadcastable shapes.
+the node feature ``'h'`` and the edge feature ``'w'`` are of different, but shapes that can be broadcast.
 
-All DGL's builtin functions support both CPU and GPU and backward computation so they
-can be used in any autograd system. Also, builtin functions can be used not only in ``update_all``
+All DGL's built-in functions support both CPU and GPU and backward computation so they
+can be used in any `autograd` system. Also, builtin functions can be used not only in ``update_all``
 or ``apply_edges`` as shown in the example, but wherever message/reduce functions are
 required (e.g. ``pull``, ``push``, ``send_and_recv``, etc.).
 

@@ -2,15 +2,21 @@
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
-from .citation_graph import CoraBinary
+from .citation_graph import CoraBinary, CitationGraphDataset, CoraDataset
 from .minigc import *
 from .tree import *
 from .utils import *
 from .sbm import SBMMixture
 from .reddit import RedditDataset
-from .ppi import PPIDataset
-from .tu import TUDataset
+from .ppi import PPIDataset, LegacyPPIDataset
+from .tu import TUDataset, LegacyTUDataset
+from .gnn_benckmark import AmazonCoBuy, CoraFull, Coauthor
+from .karate import KarateClub
 from .gindt import GINDataset
+from .bitcoinotc import BitcoinOTC
+from .gdelt import GDELT
+from .icews18 import ICEWS18
+from .qm7b import QM7b
 
 
 def register_data_args(parser):

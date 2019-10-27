@@ -53,8 +53,9 @@ def verify_subgraph(g, subg, seed_id):
     assert(is_sorted(child_src))
 
     # a neighbor in the subgraph must also exist in parent graph.
+    src = F.asnumpy(src)
     for i in subg.map_to_parent_nid(child_src):
-        assert i in src
+        assert F.asnumpy(i) in src
 
 def test_1neighbor_sampler():
     g = generate_rand_graph(100)
@@ -186,7 +187,7 @@ def test_nonuniform_neighbor_sampler():
     assert nf.num_layers == 100
     for i in range(nf.num_layers):
         assert nf.layer_size(i) == 1
-        assert nf.layer_parent_nid(i)[0] == i
+        assert F.asnumpy(nf.layer_parent_nid(i)[0]) == i
 
     # Test the reverse direction
     sampler = dgl.contrib.sampling.NeighborSampler(
@@ -196,7 +197,7 @@ def test_nonuniform_neighbor_sampler():
     assert nf.num_layers == 100
     for i in range(nf.num_layers):
         assert nf.layer_size(i) == 1
-        assert nf.layer_parent_nid(i)[0] == 99 - i
+        assert F.asnumpy(nf.layer_parent_nid(i)[0]) == 99 - i
 
 def test_setseed():
     g = generate_rand_graph(100)
@@ -220,8 +221,23 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
-def check_negative_sampler(mode, exclude_positive):
+def check_head_tail(g):
+    lsrc, ldst, leid = g.all_edges(form='all', order='eid')
+
+    lsrc = np.unique(F.asnumpy(lsrc))
+    head_nid = np.unique(F.asnumpy(g.head_nid))
+    assert len(head_nid) == len(g.head_nid)
+    np.testing.assert_equal(lsrc, head_nid)
+
+    ldst = np.unique(F.asnumpy(ldst))
+    tail_nid = np.unique(F.asnumpy(g.tail_nid))
+    assert len(tail_nid) == len(g.tail_nid)
+    np.testing.assert_equal(tail_nid, ldst)
+
+def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
+    etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
+    g.edata['etype'] = F.tensor(etype)
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
@@ -231,26 +247,22 @@ def check_negative_sampler(mode, exclude_positive):
         pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
-    neg_size = 10
+    # Test the homogeneous graph.
     for pos_edges, neg_edges in EdgeSampler(g, 50,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
-                                            exclude_positive=exclude_positive):
-        pos_nid = pos_edges.parent_nid
-        pos_eid = pos_edges.parent_eid
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        pos_src = pos_nid[pos_lsrc]
-        pos_dst = pos_nid[pos_ldst]
-        pos_eid = pos_eid[pos_leid]
-        assert_array_equal(F.asnumpy(pos_eid), F.asnumpy(g.edge_ids(pos_src, pos_dst)))
+        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
+                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
+                                                pos_edges.parent_nid[pos_ldst])))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
-        neg_nid = neg_edges.parent_nid
-        neg_eid = neg_edges.parent_eid
-        neg_src = neg_nid[neg_lsrc]
-        neg_dst = neg_nid[neg_ldst]
-        neg_eid = neg_eid[neg_leid]
 
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
         for i in range(len(neg_eid)):
             neg_d = int(F.asnumpy(neg_dst[i]))
             neg_e = int(F.asnumpy(neg_eid[i]))
@@ -258,9 +270,46 @@ def check_negative_sampler(mode, exclude_positive):
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
+        check_head_tail(neg_edges)
+        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
+        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
+        pos_tails = np.sort(F.asnumpy(pos_tails))
+        neg_tails = np.sort(F.asnumpy(neg_tails))
+        np.testing.assert_equal(pos_tails, neg_tails)
+
+        exist = neg_edges.edata['false_neg']
+        if exclude_positive:
+            assert np.sum(F.asnumpy(exist) == 0) == len(exist)
+        else:
+            assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
+
+    # Test the knowledge graph.
+    for _, neg_edges in EdgeSampler(g, 50,
+                                    negative_mode=mode,
+                                    neg_sample_size=neg_size,
+                                    exclude_positive=exclude_positive,
+                                    relations=g.edata['etype'],
+                                    return_false_neg=True):
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
+        exists = neg_edges.edata['false_neg']
+        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        for i in range(len(neg_eid)):
+            u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
+            if g.has_edge_between(u, v):
+                eid = g.edge_id(u, v)
+                etype = g.edata['etype'][eid]
+                exist = neg_edges.edata['etype'][i] == etype
+                assert F.asnumpy(exists[i]) == F.asnumpy(exist)
+
 def test_negative_sampler():
-    check_negative_sampler('head', True)
-    check_negative_sampler('PBG-head', False)
+    check_negative_sampler('PBG-head', False, 10)
+    check_negative_sampler('head', True, 10)
+    check_negative_sampler('head', False, 10)
+    #disable this check for now. It might take too long time.
+    #check_negative_sampler('head', False, 100)
 
 
 if __name__ == '__main__':
