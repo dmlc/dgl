@@ -166,3 +166,83 @@ def multi_gpu_test(args, model, graph_name, edges, rank, mode='Test'):
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
     graph.destroy()
+
+def run(args, logger):
+    if len(args.gpu) > args.num_proc or args.num_proc % len(args.gpu) > 0:
+        raise Exception('Incorrect gpu number')
+    gpu_list = None
+    if len(args.gpu) == 1 and (args.gpu[0] == -1 or args.num_proc == 1):
+        args.gpu = args.gpu[0]
+    else:
+        gpu_list = args.gpu
+        args.gpu = -1
+
+    # load dataset and samplers
+    dataset = get_dataset(args.data_path, args.dataset, args.format)
+    n_entities = dataset.n_entities
+    n_relations = dataset.n_relations
+    if args.neg_sample_size_test < 0:
+        args.neg_sample_size_test = n_entities
+
+    train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    if args.valid or args.test:
+        eval_dataset = EvalDataset(dataset, args)
+
+    if args.valid or args.test:
+        num_connection = args.num_proc * 2 if args.valid and args.test else args.num_proc
+        proc = mp.Process(target=run_server, args=(num_connection, eval_dataset.g, eval_dataset.etype_id))
+        proc.start()
+
+    # We need to free all memory referenced by dataset.
+    if args.test:
+        test_edges = eval_dataset.get_edges('test')
+    if args.valid:
+        valid_edges = eval_dataset.get_edges('valid')
+    else:
+        valid_edges = None
+
+    eval_dataset = None
+    dataset = None
+
+    # load model
+    model = load_model(logger, args, n_entities, n_relations)
+
+    if args.num_proc > 1:
+        model.share_memory()
+
+    # train
+    start = time.time()
+    
+    if args.num_proc > 1:
+        if gpu_list:
+            args.gpu = gpu_list
+        procs = []
+        for i in range(args.num_proc):
+            g = train_data.graphs[i]
+            proc = mp.Process(target=multi_gpu_train, args=(args, model, g, n_entities, valid_edges, i))
+            procs.append(proc)
+            proc.start()
+        for proc in procs:
+            proc.join()
+    else:
+        g = train_data.graphs[0]
+        multi_gpu_train(args, model, g, n_entities, valid_edges, 0)
+    print('training takes {} seconds'.format(time.time() - start))
+    
+    if args.save_emb is not None:
+        if not os.path.exists(args.save_emb):
+            os.mkdir(args.save_emb)
+        model.save_emb(args.save_emb, args.dataset)
+
+    # test
+    if args.test:
+        if args.num_proc > 1:
+            procs = []
+            for i in range(args.num_proc):
+                proc = mp.Process(target=multi_gpu_test, args=(args, model, 'Test', test_edges, i))
+                procs.append(proc)
+                proc.start()
+            for proc in procs:
+                proc.join()
+        else:
+            multi_gpu_test(args, model, 'Test', test_edges, 0)
