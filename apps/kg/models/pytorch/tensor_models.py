@@ -55,8 +55,6 @@ class ExternalEmbedding:
         s = self.emb[idx]
         if gpu_id != -1:
             s = s.cuda(gpu_id)
-        elif self.gpu >= 0:
-            s = s.cuda(self.gpu)
         data = s.clone().detach().requires_grad_(True)
         if trace:
             self.trace.append((idx, data))
@@ -86,8 +84,6 @@ class ExternalEmbedding:
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
                 if gpu_id != -1:
                     std_values = std_values.cuda(gpu_id)
-                elif self.gpu >= 0:
-                    std_values = std_values.cuda(self.args.gpu)
                 tmp = (-clr * grad_values / std_values)
                 if tmp.device != device:
                     tmp = tmp.to(device)
