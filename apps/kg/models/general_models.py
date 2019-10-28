@@ -123,6 +123,7 @@ class KEModel(object):
         # We need to filter the positive edges in the negative graph.
         filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
         if gpu_id != -1:
+            neg_scores = cuda(neg_scores, gpu_id)
             filter_bias = cuda(filter_bias, gpu_id)
         neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
