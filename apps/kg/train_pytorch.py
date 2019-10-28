@@ -120,6 +120,8 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
 def test(args, model, test_samplers, gpu_id=-1, mode='Test'):
     if args.num_proc > 1:
         th.set_num_threads(1)
+    if gpu_id == -1:
+        gpu_id = args.gpu[0] 
     start = time.time()
     with th.no_grad():
         logs = []
