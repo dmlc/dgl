@@ -48,7 +48,7 @@ def train(args, model, train_sampler, valid_samplers=None):
         pos_g, neg_g = next(train_sampler)
         args.step = step
         with mx.autograd.record():
-            loss, log = model.forward(pos_g, neg_g, args.gpu)
+            loss, log = model.forward(pos_g, neg_g, args.gpu[0])
         loss.backward()
         logs.append(log)
         model.update()
@@ -75,7 +75,7 @@ def test(args, model, test_samplers, mode='Test'):
         #print('Number of tests: ' + len(sampler))
         count = 0
         for pos_g, neg_g in sampler:
-            model.forward_test(pos_g, neg_g, logs, args.gpu)
+            model.forward_test(pos_g, neg_g, logs, args.gpu[0])
 
     metrics = {}
     if len(logs) > 0:
@@ -89,9 +89,8 @@ def test(args, model, test_samplers, mode='Test'):
 
 def run(args, logger):
     if len(args.gpu) > 1:
-        raise Exception('Mxnet do not support multi-gpu')
-    else:
-        args.gpu = args.gpu[0]
+        raise Exception('Mxnet does not support multi-gpu')
+
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     n_entities = dataset.n_entities

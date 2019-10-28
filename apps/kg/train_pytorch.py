@@ -180,12 +180,6 @@ def multi_gpu_test(args, model, graph_name, edges, rank, mode='Test'):
 def run(args, logger):
     if len(args.gpu) > args.num_proc or args.num_proc % len(args.gpu) > 0:
         raise Exception('Incorrect gpu number')
-    gpu_list = None
-    if len(args.gpu) == 1 and (args.gpu[0] == -1 or args.num_proc == 1):
-        args.gpu = args.gpu[0]
-    else:
-        gpu_list = args.gpu
-        args.gpu = -1
 
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
@@ -224,8 +218,6 @@ def run(args, logger):
     start = time.time()
     
     if args.num_proc > 1:
-        if gpu_list:
-            args.gpu = gpu_list
         procs = []
         for i in range(args.num_proc):
             g = train_data.graphs[i]

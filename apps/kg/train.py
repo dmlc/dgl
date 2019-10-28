@@ -54,7 +54,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='sample some percentage for evaluation.')
 
         self.add_argument('--gpu', type=int, default=[-1], nargs='+', 
-                          help='use GPU')
+                          help='gpu id list to use, which can include multiple ids')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
         self.add_argument('-de', '--double_ent', action='store_true',

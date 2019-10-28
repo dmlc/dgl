@@ -124,8 +124,6 @@ class KEModel(object):
         filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
         if gpu_id != -1:
             filter_bias = cuda(filter_bias, gpu_id)
-        elif self.args.gpu >= 0:
-            filter_bias = cuda(filter_bias, self.args.gpu)
         neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
@@ -149,11 +147,9 @@ class KEModel(object):
 
         pos_score = self.predict_score(pos_g)
         pos_score = logsigmoid(pos_score)
-        if gpu_id >= 0:
-            neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
-                                               gpu_id=gpu_id, trace=True)
-        else:
-            neg_score = self.predict_neg_score(pos_g, neg_g, trace=True)
+
+        neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda, 
+                    gpu_id=gpu_id, trace=True)
 
         neg_score = reshape(neg_score, -1, neg_g.neg_sample_size)
         # Adversarial sampling
