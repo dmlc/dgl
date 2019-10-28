@@ -59,7 +59,7 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
     train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
                                                         True, n_entities)
     if args.valid:
-        graph = dgl.contrib.graph_store.create_graph_from_store('Test', store_type="shared_mem")
+        g = dgl.contrib.graph_store.create_graph_from_store('Test', store_type="shared_mem")
         valid_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             mode='PBG-head',
@@ -115,6 +115,8 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
             start = time.time()
             test(args, model, valid_samplers, gpu_id, mode='Valid')
             print('test:', time.time() - start)
+    if args.valid:
+        g.destroy()
 
 def test(args, model, test_samplers, gpu_id=-1, mode='Test'):
     if args.num_proc > 1:
