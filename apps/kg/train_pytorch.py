@@ -60,12 +60,12 @@ def multi_gpu_train(args, model, graph, n_entities, edges, rank):
                                                         True, n_entities)
     if args.valid:
         g = dgl.contrib.graph_store.create_graph_from_store('Test', store_type="shared_mem")
-        valid_sampler_head = create_test_sampler(graph, edges, args.batch_size_eval,
+        valid_sampler_head = create_test_sampler(g, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             mode='PBG-head',
                                                             num_workers=args.num_worker,
                                                             rank=rank, ranks=args.num_proc)
-        valid_sampler_tail = create_test_sampler(graph, edges, args.batch_size_eval,
+        valid_sampler_tail = create_test_sampler(g, edges, args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             mode='PBG-tail',
                                                             num_workers=args.num_worker,
