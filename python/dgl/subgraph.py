@@ -46,6 +46,7 @@ class DGLSubGraph(DGLGraph):
         self._parent = parent
         self._parent_nid = sgi.induced_nodes
         self._parent_eid = sgi.induced_edges
+        self._subgraph_index = sgi
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -136,4 +137,5 @@ class DGLSubGraph(DGLGraph):
         tensor
             The node ID array in the subgraph.
         """
-        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()
+        v = map_to_subgraph_nid(self._subgraph_index, utils.toindex(parent_vids))
+        return v.tousertensor()
