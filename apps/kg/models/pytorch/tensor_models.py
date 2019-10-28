@@ -53,7 +53,7 @@ class ExternalEmbedding:
 
     def __call__(self, idx, gpu_id=-1, trace=True):
         s = self.emb[idx]
-        if gpu_id != -1 and self.args.mix_cpu_gpu:
+        if gpu_id != -1 :
             s = s.cuda(gpu_id)
         data = s.clone().detach().requires_grad_(True)
         if trace:
