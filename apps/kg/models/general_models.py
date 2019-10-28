@@ -128,8 +128,8 @@ class KEModel(object):
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
         # the positive edge.
-        rankings = F.sum(neg_scores > pos_scores, dim=1) + 1
-        rankings = F.asnumpy(rankings)
+        rankings = F.sum(neg_scores > pos_scores, dim=1)
+        rankings = F.asnumpy(rankings) + 1
         for i in range(batch_size):
             ranking = rankings[i]
             logs.append({
