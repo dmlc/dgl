@@ -21,6 +21,15 @@ Before you proceed, make sure you have installed the dependencies below:
 
 The rest dependencies can be installed with `pip install -r requirements.txt`.
 
+## Speed Reference
+
+Below we provide some reference numbers to show how DGL improves the speed of training models per epoch in seconds.
+
+| Model                      | Original Implementation | DGL Implementation | Improvement |
+| -------------------------- | ----------------------- | ------------------ | ----------- |
+| AttentiveFP on Aromaticity | 6                       | 1.2                | 5x          |
+| JTNN on ZINC               | 1826                    | 743                | 2.5x        |   
+
 ## Property Prediction
 
 To evaluate molecules for drug candidates, we need to know their properties and activities. In practice, this is
