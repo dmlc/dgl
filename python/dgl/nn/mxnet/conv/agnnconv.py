@@ -56,7 +56,7 @@ class AGNNConv(nn.Block):
         """
         graph = graph.local_var()
         graph.ndata['h'] = feat
-        graph.ndata['norm_h'] = normalize(feat, ord=2, axis=-1)
+        graph.ndata['norm_h'] = normalize(feat, p=2, axis=-1)
         # compute cosine distance
         graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
         cos = graph.edata.pop('cos')

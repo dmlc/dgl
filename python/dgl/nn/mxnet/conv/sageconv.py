@@ -1,7 +1,7 @@
 """MXNet Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import mxnet as mx
 import math
+import mxnet as mx
 from mxnet.gluon import nn
 
 from .... import function as fn

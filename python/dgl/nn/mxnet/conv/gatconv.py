@@ -1,7 +1,7 @@
 """MXNet modules for graph attention networks(GAT)."""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import mxnet as mx
 import math
+import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 
@@ -73,7 +73,8 @@ class GATConv(nn.Block):
             if residual:
                 if in_feats != out_feats:
                     self.res_fc = nn.Dense(out_feats * num_heads, use_bias=False,
-                                           weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                           weight_initializer=mx.init.Xavier(
+                                               magnitude=math.sqrt(2.0)),
                                            in_units=in_feats)
                 else:
                     self.res_fc = Identity()

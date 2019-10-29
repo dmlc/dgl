@@ -1,7 +1,6 @@
 """MXNet Module for Graph Isomorphism Network layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
-from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
@@ -47,7 +46,7 @@ class GINConv(nn.Block):
             self.apply_func = apply_func
             self.params.get('eps',
                             shape=(1,),
-                            grad_req = 'write' if learn_eps else 'null',
+                            grad_req='write' if learn_eps else 'null',
                             init=mx.init.Constant(init_eps))
 
     def forward(self, graph, feat):

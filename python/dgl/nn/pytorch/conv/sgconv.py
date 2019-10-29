@@ -50,6 +50,7 @@ class SGConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.fc.weight)
         if self.fc.bias is not None:
             nn.init.zeros_(self.fc.bias)

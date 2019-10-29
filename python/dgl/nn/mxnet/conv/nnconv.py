@@ -1,7 +1,6 @@
 """MXNet Module for NNConv layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import mxnet as mx
-from mxnet import nd
 from mxnet.gluon import nn
 from mxnet.gluon.contrib.nn import Identity
 

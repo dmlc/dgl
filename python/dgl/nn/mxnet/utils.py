@@ -85,7 +85,7 @@ def bmm_maybe_select(A, B, index):
         BB = nd.take(B, index, axis=0)
         return nd.batch_dot(A.expand_dims(1), BB).squeeze()
 
-def normalize(input, ord=2, axis=1, eps=1e-12):
+def normalize(x, p=2, axis=1, eps=1e-12):
     r"""Performs :math:`L_p` normalization of inputs over specified dimension.
 
     For a tensor :attr:`input` of sizes :math:`(n_0, ..., n_{dim}, ..., n_k)`, each
@@ -94,13 +94,14 @@ def normalize(input, ord=2, axis=1, eps=1e-12):
     .. math::
         v = \frac{v}{\max(\lVert v \rVert_p, \epsilon)}.
 
-    With the default arguments it uses the Euclidean norm over vectors along dimension :math:`1` for normalization.
+    With the default arguments it uses the Euclidean norm over vectors along dimension
+     :math:`1` for normalization.
 
     Args:
-        input: input ndarray of any shape
+        x: input ndarray of any shape
         ord (float): the exponent value in the norm formulation. Default: 2
         dim (int): the dimension to reduce. Default: 1
         eps (float): small value to avoid division by zero. Default: 1e-12
     """
-    denom = nd.clip(nd.norm(input, ord=ord, axis=axis, keepdims=True), eps, float('inf'))
+    denom = nd.clip(nd.norm(x, ord=p, axis=axis, keepdims=True), eps, float('inf'))
     return input / denom

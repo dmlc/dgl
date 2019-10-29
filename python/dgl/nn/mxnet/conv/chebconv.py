@@ -1,7 +1,7 @@
 """MXNet Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import mxnet as mx
 import math
+import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
 

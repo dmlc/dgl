@@ -2,13 +2,40 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 
 import mxnet as mx
-from mxnet import nd, gluon
+from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
 
 
 class SGConv(nn.Block):
+    r"""Simplifying Graph Convolution layer from paper `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+
+    .. math::
+        H^{l+1} = (\hat{D}^{-1/2} \hat{A} \hat{D}^{-1/2})^K H^{l} \Theta^{l}
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    out_feats : int
+        Number of output features.
+    k : int
+        Number of hops :math:`K`. Defaults:``1``.
+    cached : bool
+        If True, the module would cache
+
+        .. math::
+            (\hat{D}^{-\frac{1}{2}}\hat{A}\hat{D}^{-\frac{1}{2}})^K X\Theta
+
+        at the first forward call. This parameter should only be set to
+        ``True`` in Transductive Learning setting.
+    bias : bool
+        If True, adds a learnable bias to the output. Default: ``True``.
+    norm : callable activation function/layer or None, optional
+        If not None, applies normalization to the updated node features.
+    """
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -71,4 +98,3 @@ class SGConv(nn.Block):
             if self._cached:
                 self._cached_h = feat
         return self.fc(feat)
-
