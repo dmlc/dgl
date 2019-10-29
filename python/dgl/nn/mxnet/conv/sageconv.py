@@ -2,6 +2,7 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
 import mxnet as mx
+from mxnet import nd
 from mxnet.gluon import nn
 
 from .... import function as fn
@@ -28,7 +29,7 @@ class SAGEConv(nn.Block):
     feat_drop : float
         Dropout rate on features, default: ``0``.
     aggregator_type : str
-        Aggregator type to use (``mean``).
+        Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -49,15 +50,20 @@ class SAGEConv(nn.Block):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._aggre_type = aggregator_type
-        if aggregator_type != 'mean':
-            raise KeyError('Aggregator type {} not supported.'.format(self._aggre_type))
         with self.name_scope():
             self.norm = norm
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
-            self.fc_self = nn.Dense(out_feats, use_bias=bias,
-                                    weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
-                                    in_units=in_feats)
+            if aggregator_type == 'pool':
+                self.fc_pool = nn.Dense(out_feats, use_bias=bias,
+                                        weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                        in_units=in_feats)
+            if aggregator_type == 'lstm':
+                raise NotImplementedError
+            if aggregator_type != 'gcn':
+                self.fc_self = nn.Dense(out_feats, use_bias=bias,
+                                        weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                                        in_units=in_feats)
             self.fc_neigh = nn.Dense(out_feats, use_bias=bias,
                                      weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                      in_units=in_feats)
@@ -82,10 +88,30 @@ class SAGEConv(nn.Block):
         graph = graph.local_var()
         feat = self.feat_drop(feat)
         h_self = feat
-        graph.ndata['h'] = feat
-        graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
-        h_neigh = graph.ndata['neigh']
-        rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
+        if self._aggre_type == 'mean':
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
+            h_neigh = graph.ndata['neigh']
+        elif self._aggre_type == 'gcn':
+            graph.ndata['h'] = feat
+            graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
+            # divide in degrees
+            degs = graph.in_degrees().astype(feat.dtype)
+            degs = degs.as_in_context(feat.context)
+            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']) / (degs.expand_dims(-1) + 1)
+        elif self._aggre_type == 'pool':
+            graph.ndata['h'] = nd.relu(self.fc_pool(feat))
+            graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
+            h_neigh = graph.ndata['neigh']
+        elif self._aggre_type == 'lstm':
+            raise NotImplementedError
+        else:
+            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
+
+        if self._aggre_type == 'gcn':
+            rst = self.fc_neigh(h_neigh)
+        else:
+            rst = self.fc_self(h_self) + self.fc_neigh(h_neigh)
         # activation
         if self.activation is not None:
             rst = self.activation(rst)

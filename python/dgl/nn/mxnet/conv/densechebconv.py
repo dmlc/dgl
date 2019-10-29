@@ -43,7 +43,7 @@ class DenseChebConv(nn.Block):
             for _ in range(k):
                 self.fc.add(
                     nn.Dense(out_feats, in_units=in_feats, use_bias=False,
-                             weight_initializer=mx.init.Xavier(math.sqrt(2.0)))
+                             weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
                 )
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
@@ -73,7 +73,7 @@ class DenseChebConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        A = adj.astype(float).as_in_context(feat.context)
+        A = adj.astype(feat.dtype).as_in_context(feat.context)
         num_nodes = A.shape[0]
 
         in_degree = 1. / nd.clip(A.sum(axis=1), 1, float('inf')).sqrt()
@@ -96,5 +96,5 @@ class DenseChebConv(nn.Block):
             Zh = Zh + nd.dot(Z[i], self.fc[i](feat))
 
         if self.bias is not None:
-            Zh = Zh + self.bias
+            Zh = Zh + self.bias.data(feat.context)
         return Zh

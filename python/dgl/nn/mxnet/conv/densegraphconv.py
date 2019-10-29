@@ -69,7 +69,7 @@ class DenseGraphConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.astype(float).as_in_context(feat.context)
+        adj = adj.astype(feat.dtype).as_in_context(feat.context)
         if self._norm:
             in_degrees = adj.sum(axis=1)
             norm = nd.power(in_degrees, -0.5)
@@ -79,18 +79,18 @@ class DenseGraphConv(nn.Block):
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = nd.dot(feat, self.weight)
+            feat = nd.dot(feat, self.weight.data(feat.context))
             rst = nd.dot(adj, feat)
         else:
             # aggregate first then mult W
             rst = nd.dot(adj, feat)
-            rst = nd.dot(rst, self.weight)
+            rst = nd.dot(rst, self.weight.data(feat.context))
 
         if self._norm:
             rst = rst * norm
 
         if self.bias is not None:
-            rst = rst + self.bias
+            rst = rst + self.bias.data(feat.context)
 
         if self._activation is not None:
             rst = self._activation(rst)

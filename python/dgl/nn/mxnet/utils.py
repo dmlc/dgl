@@ -104,4 +104,4 @@ def normalize(x, p=2, axis=1, eps=1e-12):
         eps (float): small value to avoid division by zero. Default: 1e-12
     """
     denom = nd.clip(nd.norm(x, ord=p, axis=axis, keepdims=True), eps, float('inf'))
-    return input / denom
+    return x / denom

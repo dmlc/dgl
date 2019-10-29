@@ -56,7 +56,7 @@ class APPNPConv(nn.Block):
         """
         graph = graph.local_var()
         norm = mx.nd.power(mx.nd.clip(
-            graph.in_degrees().float(), a_min=1, a_max=float("inf")), -0.5)
+            graph.in_degrees().astype(feat.dtype), a_min=1, a_max=float("inf")), -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = norm.reshape(shp).as_in_context(feat.context)
         feat_0 = feat

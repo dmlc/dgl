@@ -48,7 +48,7 @@ class DenseSAGEConv(nn.Block):
         with self.name_scope():
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
-            self.fc = nn.Dense(out_feats, in_units=in_feats, bias=bias,
+            self.fc = nn.Dense(out_feats, in_units=in_feats, use_bias=bias,
                                weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
 
     def forward(self, adj, feat):
@@ -70,7 +70,7 @@ class DenseSAGEConv(nn.Block):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.astype(float).as_in_context(feat.context)
+        adj = adj.astype(feat.dtype).as_in_context(feat.context)
         feat = self.feat_drop(feat)
         in_degrees = adj.sum(axis=1, keepdims=True)
         h_neigh = (nd.dot(adj, feat) + feat) / (in_degrees + 1)
