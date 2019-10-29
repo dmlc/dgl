@@ -46,9 +46,14 @@ def main(args):
         labels = torch.LongTensor(data.labels)
     else:
         labels = torch.FloatTensor(data.labels)
-    train_mask = torch.ByteTensor(data.train_mask).type(torch.bool)
-    val_mask = torch.ByteTensor(data.val_mask).type(torch.bool)
-    test_mask = torch.ByteTensor(data.test_mask).type(torch.bool)
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = torch.BoolTensor(data.train_mask)
+        val_mask = torch.BoolTensor(data.val_mask)
+        test_mask = torch.BoolTensor(data.test_mask)
+    else:
+        train_mask = torch.ByteTensor(data.train_mask)
+        val_mask = torch.ByteTensor(data.val_mask)
+        test_mask = torch.ByteTensor(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
