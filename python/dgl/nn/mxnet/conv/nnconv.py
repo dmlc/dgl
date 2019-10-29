@@ -107,4 +107,3 @@ class NNConv(nn.Block):
         if self.bias is not None:
             rst = rst + self.bias
         return rst
-
