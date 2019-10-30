@@ -4,6 +4,7 @@ import time
 import random
 
 import numpy as np
+import networkx as nx
 import sklearn.preprocessing
 import torch
 import torch.nn as nn
@@ -73,7 +74,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
         print("adding self-loop edges")
     g = DGLGraph(g, readonly=True)

@@ -8,6 +8,7 @@ import argparse
 import time
 import abc
 import numpy as np
+import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -91,7 +92,7 @@ def main(args):
 
     # graph preprocess and calculate normalization factor
     g = data.graph
-    g.remove_edges_from(g.selfloop_edges())
+    g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
 

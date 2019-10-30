@@ -1,6 +1,7 @@
 """Training GCN model on citation graphs."""
 import argparse, time
 import numpy as np
+import networkx as nx
 import mxnet as mx
 from mxnet import gluon
 
@@ -54,7 +55,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop:
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     # normalization

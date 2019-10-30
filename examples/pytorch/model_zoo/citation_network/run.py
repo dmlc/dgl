@@ -7,6 +7,7 @@ from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from models import *
 from conf import *
+import networkx as nx
 
 
 def get_model_and_config(name):
@@ -77,7 +78,7 @@ def main(args):
     g = data.graph
     # add self loop
     if args.self_loop:
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
