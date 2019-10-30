@@ -22,6 +22,60 @@ namespace {
 /*!
  * \brief Random walk based on the given metapath.
  *
+ * Raises an error if the trace could not completely traverse the given metapath.
+ *
+ * \param hg The heterograph
+ * \param etypes The metapath as an array of edge type IDs
+ * \param seeds The array of starting vertices for random walks
+ * \param num_traces Number of traces to generate for each starting vertex
+ * \note The metapath should have the same starting and ending node type
+ * \return A 3D tensor traces[seed_id][trace_id][step]
+ */
+IdArray MetapathRandomWalkAligned(
+    const HeteroGraphPtr hg,
+    const IdArray etypes,
+    const IdArray seeds,
+    int num_traces) {
+  const auto metagraph = hg->meta_graph();
+  uint64_t num_etypes = etypes->shape[0];
+  uint64_t num_seeds = seeds->shape[0];
+  const dgl_type_t *etype_data = static_cast<dgl_type_t *>(etypes->data);
+  const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
+
+  IdArray traces = IdArray::Empty(
+      {num_seeds, num_traces, num_etypes},
+      DLDataType{kDLInt, hg->NumBits(), 1},
+      hg->Context());
+  dgl_id_t *traces_data = static_cast<dgl_id_t *>(traces->data);
+
+#pragma omp parallel for
+  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
+    int curr_num_traces = 0;
+    size_t pos = seed_id * num_traces * num_etypes;
+    for (; curr_num_traces < num_traces; ++curr_num_traces) {
+      dgl_id_t curr = seed_data[seed_id];
+
+      for (size_t i = 0; i < num_etypes; ++i) {
+        const auto &succ = hg->SuccVec(etype_data[i], curr);
+        if (succ.size() == 0) {
+          LOG(FATAL) << "no successors of edge type " << etype_data[i] << " for vertex " << curr;
+          break;
+        }
+        curr = succ[RandomEngine::ThreadLocal()->RandInt(succ.size())];
+        traces_data[pos++] = curr;
+      }
+    }
+  }
+
+  return traces;
+}
+
+/*!
+ * \brief Random walk based on the given metapath.
+ *
+ * Continues even if the trace could not completely traverse the given metapath.
+ * This method would be slower than MetapathRandomWalkAligned()
+ *
  * \param hg The heterograph
  * \param etypes The metapath as an array of edge type IDs
  * \param seeds The array of starting vertices for random walks
@@ -97,6 +151,17 @@ RandomWalkTracesPtr MetapathRandomWalk(
 }
 
 };  // namespace
+
+DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLMetapathRandomWalkAligned")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    const HeteroGraphRef hg = args[0];
+    const IdArray etypes = args[1];
+    const IdArray seeds = args[2];
+    int num_traces = args[3];
+
+    const IdArray traces = MetapathRandomWalkAligned(hg.sptr(), etypes, seeds, num_traces);
+    *rv = traces;
+  });
 
 DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLMetapathRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {

@@ -170,15 +170,15 @@ def bipartite_single_sided_random_walk_with_restart(
     return _split_traces(traces)
 
 
-def metapath_random_walk(hg, etypes, seeds, num_traces):
+def metapath_random_walk(hg, etypes, seeds, num_traces, aligned=False):
     """Generate random walk traces from an array of seed nodes (or starting nodes),
     based on the given metapath.
 
     For a single seed node, ``num_traces`` traces would be generated.  A trace would
 
     1. Start from the given seed and set ``t`` to 0.
-    2. Pick and traverse along edge type ``etypes[t % len(etypes)]`` from the current node.
-    3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
+    2. Pick and traverse along edge type ``etypes[t]`` from the current node.
+    3. If no edge can be found, halt or raise error.  Otherwise, increment ``t`` and go to step 2.
 
     Parameters
     ----------
@@ -191,13 +191,15 @@ def metapath_random_walk(hg, etypes, seeds, num_traces):
         The seed nodes.  Node type is the same as the beginning node type of metapath.
     num_traces : int
         The number of traces
+    aligned : bool, default False
+        Whether encountering a node without successor would raise an error.
 
     Returns
     -------
-    traces : list[list[Tensor]]
+    traces : list[list[Tensor]] if aligned is False, or a 3D Tensor
         traces[i][j] is the j-th trace generated for i-th seed.
         traces[i][j][k] would have node type the same as the destination node type of edge
-        type ``etypes[k % len(etypes)]``
+        type ``etypes[k]``
 
     Notes
     -----
@@ -211,7 +213,12 @@ def metapath_random_walk(hg, etypes, seeds, num_traces):
         return []
     etype_array = ndarray.array(np.array([hg.get_etype_id(et) for et in etypes], dtype='int64'))
     seed_array = utils.toindex(seeds).todgltensor()
-    traces = _CAPI_DGLMetapathRandomWalk(hg._graph, etype_array, seed_array, num_traces)
-    return _split_traces(traces)
+    if not aligned:
+        traces = _CAPI_DGLMetapathRandomWalk(hg._graph, etype_array, seed_array, num_traces)
+        return _split_traces(traces)
+    else:
+        traces = _CAPI_DGLMetapathRandomWalkAligned(
+            hg._graph, etype_array, seed_array, num_traces)
+        return F.zerocopy_from_dgl_ndarray(traces)
 
 _init_api('dgl.sampler.randomwalk', __name__)
