@@ -4,6 +4,7 @@ import time
 import random
 
 import numpy as np
+import networkx as nx
 import sklearn.preprocessing
 import torch
 import torch.nn as nn
@@ -46,9 +47,14 @@ def main(args):
         labels = torch.LongTensor(data.labels)
     else:
         labels = torch.FloatTensor(data.labels)
-    train_mask = torch.ByteTensor(data.train_mask).type(torch.bool)
-    val_mask = torch.ByteTensor(data.val_mask).type(torch.bool)
-    test_mask = torch.ByteTensor(data.test_mask).type(torch.bool)
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = torch.BoolTensor(data.train_mask)
+        val_mask = torch.BoolTensor(data.val_mask)
+        test_mask = torch.BoolTensor(data.test_mask)
+    else:
+        train_mask = torch.ByteTensor(data.train_mask)
+        val_mask = torch.ByteTensor(data.val_mask)
+        test_mask = torch.ByteTensor(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -70,7 +76,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
         print("adding self-loop edges")
     g = DGLGraph(g, readonly=True)
