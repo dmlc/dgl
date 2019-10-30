@@ -1,5 +1,6 @@
 import argparse, time
 import numpy as np
+import networkx as nx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -49,7 +50,7 @@ def main(args):
     g = data.graph
     # add self loop
     if args.self_loop:
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()

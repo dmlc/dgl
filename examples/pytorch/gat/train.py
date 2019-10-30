@@ -12,6 +12,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 
 import argparse
 import numpy as np
+import networkx as nx
 import time
 import torch
 import torch.nn.functional as F
@@ -76,7 +77,7 @@ def main(args):
 
     g = data.graph
     # add self loop
-    g.remove_edges_from(g.selfloop_edges())
+    g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
     n_edges = g.number_of_edges()
