@@ -37,8 +37,8 @@ IdArray MetapathRandomWalkAligned(
     const IdArray seeds,
     int num_traces) {
   const auto metagraph = hg->meta_graph();
-  uint64_t num_etypes = etypes->shape[0];
-  uint64_t num_seeds = seeds->shape[0];
+  int64_t num_etypes = etypes->shape[0];
+  int64_t num_seeds = seeds->shape[0];
   const dgl_type_t *etype_data = static_cast<dgl_type_t *>(etypes->data);
   const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
 
@@ -51,11 +51,11 @@ IdArray MetapathRandomWalkAligned(
 #pragma omp parallel for
   for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
     int curr_num_traces = 0;
-    size_t pos = seed_id * num_traces * num_etypes;
+    int64_t pos = seed_id * num_traces * num_etypes;
     for (; curr_num_traces < num_traces; ++curr_num_traces) {
       dgl_id_t curr = seed_data[seed_id];
 
-      for (size_t i = 0; i < num_etypes; ++i) {
+      for (int64_t i = 0; i < num_etypes; ++i) {
         const auto &succ = hg->SuccVec(etype_data[i], curr);
         if (succ.size() == 0) {
           LOG(FATAL) << "no successors of edge type " << etype_data[i] << " for vertex " << curr;
