@@ -60,16 +60,16 @@ class GMMConv(nn.Block):
             raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
 
         with self.name_scope():
-            self.params.get('mu',
-                            shape=(n_kernels, dim),
-                            init=mx.init.Normal(0.1))
-            self.params.get('inv_sigma',
-                            shape=(n_kernels, dim),
-                            init=mx.init.Constant(1))
+            self.mu = self.params.get('mu',
+                                      shape=(n_kernels, dim),
+                                      init=mx.init.Normal(0.1))
+            self.inv_sigma = self.params.get('inv_sigma',
+                                             shape=(n_kernels, dim),
+                                             init=mx.init.Constant(1))
             self.fc = nn.Dense(n_kernels * out_feats,
                                in_units=in_feats,
                                use_bias=False,
-                               weight_initializer=mx.init.Xavier(math.sqrt(2.0)))
+                               weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
             if residual:
                 if in_feats != out_feats:
                     self.res_fc = nn.Dense(out_feats, in_units=in_feats, use_bias=False)
@@ -79,9 +79,9 @@ class GMMConv(nn.Block):
                 self.res_fc = None
 
             if bias:
-                self.params.get('bias',
-                                shape=(out_feats,),
-                                init=mx.init.Zero())
+                self.bias = self.params.get('bias',
+                                            shape=(out_feats,),
+                                            init=mx.init.Zero())
             else:
                 self.bias = None
 
@@ -112,8 +112,9 @@ class GMMConv(nn.Block):
         E = graph.number_of_edges()
         # compute gaussian weight
         gaussian = -0.5 * ((pseudo.reshape(E, 1, self._dim) -
-                            self.mu.reshape(1, self._n_kernels, self._dim)) ** 2)
-        gaussian = gaussian * (self.inv_sigma.reshape(1, self._n_kernels, self._dim) ** 2)
+                            self.mu.data(feat.context).reshape(1, self._n_kernels, self._dim)) ** 2)
+        gaussian = gaussian * (
+                self.inv_sigma.data(feat.context).reshape(1, self._n_kernels, self._dim) ** 2)
         gaussian = nd.exp(gaussian.sum(axis=-1, keepdims=True)) # (E, K, 1)
         graph.edata['w'] = gaussian
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
@@ -123,5 +124,5 @@ class GMMConv(nn.Block):
             rst = rst + self.res_fc(feat)
         # bias
         if self.bias is not None:
-            rst = rst + self.bias
+            rst = rst + self.bias.data(feat.context)
         return rst

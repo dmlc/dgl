@@ -65,9 +65,9 @@ class NNConv(nn.Block):
                 self.res_fc = None
 
             if bias:
-                self.params.get('bias',
-                                shape=(out_feats,),
-                                init=mx.init.Zero())
+                self.bias = self.params.get('bias',
+                                            shape=(out_feats,),
+                                            init=mx.init.Zero())
             else:
                 self.bias = None
 
@@ -99,11 +99,11 @@ class NNConv(nn.Block):
         graph.edata['w'] = self.edge_nn(efeat).reshape(-1, self._in_feats, self._out_feats)
         # (n, d_in, d_out)
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
-        rst = graph.ndata.pop('neigh').sum(dim=1) # (n, d_out)
+        rst = graph.ndata.pop('neigh').sum(axis=1) # (n, d_out)
         # residual connection
         if self.res_fc is not None:
             rst = rst + self.res_fc(feat)
         # bias
         if self.bias is not None:
-            rst = rst + self.bias
+            rst = rst + self.bias.data(feat.context)
         return rst

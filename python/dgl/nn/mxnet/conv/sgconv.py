@@ -79,7 +79,7 @@ class SGConv(nn.Block):
             feat = self._cached_h
         else:
             # compute normalization
-            degs = nd.clip(graph.in_degrees().float(), 1, float('inf'))
+            degs = nd.clip(graph.in_degrees().astype(feat.dtype), 1, float('inf'))
             norm = nd.power(degs, -0.5).expand_dims(1)
             norm = norm.as_in_context(feat.context)
             # compute (D^-1 A D)^k X

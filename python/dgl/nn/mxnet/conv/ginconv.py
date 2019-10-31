@@ -44,10 +44,10 @@ class GINConv(nn.Block):
 
         with self.name_scope():
             self.apply_func = apply_func
-            self.params.get('eps',
-                            shape=(1,),
-                            grad_req='write' if learn_eps else 'null',
-                            init=mx.init.Constant(init_eps))
+            self.eps = self.params.get('eps',
+                                       shape=(1,),
+                                       grad_req='write' if learn_eps else 'null',
+                                       init=mx.init.Constant(init_eps))
 
     def forward(self, graph, feat):
         r"""Compute Graph Isomorphism Network layer.

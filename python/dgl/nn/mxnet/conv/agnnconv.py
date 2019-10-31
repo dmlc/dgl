@@ -33,9 +33,9 @@ class AGNNConv(nn.Block):
         super(AGNNConv, self).__init__()
         with self.name_scope():
             self.beta = self.params.get('beta',
-                            shape=(1,),
-                            grad_req='write' if learn_beta else 'null',
-                            init=mx.init.Constant(init_beta))
+                                        shape=(1,),
+                                        grad_req='write' if learn_beta else 'null',
+                                        init=mx.init.Constant(init_beta))
 
     def forward(self, graph, feat):
         r"""Compute AGNN Layer.

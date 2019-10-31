@@ -148,7 +148,7 @@ def test_gg_conv():
 
     # test#1: basic
     h0 = F.randn((20, 10))
-    etypes = nd.random.randint(0, 4, g.number_of_edges())
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
     h1 = gg_conv(g, h0, etypes)
     assert h1.shape == (20, 20)
 
@@ -250,19 +250,71 @@ def test_dense_sage_conv():
     assert F.allclose(out_sage, out_dense_sage)
 
 def test_edge_conv():
-    pass
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    edge_conv = nn.EdgeConv(5, 2)
+    edge_conv.initialize(ctx=ctx)
+    print(edge_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = edge_conv(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_gin_conv():
-    pass
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gin_conv = nn.GINConv(lambda x: x, 'mean', 0.1)
+    gin_conv.initialize(ctx=ctx)
+    print(gin_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = gin_conv(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 5)
 
 def test_gmm_conv():
-    pass
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gmm_conv = nn.GMMConv(5, 2, 5, 3, 'max')
+    gmm_conv.initialize(ctx=ctx)
+    print(gmm_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    pseudo = F.randn((g.number_of_edges(), 5))
+    h1 = gmm_conv(g, h0, pseudo)
+    assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_nn_conv():
-    pass
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    nn_conv = nn.NNConv(5, 2, gluon.nn.Embedding(3, 5 * 2), 'max')
+    nn_conv.initialize(ctx=ctx)
+    print(nn_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    h1 = nn_conv(g, h0, etypes)
+    assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_sg_conv():
-    pass
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    sgc = nn.SGConv(5, 2, 2)
+    sgc.initialize(ctx=ctx)
+    print(sgc)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = sgc(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 2)
 
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))

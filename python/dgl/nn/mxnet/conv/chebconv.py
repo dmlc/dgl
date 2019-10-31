@@ -45,7 +45,6 @@ class ChebConv(nn.Block):
         self._out_feats = out_feats
         self._k = k
         with self.name_scope():
-            # NOTE(zihao): MXNet do not support ModuleList, use Sequential as workaround.
             self.fc = nn.Sequential()
             for _ in range(k):
                 self.fc.add(

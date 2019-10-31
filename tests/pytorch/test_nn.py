@@ -493,6 +493,7 @@ def test_gated_graph_conv():
 
     if F.gpu_ctx():
         ggconv = ggconv.to(ctx)
+        etypes = etypes.to(ctx)
 
     h = ggconv(g, feat, etypes)
     # current we only do shape check
