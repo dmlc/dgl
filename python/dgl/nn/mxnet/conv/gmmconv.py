@@ -113,8 +113,8 @@ class GMMConv(nn.Block):
         # compute gaussian weight
         gaussian = -0.5 * ((pseudo.reshape(E, 1, self._dim) -
                             self.mu.data(feat.context).reshape(1, self._n_kernels, self._dim)) ** 2)
-        gaussian = gaussian * (
-                self.inv_sigma.data(feat.context).reshape(1, self._n_kernels, self._dim) ** 2)
+        gaussian = gaussian *\
+                   (self.inv_sigma.data(feat.context).reshape(1, self._n_kernels, self._dim) ** 2)
         gaussian = nd.exp(gaussian.sum(axis=-1, keepdims=True)) # (E, K, 1)
         graph.edata['w'] = gaussian
         graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
