@@ -213,7 +213,6 @@ class RotatEScore(nn.Module):
         
         phase_rel = edges.data['emb']/(self.emb_init/pi)
         re_rel, im_rel = th.cos(phase_rel), th.sin(phase_rel)
-        print("edge_func",th.cos(phase_rel)**2+ th.sin(phase_rel)**2)
         re_score = re_head * re_rel - im_head * im_rel     
         im_score = re_head * im_rel + im_head * re_rel
         re_score = re_score - re_tail
