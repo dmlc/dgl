@@ -18,6 +18,8 @@ def generate_rand_graph(n, func_name):
     g = dgl.DGLGraph(arr, readonly=True)
     num_rels = 10
     entity_emb = F.uniform((g.number_of_nodes(), 10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RotatE':
+        entity_emb = F.uniform((g.number_of_nodes(), 20), F.float32, F.cpu(), 0, 1)
     rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
     if func_name == 'RESCAL':
         rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
