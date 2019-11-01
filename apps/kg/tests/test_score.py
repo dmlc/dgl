@@ -29,7 +29,8 @@ def generate_rand_graph(n, func_name):
 ke_score_funcs = {'TransE': TransEScore(12.0),
                   'DistMult': DistMultScore(),
                   'ComplEx': ComplExScore(),
-                  'RESCAL': RESCALScore(10, 10)}
+                  'RESCAL': RESCALScore(10, 10),
+                 'RotatE': RotatEScore(12.0, 0.028)} #(12+2)/500=0.025
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
