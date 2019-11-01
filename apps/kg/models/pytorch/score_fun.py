@@ -219,7 +219,6 @@ class RotatEScore(nn.Module):
         im_score = im_score - im_tail
         score = th.stack([re_score, im_score], dim = 0)
         score = score.norm(dim = 0, p = 1)
-        #print(score)
         return {'score': self.gamma - score.sum(-1)}
 
     def reset_parameters(self):
