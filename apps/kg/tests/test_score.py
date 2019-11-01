@@ -69,6 +69,8 @@ class BaseKEModel:
         self.tail_neg_prepare = self.score_func.create_neg_prepare(False)
         self.entity_emb = entity_emb
         self.rel_emb = rel_emb
+        # init score_func specific data if needed
+        self.score_func.reset_parameters()
 
     def predict_score(self, g):
         g.ndata['emb'] = self.entity_emb[g.ndata['id']]
