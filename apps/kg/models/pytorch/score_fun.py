@@ -212,17 +212,16 @@ class RotatEScore(nn.Module):
         re_tail, im_tail = th.chunk(edges.dst['emb'], 2, dim=-1)
         
         phase_rel = edges.data['emb']/(self.emb_init/pi)
-        re_rel, im_rel = th.cos(phase_rel),th.sin(phase_rel)
-        
+        re_rel, im_rel = th.cos(phase_rel), th.sin(phase_rel)
+        print("edge_func",th.cos(phase_rel)**2+ th.sin(phase_rel)**2)
         re_score = re_head * re_rel - im_head * im_rel     
         im_score = re_head * im_rel + im_head * re_rel
         re_score = re_score - re_tail
         im_score = im_score - im_tail
-        
         score = th.stack([re_score, im_score], dim = 0)
         score = score.norm(dim = 0, p = 1)
-        
-        return {'score': self.gamma - th.sum(score, -1)}
+        #print(score)
+        return {'score': self.gamma - score.sum(-1)}
 
     def reset_parameters(self):
         pass
@@ -239,18 +238,17 @@ class RotatEScore(nn.Module):
     def create_neg(self, neg_head):
         pi = 3.14159265358979323846
         gamma = self.gamma
+        emb_init = self.emb_init
         if neg_head:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
                 hidden_dim = heads.shape[1]
                 emb_real = tails[..., :hidden_dim // 2]
                 emb_imag = tails[..., hidden_dim // 2:]
                 
-                phase_rel = relations/(self.emb_init/pi)
-                rel_real, rel_imag = th.cos(phase_rel),-th.sin(phase_rel)
-                
-                real = emb_real * rel_real - emb_imag * rel_imag
-                imag = emb_real * rel_imag + emb_imag * rel_real
-                
+                phase_rel = relations/(emb_init/pi)
+                rel_real, rel_imag = th.cos(phase_rel),th.sin(phase_rel)
+                real = emb_real * rel_real + emb_imag * rel_imag
+                imag = -emb_real * rel_imag + emb_imag * rel_real
                 emb_complex = th.cat((real, imag), dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
@@ -262,9 +260,8 @@ class RotatEScore(nn.Module):
                 emb_real = heads[..., :hidden_dim // 2]
                 emb_imag = heads[..., hidden_dim // 2:]
                 
-                phase_rel = relations/(self.emb_init/pi)
+                phase_rel = relations/(emb_init/pi)
                 rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
-                
                 real = emb_real * rel_real - emb_imag * rel_imag
                 imag = emb_real * rel_imag + emb_imag * rel_real
                 
