@@ -44,7 +44,7 @@ class KEModel(object):
             rel_dim = relation_dim * entity_dim
         else:
             rel_dim = relation_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
 
         if model_name == 'TransE':
             self.score_func = TransEScore(gamma)
@@ -52,9 +52,9 @@ class KEModel(object):
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
+            
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
-
         self.reset_parameters()
 
     def share_memory(self):
@@ -122,14 +122,14 @@ class KEModel(object):
 
         # We need to filter the positive edges in the negative graph.
         filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
-        if self.args.gpu >= 0:
-            filter_bias = cuda(filter_bias, self.args.gpu)
+        if gpu_id != -1:
+            filter_bias = cuda(filter_bias, gpu_id)
         neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
         # the positive edge.
-        rankings = F.sum(neg_scores > pos_scores, dim=1) + 1
-        rankings = F.asnumpy(rankings)
+        rankings = F.sum(neg_scores > pos_scores, dim=1)
+        rankings = F.asnumpy(rankings) + 1
         for i in range(batch_size):
             ranking = rankings[i]
             logs.append({
@@ -147,11 +147,9 @@ class KEModel(object):
 
         pos_score = self.predict_score(pos_g)
         pos_score = logsigmoid(pos_score)
-        if gpu_id >= 0:
-            neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
-                                               gpu_id=gpu_id, trace=True)
-        else:
-            neg_score = self.predict_neg_score(pos_g, neg_g, trace=True)
+
+        neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda, 
+                    gpu_id=gpu_id, trace=True)
 
         neg_score = reshape(neg_score, -1, neg_g.neg_sample_size)
         # Adversarial sampling
@@ -188,6 +186,6 @@ class KEModel(object):
 
         return loss, log
 
-    def update(self):
-        self.entity_emb.update()
-        self.relation_emb.update()
+    def update(self, gpu_id=-1):
+        self.entity_emb.update(gpu_id)
+        self.relation_emb.update(gpu_id)

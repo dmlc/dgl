@@ -117,6 +117,18 @@ class TrainDataset(object):
                            exclude_positive=exclude_positive,
                            return_false_neg=False)
 
+def create_train_sampler(graph, batch_size, neg_sample_size=2, mode='head', num_workers=5,
+                       shuffle=True, exclude_positive=False):
+    EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+    return EdgeSampler(graph,
+                       batch_size=batch_size,
+                       neg_sample_size=neg_sample_size,
+                       negative_mode=mode,
+                       num_workers=num_workers,
+                       shuffle=shuffle,
+                       exclude_positive=exclude_positive,
+                       return_false_neg=False)
+
 class PBGNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     def __init__(self, subg, num_chunks, chunk_size,
                  neg_sample_size, neg_head):
@@ -172,7 +184,7 @@ class EvalSampler(object):
                                    num_workers=num_workers,
                                    shuffle=False,
                                    exclude_positive=False,
-                                   relations=g.edata['id'],
+                                   relations=g.edges[:].data['id'],
                                    return_false_neg=True)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
@@ -211,6 +223,7 @@ class EvalDataset(object):
         else:
             src = [t[0] for t in triples]
             etype_id = [t[1] for t in triples]
+            self.etype_id = etype_id
             dst = [t[2] for t in triples]
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[dataset.n_entities, dataset.n_entities])
             g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
@@ -280,6 +293,14 @@ class EvalDataset(object):
         edges = edges[beg: end]
         print("eval on {} edges".format(len(edges)))
         return EvalSampler(self.g, edges, batch_size, neg_sample_size, mode, num_workers)
+
+def create_test_sampler(graph, edges, batch_size, neg_sample_size, mode='head',
+                       num_workers=5, rank=0, ranks=1):
+        beg = edges.shape[0] * rank // ranks
+        end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
+        edges = edges[beg: end]
+        print("eval on {} edges".format(len(edges)))
+        return EvalSampler(graph, edges, batch_size, neg_sample_size, mode, num_workers)
 
 class NewBidirectionalOneShotIterator:
     def __init__(self, dataloader_head, dataloader_tail, is_pbg, num_nodes):

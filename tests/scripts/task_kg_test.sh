@@ -56,6 +56,14 @@ elif [ "$2" == "gpu" ]; then
         --batch_size_eval 16 --gpu 0 --valid --test -adv --eval_interval 30 --eval_percent 0.01 \
         --data_path /data/kg || fail "run DistMult on $2"
 
+    # verify multi-GPU training DistMult
+    if [ $DGLBACKEND == "pytorch" ]; then
+        python3 train.py --model DistMult --dataset FB15k --batch_size 128 \
+            --neg_sample_size 16 --hidden_dim 100 --gamma 500.0 --lr 0.1 --max_step 100 \
+            --batch_size_eval 16 --gpu 0 0 --num_proc 2 --mix_cpu_gpu --valid --test -adv \
+            --eval_interval 30 --eval_percent 0.01 --data_path /data/kg || fail "run DistMult on $2"
+    fi
+
     # verify mixed CPU GPU training
     python3 train.py --model DistMult --dataset FB15k --batch_size 128 \
         --neg_sample_size 16 --hidden_dim 100 --gamma 500.0 --lr 0.1 --max_step 100 \
