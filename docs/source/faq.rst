@@ -1,12 +1,12 @@
 FAQ
 ===
 
-Trouble Shooting
+Troubleshooting
 ----------------
 
-DGL is still in its alpha stage, so expect some trial and error. Keep in mind that
-DGL is a framework atop other frameworks (e.g. Pytorch, MXNet), so it is important
-to figure out whether the bug is due to DGL or the backend framework. For example,
+Deep Graph Library (DGL) is still in its alpha stage, so expect some trial and error. Keep in mind that
+DGL is a framework atop other frameworks, e.g., PyTorch, MXNet, so it is important
+to figure out whether a bug is due to DGL or the backend framework. For example,
 DGL will usually complain and throw a ``DGLError`` if anything goes wrong. If you
 are pretty confident that it is a bug, feel free to raise an issue.
 
@@ -14,7 +14,7 @@ are pretty confident that it is a bug, feel free to raise an issue.
 Out-of-memory
 -------------
 
-Graph can be very large and training on graph may cause OOM. There are several
+Graph can be very large and training on graph may cause out of memory (OOM) errors. There are several
 tips to check when you get an OOM error.
 
 * Try to avoid propagating node features to edges. Number of edges are usually
