@@ -219,8 +219,8 @@ class RotatEScore(nn.Module):
         re_score = re_score - re_tail
         im_score = im_score - im_tail
         
-        score = th.stack([re_score, im_score], dim = 0, p = 1)
-        score = score.norm(dim = 0)
+        score = th.stack([re_score, im_score], dim = 0)
+        score = score.norm(dim = 0, p = 1)
         
         return {'score': self.gamma - th.sum(score, -1)}
 
