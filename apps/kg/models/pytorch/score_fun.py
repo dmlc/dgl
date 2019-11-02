@@ -367,7 +367,15 @@ class RotatEScore(nn.Module):
 
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
-
+        
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
+    
+    def prepare(self, g, gpu_id, trace=False):
+        pass
+    
     def create_neg(self, neg_head):
         pi = 3.14159265358979323846
         gamma = self.gamma
