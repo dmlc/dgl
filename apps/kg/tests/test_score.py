@@ -23,6 +23,8 @@ def generate_rand_graph(n, func_name):
     rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
     if func_name == 'RESCAL':
         rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RotatE':
+        rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
@@ -32,8 +34,8 @@ ke_score_funcs = {'TransE': TransEScore(12.0),
                   'DistMult': DistMultScore(),
                   'ComplEx': ComplExScore(),
                   'RESCAL': RESCALScore(10, 10),
-                  'RotatE': RotatEScore(12.0, 0.028)} #(12+2)/500=0.025
-
+                  'RotatE': RotatEScore(12.0, 1.0)
+}
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
         self.score_func = score_func

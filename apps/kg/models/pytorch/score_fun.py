@@ -200,25 +200,26 @@ class RESCALScore(nn.Module):
                 return th.bmm(tmp, tails)
             return fn
 
+
 class RotatEScore(nn.Module):
     def __init__(self, gamma, emb_init):
         super(RotatEScore, self).__init__()
         self.gamma = gamma
         self.emb_init = emb_init
-        
+
     def edge_func(self, edges):
         pi = 3.14159265358979323846
         re_head, im_head = th.chunk(edges.src['emb'], 2, dim=-1)
         re_tail, im_tail = th.chunk(edges.dst['emb'], 2, dim=-1)
-        
-        phase_rel = edges.data['emb']/(self.emb_init/pi)
+
+        phase_rel = edges.data['emb'] / (self.emb_init / pi)
         re_rel, im_rel = th.cos(phase_rel), th.sin(phase_rel)
-        re_score = re_head * re_rel - im_head * im_rel     
+        re_score = re_head * re_rel - im_head * im_rel
         im_score = re_head * im_rel + im_head * re_rel
         re_score = re_score - re_tail
         im_score = im_score - im_tail
-        score = th.stack([re_score, im_score], dim = 0)
-        score = score.norm(dim = 0, p = 1)
+        score = th.stack([re_score, im_score], dim=0)
+        score = score.norm(dim=0)
         return {'score': self.gamma - score.sum(-1)}
 
     def reset_parameters(self):
@@ -242,29 +243,46 @@ class RotatEScore(nn.Module):
                 hidden_dim = heads.shape[1]
                 emb_real = tails[..., :hidden_dim // 2]
                 emb_imag = tails[..., hidden_dim // 2:]
-                
-                phase_rel = relations/(emb_init/pi)
-                rel_real, rel_imag = th.cos(phase_rel),th.sin(phase_rel)
+
+                phase_rel = relations / (emb_init / pi)
+                rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
                 real = emb_real * rel_real + emb_imag * rel_imag
                 imag = -emb_real * rel_imag + emb_imag * rel_real
                 emb_complex = th.cat((real, imag), dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                return gamma - th.cdist(tmp, heads, p=1)
+                s1 = tmp.unsqueeze(dim=2).expand(num_chunks, chunk_size,
+                                                 neg_sample_size, hidden_dim)
+                s2 = heads.unsqueeze(dim=1).expand(num_chunks, chunk_size,
+                                                   neg_sample_size, hidden_dim)
+                s = s1 - s2
+                score = th.stack([s[..., :hidden_dim // 2],
+                                  s[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+                return gamma - score.sum(-1)
+
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
                 hidden_dim = heads.shape[1]
                 emb_real = heads[..., :hidden_dim // 2]
                 emb_imag = heads[..., hidden_dim // 2:]
-                
-                phase_rel = relations/(emb_init/pi)
+
+                phase_rel = relations / (emb_init / pi)
                 rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
                 real = emb_real * rel_real - emb_imag * rel_imag
                 imag = emb_real * rel_imag + emb_imag * rel_real
-                
+
                 emb_complex = th.cat((real, imag), dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                return  gamma - th.cdist(tmp, tails, p=1)
+                s1 = tmp.unsqueeze(dim=2).expand(num_chunks, chunk_size,
+                                                 neg_sample_size, hidden_dim)
+                s2 = tails.unsqueeze(dim=1).expand(num_chunks, chunk_size,
+                                                   neg_sample_size, hidden_dim)
+                s = s1 - s2
+                score = th.stack([s[..., :hidden_dim // 2],
+                                  s[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+
+                return gamma - score.sum(-1)
+
             return fn
