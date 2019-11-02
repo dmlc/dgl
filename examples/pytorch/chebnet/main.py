@@ -15,6 +15,13 @@ from dgl.nn.pytorch.glob import MaxPooling
 from grid_graph import *
 from coarsening import *
 
+argparser = argparse.ArgumentParser("ChebNet on MNIST")
+argparser.add_argument("--gpu", type=int, default=-1,
+                       help="gpu id, use cpu if set to -1")
+argparser.add_argument("--batch-size", type=int, default=100,
+                       help="batch size")
+args = parser.parse_args()
+
 grid_side = 28
 number_edges = 8
 metric = 'euclidean'
@@ -46,12 +53,12 @@ trainset = datasets.MNIST(root='.', train=True, download=True, transform=transfo
 testset = datasets.MNIST(root='.', train=False, download=True, transform=transforms.ToTensor())
 
 train_loader = DataLoader(trainset,
-                          batch_size=100,
+                          batch_size=args.batch_size,
                           shuffle=True,
                           collate_fn=batcher,
                           num_workers=6)
 test_loader = DataLoader(testset,
-                         batch_size=100,
+                         batch_size=args.batch_size,
                          shuffle=False,
                          collate_fn=batcher,
                          num_workers=6)
@@ -86,7 +93,10 @@ class ChebNet(nn.Module):
                 .squeeze(0).transpose(-1, -2)
         return self.cls(self.readout(g_arr[-1], feat))
 
-device = torch.device('cpu')
+if args.gpu == -1:
+    device = torch.device('cpu')
+else:
+    device = torch.device(args.gpu)
 
 model = ChebNet(2, 1, [32, 64, 128, 256], 10)
 model = model.to(device)
