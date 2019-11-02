@@ -54,6 +54,8 @@ def generate_rand_graph(n, func_name):
         return g, entity_emb, rel_emb, (12.0)
     elif (func_name == 'RESCAL'):
         return g, entity_emb, rel_emb, (10, 10)
+    elif (func_name == 'RotatE'):
+        return g, entity_emb, rel_emb, (12.0, 1.0)
     else:
         return g, entity_emb, rel_emb, None
 
@@ -70,7 +72,7 @@ else:
                       'ComplEx': ComplExScore,
                       'RESCAL': RESCALScore,
                       'TransR': TransRScore,
-                      'RotatE': RotatEScore(12.0, 1.0)}
+                      'RotatE': RotatEScore}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -171,6 +173,7 @@ def test_score_func_transr():
     check_score_func('TransR')
 
 def test_score_func_rotate():
+    #TODO change this if we have mxnet version of RotatE
     if backend.lower() != 'mxnet':
         check_score_func('RotatE')
         
