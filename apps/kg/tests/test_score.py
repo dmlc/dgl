@@ -57,12 +57,20 @@ def generate_rand_graph(n, func_name):
     else:
         return g, entity_emb, rel_emb, None
 
-ke_score_funcs = {'TransE': TransEScore,
-                  'DistMult': DistMultScore,
-                  'ComplEx': ComplExScore,
-                  'RESCAL': RESCALScore,
-                  'TransR': TransRScore,
-                  'RotatE': RotatEScore(12.0, 1.0)}
+if backend.lower() == 'mxnet':
+    ke_score_funcs = {'TransE': TransEScore,
+                      'DistMult': DistMultScore,
+                      'ComplEx': ComplExScore,
+                      'RESCAL': RESCALScore,
+                      'TransR': TransRScore}
+    #TODO:add mxnet version of RotatE
+else:
+    ke_score_funcs = {'TransE': TransEScore,
+                      'DistMult': DistMultScore,
+                      'ComplEx': ComplExScore,
+                      'RESCAL': RESCALScore,
+                      'TransR': TransRScore,
+                      'RotatE': RotatEScore(12.0, 1.0)}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
