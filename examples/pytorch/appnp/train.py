@@ -65,13 +65,6 @@ def main(args):
     g.add_edges(g.nodes(), g.nodes())
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
-    # normalization
-    degs = g.in_degrees().float()
-    norm = torch.pow(degs, -0.5)
-    norm[torch.isinf(norm)] = 0
-    if cuda:
-        norm = norm.cuda()
-    g.ndata['norm'] = norm.unsqueeze(1)
 
     # create APPNP model
     model = APPNP(g,

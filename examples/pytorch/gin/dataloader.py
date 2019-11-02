@@ -24,7 +24,7 @@ def collate(samples):
             # torch.DoubleTensor and torch.tensor
             # will meet error in executor.py@runtime line 472, tensor.py@backend line 147
             # RuntimeError: expected type torch.cuda.DoubleTensor but got torch.cuda.FloatTensor
-            g.ndata[feat] = torch.Tensor(g.ndata[feat])
+            g.ndata[feat] = torch.tensor(g.ndata[feat]).float()
         # no edge feats
     batched_graph = dgl.batch(graphs)
     labels = torch.tensor(labels)

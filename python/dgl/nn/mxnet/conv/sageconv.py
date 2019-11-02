@@ -55,7 +55,7 @@ class SAGEConv(nn.Block):
             self.feat_drop = nn.Dropout(feat_drop)
             self.activation = activation
             if aggregator_type == 'pool':
-                self.fc_pool = nn.Dense(out_feats, use_bias=bias,
+                self.fc_pool = nn.Dense(in_feats, use_bias=bias,
                                         weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
                                         in_units=in_feats)
             if aggregator_type == 'lstm':

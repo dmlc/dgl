@@ -1,9 +1,3 @@
-"""
-Inductive Representation Learning on Large Graphs
-Paper: http://papers.nips.cc/paper/6703-inductive-representation-learning-on-large-graphs.pdf
-Code: https://github.com/williamleif/graphsage-simple
-Simple reference implementation of GraphSAGE.
-"""
 import argparse
 import time
 import numpy as np
@@ -13,42 +7,51 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.nn.pytorch.conv import SAGEConv
+from dgl.nn.pytorch.conv import GMMConv
 
 
-class GraphSAGE(nn.Module):
+class MoNet(nn.Module):
     def __init__(self,
                  g,
                  in_feats,
                  n_hidden,
-                 n_classes,
+                 out_feats,
                  n_layers,
-                 activation,
-                 dropout,
-                 aggregator_type):
-        super(GraphSAGE, self).__init__()
-        self.layers = nn.ModuleList()
+                 dim,
+                 n_kernels):
+        super(MoNet, self).__init__()
         self.g = g
+        self.layers = nn.ModuleList()
+        self.pseudo_proj = nn.ModuleList()
 
-        # input layer
-        self.layers.append(SAGEConv(in_feats, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(SAGEConv(n_hidden, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
-        # output layer
-        self.layers.append(SAGEConv(n_hidden, n_classes, aggregator_type, feat_drop=dropout, activation=None)) # activation None
+        # Input layer
+        self.layers.append(
+            GMMConv(in_feats, n_hidden, dim, n_kernels))
+        self.pseudo_proj.append(
+            nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
 
-    def forward(self, features):
-        h = features
-        for layer in self.layers:
-            h = layer(self.g, h)
+        # Hidden layer
+        for _ in range(n_layers - 1):
+            self.layers.append(GMMConv(n_hidden, n_hidden, dim, n_kernels))
+            self.pseudo_proj.append(
+                nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+
+        # Output layer
+        self.layers.append(GMMConv(n_hidden, out_feats, dim, n_kernels))
+        self.pseudo_proj.append(
+            nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+
+    def forward(self, feat, pseudo):
+        h = feat
+        for i in range(len(self.layers)):
+            h = self.layers[i](
+                self.g, h, self.pseudo_proj[i](pseudo))
         return h
 
-
-def evaluate(model, features, labels, mask):
+def evaluate(model, features, pseudo, labels, mask):
     model.eval()
     with torch.no_grad():
-        logits = model(features)
+        logits = model(features, pseudo)
         logits = logits[mask]
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
@@ -60,7 +63,7 @@ def main(args):
     data = load_data(args)
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
+    if False: #hasattr(torch, 'BoolTensor'):
         train_mask = torch.BoolTensor(data.train_mask)
         val_mask = torch.BoolTensor(data.val_mask)
         test_mask = torch.BoolTensor(data.test_mask)
@@ -99,17 +102,26 @@ def main(args):
     g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     n_edges = g.number_of_edges()
+    us, vs = g.edges()
+    pseudo = []
+    for i in range(g.number_of_edges()):
+        pseudo.append([
+            1 / np.sqrt(g.in_degree(us[i])),
+            1 / np.sqrt(g.in_degree(vs[i]))
+        ])
+    pseudo = torch.Tensor(pseudo)
+    if cuda:
+        pseudo = pseudo.cuda()
 
     # create GraphSAGE model
-    model = GraphSAGE(g,
-                      in_feats,
-                      args.n_hidden,
-                      n_classes,
-                      args.n_layers,
-                      F.relu,
-                      args.dropout,
-                      args.aggregator_type
-                      )
+    model = MoNet(g,
+                  in_feats,
+                  args.n_hidden,
+                  n_classes,
+                  args.n_layers,
+                  args.pseudo_dim,
+                  args.n_kernels,
+                  )
 
     if cuda:
         model.cuda()
@@ -125,7 +137,7 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features)
+        logits = model(features, pseudo)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -135,18 +147,18 @@ def main(args):
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, features, labels, val_mask)
+        acc = evaluate(model, features, pseudo, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
               "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
                                             acc, n_edges / np.mean(dur) / 1000))
 
     print()
-    acc = evaluate(model, features, labels, test_mask)
+    acc = evaluate(model, features, pseudo, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GraphSAGE')
+    parser = argparse.ArgumentParser(description='MoNet on citation network')
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
                         help="dropout probability")
@@ -160,10 +172,12 @@ if __name__ == '__main__':
                         help="number of hidden gcn units")
     parser.add_argument("--n-layers", type=int, default=1,
                         help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay", type=float, default=5e-4,
+    parser.add_argument("--pseudo-dim", type=int, default=2,
+                        help="Pseudo coordinate dimensions in GMMConv, 2 for cora and 3 for pubmed")
+    parser.add_argument("--n-kernels", type=int, default=3,
+                        help="Number of kernels in GMMConv layer")
+    parser.add_argument("--weight-decay", type=float, default=5e-5,
                         help="Weight for L2 loss")
-    parser.add_argument("--aggregator-type", type=str, default="gcn",
-                        help="Aggregator type: mean/gcn/pool/lstm")
     args = parser.parse_args()
     print(args)
 

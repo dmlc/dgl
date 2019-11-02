@@ -31,9 +31,9 @@ class GMMConv(nn.Block):
     n_kernels : int
         Number of kernels :math:`K`.
     aggregator_type : str
-        Aggregator type (``sum``, ``mean``, ``max``).
+        Aggregator type (``sum``, ``mean``, ``max``). Default: ``sum``.
     residual : bool
-        If True, use residual connection inside this layer.
+        If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     """
@@ -42,8 +42,8 @@ class GMMConv(nn.Block):
                  out_feats,
                  dim,
                  n_kernels,
-                 aggregator_type,
-                 residual=True,
+                 aggregator_type='sum',
+                 residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
         self._in_feats = in_feats
