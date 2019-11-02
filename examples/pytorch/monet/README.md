@@ -11,9 +11,6 @@ Dependencies
 Results
 =======
 
-Image
-- MNIST: 
-
-Citation Network
+Node classification on citation networks:
 - Cora: ~0.816
 - Pubmed: ~0.757

@@ -1,3 +1,6 @@
+# author: xbresson
+# code link: https://github.com/xbresson/CE7454_2019/blob/master/codes/labs_lecture14/lab01_ChebGCNs/lib/grid_graph.py
+
 import sklearn
 import sklearn.metrics
 import scipy.sparse, scipy.sparse.linalg  # scipy.spatial.distance

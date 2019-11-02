@@ -15,9 +15,11 @@ from dgl.nn.pytorch.glob import MaxPooling
 from grid_graph import *
 from coarsening import *
 
-argparser = argparse.ArgumentParser("ChebNet on MNIST")
+argparser = argparse.ArgumentParser("MNIST")
 argparser.add_argument("--gpu", type=int, default=-1,
                        help="gpu id, use cpu if set to -1")
+argparser.add_argument("--model", type=str, default="chebnet",
+                       help="model to use, chebnet/monet")
 argparser.add_argument("--batch-size", type=int, default=100,
                        help="batch size")
 args = parser.parse_args()
