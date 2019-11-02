@@ -170,9 +170,14 @@ def test_score_func_rescal():
 def test_score_func_transr():
     check_score_func('TransR')
 
+def test_score_func_rotate():
+    if backend.lower() != 'mxnet':
+        check_score_func('RotatE')
+        
 if __name__ == '__main__':
     test_score_func_transe()
     test_score_func_distmult()
     test_score_func_complex()
     test_score_func_rescal()
     test_score_func_transr()
+    test_score_func_rotate()
