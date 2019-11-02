@@ -18,7 +18,8 @@ class MoNet(nn.Module):
                  out_feats,
                  n_layers,
                  dim,
-                 n_kernels):
+                 n_kernels,
+                 dropout):
         super(MoNet, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
@@ -40,10 +41,13 @@ class MoNet(nn.Module):
         self.layers.append(GMMConv(n_hidden, out_feats, dim, n_kernels))
         self.pseudo_proj.append(
             nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, feat, pseudo):
         h = feat
         for i in range(len(self.layers)):
+            if i != 0:
+                h = self.dropout(h)
             h = self.layers[i](
                 self.g, h, self.pseudo_proj[i](pseudo))
         return h
@@ -121,6 +125,7 @@ def main(args):
                   args.n_layers,
                   args.pseudo_dim,
                   args.n_kernels,
+                  args.dropout
                   )
 
     if cuda:
@@ -176,7 +181,7 @@ if __name__ == '__main__':
                         help="Pseudo coordinate dimensions in GMMConv, 2 for cora and 3 for pubmed")
     parser.add_argument("--n-kernels", type=int, default=3,
                         help="Number of kernels in GMMConv layer")
-    parser.add_argument("--weight-decay", type=float, default=5e-5,
+    parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
     args = parser.parse_args()
     print(args)
