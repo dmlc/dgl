@@ -50,7 +50,8 @@ def main(dev_id, args):
     else:
         device = torch.device('cuda:{}'.format(dev_id))
     # Set current device
-    th.cuda.set_device(device)
+    if args.ngpu > 0:
+        th.cuda.set_device(device)
     # Prepare dataset
     dataset = get_dataset(args.dataset)
     V = dataset.vocab_size

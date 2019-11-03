@@ -1,7 +1,7 @@
 from .attention import *
 from .layers import *
-from .functions import *
 from .embedding import *
+from dgl.nn.pytorch.softmax import edge_softmax
 import torch as th
 import dgl.function as fn
 import torch.nn.init as INIT
@@ -23,8 +23,8 @@ class UEncoder(nn.Module):
     def post_func(self):
         layer = self.layer
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, wv = nodes.data['x'], nodes.data['wv']
+            o = layer.self_attn.get_o(wv)
             x = x + layer.sublayer[0].dropout(o)
             x = layer.sublayer[1](x, layer.feed_forward)
             return {'x': x}
@@ -51,8 +51,8 @@ class UDecoder(nn.Module):
     def post_func(self, l=0):
         layer = self.layer
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, wv = nodes.data['x'], nodes.data['wv']
+            o = layer.self_attn.get_o(wv)
             x = x + layer.sublayer[l].dropout(o)
             if l == 1:
                 x = layer.sublayer[2](x, layer.feed_forward)
@@ -113,12 +113,11 @@ class UTransformer(nn.Module):
 
     def propagate_attention(self, g, eids):
         # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+        g.apply_edges(fn.u_dot_v('k', 'q', 'e'), eids)
+        g.edata['e/dk'] = g.edata.pop('e').unsqueeze(-1) / np.sqrt(self.d_k)
         # Send weighted values to target nodes
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+        g.edata['a'] = edge_softmax(g, g.edata.pop('e/dk'))
+        g.send_and_recv(eids, fn.u_mul_e('v', 'a', 'm'), fn.sum('m', 'wv'))
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."

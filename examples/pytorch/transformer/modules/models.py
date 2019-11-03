@@ -3,8 +3,8 @@ from .act import *
 from .attention import *
 from .viz import *
 from .layers import *
-from .functions import *
 from .embedding import *
+from dgl.nn.pytorch.softmax import edge_softmax
 import threading
 import torch as th
 import dgl.function as fn
@@ -28,8 +28,8 @@ class Encoder(nn.Module):
     def post_func(self, i):
         layer = self.layers[i]
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, wv = nodes.data['x'], nodes.data['wv']
+            o = layer.self_attn.get_o(wv)
             x = x + layer.sublayer[0].dropout(o)
             x = layer.sublayer[1](x, layer.feed_forward)
             return {'x': x if i < self.N - 1 else self.norm(x)}
@@ -56,8 +56,8 @@ class Decoder(nn.Module):
     def post_func(self, i, l=0):
         layer = self.layers[i]
         def func(nodes):
-            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
-            o = layer.self_attn.get_o(wv / z)
+            x, wv = nodes.data['x'], nodes.data['wv']
+            o = layer.self_attn.get_o(wv)
             x = x + layer.sublayer[l].dropout(o)
             if l == 1:
                 x = layer.sublayer[2](x, layer.feed_forward)
@@ -76,12 +76,11 @@ class Transformer(nn.Module):
 
     def propagate_attention(self, g, eids):
         # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+        g.apply_edges(fn.u_dot_v('k', 'q', 'e'), eids)
+        g.edata['e/dk'] = g.edata.pop('e').unsqueeze(-1) / np.sqrt(self.d_k)
         # Send weighted values to target nodes
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+        g.edata['a'] = edge_softmax(g, g.edata.pop('e/dk'))
+        g.send_and_recv(eids, fn.u_mul_e('v', 'a', 'm'), fn.sum('m', 'wv'))
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
