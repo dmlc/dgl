@@ -403,7 +403,6 @@ def test_gat_conv():
 
     if F.gpu_ctx():
         gat = gat.to(ctx)
-        feat = feat.to(ctx)
 
     h = gat(g, feat)
     assert h.shape[-1] == 2 and h.shape[-2] == 4
@@ -417,7 +416,6 @@ def test_sage_conv():
 
         if F.gpu_ctx():
             sage = sage.to(ctx)
-            feat = feat.to(ctx)
 
         h = sage(g, feat)
         assert h.shape[-1] == 10
@@ -431,7 +429,6 @@ def test_sgc_conv():
 
     if F.gpu_ctx():
         sgc = sgc.to(ctx)
-        feat = feat.to(ctx)
 
     h = sgc(g, feat)
     assert h.shape[-1] == 10
@@ -455,7 +452,6 @@ def test_appnp_conv():
 
     if F.gpu_ctx():
         appnp = appnp.to(ctx)
-        feat = feat.to(ctx)
 
     h = appnp(g, feat)
     assert h.shape[-1] == 5
@@ -472,7 +468,6 @@ def test_gin_conv():
 
         if F.gpu_ctx():
             gin = gin.to(ctx)
-            feat = feat.to(ctx)
 
         h = gin(g, feat)
         assert h.shape[-1] == 12
@@ -485,7 +480,6 @@ def test_agnn_conv():
 
     if F.gpu_ctx():
         agnn = agnn.to(ctx)
-        feat = feat.to(ctx)
 
     h = agnn(g, feat)
     assert h.shape[-1] == 5
@@ -499,7 +493,6 @@ def test_gated_graph_conv():
 
     if F.gpu_ctx():
         ggconv = ggconv.to(ctx)
-        feat = feat.to(ctx)
         etypes = etypes.to(ctx)
 
     h = ggconv(g, feat, etypes)
@@ -516,8 +509,6 @@ def test_nn_conv():
 
     if F.gpu_ctx():
         nnconv = nnconv.to(ctx)
-        feat = feat.to(ctx)
-        efeat = efeat.to(ctx)
 
     h = nnconv(g, feat, efeat)
     # currently we only do shape check
@@ -532,8 +523,6 @@ def test_gmm_conv():
 
     if F.gpu_ctx():
         gmmconv = gmmconv.to(ctx)
-        feat = feat.to(ctx)
-        pseudo = pseudo.to(ctx)
 
     h = gmmconv(g, feat, pseudo)
     # currently we only do shape check
@@ -551,7 +540,6 @@ def test_dense_graph_conv():
     if F.gpu_ctx():
         conv = conv.to(ctx)
         dense_conv = dense_conv.to(ctx)
-        feat = feat.to(ctx)
 
     out_conv = conv(g, feat)
     out_dense_conv = dense_conv(adj, feat)
@@ -561,7 +549,7 @@ def test_dense_sage_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
     adj = g.adjacency_matrix(ctx=ctx).to_dense()
-    sage = nn.SAGEConv(5, 2, 'gcn',)
+    sage = nn.SAGEConv(5, 2, 'gcn')
     dense_sage = nn.DenseSAGEConv(5, 2)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
     dense_sage.fc.bias.data = sage.fc_neigh.bias.data
@@ -569,7 +557,6 @@ def test_dense_sage_conv():
     if F.gpu_ctx():
         sage = sage.to(ctx)
         dense_sage = dense_sage.to(ctx)
-        feat = feat.to(ctx)
 
     out_sage = sage(g, feat)
     out_dense_sage = dense_sage(adj, feat)
@@ -590,7 +577,6 @@ def test_dense_cheb_conv():
         if F.gpu_ctx():
             cheb = cheb.to(ctx)
             dense_cheb = dense_cheb.to(ctx)
-            feat = feat.to(ctx)
 
         out_cheb = cheb(g, feat, [2.0])
         out_dense_cheb = dense_cheb(adj, feat, 2.0)

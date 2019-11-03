@@ -8,15 +8,15 @@ import argparse
 import time
 import numpy as np
 import networkx as nx
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import mxnet as mx
+from mxnet import nd, gluon
+from mxnet.gluon import nn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.nn.pytorch.conv import SAGEConv
+from dgl.nn.mxnet.conv import SAGEConv
 
 
-class GraphSAGE(nn.Module):
+class GraphSAGE(nn.Block):
     def __init__(self,
                  g,
                  in_feats,
@@ -27,16 +27,17 @@ class GraphSAGE(nn.Module):
                  dropout,
                  aggregator_type):
         super(GraphSAGE, self).__init__()
-        self.layers = nn.ModuleList()
         self.g = g
 
-        # input layer
-        self.layers.append(SAGEConv(in_feats, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(SAGEConv(n_hidden, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
-        # output layer
-        self.layers.append(SAGEConv(n_hidden, n_classes, aggregator_type, feat_drop=dropout, activation=None)) # activation None
+        with self.name_scope():
+            self.layers = nn.Sequential()
+            # input layer
+            self.layers.add(SAGEConv(in_feats, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
+            # hidden layers
+            for i in range(n_layers - 1):
+                self.layers.add(SAGEConv(n_hidden, n_hidden, aggregator_type, feat_drop=dropout, activation=activation))
+            # output layer
+            self.layers.add(SAGEConv(n_hidden, n_classes, aggregator_type, feat_drop=dropout, activation=None)) # activation None
 
     def forward(self, features):
         h = features
@@ -44,30 +45,20 @@ class GraphSAGE(nn.Module):
             h = layer(self.g, h)
         return h
 
-
 def evaluate(model, features, labels, mask):
-    model.eval()
-    with torch.no_grad():
-        logits = model(features)
-        logits = logits[mask]
-        labels = labels[mask]
-        _, indices = torch.max(logits, dim=1)
-        correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
+    pred = model(features).argmax(axis=1)
+    accuracy = ((pred == labels) * mask).sum() / mask.sum().asscalar()
+    return accuracy.asscalar()
 
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    features = torch.FloatTensor(data.features)
-    labels = torch.LongTensor(data.labels)
-    if hasattr(torch, 'BoolTensor'):
-        train_mask = torch.BoolTensor(data.train_mask)
-        val_mask = torch.BoolTensor(data.val_mask)
-        test_mask = torch.BoolTensor(data.test_mask)
-    else:
-        train_mask = torch.ByteTensor(data.train_mask)
-        val_mask = torch.ByteTensor(data.val_mask)
-        test_mask = torch.ByteTensor(data.test_mask)
+    features = nd.array(data.features)
+    labels = nd.array(data.labels)
+    train_mask = nd.array(data.train_mask)
+    val_mask = nd.array(data.val_mask)
+    test_mask = nd.array(data.test_mask)
+
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -78,21 +69,21 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-           train_mask.sum().item(),
-           val_mask.sum().item(),
-           test_mask.sum().item()))
+           train_mask.sum().asscalar(),
+           val_mask.sum().asscalar(),
+           test_mask.sum().asscalar()))
 
     if args.gpu < 0:
-        cuda = False
+        ctx = mx.cpu(0)
     else:
-        cuda = True
-        torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        train_mask = train_mask.cuda()
-        val_mask = val_mask.cuda()
-        test_mask = test_mask.cuda()
+        ctx = mx.gpu(args.gpu)
         print("use cuda:", args.gpu)
+
+    features = features.as_in_context(ctx)
+    labels = labels.as_in_context(ctx)
+    train_mask = train_mask.as_in_context(ctx)
+    val_mask = val_mask.as_in_context(ctx)
+    test_mask = test_mask.as_in_context(ctx)
 
     # graph preprocess and calculate normalization factor
     g = data.graph
@@ -106,43 +97,45 @@ def main(args):
                       args.n_hidden,
                       n_classes,
                       args.n_layers,
-                      F.relu,
+                      nd.relu,
                       args.dropout,
                       args.aggregator_type
                       )
 
-    if cuda:
-        model.cuda()
-    loss_fcn = torch.nn.CrossEntropyLoss()
+    model.initialize(ctx=ctx)
+    n_train_samples = train_mask.sum().asscalar()
+    loss_fcn = gluon.loss.SoftmaxCELoss()
 
-    # use optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    print(model.collect_params())
+    trainer = gluon.Trainer(model.collect_params(), 'adam',
+            {'learning_rate': args.lr, 'wd': args.weight_decay})
+
 
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        model.train()
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
+        with mx.autograd.record():
+            pred = model(features)
+            loss = loss_fcn(pred, labels, mx.nd.expand_dims(train_mask, 1))
+            loss = loss.sum() / n_train_samples
 
-        optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        trainer.step(batch_size=1)
 
         if epoch >= 3:
+            loss.asscalar()
             dur.append(time.time() - t0)
+            acc = evaluate(model, features, labels, val_mask)
+            print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+                  "ETputs(KTEPS) {:.2f}". format(
+                epoch, np.mean(dur), loss.asscalar(), acc, n_edges / np.mean(dur) / 1000))
 
-        acc = evaluate(model, features, labels, val_mask)
-        print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-                                            acc, n_edges / np.mean(dur) / 1000))
-
-    print()
+    # test set accuracy
     acc = evaluate(model, features, labels, test_mask)
-    print("Test Accuracy {:.4f}".format(acc))
+    print("Test accuracy {:.2%}".format(acc))
 
 
 if __name__ == '__main__':

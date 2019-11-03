@@ -112,6 +112,210 @@ def test_tagconv():
     h1 = conv(g, h0)
     assert h1.shape[-1] == 2
 
+def test_gat_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gat = nn.GATConv(10, 20, 5) # n_heads = 5
+    gat.initialize(ctx=ctx)
+    print(gat)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = gat(g, h0)
+    assert h1.shape == (20, 5, 20)
+
+def test_sage_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    graphsage = nn.SAGEConv(10, 20)
+    graphsage.initialize(ctx=ctx)
+    print(graphsage)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = graphsage(g, h0)
+    assert h1.shape == (20, 20)
+
+def test_gg_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gg_conv = nn.GatedGraphConv(10, 20, 3, 4) # n_step = 3, n_etypes = 4
+    gg_conv.initialize(ctx=ctx)
+    print(gg_conv)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    h1 = gg_conv(g, h0, etypes)
+    assert h1.shape == (20, 20)
+
+def test_cheb_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    cheb = nn.ChebConv(10, 20, 3) # k = 3
+    cheb.initialize(ctx=ctx)
+    print(cheb)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = cheb(g, h0)
+    assert h1.shape == (20, 20)
+
+def test_agnn_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    agnn_conv = nn.AGNNConv(0.1, True)
+    agnn_conv.initialize(ctx=ctx)
+    print(agnn_conv)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = agnn_conv(g, h0)
+    assert h1.shape == (20, 10)
+
+def test_appnp_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    appnp_conv = nn.APPNPConv(3, 0.1, 0)
+    appnp_conv.initialize(ctx=ctx)
+    print(appnp_conv)
+
+    # test#1: basic
+    h0 = F.randn((20, 10))
+    h1 = appnp_conv(g, h0)
+    assert h1.shape == (20, 10)
+
+def test_dense_cheb_conv():
+    for k in range(1, 4):
+        ctx = F.ctx()
+        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3), readonly=True)
+        adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+        cheb = nn.ChebConv(5, 2, k)
+        dense_cheb = nn.DenseChebConv(5, 2, k)
+        cheb.initialize(ctx=ctx)
+        dense_cheb.initialize(ctx=ctx)
+
+        for i in range(len(cheb.fc)):
+            dense_cheb.fc[i].weight.set_data(
+                cheb.fc[i].weight.data())
+            if cheb.bias is not None:
+                dense_cheb.bias.set_data(
+                    cheb.bias.data())
+
+        feat = F.randn((100, 5))
+        out_cheb = cheb(g, feat, [2.0])
+        out_dense_cheb = dense_cheb(adj, feat, 2.0)
+        assert F.allclose(out_cheb, out_dense_cheb)
+
+def test_dense_graph_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.3), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    dense_conv = nn.DenseGraphConv(5, 2, norm=False, bias=True)
+    conv.initialize(ctx=ctx)
+    dense_conv.initialize(ctx=ctx)
+    dense_conv.weight.set_data(
+        conv.weight.data())
+    dense_conv.bias.set_data(
+        conv.bias.data())
+    feat = F.randn((100, 5))
+
+    out_conv = conv(g, feat)
+    out_dense_conv = dense_conv(adj, feat)
+    assert F.allclose(out_conv, out_dense_conv)
+
+def test_dense_sage_conv():
+    ctx = F.ctx()
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    adj = g.adjacency_matrix(ctx=ctx).tostype('default')
+    sage = nn.SAGEConv(5, 2, 'gcn')
+    dense_sage = nn.DenseSAGEConv(5, 2)
+    sage.initialize(ctx=ctx)
+    dense_sage.initialize(ctx=ctx)
+    dense_sage.fc.weight.set_data(
+        sage.fc_neigh.weight.data())
+    dense_sage.fc.bias.set_data(
+        sage.fc_neigh.bias.data())
+    feat = F.randn((100, 5))
+
+    out_sage = sage(g, feat)
+    out_dense_sage = dense_sage(adj, feat)
+    assert F.allclose(out_sage, out_dense_sage)
+
+def test_edge_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    edge_conv = nn.EdgeConv(5, 2)
+    edge_conv.initialize(ctx=ctx)
+    print(edge_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = edge_conv(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
+def test_gin_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gin_conv = nn.GINConv(lambda x: x, 'mean', 0.1)
+    gin_conv.initialize(ctx=ctx)
+    print(gin_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = gin_conv(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 5)
+
+def test_gmm_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    gmm_conv = nn.GMMConv(5, 2, 5, 3, 'max')
+    gmm_conv.initialize(ctx=ctx)
+    print(gmm_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    pseudo = F.randn((g.number_of_edges(), 5))
+    h1 = gmm_conv(g, h0, pseudo)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
+def test_nn_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    nn_conv = nn.NNConv(5, 2, gluon.nn.Embedding(3, 5 * 2), 'max')
+    nn_conv.initialize(ctx=ctx)
+    print(nn_conv)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    h1 = nn_conv(g, h0, etypes)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
+def test_sg_conv():
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(20, 0.3))
+    ctx = F.ctx()
+
+    sgc = nn.SGConv(5, 2, 2)
+    sgc.initialize(ctx=ctx)
+    print(sgc)
+
+    # test #1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = sgc(g, h0)
+    assert h1.shape == (g.number_of_nodes(), 2)
+
 def test_set2set():
     g = dgl.DGLGraph(nx.path_graph(10))
     ctx = F.ctx()
@@ -306,6 +510,20 @@ def test_rgcn():
 
 if __name__ == '__main__':
     test_graph_conv()
+    test_gat_conv()
+    test_sage_conv()
+    test_gg_conv()
+    test_cheb_conv()
+    test_agnn_conv()
+    test_appnp_conv()
+    test_dense_cheb_conv()
+    test_dense_graph_conv()
+    test_dense_sage_conv()
+    test_edge_conv()
+    test_gin_conv()
+    test_gmm_conv()
+    test_nn_conv()
+    test_sg_conv()
     test_edge_softmax()
     test_partial_edge_softmax()
     test_set2set()
