@@ -1,5 +1,4 @@
 import torch as th
-import torch.functional as F
 
 """Compute x,y coordinate for nodes in the graph"""
 eps = 1e-8
@@ -24,7 +23,7 @@ def get_coordinates(graphs, grid_side, coarsening_levels, perm):
 """Cartesian coordinate to polar coordinate"""
 def z2polar(edges):
     z = edges.dst['xy'] - edges.src['xy']
-    rho = F.norm(z, dim=-1, p=2)
+    rho = th.norm(z, dim=-1, p=2)
     x, y = z.unbind(dim=-1)
     phi = th.atan2(y, x)
     return {'u': th.cat([rho.unsqueeze(-1), phi.unsqueeze(-1)], -1)}

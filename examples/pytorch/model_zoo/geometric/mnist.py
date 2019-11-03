@@ -12,9 +12,9 @@ from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgl.nn.pytorch.conv import ChebConv, GMMConv
 from dgl.nn.pytorch.glob import MaxPooling
-from grid_graph import *
-from coarsening import *
-from coordinate import *
+from grid_graph import grid_graph
+from coarsening import coarsen
+from coordinate import get_coordinates, z2polar
 
 argparser = argparse.ArgumentParser("MNIST")
 argparser.add_argument("--gpu", type=int, default=-1,
@@ -80,6 +80,7 @@ class MoNet(nn.Module):
         super(MoNet, self).__init__()
         self.pool = nn.MaxPool1d(2)
         self.layers = nn.ModuleList()
+        self.readout = MaxPooling()
 
         # Input layer
         self.layers.append(
@@ -88,9 +89,6 @@ class MoNet(nn.Module):
         # Hidden layer
         for i in range(1, len(hiddens)):
             self.layers.append(GMMConv(hiddens[i - 1], hiddens[i], 2, n_kernels))
-
-        # Output layer
-        self.layers.append(GMMConv(hiddens[-1], out_feats, 2, n_kernels))
 
         self.cls = nn.Sequential(
             nn.Linear(hiddens[-1], out_feats),
