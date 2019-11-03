@@ -5,7 +5,7 @@ import torch.functional as F
 eps = 1e-8
 def get_coordinates(graphs, grid_side, coarsening_levels, perm):
     rst = []
-    for l in range(coarsening_levels):
+    for l in range(coarsening_levels + 1):
         xs, ys = [], []
         for i in range(graphs[l].number_of_nodes()):
             cnt = eps
