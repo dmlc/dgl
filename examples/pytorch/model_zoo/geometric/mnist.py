@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.nn.pytorch.conv import ChebConv
+from dgl.nn.pytorch.conv import ChebConv, GMMConv
 from dgl.nn.pytorch.glob import MaxPooling
 from grid_graph import *
 from coarsening import *
@@ -65,6 +65,47 @@ test_loader = DataLoader(testset,
                          collate_fn=batcher,
                          num_workers=6)
 
+class MoNet(nn.Module):
+    def __init__(self,
+                 dim,
+                 n_kernels,
+                 in_feats,
+                 hiddens,
+                 out_feats):
+        super(MoNet, self).__init__()
+        self.pool = nn.MaxPool1d(2)
+        self.layers = nn.ModuleList()
+        self.pseudo_proj = nn.ModuleList()
+
+        # Input layer
+        self.layers.append(
+            GMMConv(in_feats, hiddens[0], dim, n_kernels))
+        self.pseudo_proj.append(
+            nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+
+        # Hidden layer
+        for i in range(1, len(hiddens)):
+            self.layers.append(GMMConv(hiddens[i - 1], hiddens[i], dim, n_kernels))
+            self.pseudo_proj.append(
+                nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+
+        # Output layer
+        self.layers.append(GMMConv(hiddens[-1], out_feats, dim, n_kernels))
+        self.pseudo_proj.append(
+            nn.Sequential(nn.Linear(2, dim), nn.Tanh()))
+
+        self.cls = nn.Sequential(
+            nn.Linear(hiddens[-1], out_feats),
+            nn.LogSoftmax()
+        )
+
+    def forward(self, g_arr, feat):
+        for g, layer, pseudo_proj in zip(g_arr, self.layers, self.pseudo_proj):
+            u = g.edata['u']
+            feat = self.pool(layer(g, feat, [2] * pseudo_proj(u)).transpose(-1, -2).unsqueeze(0))\
+                .squeeze(0).transpose(-1, -2)
+        return self.cls(self.readout(g_arr[-1], feat))
+
 class ChebNet(nn.Module):
     def __init__(self,
                  k,
@@ -85,7 +126,7 @@ class ChebNet(nn.Module):
                 ChebConv(hiddens[i - 1], hiddens[i], k))
 
         self.cls = nn.Sequential(
-            nn.Linear(hiddens[i], out_feats),
+            nn.Linear(hiddens[-1], out_feats),
             nn.LogSoftmax()
         )
 
@@ -100,7 +141,11 @@ if args.gpu == -1:
 else:
     device = torch.device(args.gpu)
 
-model = ChebNet(2, 1, [32, 64, 128, 256], 10)
+if args.model == 'chebnet':
+    model = ChebNet(2, 1, [32, 64, 128, 256], 10)
+else:
+    model = MoNet(3, 10, 1, [32, 64, 128, 256], 10)
+
 model = model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

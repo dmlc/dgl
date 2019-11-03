@@ -5,29 +5,29 @@ https://openreview.net/forum?id=ryGs6iA5Km
 Author's implementation: https://github.com/weihua916/powerful-gnns
 """
 
+import mxnet as mx
+from mxnet import nd, gluon
+from mxnet.gluon import nn
+from dgl.nn.mxnet.conv import GINConv
+from dgl.nn.mxnet.glob import SumPooling, AvgPooling, MaxPooling
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from dgl.nn.pytorch.conv import GINConv
-from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 
-
-class ApplyNodeFunc(nn.Module):
+class ApplyNodeFunc(nn.Block):
     """Update the node feature hv with MLP, BN and ReLU."""
     def __init__(self, mlp):
         super(ApplyNodeFunc, self).__init__()
-        self.mlp = mlp
-        self.bn = nn.BatchNorm1d(self.mlp.output_dim)
+        with self.name_scope():
+            self.mlp = mlp
+            self.bn = nn.BatchNorm(in_channels=self.mlp.output_dim)
 
     def forward(self, h):
         h = self.mlp(h)
         h = self.bn(h)
-        h = F.relu(h)
+        h = nd.relu(h)
         return h
 
 
-class MLP(nn.Module):
+class MLP(nn.Block):
     """MLP with linear output"""
     def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
         """MLP layers construction
@@ -42,45 +42,42 @@ class MLP(nn.Module):
             The dimensionality of hidden units at ALL layers
         output_dim: int
             The number of classes for prediction
-
         """
         super(MLP, self).__init__()
-        self.linear_or_not = True  # default is linear model
+        self.linear_or_not = True
         self.num_layers = num_layers
         self.output_dim = output_dim
 
-        if num_layers < 1:
-            raise ValueError("number of layers should be positive!")
-        elif num_layers == 1:
-            # Linear model
-            self.linear = nn.Linear(input_dim, output_dim)
-        else:
-            # Multi-layer model
-            self.linear_or_not = False
-            self.linears = torch.nn.ModuleList()
-            self.batch_norms = torch.nn.ModuleList()
+        with self.name_scope():
+            if num_layers < 1:
+                raise ValueError("number of layers should be positive!")
+            elif num_layers == 1:
+                # Linear model
+                self.linear = nn.Dense(output_dim, in_units=input_dim)
+            else:
+                self.linear_or_not = False
+                self.linears = nn.Sequential()
+                self.batch_norms = nn.Sequential()
 
-            self.linears.append(nn.Linear(input_dim, hidden_dim))
-            for layer in range(num_layers - 2):
-                self.linears.append(nn.Linear(hidden_dim, hidden_dim))
-            self.linears.append(nn.Linear(hidden_dim, output_dim))
+                self.linears.add(nn.Dense(hidden_dim, in_units=input_dim))
+                for layer in range(num_layers - 2):
+                    self.linears.add(nn.Dense(hidden_dim, in_units=hidden_dim))
+                self.linears.add(nn.Dense(output_dim, in_units=hidden_dim))
 
-            for layer in range(num_layers - 1):
-                self.batch_norms.append(nn.BatchNorm1d((hidden_dim)))
+                for layer in range(num_layers - 1):
+                    self.batch_norms.add(nn.BatchNorm(in_channels=hidden_dim))
 
     def forward(self, x):
         if self.linear_or_not:
-            # If linear model
             return self.linear(x)
         else:
-            # If MLP
             h = x
             for i in range(self.num_layers - 1):
-                h = F.relu(self.batch_norms[i](self.linears[i](h)))
+                h = nd.relu(self.batch_norms[i](self.linears[i](h)))
             return self.linears[-1](h)
 
 
-class GIN(nn.Module):
+class GIN(nn.Block):
     """GIN model"""
     def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim,
                  output_dim, final_dropout, learn_eps, graph_pooling_type,
@@ -114,58 +111,53 @@ class GIN(nn.Module):
         self.num_layers = num_layers
         self.learn_eps = learn_eps
 
-        # List of MLPs
-        self.ginlayers = torch.nn.ModuleList()
-        self.batch_norms = torch.nn.ModuleList()
+        with self.name_scope():
+            # List of MLPs
+            self.ginlayers = nn.Sequential()
+            self.batch_norms = nn.Sequential()
 
-        for layer in range(self.num_layers - 1):
-            if layer == 0:
-                mlp = MLP(num_mlp_layers, input_dim, hidden_dim, hidden_dim)
+            for i in range(self.num_layers - 1):
+                if i == 0:
+                    mlp = MLP(num_mlp_layers, input_dim, hidden_dim, hidden_dim)
+                else:
+                    mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim)
+
+                self.ginlayers.add(
+                    GINConv(ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps))
+                self.batch_norms.add(nn.BatchNorm(in_channels=hidden_dim))
+
+            self.linears_prediction = nn.Sequential()
+
+            for i in range(num_layers):
+                if i == 0:
+                    self.linears_prediction.add(nn.Dense(output_dim, in_units=input_dim))
+                else:
+                    self.linears_prediction.add(nn.Dense(output_dim, in_units=hidden_dim))
+
+            self.drop = nn.Dropout(final_dropout)
+
+            if graph_pooling_type == 'sum':
+                self.pool = SumPooling()
+            elif graph_pooling_type == 'mean':
+                self.pool = AvgPooling()
+            elif graph_pooling_type == 'max':
+                self.pool = MaxPooling()
             else:
-                mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim)
-
-            self.ginlayers.append(
-                GINConv(ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps))
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-
-        # Linear function for graph poolings of output of each layer
-        # which maps the output of different layers into a prediction score
-        self.linears_prediction = torch.nn.ModuleList()
-
-        for layer in range(num_layers):
-            if layer == 0:
-                self.linears_prediction.append(
-                    nn.Linear(input_dim, output_dim))
-            else:
-                self.linears_prediction.append(
-                    nn.Linear(hidden_dim, output_dim))
-
-        self.drop = nn.Dropout(final_dropout)
-
-        if graph_pooling_type == 'sum':
-            self.pool = SumPooling()
-        elif graph_pooling_type == 'mean':
-            self.pool = AvgPooling()
-        elif graph_pooling_type == 'max':
-            self.pool = MaxPooling()
-        else:
-            raise NotImplementedError
+                raise NotImplementedError
 
     def forward(self, g, h):
-        # list of hidden representation at each layer (including input)
         hidden_rep = [h]
 
         for i in range(self.num_layers - 1):
             h = self.ginlayers[i](g, h)
             h = self.batch_norms[i](h)
-            h = F.relu(h)
+            h = nd.relu(h)
             hidden_rep.append(h)
 
         score_over_layer = 0
-
         # perform pooling over all nodes in each graph in every layer
         for i, h in enumerate(hidden_rep):
             pooled_h = self.pool(g, h)
-            score_over_layer += self.drop(self.linears_prediction[i](pooled_h))
+            score_over_layer = score_over_layer + self.drop(self.linears_prediction[i](pooled_h))
 
         return score_over_layer

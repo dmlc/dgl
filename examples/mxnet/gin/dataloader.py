@@ -1,16 +1,24 @@
 """
-PyTorch compatible dataloader
+MxNet compatible dataloader
 """
 
+from mxnet.gluon.data import DataLoader, Sampler
 
 import math
 import numpy as np
-import torch
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
+from mxnet import nd
 from sklearn.model_selection import StratifiedKFold
 import dgl
 
+class SubsetRandomSampler(Sampler):
+    def __init__(self, indices):
+        self.indices = indices
+
+    def __iter__(self):
+        return iter([self.indices[i] for i in np.random.permutation(len(self.indices))])
+
+    def __len__(self):
+        return len(self.indices)
 
 # default collate function
 def collate(samples):
@@ -19,18 +27,16 @@ def collate(samples):
     for g in graphs:
         # deal with node feats
         for key in g.node_attr_schemes().keys():
-            g.ndata[key] = torch.from_numpy(g.ndata[key]).float()
+            g.ndata[key] = nd.array(g.ndata[key])
         # no edge feats
     batched_graph = dgl.batch(graphs)
-    labels = torch.tensor(labels)
+    labels = nd.array(labels)
     return batched_graph, labels
-
 
 class GraphDataLoader():
     def __init__(self,
                  dataset,
                  batch_size,
-                 device,
                  collate_fn=collate,
                  seed=0,
                  shuffle=True,
@@ -40,7 +46,6 @@ class GraphDataLoader():
 
         self.shuffle = shuffle
         self.seed = seed
-        self.kwargs = {'pin_memory': True} if 'cuda' in device.type else {}
 
         labels = [l for _, l in dataset]
 
@@ -58,10 +63,10 @@ class GraphDataLoader():
 
         self.train_loader = DataLoader(
             dataset, sampler=train_sampler,
-            batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
+            batch_size=batch_size, batchify_fn=collate_fn)
         self.valid_loader = DataLoader(
             dataset, sampler=valid_sampler,
-            batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
+            batch_size=batch_size, batchify_fn=collate_fn)
 
     def train_valid_loader(self):
         return self.train_loader, self.valid_loader
@@ -96,4 +101,3 @@ class GraphDataLoader():
             len(train_idx), len(valid_idx))
 
         return train_idx, valid_idx
-

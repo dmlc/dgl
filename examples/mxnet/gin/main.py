@@ -2,9 +2,9 @@ import sys
 import numpy as np
 from tqdm import tqdm
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
+import mxnet as mx
+from mxnet import gluon, nd
+from mxnet.gluon import nn
 
 from dgl.data.gindt import GINDataset
 from dataloader import GraphDataLoader, collate
@@ -12,9 +12,7 @@ from parser import Parser
 from gin import GIN
 
 
-def train(args, net, trainloader, optimizer, criterion, epoch):
-    net.train()
-
+def train(args, net, trainloader, trainer, criterion, epoch):
     running_loss = 0
     total_iters = len(trainloader)
     # setup the offset to avoid the overlap with mouse cursor
@@ -22,17 +20,19 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
 
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
-        labels = labels.to(args.device)
-        feat = graphs.ndata['attr'].to(args.device)
-        outputs = net(graphs, feat)
+        labels = labels.as_in_context(args.device)
+        feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
 
-        loss = criterion(outputs, labels)
-        running_loss += loss.item()
+        with mx.autograd.record():
+            outputs = net(graphs, feat)
+            loss = criterion(outputs, labels)
+            loss = loss.sum() / len(labels)
+
+        running_loss += loss.asscalar()
 
         # backprop
-        optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        trainer.step(batch_size=1)
 
         # report
         bar.set_description('epoch-{}'.format(epoch))
@@ -44,28 +44,26 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
 
 
 def eval_net(args, net, dataloader, criterion):
-    net.eval()
-
     total = 0
     total_loss = 0
     total_correct = 0
 
     for data in dataloader:
         graphs, labels = data
-        feat = graphs.ndata['attr'].to(args.device)
-        labels = labels.to(args.device)
-        total += len(labels)
-        outputs = net(graphs, feat)
-        _, predicted = torch.max(outputs.data, 1)
+        labels = labels.as_in_context(args.device)
+        feat = graphs.ndata['attr'].astype('float32').as_in_context(args.device)
 
-        total_correct += (predicted == labels.data).sum().item()
+        total += len(labels)
+
+        outputs = net(graphs, feat)
+        predicted = nd.argmax(outputs, axis=1)
+
+        total_correct += (predicted == labels).sum().asscalar()
         loss = criterion(outputs, labels)
         # crossentropy(reduce=True) for default
-        total_loss += loss.item() * len(labels)
+        total_loss += loss.sum().asscalar()
 
-    loss, acc = 1.0*total_loss / total, 1.0*total_correct / total
-
-    net.train()
+    loss, acc = 1.0 * total_loss / total, 1.0*total_correct / total
 
     return loss, acc
 
@@ -73,21 +71,20 @@ def eval_net(args, net, dataloader, criterion):
 def main(args):
 
     # set up seeds, args.seed supported
-    torch.manual_seed(seed=0)
+    mx.random.seed(0)
     np.random.seed(seed=0)
 
-    is_cuda = not args.disable_cuda and torch.cuda.is_available()
 
-    if is_cuda:
-        args.device = torch.device("cuda:" + str(args.device))
-        torch.cuda.manual_seed_all(seed=0)
+
+    if args.device >= 0:
+        args.device = mx.gpu(args.device)
     else:
-        args.device = torch.device("cpu")
+        args.device = mx.cpu()
 
     dataset = GINDataset(args.dataset, not args.learn_eps)
 
     trainloader, validloader = GraphDataLoader(
-        dataset, batch_size=args.batch_size, device=args.device,
+        dataset, batch_size=args.batch_size,
         collate_fn=collate, seed=args.seed, shuffle=True,
         split_name='fold10', fold_idx=args.fold_idx).train_valid_loader()
     # or split_name='rand', split_ratio=0.7
@@ -96,11 +93,15 @@ def main(args):
         args.num_layers, args.num_mlp_layers,
         dataset.dim_nfeats, args.hidden_dim, dataset.gclasses,
         args.final_dropout, args.learn_eps,
-        args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
+        args.graph_pooling_type, args.neighbor_pooling_type)
+    model.initialize(ctx=args.device)
 
-    criterion = nn.CrossEntropyLoss()  # defaul reduce is true
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    criterion = gluon.loss.SoftmaxCELoss()
+
+    print(model.collect_params())
+    lr_scheduler = mx.lr_scheduler.FactorScheduler(50, 0.5)
+    trainer = gluon.Trainer(model.collect_params(), 'adam',
+                            {'lr_scheduler': lr_scheduler})
 
     # it's not cost-effective to hanle the cursor and init 0
     # https://stackoverflow.com/a/23121189
@@ -109,9 +110,7 @@ def main(args):
     lrbar = tqdm(range(args.epochs), unit="epoch", position=5, ncols=0, file=sys.stdout)
 
     for epoch, _, _ in zip(tbar, vbar, lrbar):
-        scheduler.step()
-
-        train(args, model, trainloader, optimizer, criterion, epoch)
+        train(args, model, trainloader, trainer, criterion, epoch)
 
         train_loss, train_acc = eval_net(
             args, model, trainloader, criterion)
@@ -144,7 +143,7 @@ def main(args):
 
         lrbar.set_description(
             "Learning eps with learn_eps={}: {}".format(
-                args.learn_eps, [layer.eps.data.item() for layer in model.ginlayers]))
+                args.learn_eps, [layer.eps.data(args.device).asscalar() for layer in model.ginlayers]))
 
     tbar.close()
     vbar.close()
