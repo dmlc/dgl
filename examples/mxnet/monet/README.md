@@ -6,14 +6,11 @@ MoNet
 Dependencies
 ============
 
-- pytorch 1.1+
+- MXNet 1.5+
 
 Results
 =======
 
 Node classification on citation networks:
-- Cora: ~0.816
-- Pubmed: ~0.763
-
-Image classification on MNIST:
-- please refer to [model_zoo/geometric](../model_zoo/geometric).
+- Cora: ~0.814
+- Pubmed: ~0.748

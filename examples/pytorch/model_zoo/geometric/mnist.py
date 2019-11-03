@@ -10,17 +10,20 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from dgl.nn.pytorch.conv import ChebConv
+from dgl.nn.pytorch.conv import ChebConv, GMMConv
 from dgl.nn.pytorch.glob import MaxPooling
 from grid_graph import *
 from coarsening import *
+from coordinate import *
 
-argparser = argparse.ArgumentParser("ChebNet on MNIST")
+argparser = argparse.ArgumentParser("MNIST")
 argparser.add_argument("--gpu", type=int, default=-1,
                        help="gpu id, use cpu if set to -1")
+argparser.add_argument("--model", type=str, default="chebnet",
+                       help="model to use, chebnet/monet")
 argparser.add_argument("--batch-size", type=int, default=100,
                        help="batch size")
-args = parser.parse_args()
+args = argparser.parse_args()
 
 grid_side = 28
 number_edges = 8
@@ -31,6 +34,11 @@ A = grid_graph(28, 8, metric)
 coarsening_levels = 4
 L, perm = coarsen(A, coarsening_levels)
 g_arr = [DGLGraph(csr) for csr in L]
+
+coordinate_arr = get_coordinates(g_arr, grid_side, coarsening_levels, perm)
+for g, coordinate_arr in zip(g_arr, coordinate_arr):
+    g.ndata['xy'] = coordinate_arr
+    g.apply_edges(z2polar)
 
 def batcher(batch):
     g_batch = [[] for _ in range(coarsening_levels + 1)]
@@ -63,6 +71,39 @@ test_loader = DataLoader(testset,
                          collate_fn=batcher,
                          num_workers=6)
 
+class MoNet(nn.Module):
+    def __init__(self,
+                 n_kernels,
+                 in_feats,
+                 hiddens,
+                 out_feats):
+        super(MoNet, self).__init__()
+        self.pool = nn.MaxPool1d(2)
+        self.layers = nn.ModuleList()
+
+        # Input layer
+        self.layers.append(
+            GMMConv(in_feats, hiddens[0], 2, n_kernels))
+
+        # Hidden layer
+        for i in range(1, len(hiddens)):
+            self.layers.append(GMMConv(hiddens[i - 1], hiddens[i], 2, n_kernels))
+
+        # Output layer
+        self.layers.append(GMMConv(hiddens[-1], out_feats, 2, n_kernels))
+
+        self.cls = nn.Sequential(
+            nn.Linear(hiddens[-1], out_feats),
+            nn.LogSoftmax()
+        )
+
+    def forward(self, g_arr, feat):
+        for g, layer in zip(g_arr, self.layers):
+            u = g.edata['u'].to(feat.device)
+            feat = self.pool(layer(g, feat, u).transpose(-1, -2).unsqueeze(0))\
+                .squeeze(0).transpose(-1, -2)
+        return self.cls(self.readout(g_arr[-1], feat))
+
 class ChebNet(nn.Module):
     def __init__(self,
                  k,
@@ -83,7 +124,7 @@ class ChebNet(nn.Module):
                 ChebConv(hiddens[i - 1], hiddens[i], k))
 
         self.cls = nn.Sequential(
-            nn.Linear(hiddens[i], out_feats),
+            nn.Linear(hiddens[-1], out_feats),
             nn.LogSoftmax()
         )
 
@@ -98,7 +139,11 @@ if args.gpu == -1:
 else:
     device = torch.device(args.gpu)
 
-model = ChebNet(2, 1, [32, 64, 128, 256], 10)
+if args.model == 'chebnet':
+    model = ChebNet(2, 1, [32, 64, 128, 256], 10)
+else:
+    model = MoNet(10, 1, [32, 64, 128, 256], 10)
+
 model = model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

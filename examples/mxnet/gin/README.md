@@ -6,7 +6,7 @@ Graph Isomorphism Network (GIN)
 
 Dependencies
 ------------
-- PyTorch 1.0.1+
+- MXNet 1.5+
 - sklearn
 - tqdm
 
@@ -39,7 +39,3 @@ DGLBACKEND=mxnet python main.py --dataset MUTAG --device 0  \
                 --graph_pooling_type sum --neighbor_pooling_type sum
 ```
 
-* MUTAG: 0.85 (paper: ~0.89)
-* COLLAB: 0.89 (paper: ~0.80)
-* IMDBBINARY: 0.76 (paper: ~0.75)
-* IMDBMULTI: 0.51 (paper: ~0.52)

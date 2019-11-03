@@ -1,3 +1,6 @@
+# author: xbresson
+# code link: https://github.com/xbresson/CE7454_2019/blob/master/codes/labs_lecture14/lab01_ChebGCNs/lib/coarsening.py
+
 import numpy as np
 import scipy.sparse
 import sklearn.metrics
