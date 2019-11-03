@@ -20,6 +20,6 @@ python mnist.py --model monet --gpu 0
 ```
 
 ### Acknowledgement
-We thank [Xavier Bresson](https://github.com/xbresson) for providing the
-code for graph coarsening and grid graph building in  
+We thank [Xavier Bresson](https://github.com/xbresson) for providing 
+code for graph coarsening algorithm and grid graph building in  
 [CE7454_2019 Labs](https://github.com/xbresson/CE7454_2019/tree/master/codes/labs_lecture14/lab01_ChebGCNs).
