@@ -46,18 +46,18 @@ def start_client():
     assert server_id == 0
 
     target_tensor = th.tensor(
-        [[ 0.  0.  0.],
-         [ 0.  0.  0.],
-         [20. 20. 20.],
-         [ 0.  0.  0.],
-         [40. 40. 40.]])
+        [[ 0., 0., 0.],
+         [ 0., 0., 0.],
+         [ 5., 5., 5.],
+         [ 0., 0., 0.],
+         [10., 10., 10.]])
 
     assert th.equal(new_tensor, target_tensor) == True
 
     client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
     server_id, new_tensor = client.pull_wait()
 
-    target_tensor = th.tensor([ 0., 0., 20., 0., 40.])
+    target_tensor = th.tensor([ 0., 0., 5., 0., 10.])
 
     assert th.equal(new_tensor, target_tensor) == True
 
