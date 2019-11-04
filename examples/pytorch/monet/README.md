@@ -11,9 +11,14 @@ Dependencies
 Results
 =======
 
-Node classification on citation networks:
+## Citation networks
+Run with following (available dataset: "cora", "citeseer", "pubmed")
+```bash
+python3 citation.py --dataset cora --gpu 0
+```
+
 - Cora: ~0.816
 - Pubmed: ~0.763
 
-Image classification on MNIST:
+## Image classification:
 - please refer to [model_zoo/geometric](../model_zoo/geometric).
