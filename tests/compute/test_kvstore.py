@@ -2,7 +2,7 @@ import backend as F
 import numpy as np
 import scipy as sp
 import dgl
-import torch
+import torch as th
 from dgl import utils
 
 import os
@@ -28,70 +28,55 @@ def start_client():
 
     client.connect()
 
-    client.init_data(name='embed_0', shape=[10, 3], init_type='zero')
-    client.init_data(name='embed_1', shape=[11, 3], init_type='uniform', low=0.0, high=0.0)
-    client.init_data(name='embed_2', shape=[11], init_type='zero')
+    # Initialize data on server
+    client.init_data(name='embed_0', server_id=0, shape=[5, 3], init_type='zero')
+    client.init_data(name='embed_0', server_id=1, shape=[6, 3], init_type='zero')
+    client.init_data(name='embed_1', server_id=0, shape=[5], init_type='uniform', low=0.0, high=0.0)
+    client.init_data(name='embed_1', server_id=1, shape=[6], init_type='uniform', low=0.0, high=0.0)
 
-    tensor_id = torch.tensor([0, 1, 2])
-    tensor_data = torch.tensor([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
+    data_0 = th.tensor([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
+    data_1 = th.tensor([0., 1., 2.])
 
-    # Push
     for i in range(5):
-        client.push('embed_0', tensor_id, tensor_data)
-        client.push('embed_1', tensor_id, tensor_data)
-        client.push('embed_2', tensor_id, torch.tensor([2., 2., 2.]))
+        client.push(name='embed_0', server_id=0, id_tensor=th.tensor([0, 2, 4]), data_tensor=data_0)
+        client.push(name='embed_0', server_id=1, id_tensor=th.tensor([1, 3, 5]), data_tensor=data_0)
+        client.push(name='embed_1', server_id=0, id_tensor=th.tensor([0, 2, 4]), data_tensor=data_1)
+        client.push(name='embed_1', server_id=1, id_tensor=th.tensor([1, 3, 5]), data_tensor=data_1)
 
-    tensor_id = torch.tensor([6, 7, 8])
-    for i in range(5):
-        client.push('embed_0', tensor_id, tensor_data)
-        client.push('embed_1', tensor_id, tensor_data)
-        client.push('embed_2', tensor_id, torch.tensor([3., 3., 3.]))
+    client.barrier()
 
-    # Pull
-    tensor_id = torch.tensor([0, 1, 2, 6, 7, 8])
-    new_tensor_0 = client.pull('embed_0', tensor_id)
-    new_tensor_1 = client.pull('embed_1', tensor_id)
-    new_tensor_2 = client.pull('embed_2', tensor_id)
-    
-    target_tensor = torch.tensor(
-        [[ 0.,  0.,  0.],
-        [ 5.,  5.,  5.],
-        [10., 10., 10.],
-        [ 0.,  0.,  0.],
-        [ 5.,  5.,  5.],
-        [10., 10., 10.]])
+    client.pull(name='embed_0', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
+    server_id, new_tensor_0 = client.pull_wait()
+    assert server_id == 0
+    client.pull(name='embed_0', server_id=1, id_tensor=th.tensor([0, 1, 2, 3, 4, 5]))
+    server_id, new_tensor_1 = client.pull_wait()
+    assert server_id == 1
 
-    assert torch.equal(new_tensor_0, target_tensor) == True
-    assert torch.equal(new_tensor_1, target_tensor) == True
+    target_tensor = th.tensor(
+        [[ 0.  0.  0.]
+         [ 0.  0.  0.]
+         [20. 20. 20.]
+         [ 0.  0.  0.]
+         [40. 40. 40.]
+         [ 0.  0.  0.]
+         [ 0.  0.  0.]
+         [ 0.  0.  0.]
+         [20. 20. 20.]
+         [ 0.  0.  0.]
+         [40. 40. 40.]])
 
-    target_tensor = tensor.tensor([10., 10., 10., 15., 15., 15.])
+    assert th.equal(th.cat(new_tensor_0, new_tensor_1), target_tensor) == True
 
-    assert torch.equal(new_tensor_2, target_tensor) == True
+    client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
+    server_id, new_tensor_0 = client.pull_wait()
+    assert server_id == 0
+    client.pull(name='embed_1', server_id=1, id_tensor=th.tensor([0, 1, 2, 3, 4, 5]))
+    server_id, new_tensor_1 = client.pull_wait()
+    assert server_id == 1
 
-    client.push_all('embed_0', client.pull_all('embed_0'))
-    client.push_all('embed_1', client.pull_all('embed_1'))
-    client.push_all('embed_2', client.pull_all('embed_2'))
+    target_tensor = th.tensor([ 0.  0. 20.  0. 40.  0.  0.  0. 20.  0. 40.])
 
-    # Pull
-    tensor_id = torch.tensor([0, 1, 2, 6, 7, 8])
-    new_tensor_0 = client.pull('embed_0', tensor_id)
-    new_tensor_1 = client.pull('embed_1', tensor_id)
-    new_tensor_2 = client.pull('embed_2', tensor_id)
-
-    target_tensor = torch.tensor(
-        [[ 0.,  0.,  0.],
-        [ 10.,  10.,  10.],
-        [20., 20., 20.],
-        [ 0.,  0.,  0.],
-        [ 10.,  10.,  10.],
-        [20., 20., 20.]])
-
-    assert torch.equal(new_tensor_0, target_tensor) == True
-    assert torch.equal(new_tensor_1, target_tensor) == True
-
-    target_tensor = tensor.tensor([20., 20., 20., 30., 30., 30.])
-
-    assert torch.equal(new_tensor_2, target_tensor) == True
+    assert th.equal(th.cat(new_tensor_0, new_tensor_1), target_tensor) == True
 
     client.shut_down()
 
