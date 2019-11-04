@@ -26,8 +26,8 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreePadding")
     const IdArray msg_ids = args[0];
     const IdArray vids = args[1];
     const IdArray nids = args[2];
-    const IdArray bkt_sizes = args[3];
-    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreePadding(msg_ids, vids, nids, bkt_sizes));
+    const IdArray bkt_split = args[3];
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreePadding(msg_ids, vids, nids, bkt_split));
   });
 
 DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")

@@ -100,8 +100,8 @@ std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
     auto n_bkts = bkt_split->shape[0];
     auto n_recv_nodes = recv_ids->shape[0];
 
-    const int64_t* vid_data = static_cast<int64_t*>(vids->data)
-    const int64_t* msg_id_data = static_cast<int64_t*>(msg_ids->data)
+    const int64_t* vid_data = static_cast<int64_t*>(vids->data);
+    const int64_t* msg_id_data = static_cast<int64_t*>(msg_ids->data);
     const int64_t* recv_id_data = static_cast<int64_t*>(recv_ids->data);
     const int64_t* bkt_data = static_cast<int64_t*>(bkt_split->data);
 
@@ -114,7 +114,7 @@ std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
     // bkt: deg->dsts
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, int64_t>>> bkt;
     for (const auto &it : in_edges) {
-        int64_t idx = std::lower_bound(bkt_data, bkt_data + n_bkts, it.second.size());
+        const int64_t idx = std::lower_bound(bkt_data, bkt_data + n_bkts, it.second.size()) - bkt_data;
         bkt[idx].push_back(std::make_pair(it.second.size(), it.first));
     }
 

@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..udf import NodeBatch, EdgeBatch
-from ..function import DegreePadding
+from ..function.reducer import DegreePadding
 from .. import utils
 
 from . import ir
@@ -108,8 +108,7 @@ def _degree_padding_schedule(mids, dsts, v, bkt_split):
     """
     buckets = _CAPI_DGLDegreePadding(mids.todgltensor(), dsts.todgltensor(),
                                      v.todgltensor(), bkt_split.todgltensor())
-    # TODO(zihao)
-    pass
+    return _process_node_buckets_padding(buckets)
 
 def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of
@@ -128,13 +127,57 @@ def _degree_bucketing_schedule(mids, dsts, v):
                                        v.todgltensor())
     return _process_node_buckets(buckets)
 
+def _process_node_buckets_padding(buckets):
+    """read bucketing auxiliary data
+
+    Returns
+    -------
+    unique_v: utils.Index
+        unique destination nodes
+    degrees: list of utils.Index
+        A list of degrees for each bucket
+    v_bkt: list of utils.Index
+        A list of node id buckets, nodes in each bucket are padded to the same degree.
+    msg_ids: list of utils.Index
+        A list of message id buckets,
+    zero_deg_nodes: utils.Index
+        The zero-degree nodes
+    """
+    degs = utils.toindex(buckets(0))
+    v = utils.toindex(buckets(1))
+
+    v_section = buckets(2).asnumpy().tolist()
+    msg_ids = utils.toindex(buckets(3))
+    msg_section = buckets(4).asnumpy().tolist()
+
+    # split buckets
+    msg_ids = msg_ids.tousertensor()
+    degs = F.split(degs.tousertensor(), v_section, 0)
+    dsts = F.split(v.tousertensor(), v_section, 0)
+    msg_ids = F.split(msg_ids, msg_section, 0)
+
+    # convert to utils.Index
+    degs = [utils.toindex(deg).tonumpy() for deg in degs]
+    dsts = [utils.toindex(dst) for dst in dsts]
+    msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
+
+    # handle zero deg
+    if degs[-1][-1] == 0:
+        degs = degs[:-1]
+        zero_deg_nodes = dsts[-1]
+        dsts = dsts[:-1]
+    else:
+        zero_deg_nodes = None
+
+    return v, degs, dsts, msg_ids, zero_deg_nodes
+
 def _process_node_buckets(buckets):
     """read bucketing auxiliary data
 
     Returns
     -------
     unique_v: utils.Index
-        unqiue destination nodes
+        unique destination nodes
     degrees: numpy.ndarray
         A list of degree for each bucket
     v_bkt: list of utils.Index
@@ -142,7 +185,7 @@ def _process_node_buckets(buckets):
     msg_ids: list of utils.Index
         A list of message id buckets, each node in the ith node id bucket has
         degree[i] messages in the ith message id bucket
-    zero_deg_nodes : utils.Index
+    zero_deg_nodes: utils.Index
         The zero-degree nodes
     """
     # get back results
@@ -182,7 +225,7 @@ def _create_per_bkt_rfunc_padding(reduce_udf, degs, vbkt):
             return F.pad_packed_tensor(msg, degs, reduce_udf.padding_val)
         reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
         nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data)
-        return reduce_udf(nbatch)
+        return reduce_udf(nbatch, degs)
     return _rfunc_wrapper
 
 def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):

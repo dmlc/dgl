@@ -32,6 +32,11 @@ namespace sched {
 std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids);
 
+/*! TODO(zihao): finish the docstring
+ */
+std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
+        const IdArray& recv_ids, const IdArray& bkt_split);
+
 /*!
  * \brief Generate degree bucketing schedule for group_apply edge
  * \param uids One end vertex of edge by which edges are grouped
