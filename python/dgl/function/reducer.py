@@ -3,11 +3,11 @@
 from __future__ import absolute_import
 
 import sys
+import functools
 
 from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
-from functools import wraps
 
 
 class ReduceFunction(BuiltinFunction):
@@ -91,10 +91,18 @@ class DegreePadding(object):
             self.bucket_split = bucket_split
         self.padding_val = padding_val
 
+    def __get__(self, obj):
+        return functools.partial(self, obj)
+
     def __call__(self, *args, **kwargs):
         return self.fn(*args, **kwargs)
 
-__all__ = ['DegreePadding']
+def degree_padding(bucket_split=None, padding_val=0):
+    return functools.partial(DegreePadding,
+                             bucket_split=bucket_split,
+                             padding_val=padding_val)
+
+__all__ = ['DegreePadding', 'degree_padding']
 
 
 def _register_builtin_reduce_func():

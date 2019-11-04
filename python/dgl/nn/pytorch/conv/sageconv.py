@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from .... import function as fn
-from ....function.reducer import DegreePadding
+from ....function.reducer import degree_padding
 
 
 class SAGEConv(nn.Module):
@@ -75,6 +75,7 @@ class SAGEConv(nn.Module):
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
+    @degree_padding(bucket_split=[1,8])
     def _lstm_reducer(self, nodes, degs):
         """LSTM reducer
         NOTE(zihao): lstm reducer with default schedule (degree bucketing)
@@ -126,8 +127,7 @@ class SAGEConv(nn.Module):
             h_neigh = graph.ndata['neigh']
         elif self._aggre_type == 'lstm':
             graph.ndata['h'] = feat
-            graph.update_all(fn.copy_src('h', 'm'), DegreePadding(self._lstm_reducer,
-                                                                  bucket_split=[1, 2, 4, 8]))
+            graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
             h_neigh = graph.ndata['neigh']
         else:
             raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))

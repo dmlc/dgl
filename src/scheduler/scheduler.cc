@@ -95,7 +95,6 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
 
 std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids, const IdArray& bkt_split) {
-
     auto n_msgs = msg_ids->shape[0];
     auto n_bkts = bkt_split->shape[0];
     auto n_recv_nodes = recv_ids->shape[0];
@@ -114,7 +113,8 @@ std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
     // bkt: deg->dsts
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, int64_t>>> bkt;
     for (const auto &it : in_edges) {
-        const int64_t idx = std::lower_bound(bkt_data, bkt_data + n_bkts, it.second.size()) - bkt_data;
+        const int64_t idx = std::lower_bound(
+            bkt_data, bkt_data + n_bkts, it.second.size()) - bkt_data;
         bkt[idx].push_back(std::make_pair(it.second.size(), it.first));
     }
 
@@ -148,15 +148,15 @@ std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
     int64_t* msec_ptr = static_cast<int64_t*>(mid_section->data);
 
     // fill in bucketing ordering
-    for (const auto& it : bkt) { // for each bucket
+    for (const auto& it : bkt) {    // for each bucket
         const int64_t bucket_size = it.second.size();
         *nsec_ptr++ = bucket_size;
         int64_t msg_cnt = 0;
-        for (const auto deg_dst : it.second) { // for each dst in this bucket
+        for (const auto deg_dst : it.second) {  // for each dst in this bucket
             auto deg = deg_dst.first, dst = deg_dst.second;
             *nid_ptr++ = dst;
             *deg_ptr++ = deg;
-            for (const auto mid : in_edges[dst]) { // for each in-edge of dst
+            for (const auto mid : in_edges[dst]) {  // for each in-edge of dst
                 *mid_ptr++ = mid;
                 msg_cnt++;
             }
