@@ -154,6 +154,7 @@ def edge_softmax(graph, logits, eids=ALL):
         [0.3333]])
 
     Apply edge softmax on first 4 edges of g:
+
     >>> edge_softmax(g, edata[:4], th.Tensor([0,1,2,3]))
     tensor([[1.0000],
         [0.5000],

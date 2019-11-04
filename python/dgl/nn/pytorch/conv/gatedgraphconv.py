@@ -1,5 +1,5 @@
 """Torch Module for Gated Graph Convolution layer"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, cell-var-from-loop
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -41,7 +41,10 @@ class GatedGraphConv(nn.Module):
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._n_steps = n_steps
-        self.edge_embed = nn.Embedding(n_etypes, out_feats * out_feats)
+        self._n_etypes = n_etypes
+        self.linears = nn.ModuleList(
+            [nn.Linear(out_feats, out_feats) for _ in range(n_etypes)]
+        )
         self.gru = nn.GRUCell(out_feats, out_feats, bias=bias)
         self.reset_parameters()
 
@@ -49,7 +52,9 @@ class GatedGraphConv(nn.Module):
         """Reinitialize learnable parameters."""
         gain = init.calculate_gain('relu')
         self.gru.reset_parameters()
-        init.xavier_normal_(self.edge_embed.weight, gain=gain)
+        for linear in self.linears:
+            init.xavier_normal_(linear.weight, gain=gain)
+            init.zeros_(linear.bias)
 
     def forward(self, graph, feat, etypes):
         """Compute Gated Graph Convolution layer.
@@ -75,13 +80,17 @@ class GatedGraphConv(nn.Module):
         graph = graph.local_var()
         zero_pad = feat.new_zeros((feat.shape[0], self._out_feats - feat.shape[1]))
         feat = th.cat([feat, zero_pad], -1)
-        # NOTE(zihao): there is still room to optimize, we may do kernel fusion
-        # for such operations in the future.
-        graph.edata['w'] = self.edge_embed(etypes).view(-1, self._out_feats, self._out_feats)
+
         for _ in range(self._n_steps):
-            graph.ndata['h'] = feat.unsqueeze(-1) # (N, D, 1)
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'),
-                             fn.sum('m', 'a'))
-            a = graph.ndata.pop('a').sum(dim=1) # (N, D)
+            graph.ndata['h'] = feat
+            for i in range(self._n_etypes):
+                eids = (etypes == i).nonzero().view(-1)
+                if len(eids) > 0:
+                    graph.apply_edges(
+                        lambda edges: {'W_e*h': self.linears[i](edges.src['h'])},
+                        eids
+                    )
+            graph.update_all(fn.copy_e('W_e*h', 'm'), fn.sum('m', 'a'))
+            a = graph.ndata.pop('a') # (N, D)
             feat = self.gru(a, feat)
         return feat

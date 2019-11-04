@@ -25,6 +25,7 @@ def main(args):
     train_mask = mx.nd.array(data.train_mask)
     val_mask = mx.nd.array(data.val_mask)
     test_mask = mx.nd.array(data.test_mask)
+
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
