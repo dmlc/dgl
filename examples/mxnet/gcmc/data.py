@@ -160,12 +160,12 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = None
-            self.movie_feature = None
+            self.user_feature = mx.nd.arange(self._num_user)
+            self.movie_feature = mx.nd.arange(self._num_movie)
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
             self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)
-        if self.user_feature is None:
+        if use_one_hot_fea:
             self.user_feature_shape = (self.num_user, self.num_user)
             self.movie_feature_shape = (self.num_movie, self.num_movie)
         else:
@@ -207,6 +207,7 @@ class MovieLens(object):
                 rst += graph.number_of_edges(str(r))
             return rst
 
+        self._train_npairs = _npairs(self.train_enc_graph)
         print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
             self.train_enc_graph.number_of_nodes('user'), self.train_enc_graph.number_of_nodes('movie'),
             _npairs(self.train_enc_graph)))
@@ -303,6 +304,11 @@ class MovieLens(object):
     @property
     def num_user(self):
         return self._num_user
+
+    @property
+    def train_npairs(self):
+        return self._train_npairs
+    
 
     @property
     def num_movie(self):
