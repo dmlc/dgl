@@ -18,7 +18,8 @@ class MoNet(nn.Block):
                  out_feats,
                  n_layers,
                  dim,
-                 n_kernels):
+                 n_kernels,
+                 dropout):
         super(MoNet, self).__init__()
         self.g = g
         with self.name_scope():
@@ -39,9 +40,13 @@ class MoNet(nn.Block):
             self.layers.add(GMMConv(n_hidden, out_feats, dim, n_kernels))
             self.pseudo_proj.add(nn.Dense(dim, in_units=2, activation='tanh'))
 
+            self.dropout = nn.Dropout(dropout)
+
     def forward(self, feat, pseudo):
         h = feat
         for i in range(len(self.layers)):
+            if i > 0:
+                h = self.dropout(h)
             h = self.layers[i](
                 self.g, h, self.pseudo_proj[i](pseudo))
         return h
@@ -109,6 +114,7 @@ def main(args):
                   args.n_layers,
                   args.pseudo_dim,
                   args.n_kernels,
+                  args.dropout
                   )
     model.initialize(ctx=ctx)
     n_train_samples = train_mask.sum().asscalar()
