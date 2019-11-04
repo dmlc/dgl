@@ -83,12 +83,12 @@ def _gen_reduce_builtin(reducer):
     return func
 
 class DegreePadding(object):
-    def __init__(self, fn, bucket_sizes=None, padding_val=0):
+    def __init__(self, fn, bucket_split=None, padding_val=0):
         self.fn = fn
-        if bucket_sizes is None:
-            self.bucket_sizes = []
+        if bucket_split is None:
+            self.bucket_split = []
         else:
-            self.bucket_sizes = bucket_sizes
+            self.bucket_split = bucket_split
         self.padding_val = padding_val
 
     def __call__(self, *args, **kwargs):

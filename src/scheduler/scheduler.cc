@@ -94,16 +94,16 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
 }
 
 std::vector<IdArray> DegreePadding(const IdArray& msg_ids, const IdArray& vids,
-        const IdArray& recv_ids, const IdArray& bkt_sizes) {
+        const IdArray& recv_ids, const IdArray& bkt_split) {
 
     auto n_msgs = msg_ids->shape[0];
-    auto n_bkts = bkt_sizes->shape[0];
+    auto n_bkts = bkt_split->shape[0];
     auto n_recv_nodes = recv_ids->shape[0];
 
     const int64_t* vid_data = static_cast<int64_t*>(vids->data)
     const int64_t* msg_id_data = static_cast<int64_t*>(msg_ids->data)
     const int64_t* recv_id_data = static_cast<int64_t*>(recv_ids->data);
-    const int64_t* bkt_data = static_cast<int64_t*>(bkt_sizes->data);
+    const int64_t* bkt_data = static_cast<int64_t*>(bkt_split->data);
 
     // in edge: dst->msgs
     std::unordered_map<int64_t, std::vector<int64_t>> in_edges;

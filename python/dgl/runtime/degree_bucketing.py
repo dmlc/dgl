@@ -48,7 +48,7 @@ def gen_degree_bucketing_schedule(
     """
     if isinstance(reduce_udf, DegreePadding):
         buckets = _degree_padding_schedule(message_ids, dst_nodes, recv_nodes,
-                                           utils.Index(reduce_udf.bucket_sizes))
+                                           utils.Index(reduce_udf.bucket_split))
     else:
         buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
 
@@ -91,7 +91,7 @@ def gen_degree_bucketing_schedule(
     reduced_feat = ir.MERGE_ROW(var_order, fd_list)
     ir.WRITE_DICT_(var_out, reduced_feat)
 
-def _degree_padding_schedule(mids, dsts, v, bkt_sizes):
+def _degree_padding_schedule(mids, dsts, v, bkt_split):
     """Return the bucketing by padding scheduling for destination nodes of
      messages.
 
@@ -103,11 +103,11 @@ def _degree_padding_schedule(mids, dsts, v, bkt_sizes):
         destination node for each message
     v : utils.Index
         all receiving nodes (for checking zero degree nodes)
-    bkt_sizes : utils.Index
+    bkt_split : utils.Index
         Pre-defined bucket sizes (must be ordered).
     """
     buckets = _CAPI_DGLDegreePadding(mids.todgltensor(), dsts.todgltensor(),
-                                     v.todgltensor(), bkt_sizes.todgltensor())
+                                     v.todgltensor(), bkt_split.todgltensor())
     # TODO(zihao)
     pass
 
