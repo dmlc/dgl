@@ -2,8 +2,10 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils.rnn import pack_padded_sequence
 
 from .... import function as fn
+from ....function.reducer import DegreePadding
 
 
 class SAGEConv(nn.Module):
@@ -73,16 +75,18 @@ class SAGEConv(nn.Module):
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
-    def _lstm_reducer(self, nodes):
+    def _lstm_reducer(self, nodes, degs):
         """LSTM reducer
         NOTE(zihao): lstm reducer with default schedule (degree bucketing)
         is slow, we could accelerate this with degree padding in the future.
         """
         m = nodes.mailbox['m'] # (B, L, D)
+        m_packed = pack_padded_sequence(m, degs, batch_first=True, enforce_sorted=False)
+
         batch_size = m.shape[0]
         h = (m.new_zeros((1, batch_size, self._in_feats)),
              m.new_zeros((1, batch_size, self._in_feats)))
-        _, (rst, _) = self.lstm(m, h)
+        _, (rst, _) = self.lstm(m_packed, h)
         return {'neigh': rst.squeeze(0)}
 
     def forward(self, graph, feat):
@@ -122,7 +126,8 @@ class SAGEConv(nn.Module):
             h_neigh = graph.ndata['neigh']
         elif self._aggre_type == 'lstm':
             graph.ndata['h'] = feat
-            graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
+            graph.update_all(fn.copy_src('h', 'm'), DegreePadding(self._lstm_reducer,
+                                                                  bucket_split=[1, 2, 4, 8]))
             h_neigh = graph.ndata['neigh']
         else:
             raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
