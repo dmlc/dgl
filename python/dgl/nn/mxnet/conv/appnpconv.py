@@ -1,12 +1,12 @@
-"""Torch Module for APPNPConv"""
+"""MXNet Module for APPNPConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import torch as th
-from torch import nn
+import mxnet as mx
+from mxnet import nd
+from mxnet.gluon import nn
 
 from .... import function as fn
 
-
-class APPNPConv(nn.Module):
+class APPNPConv(nn.Block):
     r"""Approximate Personalized Propagation of Neural Predictions
     layer from paper `Predict then Propagate: Graph Neural Networks
     meet Personalized PageRank <https://arxiv.org/pdf/1810.05997.pdf>`__.
@@ -34,7 +34,8 @@ class APPNPConv(nn.Module):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
-        self.edge_drop = nn.Dropout(edge_drop)
+        with self.name_scope():
+            self.edge_drop = nn.Dropout(edge_drop)
 
     def forward(self, graph, feat):
         r"""Compute APPNP layer.
@@ -43,27 +44,28 @@ class APPNPConv(nn.Module):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mx.NDArray
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
 
         Returns
         -------
-        torch.Tensor
+        mx.NDArray
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
         """
         graph = graph.local_var()
-        norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-        shp = norm.shape + (1,) * (feat.dim() - 1)
-        norm = th.reshape(norm, shp).to(feat.device)
+        norm = mx.nd.power(mx.nd.clip(
+            graph.in_degrees().astype(feat.dtype), a_min=1, a_max=float("inf")), -0.5)
+        shp = norm.shape + (1,) * (feat.ndim - 1)
+        norm = norm.reshape(shp).as_in_context(feat.context)
         feat_0 = feat
         for _ in range(self._k):
             # normalization by src node
             feat = feat * norm
             graph.ndata['h'] = feat
             graph.edata['w'] = self.edge_drop(
-                th.ones(graph.number_of_edges(), 1).to(feat.device))
+                nd.ones((graph.number_of_edges(), 1), ctx=feat.context))
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                              fn.sum('m', 'h'))
             feat = graph.ndata.pop('h')

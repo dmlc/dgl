@@ -1,13 +1,14 @@
-"""Torch Module for Chebyshev Spectral Graph Convolution layer"""
+"""MXNet Module for Chebyshev Spectral Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
-import torch as th
-from torch import nn
-from torch.nn import init
+import math
+import mxnet as mx
+from mxnet import nd
+from mxnet.gluon import nn
 
 from .... import laplacian_lambda_max, broadcast_nodes, function as fn
 
 
-class ChebConv(nn.Module):
+class ChebConv(nn.Block):
     r"""Chebyshev Spectral Graph Convolution layer from paper `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
@@ -34,7 +35,6 @@ class ChebConv(nn.Module):
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     """
-
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -43,25 +43,20 @@ class ChebConv(nn.Module):
         super(ChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.fc = nn.ModuleList([
-            nn.Linear(in_feats, out_feats, bias=False) for _ in range(k)
-        ])
         self._k = k
-        if bias:
-            self.bias = nn.Parameter(th.Tensor(out_feats))
-        else:
-            self.register_buffer('bias', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        if self.bias is not None:
-            init.zeros_(self.bias)
-        for module in self.fc.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_normal_(module.weight, init.calculate_gain('relu'))
-                if module.bias is not None:
-                    init.zeros_(module.bias)
+        with self.name_scope():
+            self.fc = nn.Sequential()
+            for _ in range(k):
+                self.fc.add(
+                    nn.Dense(out_feats, use_bias=False,
+                             weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                             in_units=in_feats)
+                )
+            if bias:
+                self.bias = self.params.get('bias', shape=(out_feats,),
+                                            init=mx.init.Zero())
+            else:
+                self.bias = None
 
     def forward(self, graph, feat, lambda_max=None):
         r"""Compute ChebNet layer.
@@ -70,10 +65,10 @@ class ChebConv(nn.Module):
         ----------
         graph : DGLGraph or BatchedDGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
             is size of input feature, :math:`N` is the number of nodes.
-        lambda_max : list or tensor or None, optional.
+        lambda_max : list or mxnet.NDArray or None, optional.
             A list(tensor) with length :math:`B`, stores the largest eigenvalue
             of the normalized laplacian of each individual graph in ``graph``,
             where :math:`B` is the batch size of the input graph. Default: None.
@@ -82,19 +77,20 @@ class ChebConv(nn.Module):
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
         with graph.local_scope():
-            norm = th.pow(
-                graph.in_degrees().float().clamp(min=1), -0.5).unsqueeze(-1).to(feat.device)
+            degs = graph.in_degrees().astype('float32')
+            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
+            norm = norm.expand_dims(-1).as_in_context(feat.context)
             if lambda_max is None:
                 lambda_max = laplacian_lambda_max(graph)
             if isinstance(lambda_max, list):
-                lambda_max = th.Tensor(lambda_max).to(feat.device)
-            if lambda_max.dim() == 1:
-                lambda_max = lambda_max.unsqueeze(-1)  # (B,) to (B, 1)
+                lambda_max = nd.array(lambda_max).as_in_context(feat.context)
+            if lambda_max.ndim == 1:
+                lambda_max = lambda_max.expand_dims(-1)
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)
             # T0(X)
@@ -123,5 +119,5 @@ class ChebConv(nn.Module):
                 Tx_1, Tx_0 = Tx_2, Tx_1
             # add bias
             if self.bias is not None:
-                rst = rst + self.bias
+                rst = rst + self.bias.data(feat.context)
             return rst
