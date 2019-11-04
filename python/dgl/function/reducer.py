@@ -7,6 +7,7 @@ import sys
 from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
+from functools import wraps
 
 
 class ReduceFunction(BuiltinFunction):
@@ -81,8 +82,19 @@ def _gen_reduce_builtin(reducer):
     func.__doc__ = docstring
     return func
 
+class DegreePadding(object):
+    def __init__(self, fn, bucket_sizes=None, padding_val=0):
+        self.fn = fn
+        if bucket_sizes is None:
+            self.bucket_sizes = []
+        else:
+            self.bucket_sizes = bucket_sizes
+        self.padding_val = padding_val
 
-__all__ = []
+    def __call__(self, *args, **kwargs):
+        return self.fn(*args, **kwargs)
+
+__all__ = ['DegreePadding']
 
 
 def _register_builtin_reduce_func():

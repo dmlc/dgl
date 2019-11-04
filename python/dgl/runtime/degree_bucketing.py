@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from .._ffi.function import _init_api
 from .. import backend as F
 from ..udf import NodeBatch, EdgeBatch
+from ..function import DegreePadding
 from .. import utils
 
 from . import ir
@@ -45,15 +46,25 @@ def gen_degree_bucketing_schedule(
     var_out : var.FEAT_DICT
         The variable for output feature dicts.
     """
-    buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
+    if isinstance(reduce_udf, DegreePadding):
+        buckets = _degree_padding_schedule(message_ids, dst_nodes, recv_nodes,
+                                           utils.Index(reduce_udf.bucket_sizes))
+    else:
+        buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
+
     # generate schedule
     _, degs, buckets, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
     idx_list = []
     fd_list = []
+
     for deg, vbkt, mid in zip(degs, buckets, msg_ids):
         # create per-bkt rfunc
-        rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt)
+        if isinstance(reduce_udf, DegreePadding):
+            # in this case, deg is a list
+            rfunc = _create_per_bkt_rfunc_padding(reduce_udf, deg, vbkt)
+        else:
+            rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt)
         # vars
         vbkt = var.IDX(vbkt)
         mid = var.IDX(mid)
@@ -65,6 +76,7 @@ def gen_degree_bucketing_schedule(
         # save for merge
         idx_list.append(vbkt)
         fd_list.append(fdvb)
+
     if zero_deg_nodes is not None:
         # NOTE: there must be at least one non-zero-deg node; otherwise,
         #   degree bucketing should not be called.
@@ -78,6 +90,26 @@ def gen_degree_bucketing_schedule(
     var_order = var.IDX(utils.toindex(order))
     reduced_feat = ir.MERGE_ROW(var_order, fd_list)
     ir.WRITE_DICT_(var_out, reduced_feat)
+
+def _degree_padding_schedule(mids, dsts, v, bkt_sizes):
+    """Return the bucketing by padding scheduling for destination nodes of
+     messages.
+
+    Parameters
+    ----------
+    mids : utils.Index
+        edge id for each message
+    dsts : utils.Index
+        destination node for each message
+    v : utils.Index
+        all receiving nodes (for checking zero degree nodes)
+    bkt_sizes : utils.Index
+        Pre-defined bucket sizes (must be ordered).
+    """
+    buckets = _CAPI_DGLDegreePadding(mids.todgltensor(), dsts.todgltensor(),
+                                     v.todgltensor(), bkt_sizes.todgltensor())
+    # TODO(zihao)
+    pass
 
 def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of
@@ -140,6 +172,18 @@ def _process_node_buckets(buckets):
         zero_deg_nodes = None
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
+
+def _create_per_bkt_rfunc_padding(reduce_udf, degs, vbkt):
+    """Internal function to generate the per degree bucket node UDF
+     when using degree padding."""
+    def _rfunc_wrapper(node_data, mail_data):
+        def _reshaped_getter(key):
+            msg = mail_data[key]
+            return F.pad_packed_tensor(msg, degs, reduce_udf.padding_val)
+        reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
+        nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data)
+        return reduce_udf(nbatch)
+    return _rfunc_wrapper
 
 def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
     """Internal function to generate the per degree bucket node UDF."""
