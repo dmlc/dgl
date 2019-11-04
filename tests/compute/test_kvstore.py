@@ -30,53 +30,36 @@ def start_client():
 
     # Initialize data on server
     client.init_data(name='embed_0', server_id=0, shape=[5, 3], init_type='zero')
-    client.init_data(name='embed_0', server_id=1, shape=[6, 3], init_type='zero')
     client.init_data(name='embed_1', server_id=0, shape=[5], init_type='uniform', low=0.0, high=0.0)
-    client.init_data(name='embed_1', server_id=1, shape=[6], init_type='uniform', low=0.0, high=0.0)
 
     data_0 = th.tensor([[0., 0., 0., ], [1., 1., 1.], [2., 2., 2.]])
     data_1 = th.tensor([0., 1., 2.])
 
     for i in range(5):
         client.push(name='embed_0', server_id=0, id_tensor=th.tensor([0, 2, 4]), data_tensor=data_0)
-        client.push(name='embed_0', server_id=1, id_tensor=th.tensor([1, 3, 5]), data_tensor=data_0)
         client.push(name='embed_1', server_id=0, id_tensor=th.tensor([0, 2, 4]), data_tensor=data_1)
-        client.push(name='embed_1', server_id=1, id_tensor=th.tensor([1, 3, 5]), data_tensor=data_1)
 
     client.barrier()
 
     client.pull(name='embed_0', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
-    server_id, new_tensor_0 = client.pull_wait()
+    server_id, new_tensor = client.pull_wait()
     assert server_id == 0
-    client.pull(name='embed_0', server_id=1, id_tensor=th.tensor([0, 1, 2, 3, 4, 5]))
-    server_id, new_tensor_1 = client.pull_wait()
-    assert server_id == 1
 
     target_tensor = th.tensor(
-        [[ 0.  0.  0.]
-         [ 0.  0.  0.]
-         [20. 20. 20.]
-         [ 0.  0.  0.]
-         [40. 40. 40.]
-         [ 0.  0.  0.]
-         [ 0.  0.  0.]
-         [ 0.  0.  0.]
-         [20. 20. 20.]
-         [ 0.  0.  0.]
+        [[ 0.  0.  0.],
+         [ 0.  0.  0.],
+         [20. 20. 20.],
+         [ 0.  0.  0.],
          [40. 40. 40.]])
 
-    assert th.equal(th.cat(new_tensor_0, new_tensor_1), target_tensor) == True
+    assert th.equal(new_tensor, target_tensor) == True
 
     client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
-    server_id, new_tensor_0 = client.pull_wait()
-    assert server_id == 0
-    client.pull(name='embed_1', server_id=1, id_tensor=th.tensor([0, 1, 2, 3, 4, 5]))
-    server_id, new_tensor_1 = client.pull_wait()
-    assert server_id == 1
+    server_id, new_tensor = client.pull_wait()
 
-    target_tensor = th.tensor([ 0.  0. 20.  0. 40.  0.  0.  0. 20.  0. 40.])
+    target_tensor = th.tensor([ 0., 0., 20., 0., 40.])
 
-    assert th.equal(th.cat(new_tensor_0, new_tensor_1), target_tensor) == True
+    assert th.equal(new_tensor, target_tensor) == True
 
     client.shut_down()
 
