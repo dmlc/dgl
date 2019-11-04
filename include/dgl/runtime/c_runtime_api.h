@@ -33,7 +33,7 @@
 #endif
 
 // DGL version
-#define DGL_VERSION "0.4"
+#define DGL_VERSION "0.4.1"
 
 
 // DGL Runtime is DLPack compatible.
