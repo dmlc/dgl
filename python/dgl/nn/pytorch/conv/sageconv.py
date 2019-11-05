@@ -77,10 +77,6 @@ class SAGEConv(nn.Module):
 
     @degree_padding(bucket_split=[1,8])
     def _lstm_reducer(self, nodes, degs):
-        """LSTM reducer
-        NOTE(zihao): lstm reducer with default schedule (degree bucketing)
-        is slow, we could accelerate this with degree padding in the future.
-        """
         m = nodes.mailbox['m'] # (B, L, D)
         m_packed = pack_padded_sequence(m, degs, batch_first=True, enforce_sorted=False)
 

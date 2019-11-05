@@ -83,21 +83,29 @@ def _gen_reduce_builtin(reducer):
     return func
 
 class DegreePadding(object):
+    """TODO"""
     def __init__(self, fn, bucket_split=None, padding_val=0):
         self.fn = fn
+        self.bucket_split = []
+        self.padding_val = 0
         if bucket_split is None:
             self.bucket_split = []
         else:
             self.bucket_split = bucket_split
         self.padding_val = padding_val
+        self.instance = None
 
-    def __get__(self, obj):
-        return functools.partial(self, obj)
+    def __get__(self, instance, cls):
+        self.instance = instance
+        return self
 
     def __call__(self, *args, **kwargs):
+        if self.instance is not None:
+            return self.fn(self.instance, *args, **kwargs)
         return self.fn(*args, **kwargs)
 
 def degree_padding(bucket_split=None, padding_val=0):
+    """TODO"""
     return functools.partial(DegreePadding,
                              bucket_split=bucket_split,
                              padding_val=padding_val)
