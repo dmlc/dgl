@@ -39,8 +39,6 @@ def generate_rand_graph(n, func_name):
     rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
     if func_name == 'RESCAL':
         rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
-    if func_name == 'RotatE':
-        rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
@@ -59,20 +57,13 @@ def generate_rand_graph(n, func_name):
     else:
         return g, entity_emb, rel_emb, None
 
-if backend.lower() == 'mxnet':
-    ke_score_funcs = {'TransE': TransEScore,
-                      'DistMult': DistMultScore,
-                      'ComplEx': ComplExScore,
-                      'RESCAL': RESCALScore,
-                      'TransR': TransRScore}
-    #TODO:add mxnet version of RotatE
-else:
-    ke_score_funcs = {'TransE': TransEScore,
-                      'DistMult': DistMultScore,
-                      'ComplEx': ComplExScore,
-                      'RESCAL': RESCALScore,
-                      'TransR': TransRScore,
-                      'RotatE': RotatEScore}
+ke_score_funcs = {'TransE': TransEScore,
+                  'DistMult': DistMultScore,
+                  'ComplEx': ComplExScore,
+                  'RESCAL': RESCALScore,
+                  'TransR': TransRScore}
+if backend.lower() != 'mxnet':
+    ke_score_funcs['RotatE']=RotatEScore
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
