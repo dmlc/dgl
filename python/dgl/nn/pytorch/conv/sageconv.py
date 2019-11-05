@@ -75,7 +75,7 @@ class SAGEConv(nn.Module):
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
-    @degree_padding(bucket_split=[1,8])
+    @degree_padding(bucket_split=[1, 8])
     def _lstm_reducer(self, nodes, degs):
         m = nodes.mailbox['m'] # (B, L, D)
         m_packed = pack_padded_sequence(m, degs, batch_first=True, enforce_sorted=False)
