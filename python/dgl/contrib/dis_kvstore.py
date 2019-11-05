@@ -94,6 +94,19 @@ class KVServer(object):
         _finalize_sender(self._sender)
         _finalize_receiver(self._receiver)
 
+    def init_data(self, name, data_tensor):
+        """KVServer supports data initialization on server.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        data_tensor : tensor
+            data tensor
+        """
+        self._data_store[name] = data_tensor
+        self._is_init.add(name)
+
     def start(self):
         """Start service of KVServer
         """
