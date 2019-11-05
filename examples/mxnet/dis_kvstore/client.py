@@ -30,6 +30,8 @@ def start_client(args):
         client.push(name='embed_0', server_id=1, id_tensor=mx.nd.array([1, 3, 5], dtype='int64'), data_tensor=data_0)
         client.push(name='embed_1', server_id=0, id_tensor=mx.nd.array([0, 2, 4], dtype='int64'), data_tensor=data_1)
         client.push(name='embed_1', server_id=1, id_tensor=mx.nd.array([1, 3, 5], dtype='int64'), data_tensor=data_1)
+        client.push(name='server_embed', server_id=0, id_tensor=mx.nd.array([0, 2, 4], dtype='int64'), data_tensor=data_1)
+        client.push(name='server_embed', server_id=1, id_tensor=mx.nd.array([0, 2, 4], dtype='int64'), data_tensor=data_1)
 
     client.barrier()
 
@@ -40,7 +42,6 @@ def start_client(args):
         client.pull(name='embed_0', server_id=1, id_tensor=mx.nd.array([0, 1, 2, 3, 4, 5], dtype='int64'))
         server_id, new_tensor_1 = client.pull_wait()
         assert server_id == 1
-
         print("embed_0:")
         print(mx.nd.concat(new_tensor_0, new_tensor_1, dim=0))
 
@@ -50,8 +51,16 @@ def start_client(args):
         client.pull(name='embed_1', server_id=1, id_tensor=mx.nd.array([0, 1, 2, 3, 4, 5], dtype='int64'))
         server_id, new_tensor_1 = client.pull_wait()
         assert server_id == 1
-
         print("embed_1:")
+        print(mx.nd.concat(new_tensor_0, new_tensor_1, dim=0))
+
+        client.pull(name='server_embed', server_id=0, id_tensor=mx.nd.array([0, 1, 2, 3, 4], dtype='int64'))
+        server_id, new_tensor_0 = client.pull_wait()
+        assert server_id == 0
+        client.pull(name='server_embed', server_id=1, id_tensor=mx.nd.array([0, 1, 2, 3, 4], dtype='int64'))
+        server_id, new_tensor_1 = client.pull_wait()
+        assert server_id == 1
+        print("server_embed:")
         print(mx.nd.concat(new_tensor_0, new_tensor_1, dim=0))
 
     # Shut-down all the servers
