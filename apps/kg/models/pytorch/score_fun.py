@@ -334,7 +334,6 @@ class RESCALScore(nn.Module):
                 return th.bmm(tmp, tails)
             return fn
 
-
 class RotatEScore(nn.Module):
     def __init__(self, gamma, emb_init):
         super(RotatEScore, self).__init__()
