@@ -1350,18 +1350,19 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     CHECK(aten::IsValidIdArray(seed_edges));
     BuildCoo(*gptr);
 
-    const int64_t actual_batch_size = batch_size * relation_parts;
+    //each worker will generate #relation_parts batch_size data
+    const int64_t worker_batch_size = batch_size * relation_parts;
     const int64_t num_seeds = seed_edges->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
-        (num_seeds + actual_batch_size - 1) / actual_batch_size - batch_start_id);
+        (num_seeds - batch_start_id * batch_size + worker_batch_size - 1) / worker_batch_size);
     // generate subgraphs.
     std::vector<std::vector<SubgraphRef>> positive_subgs(num_workers);
     std::vector<std::vector<SubgraphRef>> negative_subgs(num_workers);
 
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
-      const int64_t start = (batch_start_id + i) * actual_batch_size;
-      const int64_t end = std::min(start + actual_batch_size, num_seeds);
+      const int64_t start = batch_start_id * batch_size + i * worker_batch_size;
+      const int64_t end = std::min(start + worker_batch_size, num_seeds);
       const int64_t num_edges = end - start;
 
       IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
