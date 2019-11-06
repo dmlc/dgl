@@ -81,15 +81,18 @@ class GCMCLayer(Block):
                 rating = str(rating)
                 if share_user_item_param and user_in_units == movie_in_units:
                     self.W_r[rating] = self.params.get(
-                        'W_r_%s' % rating, shape=(user_in_units, msg_units),
+                        'W_r_%s' % rating,
+                        shape=(user_in_units, msg_units),
                         dtype=np.float32, allow_deferred_init=True)
                     self.W_r['rev-%s' % rating] = self.W_r[rating]
                 else:
                     self.W_r[rating] = self.params.get(
-                        'W_r_%s' % rating, shape=(user_in_units, msg_units),
+                        'W_r_%s' % rating,
+                        shape=(user_in_units, msg_units),
                         dtype=np.float32, allow_deferred_init=True)
                     self.W_r['rev-%s' % rating] = self.params.get(
-                        'revW_r_%s' % rating, shape=(movie_in_units, msg_units),
+                        'revW_r_%s' % rating,
+                        shape=(movie_in_units, msg_units),
                         dtype=np.float32, allow_deferred_init=True)
             self.ufc = nn.Dense(out_units)
             if share_user_item_param:
@@ -99,7 +102,7 @@ class GCMCLayer(Block):
             self.agg_act = get_activation(agg_act)
             self.out_act = get_activation(out_act)
 
-    def forward(self, head_graph, tail_graph):
+    def eval_forward(self, graph, ufeat=None, ifeat=None, ctx=None):
         """Forward function
 
         Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
@@ -122,41 +125,99 @@ class GCMCLayer(Block):
         new_ifeat : mx.nd.NDArray
             New movie features
         """
-        ifeat = head_graph.nodes['movie'].data['feature']
-        num_i = head_graph.number_of_nodes('user')
+        num_u = graph.number_of_nodes('user')
+        num_i = graph.number_of_nodes('movie')
+        ufeat = ufeat.as_in_context(ctx)
+        ifeat = ifeat.as_in_context(ctx)
         funcs = {}
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating)
-            x_u = dot_or_identity(ifeat, self.W_r['rev-%s' % rating].data())
-            x_u = x_u * self.dropout(head_graph.nodes['movie'].data['cj'])
-            head_graph.nodes['movie'].data['h%d' % i] = x_u
+            # W_r * x
+            x_u = dot_or_identity(ufeat, self.W_r[rating].data())
+            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating].data())
+            # left norm and dropout
+            x_u = x_u * self.dropout(graph.nodes['user'].data['cj'])
+            x_i = x_i * self.dropout(graph.nodes['movie'].data['cj'])
+            graph.nodes['user'].data['h%d' % i] = x_u
+            graph.nodes['movie'].data['h%d' % i] = x_i
+            funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
             funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+        # message passing
+        graph.multi_update_all(funcs, self.agg)
+        ufeat = graph.nodes['user'].data.pop('h').reshape((num_u, -1))
+        ifeat = graph.nodes['movie'].data.pop('h').reshape((num_i, -1))
+        # right norm
+        ufeat = ufeat * graph.nodes['user'].data['ci']
+        ifeat = ifeat * graph.nodes['movie'].data['ci']
+        # fc and non-linear
+        ufeat = self.agg_act(ufeat)
+        ifeat = self.agg_act(ifeat)
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
+        ufeat = self.ufc(ufeat)
+        ifeat = self.ifc(ifeat)
+        return self.out_act(ufeat), self.out_act(ifeat)
 
-        head_graph.multi_update_all(funcs, self.agg)
-        ufeat = head_graph.nodes['user'].data['h'].reshape((num_i, -1))
-        ufeat = ifeat * head_graph.nodes['user'].data['ci']
-        ufeat = self.agg_act(ifeat)
-        ufeat = self.dropout(ifeat)
-        feat = self.ufc(ifeat)
-        head_feat = self.out_act(feat)
+    def forward(self, head_graph, tail_graph, ctx):
+        """Forward function
 
-        ufeat = tail_graph.nodes['user'].data['feature']
+        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
+        and "cj".
+
+        Parameters
+        ----------
+        graph : DGLHeteroGraph
+            User-movie rating graph. It should contain two node types: "user"
+            and "movie" and many edge types each for one rating value.
+        ufeat : mx.nd.NDArray, optional
+            User features. If None, using an identity matrix.
+        ifeat : mx.nd.NDArray, optional
+            Movie features. If None, using an identity matrix.
+
+        Returns
+        -------
+        new_ufeat : mx.nd.NDArray
+            New user features
+        new_ifeat : mx.nd.NDArray
+            New movie features
+        """
+        ifeat = head_graph.nodes['movie'].data['feature'].as_in_context(ctx)
+        num_i = head_graph.number_of_nodes('user')
+        funcs_head = {}
+        for i, rating in enumerate(self.rating_vals):
+            rating = str(rating)
+            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating].data())
+            x_i = x_i * self.dropout(head_graph.nodes['movie'].data['cj'])
+            head_graph.nodes['movie'].data['h%d' % i] = x_i
+            funcs_head['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+
+        head_graph.multi_update_all(funcs_head, self.agg)
+        ufeat = head_graph.nodes['user'].data['h']
+        ufeat = ufeat.reshape((num_i, -1))
+        ufeat = ufeat * head_graph.nodes['user'].data['ci']
+        ufeat = self.agg_act(ufeat)
+        ufeat = self.dropout(ufeat)
+        ufeat = self.ufc(ufeat)
+        head_feat = self.out_act(ufeat)
+
+        ufeat = tail_graph.nodes['user'].data['feature'].as_in_context(ctx)
         num_i = tail_graph.number_of_nodes('movie')
-        funcs = {}
+        funcs_tail = {}
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating)
             x_u = dot_or_identity(ufeat, self.W_r[rating].data())
             x_u = x_u * self.dropout(tail_graph.nodes['user'].data['cj'])
             tail_graph.nodes['user'].data['h%d' % i] = x_u
-            funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+            funcs_tail[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
 
-        tail_graph.multi_update_all(funcs, self.agg)
-        ifeat = tail_graph.nodes['movie'].data['h'].reshape((num_i, -1))
+        tail_graph.multi_update_all(funcs_tail, self.agg)
+        ifeat = tail_graph.nodes['movie'].data['h']
+        ifeat = ifeat.reshape((num_i, -1))
         ifeat = ifeat * tail_graph.nodes['movie'].data['ci']
         ifeat = self.agg_act(ifeat)
         ifeat = self.dropout(ifeat)
         ifeat = self.ifc(ifeat)
-        tail_feat = self.out_act(feat)
+        tail_feat = self.out_act(ifeat)
 
         return head_feat, tail_feat
 
@@ -201,6 +262,36 @@ class BiDecoder(Block):
                     init=mx.initializer.Xavier(magnitude=math.sqrt(2.0)),
                     allow_deferred_init=True))
             self.rate_out = nn.Dense(units=len(rating_vals), flatten=False, use_bias=False)
+
+    def eval_forward(self, graph, ufeat, ifeat):
+        """Forward function.
+
+        Parameters
+        ----------
+        graph : DGLHeteroGraph
+            "Flattened" user-movie graph with only one edge type.
+        ufeat : mx.nd.NDArray
+            User embeddings. Shape: (|V_u|, D)
+        ifeat : mx.nd.NDArray
+            Movie embeddings. Shape: (|V_m|, D)
+
+        Returns
+        -------
+        mx.nd.NDArray
+            Predicting scores for each user-movie edge.
+        """
+        graph = graph.local_var()
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
+        graph.nodes['movie'].data['h'] = ifeat
+        basis_out = []
+        for i in range(self._num_basis_functions):
+            graph.nodes['user'].data['h'] = F.dot(ufeat, self.Ps[i].data())
+            graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
+            basis_out.append(graph.edata['sr'].expand_dims(1))
+        out = F.concat(*basis_out, dim=1)
+        out = self.rate_out(out)
+        return out
 
     def forward(self, ufeat, ifeat):
         """Forward function.

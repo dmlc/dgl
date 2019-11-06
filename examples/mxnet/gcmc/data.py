@@ -160,8 +160,10 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = mx.nd.arange(self._num_user)
-            self.movie_feature = mx.nd.arange(self._num_movie)
+            self.user_feature = mx.nd.arange(self._num_user, dtype=np.int32)
+            print(self.user_feature.shape)
+            self.movie_feature = mx.nd.arange(self._num_movie, dtype=np.int32)
+            print(self.movie_feature.shape)
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
             self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)

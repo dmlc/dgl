@@ -19,6 +19,7 @@ class Net(Block):
     def __init__(self, args, **kwargs):
         super(Net, self).__init__(**kwargs)
         self._act = get_activation(args.model_activation)
+        self._ctx = args.ctx
         with self.name_scope():
             self.encoder = GCMCLayer(args.rating_vals,
                                      args.src_in_units,
@@ -33,24 +34,25 @@ class Net(Block):
                                      in_units=args.gcn_out_units,
                                      num_basis_functions=args.gen_r_num_basis_func)
 
-    def forward(self, head_subgraph, tail_subgraph, g_user_fea, g_movie_fea, true_head_ids, true_tail_ids):
+    def eval_forward(self, enc_graph, dec_graph, ufeat, ifeat):
+        user_out, movie_out = self.encoder.eval_forward(
+            enc_graph,
+            ufeat,
+            ifeat,
+            self._ctx)
+        pred_ratings = self.decoder.eval_forward(dec_graph, user_out, movie_out)
+        return pred_ratings
+
+    def forward(self, head_subgraph, tail_subgraph, g_user_fea, g_movie_fea, true_head_idx, true_tail_idx):
         user_out, movie_out = self.encoder(
             head_subgraph,
-            tail_subgraph)
+            tail_subgraph,
+            self._ctx)
 
-        head_NID = head_subgraph.nodes['user'].data[dgl.NID]
-        tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
+        true_user_out = user_out[true_head_idx]
+        true_movie_out = movie_out[true_tail_idx]
 
-        g_user_fea[head_NID] = mx.nd.arange(head_NID.shape[0])
-        g_user_fea[tail_NID] = mx.nd.arange(tail_NID.shape[0])
-
-        true_user_idx = g_user_fea[true_head_ids]
-        true_tail_idx = g_user_fea[true_tail_ids]
-
-        true_user_out = user_out[true_user_idx]
-        true_tail_out = movie_out[true_tail_idx]
-
-        pred_ratings = self.decoder(true_user_out, true_tail_out)
+        pred_ratings = self.decoder(true_user_out, true_movie_out)
         return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
@@ -70,7 +72,7 @@ def evaluate(args, net, dataset, segment='valid'):
 
     # Evaluate RMSE
     with mx.autograd.predict_mode():
-        pred_ratings = net(enc_graph, dec_graph,
+        pred_ratings = net.eval_forward(enc_graph, dec_graph,
                            dataset.user_feature, dataset.movie_feature)
     real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                          nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
@@ -91,10 +93,10 @@ def train(args):
     ### build the net
     net = Net(args=args)
     net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
-    net.hybridize()
+    #net.hybridize()
     nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
     rating_loss_net = gluon.loss.SoftmaxCELoss()
-    rating_loss_net.hybridize()
+    #rating_loss_net.hybridize()
     trainer = gluon.Trainer(net.collect_params(), args.train_optimizer, {'learning_rate': args.train_lr})
     print("Loading network finished ...\n")
 
@@ -103,7 +105,7 @@ def train(args):
     train_gt_ratings = dataset.train_truths
 
     ### prepare the logger
-    train_loss_logger = MetricLogger(['iter', 'loss', 'rmse'], ['%d', '%.4f', '%.4f'],
+    train_loss_logger = MetricLogger(['iter', 'idx', 'loss', 'rmse'], ['%d', '%d', '%.4f', '%.4f'],
                                      os.path.join(args.save_dir, 'train_loss%d.csv' % args.save_id))
     valid_loss_logger = MetricLogger(['iter', 'rmse'], ['%d', '%.4f'],
                                      os.path.join(args.save_dir, 'valid_loss%d.csv' % args.save_id))
@@ -142,11 +144,9 @@ def train(args):
         if iter_idx > 3:
             t0 = time.time()
 
-        count_rmse = 0
-        count_num = 0
-        seed = mx.nd.arange(dataset.train_npairs, dtype='int64')
+        seed = mx.nd.arange(dataset.train_npairs * 2, dtype='int64')
         edges = mx.nd.shuffle(seed)
-        for sample_idx in range(1, dataset.train_npairs//args.minibatch_size):
+        for sample_idx in range(0, dataset.train_npairs//args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size]
             head_ids, tail_ids = homo_enc_graph.find_edges(edge_ids)
 
@@ -177,7 +177,7 @@ def train(args):
                 head_in_i = enc_node_id_map[head_ids[start:idx]]
                 tail_in_i = enc_node_id_map[tail_ids[start:idx]]
 
-                # triky here, type should be 
+                # triky here, type should be
                 #   0 - rating[0]
                 #   1 - rev-rating[0]
                 #   2 - rating[1]
@@ -188,14 +188,26 @@ def train(args):
                 tail_in_edges = enc_graph.in_edges(tail_in_i, 'eid', etype=t)
 
                 if t[0] == 'user':
-                    head_subgraphs[rev_t] = head_in_edges
-                    tail_subgraphs[t] = tail_in_edges
+                    if rev_t in head_subgraphs:
+                        head_subgraphs[rev_t] = mx.nd.concat(head_subgraphs[rev_t], head_in_edges, dim=0)
+                    else:
+                        head_subgraphs[rev_t] = head_in_edges
+                    if t in tail_subgraphs:
+                        tail_subgraphs[t] = mx.nd.concat(tail_subgraphs[t], tail_in_edges, dim=0)
+                    else:
+                        tail_subgraphs[t] = tail_in_edges
                     true_head_ids.append(head_in_i)
                     true_tail_ids.append(tail_in_i)
                     true_relation_ids.append(mx.nd.full(idx-start, i))
                 else: #t[0] == 'movie'
-                    head_subgraphs[t] = tail_in_edges
-                    tail_subgraphs[rev_t] = head_in_edges
+                    if t in head_subgraphs:
+                        head_subgraphs[t] = mx.nd.concat(head_subgraphs[t], tail_in_edges, dim=0)
+                    else:
+                        head_subgraphs[t] = tail_in_edges
+                    if rev_t in tail_subgraphs:
+                        tail_subgraphs[rev_t] = mx.nd.concat(tail_subgraphs[rev_t], head_in_edges, dim=0)
+                    else:
+                        tail_subgraphs[rev_t] = head_in_edges
                     true_head_ids.append(tail_in_i)
                     true_tail_ids.append(head_in_i)
                     true_relation_ids.append(mx.nd.full(idx-start, rev_i))
@@ -205,25 +217,36 @@ def train(args):
             true_head_ids = mx.nd.concat(*true_head_ids, dim=0)
             true_tail_ids = mx.nd.concat(*true_tail_ids, dim=0)
             true_relation_ids = mx.nd.concat(*true_relation_ids, dim=0)
+            true_relation_ids = true_relation_ids.as_in_context(args.ctx)
+
+            head_NID = head_subgraph.nodes['user'].data[dgl.NID]
+            tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
+
+            g_user_fea[head_NID] = mx.nd.arange(head_NID.shape[0], dtype='int32')
+            g_movie_fea[tail_NID] = mx.nd.arange(tail_NID.shape[0], dtype='int32')
+
+            true_head_idx = g_user_fea[true_head_ids].as_in_context(args.ctx)
+            true_tail_idx = g_movie_fea[true_tail_ids].as_in_context(args.ctx)
 
             # minibatch sample here
             with mx.autograd.record():
                 pred_ratings = net(head_subgraph, tail_subgraph,
                                    g_user_fea, g_movie_fea,
-                                   true_head_ids, true_tail_ids)
+                                   true_head_idx, true_tail_idx)
                 loss = rating_loss_net(pred_ratings, true_relation_ids).mean()
-                loss.backward()
-
-            count_loss += loss.asscalar()
+            loss.backward()
             gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
-            avg_gnorm += gnorm
             trainer.step(1.0, ignore_stale_grad=True)
-
+            loss = loss.asscalar()
             real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-            rmse = mx.nd.square(real_pred_ratings - true_relation_ids).sum()
-            count_rmse += rmse.asscalar()
-            count_num += pred_ratings.shape[0]
+            rmse = mx.nd.square(real_pred_ratings - true_relation_ids).sum().asscalar()
+            sample_cnt = pred_ratings.shape[0]
+            if sample_idx % 10 == 0:
+                train_loss_logger.log(iter=iter_idx, idx=sample_idx,
+                                  loss=loss, rmse=rmse/sample_cnt)
+                print("Iter={}, sample_idx={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}".format(iter_idx,
+                    sample_idx, gnorm, loss, rmse/sample_cnt))
 
         if iter_idx > 3:
             dur.append(time.time() - t0)
@@ -233,15 +256,8 @@ def train(args):
             print(gluon_net_info(net, save_path=os.path.join(args.save_dir, 'net%d.txt' % args.save_id)))
 
         if iter_idx % args.train_log_interval == 0:
-            train_loss_logger.log(iter=iter_idx,
-                                  loss=count_loss/(iter_idx+1), rmse=count_rmse/count_num)
-            logging_str = "Iter={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}, time={:.4f}".format(
-                iter_idx, avg_gnorm/args.train_log_interval,
-                count_loss/iter_idx, count_rmse/count_num,
-                np.average(dur))
-            avg_gnorm = 0
-            count_rmse = 0
-            count_num = 0
+           logging_str = "Iter={}, time={:.4f}".format(
+                iter_idx, np.average(dur))
 
         if iter_idx % args.train_valid_interval == 0:
             valid_rmse = evaluate(args=args, net=net, dataset=dataset, segment='valid')
@@ -326,7 +342,7 @@ def config():
 
     ### configure save_fir to save all the info
     if args.save_dir is None:
-        args.save_dir = args.data_name+"_" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=2))
+        args.save_dir = args.data_name+"_" + str(int(time.time()))
     if args.save_id is None:
         args.save_id = np.random.randint(20)
     args.save_dir = os.path.join("log", args.save_dir)
