@@ -1363,9 +1363,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
       const int64_t start = (batch_start_id + i) * actual_batch_size;
       const int64_t end = std::min(start + actual_batch_size, num_seeds);
       const int64_t num_edges = end - start;
-      if (num_edges <= 0) {
-        break;
-      }
 
       IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
                                                    sizeof(dgl_id_t) * start);
@@ -1425,10 +1422,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     std::vector<SubgraphRef> subgs;
     if (neg_mode.size() > 0) {
       for (int i = 0; i < num_workers; i++) {
-        for (int j = 0; j < positive_subgs[i].size(); j ++) {
-          subgs.push_back(positive_subgs[i][j]);
-          subgs.push_back(negative_subgs[i][j]);
-        }
+        subgs.insert(subgs.end(), positive_subgs[i].begin(), positive_subgs[i].end());
+      }
+      for (int i = 0; i < num_workers; i++) {
+        subgs.insert(subgs.end(), negative_subgs[i].begin(), negative_subgs[i].end());
       }
     } else {
       for (int i = 0; i < num_workers; i++) {
