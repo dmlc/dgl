@@ -1425,8 +1425,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     std::vector<SubgraphRef> subgs;
     if (neg_mode.size() > 0) {
       for (int i = 0; i < num_workers; i++) {
-        subgs.insert(subgs.end(), positive_subgs[i].begin(), positive_subgs[i].end());
-        subgs.insert(subgs.end(), negative_subgs[i].begin(), negative_subgs[i].end());
+        for (int j = 0; j < positive_subgs[i].size(); j ++) {
+          subgs.push_back(positive_subgs[i][j]);
+          subgs.push_back(negative_subgs[i][j]);
+        }
       }
     } else {
       for (int i = 0; i < num_workers; i++) {
