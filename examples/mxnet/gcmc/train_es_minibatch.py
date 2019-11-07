@@ -43,7 +43,7 @@ class Net(Block):
         pred_ratings = self.decoder.eval_forward(dec_graph, user_out, movie_out)
         return pred_ratings
 
-    def forward(self, head_subgraph, tail_subgraph, g_user_fea, g_movie_fea, true_head_idx, true_tail_idx):
+    def forward(self, head_subgraph, tail_subgraph, true_head_idx, true_tail_idx):
         user_out, movie_out = self.encoder(
             head_subgraph,
             tail_subgraph,
@@ -56,6 +56,8 @@ class Net(Block):
         return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
+    g_user_fea = mx.nd.zeros((dataset.num_user))
+    g_movie_fea = mx.nd.zeros((dataset.num_movie))
     possible_rating_values = dataset.possible_rating_values
     nd_possible_rating_values = mx.nd.array(possible_rating_values, ctx=args.ctx, dtype=np.float32)
 
@@ -70,12 +72,48 @@ def evaluate(args, net, dataset, segment='valid'):
     else:
         raise NotImplementedError
 
-    # Evaluate RMSE
-    with mx.autograd.predict_mode():
-        pred_ratings = net.eval_forward(enc_graph, dec_graph,
-                           dataset.user_feature, dataset.movie_feature)
-    real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
-                         nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+    num_edges = rating_values.shape[0]
+    edges = mx.nd.arange(num_edges, dtype='int64')
+    real_pred_ratings = []
+    for sample_idx in range(0, ((num_edges - 1) // 5000) + 1):
+        edge_ids = edges[sample_idx * 5000: (sample_idx + 1) * 5000 if (sample_idx + 1) * 5000 < num_edges else num_edges]
+        head_ids, tail_ids = dec_graph.find_edges(edge_ids)
+
+        head_subgraphs = {}
+        tail_subgraphs = {}
+        for i, rating in enumerate(args.rating_vals):
+            t = enc_graph.canonical_etypes[i * 2]
+            rev_t = enc_graph.canonical_etypes[i * 2 + 1]
+
+            head_in_edges = enc_graph.in_edges(head_ids, 'eid', etype=rev_t)
+            tail_in_edges = enc_graph.in_edges(tail_ids, 'eid', etype=t)
+
+            head_subgraphs[rev_t] = head_in_edges
+            tail_subgraphs[t] = tail_in_edges
+
+        head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
+        tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
+
+        head_NID = head_subgraph.nodes['user'].data[dgl.NID]
+        tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
+
+        g_user_fea[head_NID] = mx.nd.arange(head_NID.shape[0], dtype='int32')
+        g_movie_fea[tail_NID] = mx.nd.arange(tail_NID.shape[0], dtype='int32')
+
+        true_head_idx = g_user_fea[head_ids].as_in_context(args.ctx)
+        true_tail_idx = g_movie_fea[tail_ids].as_in_context(args.ctx)
+
+        # Evaluate RMSE
+        with mx.autograd.predict_mode():
+            pred_ratings = net(head_subgraph, tail_subgraph,
+                               true_head_idx, true_tail_idx)
+        real_pred_rating = (mx.nd.softmax(pred_ratings, axis=1) *
+                            nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+        real_pred_ratings.append(real_pred_rating)
+        if sample_idx % 1000 == 0:
+            print("Eval idx={}".format(sample_idx))
+
+    real_pred_ratings = mx.nd.concat(*real_pred_ratings, dim=0)
     rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
     rmse = np.sqrt(rmse)
     return rmse
@@ -123,8 +161,6 @@ def train(args):
     total_nodes = dataset.num_user + dataset.num_movie
 
     enc_graph = dataset.train_enc_graph
-    enc_graph.nodes['user'].data['feature'] = dataset.user_feature
-    enc_graph.nodes['movie'].data['feature'] = dataset.movie_feature
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
     homo_enc_graph = dgl.to_homo(enc_graph)
@@ -146,7 +182,7 @@ def train(args):
 
         seed = mx.nd.arange(dataset.train_npairs * 2, dtype='int64')
         edges = mx.nd.shuffle(seed)
-        for sample_idx in range(0, dataset.train_npairs//args.minibatch_size):
+        for sample_idx in range(0, int(dataset.train_npairs * 0.5)//args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size]
             head_ids, tail_ids = homo_enc_graph.find_edges(edge_ids)
 
@@ -231,22 +267,21 @@ def train(args):
             # minibatch sample here
             with mx.autograd.record():
                 pred_ratings = net(head_subgraph, tail_subgraph,
-                                   g_user_fea, g_movie_fea,
                                    true_head_idx, true_tail_idx)
                 loss = rating_loss_net(pred_ratings, true_relation_ids).mean()
-            loss.backward()
+                loss.backward()
             gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
             trainer.step(1.0, ignore_stale_grad=True)
             loss = loss.asscalar()
             real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-            rmse = mx.nd.square(real_pred_ratings - true_relation_ids).sum().asscalar()
-            sample_cnt = pred_ratings.shape[0]
-            if sample_idx % 10 == 0:
+            rmse = mx.nd.square(real_pred_ratings - true_relation_ids).mean().asscalar()
+            rmse = np.sqrt(rmse)
+            if sample_idx % 100 == 0:
                 train_loss_logger.log(iter=iter_idx, idx=sample_idx,
-                                  loss=loss, rmse=rmse/sample_cnt)
+                                  loss=loss, rmse=rmse)
                 print("Iter={}, sample_idx={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}".format(iter_idx,
-                    sample_idx, gnorm, loss, rmse/sample_cnt))
+                    sample_idx, gnorm, loss, rmse))
 
         if iter_idx > 3:
             dur.append(time.time() - t0)
