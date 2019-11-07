@@ -263,36 +263,6 @@ class BiDecoder(Block):
                     allow_deferred_init=True))
             self.rate_out = nn.Dense(units=len(rating_vals), flatten=False, use_bias=False)
 
-    def eval_forward(self, graph, ufeat, ifeat):
-        """Forward function.
-
-        Parameters
-        ----------
-        graph : DGLHeteroGraph
-            "Flattened" user-movie graph with only one edge type.
-        ufeat : mx.nd.NDArray
-            User embeddings. Shape: (|V_u|, D)
-        ifeat : mx.nd.NDArray
-            Movie embeddings. Shape: (|V_m|, D)
-
-        Returns
-        -------
-        mx.nd.NDArray
-            Predicting scores for each user-movie edge.
-        """
-        graph = graph.local_var()
-        ufeat = self.dropout(ufeat)
-        ifeat = self.dropout(ifeat)
-        graph.nodes['movie'].data['h'] = ifeat
-        basis_out = []
-        for i in range(self._num_basis_functions):
-            graph.nodes['user'].data['h'] = F.dot(ufeat, self.Ps[i].data())
-            graph.apply_edges(fn.u_dot_v('h', 'h', 'sr'))
-            basis_out.append(graph.edata['sr'].expand_dims(1))
-        out = F.concat(*basis_out, dim=1)
-        out = self.rate_out(out)
-        return out
-
     def forward(self, ufeat, ifeat):
         """Forward function.
 

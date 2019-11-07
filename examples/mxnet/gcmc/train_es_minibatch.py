@@ -34,15 +34,6 @@ class Net(Block):
                                      in_units=args.gcn_out_units,
                                      num_basis_functions=args.gen_r_num_basis_func)
 
-    def eval_forward(self, enc_graph, dec_graph, ufeat, ifeat):
-        user_out, movie_out = self.encoder.eval_forward(
-            enc_graph,
-            ufeat,
-            ifeat,
-            self._ctx)
-        pred_ratings = self.decoder.eval_forward(dec_graph, user_out, movie_out)
-        return pred_ratings
-
     def forward(self, head_subgraph, tail_subgraph, true_head_idx, true_tail_idx):
         user_out, movie_out = self.encoder(
             head_subgraph,
@@ -55,6 +46,8 @@ class Net(Block):
         pred_ratings = self.decoder(true_user_out, true_movie_out)
         return pred_ratings
 
+eval_graphs = []
+test_graphs = []
 def evaluate(args, net, dataset, segment='valid'):
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
@@ -65,10 +58,12 @@ def evaluate(args, net, dataset, segment='valid'):
         rating_values = dataset.valid_truths
         enc_graph = dataset.valid_enc_graph
         dec_graph = dataset.valid_dec_graph
+        sub_graphs = eval_graphs
     elif segment == "test":
         rating_values = dataset.test_truths
         enc_graph = dataset.test_enc_graph
         dec_graph = dataset.test_dec_graph
+        sub_graphs = test_graphs
     else:
         raise NotImplementedError
 
@@ -107,11 +102,11 @@ def evaluate(args, net, dataset, segment='valid'):
         with mx.autograd.predict_mode():
             pred_ratings = net(head_subgraph, tail_subgraph,
                                true_head_idx, true_tail_idx)
-        real_pred_rating = (mx.nd.softmax(pred_ratings, axis=1) *
-                            nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-        real_pred_ratings.append(real_pred_rating)
-        if sample_idx % 1000 == 0:
-            print("Eval idx={}".format(sample_idx))
+            real_pred_rating = (mx.nd.softmax(pred_ratings, axis=1) *
+                                nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+            real_pred_ratings.append(real_pred_rating)
+            if sample_idx % 1000 == 0:
+                print("Eval idx={}".format(sample_idx))
 
     real_pred_ratings = mx.nd.concat(*real_pred_ratings, dim=0)
     rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
@@ -182,7 +177,7 @@ def train(args):
 
         seed = mx.nd.arange(dataset.train_npairs * 2, dtype='int64')
         edges = mx.nd.shuffle(seed)
-        for sample_idx in range(0, int(dataset.train_npairs * 0.5)//args.minibatch_size):
+        for sample_idx in range(0, dataset.train_npairs//args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size]
             head_ids, tail_ids = homo_enc_graph.find_edges(edge_ids)
 
@@ -252,9 +247,9 @@ def train(args):
             tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
             true_head_ids = mx.nd.concat(*true_head_ids, dim=0)
             true_tail_ids = mx.nd.concat(*true_tail_ids, dim=0)
-            true_relation_ids = mx.nd.concat(*true_relation_ids, dim=0)
-            true_relation_ids = true_relation_ids.as_in_context(args.ctx)
-
+            true_relation_ids = mx.nd.concat(*true_relation_ids, dim=0) / 2
+            true_relation_ratings = mx.nd.take(mx.nd.array(dataset.possible_rating_values), true_relation_ids).as_in_context(args.ctx)
+            true_relation_labels = true_relation_ids.as_in_context(args.ctx)
             head_NID = head_subgraph.nodes['user'].data[dgl.NID]
             tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
 
@@ -268,14 +263,14 @@ def train(args):
             with mx.autograd.record():
                 pred_ratings = net(head_subgraph, tail_subgraph,
                                    true_head_idx, true_tail_idx)
-                loss = rating_loss_net(pred_ratings, true_relation_ids).mean()
+                loss = rating_loss_net(pred_ratings, true_relation_labels).mean()
                 loss.backward()
             gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
             trainer.step(1.0, ignore_stale_grad=True)
             loss = loss.asscalar()
             real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-            rmse = mx.nd.square(real_pred_ratings - true_relation_ids).mean().asscalar()
+            rmse = mx.nd.square(real_pred_ratings - true_relation_ratings).mean().asscalar()
             rmse = np.sqrt(rmse)
             if sample_idx % 100 == 0:
                 train_loss_logger.log(iter=iter_idx, idx=sample_idx,
