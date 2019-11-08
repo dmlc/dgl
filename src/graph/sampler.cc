@@ -1384,7 +1384,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationTypeCentralEdgeSampler")
                                                   check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       } else if (neg_mode.size() > 0) {
-        NegSubgraph neg_subg = NegEdgeSubgraph(gptr, aten::NewIdArray(0), subg, neg_mode, neg_sample_size,
+        NegSubgraph neg_subg = NegEdgeSubgraph(gptr, aten::NewIdArray(0),
+                                               subg, neg_mode, neg_sample_size,
                                                exclude_positive, check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
@@ -1409,7 +1410,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     const bool exclude_positive = args[8];
     const bool check_false_neg = args[9];
     const int aggregated_batches = args[10];
-    
+
     // process args
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
@@ -1417,7 +1418,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     CHECK(aten::IsValidIdArray(relations));
     BuildCoo(*gptr);
 
-    //each worker will generate #relation_parts batch_size data
+    // each worker will generate #relation_parts batch_size data
     const int64_t worker_batch_size = batch_size * aggregated_batches;
     const int64_t num_seeds = seed_edges->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
@@ -1453,11 +1454,12 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
         const int64_t part_end = std::min(part_start + batch_size, num_worker_seeds);
         const int64_t part_num_edges = part_end - part_start;
 
-        //no more edges
+        // no more edges
         if (part_num_edges == 0) {
           break;
         }
-        std::vector<dgl_id_t> part_seeds(seeds_eid.begin() + part_start, seeds_eid.begin() + part_end);
+        std::vector<dgl_id_t> part_seeds(seeds_eid.begin() + part_start,
+                                         seeds_eid.begin() + part_end);
         IdArray sub_worker_seeds = aten::VecToIdArray(part_seeds);
 
         EdgeArray arr = gptr->FindEdges(sub_worker_seeds);
