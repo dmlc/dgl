@@ -584,14 +584,14 @@ class RelationChunckEdgeSampler(object):
 
         if shuffle:
             seed_edges = F.rand_shuffle(seed_edges)
-        relations = relations[self._seed_edges]
+        relations = relations[seed_edges]
 
         # sort the relation type for edges
         sort_idx = F.argsort(relations, dim=0, descending=False)
         seed_edges = seed_edges[sort_idx]
         chunks = F.arange(0, (seed_edges.shape[0] + batch_size - 1) // batch_size)
         seed_chunks = F.rand_shuffle(chunks)
-        self._seed_edges = utils.toindex(seed_edges[sort_idx])
+        self._seed_edges = utils.toindex(seed_edges)
         self._seed_chunks = utils.toindex(seed_chunks)
 
         if prefetch:
