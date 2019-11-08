@@ -44,13 +44,15 @@ class KEModel(object):
             rel_dim = relation_dim * entity_dim
         else:
             rel_dim = relation_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim,
+                                              device, args.relation_lr_decay)
 
         if model_name == 'TransE':
             self.score_func = TransEScore(gamma)
         elif model_name == 'TransR':
             projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
-                                               F.cpu() if args.mix_cpu_gpu else device)
+                                               F.cpu() if args.mix_cpu_gpu else device,
+                                               args.relation_lr_decay)
             self.score_func = TransRScore(gamma, projection_emb, relation_dim, entity_dim)
         elif model_name == 'DistMult':
             self.score_func = DistMultScore()
@@ -157,6 +159,7 @@ class KEModel(object):
 
     # @profile
     def forward(self, pos_g, neg_g, gpu_id=-1):
+        #print(len(np.unique(pos_g.edata['id'])))
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
 

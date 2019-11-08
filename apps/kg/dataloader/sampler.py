@@ -90,7 +90,7 @@ class TrainDataset(object):
                 g.edata['weight'] = F.zerocopy_from_numpy(weight)
                 # to be added
             self.graphs.append(g)
-
+        self.sampler_type = args.train_sampler
     def count_freq(self, triples, start=4):
         count = {}
         for head, rel, tail in triples:
@@ -107,19 +107,40 @@ class TrainDataset(object):
 
     def create_sampler(self, batch_size, neg_sample_size=2, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
-        EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
-        print('RelationPartitionEdgeSampler')
-        #EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
-        return EdgeSampler(self.graphs[rank],
-                           batch_size=batch_size,
-                           neg_sample_size=neg_sample_size,
-                           negative_mode=mode,
-                           num_workers=num_workers,
-                           shuffle=shuffle,
-                           exclude_positive=exclude_positive,
-                           return_false_neg=False,
-                           relation_parts=8,
-                           relations=self.graphs[rank].edata['id'])
+
+        if self.sampler_type == 'relcentrl':
+            EdgeSampler = getattr(dgl.contrib.sampling, 'RelationTypeCentralEdgeSampler')
+            return EdgeSampler(self.graphs[rank],
+                               relations=self.graphs[rank].edata['id'],
+                               batch_size=batch_size,
+                               neg_sample_size=neg_sample_size,
+                               negative_mode=mode,
+                               num_workers=num_workers,
+                               shuffle=shuffle,
+                               exclude_positive=exclude_positive,
+                               return_false_neg=False)
+        elif self.sampler_type == 'relpart':
+            EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
+            return EdgeSampler(self.graphs[rank],
+                               batch_size=batch_size,
+                               neg_sample_size=neg_sample_size,
+                               negative_mode=mode,
+                               num_workers=num_workers,
+                               shuffle=shuffle,
+                               exclude_positive=exclude_positive,
+                               return_false_neg=False,
+                               relation_parts=8,
+                               relations=self.graphs[rank].edata['id'])
+        else: # default edge
+            EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+            return EdgeSampler(self.graphs[rank],
+                               batch_size=batch_size,
+                               neg_sample_size=neg_sample_size,
+                               negative_mode=mode,
+                               num_workers=num_workers,
+                               shuffle=shuffle,
+                               exclude_positive=exclude_positive,
+                               return_false_neg=False)
 
 class PBGNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     def __init__(self, subg, num_chunks, chunk_size,
