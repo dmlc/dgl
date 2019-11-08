@@ -18,7 +18,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler', 'RelationPartitionEdgeSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler', 'RelationPartitionEdgeSampler', 'RelationChunkEdgeSampler']
 
 class SamplerIter(object):
     def __init__(self, sampler):
@@ -475,9 +475,9 @@ class EdgeSubgraph(subgraph.DGLSubGraph):
         self.set_head_tail()
         return self.tail
 
-class RelationChunckEdgeSampler(object):
-    '''Edge sampler with proper chuncking of relations for link prediction. 
-    In each chunck there will be as less type of relations as possible.
+class RelationChunkEdgeSampler(object):
+    '''Edge sampler with proper chunking of relations for link prediction. 
+    In each chunk there will be as less type of relations as possible.
 
     This samples edges from a given graph. The edges sampled for a batch are
     placed in a subgraph before returning. The main purpose of this sampler is 
