@@ -1359,8 +1359,9 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationChunckEdgeSampler")
     std::vector<SubgraphRef> negative_subgs(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
-      const int64_t chunk_id = batch_start_id + i;
-      const int64_t start = seed_chunks[chunk_id] * batch_size;
+      const int64_t chunk_idx = batch_start_id + i;
+      const dgl_id_t *chunks = static_cast<dgl_id_t *>(seed_chunks->data);
+      const int64_t start = chunks[chunk_idx] * batch_size;
       const int64_t end = std::min(start + batch_size, num_seed_edges);
       const int64_t num_edges = end - start;
       IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
@@ -1377,13 +1378,13 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationChunckEdgeSampler")
       // For PBG negative sampling, we accept "PBG-head" for corrupting head
       // nodes and "PBG-tail" for corrupting tail nodes.
       if (neg_mode.substr(0, 3) == "PBG") {
-        NegSubgraph neg_subg = PBGNegEdgeSubgraph(gptr, relations, subg,
+        NegSubgraph neg_subg = PBGNegEdgeSubgraph(gptr, aten::NewIdArray(0), subg,
                                                   neg_mode.substr(4), neg_sample_size,
                                                   gptr->IsMultigraph(), exclude_positive,
                                                   check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       } else if (neg_mode.size() > 0) {
-        NegSubgraph neg_subg = NegEdgeSubgraph(gptr, relations, subg, neg_mode, neg_sample_size,
+        NegSubgraph neg_subg = NegEdgeSubgraph(gptr, aten::NewIdArray(0), subg, neg_mode, neg_sample_size,
                                                exclude_positive, check_false_neg);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
