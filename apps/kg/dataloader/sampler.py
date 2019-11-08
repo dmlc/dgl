@@ -107,7 +107,9 @@ class TrainDataset(object):
 
     def create_sampler(self, batch_size, neg_sample_size=2, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
-        EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+        EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
+        print('RelationPartitionEdgeSampler')
+        #EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         return EdgeSampler(self.graphs[rank],
                            batch_size=batch_size,
                            neg_sample_size=neg_sample_size,
@@ -115,7 +117,9 @@ class TrainDataset(object):
                            num_workers=num_workers,
                            shuffle=shuffle,
                            exclude_positive=exclude_positive,
-                           return_false_neg=False)
+                           return_false_neg=False,
+                           relation_parts=8,
+                           relations=self.graphs[rank].edata['id'])
 
 class PBGNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     def __init__(self, subg, num_chunks, chunk_size,
