@@ -95,6 +95,7 @@ def start_client(server_embed):
 
 if __name__ == '__main__':
     server_embed = th.tensor([2., 2., 2., 2., 2.])
+    # use shared memory
     server_embed.share_memory_()
 
     pid = os.fork()
