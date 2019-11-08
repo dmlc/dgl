@@ -304,12 +304,124 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
+def check_relation_central_sampler(mode, exclude_positive, neg_size):
+    dgl.random.seed(42)
+    g = generate_rand_graph(100)
+    etype = np.random.randint(0, 2, size=g.number_of_edges(), dtype=np.int64)
+    g.edata['etype'] = F.tensor(etype)
+
+    pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
+    pos_map = {}
+    for i in range(len(pos_geid)):
+        pos_d = int(F.asnumpy(pos_gdst[i]))
+        pos_e = int(F.asnumpy(pos_geid[i]))
+        pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
+
+    EdgeSampler = getattr(dgl.contrib.sampling, 'RelationTypeCentralEdgeSampler')
+    # Test the homogeneous graph.
+    cross_relation_cnt = 0
+    for pos_edges, neg_edges in EdgeSampler(g, 10, g.edata['etype'],
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        pos_edges.copy_from_parent()
+        if len(np.unique(pos_edges.edata['etype'])) > 1:
+            cross_relation_cnt += 1
+
+        pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
+                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
+                                                pos_edges.parent_nid[pos_ldst])))
+
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
+        for i in range(len(neg_eid)):
+            neg_d = int(F.asnumpy(neg_dst[i]))
+            neg_e = int(F.asnumpy(neg_eid[i]))
+            assert (neg_d, neg_e) in pos_map
+            if exclude_positive:
+                assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+
+        check_head_tail(neg_edges)
+        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
+        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
+        pos_tails = np.sort(F.asnumpy(pos_tails))
+        neg_tails = np.sort(F.asnumpy(neg_tails))
+        np.testing.assert_equal(pos_tails, neg_tails)
+
+    # For RelationChunkEdgeSampler there should be at most 1 chunk with cross relation type
+    assert cross_relation_cnt <= 1
+
+def check_relation_partion_sampler(mode, exclude_positive, neg_size):
+    dgl.random.seed(42)
+    g = generate_rand_graph(100)
+    etype = np.random.randint(0, 4, size=g.number_of_edges(), dtype=np.int64)
+    g.edata['etype'] = F.tensor(etype)
+
+    pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
+    pos_map = {}
+    for i in range(len(pos_geid)):
+        pos_d = int(F.asnumpy(pos_gdst[i]))
+        pos_e = int(F.asnumpy(pos_geid[i]))
+        pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
+
+    EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
+    # Test the homogeneous graph.
+    cross_relation_cnt = 0
+    for pos_edges, neg_edges in EdgeSampler(g, 10,
+                                            relations=g.edata['etype'],
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            aggregated_batches=4,
+                                            return_false_neg=True):
+        pos_edges.copy_from_parent()
+        if len(np.unique(pos_edges.edata['etype'])) == 4:
+            cross_relation_cnt += 1
+
+        pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
+                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
+                                                pos_edges.parent_nid[pos_ldst])))
+
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
+        for i in range(len(neg_eid)):
+            neg_d = int(F.asnumpy(neg_dst[i]))
+            neg_e = int(F.asnumpy(neg_eid[i]))
+            assert (neg_d, neg_e) in pos_map
+            if exclude_positive:
+                assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
+
+        check_head_tail(neg_edges)
+        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
+        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
+        pos_tails = np.sort(F.asnumpy(pos_tails))
+        neg_tails = np.sort(F.asnumpy(neg_tails))
+        np.testing.assert_equal(pos_tails, neg_tails)
+
+    # For RelationPartitionEdgeSampler the chance of have all relations is low
+    assert cross_relation_cnt == 0
+
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)
     check_negative_sampler('head', False, 10)
     #disable this check for now. It might take too long time.
     #check_negative_sampler('head', False, 100)
+    check_relation_central_sampler('PBG-head', False, 10)
+    check_relation_central_sampler('head', True, 10)
+    check_relation_central_sampler('head', False, 10)
+    check_relation_partion_sampler('PBG-head', False, 10)
+    check_relation_partion_sampler('head', True, 10)
+    check_relation_partion_sampler('head', False, 10)
 
 
 if __name__ == '__main__':

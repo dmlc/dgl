@@ -1330,7 +1330,7 @@ class RelationSort {
   dgl_id_t *relation_map_;
 };
 
-DGL_REGISTER_GLOBAL("sampling._CAPI_RelationChunckEdgeSampler")
+DGL_REGISTER_GLOBAL("sampling._CAPI_RelationTypeCentralEdgeSampler")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
     GraphRef g = args[0];
@@ -1400,15 +1400,16 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     // arguments
     GraphRef g = args[0];
     IdArray seed_edges = args[1];
-    const int64_t batch_start_id = args[2];
-    const int64_t batch_size = args[3];
-    const int64_t max_num_workers = args[4];
-    const std::string neg_mode = args[5];
-    const int neg_sample_size = args[6];
-    const bool exclude_positive = args[7];
-    const bool check_false_neg = args[8];
-    const int relation_parts = args[9];
-    IdArray relations = args[10];
+    IdArray relations = args[2];
+    const int64_t batch_start_id = args[3];
+    const int64_t batch_size = args[4];
+    const int64_t max_num_workers = args[5];
+    const std::string neg_mode = args[6];
+    const int neg_sample_size = args[7];
+    const bool exclude_positive = args[8];
+    const bool check_false_neg = args[9];
+    const int aggregated_batches = args[10];
+    
     // process args
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
@@ -1417,7 +1418,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     BuildCoo(*gptr);
 
     //each worker will generate #relation_parts batch_size data
-    const int64_t worker_batch_size = batch_size * relation_parts;
+    const int64_t worker_batch_size = batch_size * aggregated_batches;
     const int64_t num_seeds = seed_edges->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds - batch_start_id * batch_size + worker_batch_size - 1) / worker_batch_size);
@@ -1447,7 +1448,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
 
       std::vector<SubgraphRef> positive_part_subgs;
       std::vector<SubgraphRef> negative_part_subgs;
-      for (int j = 0; j < relation_parts; j ++) {
+      for (int j = 0; j < aggregated_batches; j ++) {
         const int64_t part_start = j * batch_size;
         const int64_t part_end = std::min(part_start + batch_size, num_worker_seeds);
         const int64_t part_num_edges = part_end - part_start;
