@@ -1348,6 +1348,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
+    CHECK(aten::IsValidIdArray(relations));
     BuildCoo(*gptr);
 
     //each worker will generate #relation_parts batch_size data
