@@ -407,7 +407,7 @@ class KVClient(object):
         """
         msg = _recv_kv_msg(self._receiver)
         assert msg.type == KVMsgType.PULL_BACK, 'Recv kv msg error.'
-        return msg.rank, msg.data
+        return msg
     
     def barrier(self):
         """Barrier for all client nodes
