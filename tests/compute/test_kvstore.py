@@ -45,8 +45,8 @@ def start_client(server_embed):
     client.barrier()
 
     client.pull(name='embed_0', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
-    server_id, new_tensor = client.pull_wait()
-    assert server_id == 0
+    msg = client.pull_wait()
+    assert msg.rank == 0
 
     target_tensor_0 = th.tensor(
         [[ 0., 0., 0.],
@@ -55,14 +55,14 @@ def start_client(server_embed):
          [ 0., 0., 0.],
          [10., 10., 10.]])
 
-    assert th.equal(new_tensor, target_tensor_0) == True
+    assert th.equal(msg.data, target_tensor_0) == True
 
     client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
-    server_id, new_tensor = client.pull_wait()
+    msg = client.pull_wait()
 
     target_tensor_1 = th.tensor([ 0., 0., 5., 0., 10.])
 
-    assert th.equal(new_tensor, target_tensor_1) == True
+    assert th.equal(msg.data, target_tensor_1) == True
 
     client.pull(name='embed_0', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
     client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
@@ -70,26 +70,26 @@ def start_client(server_embed):
     client.pull(name='embed_1', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
     client.pull(name='server_embed', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
 
-    _, tensor_0 = client.pull_wait()
-    _, tensor_1 = client.pull_wait()
-    _, tensor_2 = client.pull_wait()
-    _, tensor_3 = client.pull_wait()
-    _, tensor_4 = client.pull_wait()
+    msg_0 = client.pull_wait()
+    msg_1 = client.pull_wait()
+    msg_2 = client.pull_wait()
+    msg_3 = client.pull_wait()
+    msg_4 = client.pull_wait()
 
     target_tensor_2 = th.tensor([ 2., 2., 7., 2., 12.])
 
-    assert th.equal(tensor_0, target_tensor_0) == True
-    assert th.equal(tensor_1, target_tensor_1) == True
-    assert th.equal(tensor_2, target_tensor_0) == True
-    assert th.equal(tensor_3, target_tensor_1) == True
-    assert th.equal(tensor_4, target_tensor_2) == True
+    assert th.equal(msg_0.data, target_tensor_0) == True
+    assert th.equal(msg_1.data, target_tensor_1) == True
+    assert th.equal(msg_2.data, target_tensor_0) == True
+    assert th.equal(msg_3.data, target_tensor_1) == True
+    assert th.equal(msg_4.data, target_tensor_2) == True
 
     server_embed += target_tensor_2
 
     client.pull(name='server_embed', server_id=0, id_tensor=th.tensor([0, 1, 2, 3, 4]))
-    _, tensor_5 = client.pull_wait()
+    msg_5 = client.pull_wait()
 
-    assert th.equal(tensor_5, target_tensor_2 * 2) == True
+    assert th.equal(msg_5.data, target_tensor_2 * 2) == True
 
     client.shut_down()
 
