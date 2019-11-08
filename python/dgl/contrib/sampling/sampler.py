@@ -588,7 +588,11 @@ class RelationChunckEdgeSampler(object):
 
         # sort the relation type for edges
         sort_idx = F.argsort(relations, dim=0, descending=False)
+        seed_edges = seed_edges[sort_idx]
+        chunks = F.arange(0, (seed_edges.shape[0] + batch_size - 1) // batch_size)
+        seed_chunks = F.rand_shuffle(chunks)
         self._seed_edges = utils.toindex(seed_edges[sort_idx])
+        self._seed_chunks = utils.toindex(seed_chunks)
 
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
@@ -615,17 +619,17 @@ class RelationChunckEdgeSampler(object):
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
             Next "bunch" of edges to be processed.
         '''
-        subgs = _CAPI_UniformEdgeSampling(
+        subgs = _CAPI_RelationChunckEdgeSampler(
             self.g._graph,
             self._seed_edges.todgltensor(),
+            self._seed_chunks.todgltensor(),
             current_index, # start batch id
             self.batch_size,        # batch size
             self._num_workers,      # num batches
             self._negative_mode,
             self._neg_sample_size,
             self._exclude_positive,
-            self._return_false_neg,
-            empty((0,), 'int64'))
+            self._return_false_neg)
 
         if len(subgs) == 0:
             return []
@@ -666,13 +670,19 @@ class RelationChunckEdgeSampler(object):
         return self._batch_size
 
 class RelationPartitionEdgeSampler(object):
-    '''Edge sampler with proper partition for link prediction.
+    '''Edge sampler with proper relation partition for link prediction.
 
     This samples edges from a given graph. The edges sampled for a batch are
     placed in a subgraph before returning. The main purpose of this sampler is 
     similar to EdgeSampler, but in the returned subgraph, the edges will only 
     belong to a subset of relations. This will help reduce the memory footprints 
-    inside a single batch for models with relation specific params (e.g. transR).
+    inside a minibatch for models with relation specific params (e.g. transR).
+
+    How it works: 
+        1. It will samples relation_parts * batch_size edges
+        2. Sort edges according to their relation type (given by relations)
+        3. Split edges into #relation_parts, and generate #relation_parts 
+           subgraphs accordingly.
 
     A negative edge is constructed by
     corrupting an existing edge in the graph. The current implementation
