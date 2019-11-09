@@ -32,7 +32,8 @@ def data_type_dict():
 
 
 def cpu():
-    return tf.DeviceSpec.from_string('/job:localhost/replica:0/task:0/device:CPU:0')
+    return "/cpu:0"
+    # return tf.DeviceSpec.from_string('/job:localhost/replica:0/task:0/device:CPU:0')
 
 
 def tensor(data, dtype=None):
@@ -82,15 +83,16 @@ def ndim(input):
 
 
 def context(input):
-    return tf.DeviceSpec.from_string(input.device)
+    return input.device
+    # return tf.DeviceSpec.from_string(input.device)
 
 
 def device_type(ctx):
-    return ctx.device_type.lower()
+    return tf.DeviceSpec.from_string(ctx).device_type.lower()
 
 
 def device_id(ctx):
-    return ctx.device_index
+    return tf.DeviceSpec.from_string(ctx).device_index
 
 
 def astype(input, ty):
@@ -111,7 +113,7 @@ def copy_to(input, ctx):
 
 
 def sum(input, dim, keepdims=False):
-    return tf.reduce_sum(input, axis=dim, keepdim=keepdims)
+    return tf.reduce_sum(input, axis=dim, keepdims=keepdims)
 
 
 def reduce_sum(input):
@@ -212,7 +214,11 @@ def narrow_row(x, start, stop):
 
 
 def scatter_row(data, row_index, value):
-    return tf.gather_nd(data, value, row_index)
+    # ndim = data.ndim
+    # assert ndim == 2
+    # for i in range(ndim - 1):
+    row_index = tf.expand_dims(row_index, 1)
+    return tf.tensor_scatter_nd_update(data, row_index, value)
 
 
 def scatter_row_inplace(data, row_index, value):
@@ -288,7 +294,7 @@ def logical_not(input):
 
 
 def unique(input):
-    return tf.unique(input)
+    return tf.unique(input).y
 
 
 def full_1d(length, fill_value, dtype, ctx):
@@ -299,8 +305,8 @@ def full_1d(length, fill_value, dtype, ctx):
 
 
 def nonzero_1d(input):
-    nonzero_bool = input != 0
-    return boolean_mask(input, nonzero_1d)
+    nonzero_bool = (input != False)
+    return tf.squeeze(tf.where(nonzero_bool))
 
 
 def sort_1d(input):
@@ -426,9 +432,10 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
         K.copy_reduce(
             'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
         # reshape
-        degs = tf.reshape(degs, 
-            (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1, clip_value_max=np.inf) # ???
+        degs = tf.reshape(degs,
+                          (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+        degs = tf.clip_by_value(degs, clip_value_min=1,
+                                clip_value_max=np.inf)  # ???
         out_data = out_data / degs
     else:
         degs = None
@@ -485,9 +492,10 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
         K.copy_reduce(
             'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
         # reshape
-        degs = tf.reshape(degs, 
-            (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
-        degs = tf.clip_by_value(degs, clip_value_min=1, clip_value_max=np.inf) # TODO: ???
+        degs = tf.reshape(degs,
+                          (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+        degs = tf.clip_by_value(degs, clip_value_min=1,
+                                clip_value_max=np.inf)  # TODO: ???
         out_data = out_data / degs
     else:
         degs = None
@@ -537,7 +545,7 @@ def _reduce_grad(grad, shape):
     in_shape = (1,) * num_to_squeeze + in_shape
     reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))
     reduce_idx += 1  # skip batch dim
-    grad = tf.reduce_sum(grad, axis=tuple(reduce_idx), keepdim=True)
+    grad = tf.reduce_sum(grad, axis=tuple(reduce_idx), keepdims=True)
     return tf.reshape(grad, shape)
 
 

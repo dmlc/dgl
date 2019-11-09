@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 def cuda():
-    return tf.device('/gpu:0')
+    return '/gpu:0'
 
 def is_cuda_available():
     return tf.test.is_gpu_available(cuda_only=True)
@@ -45,30 +45,36 @@ class record_grad(object):
 
 
 def attach_grad(x):
-    if x.grad is not None:
-        x.grad.zero_()
-        return x
-    else:
-        return x.requires_grad_()
+    return x
+    # if x.grad is not None:
+    #     x.grad.zero_()
+    #     return x
+    # else:
+    #     return x.requires_grad_()
 
 def backward(x, head_gradient=None):
-    x.backward(head_gradient)
+    pass
+    # x.backward(head_gradient)
 
 def grad(x):
-    return x.grad
+    return x
+    # return x.grad
 
 def is_no_grad(x):
-    return x.grad is None or (x.grad == 0).all()
+    return False
+    # return x.grad is None or (x.grad == 0).all()
 
 def full(shape, fill_value, dtype, ctx):
-    return th.full(shape, fill_value, dtype=dtype, device=ctx)
+    with tf.device(ctx):
+        t = tf.constant(fill_value, shape=shape, dtype=dtype)
+    return t
 
 def narrow_row_set(x, start, stop, new):
     # x[start:stop] = new
     raise NotImplementedError("TF doesn't support inplace update")
 
 def sparse_to_numpy(x):
-    return tf.sparse.to_dense(input).numpy()
+    return tf.sparse.to_dense(x).numpy()
 
 def clone(x):
     return tf.identity(x)
@@ -77,7 +83,7 @@ def reduce_sum(x):
     return tf.reduce_sum(x)
 
 def softmax(x, dim):
-    return tf.math.softmax(input, axis=dim)
+    return tf.math.softmax(x, axis=dim)
 
 def spmm(x, y):
     return tf.sparse.sparse_dense_matmul(x, y)
@@ -95,16 +101,16 @@ def div(a, b):
     return a / b
 
 def sum(x, dim):
-    return tf.reduce_sum(input, axis=dim)
+    return tf.reduce_sum(x, axis=dim)
 
 def max(x, dim):
-    return tf.reduce_max(input, axis=dim)
+    return tf.reduce_max(x, axis=dim)
 
 def min(x, dim):
-    return tf.reduce_min(input, axis=dim)
+    return tf.reduce_min(x, axis=dim)
 
 def prod(x, dim):
-    return tf.reduce_prod(input, axis=dim)
+    return tf.reduce_prod(x, axis=dim)
 
 def matmul(a, b):
     return tf.linalg.matmul(a, b)
