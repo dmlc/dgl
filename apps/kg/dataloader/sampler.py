@@ -109,6 +109,7 @@ class TrainDataset(object):
                        shuffle=True, exclude_positive=False, rank=0):
 
         if self.sampler_type == 'relcentrl':
+            print('RelationTypeCentralEdgeSampler')
             EdgeSampler = getattr(dgl.contrib.sampling, 'RelationTypeCentralEdgeSampler')
             return EdgeSampler(self.graphs[rank],
                                relations=self.graphs[rank].edata['id'],
@@ -120,6 +121,7 @@ class TrainDataset(object):
                                exclude_positive=exclude_positive,
                                return_false_neg=False)
         elif self.sampler_type == 'relpart':
+            print('RelationPartitionEdgeSampler')
             EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
             return EdgeSampler(self.graphs[rank],
                                batch_size=batch_size,
@@ -132,6 +134,7 @@ class TrainDataset(object):
                                relation_parts=8,
                                relations=self.graphs[rank].edata['id'])
         else: # default edge
+            print('EdgeSampler')
             EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
             return EdgeSampler(self.graphs[rank],
                                batch_size=batch_size,
