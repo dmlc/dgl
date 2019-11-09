@@ -507,7 +507,7 @@ class NodeFlow(DGLBaseGraph):
         ret = self._edge_mapping.tousertensor()[start:end]
         # If `add_self_loop` is enabled, the returned parent eid can be -1.
         # We have to make sure this case doesn't happen.
-        assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
+        assert F.asnumpy(ret == -1).sum(0) == 0, "The eid in the parent graph is invalid."
         return ret
 
     def block_edges(self, block_id, remap_local=False):
