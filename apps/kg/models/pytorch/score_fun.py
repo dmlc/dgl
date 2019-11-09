@@ -2,7 +2,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
-
+import numpy as np
 from .tensor_models import ExternalEmbedding
 
 class TransEScore(nn.Module):
@@ -341,11 +341,10 @@ class RotatEScore(nn.Module):
         self.emb_init = emb_init
 
     def edge_func(self, edges):
-        pi = 3.14159265358979323846
         re_head, im_head = th.chunk(edges.src['emb'], 2, dim=-1)
         re_tail, im_tail = th.chunk(edges.dst['emb'], 2, dim=-1)
 
-        phase_rel = edges.data['emb'] / (self.emb_init / pi)
+        phase_rel = edges.data['emb'] / (self.emb_init / np.pi)
         re_rel, im_rel = th.cos(phase_rel), th.sin(phase_rel)
         re_score = re_head * re_rel - im_head * im_rel
         im_score = re_head * im_rel + im_head * re_rel
@@ -376,7 +375,6 @@ class RotatEScore(nn.Module):
         pass
     
     def create_neg(self, neg_head):
-        pi = 3.14159265358979323846
         gamma = self.gamma
         emb_init = self.emb_init
         if neg_head:
@@ -385,20 +383,18 @@ class RotatEScore(nn.Module):
                 emb_real = tails[..., :hidden_dim // 2]
                 emb_imag = tails[..., hidden_dim // 2:]
 
-                phase_rel = relations / (emb_init / pi)
+                phase_rel = relations / (emb_init / np.pi)
                 rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
                 real = emb_real * rel_real + emb_imag * rel_imag
                 imag = -emb_real * rel_imag + emb_imag * rel_real
                 emb_complex = th.cat((real, imag), dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                s1 = tmp.unsqueeze(dim=2).expand(num_chunks, chunk_size,
-                                                 neg_sample_size, hidden_dim)
-                s2 = heads.unsqueeze(dim=1).expand(num_chunks, chunk_size,
-                                                   neg_sample_size, hidden_dim)
-                s = s1 - s2
-                score = th.stack([s[..., :hidden_dim // 2],
-                                  s[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+                tmp = tmp.unsqueeze(dim=2)
+                heads = heads.unsqueeze(dim=1)
+                score = tmp - heads
+                score = th.stack([score[..., :hidden_dim // 2],
+                                  score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
                 return gamma - score.sum(-1)
 
             return fn
@@ -408,7 +404,7 @@ class RotatEScore(nn.Module):
                 emb_real = heads[..., :hidden_dim // 2]
                 emb_imag = heads[..., hidden_dim // 2:]
 
-                phase_rel = relations / (emb_init / pi)
+                phase_rel = relations / (emb_init / np.pi)
                 rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
                 real = emb_real * rel_real - emb_imag * rel_imag
                 imag = emb_real * rel_imag + emb_imag * rel_real
@@ -416,13 +412,11 @@ class RotatEScore(nn.Module):
                 emb_complex = th.cat((real, imag), dim=-1)
                 tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
                 tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                s1 = tmp.unsqueeze(dim=2).expand(num_chunks, chunk_size,
-                                                 neg_sample_size, hidden_dim)
-                s2 = tails.unsqueeze(dim=1).expand(num_chunks, chunk_size,
-                                                   neg_sample_size, hidden_dim)
-                s = s1 - s2
-                score = th.stack([s[..., :hidden_dim // 2],
-                                  s[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+                tmp = tmp.unsqueeze(dim=2)
+                tails = tails.unsqueeze(dim=1)
+                score = tmp - tails
+                score = th.stack([score[..., :hidden_dim // 2],
+                                  score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
 
                 return gamma - score.sum(-1)
 
