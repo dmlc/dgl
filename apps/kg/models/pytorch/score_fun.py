@@ -388,10 +388,8 @@ class RotatEScore(nn.Module):
                 real = emb_real * rel_real + emb_imag * rel_imag
                 imag = -emb_real * rel_imag + emb_imag * rel_real
                 emb_complex = th.cat((real, imag), dim=-1)
-                tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
-                heads = heads.reshape(num_chunks, neg_sample_size, hidden_dim)
-                tmp = tmp.unsqueeze(dim=2)
-                heads = heads.unsqueeze(dim=1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                heads = heads.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
                 score = tmp - heads
                 score = th.stack([score[..., :hidden_dim // 2],
                                   score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
@@ -410,10 +408,8 @@ class RotatEScore(nn.Module):
                 imag = emb_real * rel_imag + emb_imag * rel_real
 
                 emb_complex = th.cat((real, imag), dim=-1)
-                tmp = emb_complex.reshape(num_chunks, chunk_size, hidden_dim)
-                tails = tails.reshape(num_chunks, neg_sample_size, hidden_dim)
-                tmp = tmp.unsqueeze(dim=2)
-                tails = tails.unsqueeze(dim=1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                tails = tails.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
                 score = tmp - tails
                 score = th.stack([score[..., :hidden_dim // 2],
                                   score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
