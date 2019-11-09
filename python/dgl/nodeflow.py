@@ -340,7 +340,7 @@ class NodeFlow(DGLBaseGraph):
         """
         nid = utils.toindex(nid)
         # TODO(minjie): should not directly use []
-        return self._node_mapping.tousertensor()[nid.tousertensor()]
+        return F.gather_row(self._node_mapping.tousertensor(), nid.tousertensor())
 
     def map_to_parent_eid(self, eid):
         """This maps the child edge Ids to the parent Ids.
