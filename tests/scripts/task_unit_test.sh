@@ -20,10 +20,13 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
-python3 -m nose -v --with-xunit tests/compute || fail "compute"
-python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
-python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
+python3 -m pip install pytest
+
+python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
+python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index || fail "graph_index"
+python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
+
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
-    python3 -m nose -v --with-xunit tests/distributed || fail "distributed"
+    python3 -m pytest -v --junitxml=pytest_distributed.xml tests/distributed || fail "distributed"
 fi
