@@ -137,12 +137,12 @@ def _test_layer_sampler(prefetch=False):
         sub_src, sub_dst = sub_g.all_edges(order='eid')
         for i in range(sub_g.num_blocks):
             block_eid = sub_g.block_eid(i)
-            block_src = sub_g.map_to_parent_nid(sub_src[block_eid])
-            block_dst = sub_g.map_to_parent_nid(sub_dst[block_eid])
+            block_src = sub_g.map_to_parent_nid(F.gather_row(sub_src, block_eid))
+            block_dst = sub_g.map_to_parent_nid(F.gather_row(sub_dst, block_eid))
 
             block_parent_eid = sub_g.block_parent_eid(i)
-            block_parent_src = src[block_parent_eid]
-            block_parent_dst = dst[block_parent_eid]
+            block_parent_src = F.gather_row(src, block_parent_eid)
+            block_parent_dst = F.gather_row(dst, block_parent_eid)
 
             assert np.all(F.asnumpy(block_src == block_parent_src))
 
