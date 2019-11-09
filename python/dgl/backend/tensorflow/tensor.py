@@ -8,8 +8,12 @@ import builtins
 import tfdlpack
 from tfdlpack import to_dlpack, from_dlpack
 
+from ..._ffi.object import ObjectBase
 from ... import ndarray as nd
 from ... import kernel as K
+# import dgl.graph_index
+# from ... import GraphIndex
+# from dgl.graph_index import GraphIndex
 from ...function.base import TargetCode
 
 TF_VERSION = LooseVersion(tf.__version__)
@@ -81,7 +85,7 @@ def context(input):
 
 
 def device_type(ctx):
-    return ctx.device_type
+    return ctx.device_type.lower()
 
 
 def device_id(ctx):
@@ -183,11 +187,9 @@ def split(input, sizes_or_sections, dim):
 
 
 def repeat(input, repeats, dim):
-    # return th.repeat_interleave(input, repeats, dim) # PyTorch 1.1
-    raise NotImplementedError
-    # if dim < 0:
-    #     dim += input.dim()
-    # return th.flatten(th.stack([input] * repeats, dim=dim+1), dim, dim+1)
+    tile_shape = np.ones(input.ndim, dtype=np.int32)
+    tile_shape[dim] = repeats
+    return tf.tile(input, tf.constant(tile_shape))
 
 
 def gather_row(data, row_index):
@@ -198,13 +200,10 @@ def gather_row(data, row_index):
 def slice_axis(data, axis, begin, end):
     assert axis == 0
     return tf.slice(data, begin=begin, size=end-begin)
-    # return th.narrow(data, axis, begin, end - begin)
 
 
 def take(data, indices, dim):
-    raise NotImplementedError
-    # new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
-    # return th.index_select(data, dim, indices.view(-1)).view(new_shape)
+    return tf.gather_nd(data, indices, dim)
 
 
 def narrow_row(x, start, stop):
@@ -212,13 +211,11 @@ def narrow_row(x, start, stop):
 
 
 def scatter_row(data, row_index, value):
-    raise NotImplementedError
-    # return data.index_copy(0, row_index, value)
+    return tf.gather_nd(data, value, row_index)
 
 
 def scatter_row_inplace(data, row_index, value):
     raise NotImplementedError("Tensorflow doesn't support inplace update")
-    # data[row_index] = value
 
 
 def squeeze(input, dim):
@@ -349,166 +346,198 @@ def one_hot(t, num_classes=-1):
     # return th.nn.functional.one_hot(t, num_classes)
 
 
-# class BinaryReduce(th.autograd.Function):
-#     @staticmethod
-#     def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-#                 out_size, lhs_map, rhs_map, out_map):
-#         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
-#         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-#         feat_shape = K.infer_binary_feature_shape(
-#             binary_op, lhs_data_nd, rhs_data_nd)
-#         out_shape = feat_shape
-#         if binary_op == 'dot':
-#             out_shape = feat_shape[:-1]
-#         out_data = lhs_data.new_empty((out_size,) + out_shape)
-#         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-#         K.binary_op_reduce(
-#             reducer if reducer != 'mean' else 'sum',
-#             binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-#             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
-#         # normalize if mean reducer
-#         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-#         if reducer == 'mean':
-#             degs = lhs_data.new_empty((out_data.shape[0],))
-#             degs_nd = zerocopy_to_dgl_ndarray(degs)
-#             if lhs != TargetCode.DST:  # src or edge
-#                 target = lhs
-#                 n = lhs_data.shape[0]
-#                 in_map = lhs_map[0]
-#             else:  # rhs != TargetCode.DST
-#                 target = rhs
-#                 n = rhs_data.shape[0]
-#                 in_map = rhs_map[0]
-#             in_ones = lhs_data.new_ones((n,))
-#             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-#             K.copy_reduce(
-#                 'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
-#             # reshape
-#             degs = degs.reshape(
-#                 (out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
-#             out_data = out_data / degs
-#         else:
-#             degs = None
-#         # save_for_backward can only save variables
-#         ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
-#                               rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-#                               out_data_nd, feat_shape, degs)
-#         return out_data
-
-#     @staticmethod
-#     def backward(ctx, grad_out):
-#         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-#             lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape, degs \
-#             = ctx.backward_cache
-#         ctx.backward_cache = None
-#         grad_lhs = None
-#         grad_rhs = None
-#         if reducer == 'mean':
-#             grad_out = grad_out / degs
-#         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-#         if ctx.needs_input_grad[5]:
-#             grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
-#             K.backward_lhs_binary_op_reduce(
-#                 reducer if reducer != 'mean' else 'sum',
-#                 binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-#                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
-#                 lhs_map[1], rhs_map[1], out_map[1])
-#             grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
-#         if ctx.needs_input_grad[6]:
-#             grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
-#             K.backward_rhs_binary_op_reduce(
-#                 reducer if reducer != 'mean' else 'sum',
-#                 binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
-#                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_rhs),
-#                 lhs_map[1], rhs_map[1], out_map[1])
-#             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
-
-#         return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
-#             None, None
+# Weird tf convert, still investigating
+def convert_dglobject_to_tftensor(obj, dtype=None, name=None, as_ref=False):
+    """This only store the handle and erase the type information"""
+    return tf.constant([obj.handle.value], dtype=tf.int64, name=name)
 
 
-# class CopyReduce(th.autograd.Function):
-#     @staticmethod
-#     def forward(ctx, reducer, graph, target, in_data, out_size, in_map,
-#                 out_map):
-#         out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
-#         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
-#         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-#         K.copy_reduce(
-#             reducer if reducer != 'mean' else 'sum',
-#             graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
-#         # normalize if mean reducer
-#         # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
-#         if reducer == 'mean':
-#             in_ones = in_data.new_ones((in_data.shape[0],))
-#             degs = in_data.new_empty((out_data.shape[0],))
-#             in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
-#             degs_nd = zerocopy_to_dgl_ndarray(degs)
-#             K.copy_reduce(
-#                 'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
-#             # reshape
-#             degs = degs.reshape(
-#                 (out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
-#             out_data = out_data / degs
-#         else:
-#             degs = None
-#         # save_for_backward can only save variables
-#         ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-#                               in_data_nd, out_data_nd, degs)
-#         return out_data
-
-#     @staticmethod
-#     def backward(ctx, grad_out):
-#         reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd, degs \
-#             = ctx.backward_cache
-#         ctx.backward_cache = None
-#         grad_in = None
-#         if reducer == 'mean':
-#             grad_out = grad_out / degs
-#         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
-#         if ctx.needs_input_grad[3]:
-#             grad_in = grad_out.new_empty(in_data_nd.shape)
-#             K.backward_copy_reduce(
-#                 reducer if reducer != 'mean' else 'sum',
-#                 graph, target, in_data_nd, out_data_nd, grad_out_nd,
-#                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-#         return None, None, None, grad_in, None, None, None
+def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
+    if obj == (None, None):
+        return tf.constant([48966, 0], dtype=tf.int64)
+    else:
+        return tf.constant(obj, dtype=tf.int64)
 
 
-# binary_reduce = BinaryReduce.apply
-# copy_reduce = CopyReduce.apply
+def convert_back_to_tuple(tf_tensor):
+    print("TTTTTTTTTTTTTT")
+    if tf_tensor.numpy()[0].item() == 48966:
+        return (None, None)
+    else:
+        return tuple(tf_tensor.numpy())
 
 
-# def _reduce_grad(grad, shape):
-#     """Reduce gradient on the broadcast dimension
+def dummy_convert(obj, dtype=None, name=None, as_ref=False):
+    return tf.constant([0], dtype=tf.int64)
 
-#     If there is broadcast in forward pass, gradients need to be reduced on
-#     broadcast dimension. This function checks the input tensor shape and
-#     gradient shape and perform the reduction.
 
-#     Parameters
-#     ----------
-#     grad: Tensor
-#         Gradient tensor
-#     shape: tuple
-#         Shape of input tensor
+tf.register_tensor_conversion_function(
+    ObjectBase, dummy_convert)
 
-#     Returns
-#     -------
-#     Tensor
-#     """
-#     grad_shape = grad.shape[1:]
-#     in_shape = shape[1:]
-#     if in_shape == grad_shape:
-#         # no need to reduce
-#         return grad
-#     num_to_squeeze = len(grad_shape) - len(in_shape)
-#     # pad inshape
-#     in_shape = (1,) * num_to_squeeze + in_shape
-#     reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
-#     reduce_idx += 1  # skip batch dim
-#     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
-#     return grad.view(shape)
+tf.register_tensor_conversion_function(
+    tuple, patch_None_tuple,  priority=90)
+
+# tf.register_tensor_conversion_function(
+#     ObjectBase, convert_dglobject_to_tftensor)
+# tf.register_tensor_conversion_function(tuple, patch_None_tuple, priority=90)
+
+
+def convert_tftensor_to_gindex(tf_tensor):
+    from dgl.graph_index import GraphIndex
+    handle = tf_tensor.numpy().item()
+    cls = GraphIndex
+    obj = cls.__new__(cls)
+    obj.handle = handle
+    return obj
+
+
+@tf.custom_gradient
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map):
+    lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+    rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+    feat_shape = K.infer_binary_feature_shape(
+        binary_op, lhs_data_nd, rhs_data_nd)
+    out_shape = feat_shape
+    if binary_op == 'dot':
+        out_shape = feat_shape[:-1]
+    out_data = lhs_data.new_empty((out_size,) + out_shape)
+    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+    K.binary_op_reduce(
+        reducer if reducer != 'mean' else 'sum',
+        binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+        out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+    # normalize if mean reducer
+    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+    if reducer == 'mean':
+        degs = lhs_data.new_empty((out_data.shape[0],))
+        degs_nd = zerocopy_to_dgl_ndarray(degs)
+        if lhs != TargetCode.DST:  # src or edge
+            target = lhs
+            n = lhs_data.shape[0]
+            in_map = lhs_map[0]
+        else:  # rhs != TargetCode.DST
+            target = rhs
+            n = rhs_data.shape[0]
+            in_map = rhs_map[0]
+        in_ones = lhs_data.new_ones((n,))
+        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+        K.copy_reduce(
+            'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
+        # reshape
+        degs = tf.reshape(degs, 
+            (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+        degs = tf.clip_by_value(degs, clip_value_min=1, clip_value_max=np.inf) # ???
+        out_data = out_data / degs
+    else:
+        degs = None
+
+    def grad(grad_out):
+        grad_lhs = None
+        grad_rhs = None
+        if reducer == 'mean':
+            grad_out = grad_out / degs
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        if True:
+            # grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
+            grad_lhs = tf.zeros((lhs_data_nd.shape[0],) + feat_shape)
+            K.backward_lhs_binary_op_reduce(
+                reducer if reducer != 'mean' else 'sum',
+                binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
+                lhs_map[1], rhs_map[1], out_map[1])
+            grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
+        if True:
+            # grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
+            grad_rhs = tf.zeros((rhs_data_nd.shape[0],) + feat_shape)
+            K.backward_rhs_binary_op_reduce(
+                reducer if reducer != 'mean' else 'sum',
+                binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_rhs),
+                lhs_map[1], rhs_map[1], out_map[1])
+            grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+
+        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
+            None, None
+    return out_data, grad
+
+
+@tf.custom_gradient
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
+                out_map):
+    out_data = tf.zeros(
+        (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
+    in_data_nd = zerocopy_to_dgl_ndarray(in_data)
+    out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+    K.copy_reduce(
+        reducer if reducer != 'mean' else 'sum',
+        graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
+    # normalize if mean reducer
+    # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+    if reducer == 'mean':
+        # in_ones = in_data.new_ones((in_data.shape[0],))
+        in_ones = tf.ones(in_data.shape[0], dtype=in_data.dtype)
+        # degs = in_data.new_empty((out_data.shape[0],))
+        degs = tf.zeros(out_data.shape[0], dtype=in_data.dtype)
+        in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+        degs_nd = zerocopy_to_dgl_ndarray(degs)
+        K.copy_reduce(
+            'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
+        # reshape
+        degs = tf.reshape(degs, 
+            (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+        degs = tf.clip_by_value(degs, clip_value_min=1, clip_value_max=np.inf) # TODO: ???
+        out_data = out_data / degs
+    else:
+        degs = None
+    # save_for_backward can only save variables
+
+    def grad(grad_out):
+        if reducer == 'mean':
+            grad_out = grad_out / degs
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        # if ctx.needs_input_grad[3]:
+        if True:
+            # grad_in = grad_out.new_empty(in_data_nd.shape)
+            grad_in = tf.zeros(in_data_nd.shape)
+            K.backward_copy_reduce(
+                reducer if reducer != 'mean' else 'sum',
+                graph, target, in_data_nd, out_data_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
+        return None, None, None, grad_in, None, None, None
+    return out_data, grad
+
+
+def _reduce_grad(grad, shape):
+    """Reduce gradient on the broadcast dimension
+
+    If there is broadcast in forward pass, gradients need to be reduced on
+    broadcast dimension. This function checks the input tensor shape and
+    gradient shape and perform the reduction.
+
+    Parameters
+    ----------
+    grad: Tensor
+        Gradient tensor
+    shape: tuple
+        Shape of input tensor
+
+    Returns
+    -------
+    Tensor
+    """
+    grad_shape = grad.shape[1:]
+    in_shape = shape[1:]
+    if in_shape == grad_shape:
+        # no need to reduce
+        return grad
+    num_to_squeeze = len(grad_shape) - len(in_shape)
+    # pad inshape
+    in_shape = (1,) * num_to_squeeze + in_shape
+    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))
+    reduce_idx += 1  # skip batch dim
+    grad = tf.reduce_sum(grad, axis=tuple(reduce_idx), keepdim=True)
+    return tf.reshape(grad, shape)
 
 
 def sync():
