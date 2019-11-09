@@ -354,6 +354,9 @@ class RotatEScore(nn.Module):
         score = score.norm(dim=0)
         return {'score': self.gamma - score.sum(-1)}
 
+    def update(self):
+        pass
+
     def reset_parameters(self):
         pass
 
