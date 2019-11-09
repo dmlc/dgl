@@ -197,9 +197,12 @@ class MovieLens(object):
         self.train_enc_graph.nodes['movie'].data['feature'] = self.movie_feature
 
         self.valid_enc_graph = self.train_enc_graph
-        self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
-        self.valid_labels = _make_labels(valid_rating_values)
-        self.valid_truths = mx.nd.array(valid_rating_values, ctx=ctx, dtype=np.float32)
+        self.valid_dec_graph = self._generate_dec_graph(train_rating_pairs)
+        self.valid_labels = _make_labels(train_rating_values)
+        self.valid_truths = mx.nd.array(train_rating_values, ctx=ctx, dtype=np.float32)
+        #self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
+        #self.valid_labels = _make_labels(valid_rating_values)
+        #self.valid_truths = mx.nd.array(valid_rating_values, ctx=ctx, dtype=np.float32)
 
         self.test_enc_graph = self._generate_enc_graph(all_train_rating_pairs, all_train_rating_values, add_support=True)
         self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)

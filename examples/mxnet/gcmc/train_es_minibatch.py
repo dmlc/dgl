@@ -46,8 +46,6 @@ class Net(Block):
         pred_ratings = self.decoder(true_user_out, true_movie_out)
         return pred_ratings
 
-eval_graphs = []
-test_graphs = []
 def evaluate(args, net, dataset, segment='valid'):
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
@@ -58,12 +56,10 @@ def evaluate(args, net, dataset, segment='valid'):
         rating_values = dataset.valid_truths
         enc_graph = dataset.valid_enc_graph
         dec_graph = dataset.valid_dec_graph
-        sub_graphs = eval_graphs
     elif segment == "test":
         rating_values = dataset.test_truths
         enc_graph = dataset.test_enc_graph
         dec_graph = dataset.test_dec_graph
-        sub_graphs = test_graphs
     else:
         raise NotImplementedError
 
@@ -171,21 +167,20 @@ def train(args):
 
     print("Start training ...")
     dur = []
+
     for iter_idx in range(1, args.train_max_iter):
         if iter_idx > 3:
             t0 = time.time()
 
         seed = mx.nd.arange(dataset.train_npairs * 2, dtype='int64')
         edges = mx.nd.shuffle(seed)
-        for sample_idx in range(0, dataset.train_npairs//args.minibatch_size):
+        for sample_idx in range(0, (dataset.train_npairs * 2)//args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size]
             head_ids, tail_ids = homo_enc_graph.find_edges(edge_ids)
-
             s_edge_type = enc_edge_type_map[edge_ids]
             s_i = mx.nd.argsort(s_edge_type)
             head_ids = head_ids[s_i]
             tail_ids = tail_ids[s_i]
-            edge_ids = edge_ids[s_i]
             s_edge_type = s_edge_type[s_i]
 
             idx = 0
