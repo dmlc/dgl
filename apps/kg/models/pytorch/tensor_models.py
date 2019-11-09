@@ -34,7 +34,7 @@ reshape = lambda arr, x, y: arr.view(x, y)
 cuda = lambda arr, gpu: arr.cuda(gpu)
 
 class ExternalEmbedding:
-    def __init__(self, args, num, dim, device, lr_decay=1.0):
+    def __init__(self, args, num, dim, device):
         self.gpu = args.gpu
         self.args = args
         self.trace = []
@@ -42,7 +42,6 @@ class ExternalEmbedding:
         self.emb = th.empty(num, dim, dtype=th.float32, device=device)
         self.state_sum = self.emb.new().resize_(self.emb.size(0)).zero_()
         self.state_step = 0
-        self.lr_decay = lr_decay
 
     def init(self, emb_init):
         INIT.uniform_(self.emb, -emb_init, emb_init)
@@ -67,7 +66,7 @@ class ExternalEmbedding:
             for idx, data in self.trace:
                 grad = data.grad.data
 
-                clr = self.args.lr * self.lr_decay
+                clr = self.args.lr * self.args.relation_lr_decay
                 #clr = self.args.lr / (1 + (self.state_step - 1) * group['lr_decay'])
 
                 # the update is non-linear so indices must be unique

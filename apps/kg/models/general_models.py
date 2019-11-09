@@ -45,14 +45,13 @@ class KEModel(object):
         else:
             rel_dim = relation_dim
         self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim,
-                                              device, args.relation_lr_decay)
+                                              device)
 
         if model_name == 'TransE':
             self.score_func = TransEScore(gamma)
         elif model_name == 'TransR':
             projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
-                                               F.cpu() if args.mix_cpu_gpu else device,
-                                               args.relation_lr_decay)
+                                               F.cpu() if args.mix_cpu_gpu else device)
             self.score_func = TransRScore(gamma, projection_emb, relation_dim, entity_dim)
         elif model_name == 'DistMult':
             self.score_func = DistMultScore()
