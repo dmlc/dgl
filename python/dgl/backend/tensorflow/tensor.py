@@ -6,6 +6,7 @@ import tensorflow as tf
 from tensorflow.python.eager import context
 import builtins
 import tfdlpack
+import numpy as np
 from tfdlpack import to_dlpack, from_dlpack
 
 from ..._ffi.object import ObjectBase
@@ -55,8 +56,8 @@ def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt != 'coo':
         raise TypeError(
-            'Pytorch backend only supports COO format. But got %s.' % fmt)
-    spmat = th.sparse_coo_tensor(index[1], data, shape)
+            'Tensorflow backend only supports COO format. But got %s.' % fmt)
+    spmat = tf.SparseTensor(indices=index[1], values=data, dense_shape=shape)
     return spmat, None
 
 
