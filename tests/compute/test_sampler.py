@@ -326,7 +326,7 @@ def check_relation_central_sampler(mode, exclude_positive, neg_size):
                                             exclude_positive=exclude_positive,
                                             return_false_neg=True):
         pos_edges.copy_from_parent()
-        if len(np.unique(pos_edges.edata['etype'])) > 1:
+        if len(np.unique(F.asnumpy(pos_edges.edata['etype']))) > 1:
             cross_relation_cnt += 1
 
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
@@ -380,7 +380,7 @@ def check_relation_partion_sampler(mode, exclude_positive, neg_size):
                                             aggregated_batches=4,
                                             return_false_neg=True):
         pos_edges.copy_from_parent()
-        if len(np.unique(pos_edges.edata['etype'])) == 4:
+        if len(np.unique(F.asnumpy(pos_edges.edata['etype']))) == 4:
             cross_relation_cnt += 1
 
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
