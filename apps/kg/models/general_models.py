@@ -222,7 +222,7 @@ class KEModel(object):
         # relation id
         relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
         relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
-        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id)
+        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id[0:10])
         msg = client.pull_wait()
         self.relation_emb.emb[msg.id] = msg.data
         # wait and update
