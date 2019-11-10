@@ -174,6 +174,7 @@ def run(args, logger):
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
+    # For distributed training
     server_namebook = None
     client_namebook = None
     client = None

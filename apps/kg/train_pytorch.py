@@ -5,6 +5,8 @@ import torch.optim as optim
 import torch as th
 import torch.multiprocessing as mp
 
+from dgl.contrib import KVServer
+
 from distutils.version import LooseVersion
 TH_VERSION = LooseVersion(th.__version__)
 if TH_VERSION.version[0] == 1 and TH_VERSION.version[1] < 2:
