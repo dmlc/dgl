@@ -245,7 +245,7 @@ def test_all_binary_builtins():
             else:
                 g.update_all(builtin_msg(lhs, rhs, 'm'), builtin_red('m', 'r1'))
             r1 = g.ndata.pop('r1')
-            F.backward(r1.sum())
+            F.backward(F.reduce_sum(r1))
             lhs_grad_1 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_1 = F.grad(target_feature_switch(g, rhs))
 
@@ -286,7 +286,7 @@ def test_all_binary_builtins():
             else:
                 g.update_all(mfunc, rfunc)
             r2 = g.ndata.pop('r2')
-            F.backward(r2.sum(), F.tensor([1.]))
+            F.backward(F.reduce_sum(r2), F.tensor([1.]))
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 

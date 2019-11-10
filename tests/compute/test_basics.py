@@ -3,6 +3,7 @@ import dgl
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
+import pytest
 
 D = 5
 reduce_msg_shapes = set()
@@ -124,6 +125,7 @@ def test_batch_setter_getter():
     v = F.tensor([3, 4, 5])
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="Temp shut down")
 def test_batch_setter_autograd():
     g = generate_graph(grad=True)
     h1 = g.ndata['h']
@@ -244,7 +246,7 @@ def test_nx_conversion():
     nxg = nx.cycle_graph(5)
     nxg.remove_nodes_from([0, 4])
     for u in nxg.nodes():
-        nxg.node[u]['h'] = F.tensor([u])
+        nxg.nodes[u]['h'] = F.tensor([u])
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
