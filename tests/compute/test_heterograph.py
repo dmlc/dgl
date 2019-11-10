@@ -515,10 +515,10 @@ def test_flatten():
             # TODO(gq): I feel this code is quite redundant; can we just add new members (like
             # "induced_srcid") to returned heterograph object and not store them as features?
             assert src_g == F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0]
-            tid = F.asnumpy(F.gather_row(fg.nodes[SRC].data[dgl.NTYPE], src_fg))
+            tid = F.asnumpy(F.gather_row(fg.nodes[SRC].data[dgl.NTYPE], src_fg)).item()
             assert g.canonical_etypes[etype][0] == g.ntypes[tid]
             assert dst_g == F.gather_row(fg.nodes[DST].data[dgl.NID], dst_fg)[0]
-            tid = F.asnumpy(F.gather_row(fg.nodes[DST].data[dgl.NTYPE], dst_fg))
+            tid = F.asnumpy(F.gather_row(fg.nodes[DST].data[dgl.NTYPE], dst_fg)).item()
             assert g.canonical_etypes[etype][2] == g.ntypes[tid]
 
     # check for wildcard slices
