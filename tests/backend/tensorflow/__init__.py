@@ -74,7 +74,8 @@ def narrow_row_set(x, start, stop, new):
     raise NotImplementedError("TF doesn't support inplace update")
 
 def sparse_to_numpy(x):
-    return tf.sparse.to_dense(x).numpy()
+    # tf.sparse.to_dense assume sorted indices, need to turn off validate_indices in our cases
+    return tf.sparse.to_dense(x, validate_indices=False).numpy() 
 
 def clone(x):
     return tf.identity(x)
