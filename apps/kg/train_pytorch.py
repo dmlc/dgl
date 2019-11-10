@@ -52,7 +52,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None):
+def train(args, model, train_sampler, valid_samplers=None, clien=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
     logs = []
