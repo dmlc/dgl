@@ -58,7 +58,7 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
-    spmat = tf.SparseTensor(indices=index[1], values=data, dense_shape=shape)
+    spmat = tf.SparseTensor(indices=tf.transpose(index[1], (1, 0)), values=data, dense_shape=shape)
     return spmat, None
 
 
@@ -101,7 +101,8 @@ def astype(input, ty):
 
 def asnumpy(input):
     if isinstance(input, tf.SparseTensor):
-        return tf.sparse.to_dense(input).numpy()
+        # tf.sparse.to_dense assume sorted indices, need to turn off validate_indices in our cases
+        return tf.sparse.to_dense(input, validate_indices=False).numpy() 
     else:
         return input.numpy()
 
@@ -363,7 +364,7 @@ def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
     if obj == (None, None):
         return tf.constant([48966, 0], dtype=tf.int64)
     else:
-        return tf.constant(obj, dtype=tf.int64)
+        return tf.constant(obj, dtype=dtype, name=name)
 
 
 def convert_back_to_tuple(tf_tensor):
@@ -408,7 +409,8 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     out_shape = feat_shape
     if binary_op == 'dot':
         out_shape = feat_shape[:-1]
-    out_data = lhs_data.new_empty((out_size,) + out_shape)
+    # out_data = lhs_data.new_empty((out_size,) + out_shape)
+    out_data = tf.zeros((out_size,) + out_shape, dtype=lhs_data.dtype)
     out_data_nd = zerocopy_to_dgl_ndarray(out_data)
     K.binary_op_reduce(
         reducer if reducer != 'mean' else 'sum',
