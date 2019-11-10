@@ -5,6 +5,7 @@ import argparse
 import os
 import logging
 import time
+import dgl
 
 backend = os.environ.get('DGLBACKEND')
 if backend.lower() == 'mxnet':
