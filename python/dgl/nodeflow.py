@@ -1023,7 +1023,7 @@ def _copy_to_like(arr1, arr2):
 def _get_frame(frame, names, ids, ctx):
     col_dict = {}
     for name in names:
-        col = frame[name][_copy_to_like(ids, frame[name])]
+        col = F.gather_row(frame[name], _copy_to_like(ids, frame[name]))
         if ctx:
             col = F.copy_to(col, ctx)
         col_dict[name] = col
