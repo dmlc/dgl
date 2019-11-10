@@ -209,3 +209,12 @@ class KEModel(object):
         self.entity_emb.update()
         self.relation_emb.update()
         self.score_func.update()
+
+    def pull_model(self, client, pos_g, neg_g):
+        entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
+        entity_id = F.tensor(np.unique(F.asnumpy(entity_id)))
+        relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata('id')], dim=0)
+        relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
+
+    def push_gradient(self, client):
+        pass

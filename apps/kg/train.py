@@ -196,7 +196,6 @@ def run(args, logger):
             client = connect_to_kvstore(args, model, client_namebook, server_namebook)
             partition_book = get_partition_book(args.data_path, args.dataset, args.partition_file)
             client.partition(partition_book)
-            print(partition_book)
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     if args.num_proc > 1:

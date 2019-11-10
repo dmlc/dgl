@@ -52,7 +52,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None, clien=None):
+def train(args, model, train_sampler, valid_samplers=None, client=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
     logs = []
@@ -68,6 +68,8 @@ def train(args, model, train_sampler, valid_samplers=None, clien=None):
         args.step = step
 
         start1 = time.time()
+        if args.dist == True:
+            model.pull_model(client, pos_g, neg_g)
         loss, log = model.forward(pos_g, neg_g)
         forward_time += time.time() - start1
 
@@ -76,6 +78,8 @@ def train(args, model, train_sampler, valid_samplers=None, clien=None):
         backward_time += time.time() - start1
 
         start1 = time.time()
+        if args.dist == True:
+            model.push_gradient(client)
         model.update()
         update_time += time.time() - start1
         logs.append(log)
