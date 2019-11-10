@@ -236,5 +236,5 @@ class KEModel(object):
 
     def push_gradient(self, client):
         # push entity gradient
-
         # push relation gradient
+        pass
