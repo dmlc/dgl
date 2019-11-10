@@ -1,5 +1,5 @@
 from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
-from dataloader import get_dataset
+from dataloader import get_dataset, get_partition_book
 
 import argparse
 import os
@@ -17,6 +17,7 @@ else:
     from train_pytorch import load_model
     from train_pytorch import train
     from train_pytorch import test
+    from train_pytorch import RowSparseAdaGradKVStore
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
@@ -101,6 +102,14 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
 
+        self.add_argument('--dist', action='store_true',
+                          help='use distributed training.')
+        self.add_argument('--ip_config', type=str, default='ip_config.txt',
+                          help='path of network configuration file.')
+        self.add_argument('--id', type=int, default=0,
+                          help='node ID for distributed training.')
+        self.add_argument('--partition_file', type=str, default='partition.txt',
+                          help='file to store partition book.')
 
 def get_logger(args):
     if not os.path.exists(args.save_path):
@@ -127,6 +136,32 @@ def get_logger(args):
     print("Logs are being recorded at: {}".format(log_file))
     return logger
 
+def start_server(args, model, client_namebook, server_namebook):
+    server = RowSparseAdaGradKVStore(
+            server_id=args.id,
+            client_namebook=client_namebook,
+            server_addr=server_namebook[args.id])
+
+    server.set_clr(args.lr)
+
+    server.init_data(name='relation_emb', data_tensor=model.relation_emb.emb)
+    server.init_data(name='entity_emb', data_tensor=model.entity_emb.emb)
+    server.init_data(name='relation_emb_state', data_tensor=model.relation_emb.state_sum)
+    server.init_data(name='entity_emb_state', data_tensor=model.entity_emb.state_sum)
+
+    server.start()
+
+    exit()
+
+def connect_to_kvstore(args, model, client_namebook, server_namebook):
+    client = dgl.contrib.KVClient(
+        client_id=args.id,
+        server_namebook=server_namebook,
+        client_addr=client_namebook[args.id])
+
+    client.connect()
+
+    return client
 
 def run(args, logger):
     # load dataset and samplers
@@ -135,6 +170,31 @@ def run(args, logger):
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = n_entities
+
+    # load model
+    model = load_model(logger, args, n_entities, n_relations)
+
+    server_namebook = None
+    client_namebook = None
+    client = None
+
+    if args.num_proc > 1 or args.dist == True:
+        model.share_memory()
+
+    if args.dist == True:
+        server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure(args.ip_config)
+
+    # Start server node
+    if args.dist == True:
+        pid = os.fork()
+        if pid == 0:
+            start_server(args, model, client_namebook, server_namebook)
+        else:
+            time.sleep(2)  # wait for server node
+            client = connect_to_kvstore(args, model, client_namebook, server_namebook)
+            partition_book = get_partition_book(args.data_path, args.dataset, args.partition_file)
+            client.partition(partition_book)
+            print(partition_book)
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     if args.num_proc > 1:
@@ -234,11 +294,6 @@ def run(args, logger):
     # We need to free all memory referenced by dataset.
     eval_dataset = None
     dataset = None
-    # load model
-    model = load_model(logger, args, n_entities, n_relations)
-
-    if args.num_proc > 1:
-        model.share_memory()
 
     # train
     start = time.time()
@@ -253,7 +308,7 @@ def run(args, logger):
             proc.join()
     else:
         valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-        train(args, model, train_sampler, valid_samplers)
+        train(args, model, train_sampler, valid_samplers, client)
     print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb is not None:

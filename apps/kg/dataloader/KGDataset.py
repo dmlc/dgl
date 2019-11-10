@@ -137,3 +137,12 @@ def get_dataset(data_path, data_name, format_str):
         dataset = KGDataset2(data_path, data_name)
 
     return dataset
+
+def get_partition_book(data_path, data_name, file_name):
+    partition_book = []
+    path = os.path.join(data_path, data_name)
+    with open(os.path.join(path, file_name)) as f:
+        for line in f:
+            partition_book.append(int(line))
+            
+    return partition_book

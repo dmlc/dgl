@@ -14,6 +14,27 @@ import os
 import logging
 import time
 
+class RowSparseAdaGradKVStore(KVServer):
+    """User-defined kvstore for DGL-KGE task
+    """
+    def _push_handler(self, name, ID, data):
+        """User-defined RowSparse AdaGrad optimizer.
+        """
+        grad_indices = ID
+        grad_values = data
+        state_sum = self._data_store[name+'_state']
+        grad_sum = (grad_values * grad_values).mean(1)
+        state_sum.index_add_(0, grad_indices, grad_sum)
+        std = state_sum[grad_indices]  # _sparse_mask
+        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+        tmp = (-self.clr * grad_values / std_values)
+        self._data_store[name].index_add_(0, grad_indices, tmp)
+
+    def set_clr(self, learning_rate):
+        """Set learning rate
+        """
+        self.clr = learning_rate
+
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
     model = KEModel(args, args.model_name, n_entities, n_relations,
                     args.hidden_dim, args.gamma,
