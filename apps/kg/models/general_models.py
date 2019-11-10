@@ -211,10 +211,30 @@ class KEModel(object):
         self.score_func.update()
 
     def pull_model(self, client, pos_g, neg_g):
+        # entity id
         entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
         entity_id = F.tensor(np.unique(F.asnumpy(entity_id)))
+        #entity_server_group, entity_id_group = client.get_group(entity_id)
+        #for idx in range(len(entity_id_group)):
+        #    client.pull(name='entity_emb', 
+        #        server_id=entity_server_group[idx],
+        #        id_tensor=entity_id_group[idx])
+        # relation id
         relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
         relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
+        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id)
+        msg = client.pull_wait()
+        self.relation_emb.emb[msg.id] = msg.data
+        # wait and update
+        #total_count = len(entity_id_group) + len(rel_id_group)
+        #for idx in range(len(total_count)):
+        #    msg = client.pull_wait()
+        #    if msg.name == 'entity_emb':
+        #        self.entity_emb.emb[msg.id] = msg.data
+        #    else:
+        #        self.relation_emb.emb[msg.id] = msg.data
 
     def push_gradient(self, client):
-        pass
+        # push entity gradient
+
+        # push relation gradient
