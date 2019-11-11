@@ -255,7 +255,7 @@ class KEModel(object):
             sorted_id = np.argsort(server_id)
             entity_id = entity_id[sorted_id]
             entity_data = entity_data[sorted_id]
-            server, count = np.unique(sorted_id, return_counts=True)
+            server, count = np.unique(server_id, return_counts=True)
             print('server list: ')
             print(server)
             print(count)
