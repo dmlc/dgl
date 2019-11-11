@@ -226,6 +226,7 @@ class KEModel(object):
         pull_count = 0
         print('server list: ')
         print(server)
+        print(count)
         for idx in range(len(server)):
             if server[idx] == self.node_id:
                 continue
