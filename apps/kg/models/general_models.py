@@ -249,8 +249,8 @@ class KEModel(object):
     def push_gradient(self, client):
         # push entity gradient
         for entity_id, entity_data in self.entity_emb.trace:
-            entity_id = np.asnumpy(entity_id)
-            entity_data = np.asnumpy(entity_data.grad.data)
+            entity_id = F.asnumpy(entity_id)
+            entity_data = F.asnumpy(entity_data.grad.data)
             server_id = self.partition_book[entity_id]
             sorted_id = np.argsort(server_id)
             entity_id = entity_id[sorted_id]
