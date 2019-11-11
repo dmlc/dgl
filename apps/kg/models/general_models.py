@@ -224,6 +224,8 @@ class KEModel(object):
         server, count = np.unique(server_id, return_counts=True)
         start_idx = 0
         pull_count = 0
+        print('server list: ')
+        print(server)
         for idx in range(len(server)):
             if server[idx] == self.node_id:
                 continue
