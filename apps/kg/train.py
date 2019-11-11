@@ -195,7 +195,7 @@ def run(args, logger):
             time.sleep(2)  # wait for server node
             client = connect_to_kvstore(args, model, client_namebook, server_namebook)
             partition_book = get_partition_book(args.data_path, args.dataset, args.partition_file)
-            client.partition(partition_book)
+            model.partition_book = F.asnumpy(F.tensor(partition_book))
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     if args.num_proc > 1:

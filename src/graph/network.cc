@@ -581,5 +581,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
     *rv = msg->data;
   });
 
+DGL_REGISTER_GLOBAL("network._CAPI_PartitionID")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray id_tensor = args[0];
+    NDArray partition_book = args[1];
+  });
+
+
 }  // namespace network
 }  // namespace dgl

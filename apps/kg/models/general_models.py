@@ -32,6 +32,7 @@ class KEModel(object):
         self.hidden_dim = hidden_dim
         self.eps = 2.0
         self.emb_init = (gamma + self.eps) / hidden_dim
+        self.partition_book = None
 
         entity_dim = 2 * hidden_dim if double_entity_emb else hidden_dim
         relation_dim = 2 * hidden_dim if double_relation_emb else hidden_dim
@@ -213,26 +214,28 @@ class KEModel(object):
     def pull_model(self, client, pos_g, neg_g):
         # entity id
         entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
-        entity_id = F.tensor(np.unique(F.asnumpy(entity_id)))
-        #entity_server_group, entity_id_group = client.get_group(entity_id)
-        #for idx in range(len(entity_id_group)):
-        #    client.pull(name='entity_emb', 
-        #        server_id=entity_server_group[idx],
-        #        id_tensor=entity_id_group[idx])
+        entity_id = np.unique(F.asnumpy(entity_id))
+        server_id = self.partition_book[entity_id]
+        entity_id = entity_id[np.argsort(server_id)]
+        server, count = np.unique(server_id, return_counts=True)
+        start_idx = 0
+        for idx in range(len(server)):
+            client.pull(name='entity_emb', 
+                server_id=server[idx], 
+                id_tensor=entity_id[start_idx:start_idx+count[idx]])
+            start_idx += count[idx]
         # relation id
         relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
         relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
-        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id[0:10])
-        msg = client.pull_wait()
-        self.relation_emb.emb[msg.id] = msg.data
+        # we pull all relation data from server_0 by default
+        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id)
         # wait and update
-        #total_count = len(entity_id_group) + len(rel_id_group)
-        #for idx in range(len(total_count)):
-        #    msg = client.pull_wait()
-        #    if msg.name == 'entity_emb':
-        #        self.entity_emb.emb[msg.id] = msg.data
-        #    else:
-        #        self.relation_emb.emb[msg.id] = msg.data
+        for idx in range(len(server) + 1):
+            msg = client.pull_wait()
+            if msg.name == 'entity_emb':
+                self.entity_emb.emb[msg.id] = msg.data
+            else:
+                self.relation_emb.emb[msg.id] = msg.data
 
     def push_gradient(self, client):
         # push entity gradient

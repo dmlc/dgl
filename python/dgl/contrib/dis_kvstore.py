@@ -4,6 +4,7 @@ from ..network import _finalize_sender, _finalize_receiver
 from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
+from ..network import _partition_id, _partition_id_data
 from ..network import KVMsgType, KVStoreMsg
 
 import math
@@ -425,16 +426,6 @@ class KVClient(object):
         for server_id in range(self._server_count):
             back_msg = _recv_kv_msg(self._receiver)
             assert back_msg.type == KVMsgType.BARRIER, 'Recv kv msg error.'
-
-    def partition(self, partition_book):
-        """Set partition book to client
-
-        Parameters
-        ----------
-        partition_book : list
-            a list to store the partition id for each node.
-        """
-        self.partition_book = F.tensor(partition_book)
 
     def shut_down(self):
         """Shutdown all KVServer nodes
