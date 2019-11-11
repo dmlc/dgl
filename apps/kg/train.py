@@ -110,7 +110,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--id', type=int, default=0,
                           help='node ID for distributed training.')
         self.add_argument('--partition_file', type=str, default='partition.txt',
-                          help='file to store partition book.')
+                          help='file for partition book.')
 
 def get_logger(args):
     if not os.path.exists(args.save_path):
