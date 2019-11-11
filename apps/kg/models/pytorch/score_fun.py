@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
 import numpy as np
-from .tensor_models import ExternalEmbedding
 
 class TransEScore(nn.Module):
     def __init__(self, gamma):

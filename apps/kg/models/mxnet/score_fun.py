@@ -1,3 +1,4 @@
+import numpy as np
 import mxnet as mx
 from mxnet import gluon
 from mxnet.gluon import nn
@@ -359,3 +360,91 @@ class RESCALScore(nn.Block):
                 tmp = tmp.reshape(num_chunks, chunk_size, hidden_dim)
                 return nd.linalg_gemm2(tmp, tails)
             return fn
+
+class RotatEScore(nn.Block):
+    def __init__(self, gamma, emb_init):
+        super(RotatEScore, self).__init__()
+        self.gamma = gamma
+        self.emb_init = emb_init
+
+    def edge_func(self, edges):
+        real_head, img_head = nd.split(edges.src['emb'], num_outputs=2, axis=-1)
+        real_tail, img_tail = nd.split(edges.dst['emb'], num_outputs=2, axis=-1)
+
+        phase_rel = edges.data['emb'] / (self.emb_init / np.pi)
+        re_rel, im_rel = nd.cos(phase_rel), nd.sin(phase_rel)
+        real_score = real_head * re_rel - img_head * im_rel
+        img_score = real_head * im_rel + img_head * re_rel
+        real_score = real_score - real_tail
+        img_score = img_score - img_tail
+
+        score = nd.stack(real_score, img_score, axis=0)
+        score = nd.norm(score, ord=2, axis=0)
+        return {'score': self.gamma - score.sum(axis=-1)}
+
+    def prepare(self, g, gpu_id, trace=False):
+        pass
+
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
+
+    def update(self):
+        pass
+
+    def reset_parameters(self):
+        pass
+
+    def save(self, path, name):
+        pass
+
+    def load(self, path, name):
+        pass
+
+    def forward(self, g):
+        g.apply_edges(lambda edges: self.edge_func(edges))
+
+    def create_neg(self, neg_head):
+        gamma = self.gamma
+        emb_init = self.emb_init
+        if neg_head:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real, emb_img = nd.split(tails, num_outputs=2, axis=-1)
+                phase_rel = relations / (emb_init / np.pi)
+
+                rel_real, rel_img = nd.cos(phase_rel), nd.sin(phase_rel)
+                real = emb_real * rel_real + emb_img * rel_img
+                img = -emb_real * rel_img + emb_img * rel_real
+                emb_complex = nd.concat(real, img, dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                heads = heads.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
+
+                score = tmp - heads
+                score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
+                score = nd.stack(score_real, score_img, axis=0)
+                score = nd.norm(score, ord=2, axis=0)
+                return gamma - score.sum(-1)
+            return fn
+        else:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real, emb_img = nd.split(heads, num_outputs=2, axis=-1)
+                phase_rel = relations / (emb_init / np.pi)
+
+                rel_real, rel_img = nd.cos(phase_rel), nd.sin(phase_rel)
+                real = emb_real * rel_real - emb_img * rel_img
+                img = emb_real * rel_img + emb_img * rel_real
+                emb_complex = nd.concat(real, img, dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                tails = tails.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
+
+                score = tmp - tails
+                score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
+                score = nd.stack(score_real, score_img, axis=0)
+                score = nd.norm(score, ord=2, axis=0)
+                return gamma - score.sum(-1)
+            return fn
+
+
