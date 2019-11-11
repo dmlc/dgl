@@ -219,23 +219,23 @@ class KEModel(object):
         entity_id = entity_id[np.argsort(server_id)]
         server, count = np.unique(server_id, return_counts=True)
         start_idx = 0
-        for idx in range(len(server)):
-            client.pull(name='entity_emb', 
-                server_id=server[idx], 
-                id_tensor=entity_id[start_idx:start_idx+count[idx]])
-            start_idx += count[idx]
+        #for idx in range(len(server)):
+        #    client.pull(name='entity_emb', 
+        #        server_id=server[idx], 
+        #        id_tensor=entity_id[start_idx:start_idx+count[idx]])
+        #    start_idx += count[idx]
         # relation id
         relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
         relation_id = F.tensor(np.unique(F.asnumpy(relation_id)))
         # we pull all relation data from server_0 by default
-        client.pull(name='relation_emb', server_id=0, id_tensor=relation_id)
+        #client.pull(name='relation_emb', server_id=0, id_tensor=relation_id)
         # wait and update
-        for idx in range(len(server) + 1):
-            msg = client.pull_wait()
-            if msg.name == 'entity_emb':
-                self.entity_emb.emb[msg.id] = msg.data
-            else:
-                self.relation_emb.emb[msg.id] = msg.data
+        #for idx in range(len(server) + 1):
+        #    msg = client.pull_wait()
+        #    if msg.name == 'entity_emb':
+        #        self.entity_emb.emb[msg.id] = msg.data
+        #    else:
+        #        self.relation_emb.emb[msg.id] = msg.data
 
     def push_gradient(self, client):
         # push entity gradient
