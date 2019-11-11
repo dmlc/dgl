@@ -256,6 +256,9 @@ class KEModel(object):
             entity_id = entity_id[sorted_id]
             entity_data = entity_data[sorted_id]
             server, count = np.unique(sorted_id, return_counts=True)
+            print('server list: ')
+            print(server)
+            print(count)
             start_idx = 0
             for idx in range(len(server)):
                 if server[idx] == self.node_id:
