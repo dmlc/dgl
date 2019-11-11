@@ -2,6 +2,8 @@ import numpy as np
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
 import backend as F
+import dgl
+import pytest
 
 N = 10
 D = 5
@@ -231,6 +233,8 @@ def test_row3():
     for k, v in f.items():
         assert F.allclose(v, data[k][newidx])
 
+
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_row4():
     # test updating row with empty frame but has preset num_rows
     f = FrameRef(Frame(num_rows=5))
@@ -351,17 +355,17 @@ def test_inplace():
     assert a2addr == newa2addr
 
 if __name__ == '__main__':
-    test_create()
-    test_column1()
-    test_column2()
-    test_append1()
-    test_append2()
-    test_append3()
-    test_row1()
-    test_row2()
-    test_row3()
+    # test_create()
+    # test_column1()
+    # test_column2()
+    # test_append1()
+    # test_append2()
+    # test_append3()
+    # test_row1()
+    # test_row2()
+    # test_row3()
     test_row4()
-    test_sharing()
-    test_slicing()
-    test_add_rows()
-    test_inplace()
+    # test_sharing()
+    # test_slicing()
+    # test_add_rows()
+    # test_inplace()

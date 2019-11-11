@@ -6,6 +6,7 @@ import scipy.sparse as ssp
 import itertools
 import backend as F
 import networkx as nx
+import pytest
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -883,6 +884,8 @@ def test_level1():
         fail = True
     assert fail
 
+
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="Core dump")
 def test_level2():
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
