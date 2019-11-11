@@ -67,6 +67,9 @@ class KEModel(object):
 
         self.reset_parameters()
 
+    def set_partition_book(self, book):
+        self.partition_book = F.asnumpy(F.tensor(book))
+
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
         self.entity_emb.share_memory()

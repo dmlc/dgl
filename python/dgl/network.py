@@ -292,26 +292,3 @@ def _recv_kv_msg(receiver):
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
-
-def _partition_id(id_tensor, partition_book):
-    """Partition ID tensor into different groups
-
-    Parameters
-    ----------
-    id_tensor : tensor
-        target ID tensor
-    partition_book : tensor
-        partition book tensor
-    """
-    server_group = []
-    id_group = []
-    group_ptr = _CAPI_PartitionID(id_tensor, partition_book)
-    count = _CAPI_GetGroupCount(group_ptr)
-    for idx in range(count):
-        server_group.append(_CAPI_GetServerGroup(group_ptr))
-        id_group.append(_CAP_GetIDGroup(group_ptr))
-
-    return server_group, id_group
-
-def _partition_id_data(id_tensor, data_tensor, partition_book):
-    pass
