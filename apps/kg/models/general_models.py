@@ -247,4 +247,8 @@ class KEModel(object):
 
     def push_gradient(self, client):
         # push entity gradient
+        #for idx, data in self.entity_emb.trace:
+        #    client.push()
         # push relation gradient
+        #for idx
+        pass
