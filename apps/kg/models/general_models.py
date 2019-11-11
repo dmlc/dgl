@@ -220,7 +220,8 @@ class KEModel(object):
         entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
         entity_id = np.unique(F.asnumpy(entity_id))
         server_id = self.partition_book[entity_id]
-        entity_id = entity_id[np.argsort(server_id)]
+        sorted_id = np.argsort(server_id)
+        entity_id = entity_id[sorted_id]
         server, count = np.unique(server_id, return_counts=True)
         start_idx = 0
         pull_count = 0
@@ -247,8 +248,27 @@ class KEModel(object):
 
     def push_gradient(self, client):
         # push entity gradient
-        #for idx, data in self.entity_emb.trace:
-        #    client.push()
+        for entity_id, entity_data in self.entity_emb.trace:
+            entity_id = np.asnumpy(entity_id)
+            entity_data = np.asnumpy(entity_data.grad.data)
+            server_id = self.partition_book[entity_id]
+            sorted_id = np.argsort(server_id)
+            entity_id = entity_id[sorted_id]
+            entity_data = entity_data[sorted_id]
+            server, count = np.unique(sorted_id, return_counts=True)
+            start_idx = 0
+            for idx in range(len(server)):
+                if server[idx] == self.node_id:
+                    continue
+                client.push(name='entity_emb', 
+                    server_id=server[idx], 
+                    id_tensor=F.tensor(entity_id[start_idx:start_idx+count[idx]]), 
+                    data_tensor=F.tensor(entity_data[start_idx:start_idx+count[idx]]))
+                start_idx += count[idx]
         # push relation gradient
-        #for idx
-        pass
+        for relation_id, relation_data in self.relation_emb.trace:
+            # we push relation data to server_0 by default
+            client.push(name='relation_emb', 
+                server_id=0, 
+                id_tensor=relation_id,
+                data_tensor=relation_data.grad.data)
