@@ -394,7 +394,6 @@ def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
 
 
 def convert_back_to_tuple(tf_tensor):
-    # print("TTTTTTTTTTTTTT")
     if tf_tensor.numpy()[0].item() == 48966:
         return (None, None)
     else:
