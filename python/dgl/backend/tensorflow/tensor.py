@@ -58,7 +58,8 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError(
             'Tensorflow backend only supports COO format. But got %s.' % fmt)
-    spmat = tf.SparseTensor(indices=tf.transpose(index[1], (1, 0)), values=data, dense_shape=shape)
+    spmat = tf.SparseTensor(indices=tf.transpose(
+        index[1], (1, 0)), values=data, dense_shape=shape)
     return spmat, None
 
 
@@ -102,7 +103,7 @@ def astype(input, ty):
 def asnumpy(input):
     if isinstance(input, tf.SparseTensor):
         # tf.sparse.to_dense assume sorted indices, need to turn off validate_indices in our cases
-        return tf.sparse.to_dense(input, validate_indices=False).numpy() 
+        return tf.sparse.to_dense(input, validate_indices=False).numpy()
     else:
         return input.numpy()
 
@@ -122,7 +123,7 @@ def reduce_sum(input):
 
 
 def mean(input, dim):
-    return th.reduce_mean(input, axis=dim)
+    return tf.reduce_mean(input, axis=dim)
 
 
 def reduce_mean(input):
@@ -147,28 +148,20 @@ def reduce_min(input):
 
 def argsort(input, dim, descending):
     if descending:
-        return tf.argsort(input, axis=dim, descending="DESCENDING")
+        return tf.cast(tf.argsort(input, axis=dim, direction="DESCENDING"), dtype=tf.int64)
     else:
-        return tf.argsort(input, axis=dim, descending="ASCENDING")
+        return tf.cast(tf.argsort(input, axis=dim, direction="ASCENDING"), dtype=tf.int64)
 
 
 def topk(input, k, dim, descending=True):
-    if dim != -1:
-        raise NotImplementedError("Only support last dimension")
-    if not descending:
-        raise NotImplementedError("Only support descending")
-
-    return tf.math.top_k(input, k=k).values
-
+    # tf's topk doesn't support direction and dimension, use sort instead
+    direction = 'DESCENDING' if descending else 'ASCENDING'
+    return slice_axis(tf.sort(input, axis=dim, direction=direction), dim, 0, k)
 
 def argtopk(input, k, dim, descending=True):
-    if dim != -1:
-        raise NotImplementedError("Only support last dimension")
-    if not descending:
-        raise NotImplementedError("Only support descending")
-
-    return tf.math.top_k(input, k=k).indices
-
+    # tf's topk doesn't support direction and dimension, use argsort instead
+    direction = 'DESCENDING' if descending else 'ASCENDING'
+    return slice_axis(tf.argsort(input, axis=dim, direction=direction), dim, 0, k)
 
 def exp(input):
     return tf.exp(input)
@@ -202,8 +195,13 @@ def gather_row(data, row_index):
 
 
 def slice_axis(data, axis, begin, end):
-    assert axis == 0
-    return tf.slice(data, begin=begin, size=end-begin)
+    # assert axis == 0
+    # tf doesn't behave well with negative
+    s = [slice(None) for i in range(data.ndim)]
+    if end == 0:
+        end = data.shape[axis]
+    s[axis] = slice(begin, end, None)
+    return data[tuple(s)]
 
 
 def take(data, indices, dim):
@@ -265,21 +263,49 @@ def uniform(shape, dtype, ctx, low, high):
 
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
-    raise NotImplementedError
+    old_shape = input.shape
+    if isinstance(lengths, tf.Tensor):
+        max_len = as_scalar(lengths.max())
+    else:
+        max_len = builtins.max(lengths)
+
+    if l_min is not None:
+        max_len = builtins.max(max_len, l_min)
+
+    batch_size = len(lengths)
+    ndim = input.ndim
+    tensor_list = []
+    cum_row = 0
+    pad_nparray = np.zeros((ndim, 2), dtype=np.int32)
+    for l in lengths:
+        t = input[cum_row:cum_row+l]
+        pad_nparray[0, 1] = max_len - l
+        t = tf.pad(t, tf.constant(pad_nparray),
+                   mode='CONSTANT', constant_values=value)
+        tensor_list.append(t)
+        cum_row += l
+    return tf.stack(tensor_list, axis=0)
 
 
 def pack_padded_tensor(input, lengths):
-    raise NotImplementedError
+    out_list = []
+    for i, l in enumerate(lengths):
+        t = input[i]
+        out = t[:l]
+        out_list.append(out)
+    return tf.concat(out_list, axis=0)
 
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_sum(input, seg_id, n_seg)
+    return tf.math.unsorted_segment_sum(input, seg_id, n_segs)
 
 
 def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     assert dim == 0  # Why we need dim for 1d?
-    return tf.math.unsorted_segment_mean(input, seg_id, n_seg)
+    return tf.math.unsorted_segment_mean(input, seg_id, n_segs)
+
+# TODO: TF has unsorted_segment_max, which can accelerate _max_on on batched graph
 
 
 def boolean_mask(input, mask):
@@ -307,7 +333,7 @@ def full_1d(length, fill_value, dtype, ctx):
 
 def nonzero_1d(input):
     nonzero_bool = (input != False)
-    return tf.squeeze(tf.where(nonzero_bool))
+    return tf.reshape(tf.where(nonzero_bool), (-1, ))
 
 
 def sort_1d(input):
@@ -368,7 +394,7 @@ def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
 
 
 def convert_back_to_tuple(tf_tensor):
-    print("TTTTTTTTTTTTTT")
+    # print("TTTTTTTTTTTTTT")
     if tf_tensor.numpy()[0].item() == 48966:
         return (None, None)
     else:
@@ -435,7 +461,7 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
             'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
         # reshape
         degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
         degs = tf.clip_by_value(degs, clip_value_min=1,
                                 clip_value_max=np.inf)  # ???
         out_data = out_data / degs
@@ -495,7 +521,7 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
             'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0])
         # reshape
         degs = tf.reshape(degs,
-                          (out_data.shape[0],) + (1,) * (out_data.dim() - 1))
+                          (out_data.shape[0],) + (1,) * (out_data.ndim - 1))
         degs = tf.clip_by_value(degs, clip_value_min=1,
                                 clip_value_max=np.inf)  # TODO: ???
         out_data = out_data / degs
