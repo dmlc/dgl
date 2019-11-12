@@ -362,10 +362,11 @@ class RESCALScore(nn.Block):
             return fn
 
 class RotatEScore(nn.Block):
-    def __init__(self, gamma, emb_init):
+    def __init__(self, gamma, emb_init, eps=1e-10):
         super(RotatEScore, self).__init__()
         self.gamma = gamma
         self.emb_init = emb_init
+        self.eps = eps
 
     def edge_func(self, edges):
         real_head, img_head = nd.split(edges.src['emb'], num_outputs=2, axis=-1)
@@ -378,10 +379,8 @@ class RotatEScore(nn.Block):
         real_score = real_score - real_tail
         img_score = img_score - img_tail
         #sqrt((x*x).sum() + eps)
-        real_score = mx.nd.sqrt((real_score * real_score).sum(axis=-1) + 1e-8)
-        img_score = mx.nd.sqrt((img_score * img_score).sum(axis=-1) + 1e-8)
-        score = real_score + img_score
-        return {'score': self.gamma - score}
+        score = mx.nd.sqrt(real_score * real_score + img_score * img_score + self.eps).sum(-1)
+        return {'score': self.gamma - score} 
 
     def prepare(self, g, gpu_id, trace=False):
         pass
@@ -409,6 +408,7 @@ class RotatEScore(nn.Block):
     def create_neg(self, neg_head):
         gamma = self.gamma
         emb_init = self.emb_init
+        eps = self.eps
         if neg_head:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
                 hidden_dim = heads.shape[1]
@@ -424,9 +424,7 @@ class RotatEScore(nn.Block):
 
                 score = tmp - heads
                 score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
-                score_real = mx.nd.sqrt((score_real * score_real).sum(axis=-1) + 1e-8)
-                score_img = mx.nd.sqrt((score_img * score_img).sum(axis=-1) + 1e-8)
-                score = score_real + score_img
+                score = mx.nd.sqrt(score_real * score_real + score_img * score_img + self.eps).sum(-1)
  
                 return gamma - score
             return fn
@@ -445,9 +443,7 @@ class RotatEScore(nn.Block):
 
                 score = tmp - tails
                 score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
-                score_real = mx.nd.sqrt((score_real * score_real).sum(axis=-1) + 1e-8)
-                score_img = mx.nd.sqrt((score_img * score_img).sum(axis=-1) + 1e-8)
-                score = score_real + score_img
+                score = mx.nd.sqrt(score_real * score_real + score_img * score_img + self.eps).sum(-1)
  
                 return gamma - score
             return fn
