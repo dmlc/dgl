@@ -290,10 +290,10 @@ def test_recv_no_send():
     expected = F.copy_to(F.zeros(2, dtype=F.int64), F.cpu())
     expected = F.asnumpy(expected)
     expected[1] = 1
-    assert np.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     g.recv(2, reduce_func)
     expected[1] = 0
-    assert np.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
 def test_send_recv_after_conversion():
     # test send and recv after converting from a graph with edges
