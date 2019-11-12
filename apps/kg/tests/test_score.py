@@ -164,9 +164,7 @@ def test_score_func_transr():
     check_score_func('TransR')
 
 def test_score_func_rotate():
-    #TODO change this if we have mxnet version of RotatE
-    if backend.lower() != 'mxnet':
-        check_score_func('RotatE')
+    check_score_func('RotatE')
         
 if __name__ == '__main__':
     test_score_func_transe()

@@ -377,10 +377,11 @@ class RotatEScore(nn.Block):
         img_score = real_head * im_rel + img_head * re_rel
         real_score = real_score - real_tail
         img_score = img_score - img_tail
-
-        score = nd.stack(real_score, img_score, axis=0)
-        score = nd.norm(score, ord=2, axis=0)
-        return {'score': self.gamma - score.sum(axis=-1)}
+        #sqrt((x*x).sum() + eps)
+        real_score = mx.nd.sqrt((real_score * real_score).sum(axis=-1) + 1e-8)
+        img_score = mx.nd.sqrt((img_score * img_score).sum(axis=-1) + 1e-8)
+        score = real_score + img_score
+        return {'score': self.gamma - score}
 
     def prepare(self, g, gpu_id, trace=False):
         pass
@@ -423,9 +424,11 @@ class RotatEScore(nn.Block):
 
                 score = tmp - heads
                 score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
-                score = nd.stack(score_real, score_img, axis=0)
-                score = nd.norm(score, ord=2, axis=0)
-                return gamma - score.sum(-1)
+                score_real = mx.nd.sqrt((score_real * score_real).sum(axis=-1) + 1e-8)
+                score_img = mx.nd.sqrt((score_img * score_img).sum(axis=-1) + 1e-8)
+                score = score_real + score_img
+ 
+                return gamma - score
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
@@ -442,9 +445,11 @@ class RotatEScore(nn.Block):
 
                 score = tmp - tails
                 score_real, score_img = nd.split(score, num_outputs=2, axis=-1)
-                score = nd.stack(score_real, score_img, axis=0)
-                score = nd.norm(score, ord=2, axis=0)
-                return gamma - score.sum(-1)
+                score_real = mx.nd.sqrt((score_real * score_real).sum(axis=-1) + 1e-8)
+                score_img = mx.nd.sqrt((score_img * score_img).sum(axis=-1) + 1e-8)
+                score = score_real + score_img
+ 
+                return gamma - score
             return fn
 
 
