@@ -61,9 +61,8 @@ ke_score_funcs = {'TransE': TransEScore,
                   'DistMult': DistMultScore,
                   'ComplEx': ComplExScore,
                   'RESCAL': RESCALScore,
-                  'TransR': TransRScore}
-if backend.lower() != 'mxnet':
-    ke_score_funcs['RotatE']=RotatEScore
+                  'TransR': TransRScore,
+                  'RotatE': RotatEScore}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
