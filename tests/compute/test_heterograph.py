@@ -745,8 +745,8 @@ def test_subgraph():
             assert F.array_equal(dst_sg, dst_g)
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
-        g.nodes['user'].data['h'][2] = F.randn((5,))
-        g.edges['follows'].data['h'][1] = F.randn((4,))
+        g.nodes['user'].data['h'] = F.scatter_row(g.nodes['user'].data['h'], [2], F.randn((1, 5)))
+        g.edges['follows'].data['h'] = F.scatter_row(g.edges['follows'].data['h'], [1], F.randn((1, 4)))
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
 

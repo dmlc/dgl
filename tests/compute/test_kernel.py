@@ -349,6 +349,6 @@ def test_all_binary_builtins():
 
 if __name__ == '__main__':
     test_copy_src_reduce()
-    # test_copy_edge_reduce()
-    # test_all_binary_builtins()
+    test_copy_edge_reduce()
+    test_all_binary_builtins()
 
