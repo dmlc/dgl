@@ -389,6 +389,8 @@ def convert_dglobject_to_tftensor(obj, dtype=None, name=None, as_ref=False):
 def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
     if obj == (None, None):
         return tf.constant([48966, 0], dtype=tf.int64)
+    elif isinstance(obj[0], nd.NDArray):
+        return tf.constant([48966, 1], dtype=tf.int64)
     else:
         return tf.constant(obj, dtype=dtype, name=name)
 
@@ -444,7 +446,8 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     # normalize if mean reducer
     # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
     if reducer == 'mean':
-        degs = lhs_data.new_empty((out_data.shape[0],))
+        # degs = lhs_data.new_empty((out_data.shape[0],))
+        degs = tf.zeros((out_data.shape[0],), dtype=lhs_data.dtype)
         degs_nd = zerocopy_to_dgl_ndarray(degs)
         if lhs != TargetCode.DST:  # src or edge
             target = lhs
@@ -454,7 +457,8 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
             target = rhs
             n = rhs_data.shape[0]
             in_map = rhs_map[0]
-        in_ones = lhs_data.new_ones((n,))
+        # in_ones = lhs_data.new_ones((n,))
+        in_ones = tf.ones((n,), dtype=lhs_data.dtype)
         in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
         K.copy_reduce(
             'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
