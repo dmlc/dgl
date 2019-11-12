@@ -20,6 +20,7 @@ DGL-KE includes the following knowledge graph embedding models:
 - ComplEx
 - RESCAL
 - TransR
+- RotatE
 
 It will add other popular models in the future.
 
