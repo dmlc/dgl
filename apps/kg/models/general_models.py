@@ -230,6 +230,8 @@ class KEModel(object):
             sorted_id = np.argsort(server_id)
             entity_id = entity_id[sorted_id] # sort data ID by server-id
             server, count = np.unique(server_id, return_counts=True) # get data size for each server
+            print("pull count:")
+            print(count)
             for idx in range(len(server)):
                 if server[idx] == self.node_id:
                     continue  # we don't need to pull the data on local machine
@@ -266,6 +268,8 @@ class KEModel(object):
                 entity_id = entity_id[sorted_id] # sort data id
                 grad_data = grad_data[sorted_id] # sort data gradient
                 server, count = np.unique(server_id, return_counts=True) # get data size for each server
+                print("push count:")
+                print(count)
                 entity_id = F.tensor(entity_id)
                 grad_data = F.tensor(grad_data)
                 grad_sum = (grad_data * grad_data).mean(1)
