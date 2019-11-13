@@ -262,6 +262,7 @@ class KEModel(object):
             for entity_id, entity_data in self.entity_emb.trace:
                 entity_id = F.asnumpy(entity_id)
                 grad_data = F.asnumpy(entity_data.grad.data)
+                print(grad_data)
                 server_id = self.partition_book[entity_id] # get the server-id mapping to each server
                 sorted_id = np.argsort(server_id)
                 entity_id = entity_id[sorted_id] # sort data id
