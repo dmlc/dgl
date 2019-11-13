@@ -111,6 +111,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='node ID for distributed training.')
         self.add_argument('--partition_file', type=str, default='partition.txt',
                           help='file for partition book.')
+        self.add_argument('--rela_server',  action='store_true',
+                          help='current node is relation server')
 
 def get_logger(args):
     if not os.path.exists(args.save_path):
@@ -191,6 +193,8 @@ def run(args, logger):
         if pid == 0:
             start_server(args, model, client_namebook, server_namebook)
         else:
+            if args.rela_server == True:
+                exit()
             time.sleep(2)  # wait for server node started
             client = connect_to_kvstore(args, model, client_namebook, server_namebook)
             # Note that, if partition_book is None, we sync model on server_0 by default

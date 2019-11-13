@@ -241,8 +241,8 @@ class KEModel(object):
             ######### pull relation id #########
             relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
             relation_id = np.unique(F.asnumpy(relation_id)) # remove the dupplicated ID
-            # we pull relation_emb from server_0 by default
-            client.pull(name='relation_emb', server_id=0, id_tensor=F.tensor(relation_id))
+            # we pull relation_emb from the last server by default
+            client.pull(name='relation_emb', server_id=4, id_tensor=F.tensor(relation_id))
             pull_count += 1
             ######### wait pull result #########
             for idx in range(pull_count):
@@ -293,11 +293,11 @@ class KEModel(object):
                 grad_data = relation_data.grad.data
                 grad_sum = (grad_data * grad_data).mean(1)
                 client.push(name='relation_emb_state',
-                    server_id=0,
+                    server_id=4,
                     id_tensor=relation_id,
                     data_tensor=grad_sum)
                 client.push(name='relation_emb', 
-                    server_id=0, 
+                    server_id=4, 
                     id_tensor=relation_id,
                     data_tensor=grad_data)
             # clear gradient
