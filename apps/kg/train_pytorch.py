@@ -29,7 +29,7 @@ class RowSparseAdaGradKVStore(KVServer):
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
                 tmp = (-self.clr * data / std_values)
                 self._data_store[name].index_add_(0, ID, tmp)
-            else if name == 'entity_emb_state' or name == 'relation_emb_state':
+            elif name == 'entity_emb_state' or name == 'relation_emb_state':
                 self._data_store[name].index_add_(0, ID, data)
             else:
                 raise RuntimeError('Unknown embedding name: %s' % name)
