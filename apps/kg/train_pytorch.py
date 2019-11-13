@@ -66,6 +66,7 @@ def train(args, model, train_sampler, valid_samplers=None, client=None):
     forward_time = 0
     backward_time = 0
     for step in range(args.init_step, args.max_step):
+        print("step: " + str(step))
         pos_g, neg_g = next(train_sampler)
         args.step = step
 
