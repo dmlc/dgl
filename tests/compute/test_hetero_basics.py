@@ -149,7 +149,7 @@ def test_batch_setter_autograd():
     with F.record_grad():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
-    F.backward(h2, F.ones((10, D)) * 2)
+        F.backward(h2, F.ones((10, D)) * 2)
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 

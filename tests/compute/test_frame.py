@@ -183,7 +183,7 @@ def test_row2():
         rowid = Index(F.tensor([0, 2]))
         rows = f[rowid]
         y = rows['a1']
-    F.backward(y, F.ones((len(rowid), D)))
+        F.backward(y, F.ones((len(rowid), D)))
     assert F.allclose(F.grad(c1)[:,0], F.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
 
     f['a1'] = F.attach_grad(f['a1'])
@@ -193,7 +193,7 @@ def test_row2():
         rowid = Index(F.tensor([8, 2, 2, 1]))
         rows = f[rowid]
         y = rows['a1']
-    F.backward(y, F.ones((len(rowid), D)))
+        F.backward(y, F.ones((len(rowid), D)))
     assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
 
     f['a1'] = F.attach_grad(f['a1'])
@@ -207,7 +207,7 @@ def test_row2():
                 }
         f[rowid] = vals
         c11 = f['a1']
-    F.backward(c11, F.ones((N, D)))
+        F.backward(c11, F.ones((N, D)))
     assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
     assert F.allclose(F.grad(vals['a1']), F.ones((len(rowid), D)))
     assert F.is_no_grad(vals['a2'])
@@ -244,6 +244,7 @@ def test_row4():
     ans[F.tensor([0, 2, 4])] = F.ones((3, 2))
     assert F.allclose(f['h'], ans)
 
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_sharing():
     data = Frame(create_test_data())
     f1 = FrameRef(data, index=toindex([0, 1, 2, 3]))
@@ -271,6 +272,7 @@ def test_sharing():
     F.narrow_row_set(f2_a1, 0, 2, F.ones([2, D]))
     assert F.allclose(f2['a1'], f2_a1)
 
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_slicing():
     data = Frame(create_test_data(grad=True))
     f1 = FrameRef(data, index=toindex(slice(1, 5)))
@@ -318,6 +320,7 @@ def test_add_rows():
     ans = F.cat([F.zeros((4, 5)), F.ones((4, 5))], 0)
     assert F.allclose(f1['y'], ans)
 
+@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace():
     f = FrameRef(Frame(create_test_data()))
     print(f.schemes)
@@ -355,17 +358,17 @@ def test_inplace():
     assert a2addr == newa2addr
 
 if __name__ == '__main__':
-    # test_create()
-    # test_column1()
-    # test_column2()
-    # test_append1()
-    # test_append2()
-    # test_append3()
-    # test_row1()
-    # test_row2()
-    # test_row3()
+    test_create()
+    test_column1()
+    test_column2()
+    test_append1()
+    test_append2()
+    test_append3()
+    test_row1()
+    test_row2()
+    test_row3()
     test_row4()
-    # test_sharing()
-    # test_slicing()
-    # test_add_rows()
-    # test_inplace()
+    test_sharing()
+    test_slicing()
+    test_add_rows()
+    test_inplace()

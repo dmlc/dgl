@@ -125,7 +125,7 @@ def test_batch_setter_getter():
     v = F.tensor([3, 4, 5])
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
-@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="Temp shut down")
+
 def test_batch_setter_autograd():
     g = generate_graph(grad=True)
     h1 = g.ndata['h']
@@ -135,7 +135,7 @@ def test_batch_setter_autograd():
     with F.record_grad():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
-    F.backward(h2, F.ones((10, D)) * 2)
+        F.backward(h2, F.ones((10, D)) * 2)
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 

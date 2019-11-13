@@ -158,10 +158,12 @@ def topk(input, k, dim, descending=True):
     direction = 'DESCENDING' if descending else 'ASCENDING'
     return slice_axis(tf.sort(input, axis=dim, direction=direction), dim, 0, k)
 
+
 def argtopk(input, k, dim, descending=True):
     # tf's topk doesn't support direction and dimension, use argsort instead
     direction = 'DESCENDING' if descending else 'ASCENDING'
     return slice_axis(tf.argsort(input, axis=dim, direction=direction), dim, 0, k)
+
 
 def exp(input):
     return tf.exp(input)
@@ -387,10 +389,12 @@ def convert_dglobject_to_tftensor(obj, dtype=None, name=None, as_ref=False):
 
 
 def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
-    if obj == (None, None):
-        return tf.constant([48966, 0], dtype=tf.int64)
+    if isinstance(obj, tuple) and len(obj) == 2 and obj[0] is None and obj[1] is None:
+        return tf.constant([48966, 0], dtype=tf.int32)
+    elif isinstance(obj, tuple) and len(obj) == 2 and isinstance(obj[0], tf.Tensor):
+        return tf.constant([obj[0].numpy(), obj[1].numpy()], dtype=dtype)
     elif isinstance(obj[0], nd.NDArray):
-        return tf.constant([48966, 1], dtype=tf.int64)
+        return tf.constant([48966, 1], dtype=tf.int32)
     else:
         return tf.constant(obj, dtype=dtype, name=name)
 
@@ -574,9 +578,12 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))
+    reduce_idx = np.array(np.nonzero(
+        np.array(grad_shape) - np.array(in_shape)))
     reduce_idx += 1  # skip batch dim
-    grad = tf.reduce_sum(grad, axis=tuple(reduce_idx), keepdims=True)
+    reduce_idx_tensor = tf.constant(tuple(
+        reduce_idx.flatten().tolist()))
+    grad = tf.reduce_sum(grad, axis=reduce_idx_tensor, keepdims=True)
     return tf.reshape(grad, shape)
 
 
