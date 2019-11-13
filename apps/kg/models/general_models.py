@@ -249,7 +249,7 @@ class KEModel(object):
                 msg = client.pull_wait()
                 if msg.name == 'entity_emb':
                     self.entity_emb.emb[msg.id] = msg.data
-                elif msg.anme == 'relation_emb':
+                elif msg.name == 'relation_emb':
                     self.relation_emb.emb[msg.id] = msg.data
                 else:
                     raise RuntimeError('Unknown embedding name: %s' % msg.name)
