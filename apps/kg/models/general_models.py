@@ -258,7 +258,6 @@ class KEModel(object):
         ######### TODO(chao): we still have room to improve the performance #########
         with th.no_grad():
             ######### update entity gradient #########
-            start = 0
             for entity_id, entity_data in self.entity_emb.trace:
                 entity_id = F.asnumpy(entity_id)
                 grad_data = F.asnumpy(entity_data.grad.data)
@@ -270,14 +269,9 @@ class KEModel(object):
                 entity_id = F.tensor(entity_id)
                 grad_data = F.tensor(grad_data)
                 grad_sum = (grad_data * grad_data).mean(1)
+                start = 0
                 for idx in range(len(server)):
                     end = start + count[idx]
-                    print("server_id:")
-                    print(server_id[idx])
-                    print("id_tensor:")
-                    print(entity_id[start:end])
-                    print("data tensor:")
-                    print(grad_sum[start:end])
                     if server[idx] == self.node_id: # update local model
                         self.entity_emb.partial_update(
                             grad_data[start:end], 
