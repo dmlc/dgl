@@ -304,3 +304,6 @@ class KEModel(object):
                     server_id=0, 
                     id_tensor=relation_id,
                     data_tensor=grad_data)
+            # clear gradient
+            self.entity_emb.trace = []
+            self.relation_emb.trace = []
