@@ -287,7 +287,7 @@ class KEModel(object):
                     start += count[idx]
             ######### update relation gradient #########
             for relation_id, relation_data in self.relation_emb.trace:
-                # we push relation data to server_0 by default
+                # we sync relation data on server_0 by default
                 grad_data = relation_data.grad.data
                 grad_sum = (grad_data * grad_data).mean(1)
                 client.push(name='relation_emb_state',

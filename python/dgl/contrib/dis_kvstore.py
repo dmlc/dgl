@@ -4,7 +4,6 @@ from ..network import _finalize_sender, _finalize_receiver
 from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
-from ..network import _partition_id, _partition_id_data
 from ..network import KVMsgType, KVStoreMsg
 
 import math
