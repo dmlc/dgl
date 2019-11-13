@@ -57,8 +57,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='learning rate')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
-        self.add_argument('--relation_lr_decay', type=float, default=1.0,
-                          help='learning rate decay used with relation-based edge samplers')
         self.add_argument('--train_sampler', type=str, default='edge',
                           help='sampler type, possible sampler: edge, relpart, relcentrl')
         self.add_argument('--eval_percent', type=float, default=1,

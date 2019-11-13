@@ -131,7 +131,7 @@ class TrainDataset(object):
                                shuffle=shuffle,
                                exclude_positive=exclude_positive,
                                return_false_neg=False,
-                               relation_parts=8,
+                               aggregated_batches=8,
                                relations=self.graphs[rank].edata['id'])
         else: # default edge
             print('EdgeSampler')

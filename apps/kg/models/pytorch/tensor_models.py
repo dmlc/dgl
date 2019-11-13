@@ -66,19 +66,22 @@ class ExternalEmbedding:
             for idx, data in self.trace:
                 grad = data.grad.data
 
-                clr = self.args.lr * self.args.relation_lr_decay
+                clr = self.args.lr
                 #clr = self.args.lr / (1 + (self.state_step - 1) * group['lr_decay'])
 
                 # the update is non-linear so indices must be unique
                 grad_indices = idx
                 grad_values = grad
-
+                _, inverse_idx, cnt = th.unique(grad_indices, return_inverse=True, return_counts=True)
+                cnt = cnt.type(th.float32)
                 grad_sum = (grad_values * grad_values).mean(1)
                 device = self.state_sum.device
                 if device != grad_indices.device:
                     grad_indices = grad_indices.to(device)
                 if device != grad_sum.device:
                     grad_sum = grad_sum.to(device)
+                cnt = cnt.to(device)
+                grad_sum = grad_sum / cnt[inverse_idx]
                 self.state_sum.index_add_(0, grad_indices, grad_sum)
                 std = self.state_sum[grad_indices]  # _sparse_mask
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
@@ -87,8 +90,11 @@ class ExternalEmbedding:
                 tmp = (-clr * grad_values / std_values)
                 if tmp.device != device:
                     tmp = tmp.to(device)
+                cnt = cnt[inverse_idx].unsqueeze(1)
+                tmp = tmp / cnt
                 # TODO(zhengda) the overhead is here.
                 self.emb.index_add_(0, grad_indices, tmp)
+                #self.emb[grad_indices] += tmp
         self.trace = []
 
     def curr_emb(self):
