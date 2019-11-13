@@ -226,7 +226,7 @@ class KEModel(object):
             pull_count = 0
             entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
             entity_id = np.unique(F.asnumpy(entity_id)) # remove the duplicated ID
-            server_id = self.partition_book[entity_id]  # get the server-id mapping of data ID
+            server_id = self.partition_book[entity_id]  # get the server-id mapping to data ID
             sorted_id = np.argsort(server_id)
             entity_id = entity_id[sorted_id] # sort data ID by server-id
             server, count = np.unique(server_id, return_counts=True) # get data size for each server
@@ -262,7 +262,7 @@ class KEModel(object):
             for entity_id, entity_data in self.entity_emb.trace:
                 entity_id = F.asnumpy(entity_id)
                 grad_data = F.asnumpy(entity_data.grad.data)
-                server_id = self.partition_book[entity_id] # get the server-id mapping of each server
+                server_id = self.partition_book[entity_id] # get the server-id mapping to each server
                 sorted_id = np.argsort(server_id)
                 entity_id = entity_id[sorted_id] # sort data id
                 grad_data = grad_data[sorted_id] # sort data gradient
