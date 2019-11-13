@@ -222,13 +222,14 @@ class KEModel(object):
         ######### TODO(chao): we still have room to improve the performance #########
         with th.no_grad():
             ######### pull entity id #########
+            start = 0
+            pull_count = 0
             entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
             entity_id = np.unique(F.asnumpy(entity_id)) # remove the duplicated ID
             server_id = self.partition_book[entity_id]  # get the server-id mapping of data ID
             sorted_id = np.argsort(server_id)
             entity_id = entity_id[sorted_id] # sort data ID by server-id
             server, count = np.unique(server_id, return_counts=True) # get data size for each server
-            start = 0, pull_count = 0
             for idx in range(len(server)):
                 if server[idx] == self.node_id:
                     continue  # we don't need to pull the data on local machine
@@ -257,6 +258,7 @@ class KEModel(object):
         ######### TODO(chao): we still have room to improve the performance #########
         with th.no_grad():
             ######### update entity gradient #########
+            start = 0
             for entity_id, entity_data in self.entity_emb.trace:
                 entity_id = F.asnumpy(entity_id)
                 grad_data = F.asnumpy(entity_data.grad.data)
@@ -268,7 +270,6 @@ class KEModel(object):
                 entity_id = F.tensor(entity_id)
                 grad_data = F.tensor(grad_data)
                 grad_sum = (grad_data * grad_data).mean(1)
-                start = 0
                 for idx in range(len(server)):
                     end = start + count[idx]
                     if server[idx] == self.node_id: # update local model
