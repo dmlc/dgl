@@ -20,17 +20,19 @@ class RowSparseAdaGradKVStore(KVServer):
     """User-defined kvstore for DGL-KGE task
     """
     def _push_handler(self, name, ID, data):
-        """User-defined RowSparse AdaGrad optimizer.
+        """User-defined RowSparse AdaGrad optmizer
         """
-        grad_indices = ID
-        grad_values = data
-        state_sum = self._data_store[name+'_state']
-        grad_sum = (grad_values * grad_values).mean(1)
-        state_sum.index_add_(0, grad_indices, grad_sum)
-        std = state_sum[grad_indices]  # _sparse_mask
-        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-        tmp = (-self.clr * grad_values / std_values)
-        self._data_store[name].index_add_(0, grad_indices, tmp)
+        with th.no_grad():
+            if name == 'entity_emb' or name == 'relation_emb':
+                state_sum = self._data_store[name+'_state']
+                std = state_sum[ID]
+                std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+                tmp = (-self.clr * data / std_values)
+                self._data_store[name].index_add_(0, ID, tmp)
+            else if name == 'entity_emb_state' or name == 'relation_emb_state':
+                self._data_store[name].index_add_(0, ID, data)
+            else:
+                raise RuntimeError('Unknown embedding name: %s' % name)
 
     def set_clr(self, learning_rate):
         """Set learning rate
@@ -79,8 +81,9 @@ def train(args, model, train_sampler, valid_samplers=None, client=None):
 
         start1 = time.time()
         if args.dist == True:
-            model.push_gradient(client)
-        model.update()
+            model.dist_update(client)
+        else:
+            model.update()
         update_time += time.time() - start1
         logs.append(log)
 

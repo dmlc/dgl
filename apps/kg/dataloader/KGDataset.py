@@ -141,8 +141,10 @@ def get_dataset(data_path, data_name, format_str):
 def get_partition_book(data_path, data_name, file_name):
     partition_book = []
     path = os.path.join(data_path, data_name)
+    if not os.path.exists(os.path.join(path, file_name)):
+        return None
     with open(os.path.join(path, file_name)) as f:
         for line in f:
             partition_book.append(int(line))
-            
+
     return partition_book

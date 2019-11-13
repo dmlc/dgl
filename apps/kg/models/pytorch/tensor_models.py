@@ -91,6 +91,30 @@ class ExternalEmbedding:
                 self.emb.index_add_(0, grad_indices, tmp)
         self.trace = []
 
+    def partial_update(self, grad, g_sum, idx):
+        with th.no_grad:
+            clr = self.args.lr
+            
+            grad_indices = idx
+            grad_values = grad
+            grad_sum = g_sum
+
+            device = self.state_sum.device
+            if device != grad_indices.device:
+                grad_indices = grad_indices.to(device)
+            if device != grad_sum.device:
+                grad_sum = grad_sum.to(device)
+            self.state_sum.index_add_(0, grad_indices, grad_sum)
+            std = self.state_sum[grad_indices]  # _sparse_mask
+            std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+            if self.gpu >= 0:
+                std_values = std_values.cuda(self.args.gpu)
+            tmp = (-clr * grad_values / std_values)
+            if tmp.device != device:
+                tmp = tmp.to(device)
+            # TODO(zhengda) the overhead is here.
+            self.emb.index_add_(0, grad_indices, tmp)
+
     def curr_emb(self):
         data = [data for _, data in self.trace]
         return th.cat(data, 0)

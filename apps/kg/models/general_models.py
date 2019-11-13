@@ -69,7 +69,10 @@ class KEModel(object):
         self.reset_parameters()
 
     def set_partition_book(self, book):
-        self.partition_book = F.asnumpy(F.tensor(book))
+        if book != None:
+            self.partition_book = F.asnumpy(F.tensor(book))
+        else:
+            self.partition_book = None
 
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
@@ -216,59 +219,82 @@ class KEModel(object):
         self.score_func.update()
 
     def pull_model(self, client, pos_g, neg_g):
-        # entity id
-        entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
-        entity_id = np.unique(F.asnumpy(entity_id))
-        server_id = self.partition_book[entity_id]
-        sorted_id = np.argsort(server_id)
-        entity_id = entity_id[sorted_id]
-        server, count = np.unique(server_id, return_counts=True)
-        start_idx = 0
-        pull_count = 0
-        for idx in range(len(server)):
-            if server[idx] == self.node_id:
-                continue
-            client.pull(name='entity_emb', 
-                server_id=server[idx], 
-                id_tensor=F.tensor(entity_id[start_idx:start_idx+count[idx]]))
-            start_idx += count[idx]
-            pull_count += 1
-        # relation id
-        relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
-        relation_id = np.unique(F.asnumpy(relation_id))
-        # we pull all relation data from server_0 by default
-        client.pull(name='relation_emb', server_id=0, id_tensor=F.tensor(relation_id))
-        # wait and update
-        for idx in range(pull_count+1):
-            msg = client.pull_wait()
-            if msg.name == 'entity_emb':
-                self.entity_emb.emb[msg.id] = msg.data
-            else:
-                self.relation_emb.emb[msg.id] = msg.data
-
-    def push_gradient(self, client):
-        # push entity gradient
-        for entity_id, entity_data in self.entity_emb.trace:
-            entity_id = F.asnumpy(entity_id)
-            entity_data = F.asnumpy(entity_data.grad.data)
-            server_id = self.partition_book[entity_id]
+        ######### TODO(chao): we still have room to improve the performance #########
+        with th.no_grad():
+            ######### pull entity id #########
+            entity_id = F.cat(seq=[pos_g.ndata['id'], neg_g.ndata['id']], dim=0)
+            entity_id = np.unique(F.asnumpy(entity_id)) # remove the duplicated ID
+            server_id = self.partition_book[entity_id]  # get the server-id mapping of data ID
             sorted_id = np.argsort(server_id)
-            entity_id = entity_id[sorted_id]
-            entity_data = entity_data[sorted_id]
-            server, count = np.unique(server_id, return_counts=True)
-            start_idx = 0
+            entity_id = entity_id[sorted_id] # sort data ID by server-id
+            server, count = np.unique(server_id, return_counts=True) # get data size for each server
+            start = 0, pull_count = 0
             for idx in range(len(server)):
                 if server[idx] == self.node_id:
-                    continue
-                client.push(name='entity_emb', 
+                    continue  # we don't need to pull the data on local machine
+                client.pull(name='entity_emb', 
                     server_id=server[idx], 
-                    id_tensor=F.tensor(entity_id[start_idx:start_idx+count[idx]]), 
-                    data_tensor=F.tensor(entity_data[start_idx:start_idx+count[idx]]))
-                start_idx += count[idx]
-        # push relation gradient
-        for relation_id, relation_data in self.relation_emb.trace:
-            # we push relation data to server_0 by default
-            client.push(name='relation_emb', 
-                server_id=0, 
-                id_tensor=relation_id,
-                data_tensor=relation_data.grad.data)
+                    id_tensor=F.tensor(entity_id[start:start+count[idx]]))
+                start += count[idx]
+                pull_count += 1
+            ######### pull relation id #########
+            relation_id = F.cat(seq=[pos_g.edata['id'], neg_g.edata['id']], dim=0)
+            relation_id = np.unique(F.asnumpy(relation_id)) # remove the dupplicated ID
+            # we pull relation_emb from server_0 by default
+            client.pull(name='relation_emb', server_id=0, id_tensor=F.tensor(relation_id))
+            pull_count += 1
+            ######### wait pull result #########
+            for idx in range(pull_count):
+                msg = client.pull_wait()
+                if msg.name == 'entity_emb':
+                    self.entity_emb.emb[msg.id] = msg.data
+                elif msg.anme == 'relation_emb':
+                    self.relation_emb.emb[msg.id] = msg.data
+                else:
+                    raise RuntimeError('Unknown embedding name: %s' % msg.name)
+
+    def dist_update(self, client):
+        ######### TODO(chao): we still have room to improve the performance #########
+        with th.no_grad():
+            ######### update entity gradient #########
+            for entity_id, entity_data in self.entity_emb.trace:
+                entity_id = F.asnumpy(entity_id)
+                grad_data = F.asnumpy(entity_data.grad.data)
+                server_id = self.partition_book[entity_id] # get the server-id mapping of each server
+                sorted_id = np.argsort(server_id)
+                entity_id = entity_id[sorted_id] # sort data id
+                grad_data = grad_data[sorted_id] # sort data gradient
+                server, count = np.unique(server_id, return_counts=True) # get data size for each server
+                entity_id = F.tensor(entity_id)
+                grad_data = F.tensor(grad_data)
+                grad_sum = (grad_data * grad_data).mean(1)
+                start = 0
+                for idx in range(len(server)):
+                    end = start + count[idx]
+                    if server[idx] == self.node_id: # update local model
+                        self.entity_emb.partial_update(
+                            grad_data[start:end], 
+                            grad_sum[start:end],
+                            entity_id[start:end])
+                    else: # push gradient to remote machine
+                        client.push(name='entity_emb_state',
+                            id_tensor=entity_id[start:end],
+                            data_tensor=grad_sum[start:end])
+                        client.push(name='entity_emb', 
+                            server_id=server[idx], 
+                            id_tensor=entity_id[start:end], 
+                            data_tensor=grad_data[start:end])
+                    start += count[idx]
+            ######### update relation gradient #########
+            for relation_id, relation_data in self.relation_emb.trace:
+                # we push relation data to server_0 by default
+                grad_data = relation_data.grad.data
+                grad_sum = (grad_data * grad_data).mean(1)
+                client.push(name='relation_emb_state',
+                    server_id=0,
+                    id_tensor=relation_id,
+                    data_tensor=grad_sum)
+                client.push(name='relation_emb', 
+                    server_id=0, 
+                    id_tensor=relation_id,
+                    data_tensor=grad_data)

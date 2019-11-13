@@ -143,16 +143,17 @@ def start_server(args, model, client_namebook, server_namebook):
             client_namebook=client_namebook,
             server_addr=server_namebook[args.id])
 
-    server.set_clr(args.lr)
+    server.set_clr(args.lr)  # learning rate ob kvstore
 
+    # Initialize data on kvstore, the data_tensor is shared-memory data
     server.init_data(name='relation_emb', data_tensor=model.relation_emb.emb)
-    server.init_data(name='entity_emb', data_tensor=model.entity_emb.emb)
     server.init_data(name='relation_emb_state', data_tensor=model.relation_emb.state_sum)
+    server.init_data(name='entity_emb', data_tensor=model.entity_emb.emb)
     server.init_data(name='entity_emb_state', data_tensor=model.entity_emb.state_sum)
 
     server.start()
 
-    exit()
+    exit()  # exit program directly when finishing training
 
 def connect_to_kvstore(args, model, client_namebook, server_namebook):
     client = dgl.contrib.KVClient(
@@ -167,6 +168,7 @@ def connect_to_kvstore(args, model, client_namebook, server_namebook):
 def run(args, logger):
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
+
     n_entities = dataset.n_entities
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:
@@ -185,19 +187,18 @@ def run(args, logger):
 
     if args.dist == True:
         server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure(args.ip_config)
-
-    # Start server node
-    if args.dist == True:
         pid = os.fork()
         if pid == 0:
             start_server(args, model, client_namebook, server_namebook)
         else:
-            time.sleep(2)  # wait for server node
+            time.sleep(2)  # wait for server node started
             client = connect_to_kvstore(args, model, client_namebook, server_namebook)
+            # Note that, if partition_book is None, we sync model on server_0 by default
             partition_book = get_partition_book(args.data_path, args.dataset, args.partition_file)
             model.set_partition_book(partition_book)
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
