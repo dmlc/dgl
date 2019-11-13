@@ -22,9 +22,9 @@ DGLBACKEND=pytorch python3 train.py --model TransR --dataset FB15k --batch_size 
     --neg_sample_size 256 --hidden_dim 500 --gamma 24.0 --lr 0.01 --max_step 30000 \
     --batch_size_eval 16 --gpu 0 --valid --test -adv
 
-DGLBACKEND=mxnet python3 train.py --model RotatE --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.1 --max_step 100000 \
-    --batch_size_eval 16 --gpu 0 --valid --test -adv -de --regularization_coef=1e-7
+DGLBACKEND=pytorch python3 train.py --model RotatE --dataset FB15k --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 12.0 --lr 0.01 --max_step 30000 \
+    --batch_size_eval 16 --gpu 0 --valid --test -adv -de --regularization_coef=1e-4
 
 # for wn18
 
@@ -49,8 +49,8 @@ DGLBACKEND=pytorch python3 train.py --model TransR --dataset wn18 --batch_size 1
     --neg_sample_size 256 --hidden_dim 500 --gamma 16.0 --lr 0.1 --max_step 30000 \
     --batch_size_eval 16 --gpu 0 --valid --test -adv
 
-DGLBACKEND=mxnet python3 train.py --model RotatE --dataset wn18 --batch_size 1024 \
-    --neg_sample_size 256 --hidden_dim 400 --gamma 24.0 --lr 0.05 --max_step 20000 \
+DGLBACKEND=pytorch python3 train.py --model RotatE --dataset wn18 --batch_size 1024 \
+    --neg_sample_size 256 --hidden_dim 400 --gamma 12.0 --lr 0.02 --max_step 20000 \
     --batch_size_eval 16 --gpu 0 --valid --test -adv -de
 
 # for Freebase
