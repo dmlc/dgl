@@ -279,6 +279,7 @@ class KEModel(object):
                             entity_id[start:end])
                     else: # push gradient to remote machine
                         client.push(name='entity_emb_state',
+                            server_id=server[idx],
                             id_tensor=entity_id[start:end],
                             data_tensor=grad_sum[start:end])
                         client.push(name='entity_emb', 

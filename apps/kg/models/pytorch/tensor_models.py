@@ -92,9 +92,9 @@ class ExternalEmbedding:
         self.trace = []
 
     def partial_update(self, grad, g_sum, idx):
-        with th.no_grad:
+        with th.no_grad():
             clr = self.args.lr
-            
+
             grad_indices = idx
             grad_values = grad
             grad_sum = g_sum
