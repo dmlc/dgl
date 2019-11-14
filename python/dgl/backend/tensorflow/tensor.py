@@ -366,7 +366,10 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     # NOTE: not zerocopy
-    return tf.convert_to_tensor(np_array)
+    # This assumes tensor should be on cpu
+    with tf.device("/cpu:0"):
+        t = tf.convert_to_tensor(np_array)
+    return t
 
 
 def zerocopy_to_dgl_ndarray(input):
@@ -408,7 +411,13 @@ def convert_back_to_tuple(tf_tensor):
 
 def dummy_convert(obj, dtype=None, name=None, as_ref=False):
     return tf.constant([0], dtype=tf.int64)
+    
+def convert_str(obj, dtype=None, name=None, as_ref=False):
+    with tf.device("/cpu:0"):
+        return tf.constant(obj)
 
+tf.register_tensor_conversion_function(
+    str, convert_str)
 
 tf.register_tensor_conversion_function(
     ObjectBase, dummy_convert)

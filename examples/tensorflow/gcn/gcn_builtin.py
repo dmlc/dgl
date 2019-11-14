@@ -109,83 +109,87 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    features = tf.convert_to_tensor(data.features, dtype=tf.float32)
-    labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
-    train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
-    val_mask = tf.convert_to_tensor(data.val_mask, dtype=tf.bool)
-    test_mask = tf.convert_to_tensor(data.test_mask, dtype=tf.bool)
-    in_feats = features.shape[1]
-    n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
-    print("""----Data statistics------'
-      #Edges %d
-      #Classes %d
-      #Train samples %d
-      #Val samples %d
-      #Test samples %d""" %
-          (n_edges, n_classes,
-              train_mask.numpy().sum(),
-              val_mask.numpy().sum(),
-              test_mask.numpy().sum()))
-
+    
     if args.gpu < 0:
-        cuda = False
+        device = "/cpu:0"
+    else:
+        device = "/gpu:{}".format(args.gpu)
 
-    # graph preprocess and calculate normalization factor
-    g = data.graph
-    g.remove_edges_from(nx.selfloop_edges(g))
-    g = DGLGraph(g)
-    # # add self loop
-    g.add_edges(g.nodes(), g.nodes())
-    n_edges = g.number_of_edges()
-    # # normalization
-    degs = tf.cast(g.in_degrees(), dtype=tf.float32)
-    norm = tf.math.pow(degs, -0.5)
-    norm = tf.where(tf.math.is_inf(norm), tf.zeros_like(norm), norm)
-    # norm[tf.math.is_inf(norm)] = 0
-    # if cuda:
-    #     norm = norm.cuda()
-    g.ndata['norm'] = tf.expand_dims(norm, -1)
+    with tf.device("/cpu:0"):
+        features = tf.convert_to_tensor(data.features, dtype=tf.float32)
+        labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
+        train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
+        val_mask = tf.convert_to_tensor(data.val_mask, dtype=tf.bool)
+        test_mask = tf.convert_to_tensor(data.test_mask, dtype=tf.bool)
+        in_feats = features.shape[1]
+        n_classes = data.num_labels
+        n_edges = data.graph.number_of_edges()
+        print("""----Data statistics------'
+        #Edges %d
+        #Classes %d
+        #Train samples %d
+        #Val samples %d
+        #Test samples %d""" %
+            (n_edges, n_classes,
+                train_mask.numpy().sum(),
+                val_mask.numpy().sum(),
+                test_mask.numpy().sum()))
 
-    # create GCN model
-    model = GCN(g,
-                in_feats,
-                args.n_hidden,
-                n_classes,
-                args.n_layers,
-                tf.nn.relu,
-                args.dropout)
+        # graph preprocess and calculate normalization factor
+        g = data.graph
+        g.remove_edges_from(nx.selfloop_edges(g))
+        g = DGLGraph(g)
+        # # add self loop
+        g.add_edges(g.nodes(), g.nodes())
+        n_edges = g.number_of_edges()
+        # # normalization
+        degs = tf.cast(g.in_degrees(), dtype=tf.float32)
+        norm = tf.math.pow(degs, -0.5)
+        norm = tf.where(tf.math.is_inf(norm), tf.zeros_like(norm), norm)
+        # norm[tf.math.is_inf(norm)] = 0
+        # if cuda:
+        #     norm = norm.cuda()
+        g.ndata['norm'] = tf.expand_dims(norm, -1)
 
-    # if cuda:
-    #     model.cuda()
-    optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+        # create GCN model
+        model = GCN(g,
+                    in_feats,
+                    args.n_hidden,
+                    n_classes,
+                    args.n_layers,
+                    tf.nn.relu,
+                    args.dropout)
 
-    loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+        # if cuda:
+        #     model.cuda()
+        optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr, decay=args.weight_decay)
 
+        loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     # initialize graph
-    dur = []
-    for epoch in range(args.n_epochs):
-        if epoch >= 3:
-            t0 = time.time()
-        # forward
-        with tf.GradientTape() as tape:
-            logits = model(tf.cast(features, tf.float32))
-            loss_value = loss_fcn(labels[train_mask], logits[train_mask])
+    with tf.device(device):
+        dur = []
+        for epoch in range(args.n_epochs):
+            if epoch >= 3:
+                t0 = time.time()
+            # forward
+            with tf.GradientTape() as tape:
+                logits = model(tf.cast(features, tf.float32))
+                loss_value = loss_fcn(labels[train_mask], logits[train_mask])
 
-            grads = tape.gradient(loss_value, model.trainable_weights)
-            optimizer.apply_gradients(zip(grads, model.trainable_weights))
+                grads = tape.gradient(loss_value, model.trainable_weights)
+                optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-        if epoch >= 3:
-            dur.append(time.time() - t0)
+            if epoch >= 3:
+                dur.append(time.time() - t0)
 
-        acc = evaluate(model, features, labels, val_mask)
-        print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss_value.numpy().item(),
-                                             acc, n_edges / np.mean(dur) / 1000))
+            acc = evaluate(model, features, labels, val_mask)
+            print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+                "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss_value.numpy().item(),
+                                                acc, n_edges / np.mean(dur) / 1000))
 
-    print()
-    acc = evaluate(model, features, labels, test_mask)
-    print("Test Accuracy {:.4f}".format(acc))
+        print()
+        acc = evaluate(model, features, labels, test_mask)
+        print("Test Accuracy {:.4f}".format(acc))
 
 
 if __name__ == '__main__':
