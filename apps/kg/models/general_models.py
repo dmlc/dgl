@@ -49,13 +49,22 @@ class KEModel(object):
 
         if model_name == 'TransE':
             self.score_func = TransEScore(gamma)
+        elif model_name == 'TransR':
+            projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
+                                               F.cpu() if args.mix_cpu_gpu else device)
+            self.score_func = TransRScore(gamma, projection_emb, relation_dim, entity_dim)
         elif model_name == 'DistMult':
             self.score_func = DistMultScore()
         elif model_name == 'ComplEx':
             self.score_func = ComplExScore()
+        elif model_name == 'RESCAL':
+            self.score_func = RESCALScore(relation_dim, entity_dim)
             
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
+        self.head_neg_prepare = self.score_func.create_neg_prepare(True)
+        self.tail_neg_prepare = self.score_func.create_neg_prepare(False)
+
         self.reset_parameters()
 
     def share_memory(self):
@@ -66,12 +75,12 @@ class KEModel(object):
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
         self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
-        self.score_func.save(path, dataset)
+        self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):
         self.entity_emb.load(path, dataset+'_'+self.model_name+'_entity')
         self.relation_emb.load(path, dataset+'_'+self.model_name+'_relation')
-        self.score_func.load(path, dataset)
+        self.score_func.load(path, dataset+'_'+self.model_name)
 
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
@@ -95,6 +104,8 @@ class KEModel(object):
                 tail_ids = to_device(tail_ids, gpu_id)
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
+
+            neg_head, tail = self.head_neg_prepare(pos_g.edata['id'], num_chunks, neg_head, tail, gpu_id, trace)
             neg_score = self.head_neg_score(neg_head, rel, tail,
                                             num_chunks, chunk_size, neg_sample_size)
         else:
@@ -105,6 +116,8 @@ class KEModel(object):
                 head_ids = to_device(head_ids, gpu_id)
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
+
+            head, neg_tail = self.tail_neg_prepare(pos_g.edata['id'], num_chunks, head, neg_tail, gpu_id, trace)
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
@@ -113,6 +126,8 @@ class KEModel(object):
     def forward_test(self, pos_g, neg_g, logs, gpu_id=-1):
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
+
+        self.score_func.prepare(pos_g, gpu_id, False)
 
         batch_size = pos_g.number_of_edges()
         pos_scores = self.predict_score(pos_g)
@@ -146,6 +161,8 @@ class KEModel(object):
     def forward(self, pos_g, neg_g, gpu_id=-1):
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
+
+        self.score_func.prepare(pos_g, gpu_id, True)
 
         pos_score = self.predict_score(pos_g)
         pos_score = logsigmoid(pos_score)
@@ -191,3 +208,4 @@ class KEModel(object):
     def update(self, gpu_id=-1):
         self.entity_emb.update(gpu_id)
         self.relation_emb.update(gpu_id)
+        self.score_func.update()

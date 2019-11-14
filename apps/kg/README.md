@@ -18,6 +18,8 @@ DGL-KE includes the following knowledge graph embedding models:
 - TransE
 - DistMult
 - ComplEx
+- RESCAL
+- TransR
 
 It will add other popular models in the future.
 
@@ -43,11 +45,13 @@ For MXNet, it works with MXNet 1.5 or newer.
 
 DGL-KE provides five knowledge graphs:
 
-- [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k}.zip)
-- [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{FB15k-237}.zip)
-- [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18}.zip)
-- [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{wn18rr}.zip)
-- [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{Freebase}.zip)
+| Dataset | #nodes | #edges | #relations |
+|---------|--------|--------|------------|
+| [FB15k](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k.zip) | 14951 | 592213 | 1345 |
+| [FB15k-237](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/FB15k-237.zip) | 14541 | 310116 | 237 |
+| [wn18](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18.zip) | 40943 | 151442 | 18 |
+| [wn18rr](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wn18rr.zip) | 40943 | 93003 | 11 |
+| [Freebase](https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/Freebase.zip) | 86054151 | 338586276 | 14824 |
 
 Users can specify one of the datasets with `--dataset` in `train.py` and `eval.py`.
 
@@ -57,10 +61,10 @@ The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
 The speed on FB15k
 
-|  Models | TransE | DistMult | ComplEx |
-|---------|--------|----------|---------|
-|MAX_STEPS| 20000  | 100000   | 100000  |
-|TIME     | 411s   | 690s     | 806s    |
+|  Models | TransE | DistMult | ComplEx | RESCAL | TransR |
+|---------|--------|----------|---------|--------|--------|
+|MAX_STEPS| 20000  | 100000   | 100000  | 30000  | 100000 |
+|TIME     | 411s   | 690s     | 806s    | 1800s  | 7627s  |
 
 The accuracy on FB15k
 
@@ -69,15 +73,17 @@ The accuracy on FB15k
 | TransE   | 69.12 | 0.656 | 0.567  | 0.718  | 0.802   |
 | DistMult | 43.35 | 0.783 | 0.713  | 0.837  | 0.897   |
 | ComplEx  | 51.99 | 0.785 | 0.720  | 0.832  | 0.889   |
+| RESCAL   | 130.89| 0.668 | 0.597  | 0.720  | 0.800   |
+| TransR   | 138.7 | 0.501 | 0.274  | 0.704  | 0.801   |
 
 In comparison, GraphVite uses 4 GPUs and takes 14 minutes. Thus, DGL-KE trains TransE on FB15k twice as fast as GraphVite while using much few resources. More performance information on GraphVite can be found [here](https://github.com/DeepGraphLearning/graphvite).
 
 The speed on wn18
 
-|  Models | TransE | DistMult | ComplEx |
-|---------|--------|----------|---------|
-|MAX_STEPS| 40000  | 10000    | 20000   |
-|TIME     | 719s   | 126s     | 266s    |
+|  Models | TransE | DistMult | ComplEx | RESCAL | TransR |
+|---------|--------|----------|---------|--------|--------|
+|MAX_STEPS| 40000  | 10000    | 20000   | 20000  | 20000  |
+|TIME     | 719s   | 126s     | 266s    | 333s   | 1547s  |
 
 The accuracy on wn18
 
@@ -86,6 +92,8 @@ The accuracy on wn18
 | TransE   | 321.35 | 0.760 | 0.652  | 0.850  | 0.940   |
 | DistMult | 271.09 | 0.769 | 0.639  | 0.892  | 0.949   |
 | ComplEx  | 276.37 | 0.935 | 0.916  | 0.950  | 0.960   |
+| RESCAL   | 579.54 | 0.846 | 0.791  | 0.898  | 0.931   |
+| TransR   | 615.56 | 0.606 | 0.378  | 0.826  | 0.890   |
 
 The speed on Freebase
 

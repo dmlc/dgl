@@ -1,4 +1,4 @@
-networkx
+networkx>=2.1
 torch
 numpy
 seaborn

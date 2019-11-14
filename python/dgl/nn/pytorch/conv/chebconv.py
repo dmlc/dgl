@@ -93,7 +93,7 @@ class ChebConv(nn.Module):
                 lambda_max = laplacian_lambda_max(graph)
             if isinstance(lambda_max, list):
                 lambda_max = th.Tensor(lambda_max).to(feat.device)
-            if lambda_max.dim() < 1:
+            if lambda_max.dim() == 1:
                 lambda_max = lambda_max.unsqueeze(-1)  # (B,) to (B, 1)
             # broadcast from (B, 1) to (N, 1)
             lambda_max = broadcast_nodes(graph, lambda_max)

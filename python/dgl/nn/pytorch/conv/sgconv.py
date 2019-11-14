@@ -47,6 +47,13 @@ class SGConv(nn.Module):
         self._cached_h = None
         self._k = k
         self.norm = norm
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reinitialize learnable parameters."""
+        nn.init.xavier_uniform_(self.fc.weight)
+        if self.fc.bias is not None:
+            nn.init.zeros_(self.fc.bias)
 
     def forward(self, graph, feat):
         r"""Compute Simplifying Graph Convolution layer.
@@ -77,9 +84,8 @@ class SGConv(nn.Module):
             # compute normalization
             degs = graph.in_degrees().float().clamp(min=1)
             norm = th.pow(degs, -0.5)
-            norm[th.isinf(norm)] = 0
             norm = norm.to(feat.device).unsqueeze(1)
-            # compute (D^-1 A D) X
+            # compute (D^-1 A^k D)^k X
             for _ in range(self._k):
                 feat = feat * norm
                 graph.ndata['h'] = feat

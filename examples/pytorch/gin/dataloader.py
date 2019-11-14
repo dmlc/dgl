@@ -1,6 +1,5 @@
 """
 PyTorch compatible dataloader
-
 """
 
 
@@ -19,12 +18,8 @@ def collate(samples):
     graphs, labels = map(list, zip(*samples))
     for g in graphs:
         # deal with node feats
-        for feat in g.node_attr_schemes().keys():
-            # TODO torch.Tensor is not recommended
-            # torch.DoubleTensor and torch.tensor
-            # will meet error in executor.py@runtime line 472, tensor.py@backend line 147
-            # RuntimeError: expected type torch.cuda.DoubleTensor but got torch.cuda.FloatTensor
-            g.ndata[feat] = torch.Tensor(g.ndata[feat])
+        for key in g.node_attr_schemes().keys():
+            g.ndata[key] = torch.from_numpy(g.ndata[key]).float()
         # no edge feats
     batched_graph = dgl.batch(graphs)
     labels = torch.tensor(labels)
@@ -63,10 +58,10 @@ class GraphDataLoader():
 
         self.train_loader = DataLoader(
             dataset, sampler=train_sampler,
-            batch_size=batch_size, collate_fn=collate, **self.kwargs)
+            batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
         self.valid_loader = DataLoader(
             dataset, sampler=valid_sampler,
-            batch_size=batch_size, collate_fn=collate, **self.kwargs)
+            batch_size=batch_size, collate_fn=collate_fn, **self.kwargs)
 
     def train_valid_loader(self):
         return self.train_loader, self.valid_loader
@@ -76,7 +71,6 @@ class GraphDataLoader():
         assert 0 <= fold_idx and fold_idx < 10, print(
             "fold_idx must be from 0 to 9.")
 
-        idx_list = []
         skf = StratifiedKFold(n_splits=10, shuffle=shuffle, random_state=seed)
         idx_list = []
         for idx in skf.split(np.zeros(len(labels)), labels):    # split(x, y)

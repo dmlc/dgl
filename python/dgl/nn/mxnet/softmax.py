@@ -152,6 +152,7 @@ def edge_softmax(graph, logits, eids=ALL):
     <NDArray 6x1 @cpu(0)>
 
     Apply edge softmax on first 4 edges of g:
+
     >>> edge_softmax(g, edata, nd.array([0,1,2,3], dtype='int64'))
     [[1. ]
      [0.5]
