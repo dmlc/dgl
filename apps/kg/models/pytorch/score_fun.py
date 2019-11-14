@@ -2,8 +2,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
-
-from .tensor_models import ExternalEmbedding
+import numpy as np
 
 class TransEScore(nn.Module):
     def __init__(self, gamma):
@@ -332,4 +331,91 @@ class RESCALScore(nn.Module):
                 tmp = th.matmul(relations, heads).squeeze(-1)
                 tmp = tmp.reshape(num_chunks, chunk_size, hidden_dim)
                 return th.bmm(tmp, tails)
+            return fn
+
+class RotatEScore(nn.Module):
+    def __init__(self, gamma, emb_init):
+        super(RotatEScore, self).__init__()
+        self.gamma = gamma
+        self.emb_init = emb_init
+
+    def edge_func(self, edges):
+        re_head, im_head = th.chunk(edges.src['emb'], 2, dim=-1)
+        re_tail, im_tail = th.chunk(edges.dst['emb'], 2, dim=-1)
+
+        phase_rel = edges.data['emb'] / (self.emb_init / np.pi)
+        re_rel, im_rel = th.cos(phase_rel), th.sin(phase_rel)
+        re_score = re_head * re_rel - im_head * im_rel
+        im_score = re_head * im_rel + im_head * re_rel
+        re_score = re_score - re_tail
+        im_score = im_score - im_tail
+        score = th.stack([re_score, im_score], dim=0)
+        score = score.norm(dim=0)
+        return {'score': self.gamma - score.sum(-1)}
+
+    def update(self):
+        pass
+
+    def reset_parameters(self):
+        pass
+
+    def save(self, path, name):
+        pass
+
+    def load(self, path, name):
+        pass
+
+    def forward(self, g):
+        g.apply_edges(lambda edges: self.edge_func(edges))
+        
+    def create_neg_prepare(self, neg_head):
+        def fn(rel_id, num_chunks, head, tail, gpu_id, trace=False):
+            return head, tail
+        return fn
+    
+    def prepare(self, g, gpu_id, trace=False):
+        pass
+    
+    def create_neg(self, neg_head):
+        gamma = self.gamma
+        emb_init = self.emb_init
+        if neg_head:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real = tails[..., :hidden_dim // 2]
+                emb_imag = tails[..., hidden_dim // 2:]
+
+                phase_rel = relations / (emb_init / np.pi)
+                rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
+                real = emb_real * rel_real + emb_imag * rel_imag
+                imag = -emb_real * rel_imag + emb_imag * rel_real
+                emb_complex = th.cat((real, imag), dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                heads = heads.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
+                score = tmp - heads
+                score = th.stack([score[..., :hidden_dim // 2],
+                                  score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+                return gamma - score.sum(-1)
+
+            return fn
+        else:
+            def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
+                hidden_dim = heads.shape[1]
+                emb_real = heads[..., :hidden_dim // 2]
+                emb_imag = heads[..., hidden_dim // 2:]
+
+                phase_rel = relations / (emb_init / np.pi)
+                rel_real, rel_imag = th.cos(phase_rel), th.sin(phase_rel)
+                real = emb_real * rel_real - emb_imag * rel_imag
+                imag = emb_real * rel_imag + emb_imag * rel_real
+
+                emb_complex = th.cat((real, imag), dim=-1)
+                tmp = emb_complex.reshape(num_chunks, chunk_size, 1, hidden_dim)
+                tails = tails.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
+                score = tmp - tails
+                score = th.stack([score[..., :hidden_dim // 2],
+                                  score[..., hidden_dim // 2:]], dim=-1).norm(dim=-1)
+
+                return gamma - score.sum(-1)
+
             return fn
