@@ -208,4 +208,4 @@ class KEModel(object):
     def update(self, gpu_id=-1):
         self.entity_emb.update(gpu_id)
         self.relation_emb.update(gpu_id)
-        self.score_func.update()
+        self.score_func.update(gpu_id)
