@@ -65,7 +65,7 @@ is standard and matches `NumPy <https://docs.scipy.org/doc/numpy/user/basics.bro
 and `PyTorch <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. If you are not familiar
 with broadcasting, see the linked topics to learn more. In the
 above example, ``fn.u_mul_e`` will perform broadcasted multiplication automatically because
-the node feature ``'h'`` and the edge feature ``'w'`` are of different, but shapes that can be broadcast.
+the node feature ``'h'`` and the edge feature ``'w'`` are of different shapes, but they can be broadcast.
 
 All DGL's built-in functions support both CPU and GPU and backward computation so they
 can be used in any `autograd` system. Also, built-in functions can be used not only in ``update_all``
