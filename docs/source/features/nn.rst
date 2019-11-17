@@ -1,6 +1,6 @@
 .. currentmodule:: dgl
 
-Neural network modules
+Graph neural network modules
 ===============
 
 This topic provides a link to several high-level, pre-defined modules you can use to build graph neural networks (NN).
