@@ -1,51 +1,49 @@
 """
 .. _model-rgcn:
 
-Relational Graph Convolutional Network Tutorial
+Relational graph convolutional network
 ================================================
 
 **Author:** Lingfan Yu, Mufei Li, Zheng Zhang
 
-The vanilla Graph Convolutional Network (GCN)
-(`paper <https://arxiv.org/pdf/1609.02907.pdf>`_,
+In this tutorial, you learn how to implement a relational graph convolutional
+network (R-GCN). This type of network is one effort to generalize GCN 
+to handle different relationships between entities in a knowledge base. To 
+learn more about the research behind R-GCN, see `Modeling Relational Data with Graph Convolutional
+Networks <https://arxiv.org/pdf/1703.06103.pdf>`_ 
+
+The straightforward graph convolutional network (GCN) and 
 `DGL tutorial <http://doc.dgl.ai/tutorials/index.html>`_) exploits
-structural information of the dataset (i.e. the graph connectivity) to
+structural information of a dataset (that is, the graph connectivity) in order to
 improve the extraction of node representations. Graph edges are left as
 untyped.
 
-A knowledge graph is made up by a collection of triples of the form
-(subject, relation, object). Edges thus encode important information and
+A knowledge graph is made up of a collection of triples in the form
+subject, relation, object. Edges thus encode important information and
 have their own embeddings to be learned. Furthermore, there may exist
 multiple edges among any given pair.
 
-A recent model Relational-GCN (R-GCN) from the paper
-`Modeling Relational Data with Graph Convolutional
-Networks <https://arxiv.org/pdf/1703.06103.pdf>`_ is one effort to
-generalize GCN to handle different relations between entities in knowledge
-base. This tutorial shows how to implement R-GCN with DGL.
 """
 ###############################################################################
-# R-GCN: a brief introduction
+# A brief introduction to R-GCN
 # ---------------------------
 # In *statistical relational learning* (SRL), there are two fundamental
 # tasks:
 #
-# - **Entity classification**, i.e., assign types and categorical
+# - **Entity classification** - Where you assign types and categorical
 #   properties to entities.
-# - **Link prediction**, i.e., recover missing triples.
+# - **Link prediction** - Where you recover missing triples.
 #
-# In both cases, missing information are expected to be recovered from
-# neighborhood structure of the graph. Here is the example from the R-GCN
-# paper:
-#
-# "Knowing that Mikhail Baryshnikov was educated at the Vaganova Academy
+# In both cases, missing information is expected to be recovered from the 
+# neighborhood structure of the graph. For example, the R-GCN
+# paper cited earlier provides the following example. Knowing that Mikhail Baryshnikov was educated at the Vaganova Academy
 # implies both that Mikhail Baryshnikov should have the label person, and
 # that the triple (Mikhail Baryshnikov, lived in, Russia) must belong to the
-# knowledge graph."
+# knowledge graph.
 #
-# R-GCN solves these two problems using a common graph convolutional network
+# R-GCN solves these two problems using a common graph convolutional network. It's 
 # extended with multi-edge encoding to compute embedding of the entities, but
-# with different downstream processing:
+# with different downstream processing.
 #
 # - Entity classification is done by attaching a softmax classifier at the
 #   final embedding of an entity (node). Training is through loss of standard
@@ -54,10 +52,10 @@ base. This tutorial shows how to implement R-GCN with DGL.
 #   architecture, using a parameterized score function. Training uses negative
 #   sampling.
 #
-# This tutorial will focus on the first task to show how to generate entity
+# This tutorial focuses on the first task, entity classification, to show how to generate entity
 # representation. `Complete
 # code <https://github.com/dmlc/dgl/tree/rgcn/examples/pytorch/rgcn>`_
-# for both tasks can be found in DGL's github repository.
+# for both tasks is found in the DGL Github repository.
 #
 # Key ideas of R-GCN
 # -------------------
@@ -85,10 +83,10 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # constant. In entity classification, the R-GCN paper uses
 # :math:`c_{i,r}=|N_i^r|`.
 #
-# The problem of applying the above equation directly is rapid growth of
-# number of parameters, especially with highly multi-relational data. In
+# The problem of applying the above equation directly is the rapid growth of
+# the number of parameters, especially with highly multi-relational data. In
 # order to reduce model parameter size and prevent overfitting, the original
-# paper proposes to use basis decomposition:
+# paper proposes to use basis decomposition.
 #
 # .. math:: W_r^{(l)}=\sum\limits_{b=1}^B a_{rb}^{(l)}V_b^{(l)}~~~~~~~~~~(3)\\
 #
@@ -105,11 +103,11 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # ----------------------
 #
 # An R-GCN model is composed of several R-GCN layers. The first R-GCN layer
-# also serves as input layer and takes in features (e.g. description texts)
-# associated with node entity and project to hidden space. In this tutorial,
-# we only use entity id as entity feature.
+# also serves as input layer and takes in features (for example, description texts)
+# that are associated with node entity and project to hidden space. In this tutorial,
+# we only use the entity ID as an entity feature.
 #
-# R-GCN Layers
+# R-GCN layers
 # ~~~~~~~~~~~~
 #
 # For each node, an R-GCN layer performs the following steps:
@@ -119,7 +117,7 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # - Aggregate incoming messages and generate new node representations (reduce
 #   and apply function)
 #
-# The following is the definition of an R-GCN hidden layer.
+# The following code is the definition of an R-GCN hidden layer.
 #
 # .. note::
 #    Each relation type is associated with a different weight. Therefore,
@@ -206,7 +204,7 @@ class RGCNLayer(nn.Module):
 
 
 ###############################################################################
-# Define full R-GCN model
+# Full R-GCN model defined
 # ~~~~~~~~~~~~~~~~~~~~~~~
 
 class Model(nn.Module):
@@ -266,7 +264,7 @@ class Model(nn.Module):
 ###############################################################################
 # Handle dataset
 # ~~~~~~~~~~~~~~~~
-# In this tutorial, we use AIFB dataset from R-GCN paper:
+# This tutorial uses Institute for Applied Informatics and Formal Description Methods (AIFB) dataset from R-GCN paper.
 
 # load graph data
 from dgl.contrib.data import load_data
@@ -344,16 +342,16 @@ for epoch in range(n_epochs):
 ###############################################################################
 # .. _link-prediction:
 #
-# The second task: Link prediction
+# The second task, link prediction
 # --------------------------------
-# So far, we have seen how to use DGL to implement entity classification with
+# So far, you have seen how to use DGL to implement entity classification with an 
 # R-GCN model. In the knowledge base setting, representation generated by
-# R-GCN can be further used to uncover potential relations between nodes. In
-# R-GCN paper, authors feed the entity representations generated by R-GCN
+# R-GCN can be used to uncover potential relationships between nodes. In the 
+# R-GCN paper, the authors feed the entity representations generated by R-GCN
 # into the `DistMult <https://arxiv.org/pdf/1412.6575.pdf>`_ prediction model
-# to predict possible relations.
+# to predict possible relationships.
 #
-# The implementation is similar to the above but with an extra DistMult layer
-# stacked on top of the R-GCN layers. You may find the complete
-# implementation of link prediction with R-GCN in our `example
-# code <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link_predict.py>`_.
+# The implementation is similar to that presented here, but with an extra DistMult layer
+# stacked on top of the R-GCN layers. You can find the complete
+# implementation of link prediction with R-GCN in our `Github Python code example
+#  <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link_predict.py>`_.
