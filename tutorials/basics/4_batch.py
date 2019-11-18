@@ -253,7 +253,6 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 
 ###############################################################################
 # The animation here plots the probability that a trained model predicts the correct graph type.
-# assigns its Amazon SageMaker ground truth label to it.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval4.gif
 #
