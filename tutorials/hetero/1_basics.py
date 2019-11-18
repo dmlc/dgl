@@ -188,7 +188,7 @@ print(pa_g.number_of_edges('written-by'))
 print(pa_g.successors(1, etype='written-by'))  # get the authors that write paper #1
 
 # Type name argument could be omitted whenever the behavior is unambiguous.
-print(pa_g.number_of_edges())  # Oly one edge type, the edge type argument could be omitted
+print(pa_g.number_of_edges())  # Only one edge type, the edge type argument could be omitted
 
 ###############################################################################
 # A homogeneous graph is just a special case of a heterograph with only one type
