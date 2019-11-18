@@ -34,13 +34,14 @@ def generate_rand_graph(n, func_name):
     g = dgl.DGLGraph(arr, readonly=True)
     num_rels = 10
     entity_emb = F.uniform((g.number_of_nodes(), 10), F.float32, F.cpu(), 0, 1)
-    rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RotatE':
+        entity_emb = F.uniform((g.number_of_nodes(), 20), F.float32, F.cpu(), 0, 1)
+    rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), -1, 1)
     if func_name == 'RESCAL':
         rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
-
     # TransR have additional projection_emb
     if (func_name == 'TransR'):
         args = {'gpu':-1, 'lr':0.1}
@@ -51,6 +52,8 @@ def generate_rand_graph(n, func_name):
         return g, entity_emb, rel_emb, (12.0)
     elif (func_name == 'RESCAL'):
         return g, entity_emb, rel_emb, (10, 10)
+    elif (func_name == 'RotatE'):
+        return g, entity_emb, rel_emb, (12.0, 1.0)
     else:
         return g, entity_emb, rel_emb, None
 
@@ -58,7 +61,8 @@ ke_score_funcs = {'TransE': TransEScore,
                   'DistMult': DistMultScore,
                   'ComplEx': ComplExScore,
                   'RESCAL': RESCALScore,
-                  'TransR': TransRScore}
+                  'TransR': TransRScore,
+                  'RotatE': RotatEScore}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -158,9 +162,13 @@ def test_score_func_rescal():
 def test_score_func_transr():
     check_score_func('TransR')
 
+def test_score_func_rotate():
+    check_score_func('RotatE')
+        
 if __name__ == '__main__':
     test_score_func_transe()
     test_score_func_distmult()
     test_score_func_complex()
     test_score_func_rescal()
     test_score_func_transr()
+    test_score_func_rotate()
