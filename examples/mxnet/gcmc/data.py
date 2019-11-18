@@ -160,14 +160,12 @@ class MovieLens(object):
 
         ### Generate features
         if use_one_hot_fea:
-            self.user_feature = mx.nd.arange(self._num_user, dtype=np.int32)
-            print(self.user_feature.shape)
-            self.movie_feature = mx.nd.arange(self._num_movie, dtype=np.int32)
-            print(self.movie_feature.shape)
+            self.user_feature = None
+            self.movie_feature = None
         else:
             self.user_feature = mx.nd.array(self._process_user_fea(), ctx=ctx, dtype=np.float32)
             self.movie_feature = mx.nd.array(self._process_movie_fea(), ctx=ctx, dtype=np.float32)
-        if use_one_hot_fea:
+        if self.user_feature is None:
             self.user_feature_shape = (self.num_user, self.num_user)
             self.movie_feature_shape = (self.num_movie, self.num_movie)
         else:
@@ -193,9 +191,6 @@ class MovieLens(object):
         self.train_labels = _make_labels(train_rating_values)
         self.train_truths = mx.nd.array(train_rating_values, ctx=ctx, dtype=np.float32)
 
-        self.train_enc_graph.nodes['user'].data['feature'] = self.user_feature
-        self.train_enc_graph.nodes['movie'].data['feature'] = self.movie_feature
-
         self.valid_enc_graph = self.train_enc_graph
         self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
         self.valid_labels = _make_labels(valid_rating_values)
@@ -205,8 +200,6 @@ class MovieLens(object):
         self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)
         self.test_labels = _make_labels(test_rating_values)
         self.test_truths = mx.nd.array(test_rating_values, ctx=ctx, dtype=np.float32)
-        self.test_enc_graph.nodes['user'].data['feature'] = self.user_feature
-        self.test_enc_graph.nodes['movie'].data['feature'] = self.movie_feature
 
         def _npairs(graph):
             rst = 0

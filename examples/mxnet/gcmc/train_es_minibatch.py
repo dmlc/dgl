@@ -12,6 +12,7 @@ from model_es import GCMCLayer, BiDecoder
 from utils import get_activation, parse_ctx, gluon_net_info, gluon_total_param_num, \
                   params_clip_global_norm, MetricLogger
 from mxnet.gluon import Block
+from mxnet import profiler
 
 import dgl
 
@@ -46,8 +47,6 @@ class Net(Block):
         pred_ratings = self.decoder(true_user_out, true_movie_out)
         return pred_ratings
 
-eval_graphs = []
-test_graphs = []
 def evaluate(args, net, dataset, segment='valid'):
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
@@ -58,19 +57,17 @@ def evaluate(args, net, dataset, segment='valid'):
         rating_values = dataset.valid_truths
         enc_graph = dataset.valid_enc_graph
         dec_graph = dataset.valid_dec_graph
-        sub_graphs = eval_graphs
     elif segment == "test":
         rating_values = dataset.test_truths
         enc_graph = dataset.test_enc_graph
         dec_graph = dataset.test_dec_graph
-        sub_graphs = test_graphs
     else:
         raise NotImplementedError
 
     num_edges = rating_values.shape[0]
     edges = mx.nd.arange(num_edges, dtype='int64')
     real_pred_ratings = []
-    for sample_idx in range(0, ((num_edges - 1) // 5000) + 1):
+    for sample_idx in range(0, (num_edges + 5000 - 1) // 5000):
         edge_ids = edges[sample_idx * 5000: (sample_idx + 1) * 5000 if (sample_idx + 1) * 5000 < num_edges else num_edges]
         head_ids, tail_ids = dec_graph.find_edges(edge_ids)
 
@@ -111,6 +108,7 @@ def evaluate(args, net, dataset, segment='valid'):
     real_pred_ratings = mx.nd.concat(*real_pred_ratings, dim=0)
     rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
     rmse = np.sqrt(rmse)
+    print("rmse={}".format(rmse))
     return rmse
 
 def train(args):
@@ -156,18 +154,10 @@ def train(args):
     total_nodes = dataset.num_user + dataset.num_movie
 
     enc_graph = dataset.train_enc_graph
-    g_user_fea = mx.nd.zeros((dataset.num_user))
-    g_movie_fea = mx.nd.zeros((dataset.num_movie))
-    homo_enc_graph = dgl.to_homo(enc_graph)
-    enc_node_type_map = homo_enc_graph.ndata['_TYPE']
-    enc_node_id_map = homo_enc_graph.ndata['_ID']
-    enc_edge_type_map = homo_enc_graph.edata['_TYPE']
-    enc_edge_id_map = homo_enc_graph.edata['_ID']
-    edge_sampler = dgl.contrib.sampling.EdgeSampler(homo_enc_graph, 
-        batch_size=args.minibatch_size,
-        shuffle=True,
-        num_workers=8,
-        prefetch=True).__iter__()
+    g_user_fea = mx.nd.zeros((dataset.num_user,))
+    g_movie_fea = mx.nd.zeros((dataset.num_movie,))
+    train_truths = dataset.train_truths
+    train_labels = dataset.train_labels
 
     print("Start training ...")
     dur = []
@@ -175,91 +165,50 @@ def train(args):
         if iter_idx > 3:
             t0 = time.time()
 
-        seed = mx.nd.arange(dataset.train_npairs * 2, dtype='int64')
+        num_edges = dataset.train_truths.shape[0]
+        seed = mx.nd.arange(num_edges, dtype='int64')
         edges = mx.nd.shuffle(seed)
-        for sample_idx in range(0, dataset.train_npairs//args.minibatch_size):
-            edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size]
-            head_ids, tail_ids = homo_enc_graph.find_edges(edge_ids)
+        for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
+            edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges]
+            head_ids, tail_ids = dataset.train_dec_graph.find_edges(edge_ids)
 
-            s_edge_type = enc_edge_type_map[edge_ids]
-            s_i = mx.nd.argsort(s_edge_type)
-            head_ids = head_ids[s_i]
-            tail_ids = tail_ids[s_i]
-            edge_ids = edge_ids[s_i]
-            s_edge_type = s_edge_type[s_i]
-
-            idx = 0
             head_subgraphs = {}
             tail_subgraphs = {}
-            true_head_ids = []
-            true_tail_ids = []
-            true_relation_ids = []
-            for i, t in enumerate(enc_graph.canonical_etypes):
-                if (idx == s_edge_type.shape[0]):
-                    break
+            for i, _ in enumerate(args.rating_vals):
+                t = enc_graph.canonical_etypes[i * 2]
+                rev_t = enc_graph.canonical_etypes[i * 2 + 1]
 
-                start = idx
-                if (s_edge_type[start] > i):
-                    continue
+                head_in_edges = enc_graph.in_edges(head_ids, 'eid', etype=rev_t)
+                tail_in_edges = enc_graph.in_edges(tail_ids, 'eid', etype=t)
 
-                while(idx < s_edge_type.shape[0] and s_edge_type[idx] == i):
-                    idx += 1
+                if head_in_edges.shape[0] == 0:
+                    print('skip {} with 0'.format(rev_t))
+                else:
+                    print('{}.{}'.format(rev_t, head_in_edges.shape[0])
+                    head_subgraphs[rev_t] = head_in_edges
 
-                head_in_i = enc_node_id_map[head_ids[start:idx]]
-                tail_in_i = enc_node_id_map[tail_ids[start:idx]]
-
-                # triky here, type should be
-                #   0 - rating[0]
-                #   1 - rev-rating[0]
-                #   2 - rating[1]
-                #   3 - rev-rating[1]
-                rev_i = i + (i + 1) % 2 - (i % 2)
-                rev_t = enc_graph.canonical_etypes[rev_i]
-                head_in_edges = enc_graph.in_edges(head_in_i, 'eid', etype=rev_t)
-                tail_in_edges = enc_graph.in_edges(tail_in_i, 'eid', etype=t)
-
-                if t[0] == 'user':
-                    if rev_t in head_subgraphs:
-                        head_subgraphs[rev_t] = mx.nd.concat(head_subgraphs[rev_t], head_in_edges, dim=0)
-                    else:
-                        head_subgraphs[rev_t] = head_in_edges
-                    if t in tail_subgraphs:
-                        tail_subgraphs[t] = mx.nd.concat(tail_subgraphs[t], tail_in_edges, dim=0)
-                    else:
-                        tail_subgraphs[t] = tail_in_edges
-                    true_head_ids.append(head_in_i)
-                    true_tail_ids.append(tail_in_i)
-                    true_relation_ids.append(mx.nd.full(idx-start, i))
-                else: #t[0] == 'movie'
-                    if t in head_subgraphs:
-                        head_subgraphs[t] = mx.nd.concat(head_subgraphs[t], tail_in_edges, dim=0)
-                    else:
-                        head_subgraphs[t] = tail_in_edges
-                    if rev_t in tail_subgraphs:
-                        tail_subgraphs[rev_t] = mx.nd.concat(tail_subgraphs[rev_t], head_in_edges, dim=0)
-                    else:
-                        tail_subgraphs[rev_t] = head_in_edges
-                    true_head_ids.append(tail_in_i)
-                    true_tail_ids.append(head_in_i)
-                    true_relation_ids.append(mx.nd.full(idx-start, rev_i))
+                if tail_in_edges.shape[0] == 0:
+                    print('skip {} with 0'.format(t))
+                else:
+                    print('{}.{}'.format(t, tail_in_edges.shape[0]))
+                    tail_subgraphs[t] = tail_in_edges
 
             head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
             tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
-            true_head_ids = mx.nd.concat(*true_head_ids, dim=0)
-            true_tail_ids = mx.nd.concat(*true_tail_ids, dim=0)
-            true_relation_ids = mx.nd.concat(*true_relation_ids, dim=0) / 2
-            true_relation_ratings = mx.nd.take(mx.nd.array(dataset.possible_rating_values), true_relation_ids).as_in_context(args.ctx)
-            true_relation_labels = true_relation_ids.as_in_context(args.ctx)
+            true_relation_ratings = train_truths[edge_ids].as_in_context(args.ctx)
+            true_relation_labels = train_labels[edge_ids].as_in_context(args.ctx)
+
+            print(head_subgraph.number_of_nodes())
+            print(tail_subgraph.number_of_nodes())
             head_NID = head_subgraph.nodes['user'].data[dgl.NID]
             tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
 
             g_user_fea[head_NID] = mx.nd.arange(head_NID.shape[0], dtype='int32')
             g_movie_fea[tail_NID] = mx.nd.arange(tail_NID.shape[0], dtype='int32')
 
-            true_head_idx = g_user_fea[true_head_ids].as_in_context(args.ctx)
-            true_tail_idx = g_movie_fea[true_tail_ids].as_in_context(args.ctx)
+            true_head_idx = g_user_fea[head_ids].as_in_context(args.ctx)
+            true_tail_idx = g_movie_fea[tail_ids].as_in_context(args.ctx)
 
-            # minibatch sample here
             with mx.autograd.record():
                 pred_ratings = net(head_subgraph, tail_subgraph,
                                    true_head_idx, true_tail_idx)
@@ -267,7 +216,6 @@ def train(args):
                 loss.backward()
             gnorm = params_clip_global_norm(net.collect_params(), args.train_grad_clip, args.ctx)
             trainer.step(1.0, ignore_stale_grad=True)
-            loss = loss.asscalar()
             real_pred_ratings = (mx.nd.softmax(pred_ratings, axis=1) *
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
             rmse = mx.nd.square(real_pred_ratings - true_relation_ratings).mean().asscalar()

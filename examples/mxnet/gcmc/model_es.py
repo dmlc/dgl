@@ -9,6 +9,8 @@ import dgl.function as fn
 
 from utils import get_activation
 
+import dgl
+
 class GCMCLayer(Block):
     r"""GCMC layer
 
@@ -102,62 +104,6 @@ class GCMCLayer(Block):
             self.agg_act = get_activation(agg_act)
             self.out_act = get_activation(out_act)
 
-    def eval_forward(self, graph, ufeat=None, ifeat=None, ctx=None):
-        """Forward function
-
-        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
-        and "cj".
-
-        Parameters
-        ----------
-        graph : DGLHeteroGraph
-            User-movie rating graph. It should contain two node types: "user"
-            and "movie" and many edge types each for one rating value.
-        ufeat : mx.nd.NDArray, optional
-            User features. If None, using an identity matrix.
-        ifeat : mx.nd.NDArray, optional
-            Movie features. If None, using an identity matrix.
-
-        Returns
-        -------
-        new_ufeat : mx.nd.NDArray
-            New user features
-        new_ifeat : mx.nd.NDArray
-            New movie features
-        """
-        num_u = graph.number_of_nodes('user')
-        num_i = graph.number_of_nodes('movie')
-        ufeat = ufeat.as_in_context(ctx)
-        ifeat = ifeat.as_in_context(ctx)
-        funcs = {}
-        for i, rating in enumerate(self.rating_vals):
-            rating = str(rating)
-            # W_r * x
-            x_u = dot_or_identity(ufeat, self.W_r[rating].data())
-            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating].data())
-            # left norm and dropout
-            x_u = x_u * self.dropout(graph.nodes['user'].data['cj'])
-            x_i = x_i * self.dropout(graph.nodes['movie'].data['cj'])
-            graph.nodes['user'].data['h%d' % i] = x_u
-            graph.nodes['movie'].data['h%d' % i] = x_i
-            funcs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-            funcs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
-        # message passing
-        graph.multi_update_all(funcs, self.agg)
-        ufeat = graph.nodes['user'].data.pop('h').reshape((num_u, -1))
-        ifeat = graph.nodes['movie'].data.pop('h').reshape((num_i, -1))
-        # right norm
-        ufeat = ufeat * graph.nodes['user'].data['ci']
-        ifeat = ifeat * graph.nodes['movie'].data['ci']
-        # fc and non-linear
-        ufeat = self.agg_act(ufeat)
-        ifeat = self.agg_act(ifeat)
-        ufeat = self.dropout(ufeat)
-        ifeat = self.dropout(ifeat)
-        ufeat = self.ufc(ufeat)
-        ifeat = self.ifc(ifeat)
-        return self.out_act(ufeat), self.out_act(ifeat)
-
     def forward(self, head_graph, tail_graph, ctx):
         """Forward function
 
@@ -181,7 +127,7 @@ class GCMCLayer(Block):
         new_ifeat : mx.nd.NDArray
             New movie features
         """
-        ifeat = head_graph.nodes['movie'].data['feature'].as_in_context(ctx)
+        ifeat = head_graph.nodes['movie'].data[dgl.NID].as_in_context(ctx)
         num_i = head_graph.number_of_nodes('user')
         funcs_head = {}
         for i, rating in enumerate(self.rating_vals):
@@ -192,7 +138,7 @@ class GCMCLayer(Block):
             funcs_head['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
 
         head_graph.multi_update_all(funcs_head, self.agg)
-        ufeat = head_graph.nodes['user'].data['h']
+        ufeat = head_graph.nodes['user'].data.pop('h')
         ufeat = ufeat.reshape((num_i, -1))
         ufeat = ufeat * head_graph.nodes['user'].data['ci']
         ufeat = self.agg_act(ufeat)
@@ -200,7 +146,7 @@ class GCMCLayer(Block):
         ufeat = self.ufc(ufeat)
         head_feat = self.out_act(ufeat)
 
-        ufeat = tail_graph.nodes['user'].data['feature'].as_in_context(ctx)
+        ufeat = tail_graph.nodes['user'].data[dgl.NID].as_in_context(ctx)
         num_i = tail_graph.number_of_nodes('movie')
         funcs_tail = {}
         for i, rating in enumerate(self.rating_vals):
@@ -211,7 +157,7 @@ class GCMCLayer(Block):
             funcs_tail[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
 
         tail_graph.multi_update_all(funcs_tail, self.agg)
-        ifeat = tail_graph.nodes['movie'].data['h']
+        ifeat = tail_graph.nodes['movie'].data.pop('h')
         ifeat = ifeat.reshape((num_i, -1))
         ifeat = ifeat * tail_graph.nodes['movie'].data['ci']
         ifeat = self.agg_act(ifeat)
