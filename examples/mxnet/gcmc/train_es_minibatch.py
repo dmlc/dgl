@@ -12,9 +12,9 @@ from model_es import GCMCLayer, BiDecoder
 from utils import get_activation, parse_ctx, gluon_net_info, gluon_total_param_num, \
                   params_clip_global_norm, MetricLogger
 from mxnet.gluon import Block
-from mxnet import profiler
 
 import dgl
+import gc
 
 class Net(Block):
     def __init__(self, args, **kwargs):
@@ -48,6 +48,7 @@ class Net(Block):
         return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
+    print('eval now')
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
     possible_rating_values = dataset.possible_rating_values
@@ -67,8 +68,8 @@ def evaluate(args, net, dataset, segment='valid'):
     num_edges = rating_values.shape[0]
     edges = mx.nd.arange(num_edges, dtype='int64')
     real_pred_ratings = []
-    for sample_idx in range(0, (num_edges + 5000 - 1) // 5000):
-        edge_ids = edges[sample_idx * 5000: (sample_idx + 1) * 5000 if (sample_idx + 1) * 5000 < num_edges else num_edges]
+    for sample_idx in range(0, (num_edges + 1000 - 1) // 1000):
+        edge_ids = edges[sample_idx * 1000: (sample_idx + 1) * 1000 if (sample_idx + 1) * 1000 < num_edges else num_edges]
         head_ids, tail_ids = dec_graph.find_edges(edge_ids)
 
         head_subgraphs = {}
@@ -170,6 +171,7 @@ def train(args):
         edges = mx.nd.shuffle(seed)
         for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges]
+            #edge_ids = edges[0: args.minibatch_size]
             head_ids, tail_ids = dataset.train_dec_graph.find_edges(edge_ids)
 
             head_subgraphs = {}
@@ -184,22 +186,19 @@ def train(args):
                 if head_in_edges.shape[0] == 0:
                     print('skip {} with 0'.format(rev_t))
                 else:
-                    print('{}.{}'.format(rev_t, head_in_edges.shape[0])
                     head_subgraphs[rev_t] = head_in_edges
 
                 if tail_in_edges.shape[0] == 0:
                     print('skip {} with 0'.format(t))
                 else:
-                    print('{}.{}'.format(t, tail_in_edges.shape[0]))
                     tail_subgraphs[t] = tail_in_edges
 
             head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
             tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
-            true_relation_ratings = train_truths[edge_ids].as_in_context(args.ctx)
-            true_relation_labels = train_labels[edge_ids].as_in_context(args.ctx)
+            edge_ids = edge_ids.as_in_context(args.ctx)
+            true_relation_ratings = train_truths[edge_ids]
+            true_relation_labels = train_labels[edge_ids]
 
-            print(head_subgraph.number_of_nodes())
-            print(tail_subgraph.number_of_nodes())
             head_NID = head_subgraph.nodes['user'].data[dgl.NID]
             tail_NID = tail_subgraph.nodes['movie'].data[dgl.NID]
 
@@ -220,11 +219,14 @@ def train(args):
                              nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
             rmse = mx.nd.square(real_pred_ratings - true_relation_ratings).mean().asscalar()
             rmse = np.sqrt(rmse)
+            loss = loss.asscalar()
             if sample_idx % 100 == 0:
                 train_loss_logger.log(iter=iter_idx, idx=sample_idx,
                                   loss=loss, rmse=rmse)
                 print("Iter={}, sample_idx={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}".format(iter_idx,
                     sample_idx, gnorm, loss, rmse))
+
+            gc.collect()
 
         if iter_idx > 3:
             dur.append(time.time() - t0)
