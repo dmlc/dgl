@@ -91,6 +91,12 @@ nx_G = G.to_networkx().to_undirected()
 pos = nx.kamada_kawai_layout(nx_G)
 nx.draw(nx_G, pos, with_labels=True, node_color=[[.7, .7, .7]])
 
+# Uncomment the code below, then the drawing will not disappear
+# import matplotlib.pyplot as plt
+# plt.pause(0)
+
+
+
 ###############################################################################
 # Step 2: Assign features to nodes or edges
 # --------------------------------------------
