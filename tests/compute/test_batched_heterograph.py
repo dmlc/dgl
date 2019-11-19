@@ -192,7 +192,7 @@ def test_batched_features():
     assert F.allclose(bg.nodes['game'].data['h2'],
                       F.cat([g1.nodes['game'].data['h2'], g2.nodes['game'].data['h2']], dim=0))
     assert F.allclose(bg.edges['follows'].data['h1'],
-                      F.cat([g1.edges['follows'].data['h1'], g2.edges['follows'].data['h1']]))
+                      F.cat([g1.edges['follows'].data['h1'], g2.edges['follows'].data['h1']], dim=0))
     assert 'h2' not in bg.edges['follows'].data.keys()
     assert 'h1' not in bg.edges['plays'].data.keys()
 
