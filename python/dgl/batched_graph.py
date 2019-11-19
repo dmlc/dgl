@@ -293,6 +293,14 @@ def unbatch(graph):
         by partitioning the attributes of the :attr:`graph`. The length of the
         list is the same as the batch size of :attr:`graph`.
 
+    Notes
+    -----
+    Unbatching will break each field tensor of the batched graph into smaller
+    partitions.
+
+    For simpler tasks such as node/edge state aggregation, try to use
+    readout functions.
+
     See Also
     --------
     batch
