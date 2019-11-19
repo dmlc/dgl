@@ -329,8 +329,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
       src_offset,
       dst_offset,
       aten::VecToIdArray(result_src),
-      aten::VecToIdArray(result_dst)
-    );
+      aten::VecToIdArray(result_dst));
     rel_graphs[etype] = rgptr;
   }
   return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
@@ -391,7 +390,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
     for (uint64_t g = 0; g < batch_size; ++g) {
       std::vector<dgl_id_t> result_src, result_dst;
       // Loop over the chunk of edges for the specified graph and edge type
-      for (uint64_t e = edge_cumsum[etype][g]; e < edge_cumsum[etype][g + 1]; ++ e) {
+      for (uint64_t e = edge_cumsum[etype][g]; e < edge_cumsum[etype][g + 1]; ++e) {
         result_src.push_back(edges_src_data[e] - vertex_cumsum[src_vtype][g]);
         result_dst.push_back(edges_dst_data[e] - vertex_cumsum[dst_vtype][g]);
       }
@@ -400,8 +399,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
         vertex_sizes_data[src_vtype * batch_size + g],
         vertex_sizes_data[dst_vtype * batch_size + g],
         aten::VecToIdArray(result_src),
-        aten::VecToIdArray(result_dst)
-      );
+        aten::VecToIdArray(result_dst));
       rel_graphs[g].push_back(rgptr);
     }
   }
