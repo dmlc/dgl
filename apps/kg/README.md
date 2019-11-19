@@ -20,6 +20,7 @@ DGL-KE includes the following knowledge graph embedding models:
 - ComplEx
 - RESCAL
 - TransR
+- RotatE
 
 It will add other popular models in the future.
 
@@ -61,10 +62,10 @@ The speed is measured with 16 CPU cores and one Nvidia V100 GPU.
 
 The speed on FB15k
 
-|  Models | TransE | DistMult | ComplEx | RESCAL | TransR |
-|---------|--------|----------|---------|--------|--------|
-|MAX_STEPS| 20000  | 100000   | 100000  | 30000  | 100000 |
-|TIME     | 411s   | 690s     | 806s    | 1800s  | 7627s  |
+|  Models | TransE | DistMult | ComplEx | RESCAL | TransR | RotatE |
+|---------|--------|----------|---------|--------|--------|--------|
+|MAX_STEPS| 20000  | 100000   | 100000  | 30000  | 100000 | 100000 |
+|TIME     | 411s   | 690s     | 806s    | 1800s  | 7627s  | 4327s  |
 
 The accuracy on FB15k
 
@@ -75,15 +76,16 @@ The accuracy on FB15k
 | ComplEx  | 51.99 | 0.785 | 0.720  | 0.832  | 0.889   |
 | RESCAL   | 130.89| 0.668 | 0.597  | 0.720  | 0.800   |
 | TransR   | 138.7 | 0.501 | 0.274  | 0.704  | 0.801   |
+| RotatE   | 39.6  | 0.725 | 0.628  | 0.802  | 0.875   |
 
 In comparison, GraphVite uses 4 GPUs and takes 14 minutes. Thus, DGL-KE trains TransE on FB15k twice as fast as GraphVite while using much few resources. More performance information on GraphVite can be found [here](https://github.com/DeepGraphLearning/graphvite).
 
 The speed on wn18
 
-|  Models | TransE | DistMult | ComplEx | RESCAL | TransR |
-|---------|--------|----------|---------|--------|--------|
-|MAX_STEPS| 40000  | 10000    | 20000   | 20000  | 20000  |
-|TIME     | 719s   | 126s     | 266s    | 333s   | 1547s  |
+|  Models | TransE | DistMult | ComplEx | RESCAL | TransR | RotatE |
+|---------|--------|----------|---------|--------|--------|--------|
+|MAX_STEPS| 40000  | 10000    | 20000   | 20000  | 20000  | 20000  |
+|TIME     | 719s   | 126s     | 266s    | 333s   | 1547s  | 786s   |
 
 The accuracy on wn18
 
@@ -94,6 +96,7 @@ The accuracy on wn18
 | ComplEx  | 276.37 | 0.935 | 0.916  | 0.950  | 0.960   |
 | RESCAL   | 579.54 | 0.846 | 0.791  | 0.898  | 0.931   |
 | TransR   | 615.56 | 0.606 | 0.378  | 0.826  | 0.890   |
+| RotatE   | 367.64 | 0.931 | 0.924  | 0.935  | 0.944   | 
 
 The speed on Freebase
 
