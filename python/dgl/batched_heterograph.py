@@ -1,3 +1,4 @@
+"""Classes and functions for batching multiple heterographs together."""
 from collections.abc import Iterable
 
 from . import backend as F
@@ -127,59 +128,59 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
                 'Got different numbers of canonical etypes for graphs in the same batch.'
             assert len(g_i_ntypes) == len(ref_ntypes), \
                 'Got different number of node types for graphs in the same batch.'
-            for t in range(len(ref_canonical_etypes)):
-                assert ref_canonical_etypes[t] == g_i_canonical_etypes[t], \
+            for tid, ety in enumerate(ref_canonical_etypes):
+                assert ety == g_i_canonical_etypes[tid], \
                     'Got different canonical etype with id {:d} ' \
-                    'for graphs in the same batch.'.format(t)
-            for t in range(len(ref_ntypes)):
-                assert ref_ntypes[t] == g_i_ntypes[t], \
+                    'for graphs in the same batch.'.format(tid)
+            for tid, nty in enumerate(ref_ntypes):
+                assert nty == g_i_ntypes[tid], \
                     'Got different node type with id {:d} ' \
-                    'for graphs in the same batch.'.format(t)
+                    'for graphs in the same batch.'.format(tid)
 
         # Merge node and edge frames
-        def _get_num_item_and_attr_types(g, mode, type):
+        def _get_num_item_and_attr_types(g, mode, mode_type):
             if mode == 'node':
-                num_items = g.number_of_nodes(type)
-                attr_types = set(g.node_attr_schemes(type).keys())
+                num_items = g.number_of_nodes(mode_type)
+                attr_types = set(g.node_attr_schemes(mode_type).keys())
             elif mode == 'edge':
-                num_items = g.number_of_edges(type)
-                attr_types = set(g.edge_attr_schemes(type).keys())
+                num_items = g.number_of_edges(mode_type)
+                attr_types = set(g.edge_attr_schemes(mode_type).keys())
             return num_items, attr_types
 
         def _init_attrs(types, attrs, mode):
             formatted_attrs = {t: set() for t in types}
             if is_all(attrs):
                 ref_g_indices = dict()
-                for t in types:
+                for typ in types:
                     # Check if at least a graph has mode items and
                     # associated features for a particular type.
                     for i, g in enumerate(graph_list):
-                        g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, t)
+                        g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, typ)
                         if g_num_items > 0 and len(g_attrs) > 0:
-                            formatted_attrs[t] = g_attrs
-                            ref_g_indices[t] = i
+                            formatted_attrs[typ] = g_attrs
+                            ref_g_indices[typ] = i
                             break
-                for t in types:
+                for typ in types:
                     # Check if all the graphs with mode items of a particular type
                     # have the same associated features.
-                    if len(formatted_attrs[t]) > 0:
+                    if len(formatted_attrs[typ]) > 0:
                         for i, g in enumerate(graph_list):
-                            g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, t)
-                            if g_attrs != formatted_attrs[t] and g_num_items > 0:
+                            g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, typ)
+                            if g_attrs != formatted_attrs[typ] and g_num_items > 0:
                                 raise ValueError(
                                     'Expect graph {0} and {1} to have the same {2} attributes '
                                     'for type {3} when {2}_attrs=ALL, got {4} and {5}.'.format(
-                                        ref_g_indices[t], i, mode, t, attrs, g_attrs))
+                                        ref_g_indices[typ], i, mode, typ, attrs, g_attrs))
             elif isinstance(attrs, dict):
-                for t, v in attrs.items():
+                for typ, v in attrs.items():
                     if isinstance(v, str):
-                        formatted_attrs[t] = [v]
+                        formatted_attrs[typ] = [v]
                     elif isinstance(v, Iterable):
-                        formatted_attrs[t] = list(v)
-                    elif (v is not None):
+                        formatted_attrs[typ] = list(v)
+                    elif v is not None:
                         raise ValueError('Expected {} attrs for type {} to be str '
-                                         'or iterable, got {}'.format(mode, t, type(v)))
-            elif (attrs is not None):
+                                         'or iterable, got {}'.format(mode, typ, type(v)))
+            elif attrs is not None:
                 raise ValueError('Expected {} attrs to be of type None or dict,'
                                  'got type {}'.format(mode, type(attrs)))
             return formatted_attrs
@@ -188,31 +189,31 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
         edge_attrs = _init_attrs(ref_canonical_etypes, edge_attrs, 'edge')
 
         node_frames = []
-        for tid, t in enumerate(ref_ntypes):
-            if len(node_attrs[t]) == 0:
+        for tid, typ in enumerate(ref_ntypes):
+            if len(node_attrs[typ]) == 0:
                 # Emtpy frames will be created when we instantiate a DGLHeteroGraph.
                 node_frames.append(None)
             else:
                 # NOTE: following code will materialize the columns of the input graphs.
                 cols = {key: F.cat([gr._node_frames[tid][key] for gr in graph_list
-                                    if gr.number_of_nodes(t) > 0], dim=0)
-                        for key in node_attrs[t]}
+                                    if gr.number_of_nodes(typ) > 0], dim=0)
+                        for key in node_attrs[typ]}
                 node_frames.append(FrameRef(Frame(cols)))
 
         edge_frames = []
-        for tid, t in enumerate(ref_canonical_etypes):
-            if len(edge_attrs[t]) == 0:
+        for tid, typ in enumerate(ref_canonical_etypes):
+            if len(edge_attrs[typ]) == 0:
                 # Emtpy frames will be created when we instantiate a DGLHeteroGraph.
                 edge_frames.append(None)
             else:
                 # NOTE: following code will materialize the columns of the input graphs.
                 cols = {key: F.cat([gr._edge_frames[tid][key] for gr in graph_list
-                                    if gr.number_of_edges(t) > 0], dim=0)
-                        for key in edge_attrs[t]}
+                                    if gr.number_of_edges(typ) > 0], dim=0)
+                        for key in edge_attrs[typ]}
                 edge_frames.append(FrameRef(Frame(cols)))
 
         # Create graph index for the batched graph
-        src, dst, eid = graph_list[0]._graph.metagraph.edges()
+        src, dst, _ = graph_list[0]._graph.metagraph.edges()
         meta_edges = list(zip(list(src.tonumpy()), list(dst.tonumpy())))
         metagraph = graph_index.from_edge_list(meta_edges, True, True)
         batched_index = heterograph_index.disjoint_union(
