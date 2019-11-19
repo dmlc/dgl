@@ -264,7 +264,7 @@ class DGLHeteroGraph(object):
                    '      metagraph={meta})')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
-            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+            nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph.edges())
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)

@@ -246,6 +246,51 @@ def hetero_from_relations(rel_graphs):
     -------
     DGLHeteroGraph
         A heterograph consisting of all relations.
+
+    Notes
+    -----
+    For each node type, we expect each relation graph to have the same number of nodes
+    with this type except for zero nodes. For example
+
+    >>> import dgl
+    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game')
+    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
+
+    will raise an error as we have 3 nodes of type 'user' in follows_g and 4 nodes of type
+    'user' in plays_g.
+
+    There are two possible workarounds.
+
+    **Workaround 1**: Manually specify the number of nodes for all types when constructing
+    the relation graphs.
+
+    >>> # A graph with 4 nodes of type 'user'
+    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', card=4)
+    >>> # A bipartite graph with 4 nodes of src type ('user') and 2 nodes of dst type ('game')
+    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game', card=(4, 2))
+    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
+    >>> print(g)
+    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
+          num_edges={'follows': 2, 'plays': 2, 'develops': 2},
+          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
+
+    devs_g does not have nodes of type 'user' so no error will be raised.
+
+    **Workaround 2**: Construct a heterograph at once without intermediate relation graphs,
+    in which case we will infer the number of nodes for each type.
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+    >>>     ('user', 'plays', 'game'): [(0, 0), (3, 1)],
+    >>>     ('developer', 'develops', 'game'): [(0, 0), (1, 1)]
+    >>> })
+    >>> print(g)
+    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
+          num_edges={'follows': 2, 'plays': 2, 'develops': 2},
+          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
     """
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
