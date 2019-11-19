@@ -171,7 +171,7 @@ class RGCNLinkDataset(object):
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
-        tgz_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
+        tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
         download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_path, self.dir)
