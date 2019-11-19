@@ -263,6 +263,7 @@ fig = plt.figure(dpi=150)
 fig.clf()
 ax = fig.subplots()
 draw(0)  # draw the prediction of the first epoch
+plt.show()
 plt.close()
 
 ###############################################################################
