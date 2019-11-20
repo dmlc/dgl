@@ -157,7 +157,7 @@ print(list(data.keys()))
 # are stored as SciPy sparse matrix under key ``XvsY``, where ``X`` and ``Y``
 # could be any of the node type code.
 #
-# The following code prints out some statistics about the paper-author relations.
+# The following code prints out some statistics about the paper-author relationships.
 
 print(type(data['PvsA']))
 print('#Papers:', data['PvsA'].shape[0])
