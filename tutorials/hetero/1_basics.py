@@ -307,7 +307,7 @@ test_idx = torch.tensor(shuffle[900:]).long()
 #
 # (i) Message computation and aggregation within each relation :math:`r`
 #
-# (ii) Reduction that merges the results from multiple relations
+# (ii) Reduction that merges the results from multiple relationships
 #
 # Following this intuition, perform message passing on a heterograph in
 # two steps.
