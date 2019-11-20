@@ -208,7 +208,7 @@ print(pp_g.successors(3))
 ###############################################################################
 # Create a subset of the ACM graph using the paper-author, paper-paper, 
 # and paper-subject relationships.  Meanwhile, also add the reverse
-# relations to prepare for the later sections.
+# relationship to prepare for the later sections.
 
 G = dgl.heterograph({
         ('paper', 'written-by', 'author') : data['PvsA'],
