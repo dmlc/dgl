@@ -30,7 +30,7 @@ Graph neural networks and its variants
 * **Line graph neural network (LGNN)** `[research paper] <https://arxiv.org/abs/1705.08415>`__ `[tutorial]
   <1_gnn/6_line_graph.html>`__ `[Pytorch code]
   <https://github.com/dmlc/dgl/tree/master/examples/pytorch/line_graph>`__:
-  This model focuses on community detection by inspecting graph structures. It
+  This network focuses on community detection by inspecting graph structures. It
   uses representations of both the original graph and its line-graph
   companion. In addition to demonstrating how an algorithm can harness multiple
   graphs, this implementation shows how you can judiciously mix simple tensor
