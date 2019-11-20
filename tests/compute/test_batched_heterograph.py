@@ -47,6 +47,7 @@ def test_batching_hetero_topology():
     bg = dgl.batch_hetero([g1, g2])
 
     assert bg.ntypes == ['user', 'developer', 'game']
+    print(bg.etypes)
     assert bg.etypes == ['follows', 'follows', 'plays']
     assert bg.canonical_etypes == [
         ('user', 'follows', 'user'), ('user', 'follows', 'developer'), ('user', 'plays', 'game')]
@@ -108,6 +109,7 @@ def test_batching_hetero_and_batched_hetero_topology():
     })
     bg2 = dgl.batch_hetero([bg1, g3])
     assert bg2.ntypes == ['user', 'game']
+    print(bg2.etypes)
     assert bg2.etypes == ['follows', 'plays']
     assert bg2.canonical_etypes == [('user', 'follows', 'user'), ('user', 'plays', 'game')]
     assert bg2.batch_size == 3
