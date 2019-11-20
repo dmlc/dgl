@@ -5,9 +5,7 @@ References
 Paper: https://arxiv.org/abs/1810.05997
 Author's code: https://github.com/klicperajo/ppnp
 """
-import torch
 import torch.nn as nn
-import dgl.function as fn
 from dgl.nn.pytorch.conv import APPNPConv
 
 

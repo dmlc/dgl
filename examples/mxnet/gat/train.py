@@ -11,6 +11,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
 import argparse
+import networkx as nx
 import time
 import mxnet as mx
 from mxnet import gluon
@@ -58,7 +59,7 @@ def main(args):
     # create graph
     g = data.graph
     # add self-loop
-    g.remove_edges_from(g.selfloop_edges())
+    g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
     # create model
