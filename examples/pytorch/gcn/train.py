@@ -117,7 +117,7 @@ def main(args):
 
     print()
     acc = evaluate(model, features, labels, test_mask)
-    print("Test Accuracy {:.4f}".format(acc))
+    print("Test accuracy {:.2%}".format(acc))
 
 
 if __name__ == '__main__':
