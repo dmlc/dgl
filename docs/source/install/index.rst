@@ -191,7 +191,7 @@ install Python binding for DGL:
 
    mkdir build
    cd build
-   cmake ..
+   cmake -DUSE_OPENMP=off ..
    make -j4
    cd ../python
    python setup.py install
