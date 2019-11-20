@@ -82,7 +82,7 @@ class GCN(nn.Module):
 # The forward function is essentially the same as any other commonly seen NNs
 # model in PyTorch.  You can initialize GCN like any ``nn.Module``. For example,
 # define a simple neural network consisting of two GCN layers. Suppose you
-# are training the classifier for the cora dataset. The input feature size is
+# are training the classifier for the Cora dataset. The input feature size is
 # 1433 and the number of classes is 7.
 
 class Net(nn.Module):
