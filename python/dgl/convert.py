@@ -635,8 +635,8 @@ def to_homo(G):
         srctype, _, dsttype = etype
         src, dst = G.all_edges(etype=etype, order='eid')
         num_edges = len(src)
-        srcs.append(src + offset_per_ntype[G.get_ntype_id(srctype)])
-        dsts.append(dst + offset_per_ntype[G.get_ntype_id(dsttype)])
+        srcs.append(src + int(offset_per_ntype[G.get_ntype_id(srctype)]))
+        dsts.append(dst + int(offset_per_ntype[G.get_ntype_id(dsttype)]))
         etype_ids.append(F.full_1d(num_edges, etype_id, F.int64, F.cpu()))
         eids.append(F.arange(0, num_edges))
 
