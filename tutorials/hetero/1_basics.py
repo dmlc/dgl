@@ -125,7 +125,7 @@ plus1.add_nodes_from(['m0', 'm1'], bipartite=1)
 plus1.add_edges_from([('u0', 'm0'), ('u0', 'm1'), ('u1', 'm0')])
 # To simplify the example, reuse the minus1 object.
 # This also means that you could use different sources of graph data
-# for different relations.
+# for different relationships.
 ratings = dgl.heterograph(
     {('user', '+1', 'movie') : plus1,
      ('user', '-1', 'movie') : minus1})
