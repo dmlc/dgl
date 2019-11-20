@@ -10,7 +10,7 @@ Graph attention network
 <https://shanghai.nyu.edu/academics/faculty/directory/zheng-zhang>`_
 
 In this tutorial, you learn about a graph attention network (GAT) and how it can be 
-implemented in MXNet-DGL. You can also learn to visualize and understand what the attention 
+implemented in PyTorch. You can also learn to visualize and understand what the attention 
 mechanism has learned.
 
 The research described in the paper `Graph Convolutional Network (GCN) <https://arxiv.org/abs/1609.02907>`_,
