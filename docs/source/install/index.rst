@@ -26,6 +26,9 @@ Install from conda
 If ``conda`` is not yet installed, get either `miniconda <https://conda.io/miniconda.html>`_ or
 the full `anaconda <https://www.anaconda.com/download/>`_.
 
+With ``conda`` installed, you will want install DGL into Python 3.5 ``conda`` environment.
+Run `conda create -n dgl python=3.5` to create the environment.
+Activate the environment by running `source activate dgl`.
 After the ``conda`` environment is activated, run one of the following commands.
 
 .. code:: bash
