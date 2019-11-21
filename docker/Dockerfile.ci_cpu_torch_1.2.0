@@ -30,5 +30,8 @@ RUN bash /install/ubuntu_install_torch.sh
 COPY install/ubuntu_install_mxnet_cpu.sh /install/ubuntu_install_mxnet_cpu.sh
 RUN bash /install/ubuntu_install_mxnet_cpu.sh
 
+COPY install/ubuntu_install_app_kg.sh /install/ubuntu_install_app_kg.sh
+RUN bash /install/ubuntu_install_app_kg.sh
+
 COPY install/FB15k.zip /data/kg/FB15k.zip
 RUN cd /data/kg && unzip FB15k.zip
