@@ -56,7 +56,7 @@ class ExternalEmbedding:
         for idx, data in self.trace:
             grad = data.grad
 
-            clr = self.args.lr * self.args.relation_lr_decay
+            clr = self.args.lr
             #clr = self.args.lr / (1 + (self.state_step - 1) * group['lr_decay'])
 
             # the update is non-linear so indices must be unique
