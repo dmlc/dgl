@@ -87,7 +87,7 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 |         |         |                                                  |
 |         |         |    pip install mxnet                             |
 |         |         |                                                  |
-|         |         | or CUDA version, e.g. for CUDA 9.0               |
+|         |         | or MXNet for GPU with CUDA version, e.g. for CUDA 9.2               |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
