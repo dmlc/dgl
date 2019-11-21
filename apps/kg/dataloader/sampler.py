@@ -7,6 +7,27 @@ import os
 import pickle
 import time
 
+from spherecluster import SphericalKMeans
+from sklearn.cluster import KMeans
+
+def RelationCluster(edges, n_relations, n_entities, n_parts):
+    print('Relation clustering {} edges with {} relations into {} parts'.format(len(edges), n_relations, n_parts))
+    rel = np.array([r for h, r, t in edges])
+
+    uniq, inverse, cnts = np.unique(rel, return_inverse=True, return_counts=True)
+    rel2node = np.zeros((n_relations, n_entities), dtype=np.int64)
+
+    for i, (h, _, t) in enumerate(edges):
+        rel_type = inverse[i]
+        rel2node[rel_type][h] = 1
+        rel2node[rel_type][t] = 1
+
+    kmeans = SphericalKMeans(n_clusters=n_parts).fit(rel2node)
+    np.set_printoptions(threshold=np.inf)
+    q, cnts = np.unique(kmeans.labels_, return_counts=True)
+
+    return F.zerocopy_from_numpy(kmeans.labels_)
+
 # This partitions a list of edges based on relations to make sure
 # each partition has roughly the same number of edges and relations.
 def RelationPartition(edges, n):
@@ -71,6 +92,10 @@ class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
         print('|Train|:', len(triples))
+        if args.train_sampler == 'relcluster' and args.sample_relation_cluster_cnt > 0:
+            relation_clusters = RelationCluster(triples, dataset.n_relations, dataset.n_entities, args.sample_relation_cluster_cnt)
+            self.relation_clusters = relation_clusters
+
         if ranks > 1 and args.rel_part:
             triples_list = RelationPartition(triples, ranks)
         elif ranks > 1:
@@ -109,7 +134,6 @@ class TrainDataset(object):
                        shuffle=True, exclude_positive=False, rank=0):
 
         if self.sampler_type == 'relcentrl':
-            print('RelationTypeCentralEdgeSampler')
             EdgeSampler = getattr(dgl.contrib.sampling, 'RelationTypeCentralEdgeSampler')
             return EdgeSampler(self.graphs[rank],
                                relations=self.graphs[rank].edata['id'],
@@ -120,21 +144,19 @@ class TrainDataset(object):
                                shuffle=shuffle,
                                exclude_positive=exclude_positive,
                                return_false_neg=False)
-        elif self.sampler_type == 'relpart':
-            print('RelationPartitionEdgeSampler')
-            EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
+        elif self.sampler_type == 'relcluster':
+            EdgeSampler = getattr(dgl.contrib.sampling, 'RelationClusteringEdgeSampler')
             return EdgeSampler(self.graphs[rank],
+                               relations=self.graphs[rank].edata['id'],
+                               r_clusters=self.relation_clusters,
                                batch_size=batch_size,
                                neg_sample_size=neg_sample_size,
                                negative_mode=mode,
                                num_workers=num_workers,
                                shuffle=shuffle,
                                exclude_positive=exclude_positive,
-                               return_false_neg=False,
-                               aggregated_batches=8,
-                               relations=self.graphs[rank].edata['id'])
+                               return_false_neg=False)
         else: # default edge
-            print('EdgeSampler')
             EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
             return EdgeSampler(self.graphs[rank],
                                batch_size=batch_size,

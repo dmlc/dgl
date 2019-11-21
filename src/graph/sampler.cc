@@ -1330,7 +1330,7 @@ class RelationSort {
   dgl_id_t *relation_map_;
 };
 
-DGL_REGISTER_GLOBAL("sampling._CAPI_RelationTypeCentralEdgeSampler")
+DGL_REGISTER_GLOBAL("sampling._CAPI_UniformChunkBasedEdgeSampler")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
     GraphRef g = args[0];
@@ -1394,115 +1394,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_RelationTypeCentralEdgeSampler")
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
     *rv = List<SubgraphRef>(positive_subgs);
-  });
-
-DGL_REGISTER_GLOBAL("sampling._CAPI_RelationPartitionEdgeSampling")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // arguments
-    GraphRef g = args[0];
-    IdArray seed_edges = args[1];
-    IdArray relations = args[2];
-    const int64_t batch_start_id = args[3];
-    const int64_t batch_size = args[4];
-    const int64_t max_num_workers = args[5];
-    const std::string neg_mode = args[6];
-    const int neg_sample_size = args[7];
-    const bool exclude_positive = args[8];
-    const bool check_false_neg = args[9];
-    const int aggregated_batches = args[10];
-
-    // process args
-    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(gptr) << "sampling isn't implemented in mutable graph";
-    CHECK(aten::IsValidIdArray(seed_edges));
-    CHECK(aten::IsValidIdArray(relations));
-    BuildCoo(*gptr);
-
-    // each worker will generate #relation_parts batch_size data
-    const int64_t worker_batch_size = batch_size * aggregated_batches;
-    const int64_t num_seeds = seed_edges->shape[0];
-    const int64_t num_workers = std::min(max_num_workers,
-        (num_seeds - batch_start_id * batch_size + worker_batch_size - 1) / worker_batch_size);
-    // generate subgraphs.
-    std::vector<std::vector<SubgraphRef>> positive_subgs(num_workers);
-    std::vector<std::vector<SubgraphRef>> negative_subgs(num_workers);
-
-#pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
-      const int64_t start = batch_start_id * batch_size + i * worker_batch_size;
-      const int64_t end = std::min(start + worker_batch_size, num_seeds);
-      const int64_t num_edges = end - start;
-
-      IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-                                                   sizeof(dgl_id_t) * start);
-
-      dgl_id_t *worker_seeds_eid = static_cast<dgl_id_t *>(worker_seeds->data);
-      dgl_id_t *relation_data = static_cast<dgl_id_t *>(relations->data);
-
-      const int64_t num_worker_seeds = worker_seeds->shape[0];
-      std::vector<dgl_id_t> seeds_eid(num_worker_seeds);
-      for (int64_t j = 0; j < num_worker_seeds; j ++) {
-        seeds_eid[j] = worker_seeds_eid[j];
-      }
-      RelationSort sorter(relation_data);
-      std::sort(seeds_eid.begin(), seeds_eid.end(), sorter);
-
-      std::vector<SubgraphRef> positive_part_subgs;
-      std::vector<SubgraphRef> negative_part_subgs;
-      for (int j = 0; j < aggregated_batches; j ++) {
-        const int64_t part_start = j * batch_size;
-        const int64_t part_end = std::min(part_start + batch_size, num_worker_seeds);
-        const int64_t part_num_edges = part_end - part_start;
-
-        // no more edges
-        if (part_num_edges == 0) {
-          break;
-        }
-        std::vector<dgl_id_t> part_seeds(seeds_eid.begin() + part_start,
-                                         seeds_eid.begin() + part_end);
-        IdArray sub_worker_seeds = aten::VecToIdArray(part_seeds);
-
-        EdgeArray arr = gptr->FindEdges(sub_worker_seeds);
-        const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
-        const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
-        std::vector<dgl_id_t> src_vec(src_ids, src_ids + part_num_edges);
-        std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + part_num_edges);
-
-        Subgraph subg = gptr->EdgeSubgraph(sub_worker_seeds, false);
-        positive_part_subgs.push_back(ConvertRef(subg));
-
-        // For PBG negative sampling, we accept "PBG-head" for corrupting head
-        // nodes and "PBG-tail" for corrupting tail nodes.
-        if (neg_mode.substr(0, 3) == "PBG") {
-          NegSubgraph neg_subg = PBGNegEdgeSubgraph(gptr, relations, subg,
-                                                    neg_mode.substr(4), neg_sample_size,
-                                                    gptr->IsMultigraph(), exclude_positive,
-                                                    check_false_neg);
-          negative_part_subgs.push_back(ConvertRef(neg_subg));
-        } else if (neg_mode.size() > 0) {
-          NegSubgraph neg_subg = NegEdgeSubgraph(gptr, relations, subg, neg_mode, neg_sample_size,
-                                                 exclude_positive, check_false_neg);
-          negative_part_subgs.push_back(ConvertRef(neg_subg));
-        }
-      }
-
-      positive_subgs[i] = positive_part_subgs;
-      negative_subgs[i] = negative_part_subgs;
-    }
-    std::vector<SubgraphRef> subgs;
-    if (neg_mode.size() > 0) {
-      for (int i = 0; i < num_workers; i++) {
-        subgs.insert(subgs.end(), positive_subgs[i].begin(), positive_subgs[i].end());
-      }
-      for (int i = 0; i < num_workers; i++) {
-        subgs.insert(subgs.end(), negative_subgs[i].begin(), negative_subgs[i].end());
-      }
-    } else {
-      for (int i = 0; i < num_workers; i++) {
-        subgs.insert(subgs.end(), positive_subgs[i].begin(), positive_subgs[i].end());
-      }
-    }
-    *rv = List<SubgraphRef>(subgs);
   });
 
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")

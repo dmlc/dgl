@@ -57,10 +57,12 @@ class ArgParser(argparse.ArgumentParser):
                           help='learning rate')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
-        self.add_argument('--train_sampler', type=str, default='edge',
-                          help='sampler type, possible sampler: edge, relpart, relcentrl')
         self.add_argument('--eval_percent', type=float, default=1,
                           help='sample some percentage for evaluation.')
+        self.add_argument('--train_sampler', type=str, default='edge',
+                          help='sampler type, possible sampler: edge, relcluster, relcentrl')
+        self.add_argument('--sample_relation_cluster_cnt', type=int, default=0,
+                          help='number of relation cluster used with sampler relpart')
 
         self.add_argument('--gpu', type=int, default=-1,
                           help='use GPU')

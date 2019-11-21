@@ -18,7 +18,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler', 'RelationPartitionEdgeSampler', 'RelationTypeCentralEdgeSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler', 'RelationClusteringEdgeSampler', 'RelationTypeCentralEdgeSampler']
 
 class SamplerIter(object):
     def __init__(self, sampler):
@@ -630,7 +630,7 @@ class RelationTypeCentralEdgeSampler(object):
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
             Next "bunch" of edges to be processed.
         '''
-        subgs = _CAPI_RelationTypeCentralEdgeSampler(
+        subgs = _CAPI_UniformChunkBasedEdgeSampler(
             self.g._graph,
             self._seed_edges.todgltensor(),
             self._seed_chunks.todgltensor(),
@@ -680,23 +680,28 @@ class RelationTypeCentralEdgeSampler(object):
     def batch_size(self):
         return self._batch_size
 
-class RelationPartitionEdgeSampler(object):
-    '''Edge sampler for link prediction with proper relation partition 
-    between minbatches.
+class RelationClusteringEdgeSampler(object):
+    '''Edge sampler for link prediction with the relation clustering 
+    guidance from the caller.
 
     This sampler is originally designed for multi-relation KG.
 
     This samples edges from a given graph. The edges sampled for a batch are
     placed in a subgraph before returning. The main purpose of this sampler is 
     similar to EdgeSampler, but in the returned subgraph, the edges will only 
-    belong to a small subset of relations. This will help reduce the memory 
-    footprints inside a minibatch for models with relation specific params (e.g. transR).
+    belong to a small subset of relations (Edges sampled will belong to relations 
+    within same relation cluster according to r_clusters provided by caller). 
+    This will help reduce the memory footprints inside a minibatch for models 
+    with relation specific params (e.g. transR). For relation type clustering, 
+    you can use Spherecluster methodology.
 
     How it works: 
-        1. It will samples relation_parts * batch_size edges
-        2. Sort edges according to their relation type (given by relations)
-        3. Split edges into #relation_parts, and generate #relation_parts 
-           subgraphs accordingly.
+        1. Caller provides relations (edge->relation mapping) and r_clusters 
+        (relation to cluster mapping).
+        2. Clustering edges according to their relations (by sorting them according 
+        to cluster type).
+        3. We divide the resulting seed edges into chunks. Each fetch will randomly 
+        select a chunk to return.
 
     A negative edge is constructed by
     corrupting an existing edge in the graph. The current implementation
@@ -730,8 +735,10 @@ class RelationPartitionEdgeSampler(object):
         The DGLGraph where we sample edges.
     batch_size : int
         The batch size (i.e, the number of edges from the graph)
-    relations: tensor, optional
+    relations: tensor
         relations of the edges used to sort the edges.
+    r_clusters: tensor
+        relation clustering strategy provided by the caller
     seed_edges : tensor, optional
         A list of edges where we sample from.
     shuffle : bool, optional
@@ -748,12 +755,10 @@ class RelationPartitionEdgeSampler(object):
         Whether to exclude positive edges from the negative edges.
     return_false_neg: bool, optional
         Whether to calculate false negative edges and return them as edge data in negative graphs.
-    aggregated_batches: int, optional
-        num of batches is aggregated before partitioned with edges sorted
 
     Examples
     --------
-    >>> for pos_g, neg_g in RelationPartitionEdgeSampler(g, batch_size=10, relations=g.edata['type']):
+    >>> for pos_g, neg_g in ClusterRelationEdgeSampler(g, batch_size=10, relations=g.edata['type'], r_clusters=cluster):
     >>>     print(pos_g.head_nid, pos_g.tail_nid)
     >>>     print(neg_g.head_nid, pos_g.tail_nid)
     >>>     print(neg_g.edata['false_neg'])
@@ -771,6 +776,7 @@ class RelationPartitionEdgeSampler(object):
             g,
             batch_size,
             relations,
+            r_clusters,
             seed_edges=None,
             shuffle=False,
             num_workers=1,
@@ -778,34 +784,44 @@ class RelationPartitionEdgeSampler(object):
             negative_mode="",
             neg_sample_size=0,
             exclude_positive=False,
-            return_false_neg=False,
-            aggregated_batches=8):
+            return_false_neg=False):
         self._g = g
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
 
-        if relations is None:
-            raise NotImplementedError("This sampler needs the relation type mapping")
-        else:
-            relations = utils.toindex(relations)
-            relations = relations.todgltensor()
-            assert g.number_of_edges() == len(relations)
-        self._relations = relations
-        self._aggregated_batches = aggregated_batches
-
         if batch_size < 0 or neg_sample_size < 0:
             raise Exception('Invalid arguments')
-
         self._return_false_neg = return_false_neg
         self._batch_size = int(batch_size)
 
+        if relations is None:
+            raise NotImplementedError("This sampler needs the relation type mapping")
+
+        if r_clusters is None:
+            raise NotImplementedError("This sampler needs the relations clustering map")
+        self._num_rcluster = r_clusters.shape[0]
+        self._r_cluster = r_clusters
+
         if seed_edges is None:
-            self._seed_edges = F.arange(0, g.number_of_edges())
+            seed_edges = F.arange(0, g.number_of_edges())
         else:
-            self._seed_edges = seed_edges
+            seed_edges = seed_edges
+
         if shuffle:
-            self._seed_edges = F.rand_shuffle(self._seed_edges)
-        self._seed_edges = utils.toindex(self._seed_edges)
+            seed_edges = F.rand_shuffle(seed_edges)
+
+        seed_relation = relations[seed_edges]
+        seed_cluster = self._r_cluster[seed_relation]
+        sort_idx = F.argsort(seed_cluster, dim=0, descending=False)
+        seed_edges = seed_edges[sort_idx]
+
+        _, num_e = np.unique(F.asnumpy(seed_cluster), return_counts=True)
+        print(num_e)
+
+        chunks = F.arange(0, (seed_edges.shape[0] + batch_size - 1) // batch_size)
+        seed_chunks = F.rand_shuffle(chunks)
+        self._seed_edges = utils.toindex(seed_edges)
+        self._seed_chunks = utils.toindex(seed_chunks)
 
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
@@ -832,18 +848,17 @@ class RelationPartitionEdgeSampler(object):
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
             Next "bunch" of edges to be processed.
         '''
-        subgs = _CAPI_RelationPartitionEdgeSampling(
+        subgs = _CAPI_UniformChunkBasedEdgeSampler(
             self.g._graph,
             self._seed_edges.todgltensor(),
-            self._relations,
+            self._seed_chunks.todgltensor(),
             current_index, # start batch id
             self.batch_size,        # batch size
             self._num_workers,      # num batches
             self._negative_mode,
             self._neg_sample_size,
             self._exclude_positive,
-            self._return_false_neg,
-            self._aggregated_batches)
+            self._return_false_neg)
 
         if len(subgs) == 0:
             return []
