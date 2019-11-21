@@ -16,7 +16,7 @@ import dgl
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'cora' : 'dataset/cora_raw.zip',
+    'cora_raw' : 'dataset/cora_raw.zip',
     'citeseer' : 'dataset/citeseer.zip',
     'pubmed' : 'dataset/pubmed.zip',
     'cora_binary' : 'dataset/cora_binary.zip',
@@ -358,7 +358,7 @@ class CoraDataset(object):
     relationships.
     """
     def __init__(self):
-        self.name = 'cora'
+        self.name = 'cora_raw'
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, self.name)
         download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
@@ -367,7 +367,7 @@ class CoraDataset(object):
         self._load()
 
     def _load(self):
-        idx_features_labels = np.genfromtxt("{}/cora/cora.content".
+        idx_features_labels = np.genfromtxt("{}/cora_raw/cora.content".
                                             format(self.dir),
                                             dtype=np.dtype(str))
         features = sp.csr_matrix(idx_features_labels[:, 1:-1],
@@ -378,7 +378,7 @@ class CoraDataset(object):
         # build graph
         idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
         idx_map = {j: i for i, j in enumerate(idx)}
-        edges_unordered = np.genfromtxt("{}/cora/cora.cites".format(self.dir),
+        edges_unordered = np.genfromtxt("{}/cora_raw/cora.cites".format(self.dir),
                                         dtype=np.int32)
         edges = np.array(list(map(idx_map.get, edges_unordered.flatten())),
                         dtype=np.int32).reshape(edges_unordered.shape)
