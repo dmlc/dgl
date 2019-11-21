@@ -343,7 +343,8 @@ def sort_1d(input):
 
 
 def arange(start, stop):
-    return tf.range(start, stop, dtype=tf.int64)
+    with tf.device("/cpu:0"):
+        return tf.range(start, stop, dtype=tf.int64)
 
 
 def rand_shuffle(arr):
@@ -385,62 +386,20 @@ def one_hot(t, num_classes=-1):
     # return th.nn.functional.one_hot(t, num_classes)
 
 
-# Weird tf convert, still investigating
-def convert_dglobject_to_tftensor(obj, dtype=None, name=None, as_ref=False):
-    """This only store the handle and erase the type information"""
-    return tf.constant([obj.handle.value], dtype=tf.int64, name=name)
 
 
-def patch_None_tuple(obj, dtype=None, name=None, as_ref=False):
-    if isinstance(obj, tuple) and len(obj) == 2 and obj[0] is None and obj[1] is None:
-        return tf.constant([48966, 0], dtype=tf.int32)
-    elif isinstance(obj, tuple) and len(obj) == 2 and isinstance(obj[0], tf.Tensor):
-        return tf.constant([obj[0].numpy(), obj[1].numpy()], dtype=dtype)
-    elif isinstance(obj[0], nd.NDArray):
-        return tf.constant([48966, 1], dtype=tf.int32)
-    else:
-        return tf.constant(obj, dtype=dtype, name=name)
-
-
-def convert_back_to_tuple(tf_tensor):
-    if tf_tensor.numpy()[0].item() == 48966:
-        return (None, None)
-    else:
-        return tuple(tf_tensor.numpy())
-
-
-def dummy_convert(obj, dtype=None, name=None, as_ref=False):
-    return tf.constant([0], dtype=tf.int64)
-    
-def convert_str(obj, dtype=None, name=None, as_ref=False):
-    with tf.device("/cpu:0"):
-        return tf.constant(obj)
-
-tf.register_tensor_conversion_function(
-    str, convert_str)
-
-tf.register_tensor_conversion_function(
-    ObjectBase, dummy_convert)
-
-tf.register_tensor_conversion_function(
-    tuple, patch_None_tuple,  priority=90)
-
-# tf.register_tensor_conversion_function(
-#     ObjectBase, convert_dglobject_to_tftensor)
-# tf.register_tensor_conversion_function(tuple, patch_None_tuple, priority=90)
-
-
-def convert_tftensor_to_gindex(tf_tensor):
-    from dgl.graph_index import GraphIndex
-    handle = tf_tensor.numpy().item()
-    cls = GraphIndex
-    obj = cls.__new__(cls)
-    obj.handle = handle
-    return obj
-
-
-@tf.custom_gradient
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map):
+
+
+    @tf.custom_gradient
+    def _lambda(lhs, rhs):
+        return binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                                  out_size, lhs_map, rhs_map, out_map)
+    return _lambda(lhs, rhs)
+
+
+def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                   out_size, lhs_map, rhs_map, out_map):
     lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
     rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
@@ -509,13 +468,20 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
 
-        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
-            None, None
+        return grad_lhs, grad_rhs
     return out_data, grad
 
 
-@tf.custom_gradient
 def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
+                out_map):
+    @tf.custom_gradient
+    def _labmda(in_data):
+        return copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
+                                out_map)
+    return _labmda(in_data)
+
+
+def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
                 out_map):
     out_data = tf.zeros(
         (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
@@ -557,7 +523,7 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
                 reducer if reducer != 'mean' else 'sum',
                 graph, target, in_data_nd, out_data_nd, grad_out_nd,
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return None, None, None, grad_in, None, None, None
+        return grad_in
     return out_data, grad
 
 
