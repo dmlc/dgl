@@ -815,9 +815,6 @@ class RelationClusteringEdgeSampler(object):
         sort_idx = F.argsort(seed_cluster, dim=0, descending=False)
         seed_edges = seed_edges[sort_idx]
 
-        _, num_e = np.unique(F.asnumpy(seed_cluster), return_counts=True)
-        print(num_e)
-
         chunks = F.arange(0, (seed_edges.shape[0] + batch_size - 1) // batch_size)
         seed_chunks = F.rand_shuffle(chunks)
         self._seed_edges = utils.toindex(seed_edges)

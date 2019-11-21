@@ -356,11 +356,12 @@ def check_relation_central_sampler(mode, exclude_positive, neg_size):
     # For RelationChunkEdgeSampler there should be at most 1 chunk with cross relation type
     assert cross_relation_cnt <= 1
 
-def check_relation_partion_sampler(mode, exclude_positive, neg_size):
+def check_relation_clustering_sampler(mode, exclude_positive, neg_size):
     dgl.random.seed(42)
     g = generate_rand_graph(100)
-    etype = np.random.randint(0, 4, size=g.number_of_edges(), dtype=np.int64)
+    etype = np.random.randint(0, 3, size=g.number_of_edges(), dtype=np.int64)
     g.edata['etype'] = F.tensor(etype)
+    cluster = F.tensor(etype // 2)
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
@@ -369,18 +370,18 @@ def check_relation_partion_sampler(mode, exclude_positive, neg_size):
         pos_e = int(F.asnumpy(pos_geid[i]))
         pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
 
-    EdgeSampler = getattr(dgl.contrib.sampling, 'RelationPartitionEdgeSampler')
+    EdgeSampler = getattr(dgl.contrib.sampling, 'RelationClusteringEdgeSampler')
     # Test the homogeneous graph.
     cross_relation_cnt = 0
     for pos_edges, neg_edges in EdgeSampler(g, 10,
                                             relations=g.edata['etype'],
+                                            r_clusters=cluster,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=exclude_positive,
-                                            aggregated_batches=4,
                                             return_false_neg=True):
         pos_edges.copy_from_parent()
-        if len(np.unique(F.asnumpy(pos_edges.edata['etype']))) == 4:
+        if len(np.unique(F.asnumpy(pos_edges.edata['etype']))) > 2:
             cross_relation_cnt += 1
 
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
@@ -407,8 +408,8 @@ def check_relation_partion_sampler(mode, exclude_positive, neg_size):
         neg_tails = np.sort(F.asnumpy(neg_tails))
         np.testing.assert_equal(pos_tails, neg_tails)
 
-    # For RelationPartitionEdgeSampler the chance of have all relations is low
-    assert cross_relation_cnt == 0
+    # For RelationClusteringEdgeSampler there should be at most 1 chunk with cross relation type
+    assert cross_relation_cnt <= 1
 
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
@@ -419,9 +420,9 @@ def test_negative_sampler():
     check_relation_central_sampler('PBG-head', False, 10)
     check_relation_central_sampler('head', True, 10)
     check_relation_central_sampler('head', False, 10)
-    check_relation_partion_sampler('PBG-head', False, 10)
-    check_relation_partion_sampler('head', True, 10)
-    check_relation_partion_sampler('head', False, 10)
+    check_relation_clustering_sampler('PBG-head', False, 10)
+    check_relation_clustering_sampler('head', True, 10)
+    check_relation_clustering_sampler('head', False, 10)
 
 
 if __name__ == '__main__':
