@@ -94,7 +94,7 @@ structure-free normalization, in the style of attention.
 # GAT in DGL
 # ----------
 #
-# To begin, you can see an overall impression about how a ``GATLayer`` module is
+# To begin, you can get an overall impression about how a ``GATLayer`` module is
 # implemented in DGL. In this section, the four equations above are broken down 
 # one at a time.
 
