@@ -108,9 +108,17 @@ To contribute a new model within a specific supported tensor framework (e.g. PyT
 1. Make a directory with the name of your model (say ``awesome-gnn``) within the directory
    ``examples/${DGLBACKEND}`` where ``${DGLBACKEND}`` refers to the framework name.
    
-2. Populate it with your work, and make a pull request once you are done.
+2. Populate it with your work, along with a README.  Make a pull request once you are done.  Your README should contain at least these:
 
-   * Instructions for running your program and the results are preferred in your README.
+   * Instructions for running your program.
+   
+   * The performance results, such as speed or accuracy or any metric, along with comparisons against some alternative implementations (if available).
+   
+     * Your performance metric does not have to beat others' implementation; they are just a signal of your code being *likely* correct.
+     
+     * Your speed also does not have to surpass others'.
+     
+     * However, better numbers are always welcomed.
    
 3. We (the DGL team) will review it, suggesting or making changes as necessary.
 
@@ -122,7 +130,7 @@ Data hosting
 ````````````
 
 One often wishes to upload a dataset when contributing a new runnable model example, especially when covering
-a new field which is not covered in our existing examples.
+a new field not in our existing examples.
 
 Uploading data file into the Git repository directly is a **bad idea** because we do not want the cloners to
 always download the dataset no matter what.  Instead, we strongly suggest the data files be hosted on a
@@ -251,11 +259,35 @@ where ``<your-backend>`` can be any supported backends (i.e. ``pytorch`` or ``mx
 Contributing Documentations
 ---------------------------
 
-If the change is about document improvement, we suggest building the document and render it locally
-before pull request. See instructions `here <https://github.com/dmlc/dgl/tree/master/docs>`__.
+If the change is about document improvement, we suggest (and strongly suggest if you change the runnable code
+there) building the document and render it locally before making a pull request.
 
-Contributing via GitHub Web Interface
-`````````````````````````````````````
+Building Docs Locally
+`````````````````````
+
+In general building the docs locally involves the following:
+
+1. Install ``sphinx``, ``sphinx-gallery``, and ``sphinx_rtd_theme``.
+
+2. You need both PyTorch and MXNet because our tutorial contains code from both frameworks.  This does *not*
+   require knowledge of coding with both frameworks, though.
+   
+3. Run the following:
+
+   .. code-block:: bash
+   
+      cd docs
+      ./clean.sh
+      make html
+      cd build/html
+      python3 -m http.server 8080
+      
+4. Open ``http://localhost:8080`` and enjoy your work.
+
+See `here <https://github.com/dmlc/dgl/tree/master/docs>`__ for more details.
+
+Contributing Editorial Changes via GitHub Web Interface
+```````````````````````````````````````````````````````
 
 If one is only changing the wording (i.e. not touching the runnable code at all), one does not
 even need to understand Git CLI to contribute!  Instead, one can simply:
@@ -268,3 +300,8 @@ even need to understand Git CLI to contribute!  Instead, one can simply:
 4. We (the DGL team) will review it, suggesting or making changes as necessary.
 5. Resolve the suggestions and reviews, and go back to step 4 until approved.
 6. Merge it and enjoy your day.
+
+Contributing Code Changes
+`````````````````````````
+
+When changing code, please make sure to build it locally and see if it fails.
