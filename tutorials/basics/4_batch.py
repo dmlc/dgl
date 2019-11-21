@@ -28,7 +28,7 @@ networks to this problem has been a popular approach recently. This can be seen 
 # Simple graph classification task
 # --------------------------------
 # In this tutorial, you learn how to perform batched graph classification
-# with DGL. The example task objective is to classify eight types of regular graphs shown here.
+# with DGL. The example task objective is to classify eight types of topologies shown here.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/dataset_overview.png
 #     :align: center
