@@ -81,7 +81,7 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 | pytorch | PyTorch | Requires 0.4.1 or later. See                     |
 |         |         | `pytorch.org <https://pytorch.org>`_             |
 +---------+---------+--------------------------------------------------+
-| mxnet   | MXNet   | Requires either MXNet 1.5                        |
+| mxnet   | MXNet   | Requires either MXNet 1.5 for CPU                   |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
