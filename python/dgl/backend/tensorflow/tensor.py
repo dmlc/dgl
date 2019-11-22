@@ -343,8 +343,7 @@ def sort_1d(input):
 
 
 def arange(start, stop):
-    with tf.device("/cpu:0"):
-        return tf.range(start, stop, dtype=tf.int64)
+    return tf.range(start, stop, dtype=tf.int64)
 
 
 def rand_shuffle(arr):
@@ -390,7 +389,6 @@ def one_hot(t, num_classes=-1):
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                   out_size, lhs_map, rhs_map, out_map):
-
 
     @tf.custom_gradient
     def _lambda(lhs, rhs):
