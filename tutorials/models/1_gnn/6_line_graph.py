@@ -174,7 +174,7 @@ visualize(label1, nx_G1)
 # ------------------------------------
 # An key innovation in this topic is the use of a line graph.
 # Unlike models in previous tutorials, message passing happens not only on the
-# original graph, e.g. the binary community sub-graph from Cora, but also on the
+# original graph, e.g. the binary community subgraph from Cora, but also on the
 # line graph associated with the original graph.
 #
 # What is a line-graph?
