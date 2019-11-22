@@ -110,7 +110,7 @@ print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 #
 #    To create a practice binary-community dataset from Cora, first extract
 #    all two-class pairs from the original Cora seven classes. For each pair, you
-#    treat each class as one community, and find the largest sub-graph that
+#    treat each class as one community, and find the largest subgraph that
 #    at least contains one cross-community edge as the training example. As
 #    a result, there are a total of 21 training samples in this small dataset.
 #
