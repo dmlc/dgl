@@ -2208,7 +2208,7 @@ class DGLGraph(DGLBaseGraph):
             raise DGLError("Group_by should be either src or dst")
 
         if is_all(edges):
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
             eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2270,7 +2270,7 @@ class DGLGraph(DGLBaseGraph):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self.number_of_edges()))
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
