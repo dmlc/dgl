@@ -24,7 +24,7 @@ Tutorial: Generative models of graphs
 # perform the analysis iteratively?
 #
 # To address the evolution of the graphs, you generate a variety of graph samples. In other words, you need
-# **generative models** of graphs. Instead of and/or, in-addition to learning
+# **generative models** of graphs. In-addition to learning
 # node and edge features, you would need to model the distribution of arbitrary graphs.
 # While general generative models can model the density function explicitly and
 # implicitly and generate samples at once or sequentially, you only focus
