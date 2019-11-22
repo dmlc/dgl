@@ -13,7 +13,7 @@ tutorial also demonstrates training a graph neural network for a simple graph cl
 
 Graph classification is an important problem
 with applications across many fields, such as bioinformatics, chemoinformatics, social
-network analysis, urban computing, and cyber-security. Applying graph neural
+network analysis, urban computing, and cybersecurity. Applying graph neural
 networks to this problem has been a popular approach recently. This can be seen in the following reserach references: 
 `Ying et al., 2018 <https://arxiv.org/abs/1806.08804>`_,
 `Cangea et al., 2018 <https://arxiv.org/abs/1811.01287>`_,
