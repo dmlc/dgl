@@ -5,9 +5,9 @@ import numpy as np
 import networkx as nx
 import tensorflow as tf
 from dgl import DGLGraph
+import dgl.function as fn
 from dgl.data import register_data_args, load_data
 from tensorflow.keras import layers
-
 
 def gcn_msg(edge):
     msg = edge.src['h'] * edge.src['norm']
@@ -17,26 +17,6 @@ def gcn_msg(edge):
 def gcn_reduce(node):
     accum = tf.reduce_sum(node.mailbox['m'], 1) * node.data['norm']
     return {'h': accum}
-
-
-class NodeApplyModule(layers.Layer):
-    def __init__(self, out_feats, activation=None, bias=True):
-        super(NodeApplyModule, self).__init__()
-        if bias:
-            self.bias = self.add_weight(shape=(out_feats,),
-                                        initializer='he_uniform',
-                                        trainable=True)
-        else:
-            self.bias = None
-        self.activation = activation
-
-    def call(self, nodes):
-        h = nodes.data['h']
-        if self.bias is not None:
-            h = h + self.bias
-        if self.activation:
-            h = self.activation(h)
-        return {'h': h}
 
 
 class GCNLayer(layers.Layer):
@@ -49,21 +29,34 @@ class GCNLayer(layers.Layer):
                  bias=True):
         super(GCNLayer, self).__init__()
         self.g = g
-        self.weight = self.add_weight(shape=(in_feats, out_feats),
-                                      initializer='he_uniform',
-                                      trainable=True)
+
+        w_init = tf.random_normal_initializer()
+        self.weight = tf.Variable(initial_value=w_init(shape=(in_feats, out_feats),
+                                                       dtype='float32'),
+                                  trainable=True)
         if dropout:
             self.dropout = layers.Dropout(rate=dropout)
         else:
             self.dropout = 0.
-        self.node_update = NodeApplyModule(out_feats, activation, bias)
+        if bias:
+            b_init = tf.zeros_initializer()
+            self.bias = tf.Variable(initial_value=b_init(shape=(out_feats,),
+                                                         dtype='float32'),
+                                    trainable=True)
+        else:
+            self.bias = None
+        self.activation = activation
 
     def call(self, h):
         if self.dropout:
             h = self.dropout(h)
         self.g.ndata['h'] = tf.matmul(h, self.weight)
-        self.g.update_all(gcn_msg, gcn_reduce, self.node_update)
-        h = self.g.ndata.pop('h')
+        self.g.update_all(gcn_msg, gcn_reduce)
+        h = self.g.ndata['h']
+        if self.bias is not None:
+            h = h + self.bias
+        if self.activation:
+            h = self.activation(h)
         return h
 
 
@@ -78,6 +71,7 @@ class GCN(layers.Layer):
                  dropout):
         super(GCN, self).__init__()
         self.layers = []
+
         # input layer
         self.layers.append(
             GCNLayer(g, in_feats, n_hidden, activation, dropout))
@@ -115,8 +109,7 @@ def main(args):
     else:
         device = "/gpu:{}".format(args.gpu)
 
-    with tf.device("/cpu:0"):
-
+    with tf.device(device):
         features = tf.convert_to_tensor(data.features, dtype=tf.float32)
         labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
         train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
@@ -131,11 +124,10 @@ def main(args):
         #Train samples %d
         #Val samples %d
         #Test samples %d""" %
-            (n_edges, n_classes,
-                train_mask.numpy().sum(),
-                val_mask.numpy().sum(),
-                test_mask.numpy().sum()))
-
+              (n_edges, n_classes,
+               train_mask.numpy().sum(),
+               val_mask.numpy().sum(),
+               test_mask.numpy().sum()))
 
         # graph preprocess and calculate normalization factor
         g = data.graph
@@ -145,12 +137,10 @@ def main(args):
         g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
         # # normalization
-        degs = tf.cast(g.in_degrees(), dtype=tf.float32)
+        degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)
         norm = tf.math.pow(degs, -0.5)
         norm = tf.where(tf.math.is_inf(norm), tf.zeros_like(norm), norm)
-        # norm[tf.math.is_inf(norm)] = 0
-        # if cuda:
-        #     norm = norm.cuda()
+
         g.ndata['norm'] = tf.expand_dims(norm, -1)
 
         # create GCN model
@@ -162,22 +152,19 @@ def main(args):
                     tf.nn.relu,
                     args.dropout)
 
-        # if cuda:
-        #     model.cuda()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr, decay=args.weight_decay)
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=args.lr, decay=args.weight_decay)
 
-        loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
+        loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
+            from_logits=True)
         # initialize graph
         dur = []
-        
-    with tf.device(device):
         for epoch in range(args.n_epochs):
             if epoch >= 3:
                 t0 = time.time()
             # forward
             with tf.GradientTape() as tape:
-                logits = model(tf.cast(features, tf.float32))
+                logits = model(features)
                 loss_value = loss_fcn(labels[train_mask], logits[train_mask])
 
                 grads = tape.gradient(loss_value, model.trainable_weights)
@@ -188,10 +175,9 @@ def main(args):
 
             acc = evaluate(model, features, labels, val_mask)
             print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-                "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss_value.numpy().item(),
-                                                acc, n_edges / np.mean(dur) / 1000))
+                  "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss_value.numpy().item(),
+                                                 acc, n_edges / np.mean(dur) / 1000))                                        
 
-        print()
         acc = evaluate(model, features, labels, test_mask)
         print("Test Accuracy {:.4f}".format(acc))
 
