@@ -68,8 +68,10 @@ def evaluate(args, net, dataset, segment='valid'):
     num_edges = rating_values.shape[0]
     edges = mx.nd.arange(num_edges, dtype='int64')
     real_pred_ratings = []
-    for sample_idx in range(0, (num_edges + 1000 - 1) // 1000):
-        edge_ids = edges[sample_idx * 1000: (sample_idx + 1) * 1000 if (sample_idx + 1) * 1000 < num_edges else num_edges]
+
+    #for sample_idx in range(0, (num_edges + 1000 - 1) // 1000):
+    if True:
+        edge_ids = edges #edges[sample_idx * 1000: (sample_idx + 1) * 1000 if (sample_idx + 1) * 1000 < num_edges else num_edges]
         head_ids, tail_ids = dec_graph.find_edges(edge_ids)
 
         head_subgraphs = {}
@@ -100,16 +102,13 @@ def evaluate(args, net, dataset, segment='valid'):
         with mx.autograd.predict_mode():
             pred_ratings = net(head_subgraph, tail_subgraph,
                                true_head_idx, true_tail_idx)
-            real_pred_rating = (mx.nd.softmax(pred_ratings, axis=1) *
-                                nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
-            real_pred_ratings.append(real_pred_rating)
-            if sample_idx % 1000 == 0:
-                print("Eval idx={}".format(sample_idx))
+        real_pred_rating = (mx.nd.softmax(pred_ratings, axis=1) *
+                            nd_possible_rating_values.reshape((1, -1))).sum(axis=1)
+        real_pred_ratings.append(real_pred_rating)
 
     real_pred_ratings = mx.nd.concat(*real_pred_ratings, dim=0)
     rmse = mx.nd.square(real_pred_ratings - rating_values).mean().asscalar()
     rmse = np.sqrt(rmse)
-    print("rmse={}".format(rmse))
     return rmse
 
 def train(args):
@@ -125,10 +124,10 @@ def train(args):
     ### build the net
     net = Net(args=args)
     net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
-    #net.hybridize()
+    net.hybridize()
     nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
     rating_loss_net = gluon.loss.SoftmaxCELoss()
-    #rating_loss_net.hybridize()
+    rating_loss_net.hybridize()
     trainer = gluon.Trainer(net.collect_params(), args.train_optimizer, {'learning_rate': args.train_lr})
     print("Loading network finished ...\n")
 
