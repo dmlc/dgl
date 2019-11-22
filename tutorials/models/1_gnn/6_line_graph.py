@@ -101,7 +101,7 @@ intra_src = th.nonzero(src_labels == 0)
 print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 
 ###########################################################################################
-# Binary community sub-graph from Cora with a test dataset
+# Binary community subgraph from Cora with a test dataset
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Without loss of generality, in this tutorial you limit the scope of the
 # task to binary community detection.
