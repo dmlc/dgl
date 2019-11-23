@@ -48,7 +48,6 @@ class Net(Block):
         return pred_ratings
 
 def evaluate(args, net, dataset, segment='valid'):
-    print('eval now')
     g_user_fea = mx.nd.zeros((dataset.num_user))
     g_movie_fea = mx.nd.zeros((dataset.num_movie))
     possible_rating_values = dataset.possible_rating_values
@@ -69,22 +68,30 @@ def evaluate(args, net, dataset, segment='valid'):
     edges = mx.nd.arange(num_edges, dtype='int64')
     real_pred_ratings = []
 
-    #for sample_idx in range(0, (num_edges + 1000 - 1) // 1000):
-    if True:
-        edge_ids = edges #edges[sample_idx * 1000: (sample_idx + 1) * 1000 if (sample_idx + 1) * 1000 < num_edges else num_edges]
+    for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
+        edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges]
         head_ids, tail_ids = dec_graph.find_edges(edge_ids)
 
         head_subgraphs = {}
         tail_subgraphs = {}
+        head_node_ids = np.unique(head_ids.asnumpy())
+        tail_node_ids = np.unique(tail_ids.asnumpy())
         for i, rating in enumerate(args.rating_vals):
             t = enc_graph.canonical_etypes[i * 2]
             rev_t = enc_graph.canonical_etypes[i * 2 + 1]
 
-            head_in_edges = enc_graph.in_edges(head_ids, 'eid', etype=rev_t)
-            tail_in_edges = enc_graph.in_edges(tail_ids, 'eid', etype=t)
+            head_in_edges = enc_graph.in_edges(head_node_ids, 'eid', etype=rev_t)
+            tail_in_edges = enc_graph.in_edges(tail_node_ids, 'eid', etype=t)
 
-            head_subgraphs[rev_t] = head_in_edges
-            tail_subgraphs[t] = tail_in_edges
+            if head_in_edges.shape[0] == 0:
+                print('skip {} with 0'.format(rev_t))
+            else:
+                head_subgraphs[rev_t] = head_in_edges
+
+            if tail_in_edges.shape[0] == 0:
+                print('skip {} with 0'.format(t))
+            else:
+                tail_subgraphs[t] = tail_in_edges
 
         head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
         tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
@@ -151,7 +158,6 @@ def train(args):
     count_rmse = 0
     count_num = 0
     count_loss = 0
-    total_nodes = dataset.num_user + dataset.num_movie
 
     enc_graph = dataset.train_enc_graph
     g_user_fea = mx.nd.zeros((dataset.num_user,))
@@ -170,17 +176,18 @@ def train(args):
         edges = mx.nd.shuffle(seed)
         for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges]
-            #edge_ids = edges[0: args.minibatch_size]
-            head_ids, tail_ids = dataset.train_dec_graph.find_edges(edge_ids)
+            head_ids, tail_ids = dataset.train_dec_graph.find_edges(edge_ids.asnumpy())
 
             head_subgraphs = {}
             tail_subgraphs = {}
+            head_node_ids = np.unique(head_ids.asnumpy())
+            tail_node_ids = np.unique(tail_ids.asnumpy())
             for i, _ in enumerate(args.rating_vals):
                 t = enc_graph.canonical_etypes[i * 2]
                 rev_t = enc_graph.canonical_etypes[i * 2 + 1]
 
-                head_in_edges = enc_graph.in_edges(head_ids, 'eid', etype=rev_t)
-                tail_in_edges = enc_graph.in_edges(tail_ids, 'eid', etype=t)
+                head_in_edges = enc_graph.in_edges(head_node_ids, 'eid', etype=rev_t)
+                tail_in_edges = enc_graph.in_edges(tail_node_ids, 'eid', etype=t)
 
                 if head_in_edges.shape[0] == 0:
                     print('skip {} with 0'.format(rev_t))

@@ -128,7 +128,7 @@ class GCMCLayer(Block):
             New movie features
         """
         ifeat = head_graph.nodes['movie'].data[dgl.NID].as_in_context(ctx)
-        num_i = head_graph.number_of_nodes('user')
+        num_u = head_graph.number_of_nodes('user')
         funcs_head = {}
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating)
@@ -139,7 +139,7 @@ class GCMCLayer(Block):
 
         head_graph.multi_update_all(funcs_head, self.agg)
         ufeat = head_graph.nodes['user'].data.pop('h')
-        ufeat = ufeat.reshape((num_i, -1))
+        ufeat = ufeat.reshape((num_u, -1))
         ufeat = ufeat * head_graph.nodes['user'].data['ci']
         ufeat = self.agg_act(ufeat)
         ufeat = self.dropout(ufeat)
