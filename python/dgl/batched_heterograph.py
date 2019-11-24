@@ -2,7 +2,6 @@
 from collections.abc import Iterable
 
 from . import backend as F
-from . import graph_index
 from . import heterograph_index
 from .base import ALL, is_all
 from .frame import FrameRef, Frame

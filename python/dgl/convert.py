@@ -235,7 +235,13 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
         raise DGLError('Unsupported graph data type:', type(data))
 
 def hetero_from_relations(rel_graphs):
-    """Create a heterograph from per-relation graphs.
+    """Create a heterograph from graphs representing connections of each relation.
+
+    The input is a list of heterographs where the ``i``th graph contains edges of type
+    :math:`(s_i, e_i, d_i)`.
+
+    If two graphs share a same node type, the number of nodes for the corresponding type
+    should be the same. See **Examples** for details.
 
     Parameters
     ----------
@@ -247,8 +253,8 @@ def hetero_from_relations(rel_graphs):
     DGLHeteroGraph
         A heterograph consisting of all relations.
 
-    Notes
-    -----
+    Examples
+    --------
     For each node type, we expect each relation graph to have the same number of nodes
     with this type except for zero nodes. For example
 
@@ -261,9 +267,9 @@ def hetero_from_relations(rel_graphs):
     will raise an error as we have 3 nodes of type 'user' in follows_g and 4 nodes of type
     'user' in plays_g.
 
-    There are two possible workarounds.
+    We have two possible methods to avoid the construction.
 
-    **Workaround 1**: Manually specify the number of nodes for all types when constructing
+    **Method 1**: Manually specify the number of nodes for all types when constructing
     the relation graphs.
 
     >>> # A graph with 4 nodes of type 'user'
@@ -277,9 +283,9 @@ def hetero_from_relations(rel_graphs):
           num_edges={'follows': 2, 'plays': 2, 'develops': 2},
           metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
 
-    devs_g does not have nodes of type 'user' so no error will be raised.
+    ``devs_g`` does not have nodes of type ``'user'`` so no error will be raised.
 
-    **Workaround 2**: Construct a heterograph at once without intermediate relation graphs,
+    **Method 2**: Construct a heterograph at once without intermediate relation graphs,
     in which case we will infer the number of nodes for each type.
 
     >>> g = dgl.heterograph({
