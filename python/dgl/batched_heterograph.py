@@ -44,12 +44,40 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
 
     Examples
     --------
-    Create two :class:`~dgl.DGLHeteroGraph` objects.
-
-    **Instantiation:**
 
     >>> import dgl
     >>> import torch as th
+
+    **Example 1**
+
+    We start with a simplest example.
+
+    >>> # Create the first graph and set features for nodes of type 'user'
+    >>> g1 = dgl.heterograph({('user', 'plays', 'game'): [(0, 0), (1, 0)]})
+    >>> g1.nodes['user'].data['h1'] = th.tensor([[0.], [1.]])
+    >>> # Create the second graph and set features for nodes of type 'user'
+    >>> g2 = dgl.heterograph({('user', 'plays', 'game'): [(0, 0)]})
+    >>> g2.nodes['user'].data['h1'] = th.tensor([[0.]])
+    >>> # Batch the graphs
+    >>> bg = dgl.batch_hetero([g1, g2])
+
+    With the batching operation, the nodes and edges are re-indexed.
+
+    >>> bg.nodes('user')
+    tensor([0, 1, 2])
+
+    By default, we also copy and concatenate all the node and edge features.
+
+    >>> bg.nodes['user'].data['h1']
+    tensor([[0.],
+            [1.],
+            [0.]])
+
+    **Example 2**
+
+    We will now see a more complex example and the
+    various operations one can play with a batched graph.
+
     >>> g1 = dgl.heterograph({
     ...    ('user', 'follows', 'user'): [(0, 1), (1, 2)],
     ...    ('user', 'plays', 'game'): [(0, 0), (1, 0)]
@@ -74,23 +102,16 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
     >>> # For edge types, only canonical edge types are allowed to avoid ambiguity.
     >>> bg = dgl.batch_hetero([g1, g2], node_attrs={'user': ['h1', 'h2'], 'game': None},
     ...                       edge_attrs={('user', 'plays', 'game'): 'h1'})
+    >>> list(bg.nodes['user'].data.keys())
+    ['h1', 'h2']
+    >>> list(bg.nodes['game'].data.keys())
+    []
+    >>> list(bg.edges['follows'].data.keys())
+    []
+    >>> list(bg.edges['plays'].data.keys())
+    ['h1']
 
-    Below one can see that the nodes are re-indexed. The edges are re-indexed in
-    the same way.
-
-    >>> bg.nodes('user')
-    tensor([0, 1, 2, 3, 4, 5])
-    >>> bg.nodes['user'].data['h1']
-    tensor([[0.],
-            [1.],
-            [2.],
-            [0.],
-            [1.],
-            [2.]])
-
-    **Property:**
-
-    We can still get a brief summary of the graphs that constitute the batched graph.
+    We can get a brief summary of the graphs that constitute the batched graph.
 
     >>> bg.batch_size
     2
@@ -98,8 +119,6 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
     [3, 3]
     >>> bg.batch_num_edges(('user', 'plays', 'game'))
     [2, 2]
-
-    **Update Attributes:**
 
     Updating the attributes of the batched graph has no effect on the original graphs.
 
@@ -213,9 +232,7 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
                 edge_frames.append(FrameRef(Frame(cols)))
 
         # Create graph index for the batched graph
-        src, dst, _ = graph_list[0]._graph.metagraph.edges()
-        meta_edges = list(zip(list(src.tonumpy()), list(dst.tonumpy())))
-        metagraph = graph_index.from_edge_list(meta_edges, True, True)
+        metagraph = graph_list[0]._graph.metagraph
         batched_index = heterograph_index.disjoint_union(
             metagraph, [g._graph for g in graph_list])
         super(BatchedDGLHeteroGraph, self).__init__(gidx=batched_index,
