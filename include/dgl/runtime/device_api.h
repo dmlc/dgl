@@ -28,7 +28,7 @@ enum DeviceAttrKind : int {
 };
 
 /*! \brief Number of bytes each allocation must align to */
-constexpr int kAllocAlignment = 64;
+static int kAllocAlignment = 64;
 
 /*! \brief Number of bytes each allocation must align to in temporary allocation */
 constexpr int kTempAllocaAlignment = 64;
