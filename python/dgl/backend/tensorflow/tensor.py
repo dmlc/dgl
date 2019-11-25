@@ -1,3 +1,4 @@
+
 from __future__ import absolute_import
 
 from distutils.version import LooseVersion
@@ -33,7 +34,6 @@ def data_type_dict():
 
 def cpu():
     return "/cpu:0"
-    # return tf.DeviceSpec.from_string('/job:localhost/replica:0/task:0/device:CPU:0')
 
 
 def tensor(data, dtype=None):
@@ -85,7 +85,6 @@ def ndim(input):
 
 def context(input):
     return input.device
-    # return tf.DeviceSpec.from_string(input.device)
 
 
 def device_type(ctx):
@@ -215,9 +214,6 @@ def narrow_row(x, start, stop):
 
 
 def scatter_row(data, row_index, value):
-    # ndim = data.ndim
-    # assert ndim == 2
-    # for i in range(ndim - 1):
     row_index = tf.expand_dims(row_index, 1)
     return tf.tensor_scatter_nd_update(data, row_index, value)
 
@@ -342,8 +338,13 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop):
-    return tf.range(start, stop, dtype=tf.int64)
+def arange(start, stop, ctx=None):
+    if ctx is None:
+        return tf.range(start, stop, dtype=tf.int64)
+    else:
+        with tf.device(ctx):
+            t = tf.range(start, stop, dtype=tf.int64)
+        return t
 
 
 def rand_shuffle(arr):
