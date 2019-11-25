@@ -10,9 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch.conv import GINConv
-
-import dgl
-import dgl.function as fn
+from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 
 
 class ApplyNodeFunc(nn.Module):
@@ -77,16 +75,16 @@ class MLP(nn.Module):
         else:
             # If MLP
             h = x
-            for layer in range(self.num_layers - 1):
-                h = F.relu(self.batch_norms[layer](self.linears[layer](h)))
-            return self.linears[self.num_layers - 1](h)
+            for i in range(self.num_layers - 1):
+                h = F.relu(self.batch_norms[i](self.linears[i](h)))
+            return self.linears[-1](h)
 
 
 class GIN(nn.Module):
     """GIN model"""
     def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim,
                  output_dim, final_dropout, learn_eps, graph_pooling_type,
-                 neighbor_pooling_type, device):
+                 neighbor_pooling_type):
         """model parameters setting
 
         Paramters
@@ -110,15 +108,10 @@ class GIN(nn.Module):
             how to aggregate neighbors (sum, mean, or max)
         graph_pooling_type: str
             how to aggregate entire nodes in a graph (sum, mean or max)
-        device: str
-            which device to use
 
         """
         super(GIN, self).__init__()
-        self.final_dropout = final_dropout
-        self.device = device
         self.num_layers = num_layers
-        self.graph_pooling_type = graph_pooling_type
         self.learn_eps = learn_eps
 
         # List of MLPs
@@ -147,36 +140,32 @@ class GIN(nn.Module):
                 self.linears_prediction.append(
                     nn.Linear(hidden_dim, output_dim))
 
-    def forward(self, g):
-        h = g.ndata['attr']
-        h = h.to(self.device)
+        self.drop = nn.Dropout(final_dropout)
 
+        if graph_pooling_type == 'sum':
+            self.pool = SumPooling()
+        elif graph_pooling_type == 'mean':
+            self.pool = AvgPooling()
+        elif graph_pooling_type == 'max':
+            self.pool = MaxPooling()
+        else:
+            raise NotImplementedError
+
+    def forward(self, g, h):
         # list of hidden representation at each layer (including input)
         hidden_rep = [h]
 
-        for layer in range(self.num_layers - 1):
-            h = self.ginlayers[layer](g, h)
-            h = self.batch_norms[layer](h)
+        for i in range(self.num_layers - 1):
+            h = self.ginlayers[i](g, h)
+            h = self.batch_norms[i](h)
             h = F.relu(h)
             hidden_rep.append(h)
 
         score_over_layer = 0
 
         # perform pooling over all nodes in each graph in every layer
-        for layer, h in enumerate(hidden_rep):
-            g.ndata['h'] = h
-            if self.graph_pooling_type == 'sum':
-                pooled_h = dgl.sum_nodes(g, 'h')
-            elif self.graph_pooling_type == 'mean':
-                pooled_h = dgl.mean_nodes(g, 'h')
-            elif self.graph_pooling_type == 'max':
-                pooled_h = dgl.max_nodes(g, 'h')
-            else:
-                raise NotImplementedError()
-
-            score_over_layer += F.dropout(
-                self.linears_prediction[layer](pooled_h),
-                self.final_dropout,
-                training=self.training)
+        for i, h in enumerate(hidden_rep):
+            pooled_h = self.pool(g, h)
+            score_over_layer += self.drop(self.linears_prediction[i](pooled_h))
 
         return score_over_layer

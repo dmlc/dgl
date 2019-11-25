@@ -12,7 +12,6 @@ class EdgeConv(nn.Module):
     <https://arxiv.org/pdf/1801.07829>`__".  Can be described as follows:
 
     .. math::
-
        x_i^{(l+1)} = \max_{j \in \mathcal{N}(i)} \mathrm{ReLU}(
        \Theta \cdot (x_j^{(l)} - x_i^{(l)}) + \Phi \cdot x_i^{(l)})
 
@@ -27,7 +26,10 @@ class EdgeConv(nn.Module):
     batch_norm : bool
         Whether to include batch normalization on messages.
     """
-    def __init__(self, in_feat, out_feat, batch_norm=False):
+    def __init__(self,
+                 in_feat,
+                 out_feat,
+                 batch_norm=False):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
 

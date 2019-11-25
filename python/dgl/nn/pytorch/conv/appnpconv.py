@@ -4,7 +4,6 @@ import torch as th
 from torch import nn
 
 from .... import function as fn
-from ..utils import Identity
 
 
 class APPNPConv(nn.Module):
@@ -35,7 +34,7 @@ class APPNPConv(nn.Module):
         super(APPNPConv, self).__init__()
         self._k = k
         self._alpha = alpha
-        self.edge_drop = nn.Dropout(edge_drop) if edge_drop > 0 else Identity()
+        self.edge_drop = nn.Dropout(edge_drop)
 
     def forward(self, graph, feat):
         r"""Compute APPNP layer.
@@ -56,10 +55,11 @@ class APPNPConv(nn.Module):
         """
         graph = graph.local_var()
         norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
-        norm = norm.unsqueeze(-1).to(feat.device)
+        shp = norm.shape + (1,) * (feat.dim() - 1)
+        norm = th.reshape(norm, shp).to(feat.device)
         feat_0 = feat
         for _ in range(self._k):
-            # normalization by src
+            # normalization by src node
             feat = feat * norm
             graph.ndata['h'] = feat
             graph.edata['w'] = self.edge_drop(
@@ -67,7 +67,7 @@ class APPNPConv(nn.Module):
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                              fn.sum('m', 'h'))
             feat = graph.ndata.pop('h')
-            # normalization by dst
+            # normalization by dst node
             feat = feat * norm
             feat = (1 - self._alpha) * feat + self._alpha * feat_0
         return feat

@@ -8,12 +8,8 @@ from dgl.data import PPIDataset
 from dgl.data import load_data as _load_data
 from sklearn.metrics import f1_score
 
-
 class Logger(object):
-    '''
-        A custom logger to log stdout to a logging file.
-    '''
-
+    '''A custom logger to log stdout to a logging file.'''
     def __init__(self, path):
         """Initialize the logger.
 
@@ -30,7 +26,6 @@ class Logger(object):
         print(s)
         return
 
-
 def arg_list(labels):
     hist, indexes, inverse, counts = np.unique(
         labels, return_index=True, return_counts=True, return_inverse=True)
@@ -38,7 +33,6 @@ def arg_list(labels):
     for h in hist:
         li.append(np.argwhere(inverse == h))
     return li
-
 
 def save_log_dir(args):
     log_dir = './log/{}/{}'.format(args.dataset, args.note)
@@ -54,7 +48,6 @@ def calc_f1(y_true, y_pred, multitask):
     return f1_score(y_true, y_pred, average="micro"), \
         f1_score(y_true, y_pred, average="macro")
 
-
 def evaluate(model, g, labels, mask, multitask=False):
     model.eval()
     with torch.no_grad():
@@ -65,11 +58,8 @@ def evaluate(model, g, labels, mask, multitask=False):
                                  logits.cpu().numpy(), multitask)
         return f1_mic, f1_mac
 
-
 def load_data(args):
-    '''
-        wraps the dgl's load_data utility to handle ppi special case
-    '''
+    '''Wraps the dgl's load_data utility to handle ppi special case'''
     if args.dataset != 'ppi':
         return _load_data(args)
     train_dataset = PPIDataset('train')

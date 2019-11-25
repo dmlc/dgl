@@ -32,7 +32,7 @@ class GMMConv(nn.Module):
     aggregator_type : str
         Aggregator type (``sum``, ``mean``, ``max``).
     residual : bool
-        If True, use residual connection inside this layer.
+        If True, use residual connection inside this layer. Default: ``False``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     """
@@ -41,8 +41,8 @@ class GMMConv(nn.Module):
                  out_feats,
                  dim,
                  n_kernels,
-                 aggregator_type,
-                 residual=True,
+                 aggregator_type='sum',
+                 residual=False,
                  bias=True):
         super(GMMConv, self).__init__()
         self._in_feats = in_feats
@@ -82,7 +82,7 @@ class GMMConv(nn.Module):
         if isinstance(self.res_fc, nn.Linear):
             init.xavier_normal_(self.res_fc.weight, gain=gain)
         init.normal_(self.mu.data, 0, 0.1)
-        init.normal_(self.inv_sigma.data, 1, 0.1)
+        init.constant_(self.inv_sigma.data, 1)
         if self.bias is not None:
             init.zeros_(self.bias.data)
 
