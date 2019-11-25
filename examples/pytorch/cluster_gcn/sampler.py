@@ -2,17 +2,15 @@ import os
 import random
 
 import dgl.function as fn
-import numpy as np
 import torch
 
 from partition_utils import *
 
 
 class ClusterIter(object):
+    '''The partition sampler given a DGLGraph and partition number.
+    The metis is used as the graph partition backend.
     '''
-        The partition sampler given a DGLGraph and partition number. The metis is used as the graph partition backend.
-    '''
-
     def __init__(self, dn, g, psize, batch_size, seed_nid, use_pp=True):
         """Initialize the sampler.
 
@@ -65,8 +63,7 @@ class ClusterIter(object):
         with torch.no_grad():
             g.update_all(fn.copy_src(src='features', out='m'),
                          fn.sum(msg='m', out='features'),
-                         None
-                         )
+                         None)
             pre_feats = g.ndata['features'] * norm
             # use graphsage embedding aggregation style
             g.ndata['features'] = torch.cat([features, pre_feats], dim=1)

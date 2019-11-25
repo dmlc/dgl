@@ -1752,12 +1752,12 @@ class DGLHeteroGraph(object):
         rel_graphs = [self._graph.get_relation_graph(i) for i in etype_ids]
         meta_src = meta_src.tonumpy()
         meta_dst = meta_dst.tonumpy()
-        induced_ntype_ids = list(set(meta_src) | set(meta_dst))
-        mapped_meta_src = [induced_ntype_ids[v] for v in meta_src]
-        mapped_meta_dst = [induced_ntype_ids[v] for v in meta_dst]
-        node_frames = [self._node_frames[i] for i in induced_ntype_ids]
+        ntypes_invmap = {n: i for i, n in enumerate(set(meta_src) | set(meta_dst))}
+        mapped_meta_src = [ntypes_invmap[v] for v in meta_src]
+        mapped_meta_dst = [ntypes_invmap[v] for v in meta_dst]
+        node_frames = [self._node_frames[i] for i in ntypes_invmap]
         edge_frames = [self._edge_frames[i] for i in etype_ids]
-        induced_ntypes = [self._ntypes[i] for i in induced_ntype_ids]
+        induced_ntypes = [self._ntypes[i] for i in ntypes_invmap]
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
 
         metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)

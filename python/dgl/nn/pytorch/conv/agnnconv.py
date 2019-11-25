@@ -58,8 +58,8 @@ class AGNNConv(nn.Module):
         graph.ndata['h'] = feat
         graph.ndata['norm_h'] = F.normalize(feat, p=2, dim=-1)
         # compute cosine distance
-        graph.apply_edges(fn.u_mul_v('norm_h', 'norm_h', 'cos'))
-        cos = graph.edata.pop('cos').sum(-1)
+        graph.apply_edges(fn.u_dot_v('norm_h', 'norm_h', 'cos'))
+        cos = graph.edata.pop('cos')
         e = self.beta * cos
         graph.edata['p'] = edge_softmax(graph, e)
         graph.update_all(fn.u_mul_e('h', 'p', 'm'), fn.sum('m', 'h'))

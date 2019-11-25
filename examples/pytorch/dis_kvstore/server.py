@@ -3,6 +3,7 @@
 import dgl
 import torch
 import argparse
+import torch as th
 
 server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
 
@@ -11,6 +12,8 @@ def start_server(args):
         server_id=args.id, 
         client_namebook=client_namebook, 
         server_addr=server_namebook[args.id])
+
+    server.init_data(name='server_embed', data_tensor=th.tensor([0., 0., 0., 0., 0.]))
 
     server.start()
 
