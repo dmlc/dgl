@@ -207,7 +207,6 @@ class MovieLens(object):
                 rst += graph.number_of_edges(str(r))
             return rst
 
-        self._train_npairs = _npairs(self.train_enc_graph)
         print("Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
             self.train_enc_graph.number_of_nodes('user'), self.train_enc_graph.number_of_nodes('movie'),
             _npairs(self.train_enc_graph)))
@@ -304,11 +303,6 @@ class MovieLens(object):
     @property
     def num_user(self):
         return self._num_user
-
-    @property
-    def train_npairs(self):
-        return self._train_npairs
-    
 
     @property
     def num_movie(self):

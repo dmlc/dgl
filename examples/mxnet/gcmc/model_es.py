@@ -112,19 +112,20 @@ class GCMCLayer(Block):
 
         Parameters
         ----------
-        graph : DGLHeteroGraph
-            User-movie rating graph. It should contain two node types: "user"
-            and "movie" and many edge types each for one rating value.
-        ufeat : mx.nd.NDArray, optional
-            User features. If None, using an identity matrix.
-        ifeat : mx.nd.NDArray, optional
-            Movie features. If None, using an identity matrix.
+        head_graph : DGLHeteroGraph(bi-partite)
+            Movie-User rev-rating graph. It should contain two node types: "user"
+            and "movie" and only containers rev-rating edge types. Used for generating
+            embedding for users within minibatch
+        tail_graph : DGLHeteroGraph(bi-partite)
+            User-Movie rating graph. It should contain two node types: "user" 
+            and "movie" and only containers rating edge types. Used for generating 
+            embedding for movies within minibatch
 
         Returns
         -------
-        new_ufeat : mx.nd.NDArray
+        head_feat : mx.nd.NDArray
             New user features
-        new_ifeat : mx.nd.NDArray
+        tail_feat : mx.nd.NDArray
             New movie features
         """
         ifeat = head_graph.nodes['movie'].data[dgl.NID].as_in_context(ctx)

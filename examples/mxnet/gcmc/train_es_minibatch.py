@@ -83,14 +83,10 @@ def evaluate(args, net, dataset, segment='valid'):
             head_in_edges = enc_graph.in_edges(head_node_ids, 'eid', etype=rev_t)
             tail_in_edges = enc_graph.in_edges(tail_node_ids, 'eid', etype=t)
 
-            if head_in_edges.shape[0] == 0:
-                print('skip {} with 0'.format(rev_t))
-            else:
+            if head_in_edges.shape[0] > 0:
                 head_subgraphs[rev_t] = head_in_edges
 
-            if tail_in_edges.shape[0] == 0:
-                print('skip {} with 0'.format(t))
-            else:
+            if tail_in_edges.shape[0] > 0:
                 tail_subgraphs[t] = tail_in_edges
 
         head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
@@ -132,7 +128,6 @@ def train(args):
     net = Net(args=args)
     net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
     net.hybridize()
-    nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
     rating_loss_net = gluon.loss.SoftmaxCELoss()
     rating_loss_net.hybridize()
     trainer = gluon.Trainer(net.collect_params(), args.train_optimizer, {'learning_rate': args.train_lr})
@@ -154,12 +149,9 @@ def train(args):
     best_valid_rmse = np.inf
     no_better_valid = 0
     best_iter = -1
-    avg_gnorm = 0
-    count_rmse = 0
-    count_num = 0
-    count_loss = 0
 
     enc_graph = dataset.train_enc_graph
+    nd_possible_rating_values = mx.nd.array(dataset.possible_rating_values, ctx=args.ctx, dtype=np.float32)
     g_user_fea = mx.nd.zeros((dataset.num_user,))
     g_movie_fea = mx.nd.zeros((dataset.num_movie,))
     train_truths = dataset.train_truths
@@ -174,6 +166,7 @@ def train(args):
         num_edges = dataset.train_truths.shape[0]
         seed = mx.nd.arange(num_edges, dtype='int64')
         edges = mx.nd.shuffle(seed)
+        # each iteration will go through all edges
         for sample_idx in range(0, (num_edges + args.minibatch_size - 1) // args.minibatch_size):
             edge_ids = edges[sample_idx * args.minibatch_size: (sample_idx + 1) * args.minibatch_size if (sample_idx + 1) * args.minibatch_size < num_edges else num_edges]
             head_ids, tail_ids = dataset.train_dec_graph.find_edges(edge_ids.asnumpy())
@@ -189,14 +182,10 @@ def train(args):
                 head_in_edges = enc_graph.in_edges(head_node_ids, 'eid', etype=rev_t)
                 tail_in_edges = enc_graph.in_edges(tail_node_ids, 'eid', etype=t)
 
-                if head_in_edges.shape[0] == 0:
-                    print('skip {} with 0'.format(rev_t))
-                else:
+                if head_in_edges.shape[0] > 0:
                     head_subgraphs[rev_t] = head_in_edges
 
-                if tail_in_edges.shape[0] == 0:
-                    print('skip {} with 0'.format(t))
-                else:
+                if tail_in_edges.shape[0] > 0:
                     tail_subgraphs[t] = tail_in_edges
 
             head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
@@ -231,7 +220,6 @@ def train(args):
                                   loss=loss, rmse=rmse)
                 print("Iter={}, sample_idx={}, gnorm={:.3f}, loss={:.4f}, rmse={:.4f}".format(iter_idx,
                     sample_idx, gnorm, loss, rmse))
-
             gc.collect()
 
         if iter_idx > 3:
