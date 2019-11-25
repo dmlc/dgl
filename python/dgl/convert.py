@@ -255,8 +255,6 @@ def hetero_from_relations(rel_graphs):
 
     Examples
     --------
-    For each node type, we expect each relation graph to have the same number of nodes
-    with this type except for zero nodes. For example
 
     >>> import dgl
     >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
@@ -280,7 +278,8 @@ def hetero_from_relations(rel_graphs):
     >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
     >>> print(g)
     Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
-          num_edges={'follows': 2, 'plays': 2, 'develops': 2},
+          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2,
+                     ('developer', 'develops', 'game'): 2},
           metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
 
     ``devs_g`` does not have nodes of type ``'user'`` so no error will be raised.
@@ -295,7 +294,9 @@ def hetero_from_relations(rel_graphs):
     >>> })
     >>> print(g)
     Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
-          num_edges={'follows': 2, 'plays': 2, 'develops': 2},
+          num_edges={('user', 'follows', 'user'): 2,
+                     ('user', 'plays', 'game'): 2,
+                     ('developer', 'develops', 'game'): 2},
           metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
     """
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
@@ -463,18 +464,18 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     >>> hetero_g = dgl.hetero_from_relations([g1, g2])
     >>> print(hetero_g)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-        num_edges={'develops': 2},
-        metagraph=[('user', 'activity'), ('developer', 'game')])
+          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'activity'), ('developer', 'game')])
 
     We first convert the heterogeneous graph to a homogeneous graph.
 
     >>> homo_g = dgl.to_homo(hetero_g)
     >>> print(homo_g)
     Graph(num_nodes=9, num_edges=4,
-        ndata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
-                       '_ID': Scheme(shape=(), dtype=torch.int64)}
-        edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
-                       '_ID': Scheme(shape=(), dtype=torch.int64)})
+          ndata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> homo_g.ndata
     {'_TYPE': tensor([0, 0, 1, 1, 1, 2, 2, 3, 3]), '_ID': tensor([0, 1, 0, 1, 2, 0, 1, 0, 1])}
     Nodes 0, 1 for 'user', 2, 3, 4 for 'activity', 5, 6 for 'developer', 7, 8 for 'game'
@@ -487,8 +488,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     >>> hetero_g_2 = dgl.to_hetero(homo_g, hetero_g.ntypes, hetero_g.etypes)
     >>> print(hetero_g_2)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-        num_edges={'develops': 2},
-        metagraph=[('user', 'activity'), ('developer', 'game')])
+          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'activity'), ('developer', 'game')])
 
     See Also
     --------

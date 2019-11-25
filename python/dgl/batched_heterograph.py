@@ -140,55 +140,45 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
         ref_etypes = ref_graph.etypes
         for i in range(1, len(graph_list)):
             g_i = graph_list[i]
-            g_i_canonical_etypes = g_i.canonical_etypes
-            g_i_ntypes = g_i.ntypes
-            assert len(g_i_canonical_etypes) == len(ref_canonical_etypes), \
-                'Got different numbers of canonical etypes for graphs in the same batch.'
-            assert len(g_i_ntypes) == len(ref_ntypes), \
-                'Got different number of node types for graphs in the same batch.'
-            for tid, ety in enumerate(ref_canonical_etypes):
-                assert ety == g_i_canonical_etypes[tid], \
-                    'Got different canonical etype with id {:d} ' \
-                    'for graphs in the same batch.'.format(tid)
-            for tid, nty in enumerate(ref_ntypes):
-                assert nty == g_i_ntypes[tid], \
-                    'Got different node type with id {:d} ' \
-                    'for graphs in the same batch.'.format(tid)
+            assert g_i.ntypes == ref_ntypes, \
+                'The node types of graph {:d} and {:d} should be the same.'.format(0, i)
+            assert g_i.canonical_etypes == ref_canonical_etypes, \
+                'The canonical edge types of graph {:d} and {:d} should be the same.'.format(0, i)
 
-        # Merge node and edge frames
-        def _get_num_item_and_attr_types(g, mode, mode_type):
-            if mode == 'node':
-                num_items = g.number_of_nodes(mode_type)
-                attr_types = set(g.node_attr_schemes(mode_type).keys())
-            elif mode == 'edge':
-                num_items = g.number_of_edges(mode_type)
-                attr_types = set(g.edge_attr_schemes(mode_type).keys())
-            return num_items, attr_types
+        # Sanity check. Make sure all graphs have same
+        # node/edge features in terns of name and size.
+        for nty in ref_ntypes:
+            ref_feats_nty = set(ref_graph.node_attr_schemes(nty).keys())
+            for i in range(1, len(graph_list)):
+                assert ref_feats_nty == set(graph_list[i].node_attr_schemes(nty).keys()), \
+                    'The node features of graph {:d} and {:d} for ' \
+                    'node type {} should be the same.'.format(0, i, nty)
+                for nfeats in ref_feats_nty:
+                    assert ref_graph.node_attr_schemes(nty)[nfeats] == \
+                           graph_list[i].node_attr_schemes(nty)[nfeats], \
+                        'For graph {:d} and {:d}, the size and dtype for feature ' \
+                        '{} of {}-typed nodes should be the same.'.format(0, i, nfeats, nty)
+
+        for ety in ref_canonical_etypes:
+            ref_feats_ety = set(ref_graph.edge_attr_schemes(ety).keys())
+            for i in range(1, len(graph_list)):
+                assert ref_feats_ety == set(graph_list[i].edge_attr_schemes(ety).keys()), \
+                    'The edge features of graph {:d} and {:d} for ' \
+                    'edge type {} should be the same.'.format(0, i, ety)
+                for efeats in ref_feats_ety:
+                    assert ref_graph.edge_attr_schemes(ety)[efeats] == \
+                           graph_list[i].edge_attr_schemes(ety)[efeats], \
+                        'For graph {:d} and {:d}, the size and dtype for feature ' \
+                        '{} of {}-typed edge should be the same.'.format(0, i, efeats, ety)
 
         def _init_attrs(types, attrs, mode):
-            formatted_attrs = {t: set() for t in types}
+            formatted_attrs = {t: [] for t in types}
             if is_all(attrs):
-                ref_g_indices = dict()
                 for typ in types:
-                    # Check if at least a graph has mode items and
-                    # associated features for a particular type.
-                    for i, g in enumerate(graph_list):
-                        g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, typ)
-                        if g_num_items > 0 and len(g_attrs) > 0:
-                            formatted_attrs[typ] = g_attrs
-                            ref_g_indices[typ] = i
-                            break
-                for typ in types:
-                    # Check if all the graphs with mode items of a particular type
-                    # have the same associated features.
-                    if len(formatted_attrs[typ]) > 0:
-                        for i, g in enumerate(graph_list):
-                            g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode, typ)
-                            if g_attrs != formatted_attrs[typ] and g_num_items > 0:
-                                raise ValueError(
-                                    'Expect graph {0} and {1} to have the same {2} attributes '
-                                    'for type {3} when {2}_attrs=ALL, got {4} and {5}.'.format(
-                                        ref_g_indices[typ], i, mode, typ, attrs, g_attrs))
+                    if mode == 'node':
+                        formatted_attrs[typ] = list(ref_graph.node_attr_schemes(typ).keys())
+                    elif mode == 'edge':
+                        formatted_attrs[typ] = list(ref_graph.edge_attr_schemes(typ).keys())
             elif isinstance(attrs, dict):
                 for typ, v in attrs.items():
                     if isinstance(v, str):
