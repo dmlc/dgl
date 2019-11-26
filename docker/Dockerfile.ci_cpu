@@ -25,3 +25,6 @@ RUN bash /install/ubuntu_install_mxnet_cpu.sh
 
 COPY install/ubuntu_install_tensorflow.sh /install/ubuntu_install_tensorflow.sh
 RUN bash /install/ubuntu_install_tensorflow.sh
+
+COPY install/ubuntu_install_tfdlpack_cpu.sh /install/ubuntu_install_tfdlpack_cpu.sh
+RUN bash /install/ubuntu_install_tfdlpack_cpu.sh

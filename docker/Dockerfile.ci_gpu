@@ -26,6 +26,9 @@ RUN bash /install/ubuntu_install_mxnet_gpu.sh
 COPY install/ubuntu_install_tensorflow.sh /install/ubuntu_install_tensorflow.sh
 RUN bash /install/ubuntu_install_tensorflow.sh
 
+COPY install/ubuntu_install_tfdlpack_cpu.sh /install/ubuntu_install_tfdlpack_gpu.sh
+RUN bash /install/ubuntu_install_tfdlpack_gpu.sh
+
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
 ENV PATH=/usr/local/cuda/bin:${PATH}
