@@ -163,7 +163,6 @@ class BatchedDGLGraph(DGLGraph):
                 # Check if all the graphs with mode items have the same associated features.
                 if len(attrs) > 0:
                     for i, g in enumerate(graph_list):
-                        g = graph_list[i]
                         g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
                         if g_attrs != attrs and g_num_items > 0:
                             raise ValueError('Expect graph {0} and {1} to have the same {2} '
@@ -345,7 +344,7 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     Returns
     -------
     BatchedDGLGraph
-        one single batched graph
+        One single batched graph
 
     See Also
     --------
