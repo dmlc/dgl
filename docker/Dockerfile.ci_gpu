@@ -26,7 +26,7 @@ RUN bash /install/ubuntu_install_mxnet_gpu.sh
 COPY install/ubuntu_install_tensorflow.sh /install/ubuntu_install_tensorflow.sh
 RUN bash /install/ubuntu_install_tensorflow.sh
 
-COPY install/ubuntu_install_tfdlpack_cpu.sh /install/ubuntu_install_tfdlpack_gpu.sh
+COPY install/ubuntu_install_tfdlpack_gpu.sh /install/ubuntu_install_tfdlpack_gpu.sh
 RUN bash /install/ubuntu_install_tfdlpack_gpu.sh
 
 # Environment variables
