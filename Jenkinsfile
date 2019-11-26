@@ -186,6 +186,36 @@ pipeline {
             }
           }
         }
+        stage("Tensorflow CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "cpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+        stage("Tensorflow GPU") {
+          agent { docker { image "dgllib/dgl-ci-gpu" } }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "gpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
         stage("Torch CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
