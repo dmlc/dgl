@@ -8,6 +8,7 @@ API Reference
    heterograph
    init
    batch
+   batch_heterograph
    function
    traversal
    propagate
