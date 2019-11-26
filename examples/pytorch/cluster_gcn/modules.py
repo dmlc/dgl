@@ -78,15 +78,15 @@ class GraphSAGE(nn.Module):
         self.layers = nn.ModuleList()
 
         # input layer
-        self.layers.append(GCNLayerSAGE(in_feats, n_hidden, activation=activation,
+        self.layers.append(GraphSAGELayer(in_feats, n_hidden, activation=activation,
                                         dropout=dropout, use_pp=use_pp, use_lynorm=True))
         # hidden layers
         for i in range(n_layers - 1):
             self.layers.append(
-                GCNLayerSAGE(n_hidden, n_hidden, activation=activation, dropout=dropout,
+                GraphSAGELayer(n_hidden, n_hidden, activation=activation, dropout=dropout,
                              use_pp=False, use_lynorm=True))
         # output layer
-        self.layers.append(GCNLayerSAGE(n_hidden, n_classes, activation=None,
+        self.layers.append(GraphSAGELayer(n_hidden, n_classes, activation=None,
                                         dropout=dropout, use_pp=False, use_lynorm=False))
 
     def forward(self, g):
