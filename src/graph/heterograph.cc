@@ -317,6 +317,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
 
       // Loop over all edges
       for (size_t j = 0; j < num_edges; ++j) {
+        // TODO(mufei): Should use array operations to implement this.
         result_src.push_back(edges_src_data[j] + src_offset);
         result_dst.push_back(edges_dst_data[j] + dst_offset);
       }
@@ -391,6 +392,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
       std::vector<dgl_id_t> result_src, result_dst;
       // Loop over the chunk of edges for the specified graph and edge type
       for (uint64_t e = edge_cumsum[etype][g]; e < edge_cumsum[etype][g + 1]; ++e) {
+        // TODO(mufei): Should use array operations to implement this.
         result_src.push_back(edges_src_data[e] - vertex_cumsum[src_vtype][g]);
         result_dst.push_back(edges_dst_data[e] - vertex_cumsum[dst_vtype][g]);
       }

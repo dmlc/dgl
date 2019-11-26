@@ -49,7 +49,7 @@ class BatchedDGLHeteroGraph(DGLHeteroGraph):
 
     **Example 1**
 
-    We start with a simplest example.
+    We start with a simple example.
 
     >>> # Create the first graph and set features for nodes of type 'user'
     >>> g1 = dgl.heterograph({('user', 'plays', 'game'): [(0, 0), (1, 0)]})
