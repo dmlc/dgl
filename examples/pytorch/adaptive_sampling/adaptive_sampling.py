@@ -47,7 +47,6 @@ config = {
     'batch_size': 256,
     ##sample size for each layer during test
     'test_batch_size': 64,
-    'test_layer_ratio': 8,
     'test_layer_sizes': [64 * 8, 64 * 8],
 }
 
@@ -381,7 +380,7 @@ class AdaptGraphSAGENet(nn.Module):
 
 def main(args):
     config.update(args)
-    config['layer_sizes'] = [int(config['batch_size'] * config['train_layer_ratio']) for _ in range(2)]
+    config['layer_sizes'] = [int(config['node_per_layer']) for _ in range(2)]
     # Create a sampler for training nodes and testing nodes
     train_sampler = NodeSampler(graph=trainG, seeds=train_nodes, batch_size=config['batch_size'])
     test_sampler = NodeSampler(graph=allG, seeds=test_nodes, batch_size=config['test_batch_size'])
@@ -441,8 +440,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Adaptive Sampling for CCN')
     parser.add_argument('-b', '--batch_size', type=int, default=256,
                         help='batch size')
-    parser.add_argument('-l', '--train_layer_ratio', type=float, default=1,
-                        help='the ratio of sampling size for each layer compared to batch size')
+    parser.add_argument('-l', '--node_per_layer', type=float, default=256,
+                        help='sampling size for each layer')
 
     args = parser.parse_args().__dict__
 

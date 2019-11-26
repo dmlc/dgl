@@ -8,6 +8,6 @@ The authors' implementation can be found [here](https://github.com/huangwb/AS-GC
 
 Test accuracy on cora dataset achieves 0.84 around 250 epochs when sample size is set to 256 for each layer.
 
-## Useage
+## Usage
 
-`python adaptive_sampling.py --batch_size 20  --train_layer_ratio 0.5`
+`python adaptive_sampling.py --batch_size 20  --node_per_layer 40`
