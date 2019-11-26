@@ -238,3 +238,25 @@ Currently three datasets are supported:
 
 .. autoclass:: dgl.data.chem.PubChemBioAssayAromaticity
     :members: __getitem__, __len__
+
+Dataset Splitting
+`````````````````
+
+We provide support for some common data splitting methods:
+
+* consecutive split
+* random split
+* molecular weight split
+* Bemis-Murcko scaffold split
+
+.. autoclass:: dgl.data.chem.ConsecutiveSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.RandomSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.MolecularWeightSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.ScaffoldSplitter
+    :members: train_val_test_split, k_fold_split

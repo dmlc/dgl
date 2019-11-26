@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-import dgl.backend as F
 import numpy as np
 import os
 import sys
