@@ -222,7 +222,8 @@ def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     return one_hot_encoding(atom.GetTotalDegree(), allowable_set, encode_unknown)
 
 def atom_total_degree(atom):
-    """
+    """The degree of an atom including Hs.
+
     See Also
     --------
     atom_degree
@@ -885,7 +886,7 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
 # DGLGraph Construction
 #################################################################
 
-def mol_to_graph(mol, graph_constructor, atom_featurizer, bond_featurizer):
+def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
 
     Parameters
@@ -894,12 +895,12 @@ def mol_to_graph(mol, graph_constructor, atom_featurizer, bond_featurizer):
         RDKit molecule holder
     graph_constructor : callable
         Takes an RDKit molecule as input and returns a DGLGraph
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
-        ndata for a DGLGraph.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
-        edata for a DGLGraph.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to
+        update ndata for a DGLGraph.
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to
+        update edata for a DGLGraph.
 
     Returns
     -------
@@ -910,11 +911,11 @@ def mol_to_graph(mol, graph_constructor, atom_featurizer, bond_featurizer):
     mol = rdmolops.RenumberAtoms(mol, new_order)
     g = graph_constructor(mol)
 
-    if atom_featurizer is not None:
-        g.ndata.update(atom_featurizer(mol))
+    if node_featurizer is not None:
+        g.ndata.update(node_featurizer(mol))
 
-    if bond_featurizer is not None:
-        g.edata.update(bond_featurizer(mol))
+    if edge_featurizer is not None:
+        g.edata.update(edge_featurizer(mol))
 
     return g
 
@@ -969,8 +970,8 @@ def construct_bigraph_from_mol(mol, add_self_loop=False):
     return g
 
 def mol_to_bigraph(mol, add_self_loop=False,
-                   atom_featurizer=None,
-                   bond_featurizer=None):
+                   node_featurizer=None,
+                   edge_featurizer=None):
     """Convert an RDKit molecule object into a bi-directed DGLGraph and featurize for it.
 
     Parameters
@@ -979,11 +980,11 @@ def mol_to_bigraph(mol, add_self_loop=False,
         RDKit molecule holder
     add_self_loop : bool
         Whether to add self loops in DGLGraphs. Default to False.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
 
     Returns
@@ -992,11 +993,11 @@ def mol_to_bigraph(mol, add_self_loop=False,
         Bi-directed DGLGraph for the molecule
     """
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
-                        atom_featurizer, bond_featurizer)
+                        node_featurizer, edge_featurizer)
 
 def smiles_to_bigraph(smiles, add_self_loop=False,
-                      atom_featurizer=None,
-                      bond_featurizer=None):
+                      node_featurizer=None,
+                      edge_featurizer=None):
     """Convert a SMILES into a bi-directed DGLGraph and featurize for it.
 
     Parameters
@@ -1005,11 +1006,11 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
         String of SMILES
     add_self_loop : bool
         Whether to add self loops in DGLGraphs. Default to False.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
 
     Returns
@@ -1018,7 +1019,7 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
         Bi-directed DGLGraph for the molecule
     """
     mol = Chem.MolFromSmiles(smiles)
-    return mol_to_bigraph(mol, add_self_loop, atom_featurizer, bond_featurizer)
+    return mol_to_bigraph(mol, add_self_loop, node_featurizer, edge_featurizer)
 
 def construct_complete_graph_from_mol(mol, add_self_loop=False):
     """Construct a complete graph with topology only for the molecule
@@ -1059,8 +1060,8 @@ def construct_complete_graph_from_mol(mol, add_self_loop=False):
     return g
 
 def mol_to_complete_graph(mol, add_self_loop=False,
-                          atom_featurizer=None,
-                          bond_featurizer=None):
+                          node_featurizer=None,
+                          edge_featurizer=None):
     """Convert an RDKit molecule into a complete DGLGraph and featurize for it.
 
     Parameters
@@ -1069,11 +1070,11 @@ def mol_to_complete_graph(mol, add_self_loop=False,
         RDKit molecule holder
     add_self_loop : bool
         Whether to add self loops in DGLGraphs. Default to False.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
 
     Returns
@@ -1082,11 +1083,11 @@ def mol_to_complete_graph(mol, add_self_loop=False,
         Complete DGLGraph for the molecule
     """
     return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
-                        atom_featurizer, bond_featurizer)
+                        node_featurizer, edge_featurizer)
 
 def smiles_to_complete_graph(smiles, add_self_loop=False,
-                             atom_featurizer=None,
-                             bond_featurizer=None):
+                             node_featurizer=None,
+                             edge_featurizer=None):
     """Convert a SMILES into a complete DGLGraph and featurize for it.
 
     Parameters
@@ -1095,11 +1096,11 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
         String of SMILES
     add_self_loop : bool
         Whether to add self loops in DGLGraphs. Default to False.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
 
     Returns
@@ -1108,4 +1109,4 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
         Complete DGLGraph for the molecule
     """
     mol = Chem.MolFromSmiles(smiles)
-    return mol_to_complete_graph(mol, add_self_loop, atom_featurizer, bond_featurizer)
+    return mol_to_complete_graph(mol, add_self_loop, node_featurizer, edge_featurizer)

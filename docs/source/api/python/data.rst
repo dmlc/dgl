@@ -224,11 +224,12 @@ If your dataset is stored in a ``.csv`` file, you may find it helpful to use
 .. autoclass:: dgl.data.chem.CSVDataset
     :members: __getitem__, __len__
 
-Currently three datasets are supported:
+Currently four datasets are supported:
 
 * Tox21
 * TencentAlchemyDataset
 * PubChemBioAssayAromaticity
+* PDBBind
 
 .. autoclass:: dgl.data.chem.Tox21
     :members: __getitem__, __len__, task_pos_weights
@@ -238,6 +239,8 @@ Currently three datasets are supported:
 
 .. autoclass:: dgl.data.chem.PubChemBioAssayAromaticity
     :members: __getitem__, __len__
+
+.. autoclass:: dgl.data.chem.PDBBind
 
 Dataset Splitting
 `````````````````

@@ -155,8 +155,8 @@ class TencentAlchemyDataset(object):
     mol_to_graph: callable, str -> DGLGraph
         A function turning an RDKit molecule instance into a DGLGraph.
         Default to :func:`dgl.data.chem.mol_to_complete_graph`.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like in a molecule, which can be used to update
         ndata for a DGLGraph. By default, we store the atom atomic numbers
         under the name ``"node_type"`` and store the atom features under the
         name ``"n_feat"``. The atom features include:
@@ -167,16 +167,16 @@ class TencentAlchemyDataset(object):
         * Whether the atom is aromatic
         * One hot encoding for atom hybridization
         * Total number of Hs on the atom
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. By default, we store the distance between the
         end atoms under the name ``"distance"`` and store the bond features under
         the name ``"e_feat"``. The bond features are one-hot encodings of the bond type.
     """
     def __init__(self, mode='dev', from_raw=False,
                  mol_to_graph=mol_to_complete_graph,
-                 atom_featurizer=alchemy_nodes,
-                 bond_featurizer=alchemy_edges):
+                 node_featurizer=alchemy_nodes,
+                 edge_featurizer=alchemy_edges):
         if mode == 'test':
             raise ValueError('The test mode is not supported before '
                              'the Alchemy contest finishes.')
@@ -204,9 +204,9 @@ class TencentAlchemyDataset(object):
             archive.extractall(file_dir)
             archive.close()
 
-        self._load(mol_to_graph, atom_featurizer, bond_featurizer)
+        self._load(mol_to_graph, node_featurizer, edge_featurizer)
 
-    def _load(self, mol_to_graph, atom_featurizer, bond_featurizer):
+    def _load(self, mol_to_graph, node_featurizer, edge_featurizer):
         if not self.from_raw:
             self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))
             self.labels = label_dict['labels']
@@ -229,8 +229,8 @@ class TencentAlchemyDataset(object):
             for mol, label in zip(supp, self.target.iterrows()):
                 cnt += 1
                 print('Processing molecule {:d}/{:d}'.format(cnt, dataset_size))
-                graph = mol_to_graph(mol, atom_featurizer=atom_featurizer,
-                                     bond_featurizer=bond_featurizer)
+                graph = mol_to_graph(mol, node_featurizer=node_featurizer,
+                                     edge_featurizer=edge_featurizer)
                 smiles = Chem.MolToSmiles(mol)
                 self.smiles.append(smiles)
                 self.graphs.append(graph)
