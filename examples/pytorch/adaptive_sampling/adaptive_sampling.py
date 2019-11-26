@@ -9,10 +9,12 @@ from dgl.data import citation_graph as citegrh
 import networkx as nx
 
 ##load data
+##cora dataset have 2708 nodes, 1208 of them is used as train set 1000 of them is used as test set
 data = citegrh.load_cora()
 adj = nx.adjacency_matrix(data.graph)
 # reorder
-ids_shuffle = np.arange(2708)
+n_nodes = 2708
+ids_shuffle = np.arange(n_nodes)
 np.random.shuffle(ids_shuffle)
 adj = adj[ids_shuffle, :][:, ids_shuffle]
 data.features = data.features[ids_shuffle]
@@ -24,54 +26,40 @@ train_adj = adj[train_nodes, :][:, train_nodes]
 test_adj = adj[test_nodes, :][:, test_nodes]
 trainG = dgl.DGLGraph(train_adj)
 allG = dgl.DGLGraph(adj)
-h = torch.tensor(data.features[train_nodes], dtype=torch.float64)
-test_h = torch.tensor(data.features[test_nodes], dtype=torch.float64)
-all_h = torch.tensor(data.features, dtype=torch.float64)
+h = torch.tensor(data.features[train_nodes], dtype=torch.float32)
+test_h = torch.tensor(data.features[test_nodes], dtype=torch.float32)
+all_h = torch.tensor(data.features, dtype=torch.float32)
 train_nodes = torch.tensor(train_nodes)
 test_nodes = torch.tensor(test_nodes)
 y_train = torch.tensor(data.labels[train_nodes])
 y_test = torch.tensor(data.labels[test_nodes])
-##configuration
-n_epoch=300
-lamb = 0.5
-lr = 1e-3
-weight_decay = 5e-4
 input_size = h.shape[1]
-hidden_size = 16
 output_size = data.num_labels
-##sample size for each layer during training
-layer_sizes = [256, 256]
-batch_size = 256
-##sample size for each layer during test
-test_batch_size = 64
-avg_degree = 8
-test_layer_sizes = [test_batch_size * avg_degree for _ in range(2)]
+
+##configuration
+config = {
+    'n_epoch': 300,
+    'lamb': 0.5,
+    'lr': 1e-3,
+    'weight_decay': 5e-4,
+    'hidden_size': 16,
+    ##sample size for each layer during training
+    'batch_size': 256,
+    ##sample size for each layer during test
+    'test_batch_size': 64,
+    'test_layer_ratio': 8,
+    'test_layer_sizes': [64 * 8, 64 * 8],
+}
 
 
-class Sampler(object):
-    def __init__(self, graph):
-        self.graph = graph
-
-    def __len__(self):
-        raise NotImplementedError
-
-    def __iter__(self):
-        """Iterator
-
-        The iterator must return a tuple at a time.  The first element must be an array of node IDs from which
-        NodeFlow is grown.  Other elements can be arbitrary auxiliary data correspond to the current minibatch.
-        """
-        raise NotImplementedError
-
-
-class NodeSampler(Sampler):
+class NodeSampler(object):
     """Minibatch sampler that samples batches of nodes uniformly from the given graph and list of seeds.
     """
 
     def __init__(self, graph, seeds, batch_size):
-        super().__init__(graph)
         self.seeds = seeds
         self.batch_size = batch_size
+        self.graph = graph
 
     def __len__(self):
         return len(self.seeds) // self.batch_size
@@ -109,20 +97,28 @@ def normalize_adj(adj):
     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt)
 
 
-class Generator(object):
-    def __init__(self, sampler=None, num_workers=0):
+class AdaptGenerator(object):
+    """
+    Nodeflow generator used for adaptive sampling
+
+    """
+
+    def __init__(self, graph, num_blocks, node_feature=None, sampler=None, num_workers=0, coalesce=False,
+                 sampler_weights=None, layer_nodes=None):
+        self.node_feature = node_feature
+        adj = graph.adjacency_matrix_scipy()
+        adj.data = np.ones(adj.nnz)
+        self.norm_adj = normalize_adj(adj).tocsr()
+        self.layer_nodes = layer_nodes
+        if sampler_weights is not None:
+            self.sample_weights = sampler_weights
+        else:
+            self.sample_weights = nn.Parameter(torch.randn((input_size, 2), dtype=torch.float32))
+            nn.init.xavier_uniform_(self.sample_weights)
+        self.graph = graph
+        self.num_blocks = num_blocks
+        self.coalesce = coalesce
         self.sampler = sampler
-        self.num_workers = num_workers
-
-        if num_workers > 0:
-            raise NotImplementedError('multiprocessing')
-
-    def __call__(self, seeds, *auxiliary):
-        """
-        The __call__ function must take in an array of seeds, and any auxiliary data, and
-        return a NodeFlow grown from the seeds and conditioned on the auxiliary data.
-        """
-        raise NotImplementedError
 
     def __iter__(self):
         for sampled in self.sampler:
@@ -131,19 +127,10 @@ class Generator(object):
             hg = self(seeds, *auxiliary)
             yield (hg, auxiliary[0])
 
-
-class IterativeGenerator(Generator):
-    """NodeFlow generator.  Only works on homographs.
-    """
-
-    def __init__(self, graph, num_blocks, sampler=None, num_workers=0, coalesce=False):
-        super().__init__(sampler, num_workers)
-        self.graph = graph
-        self.num_blocks = num_blocks
-        self.coalesce = coalesce
-
     def __call__(self, seeds, *auxiliary):
-        """Default implementation of IterativeGenerator.
+        """
+           The __call__ function must take in an array of seeds, and any auxiliary data, and
+           return a NodeFlow grown from the seeds and conditioned on the auxiliary data.
         """
         curr_frontier = seeds  # Current frontier to grow neighbors from
         layer_mappings = []  # Mapping from layer node ID to parent node ID
@@ -196,7 +183,7 @@ class IterativeGenerator(Generator):
             rel_graphs=rel_graphs,
             seed_map=seed_map)
 
-    def stepback(self, curr_frontier, *auxiliary):
+    def stepback(self, curr_frontier, layer_index, *auxiliary):
         """Function that takes in the node set in the current layer, and returns the
         neighbors of each node.
 
@@ -219,47 +206,19 @@ class IterativeGenerator(Generator):
 
             auxiliary could be of any type containing block-specific additional data.
         """
-        raise NotImplementedError
 
-
-class AdaptGenerator(IterativeGenerator):
-    """
-    Nodeflow generator used for adaptive sampling
-
-    """
-
-    def __init__(self, graph, num_blocks, node_feature=None, sampler=None, num_workers=0, coalesce=False,
-                 sampler_weights=None, layer_nodes=None):
-        self.node_feature = node_feature.double()
-        adj = graph.adjacency_matrix_scipy()
-        adj.data = np.ones(adj.nnz)
-        self.norm_adj = normalize_adj(adj).tocsr()
-        self.layer_nodes = layer_nodes
-        if sampler_weights is not None:
-            self.sample_weights = sampler_weights
-        else:
-            self.sample_weights = torch.randn((input_size, 2), dtype=torch.float64, requires_grad=True)
-            nn.init.xavier_uniform_(self.sample_weights)
-        super(AdaptGenerator, self).__init__(graph, num_blocks, sampler, num_workers, coalesce)
-
-    def stepback(self, curr_frontier, layer_index, *auxiliary):
         # Relies on that the same dst node of in_edges are contiguous, and the dst nodes
         # are ordered the same as curr_frontier.
 
-        is_sparse = False
         sample_weights = self.sample_weights
         layer_size = self.layer_nodes[layer_index]
-        current_layer_feature = self.node_feature[curr_frontier]
 
         src, des, eid = self.graph.in_edges(curr_frontier, form='all')
         neighbor_nodes = torch.unique(torch.cat((curr_frontier, src), dim=0), sorted=False)
         sparse_adj = self.norm_adj[curr_frontier, :][:, neighbor_nodes]
         square_adj = sparse_adj.multiply(sparse_adj).sum(0)
-        if is_sparse:
-            sparse_adj = sparse_adj.tocoo()
-            tensor_adj = torch.sparse.DoubleTensor(sparse_adj.row, sparse_adj.col, sparse_adj.data)
-        else:
-            tensor_adj = torch.tensor(square_adj.A[0])
+
+        tensor_adj = torch.FloatTensor(square_adj.A[0])
         ##compute sampling probability for next layer which is decided by :
         # 1. attention part derived from node hidden feature
         # 2. adjacency part derived from graph structure
@@ -270,13 +229,13 @@ class AdaptGenerator(IterativeGenerator):
         gu = F.relu(hu) + 1
         probas = adj_part * attention_part * gu
         probas = probas / torch.sum(probas)
-        ##build graph between canidates and curr_frontier
-        canidates = neighbor_nodes[probas.multinomial(num_samples=layer_size, replacement=True)]
+        ##build graph between candidates and curr_frontier
+        candidates = neighbor_nodes[probas.multinomial(num_samples=layer_size, replacement=True)]
         ivmap = {x: i for i, x in enumerate(neighbor_nodes.numpy())}
         # use matrix operation in pytorch to avoid for-loop
-        curr_padding = curr_frontier.repeat_interleave(len(canidates))
-        cand_padding = canidates.repeat(len(curr_frontier))
-        ##the edges between canidates and curr_frontier composed of
+        curr_padding = curr_frontier.repeat_interleave(len(candidates))
+        cand_padding = candidates.repeat(len(curr_frontier))
+        ##the edges between candidates and curr_frontier composed of
         # 1. edges in orginal graph
         # 2. edges between same node(self-loop)
         has_loops = curr_padding == cand_padding
@@ -297,7 +256,7 @@ class AdaptGenerator(IterativeGenerator):
         return sample_neighbor, eids, num_neighbors, q_prob
 
 
-class SAGEConv2(nn.Module):
+class AdaptSAGEConv(nn.Module):
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -307,14 +266,14 @@ class SAGEConv2(nn.Module):
                  norm=None,
                  activation=None,
                  G=None):
-        super(SAGEConv2, self).__init__()
+        super(AdaptSAGEConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
         # self.fc_self = nn.Linear(in_feats, out_feats, bias=bias).double()
-        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias).double()
+        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
         self.reset_parameters()
         self.G = G
 
@@ -344,14 +303,14 @@ class SAGEConv2(nn.Module):
         ##use the training graph during training and whole graph during testing
         if not is_test:
             graph.nodes[src_name].data['norm_deg'] = 1 / torch.sqrt(
-                trainG.in_degrees(graph.layer_mappings[layer_id]).double() + 1)
+                trainG.in_degrees(graph.layer_mappings[layer_id]).float() + 1)
             graph.nodes[dst_name].data['norm_deg'] = 1 / torch.sqrt(
-                trainG.in_degrees(graph.layer_mappings[layer_id + 1]).double() + 1)
+                trainG.in_degrees(graph.layer_mappings[layer_id + 1]).float() + 1)
         else:
             graph.nodes[src_name].data['norm_deg'] = 1 / torch.sqrt(
-                allG.in_degrees(graph.layer_mappings[layer_id]).double() + 1)
+                allG.in_degrees(graph.layer_mappings[layer_id]).float() + 1)
             graph.nodes[dst_name].data['norm_deg'] = 1 / torch.sqrt(
-                allG.in_degrees(graph.layer_mappings[layer_id + 1]).double() + 1)
+                allG.in_degrees(graph.layer_mappings[layer_id + 1]).float() + 1)
         graph.nodes[dst_name].data['node_feat'] = node_feat[graph.layer_mappings[layer_id + 1]]
         graph.nodes[src_name].data['q_probs'] = graph.block_aux_data[layer_id]
 
@@ -366,11 +325,7 @@ class SAGEConv2(nn.Module):
             hidden = edges.src['hidden_feat'] * torch.reshape(attentions, [-1, 1])
             return {"hidden": hidden}
 
-        def recv_func(nodes):
-            # print(nodes.mailbox['hidden'].shape)
-            msgs = torch.sum(nodes.mailbox['hidden'], dim=1)
-            return {'neigh': msgs}
-
+        recv_func = dgl.function.sum('hidden', 'neigh')
         # def receive_fuc(nodes):
         # aggregate from neighbors
         graph[neighbor_etype_name].update_all(message_func=send_func, reduce_func=recv_func)
@@ -390,9 +345,9 @@ class SAGEConv2(nn.Module):
             support = norm_adj[graph.layer_mappings[layer_id + 1], :][:, graph.layer_mappings[layer_id]]  ##v*u
             hu = torch.matmul(node_feat[graph.layer_mappings[layer_id]], sample_weights[:, 0])
             hv = torch.matmul(node_feat[graph.layer_mappings[layer_id + 1]], sample_weights[:, 1])
-            attensions = (F.relu(torch.reshape(hu, [1, -1]) + torch.reshape(hv, [-1, 1])) + 1) / graph.block_aux_data[
+            attentions = (F.relu(torch.reshape(hu, [1, -1]) + torch.reshape(hv, [-1, 1])) + 1) / graph.block_aux_data[
                 layer_id] / len(hu)
-            adjust_support = torch.tensor(support.A, dtype=torch.float64) * attensions
+            adjust_support = torch.tensor(support.A, dtype=torch.float32) * attentions
             support_mean = adjust_support.sum(0)
             mu_v = torch.mean(rst, dim=0)  # h
             diff = torch.reshape(support_mean, [-1, 1]) * pre_sup - torch.reshape(mu_v, [1, -1])
@@ -401,12 +356,12 @@ class SAGEConv2(nn.Module):
         return rst
 
 
-class GraphSAGENet2(nn.Module):
-    def __init__(self, sample_weights, node_feature):
+class AdaptGraphSAGENet(nn.Module):
+    def __init__(self, sample_weights, node_feature, hidden_size):
         super().__init__()
         self.layers = nn.ModuleList([
-            SAGEConv2(input_size, hidden_size, 'mean', bias=False, activation=F.relu),
-            SAGEConv2(hidden_size, output_size, 'mean', bias=False, activation=F.relu),
+            AdaptSAGEConv(input_size, hidden_size, 'mean', bias=False, activation=F.relu),
+            AdaptSAGEConv(hidden_size, output_size, 'mean', bias=False, activation=F.relu),
         ])
         self.sample_weights = sample_weights
         self.node_feature = node_feature
@@ -424,52 +379,71 @@ class GraphSAGENet2(nn.Module):
         return h, loss
 
 
-# Create a sampler for training nodes and testing nodes
-train_sampler = NodeSampler(graph=trainG, seeds=train_nodes, batch_size=batch_size)
-test_sampler = NodeSampler(graph=allG, seeds=test_nodes, batch_size=test_batch_size)
-##Generator for training
-train_generator = AdaptGenerator(graph=trainG, node_feature=all_h, layer_nodes=layer_sizes, sampler=train_sampler,
-                                 num_blocks=len(layer_sizes), coalesce=True)
-# Generator for testing
-test_sample_generator = AdaptGenerator(graph=allG, node_feature=all_h, sampler=test_sampler,
-                                       num_blocks=len(test_layer_sizes),
-                                       sampler_weights=train_generator.sample_weights, layer_nodes=test_layer_sizes,
-                                       coalesce=True)
-model2 = GraphSAGENet2(train_generator.sample_weights, all_h)
-params = list(model2.parameters())
-params.append(train_generator.sample_weights)
-opt = torch.optim.Adam(params=params, lr=lr)
-model2.train()
+def main(args):
+    config.update(args)
+    config['layer_sizes'] = [int(config['batch_size'] * config['train_layer_ratio']) for _ in range(2)]
+    # Create a sampler for training nodes and testing nodes
+    train_sampler = NodeSampler(graph=trainG, seeds=train_nodes, batch_size=config['batch_size'])
+    test_sampler = NodeSampler(graph=allG, seeds=test_nodes, batch_size=config['test_batch_size'])
+    ##Generator for training
+    train_generator = AdaptGenerator(graph=trainG, node_feature=all_h, layer_nodes=config['layer_sizes'],
+                                     sampler=train_sampler,
+                                     num_blocks=len(config['layer_sizes']), coalesce=True)
+    # Generator for testing
+    test_sample_generator = AdaptGenerator(graph=allG, node_feature=all_h, sampler=test_sampler,
+                                           num_blocks=len(config['test_layer_sizes']),
+                                           sampler_weights=train_generator.sample_weights,
+                                           layer_nodes=config['test_layer_sizes'],
+                                           coalesce=True)
+    model = AdaptGraphSAGENet(train_generator.sample_weights, all_h, config['hidden_size'])
+    params = list(model.parameters())
+    params.append(train_generator.sample_weights)
+    opt = torch.optim.Adam(params=params, lr=config['lr'])
+    # model.train()
+    lamb, weight_decay = config['lamb'], config['weight_decay']
+    for epoch in range(config['n_epoch']):
+        train_accs = []
+        for nf, sample_indices in train_generator:
+            seed_map = nf.seed_map
+            train_y_hat, varloss = model(nf, h[nf.layer_mappings[0]])
+            train_y_hat = train_y_hat[seed_map]
+            y_train_batch = y_train[sample_indices]
+            y_pred = torch.argmax(train_y_hat, dim=1)
+            train_acc = torch.sum(torch.eq(y_pred, y_train_batch)).item() / config['batch_size']
+            train_accs.append(train_acc)
+            loss = F.cross_entropy(train_y_hat.squeeze(), y_train_batch)
+            l2_loss = torch.norm(params[0])
+            total_loss = varloss * lamb + loss + l2_loss * weight_decay
+            opt.zero_grad()
+            total_loss.backward()
+            opt.step()
+            # print(train_sampler.sample_weight)
+        test_accs = []
+        for test_nf, test_sample_indices in test_sample_generator:
+            seed_map = test_nf.seed_map
+            # print(test_sample_indices)
+            test_y_hat = model(test_nf, all_h[test_nf.layer_mappings[0]], is_test=True)
+            # print("test",test_y_hat)
+            test_y_hat = test_y_hat[seed_map]
+            y_test_batch = y_test[test_sample_indices]
+            y_pred = torch.argmax(test_y_hat, dim=1)
+            test_acc = torch.sum(torch.eq(y_pred, y_test_batch)).item() / len(y_pred)
+            test_accs.append(test_acc)
+        print("eqoch{} train accuracy {}, regloss {}, loss {} ,test accuracy {}".format(epoch, np.mean(train_acc),
+                                                                                        varloss.item() * lamb,
+                                                                                        total_loss.item(),
+                                                                                        np.mean(test_accs)))
 
-for epoch in range(n_epoch):
-    train_accs = []
-    for nf, sample_indices in train_generator:
-        seed_map = nf.seed_map
-        train_y_hat, regloss = model2(nf, h[nf.layer_mappings[0]])
-        train_y_hat = train_y_hat[seed_map]
-        y_train_batch = y_train[sample_indices]
-        y_pred = torch.argmax(train_y_hat, dim=1)
-        train_acc = torch.sum(torch.eq(y_pred, y_train_batch)).item() / batch_size
-        train_accs.append(train_acc)
-        loss = F.cross_entropy(train_y_hat.squeeze(), y_train_batch)
-        l2_loss = torch.norm(params[0])
-        total_loss = regloss * lamb + loss + l2_loss * weight_decay
-        opt.zero_grad()
-        total_loss.backward()
-        opt.step()
-        # print(train_sampler.sample_weight)
-    test_accs = []
-    for test_nf, test_sample_indices in test_sample_generator:
-        seed_map = test_nf.seed_map
-        # print(test_sample_indices)
-        test_y_hat = model2(test_nf, all_h[test_nf.layer_mappings[0]], is_test=True)
-        # print("test",test_y_hat)
-        test_y_hat = test_y_hat[seed_map]
-        y_test_batch = y_test[test_sample_indices]
-        y_pred = torch.argmax(test_y_hat, dim=1)
-        test_acc = torch.sum(torch.eq(y_pred, y_test_batch)).item() / len(y_pred)
-        test_accs.append(test_acc)
-    print("eqoch{} train accuracy {}, regloss {}, loss {} ,test accuracy {}".format(epoch, np.mean(train_acc),
-                                                                                    regloss.item() * lamb,
-                                                                                    total_loss.item(),
-                                                                                    np.mean(test_accs)))
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser('Adaptive Sampling for CCN')
+    parser.add_argument('-b', '--batch_size', type=int, default=256,
+                        help='batch size')
+    parser.add_argument('-l', '--train_layer_ratio', type=float, default=1,
+                        help='the ratio of sampling size for each layer compared to batch size')
+
+    args = parser.parse_args().__dict__
+
+    main(args)
