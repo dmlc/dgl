@@ -264,7 +264,7 @@ class DGLHeteroGraph(object):
                    '      metagraph={meta})')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
-            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+            nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph.edges())
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
@@ -1501,7 +1501,7 @@ class DGLHeteroGraph(object):
         >>> sub_g = g.subgraph({'user': [1, 2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 0},
-              num_edges={'plays': 0, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
@@ -1582,7 +1582,7 @@ class DGLHeteroGraph(object):
         >>>                          ('user', 'plays', 'game'): [2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 1},
-              num_edges={'plays': 1, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
@@ -1752,12 +1752,12 @@ class DGLHeteroGraph(object):
         rel_graphs = [self._graph.get_relation_graph(i) for i in etype_ids]
         meta_src = meta_src.tonumpy()
         meta_dst = meta_dst.tonumpy()
-        induced_ntype_ids = list(set(meta_src) | set(meta_dst))
-        mapped_meta_src = [induced_ntype_ids[v] for v in meta_src]
-        mapped_meta_dst = [induced_ntype_ids[v] for v in meta_dst]
-        node_frames = [self._node_frames[i] for i in induced_ntype_ids]
+        ntypes_invmap = {n: i for i, n in enumerate(set(meta_src) | set(meta_dst))}
+        mapped_meta_src = [ntypes_invmap[v] for v in meta_src]
+        mapped_meta_dst = [ntypes_invmap[v] for v in meta_dst]
+        node_frames = [self._node_frames[i] for i in ntypes_invmap]
         edge_frames = [self._edge_frames[i] for i in etype_ids]
-        induced_ntypes = [self._ntypes[i] for i in induced_ntype_ids]
+        induced_ntypes = [self._ntypes[i] for i in ntypes_invmap]
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
 
         metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
