@@ -1,7 +1,7 @@
 """PDBBind dataset processed by MoleculeNet."""
 import os
 
-from ..utils import multiprocess_load_molecule
+from ..utils import multiprocess_load_molecules
 from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
 from .... import backend as F
 
@@ -38,18 +38,28 @@ class PDBBind(object):
         of the ``'core'`` set is 195 and the size of the ``'refined'`` set is 3706.
     load_binding_pocket : bool
         Whether to load binding pockets or full proteins. Default to False.
-    log_every_n : int
-        Molecule related computation can take a long time for a large dataset and we want
-        to learn the progress of processing. This can be done by printing a message whenever
-        a batch of ``log_every_n`` molecules have been processed. If None, no messages will
-        be printed. Default to 10.
+    add_hydrogens : bool
+        Whether to add hydrogens via pdbfixer. Default to True.
+    sanitize : bool
+        Whether sanitization is performed in initializing RDKit molecule instances. See
+        https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
+        Default to False.
+    calc_charges : bool
+        Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
+        ``add_hydrogens`` and ``sanitize`` to be True. Default to True.
+    remove_hs : bool
+        Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
+        slow for large molecules. Default to False.
+    use_conformation : bool
+        Whether we need to extract molecular conformation from proteins and ligands.
+        Default to True.
     num_processes : int or None
         Number of worker processes to use. If None,
         then we will use the number of CPUs in the systetm. Default to None.
     """
     def __init__(self, subset_choice, load_binding_pocket=False, add_hydrogens=False,
-                 sanitize=True, calc_charges=False, remove_hs=True,
-                 log_every_n=10, num_processes=None):
+                 sanitize=True, calc_charges=False, remove_hs=False, use_conformation=True,
+                 num_processes=None):
         self.task_names = ['-logKd/Ki']
         self.n_tasks = len(self.task_names)
 
@@ -70,12 +80,50 @@ class PDBBind(object):
                 'core or refined, got {}'.format(subset_choice))
 
         self._preprocess(extracted_data_path, index_label_file, load_binding_pocket,
-                         add_hydrogens, sanitize, calc_charges, remove_hs,
-                         log_every_n, num_processes)
+                         add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
+                         num_processes)
+
+    def _filter_out_invalid(self, proteins_loaded, ligands_loaded, use_conformation):
+        """Filter out invalid ligand-protein pairs.
+
+        Parameters
+        ----------
+        """
+        num_pairs = len(proteins_loaded)
+        self.protein_mols = []
+        self.ligand_mols = []
+        if use_conformation:
+            self.ligand_coordinates = []
+            self.protein_coordinates = []
+
+        for i in range(num_pairs):
+            protein_mol, protein_coordinates = proteins_loaded[i]
+            ligand_mol, ligand_coordinates = ligands_loaded[i]
+            if (not use_conformation) and all(v is not None for v in [protein_mol, ligand_mol]):
+                self.protein_mols.append(protein_mol)
+                self.ligand_mols.append(ligand_mol)
+            elif all(v is not None for v in [
+                protein_mol, protein_coordinates, ligand_mol, ligand_coordinates]):
+                self.protein_mols.append(protein_mol)
+                self.protein_coordinates.append(protein_coordinates)
+                self.ligand_mols.append(ligand_mol)
+                self.ligand_coordinates.append(ligand_coordinates)
 
     def _preprocess(self, root_path, index_label_file, load_binding_pocket,
-                    add_hydrogens, sanitize, calc_charges, remove_hs,
-                    log_every_n, num_processes):
+                    add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
+                    num_processes):
+        """Preprocess the dataset.
+
+        The pre-processing proceeds as follows:
+
+        1. Load the dataset
+        2. Clean the dataset and filter out invalid pairs
+        3. Construct graphs
+        4. Prepare node and edge features
+
+        Parameters
+        ----------
+        """
         pdbs = []
         labels = []
         with open(index_label_file, 'r') as f:
@@ -96,21 +144,23 @@ class PDBBind(object):
             root_path, 'v2015', pdb, '{}_ligand.sdf'.format(pdb)) for pdb in pdbs]
 
         print('Loading proteins...')
-        proteins_loaded = multiprocess_load_molecule(self.protein_files,
-                                                     add_hydrogens=add_hydrogens,
-                                                     sanitize=sanitize,
-                                                     calc_charges=calc_charges,
-                                                     remove_hs=remove_hs,
-                                                     num_processes=num_processes,
-                                                     msg='proteins',
-                                                     log_every_n=log_every_n)
+        proteins_loaded = multiprocess_load_molecules(self.protein_files,
+                                                      add_hydrogens=add_hydrogens,
+                                                      sanitize=sanitize,
+                                                      calc_charges=calc_charges,
+                                                      remove_hs=remove_hs,
+                                                      use_conformation=use_conformation,
+                                                      num_processes=num_processes)
 
         print('Loading ligands...')
-        ligands_loaded = multiprocess_load_molecule(self.ligand_files,
+        ligands_loaded = multiprocess_load_molecules(self.ligand_files,
                                                      add_hydrogens=add_hydrogens,
                                                      sanitize=sanitize,
                                                      calc_charges=calc_charges,
                                                      remove_hs=remove_hs,
-                                                     num_processes=num_processes,
-                                                     msg='ligands',
-                                                     log_every_n=log_every_n)
+                                                     use_conformation=use_conformation,
+                                                     num_processes=num_processes)
+        self._filter_out_invalid(proteins_loaded, ligands_loaded, use_conformation)
+
+    def __len__(self):
+        return len(self.ligand_mols)

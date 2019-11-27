@@ -154,6 +154,7 @@ We adapt several utilities for processing molecules from
     chem.add_hydrogens_to_mol
     chem.get_mol_3D_coordinates
     chem.load_molecule
+    chem.multiprocess_load_molecules
 
 Featurization Utils
 ```````````````````

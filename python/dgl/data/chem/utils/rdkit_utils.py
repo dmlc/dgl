@@ -1,7 +1,8 @@
-"""Utils for RDKit, adapted from DeepChem
+"""Utils for RDKit, mostly adapted from DeepChem
 (https://github.com/deepchem/deepchem/blob/master/deepchem)."""
 import warnings
 
+from functools import partial
 from multiprocessing import Pool
 
 try:
@@ -17,7 +18,7 @@ except ImportError:
 __all__ = ['add_hydrogens_to_mol',
            'get_mol_3D_coordinates',
            'load_molecule',
-           'multiprocess_load_molecule']
+           'multiprocess_load_molecules']
 
 def add_hydrogens_to_mol(mol):
     """Add hydrogens to an RDKit molecule instance.
@@ -82,8 +83,8 @@ def get_mol_3D_coordinates(mol):
         warnings.warn('Unable to get conformation of the molecule.')
         return None
 
-def load_molecule(molecule_file, add_hydrogens=False,
-                  sanitize=True, calc_charges=False, remove_hs=True):
+def load_molecule(molecule_file, add_hydrogens=False, sanitize=True, calc_charges=False,
+                  remove_hs=False, use_conformation=True):
     """Load a molecule from a file.
 
     Parameters
@@ -101,7 +102,11 @@ def load_molecule(molecule_file, add_hydrogens=False,
         Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
         ``add_hydrogens`` and ``sanitize`` to be True. Default to True.
     remove_hs : bool
-        Whether to remove hydrogens via RDKit. Default to True.
+        Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
+        slow for large molecules. Default to False.
+    use_conformation : bool
+        Whether we need to extract molecular conformation from proteins and ligands.
+        Default to True.
 
     Returns
     -------
@@ -109,7 +114,8 @@ def load_molecule(molecule_file, add_hydrogens=False,
         RDKit molecule instance for the loaded molecule.
     coordinates : ndarray of shape (N, 3) or None
         The 3D coordinates of atoms in the molecule. N for the number of atoms in
-        the molecule. For failures in getting the conformations, None will be returned.
+        the molecule. None will be returned if ``use_conformation`` is False or
+        we failed to get conformation information.
     """
     if molecule_file.endswith('.mol2'):
         mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=False)
@@ -129,45 +135,73 @@ def load_molecule(molecule_file, add_hydrogens=False,
         return ValueError('Expect the format of the molecule_file to be '
                           'one of .mol2, .sdf, .pdbqt and .pdb, got {}'.format(molecule_file))
 
-    if mol is None:
+    try:
+        if add_hydrogens or calc_charges:
+            mol = add_hydrogens_to_mol(mol)
+
+        if sanitize or calc_charges:
+            Chem.SanitizeMol(mol)
+
+        if calc_charges:
+            # Compute Gasteiger charges on the molecule.
+            try:
+                AllChem.ComputeGasteigerCharges(mol)
+            except:
+                warnings.warn('Unable to compute charges for the molecule.')
+
+        if remove_hs:
+            mol = Chem.RemoveHs(mol)
+    except:
         return None, None
 
-    if add_hydrogens or calc_charges:
-        mol = add_hydrogens_to_mol(mol)
-
-    if sanitize or calc_charges:
-        Chem.SanitizeMol(mol)
-
-    if calc_charges:
-        # Compute Gasteiger charges on the molecule.
-        try:
-            AllChem.ComputeGasteigerCharges(mol)
-        except:
-            warnings.warn('Unable to compute charges for the molecule.')
-
-    if remove_hs:
-        mol = Chem.RemoveHs(mol)
-
-    coordinates = get_mol_3D_coordinates(mol)
+    if use_conformation:
+        coordinates = get_mol_3D_coordinates(mol)
+    else:
+        coordinates = None
 
     return mol, coordinates
 
-def multiprocess_load_molecule(files, add_hydrogens=False, sanitize=True, calc_charges=False,
-                               remove_hs=True, num_processes=None, msg=None, log_every_n=None):
-    """"""
-    if log_every_n is not None:
-        assert msg is not None
+def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=True, calc_charges=False,
+                                remove_hs=True, use_conformation=True, num_processes=2):
+    """Load molecules from files with multiprocessing.
 
-    async_results = []
-    with Pool(processes=num_processes) as pool:
-        for f in files:
-            async_results.append(pool.apply_async(
-                load_molecule, (f, add_hydrogens, sanitize, calc_charges, remove_hs)))
-
-    mols_loaded = []
-    for i, result in enumerate(async_results):
-        if (log_every_n is not None) and ((i + 1) % log_every_n == 0):
-            print('Processing {} {:d}/{:d}'.format(msg, i+1, len(files)))
-        mols_loaded.append(result.get())
+    Parameters
+    ----------
+    files : list of str
+        Each element is a path to a file storing a molecule, which can be of format '.mol2',
+        '.sdf', '.pdbqt', or '.pdb'.
+    add_hydrogens : bool
+        Whether to add hydrogens via pdbfixer. Default to True.
+    sanitize : bool
+        Whether sanitization is performed in initializing RDKit molecule instances. See
+        https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
+        Default to False.
+    calc_charges : bool
+        Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
+        ``add_hydrogens`` and ``sanitize`` to be True. Default to True.
+    remove_hs : bool
+        Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
+        slow for large molecules. Default to False.
+    use_conformation : bool
+        Whether we need to extract molecular conformation from proteins and ligands.
+        Default to True.
+    num_processes : int or None
+        Number of worker processes to use. If None,
+        then we will use the number of CPUs in the systetm. Default to None.
+    """
+    if num_processes == 1:
+        mols_loaded = []
+        for i, f in enumerate(files):
+            print(i)
+            mols_loaded.append(load_molecule(
+                f, add_hydrogens=add_hydrogens, sanitize=sanitize, calc_charges=calc_charges,
+                remove_hs=remove_hs, use_conformation=use_conformation))
+    else:
+        with Pool(processes=num_processes) as pool:
+            mols_loaded = pool.map_async(partial(
+                load_molecule, add_hydrogens=add_hydrogens, sanitize=sanitize,
+                calc_charges=calc_charges, remove_hs=remove_hs,
+                use_conformation=use_conformation), files)
+            mols_loaded = mols_loaded.get()
 
     return mols_loaded
