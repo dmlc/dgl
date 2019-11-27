@@ -16,6 +16,4 @@ wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.11-Linux-x86_64.
     echo "conda activate base" >> ~/.bashrc
 
 export TINI_VERSION=v0.16.1
-wget https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini -o /usr/bin/tini
-chmod +x /usr/bin/tini
-
+source ~/.bashrc
