@@ -1,6 +1,6 @@
 name: pytorch-ci
 dependencies:
-  - python = 3.5
+  - python = 3.6
   - pytorch = 1.0.1
   - cudatoolkit = 9.2
   - torchvision

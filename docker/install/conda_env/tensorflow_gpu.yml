@@ -1,6 +1,5 @@
 name: tensorflow-ci
 dependencies:
-  - python = 3.5
   - cudatoolkit = 10.1
   - pip
   - pip
