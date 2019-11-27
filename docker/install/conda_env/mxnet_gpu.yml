@@ -2,7 +2,7 @@ name: mxnet-ci
 dependencies:
   - cudatoolkit = 9.2
   - pip
-  - pip
+  - pip:
     - mxnet-cu92
   - nose
   - numpy

@@ -1,8 +1,8 @@
 name: tensorflow-ci
 dependencies:
   - pip
-  - pip
-    - tf-nightly-gpu = 2.1.0.dev20191125
+  - pip:
+    - tf-nightly = 2.1.0.dev20191125
     - "git+https://github.com/VoVAllen/tf-dlpack.git@no_cuda"
   - nose
   - numpy

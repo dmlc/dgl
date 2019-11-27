@@ -1,7 +1,7 @@
 name: mxnet-ci
 dependencies:
   - pip
-  - pip
+  - pip:
     - mxnet
   - nose
   - numpy
