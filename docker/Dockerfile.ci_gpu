@@ -18,7 +18,7 @@ COPY install/ubuntu_install_antlr.sh /install/ubuntu_install_antlr.sh
 RUN bash /install/ubuntu_install_antlr.sh
 
 # python
-COPY install/ubuntu_install_python.sh /install/ubuntu_install_python.sh
+COPY install/ubuntu_install_conda.sh /install/ubuntu_install_python.sh
 RUN bash /install/ubuntu_install_python.sh
 
 COPY install/ubuntu_install_python_package.sh /install/ubuntu_install_python_package.sh
@@ -29,6 +29,13 @@ RUN bash /install/ubuntu_install_torch.sh
 
 COPY install/ubuntu_install_mxnet_gpu.sh /install/ubuntu_install_mxnet_gpu.sh
 RUN bash /install/ubuntu_install_mxnet_gpu.sh
+
+COPY install/ubuntu_install_tensorflow.sh /install/ubuntu_install_tensorflow.sh
+RUN bash /install/ubuntu_install_tensorflow.sh
+
+COPY install/ubuntu_install_tfdlpack_gpu.sh /install/ubuntu_install_tfdlpack_gpu.sh
+RUN bash /install/ubuntu_install_tfdlpack_gpu.sh
+
 
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
