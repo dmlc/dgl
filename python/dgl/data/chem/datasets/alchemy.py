@@ -9,10 +9,10 @@ import pathlib
 import zipfile
 from collections import defaultdict
 
-from .utils import mol_to_complete_graph, atom_type_one_hot, atom_hybridization_one_hot, \
-    atom_is_aromatic
-from ..utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
-from ... import backend as F
+from ..utils import mol_to_complete_graph, atom_type_one_hot, \
+    atom_hybridization_one_hot, atom_is_aromatic
+from ...utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
+from .... import backend as F
 
 try:
     import pandas as pd

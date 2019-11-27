@@ -18,6 +18,9 @@ Before you proceed, make sure you have installed the dependencies below:
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
+- Pdbfixer
+    - We recommend installation with `conda install -c omnia pdbfixer`. To install from source, see the 
+    [manual](http://htmlpreview.github.io/?https://raw.github.com/pandegroup/pdbfixer/master/Manual.html).
 
 The rest dependencies can be installed with `pip install -r requirements.txt`.
 

@@ -142,6 +142,19 @@ Molecular Graphs
 
 To work on molecular graphs, make sure you have installed `RDKit 2018.09.3 <https://www.rdkit.org/docs/Install.html>`__.
 
+Data Loading and Processing Utils
+`````````````````````````````````
+
+We adapt several utilities for processing molecules from
+`DeepChem <https://github.com/deepchem/deepchem/blob/master/deepchem>`__.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.add_hydrogens_to_mol
+    chem.get_mol_3D_coordinates
+    chem.load_molecule
+
 Featurization Utils
 ```````````````````
 

@@ -9,7 +9,7 @@ from collections import defaultdict
 from functools import partial
 from itertools import accumulate, chain
 
-from ..utils import split_dataset, Subset
+from ...utils import split_dataset, Subset
 
 try:
     from rdkit import Chem
@@ -604,3 +604,10 @@ class ScaffoldSplitter(object):
             all_folds.append((Subset(dataset, train_indices), Subset(dataset, val_indices)))
 
         return all_folds
+
+class MaxMinSplitter(object):
+    """"""
+    @staticmethod
+    def train_val_test_split(dataset, mols=None, sanitize=True, distance_func=None,
+                             frac_train=0.8, frac_val=0.1, frac_test=0.1, log_every_n=1000):
+        return NotImplementedError

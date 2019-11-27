@@ -4,8 +4,8 @@ import numpy as np
 import os
 import sys
 
-from ..utils import save_graphs, load_graphs
-from ... import backend as F
+from ...utils import save_graphs, load_graphs
+from .... import backend as F
 
 class MoleculeCSVDataset(object):
     """MoleculeCSVDataset
@@ -40,7 +40,7 @@ class MoleculeCSVDataset(object):
     def __init__(self, df, smiles_to_graph, node_featurizer, edge_featurizer,
                  smiles_column, cache_file_path):
         if 'rdkit' not in sys.modules:
-            from ...base import dgl_warning
+            from ....base import dgl_warning
             dgl_warning(
                 "Please install RDKit (Recommended Version is 2018.09.3)")
         self.df = df

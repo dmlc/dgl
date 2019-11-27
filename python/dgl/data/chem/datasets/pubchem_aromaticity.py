@@ -2,8 +2,8 @@ import pandas as pd
 import sys
 
 from .csv_dataset import MoleculeCSVDataset
-from .utils import smiles_to_bigraph
-from ..utils import get_download_dir, download, _get_dgl_url
+from ..utils import smiles_to_bigraph
+from ...utils import get_download_dir, download, _get_dgl_url
 
 class PubChemBioAssayAromaticity(MoleculeCSVDataset):
     """Subset of PubChem BioAssay Dataset for aromaticity prediction.
@@ -32,7 +32,7 @@ class PubChemBioAssayAromaticity(MoleculeCSVDataset):
                  node_featurizer=None,
                  edge_featurizer=None):
         if 'pandas' not in sys.modules:
-            from ...base import dgl_warning
+            from ....base import dgl_warning
             dgl_warning("Please install pandas")
 
         self._url = 'dataset/pubchem_bioassay_aromaticity.csv'

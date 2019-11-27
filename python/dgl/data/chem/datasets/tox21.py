@@ -1,9 +1,9 @@
 import sys
 
 from .csv_dataset import MoleculeCSVDataset
-from .utils import smiles_to_bigraph
-from ..utils import get_download_dir, download, _get_dgl_url
-from ... import backend as F
+from ..utils import smiles_to_bigraph
+from ...utils import get_download_dir, download, _get_dgl_url
+from .... import backend as F
 
 try:
     import pandas as pd
@@ -43,7 +43,7 @@ class Tox21(MoleculeCSVDataset):
                  node_featurizer=None,
                  edge_featurizer=None):
         if 'pandas' not in sys.modules:
-            from ...base import dgl_warning
+            from ....base import dgl_warning
             dgl_warning("Please install pandas")
 
         self._url = 'dataset/tox21.csv.gz'
