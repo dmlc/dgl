@@ -257,7 +257,7 @@ def test_nx_conversion():
     nxg = nx.cycle_graph(5)
     nxg.remove_nodes_from([0, 4])
     for u in nxg.nodes():
-        nxg.node[u]['h'] = F.tensor([u])
+        nxg.nodes[u]['h'] = F.tensor([u])
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
