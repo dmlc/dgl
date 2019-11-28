@@ -5,16 +5,20 @@ from mxnet.gluon import nn
 from mxnet import ndarray as nd
 
 class TransEScore(nn.Block):
-    def __init__(self, gamma):
+    def __init__(self, gamma, dist_func='l2'):
         super(TransEScore, self).__init__()
         self.gamma = gamma
+        if dist_func == 'l1':
+            self.dist_ord = 1
+        else: # default use l2
+            self.dist_ord = 2
 
     def edge_func(self, edges):
         head = edges.src['emb']
         tail = edges.dst['emb']
         rel = edges.data['emb']
         score = head + rel - tail
-        return {'score': self.gamma - nd.norm(score, ord=1, axis=-1)}
+        return {'score': self.gamma - nd.norm(score, ord=self.dist_ord, axis=-1)}
 
     def prepare(self, g, gpu_id, trace=False):
         pass
@@ -47,7 +51,7 @@ class TransEScore(nn.Block):
                 heads = heads.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
                 tails = tails - relations
                 tails = tails.reshape(num_chunks,chunk_size, 1, hidden_dim)
-                return gamma - nd.norm(heads - tails, ord=1, axis=-1)
+                return gamma - nd.norm(heads - tails, ord=self.dist_ord, axis=-1)
             return fn
         else:
             def fn(heads, relations, tails, num_chunks, chunk_size, neg_sample_size):
@@ -55,7 +59,7 @@ class TransEScore(nn.Block):
                 heads = heads + relations
                 heads = heads.reshape(num_chunks, chunk_size, 1, hidden_dim)
                 tails = tails.reshape(num_chunks, 1, neg_sample_size, hidden_dim)
-                return gamma - nd.norm(heads - tails, ord=1, axis=-1)
+                return gamma - nd.norm(heads - tails, ord=self.dist_ord, axis=-1)
             return fn
 
 class TransRScore(nn.Block):

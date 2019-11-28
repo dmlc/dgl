@@ -15,7 +15,7 @@ takes a couple of hours on Freebase, which has hundreds of millions of edges.
 
 DGL-KE includes the following knowledge graph embedding models:
  
-- TransE
+- TransE (TransE_l1 with L1 distance and TransE_l2 with L2 distance)
 - DistMult
 - ComplEx
 - RESCAL
