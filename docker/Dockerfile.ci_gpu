@@ -26,8 +26,6 @@ RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow
 
 ENV CONDA_ALWAYS_YES=
 
-COPY install/bash_profile ~/.bash_profile
-
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
 ENV PATH=/usr/local/cuda/bin:${PATH}

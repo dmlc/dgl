@@ -25,5 +25,3 @@ COPY install/conda_env/tensorflow_cpu.yml /install/conda_env/tensorflow_cpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_cpu.yml"]
 
 ENV CONDA_ALWAYS_YES=
-
-COPY install/bash_profile ~/.bash_profile
