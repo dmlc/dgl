@@ -33,7 +33,7 @@ def unpack_lib(name, libs) {
 
 def build_dgl_linux(dev) {
   init_git()
-  sh "bash -c tests/scripts/build_dgl.sh ${dev}"
+  sh "bash tests/scripts/build_dgl.sh ${dev}"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
@@ -62,7 +62,7 @@ def unit_test_linux(backend, dev) {
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   activate_conda_env(backend)
   timeout(time: 5, unit: 'MINUTES') {
-    sh "bash -c tests/scripts/task_unit_test.sh ${backend} ${dev}"
+    sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
 
