@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+source ~/.bashrc
 
 if [ $# -ne 1 ]; then
     echo "Device argument required, can be cpu or gpu"
