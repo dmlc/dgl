@@ -592,6 +592,12 @@ def test_flatten():
     assert fg.etypes == ['follows+knows']
     check_mapping(g, fg)
 
+def test_to_device():
+    hg = create_test_heterograph()
+    if F.is_cuda_available():
+        hg = hg.to(F.cuda())
+        assert hg is not None
+
 def test_convert():
     hg = create_test_heterograph()
     hs = []

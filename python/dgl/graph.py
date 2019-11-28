@@ -3339,6 +3339,11 @@ class DGLGraph(DGLBaseGraph):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLGraph
+          Moved DGLGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.

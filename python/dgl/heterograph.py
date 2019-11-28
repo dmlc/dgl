@@ -3575,6 +3575,11 @@ class DGLHeteroGraph(object):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLHeteroGraph
+          Moved DGLHeteroGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
