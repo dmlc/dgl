@@ -291,6 +291,9 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                                     relations=g.edata['etype'],
                                     return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_leid = F.copy_to(neg_leid, F.ctx())
+        neg_lsrc = F.copy_to(neg_lsrc, F.ctx())
+        neg_ldst = F.copy_to(neg_ldst, F.ctx())
         neg_src = neg_edges.parent_nid[neg_lsrc]
         neg_dst = neg_edges.parent_nid[neg_ldst]
         neg_eid = neg_edges.parent_eid[neg_leid]
