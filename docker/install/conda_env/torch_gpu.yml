@@ -5,6 +5,7 @@ dependencies:
   - python = 3.6
   - pytorch = 1.0.1
   - cudatoolkit = 9.2
+  - pip
   - torchvision
   - nose
   - numpy

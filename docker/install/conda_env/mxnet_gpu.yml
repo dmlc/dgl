@@ -3,7 +3,7 @@ dependencies:
   - cudatoolkit = 9.2
   - pip
   - pip:
-    - --pre mxnet-cu92
+    - mxnet-cu92==1.6.0b20190903
   - nose
   - numpy
   - cython
