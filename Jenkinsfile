@@ -33,7 +33,7 @@ def unpack_lib(name, libs) {
 
 def build_dgl_linux(dev) {
   init_git()
-  sh "bash -c tests/scripts/build_dgl.sh ${dev}"
+  sh "bash tests/scripts/build_dgl.sh ${dev}"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
@@ -48,7 +48,7 @@ def build_dgl_win64(dev) {
 def cpp_unit_test_linux() {
   init_git()
   unpack_lib("dgl-cpu-linux", dgl_linux_libs)
-  sh "bash -c tests/scripts/task_cpp_unit_test.sh"
+  sh "bash tests/scripts/task_cpp_unit_test.sh"
 }
 
 def cpp_unit_test_win64() {
@@ -62,7 +62,7 @@ def unit_test_linux(backend, dev) {
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   activate_conda_env(backend)
   timeout(time: 5, unit: 'MINUTES') {
-    sh "bash -c tests/scripts/task_unit_test.sh ${backend} ${dev}"
+    sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
 
@@ -78,7 +78,7 @@ def kg_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 20, unit: 'MINUTES') {
-    sh "bash -c tests/scripts/task_kg_test.sh ${backend} ${dev}"
+    sh "bash tests/scripts/task_kg_test.sh ${backend} ${dev}"
   }
 }
 
@@ -87,7 +87,7 @@ def example_test_linux(backend, dev) {
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   activate_conda_env(backend)
   timeout(time: 20, unit: 'MINUTES') {
-    sh "bash -c tests/scripts/task_example_test.sh ${dev}"
+    sh "bash tests/scripts/task_example_test.sh ${dev}"
   }
 }
 
@@ -105,7 +105,7 @@ def tutorial_test_linux(backend) {
   unpack_lib("dgl-cpu-linux", dgl_linux_libs)
   activate_conda_env(backend)
   timeout(time: 20, unit: 'MINUTES') {
-    sh "bash -c tests/scripts/task_${backend}_tutorial_test.sh"
+    sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
   }
 }
 
@@ -116,7 +116,7 @@ pipeline {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git()
-        sh "bash -c tests/scripts/task_lint.sh"
+        sh "bash tests/scripts/task_lint.sh"
       }
       post {
         always {
