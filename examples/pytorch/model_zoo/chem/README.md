@@ -12,7 +12,9 @@ the chemistry community and the deep learning community to further their researc
 
 ## Dependencies
 
-Before you proceed, make sure you have installed the dependencies below:
+Before you proceed, depending on the model/task you are interested, 
+you may need to install the dependencies below:
+
 - PyTorch 1.2
     - Check the [official website](https://pytorch.org/) for installation guide.
 - RDKit 2018.09.3
@@ -21,6 +23,9 @@ Before you proceed, make sure you have installed the dependencies below:
 - Pdbfixer
     - We recommend installation with `conda install -c omnia pdbfixer`. To install from source, see the 
     [manual](http://htmlpreview.github.io/?https://raw.github.com/pandegroup/pdbfixer/master/Manual.html).
+- MDTraj
+    - We recommend installation with `conda install -c conda-forge mdtraj`. For alternative ways of installation, 
+    see the [official documentation](http://mdtraj.org/1.9.3/installation.html).
 
 The rest dependencies can be installed with `pip install -r requirements.txt`.
 

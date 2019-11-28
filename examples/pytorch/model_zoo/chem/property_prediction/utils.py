@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from dgl import model_zoo
-from dgl.data.chem import one_hot_encoding, RandomSplitter
+from dgl.data.chem import smiles_to_bigraph, one_hot_encoding, RandomSplitter
 from sklearn.metrics import roc_auc_score
 
 def set_random_seed(seed=0):
@@ -277,7 +277,7 @@ def load_dataset_for_classification(args):
     assert args['dataset'] in ['Tox21']
     if args['dataset'] == 'Tox21':
         from dgl.data.chem import Tox21
-        dataset = Tox21(node_featurizer=args['atom_featurizer'])
+        dataset = Tox21(smiles_to_bigraph, args['atom_featurizer'])
         train_set, val_set, test_set = RandomSplitter.train_val_test_split(
             dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
             frac_test=args['frac_test'], random_state=args['random_seed'])
@@ -311,8 +311,9 @@ def load_dataset_for_regression(args):
 
     if args['dataset'] == 'Aromaticity':
         from dgl.data.chem import PubChemBioAssayAromaticity
-        dataset = PubChemBioAssayAromaticity(node_featurizer=args['atom_featurizer'],
-                                             edge_featurizer=args['bond_featurizer'])
+        dataset = PubChemBioAssayAromaticity(smiles_to_bigraph,
+                                             args['atom_featurizer'],
+                                             args['bond_featurizer'])
         train_set, val_set, test_set = RandomSplitter.train_val_test_split(
             dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
             frac_test=args['frac_test'], random_state=args['random_seed'])

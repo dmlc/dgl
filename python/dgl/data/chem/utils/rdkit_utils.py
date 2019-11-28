@@ -67,7 +67,7 @@ def get_mol_3D_coordinates(mol):
 
     Returns
     -------
-    ndarray of shape (N, 3) or None
+    numpy.ndarray of shape (N, 3) or None
         The 3D coordinates of atoms in the molecule. N for the number of atoms in
         the molecule. For failures in getting the conformations, None will be returned.
     """
@@ -83,7 +83,7 @@ def get_mol_3D_coordinates(mol):
         warnings.warn('Unable to get conformation of the molecule.')
         return None
 
-def load_molecule(molecule_file, add_hydrogens=False, sanitize=True, calc_charges=False,
+def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charges=False,
                   remove_hs=False, use_conformation=True):
     """Load a molecule from a file.
 
@@ -112,7 +112,7 @@ def load_molecule(molecule_file, add_hydrogens=False, sanitize=True, calc_charge
     -------
     mol : rdkit.Chem.rdchem.Mol
         RDKit molecule instance for the loaded molecule.
-    coordinates : ndarray of shape (N, 3) or None
+    coordinates : np.ndarray of shape (N, 3) or None
         The 3D coordinates of atoms in the molecule. N for the number of atoms in
         the molecule. None will be returned if ``use_conformation`` is False or
         we failed to get conformation information.
@@ -192,7 +192,6 @@ def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=True, calc_
     if num_processes == 1:
         mols_loaded = []
         for i, f in enumerate(files):
-            print(i)
             mols_loaded.append(load_molecule(
                 f, add_hydrogens=add_hydrogens, sanitize=sanitize, calc_charges=calc_charges,
                 remove_hs=remove_hs, use_conformation=use_conformation))

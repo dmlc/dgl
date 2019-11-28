@@ -1,7 +1,7 @@
 """PDBBind dataset processed by MoleculeNet."""
 import os
 
-from ..utils import multiprocess_load_molecules
+from ..utils import multiprocess_load_molecules, ACNN_graph_construction_and_featurization
 from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
 from .... import backend as F
 
@@ -32,7 +32,7 @@ class PDBBind(object):
 
     Parameters
     ----------
-    subset_choice : str
+    subset : str
         In MoleculeNet, we can use either the "refined" subset or the "core" subset. We can
         retrieve them by setting ``subset_choice`` to be ``'refined'`` or ``'core'``. The size
         of the ``'core'`` set is 195 and the size of the ``'refined'`` set is 3706.
@@ -53,13 +53,18 @@ class PDBBind(object):
     use_conformation : bool
         Whether we need to extract molecular conformation from proteins and ligands.
         Default to True.
+    construct_graph_and_featurize : callable
+        Construct a DGLHeteroGraph for the use of GNNs. Mapping self.protein_mols[i],
+        self.ligand_mols[i], self.protein_coordinates[i], and self.ligand_coordinates[i]
+        to a DGLHeteroGraph. Default to :func:`ACNN_graph_construction_and_featurization`.
     num_processes : int or None
         Number of worker processes to use. If None,
-        then we will use the number of CPUs in the systetm. Default to None.
+        then we will use the number of CPUs in the systetm. Default to 64.
     """
-    def __init__(self, subset_choice, load_binding_pocket=False, add_hydrogens=False,
-                 sanitize=True, calc_charges=False, remove_hs=False, use_conformation=True,
-                 num_processes=None):
+    def __init__(self, subset, load_binding_pocket=False, add_hydrogens=False,
+                 sanitize=False, calc_charges=False, remove_hs=False, use_conformation=True,
+                 construct_graph_and_featurize=ACNN_graph_construction_and_featurization,
+                 num_processes=64):
         self.task_names = ['-logKd/Ki']
         self.n_tasks = len(self.task_names)
 
@@ -70,40 +75,53 @@ class PDBBind(object):
         download(_get_dgl_url(self._url), path=data_path)
         extract_archive(data_path, extracted_data_path)
 
-        if subset_choice == 'core':
+        if subset == 'core':
             index_label_file = extracted_data_path + '/v2015/INDEX_core_data.2013'
-        elif subset_choice == 'refined':
+        elif subset == 'refined':
             index_label_file = extracted_data_path + '/v2015/INDEX_refined_data.2015'
         else:
             raise ValueError(
                 'Expect the subset_choice to be either '
-                'core or refined, got {}'.format(subset_choice))
+                'core or refined, got {}'.format(subset))
 
         self._preprocess(extracted_data_path, index_label_file, load_binding_pocket,
                          add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
-                         num_processes)
+                         construct_graph_and_featurize, num_processes)
 
     def _filter_out_invalid(self, proteins_loaded, ligands_loaded, use_conformation):
         """Filter out invalid ligand-protein pairs.
 
         Parameters
         ----------
+        proteins_loaded : list
+            Each element is a 2-tuple of the RDKit molecule instance and its associated atom
+            coordinates. None is used to represent invalid/non-existing molecule or coordinates.
+        ligands_loaded : list
+            Each element is a 2-tuple of the RDKit molecule instance and its associated atom
+            coordinates. None is used to represent invalid/non-existing molecule or coordinates.
+        use_conformation : bool
+            Whether we need conformation information (atom coordinates) and filter out molecules
+            without valid conformation.
         """
         num_pairs = len(proteins_loaded)
-        self.protein_mols = []
-        self.ligand_mols = []
+        self.indices, self.protein_mols, self.ligand_mols = [], [], []
         if use_conformation:
-            self.ligand_coordinates = []
-            self.protein_coordinates = []
+            self.ligand_coordinates, self.protein_coordinates = [], []
+        else:
+            # Use None for placeholders.
+            self.ligand_coordinates = [None for _ in range(num_pairs)]
+            self.protein_coordinates = [None for _ in range(num_pairs)]
 
         for i in range(num_pairs):
             protein_mol, protein_coordinates = proteins_loaded[i]
             ligand_mol, ligand_coordinates = ligands_loaded[i]
             if (not use_conformation) and all(v is not None for v in [protein_mol, ligand_mol]):
+                self.indices.append(i)
                 self.protein_mols.append(protein_mol)
                 self.ligand_mols.append(ligand_mol)
             elif all(v is not None for v in [
                 protein_mol, protein_coordinates, ligand_mol, ligand_coordinates]):
+                self.indices.append(i)
                 self.protein_mols.append(protein_mol)
                 self.protein_coordinates.append(protein_coordinates)
                 self.ligand_mols.append(ligand_mol)
@@ -111,7 +129,7 @@ class PDBBind(object):
 
     def _preprocess(self, root_path, index_label_file, load_binding_pocket,
                     add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
-                    num_processes):
+                    construct_graph_and_featurize, num_processes):
         """Preprocess the dataset.
 
         The pre-processing proceeds as follows:
@@ -123,9 +141,34 @@ class PDBBind(object):
 
         Parameters
         ----------
+        root_path : str
+            Root path for molecule files.
+        index_label_file : str
+            Path to the index file for the dataset.
+        load_binding_pocket : bool
+            Whether to load binding pockets or full proteins.
+        add_hydrogens : bool
+            Whether to add hydrogens via pdbfixer.
+        sanitize : bool
+            Whether sanitization is performed in initializing RDKit molecule instances. See
+            https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
+        calc_charges : bool
+            Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
+            ``add_hydrogens`` and ``sanitize`` to be True.
+        remove_hs : bool
+            Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
+            slow for large molecules.
+        use_conformation : bool
+            Whether we need to extract molecular conformation from proteins and ligands.
+        construct_graph_and_featurize : callable
+            Construct a DGLHeteroGraph for the use of GNNs. Mapping self.protein_mols[i],
+            self.ligand_mols[i], self.protein_coordinates[i], and self.ligand_coordinates[i]
+            to a DGLHeteroGraph.
+        num_processes : int or None
+            Number of worker processes to use. If None,
+            then we will use the number of CPUs in the systetm.
         """
-        pdbs = []
-        labels = []
+        pdbs, labels = [], []
         with open(index_label_file, 'r') as f:
             for line in f.readlines():
                 if line[0] != "#":
@@ -143,6 +186,7 @@ class PDBBind(object):
         self.ligand_files = [os.path.join(
             root_path, 'v2015', pdb, '{}_ligand.sdf'.format(pdb)) for pdb in pdbs]
 
+        num_processes = min(num_processes, len(pdbs))
         print('Loading proteins...')
         proteins_loaded = multiprocess_load_molecules(self.protein_files,
                                                       add_hydrogens=add_hydrogens,
@@ -151,7 +195,6 @@ class PDBBind(object):
                                                       remove_hs=remove_hs,
                                                       use_conformation=use_conformation,
                                                       num_processes=num_processes)
-
         print('Loading ligands...')
         ligands_loaded = multiprocess_load_molecules(self.ligand_files,
                                                      add_hydrogens=add_hydrogens,
@@ -161,6 +204,24 @@ class PDBBind(object):
                                                      use_conformation=use_conformation,
                                                      num_processes=num_processes)
         self._filter_out_invalid(proteins_loaded, ligands_loaded, use_conformation)
+        self.labels = self.labels[self.indices]
+        print('Finished cleaning the dataset, '
+              'got {:d}/{:d} valid pairs'.format(len(self), len(pdbs)))
+
+        print('Start constructing graphs and featurizing them.')
+        self.graphs = []
+        for i in range(len(self)):
+            print('Constructing and featurizing datapoint {:d}/{:d}'.format(i+1, len(self)))
+            self.graphs.append(construct_graph_and_featurize(
+                self.protein_mols[i], self.ligand_mols[i],
+                self.protein_coordinates[i], self.ligand_coordinates[i]))
 
     def __len__(self):
-        return len(self.ligand_mols)
+        """Get the size of the dataset.
+
+        Returns
+        -------
+        int
+            Number of valid ligand-protein pairs in the dataset.
+        """
+        return len(self.indices)
