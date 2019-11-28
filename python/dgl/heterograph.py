@@ -3575,6 +3575,11 @@ class DGLHeteroGraph(object):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLHeteroGraph
+          Moved DGLHeteroGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3583,7 +3588,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
-        >>> g.to(torch.device('cuda:0'))
+        >>> g = g.to(torch.device('cuda:0'))
         """
         for i in range(len(self._node_frames)):
             for k in self._node_frames[i].keys():
@@ -3591,6 +3596,7 @@ class DGLHeteroGraph(object):
         for i in range(len(self._edge_frames)):
             for k in self._edge_frames[i].keys():
                 self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
+        return self
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.
