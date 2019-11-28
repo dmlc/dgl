@@ -732,7 +732,7 @@ def test_subgraph():
     sg2 = g.edge_subgraph({'follows': [1], 'plays': [1], 'wishes': [1]})
     _check_subgraph(g, sg2)
 
-    def _check_typed_subgraph(g, sg):
+    def _check_typed_subgraph1(g, sg):
         assert set(sg.ntypes) == {'user', 'game'}
         assert set(sg.etypes) == {'follows', 'plays', 'wishes'}
         for ntype in sg.ntypes:
@@ -749,10 +749,23 @@ def test_subgraph():
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
 
+    def _check_typed_subgraph2(g, sg):
+        assert set(sg.ntypes) == {'developer', 'game'}
+        assert set(sg.etypes) == {'develops'}
+        for ntype in sg.ntypes:
+            assert sg.number_of_nodes(ntype) == g.number_of_nodes(ntype)
+        for etype in sg.etypes:
+            src_sg, dst_sg = sg.all_edges(etype=etype, order='eid')
+            src_g, dst_g = g.all_edges(etype=etype, order='eid')
+            assert F.array_equal(src_sg, src_g)
+            assert F.array_equal(dst_sg, dst_g)
+
     sg3 = g.node_type_subgraph(['user', 'game'])
-    _check_typed_subgraph(g, sg3)
-    sg4 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
-    _check_typed_subgraph(g, sg4)
+    _check_typed_subgraph1(g, sg3)
+    sg4 = g.edge_type_subgraph(['develops'])
+    _check_typed_subgraph2(g, sg4)
+    sg5 = g.edge_type_subgraph(['follows', 'plays', 'wishes'])
+    _check_typed_subgraph1(g, sg5)
 
 def test_apply():
     def node_udf(nodes):
