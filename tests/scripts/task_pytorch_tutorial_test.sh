@@ -18,7 +18,7 @@ export DGL_DOWNLOAD_DIR=${PWD}
 
 pushd ${TUTORIAL_ROOT} > /dev/null
 # Install requirements
-pip3 install -r requirements.txt || fail "installing requirements"
+pip install -r requirements.txt || fail "installing requirements"
 
 # Test
 for f in $(find . -name "*.py" ! -name "*_mx.py")
