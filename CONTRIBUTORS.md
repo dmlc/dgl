@@ -19,6 +19,7 @@ Contributors
 * [Aymen Waheb](https://github.com/aymenwah): APPNP in Pytorch
 * [Chengqiang Lu](https://github.com/geekinglcq): MGCN, SchNet and MPNN in PyTorch
 * [Gongze Cao](https://github.com/Zardinality): Cluster GCN
+* [Yicheng Wu](https://github.com/MilkshakeForReal): RotatE in Pytorch
 
 Other improvement
 * [Brett Koonce](https://github.com/brettkoonce)

@@ -7,18 +7,15 @@ DGL Basics
 **Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, Yu Gai,
 Zheng Zhang
 
-The Goal of this tutorial:
-
-* To create a graph.
-* To read and write node and edge representations.
+In this tutorial, you learn how to create a graph and how to read and write node and edge representations.
 """
 
 ###############################################################################
-# Graph Creation
+# Creating a graph
 # --------------
-# The design of :class:`DGLGraph` was influenced by other graph libraries. Indeed,
-# you can create a graph from networkx, and convert it into a :class:`DGLGraph` and
-# vice versa:
+# The design of :class:`DGLGraph` was influenced by other graph libraries. You 
+# can create a graph from networkx and convert it into a :class:`DGLGraph` and 
+# vice versa.
 
 import networkx as nx
 import dgl
@@ -36,33 +33,32 @@ plt.show()
 
 
 ###############################################################################
-# They are the same graph, except that :class:`DGLGraph` is *always* directional.
+# The examples here show the same graph, except that :class:`DGLGraph` is always directional.
 #
-# One can also create a graph by calling DGL's own interface.
+# You can also create a graph by calling the DGL interface.
 # 
-# Now let's build a star graph. :class:`DGLGraph` nodes are consecutive range of
+# In the next example, you build a star graph. :class:`DGLGraph` nodes are a consecutive range of
 # integers between 0 and :func:`number_of_nodes() <DGLGraph.number_of_nodes>`
 # and can grow by calling :func:`add_nodes <DGLGraph.add_nodes>`.
 # :class:`DGLGraph` edges are in order of their additions. Note that
-# edges are accessed in much the same way as nodes, with one extra feature
-# of *edge broadcasting*:
+# edges are accessed in much the same way as nodes, with one extra feature: *edge broadcasting*.
 
 import dgl
 import torch as th
 
 g = dgl.DGLGraph()
 g.add_nodes(10)
-# a couple edges one-by-one
+# A couple edges one-by-one
 for i in range(1, 4):
     g.add_edge(i, 0)
-# a few more with a paired list
+# A few more with a paired list
 src = list(range(5, 8)); dst = [0]*3
 g.add_edges(src, dst)
 # finish with a pair of tensors
 src = th.tensor([8, 9]); dst = th.tensor([0, 0])
 g.add_edges(src, dst)
 
-# edge broadcasting will do star graph in one go!
+# Edge broadcasting will do star graph in one go!
 g.clear(); g.add_nodes(10)
 src = th.tensor(list(range(1, 10)));
 g.add_edges(src, 0)
@@ -74,9 +70,9 @@ plt.show()
 
 
 ###############################################################################
-# Feature Assignment
+# Assigning a feature
 # ------------------
-# One can also assign features to nodes and edges of a :class:`DGLGraph`.  The
+# You can also assign features to nodes and edges of a :class:`DGLGraph`.  The
 # features are represented as dictionary of names (strings) and tensors,
 # called **fields**.
 #
@@ -85,7 +81,7 @@ plt.show()
 # .. note::
 #
 #    DGL aims to be framework-agnostic, and currently it supports PyTorch and
-#    MXNet tensors. From now on, we use PyTorch as an example.
+#    MXNet tensors. The following examples use PyTorch only.
 
 import dgl
 import torch as th
@@ -95,36 +91,36 @@ g.ndata['x'] = x
 
 
 ###############################################################################
-# :func:`ndata <DGLGraph.ndata>` is a syntax sugar to access states of all nodes,
-# states are stored
-# in a container ``data`` that hosts user defined dictionary.
+# :func:`ndata <DGLGraph.ndata>` is a syntax sugar to access the state of all nodes. 
+# States are stored
+# in a container ``data`` that hosts a user-defined dictionary.
 
 print(g.ndata['x'] == g.nodes[:].data['x'])
 
-# access node set with integer, list, or integer tensor
+# Access node set with integer, list, or integer tensor
 g.nodes[0].data['x'] = th.zeros(1, 3)
 g.nodes[[0, 1, 2]].data['x'] = th.zeros(3, 3)
 g.nodes[th.tensor([0, 1, 2])].data['x'] = th.zeros(3, 3)
 
 
 ###############################################################################
-# Assigning edge features is in a similar fashion to that of node features,
-# except that one can also do it by specifying endpoints of the edges.
+# Assigning edge features is similar to that of node features,
+# except that you can also do it by specifying endpoints of the edges.
 
 g.edata['w'] = th.randn(9, 2)
 
-# access edge set with IDs in integer, list, or integer tensor
+# Access edge set with IDs in integer, list, or integer tensor
 g.edges[1].data['w'] = th.randn(1, 2)
 g.edges[[0, 1, 2]].data['w'] = th.zeros(3, 2)
 g.edges[th.tensor([0, 1, 2])].data['w'] = th.zeros(3, 2)
 
-# one can also access the edges by giving endpoints
+# You can also access the edges by giving endpoints
 g.edges[1, 0].data['w'] = th.ones(1, 2)                 # edge 1 -> 0
 g.edges[[1, 2, 3], [0, 0, 0]].data['w'] = th.ones(3, 2) # edges [1, 2, 3] -> 0
 
 
 ###############################################################################
-# After assignments, each node/edge field will be associated with a scheme
+# After assignments, each node or edge field will be associated with a scheme
 # containing the shape and data type (dtype) of its field value.
 
 print(g.node_attr_schemes())
@@ -133,7 +129,7 @@ print(g.node_attr_schemes())
 
 
 ###############################################################################
-# One can also remove node/edge states from the graph. This is particularly
+# You can also remove node or edge states from the graph. This is particularly
 # useful to save memory during inference.
 
 g.ndata.pop('x')
@@ -141,9 +137,9 @@ g.edata.pop('w')
 
 
 ###############################################################################
-# Multigraphs
+# Working with multigraphs
 # ~~~~~~~~~~~
-# Many graph applications need multi-edges. To enable this, construct :class:`DGLGraph`
+# Many graph applications need parallel edges. To enable this, construct :class:`DGLGraph`
 # with ``multigraph=True``.
 
 g_multi = dgl.DGLGraph(multigraph=True)
@@ -159,8 +155,8 @@ print(g_multi.edges())
 
 
 ###############################################################################
-# An edge in multi-graph cannot be uniquely identified using its incident nodes
-# :math:`u` and :math:`v`; query their edge ids use ``edge_id`` interface.
+# An edge in multigraph cannot be uniquely identified by using its incident nodes
+# :math:`u` and :math:`v`; query their edge IDs use ``edge_id`` interface.
 
 eid_10 = g_multi.edge_id(1, 0)
 g_multi.edges[eid_10].data['w'] = th.ones(len(eid_10), 2)
@@ -170,14 +166,13 @@ print(g_multi.edata['w'])
 ###############################################################################
 # .. note::
 #
-#    * Nodes and edges can be added but not removed; we will support removal in
-#      the future.
-#    * Updating a feature of different schemes raise error on individual node (or
+#    * Nodes and edges can be added but not removed.
+#    * Updating a feature of different schemes raises the risk of error on individual nodes (or
 #      node subset).
 
 
 ###############################################################################
 # Next steps
 # ----------
-# In the :doc:`next tutorial <3_pagerank>`, we will go through the
+# In the :doc:`next tutorial <3_pagerank>` you learn the
 # DGL message passing interface by implementing PageRank.
