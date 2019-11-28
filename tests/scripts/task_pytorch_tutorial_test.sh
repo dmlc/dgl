@@ -1,6 +1,8 @@
 #!/bin/bash
 # The working directory for this script will be "tests/scripts"
 
+source ~/.bashrc
+conda activate pytorch-ci
 TUTORIAL_ROOT="./tutorials"
 
 function fail {

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source ~/.bashrc
 GCN_EXAMPLE_DIR="./examples/pytorch/"
 
 function fail {

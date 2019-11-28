@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ~/.bashrc
+
 function fail {
     echo FAIL: $@
     exit -1
