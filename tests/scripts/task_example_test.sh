@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ~/.bashrc
+. /opt/conda/etc/profile.d/conda.sh
 GCN_EXAMPLE_DIR="./examples/pytorch/"
 
 function fail {

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-source ~/.bashrc
+. /opt/conda/etc/profile.d/conda.sh
 
 if [ $# -ne 1 ]; then
     echo "Device argument required, can be cpu or gpu"

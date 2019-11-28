@@ -1,7 +1,7 @@
 #!/bin/bash
 # The working directory for this script will be "tests/scripts"
 
-source ~/.bashrc
+. /opt/conda/etc/profile.d/conda.sh
 conda activate pytorch-ci
 TUTORIAL_ROOT="./tutorials"
 
