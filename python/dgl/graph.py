@@ -3348,7 +3348,7 @@ class DGLGraph(DGLBaseGraph):
         >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
-        >>> G.to(torch.device('cuda:0'))
+        >>> G = G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
