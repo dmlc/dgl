@@ -58,7 +58,9 @@ class KEModel(object):
             self.score_func = ComplExScore()
         elif model_name == 'RESCAL':
             self.score_func = RESCALScore(relation_dim, entity_dim)
-            
+        elif model_name == 'RotatE':
+            self.score_func = RotatEScore(gamma, self.emb_init)
+        
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
         self.head_neg_prepare = self.score_func.create_neg_prepare(True)
