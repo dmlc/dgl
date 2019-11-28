@@ -1,5 +1,4 @@
 import dgl
-from dgl import DGLGraph
 import backend as F
 
 def tree1():

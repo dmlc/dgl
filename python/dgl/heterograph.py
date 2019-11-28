@@ -264,7 +264,7 @@ class DGLHeteroGraph(object):
                    '      metagraph={meta})')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
-            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+            nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph.edges())
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
@@ -1501,7 +1501,7 @@ class DGLHeteroGraph(object):
         >>> sub_g = g.subgraph({'user': [1, 2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 0},
-              num_edges={'plays': 0, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
@@ -1582,7 +1582,7 @@ class DGLHeteroGraph(object):
         >>>                          ('user', 'plays', 'game'): [2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 1},
-              num_edges={'plays': 1, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
