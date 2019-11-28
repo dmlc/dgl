@@ -16,7 +16,7 @@ def init_git_win64() {
 }
 
 def activate_conda_env(backend){
-  sh "conda activate ${backend}-ci"
+  // sh "conda activate ${backend}-ci"
 }
 
 // pack libraries for later use
