@@ -1206,6 +1206,7 @@ if __name__ == '__main__':
     test_view1()
     test_flatten()
     test_convert()
+    test_to_device()
     test_transform()
     test_subgraph()
     test_apply()
