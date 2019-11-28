@@ -22,6 +22,8 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
+conda activate ${DGLBACKEND}-ci
+
 python3 -m nose -v --with-xunit tests/compute || fail "compute"
 python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
 python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
