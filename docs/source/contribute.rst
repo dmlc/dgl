@@ -289,8 +289,8 @@ See `here <https://github.com/dmlc/dgl/tree/master/docs>`__ for more details.
 Contributing Editorial Changes via GitHub Web Interface
 ```````````````````````````````````````````````````````
 
-If one is only changing the wording (i.e. not touching the runnable code at all), one does not
-even need to understand Git CLI to contribute!  Instead, one can simply:
+If one is only changing the wording (i.e. not touching the runnable code at all), one can simply do
+without the usage of Git CLI:
 
 1. Make your fork by clicking on the **Fork** button in the DGL main repository web page.
 2. Make whatever changes in the web interface *within your own fork*.  You can usually tell
