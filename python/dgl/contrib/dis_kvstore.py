@@ -71,10 +71,12 @@ class KVServer(object):
               2:'168.12.46.12:50051' }
     server_addr : str
         IP address of current KVServer node, e.g., '127.0.0.1:50051'.
+    global_to_local : list of int
+        A book mapping for global ID and local ID. This flag is optional, and if it is None, we use original ID.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, client_namebook, server_addr, net_type='socket'):
+    def __init__(self, server_id, client_namebook, server_addr, global_to_local, net_type='socket'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(client_namebook) > 0, 'client_namebook cannot be empty.'
         assert len(server_addr.split(':')) == 2, 'Incorrect IP format: %s' % server_addr
@@ -85,6 +87,7 @@ class KVServer(object):
         self._client_namebook = client_namebook
         self._client_count = len(client_namebook)
         self._addr = server_addr
+        self._global_to_local = F.tensor(global_to_local)
         self._sender = _create_sender(net_type)
         self._receiver = _create_receiver(net_type)
 
@@ -138,9 +141,19 @@ class KVServer(object):
                         high=row_1[1])
                     self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
-                self._push_handler(msg.name, msg.id, msg.data, self._data_store)
+                ID = None
+                if self._global_to_local is not None:
+                    ID = self._global_to_local[msg.id]
+                else:
+                    ID = msg.id
+                self._push_handler(msg.name, ID, msg.data, self._data_store)
             elif msg.type == KVMsgType.PULL:
-                res_tensor = self._pull_handler(msg.name, msg.id, self._data_store)
+                ID = None
+                if self._global_to_local is not None:
+                    ID = self._global_to_local[msg.id]
+                else:
+                    ID = msg.id
+                res_tensor = self._pull_handler(msg.name, ID, self._data_store)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
@@ -220,8 +233,8 @@ class KVServer(object):
             a vector storing the ID list.
         data : tensor (mx.ndarray or torch.tensor)
             a tensor with the same row size of id
-        target : target tensor (mx.ndarray or torch.tensor)
-            the target tensor
+        target : map
+            self._data_store
         """
         target[name][ID] += data
 
@@ -236,8 +249,8 @@ class KVServer(object):
             data name
         ID : tensor (mx.ndarray or torch.tensor)
             a vector storing the IDs that has been re-mapped to local id.
-        target : tensor (mx.ndarray or torch.tensor)
-            the target tensor
+        target : tensor
+            self._data_store
 
         Return
         ------
@@ -390,22 +403,21 @@ class KVClient(object):
         start = 0
         for idx in range(len(server)):
             end = start + count[idx]
-            ID = None
-            if self._global_to_local is not None:
-                ID = self._global_to_local[id_tensor[start:end]]
-            else:
-                ID = id_tensor[start:end]
-            if len(ID) == 0: # don't have any data in target server
-                start += count[idx]
+            if start == end: # don't have any data for target server
                 continue
             if server[idx] == self._local_server_id:  # update local data
+                ID = None
+                if self._global_to_local is not None:
+                    ID = self._global_to_local[id_tensor[start:end]]
+                else:
+                    ID = id_tensor[start:end]
                 self._push_handler(name, ID, data_tensor[start:end], self._data_store)
             else: # push data to remote server
                 msg = KVStoreMsg(
                     type=KVMsgType.PUSH, 
                     rank=self._client_id, 
                     name=name, 
-                    id=ID, 
+                    id=id_tensor[start:end], 
                     data=data_tensor[start:end])
                 _send_kv_msg(self._sender, msg, server[idx])
             start += count[idx]
@@ -447,26 +459,26 @@ class KVClient(object):
         server, count = np.unique(F.asnumpy(server_id), return_counts=True)
         start = 0
         pull_count = 0
+        local_data = None
         for idx in range(len(server)):
             end = start + count[idx]
-            ID = None
-            if self._global_to_local is not None:
-                ID = self._global_to_local[id_tensor[start:end]]
-            else:
-                ID = id_tensor[start:end]  
-            if len(ID) == 0: # don't have any data in target server
-                start += count[idx]
-                continue                
+            if start == end:  # don't have any data in target server
+                continue
             if server[idx] == self._local_server_id: # local pull
-                self._pull_handler(name, ID, self._data_store)
+                ID = None
+                if self._global_to_local is not None:
+                    ID = self._global_to_local[id_tensor[start:end]]
+                else:
+                    ID = id_tensor[start:end]  
+                local_data = self._pull_handler(name, ID, self._data_store)
             else: # pull data from remote server
                 msg = KVStoreMsg(
-                    type=KVStoreMsg.PULL, 
+                    type=KVMsgType.PULL, 
                     rank=self._client_id, 
                     name=name, 
-                    id=ID, 
+                    id=id_tensor[start:end], 
                     data=None)
-                _send_kv_msg(self._sender, msg, server_id)
+                _send_kv_msg(self._sender, msg, server[idx])
                 pull_count += 1
             start += count[idx]
 
@@ -474,13 +486,22 @@ class KVClient(object):
         for idx in range(pull_count):
             msg_list.append(_recv_kv_msg(self._receiver))
 
+        if local_data is not None:
+            local_msg = KVStoreMsg(
+                type=KVMsgType.PULL_BACK, 
+                rank=self._local_server_id, 
+                name=name, 
+                id=None,
+                data=local_data)
+            msg_list.append(local_msg)
+
         # sort msg by server id
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
 
-        return data_tensor[back_sorted_id]
+        return data_tensor[back_sorted_id] # return data with original index order
 
-    def _takeId(elem):
+    def _takeId(self, elem):
         return elem.rank
 
     def _pull_handler(self, name, ID, target):
