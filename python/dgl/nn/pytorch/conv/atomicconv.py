@@ -8,7 +8,8 @@ class RadialPooling(nn.Module):
     def __init__(self, interaction_cutoffs, rbf_kernel_means, rbf_kernel_scaling):
         super(RadialPooling, self).__init__()
 
-        self.interaction_cutoffs = interaction_cutoffs.reshape(-1, 1, 1)
+        self.interaction_cutoffs = nn.Parameter(
+            interaction_cutoffs.reshape(-1, 1, 1), requires_grad=False)
         self.rbf_kernel_means = nn.Parameter(
             rbf_kernel_means.reshape(-1, 1, 1), requires_grad=True)
         self.rbf_kernel_scaling = nn.Parameter(

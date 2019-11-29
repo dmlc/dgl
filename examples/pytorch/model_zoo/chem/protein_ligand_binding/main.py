@@ -36,7 +36,7 @@ def run_an_eval_epoch(args, model, data_loader):
 
 def main(args):
     args['device'] = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    set_random_seed(args['seed'])
+    set_random_seed(args['random_seed'])
 
     dataset, train_set, val_set, test_set = load_dataset(args)
     train_loader = DataLoader(dataset=train_set,

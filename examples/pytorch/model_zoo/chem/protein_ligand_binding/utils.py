@@ -26,11 +26,9 @@ def load_dataset(args):
     assert args['dataset'] in ['PDBBind'], 'Unexpected dataset {}'.format(args['dataset'])
     if args['dataset'] == 'PDBBind':
         dataset = PDBBind(subset=args['subset'], load_binding_pocket=args['load_binding_pocket'])
-        train_set, val_set, test_set = RandomSplitter.train_val_test_split(dataset,
-                                                                           frac_train=args['frac_train'],
-                                                                           frac_val=args['frac_val'],
-                                                                           frac_test=args['frac_test'],
-                                                                           random_state=args['seed'])
+        train_set, val_set, test_set = RandomSplitter.train_val_test_split(
+            dataset, rac_train=args['frac_train'], frac_val=args['frac_val'],
+            frac_test=args['frac_test'], random_state=args['random_seed'])
 
     return dataset, train_set, val_set, test_set
 
