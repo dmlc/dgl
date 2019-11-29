@@ -3591,6 +3591,7 @@ class DGLHeteroGraph(object):
         for i in range(len(self._edge_frames)):
             for k in self._edge_frames[i].keys():
                 self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
+        return self
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.

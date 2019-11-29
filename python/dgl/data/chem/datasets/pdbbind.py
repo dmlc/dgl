@@ -225,3 +225,7 @@ class PDBBind(object):
             Number of valid ligand-protein pairs in the dataset.
         """
         return len(self.indices)
+
+    def __getitem__(self, item):
+        return item, self.protein_mols[item], self.ligand_mols[item], \
+               self.graphs[item], self.labels[item]

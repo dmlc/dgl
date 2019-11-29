@@ -55,7 +55,7 @@ def run_an_eval_epoch(args, model, data_loader):
     return total_score
 
 def main(args):
-    args['device'] = "cuda" if torch.cuda.is_available() else "cpu"
+    args['device'] = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     set_random_seed(args['random_seed'])
 
     train_set, val_set, test_set = load_dataset_for_regression(args)
