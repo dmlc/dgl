@@ -2383,7 +2383,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
             eid = utils.toindex(slice(0, self.number_of_edges(etype)))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2468,7 +2468,7 @@ class DGLHeteroGraph(object):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
