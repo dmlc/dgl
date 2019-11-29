@@ -120,7 +120,7 @@ To contribute a new model within a specific supported tensor framework (e.g. PyT
      
      * However, better numbers are always welcomed.
    
-3. We (the DGL team) will review it, suggesting or making changes as necessary.
+3. The committers will review it, suggesting or making changes as necessary.
 
 4. Resolve the suggestions and reviews, and go back to step 3 until approved.
 
@@ -167,7 +167,7 @@ Since DGL supports multiple tensor frameworks, contributing a core feature is no
 2. Once you have done that, make a pull request and summarize your changes, and wait for the CI to finish.
 3. If the CI fails on a tensor platform that you are unfamiliar with (which is well often the case), please
    refer to `Supporting Multiple Platforms`_ section.
-4. We (the DGL team) will review it, suggesting or making changes as necessary.
+4. The committers will review it, suggesting or making changes as necessary.
 5. Resolve the suggestions and reviews, and go back to step 3 until approved.
 6. Merge it and enjoy your day.
 
@@ -297,7 +297,7 @@ even need to understand Git CLI to contribute!  Instead, one can simply:
    if you are inside your own fork or in the main repository by checking whether you can commit
    to the ``master`` branch: if you cannot, you are in the wrong place.
 3. Once done, make a pull request (on the web interface).
-4. We (the DGL team) will review it, suggesting or making changes as necessary.
+4. The committers will review it, suggesting or making changes as necessary.
 5. Resolve the suggestions and reviews, and go back to step 4 until approved.
 6. Merge it and enjoy your day.
 
