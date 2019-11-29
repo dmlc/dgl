@@ -10,7 +10,7 @@ def batched_l2_dist(a, b):
 
     squared_res = nd.add(nd.linalg_gemm(
         a, nd.transpose(b, axes=(0, 2, 1)), nd.broadcast_axes(nd.expand_dims(b_squared, axis=-2), axis=1, size=a.shape[1]), alpha=-2
-    ), a_squared.expand_dims(-1))
+    ), nd.expand_dims(a_squared, axis=-1))
     res = nd.sqrt(nd.clip(squared_res, 1e-30, np.finfo(np.float32).max))
     return res
 
