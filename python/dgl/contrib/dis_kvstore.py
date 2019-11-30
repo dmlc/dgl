@@ -31,9 +31,20 @@ def ReadNetworkConfigure(filename):
     Returns
     -------
     dict
-        server namebook
+        server namebook, 
+
+         e.g., {0:'172.31.40.143:50050'}
     dict
-        client namebook
+        client namebook,
+
+         e.g., {0:'172.31.40.143:50051', 
+                1:'172.31.36.140:50051', 
+                2:'172.31.47.147:50051', 
+                3:'172.31.30.180:50051'}
+
+    Note that, for many cases we could luanch a large number of processes in one machine. 
+    In that case, we should construct server namebook and client namebook in script, 
+    instead of reading them from file.
     """
     server_namebook = {}
     client_namebook = {}
@@ -54,35 +65,39 @@ class KVServer(object):
 
     In practice, developers can use KVServer to hold large-scale graph features or 
     graph embeddings across machines in a distributed setting. User can re-wriite _push_handler 
-    and _pull_handler to support flexibale models.
+    and _pull_handler to support flexibale algorithms.
 
-    Note that, DO NOT use KVServer in multiple threads! 
+    Note that, DO NOT share one KVServer in multiple threads in python because this behavior is not defined.
+
+    For now, KVServer can only run in CPU, we will support GPU KVServer in the future.
 
     Parameters
     ----------
     server_id : int
-        KVServer's ID (start from 0). 
+        KVServer's ID (start from 0).
     client_namebook : dict
         IP address namebook of KVClient, where the key is the client's ID 
-        (start from 0) and the value is client's IP address, e.g.,
+        (start from 0) and the value is client's IP address and port, e.g.,
 
             { 0:'168.12.23.45:50051', 
               1:'168.12.23.21:50051', 
               2:'168.12.46.12:50051' }
     server_addr : str
-        IP address of current KVServer node, e.g., '127.0.0.1:50051'.
-    global_to_local : list of int
-        A book mapping for global ID and local ID. This flag is optional, and if it is None, we use original ID.
+        IP address and port of current KVServer node, e.g., '127.0.0.1:50051'.
+    global_to_local : list or tensor (mx.ndarray or torch.tensor)
+        A book that maps global ID to local partition ID. 
+        This flag is optional, and we always use global ID if it has been set to None.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, client_namebook, server_addr, global_to_local, net_type='socket'):
+    def __init__(self, server_id, client_namebook, server_addr, global_to_local=None, net_type='socket'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(client_namebook) > 0, 'client_namebook cannot be empty.'
         assert len(server_addr.split(':')) == 2, 'Incorrect IP format: %s' % server_addr
-        self._is_init = set()  # Contains tensor name
-        self._data_store = {}  # Key is name (string) and value is data (tensor)
-        self._barrier_count = 0;
+        assert net_type == 'socket' or net_type == 'mpi', 'net_type can only be \'socket\' or \'mpi\'.'
+        self._is_init = set()    # Contains tensor name
+        self._data_store = {}    # Key is data name (string) and value is data (tensor)
+        self._barrier_count = 0; # used for sync all clients
         self._server_id = server_id
         self._client_namebook = client_namebook
         self._client_count = len(client_namebook)
@@ -98,7 +113,7 @@ class KVServer(object):
         _finalize_receiver(self._receiver)
 
     def init_data(self, name, data_tensor):
-        """KVServer supports data initialization on server.
+        """Initialize data on KVServer
 
         Parameters
         ----------
@@ -109,6 +124,47 @@ class KVServer(object):
         """
         self._data_store[name] = data_tensor
         self._is_init.add(name)
+
+    def _init_data_from_client(self, name, shape, init_type, low, high):
+        """Initialize data from the message send by client.
+
+        Parameters
+        ----------
+        name : str
+            data name
+        shape : list of int
+            The shape of tensor
+        init_type : str
+            initialize method, including 'zero' and 'uniform'
+        low : float
+            min threshold, if needed
+        high : float
+            max threshold, if needed
+        """
+        if init_type == 'uniform':
+            self._data_store[name] = F.uniform(
+                shape=shape,
+                dtype=F.float32,
+                ctx=F.cpu(),
+                low=low,
+                high=high)
+        elif init_type == 'zero':
+            self._data_store[name] = F.zeros(
+                shape=shape,
+                dtype=F.float32,
+                ctx=F.cpu())
+        else:
+            raise RuntimeError('Unknown initial method')
+
+    def get_id(self):
+        """Get server id
+
+        Return
+        ------
+        int
+            KVServer ID
+        """
+        return self._server_id
 
     def start(self):
         """Start service of KVServer
@@ -134,26 +190,27 @@ class KVServer(object):
                     row_0 = (F.asnumpy(msg.data).tolist())[0] 
                     row_1 = (F.asnumpy(msg.data).tolist())[1]
                     init_type = 'zero' if row_0[0] == 0.0 else 'uniform'
-                    self._init_data(name=msg.name,
+                    self._init_data_from_client(
+                        name=msg.name,
                         shape=data_shape,
                         init_type=init_type,
                         low=row_1[0],
                         high=row_1[1])
                     self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
-                ID = None
+                local_id = None
                 if self._global_to_local is not None:
-                    ID = self._global_to_local[msg.id]
+                    local_id = self._global_to_local[msg.id]
                 else:
-                    ID = msg.id
-                self._push_handler(msg.name, ID, msg.data, self._data_store)
+                    local_id = msg.id
+                self._push_handler(msg.name, local_id, msg.data, self._data_store)
             elif msg.type == KVMsgType.PULL:
-                ID = None
+                local_id = None
                 if self._global_to_local is not None:
-                    ID = self._global_to_local[msg.id]
+                    local_id = self._global_to_local[msg.id]
                 else:
-                    ID = msg.id
-                res_tensor = self._pull_handler(msg.name, ID, self._data_store)
+                    local_id = msg.id
+                res_tensor = self._pull_handler(msg.name, local_id, self._data_store)
                 back_msg = KVStoreMsg(
                     type=KVMsgType.PULL_BACK,
                     rank=self._server_id,
@@ -179,47 +236,6 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
-    def get_id(self):
-        """Get server id
-
-        Return
-        ------
-        int
-            KVServer ID
-        """
-        return self._server_id
-
-    def _init_data(self, name, shape, init_type, low, high):
-        """Initialize kvstore tensor.
-
-        Parameters
-        ----------
-        name : str
-            data name
-        shape : list of int
-            The tensor shape
-        init_type : str
-            initialize method, including 'zero' and 'uniform'
-        low : float
-            min threshold
-        high : float
-            max threshold
-        """
-        if init_type == 'uniform':
-            self._data_store[name] = F.uniform(
-                shape=shape,
-                dtype=F.float32,
-                ctx=F.cpu(),
-                low=low,
-                high=high)
-        elif init_type == 'zero':
-            self._data_store[name] = F.zeros(
-                shape=shape,
-                dtype=F.float32,
-                ctx=F.cpu())
-        else:
-            raise RuntimeError('Unknown initial method')
-
     def _push_handler(self, name, ID, data, target):
         """Default handler for PUSH message. 
 
@@ -233,7 +249,7 @@ class KVServer(object):
             a vector storing the ID list.
         data : tensor (mx.ndarray or torch.tensor)
             a tensor with the same row size of id
-        target : map
+        target : dict of data
             self._data_store
         """
         target[name][ID] += data
@@ -248,54 +264,45 @@ class KVServer(object):
         name : str
             data name
         ID : tensor (mx.ndarray or torch.tensor)
-            a vector storing the IDs that has been re-mapped to local id.
-        target : tensor
+            a vector storing the ID list.
+        target : dict of data
             self._data_store
 
         Return
         ------
         tensor
-            a tensor with the same row size of ID
+            a tensor with the same row size of ID.
         """
         return target[name][ID]
 
 class KVClient(object):
     """KVClient is used to push/pull tensors to/from KVServer on DGL trainer.
 
-    There are five operations supported by KVClient:
+    Note that, DO NOT share one KVClient in multiple threads in python because this behavior is not defined.
 
-      * init_data(name, server_id, shape, init_type, low, high): 
-          initialize tensor on target KVServer.
-      * push(name, server_id, id_tensor, data_tensor): 
-          push sparse data to KVServer given specified ID.
-      * pull(name, server_id, id_tensor): 
-          pull sparse data from KVServer given specified ID.
-      * pull_wait(): 
-          wait scheduled pull operation finish its job.
-      * shut_down(): 
-          shut down all KVServer nodes.
-
-    Note that, DO NOT use KVClient in multiple threads!
+    For now, KVClient can only run in CPU, we will support GPU KVClient in the future.
 
     Parameters
     ----------
     client_id : int
         KVClient's ID (start from 0)
     local_server_id : int
-        server id in current local nodes
+        ID of server that located in same node with current client. By this ID, client knows that when performing local
+        update through shared-memory instead of using tcp network.
     server_namebook: dict
         IP address namebook of KVServer, where key is the KVServer's ID 
-        (start from 0) and value is the server's IP address, e.g.,
+        (start from 0) and value is the server's IP address and port, e.g.,
 
         { 0:'168.12.23.45:50051', 
           1:'168.12.23.21:50051', 
           2:'168.12.46.12:50051' }
     client_addr : str
-        IP address of current KVClient, e.g., '168.12.23.22:50051'
-    partition_book : list of int
-        A book mapping for global ID and server ID
-    global_to_local : list of int
-        A book mapping for global ID and local ID. This flag is optional, and if it is None, we use original ID.
+        IP address and port of current KVClient, e.g., '168.12.23.22:50051'
+    partition_book : list or tensor (mx.ndarray or torch.tensor)
+        A book that maps global ID to target server ID.
+    global_to_local : list or tensor (mx.ndarray or torch.tensor)
+        A book that maps global ID to local partition ID. 
+        This flag is optional, and we always use global ID if it has been set to None.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
@@ -305,6 +312,7 @@ class KVClient(object):
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert len(client_addr.split(':')) == 2, 'Incorrect IP format: %s' % client_addr
         assert len(partition_book) > 0, 'partition_book cannot be empty.'
+        assert net_type == 'socket' or net_type == 'mpi', 'net_type can only be \'socket\' or \'mpi\'.'
         self._client_id = client_id
         self._data_store = {}  # Key is name (string) and value is data (tensor)
         self._local_server_id = local_server_id
@@ -378,7 +386,7 @@ class KVClient(object):
         self._data_store[name] = data_tensor
         
     def push(self, name, id_tensor, data_tensor):
-        """Push sparse message to KVServer.
+        """Push message to KVServer.
 
         Note that push() is an async operation that will return immediately after calling.
 
@@ -391,34 +399,37 @@ class KVClient(object):
         data_tensor : tensor (mx.ndarray or torch.tensor)
             a tensor with the same row size of data ID
         """
+        assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         assert F.shape(id_tensor)[0] == F.shape(data_tensor)[0], 'The data must has the same row size with ID.'
         # partition data (we can move this into C-api if needed)
         server_id = self._partition_book[id_tensor]
         sorted_id = F.tensor(np.argsort(F.asnumpy(server_id)))
-        id_tensor = id_tensor[sorted_id]  # id sorted by server
-        data_tensor = data_tensor[sorted_id] # data sorted by server
+        id_tensor = id_tensor[sorted_id]  # id sorted by server order
+        data_tensor = data_tensor[sorted_id] # data sorted by server order
         server, count = np.unique(F.asnumpy(server_id), return_counts=True)
-        # push data
+        # push data to server by server order
         start = 0
         for idx in range(len(server)):
             end = start + count[idx]
             if start == end: # don't have any data for target server
                 continue
+            partial_id = id_tensor[start:end]
+            partial_data = data_tensor[start:end]
             if server[idx] == self._local_server_id:  # update local data
-                ID = None
+                local_id = None
                 if self._global_to_local is not None:
-                    ID = self._global_to_local[id_tensor[start:end]]
+                    local_id = self._global_to_local[partial_id]
                 else:
-                    ID = id_tensor[start:end]
-                self._push_handler(name, ID, data_tensor[start:end], self._data_store)
+                    local_id = partial_id
+                self._push_handler(name, local_id, partial_data, self._data_store)
             else: # push data to remote server
                 msg = KVStoreMsg(
                     type=KVMsgType.PUSH, 
                     rank=self._client_id, 
                     name=name, 
-                    id=id_tensor[start:end], 
-                    data=data_tensor[start:end])
+                    id=partial_id, 
+                    data=partial_data)
                 _send_kv_msg(self._sender, msg, server[idx])
             start += count[idx]
 
@@ -441,7 +452,7 @@ class KVClient(object):
         target[name][ID] += data
 
     def pull(self, name, id_tensor):
-        """Pull sparse message from KVServer
+        """Pull message from KVServer
 
         Parameters
         ----------
@@ -450,6 +461,7 @@ class KVClient(object):
         id_tensor : tensor (mx.ndarray or torch.tensor)
             a vector storing the ID list
         """
+        assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
         # partition data (we can move this into C-api if needed)
         server_id = self._partition_book[id_tensor]
@@ -457,6 +469,7 @@ class KVClient(object):
         back_sorted_id = F.tensor(np.argsort(sorted_id))
         id_tensor = id_tensor[F.tensor(sorted_id)] # id sorted by server
         server, count = np.unique(F.asnumpy(server_id), return_counts=True)
+        # pull data from server by server order
         start = 0
         pull_count = 0
         local_data = None
@@ -464,28 +477,26 @@ class KVClient(object):
             end = start + count[idx]
             if start == end:  # don't have any data in target server
                 continue
+            partial_id = id_tensor[start:end]
             if server[idx] == self._local_server_id: # local pull
-                ID = None
+                local_id = None
                 if self._global_to_local is not None:
-                    ID = self._global_to_local[id_tensor[start:end]]
+                    local_id = self._global_to_local[partial_id]
                 else:
-                    ID = id_tensor[start:end]  
-                local_data = self._pull_handler(name, ID, self._data_store)
+                    local_id = partial_id  
+                local_data = self._pull_handler(name, local_id, self._data_store)
             else: # pull data from remote server
                 msg = KVStoreMsg(
                     type=KVMsgType.PULL, 
                     rank=self._client_id, 
                     name=name, 
-                    id=id_tensor[start:end], 
+                    id=partial_id, 
                     data=None)
                 _send_kv_msg(self._sender, msg, server[idx])
                 pull_count += 1
             start += count[idx]
 
         msg_list = []
-        for idx in range(pull_count):
-            msg_list.append(_recv_kv_msg(self._receiver))
-
         if local_data is not None:
             local_msg = KVStoreMsg(
                 type=KVMsgType.PULL_BACK, 
@@ -494,6 +505,9 @@ class KVClient(object):
                 id=None,
                 data=local_data)
             msg_list.append(local_msg)
+
+        for idx in range(pull_count):
+            msg_list.append(_recv_kv_msg(self._receiver))
 
         # sort msg by server id
         msg_list.sort(key=self._takeId)
