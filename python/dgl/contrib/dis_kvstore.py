@@ -198,14 +198,12 @@ class KVServer(object):
                         high=row_1[1])
                     self._is_init.add(msg.name)
             elif msg.type == KVMsgType.PUSH:
-                local_id = None
                 if self._global_to_local is not None:
                     local_id = self._global_to_local[msg.id]
                 else:
                     local_id = msg.id
                 self._push_handler(msg.name, local_id, msg.data, self._data_store)
             elif msg.type == KVMsgType.PULL:
-                local_id = None
                 if self._global_to_local is not None:
                     local_id = self._global_to_local[msg.id]
                 else:
@@ -417,7 +415,6 @@ class KVClient(object):
             partial_id = id_tensor[start:end]
             partial_data = data_tensor[start:end]
             if server[idx] == self._local_server_id:  # update local data
-                local_id = None
                 if self._global_to_local is not None:
                     local_id = self._global_to_local[partial_id]
                 else:
@@ -479,7 +476,6 @@ class KVClient(object):
                 continue
             partial_id = id_tensor[start:end]
             if server[idx] == self._local_server_id: # local pull
-                local_id = None
                 if self._global_to_local is not None:
                     local_id = self._global_to_local[partial_id]
                 else:
