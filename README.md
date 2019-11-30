@@ -69,6 +69,7 @@ conda install -c dglteam dgl           # cpu version
 conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
+conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 ```
 
 ### Using pip
@@ -78,6 +79,7 @@ pip install dgl       # cpu version
 pip install dgl-cu90  # CUDA 9.0
 pip install dgl-cu92  # CUDA 9.2
 pip install dgl-cu100 # CUDA 10.0
+pip install dgl-cu101 # CUDA 10.1
 ```
 
 ### From source
