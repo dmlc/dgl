@@ -1,6 +1,6 @@
 .. currentmodule:: dgl
 
-Builtin message passing functions
+Built-in message passing functions
 =================================
 
 In DGL, message passing is expressed by two APIs:
@@ -9,14 +9,14 @@ In DGL, message passing is expressed by two APIs:
 - ``recv(nodes, reduce_func)`` for collecting the incoming messages, perform aggregation and so on.
 
 Although the two-stage abstraction can cover all the models that are defined in the message
-passing paradigm, it is inefficient due to storing explicit messages. See our
-`blogpost <https://www.dgl.ai/blog/2019/05/04/kernel.html>`_ for more
+passing paradigm, it is inefficient because it requires storing explicit messages. See the DGL 
+`blog post <https://www.dgl.ai/blog/2019/05/04/kernel.html>`_ for more
 details and performance results.
 
-Our solution, also explained in the blogpost, is to fuse the two stages into one kernel so no
-explicit messages are generated and stored. To achieve this, we recommend using our builtin
-message/reduce functions so that DGL can analyze and map them to fused dedicated kernels. Here
-are some examples (in PyTorch syntax):
+Our solution, also explained in the blog post, is to fuse the two stages into one kernel so no
+explicit messages are generated and stored. To achieve this, we recommend using our built-in
+message and reduce functions so that DGL can analyze and map them to fused dedicated kernels. Here
+are some examples (in PyTorch syntax).
 
 .. code:: python
    
@@ -33,14 +33,13 @@ are some examples (in PyTorch syntax):
    # compute edge embedding by multiplying source and destination node embeddings
    g.apply_edges(fn.u_mul_v('h', 'h', 'w_new'))
 
-``fn.copy_u``, ``fn.u_mul_e``, ``fn.u_mul_v`` are builtin message functions, while ``fn.sum``
-and ``fn.max`` are builtin reduce functions. We use ``u``, ``v`` and ``e`` to represent
-source nodes, destination nodes and edges among them, respectively. Hence, ``copy_u`` copies the source
-node data as the messages, ``u_mul_e`` multiplies source node features with edge features,
-so on and so forth.
+``fn.copy_u``, ``fn.u_mul_e``, ``fn.u_mul_v`` are built-in message functions, while ``fn.sum``
+and ``fn.max`` are built-in reduce functions. We use ``u``, ``v`` and ``e`` to represent
+source nodes, destination nodes, and edges among them, respectively. Hence, ``copy_u`` copies the source
+node data as the messages, ``u_mul_e`` multiplies source node features with edge features, for example.
 
-To define a unary message function (e.g. ``copy_u``) requires one input feature name and one output
-message name. To define a binary message function (e.g. ``u_mul_e``) requires
+To define a unary message function (e.g. ``copy_u``) specify one input feature name and one output
+message name. To define a binary message function (e.g. ``u_mul_e``) specify
 two input feature names and one output message name. During the computation,
 the message function will read the data under the given names, perform computation, and return
 the output using the output name. For example, the above ``fn.u_mul_e('h', 'w', 'm')`` is
@@ -62,18 +61,18 @@ following user-defined function:
 
 Broadcasting is supported for binary message function, which means the tensor arguments
 can be automatically expanded to be of equal sizes. The supported broadcasting semantic
-is standard as in `NumPy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
-and `PyTorch's <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. For unfamiliar
-users, we highly suggest reading those documents as broadcasting is very useful. In the
+is standard and matches `NumPy <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
+and `PyTorch <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. If you are not familiar
+with broadcasting, see the linked topics to learn more. In the
 above example, ``fn.u_mul_e`` will perform broadcasted multiplication automatically because
-the node feature ``'h'`` and the edge feature ``'w'`` are of different, but shapes that can be broadcast.
+the node feature ``'h'`` and the edge feature ``'w'`` are of different shapes, but they can be broadcast.
 
 All DGL's built-in functions support both CPU and GPU and backward computation so they
-can be used in any `autograd` system. Also, builtin functions can be used not only in ``update_all``
-or ``apply_edges`` as shown in the example, but wherever message/reduce functions are
-required (e.g. ``pull``, ``push``, ``send_and_recv``, etc.).
+can be used in any `autograd` system. Also, built-in functions can be used not only in ``update_all``
+or ``apply_edges`` as shown in the example, but wherever message and reduce functions are
+required (e.g. ``pull``, ``push``, ``send_and_recv``).
 
-Here is a cheatsheet of all the DGL builtins.
+Here is a cheatsheet of all the DGL built-in functions.
 
 +-------------------------+-----------------------------------------------------------------+-----------------------+
 | Category                | Functions                                                       | Memo                  |
@@ -113,5 +112,5 @@ Here is a cheatsheet of all the DGL builtins.
 
 Next Step
 ---------
-* Checkout our :mod:`dgl.nn` module for how builtin functions are used to implement Graph Neural
-  Network layers.
+* To learn how built-in functions are used to implement Graph Neural
+  Network layers See the :mod:`dgl.nn` module.
