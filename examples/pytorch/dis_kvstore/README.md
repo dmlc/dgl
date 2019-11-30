@@ -4,5 +4,5 @@ This is a simple example shows how to use DGL distributed KVStore on Pytorch loc
 In this example, we start four servers and four clients, and you can run the example by:
 
 ```
-run.sh
+python3 run.py
 ```

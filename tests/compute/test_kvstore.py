@@ -24,7 +24,9 @@ data_list.append(th.tensor([[3.,3.],[4.,4.]]))
 data_list.append(th.tensor([[5.,5.],[6.,6.]]))
 data_list.append(th.tensor([[7.,7.],[8.,8.]]))
 
-server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
+client_namebook = { 0:'127.0.0.1:50051', 1:'127.0.0.1:50052', 2:'127.0.0.1:50053', 3:'127.0.0.1:50054' }
+
+server_namebook = { 0:'127.0.0.1:50055', 1:'127.0.0.1:50056', 2:'127.0.0.1:50057', 3:'127.0.0.1:50058' }
 
 def start_server(server_id, data_tensor, global_to_local):
     server = dgl.contrib.KVServer(
@@ -99,48 +101,84 @@ def start_client(client_id, data_tensor, global_to_local):
     if client_id == 0:
         ID = th.tensor([0,1,2,3,4,5,6,7])
         result_0 = client.pull(name='embed', id_tensor=ID)
-        print("------result_0------")
-        print(result_0)
+        target_tensor = th.tensor(
+          [[17., 17.],
+           [18., 18.],
+           [19., 19.],
+           [20., 20.],
+           [21., 21.],
+           [22., 22.],
+           [23., 23.],
+           [24., 24.]])
+        assert th.equal(result_0, target_tensor) == True
 
         ID = th.tensor([6,4,2,0])
         result_1 = client.pull(name='embed', id_tensor=ID)
-        print("------result_1------")
-        print(result_1)
+        target_tensor = th.tensor(
+          [[23., 23.],
+           [21., 21.],
+           [19., 19.],
+           [17., 17.]])
+        assert th.equal(result_1, target_tensor) == True
+
 
         ID = th.tensor([7,5,3,1])
         result_2 = client.pull(name='embed', id_tensor=ID)
-        print("------result_2------")
-        print(result_2)
+        target_tensor = th.tensor(
+          [[24., 24.],
+           [22., 22.],
+           [20., 20.],
+           [18., 18.]])
+        assert th.equal(result_2, target_tensor) == True
+
 
         ID = th.tensor([3,3,4,4])
         result_3 = client.pull(name='embed', id_tensor=ID)
-        print("------result_3------")
-        print(result_3)
+        target_tensor = th.tensor(
+          [[20., 20.],
+           [20., 20.],
+           [21., 21.],
+           [21., 21.]])
+        assert th.equal(result_3, target_tensor) == True
+
 
         ID = th.tensor([0,1])
         result_4 = client.pull(name='embed', id_tensor=ID)
-        print("------result_4------")
-        print(result_4)
+        target_tensor = th.tensor(
+          [[17., 17.],
+           [18., 18.]])
+        assert th.equal(result_4, target_tensor) == True
 
         ID = th.tensor([2,3])
         result_5 = client.pull(name='embed', id_tensor=ID)
-        print("------result_5------")
-        print(result_5)
+        target_tensor = th.tensor(
+          [[19., 19.],
+           [20., 20.]])
+        assert th.equal(result_5, target_tensor) == True
 
         ID = th.tensor([4,5])
         result_6 = client.pull(name='embed', id_tensor=ID)
-        print("------result_6------")
-        print(result_6)
+        target_tensor = th.tensor(
+          [[21., 21.],
+           [22., 22.]])
+        assert th.equal(result_6, target_tensor) == True
 
         ID = th.tensor([6,7])
         result_7 = client.pull(name='embed', id_tensor=ID)
-        print("------result_7------")
-        print(result_7)
+        target_tensor = th.tensor(
+          [[23., 23.],
+           [24., 24.]])
+        assert th.equal(result_7, target_tensor) == True
 
         ID = th.tensor([0,0,0,0,0])
         result_8 = client.pull(name='embed', id_tensor=ID)
-        print("------result_8------")
-        print(result_8)
+        target_tensor = th.tensor(
+          [[17., 17.],
+           [17., 17.],
+           [17., 17.],
+           [17., 17.],
+           [17., 17.]])
+        assert th.equal(result_8, target_tensor) == True
 
         client.shut_down()
 
