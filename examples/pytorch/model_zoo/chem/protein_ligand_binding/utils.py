@@ -78,6 +78,7 @@ def load_model(args):
     assert args['model'] in ['ACNN'], 'Unexpected model {}'.format(args['model'])
     if args['model'] == 'ACNN':
         model = model_zoo.chem.ACNN(hidden_sizes=args['hidden_sizes'],
+                                    weight_init_stddevs=args['weight_init_stddevs'],
                                     dropouts=args['dropouts'],
                                     features_to_use=args['atomic_numbers_considered'],
                                     radial=args['radial'])

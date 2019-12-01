@@ -53,7 +53,7 @@ def main(args):
     args['train_std'] = train_set.labels_std.to(args['device'])
     train_loader = DataLoader(dataset=train_set,
                               batch_size=args['batch_size'],
-                              shuffle=True,
+                              shuffle=False,
                               collate_fn=collate)
     test_loader = DataLoader(dataset=test_set,
                              batch_size=args['batch_size'],

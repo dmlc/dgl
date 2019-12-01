@@ -15,6 +15,7 @@ from .... import backend as F
 try:
     from rdkit import Chem
     from rdkit.Chem import rdMolDescriptors
+    from rdkit.Chem.rdmolops import FastFindRings
     from rdkit.Chem.Scaffolds import MurckoScaffold
 except ImportError:
     pass
@@ -457,6 +458,8 @@ class ScaffoldSplitter(object):
         for i, mol in enumerate(molecules):
             count_and_log('Computing Bemis-Murcko for compound',
                           i, len(molecules), log_every_n)
+            # For mols that have not been sanitized, we need to compute their ring information
+            mol = FastFindRings(mol)
             mol_scaffold = MurckoScaffold.MurckoScaffoldSmiles(
                 mol=mol, includeChirality=include_chirality)
             # Group molecules that have the same scaffold

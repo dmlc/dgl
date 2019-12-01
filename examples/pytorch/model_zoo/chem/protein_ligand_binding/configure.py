@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 ACNN_PDBBind_core_pocket_random = {
@@ -9,7 +10,10 @@ ACNN_PDBBind_core_pocket_random = {
     'frac_val': 0.,
     'frac_test': 0.2,
     'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [32, 32, 16],
+    'weight_init_stddevs': [1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
+                            1. / float(np.sqrt(16)), 0.01],
     'dropouts': [0., 0., 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
@@ -29,7 +33,10 @@ ACNN_PDBBind_core_pocket_scaffold = {
     'frac_val': 0.,
     'frac_test': 0.2,
     'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [32, 32, 16],
+    'weight_init_stddevs': [1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
+                            1. / float(np.sqrt(16)), 0.01],
     'dropouts': [0., 0., 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
@@ -49,7 +56,10 @@ ACNN_PDBBind_core_pocket_stratified = {
     'frac_val': 0.,
     'frac_test': 0.2,
     'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [32, 32, 16],
+    'weight_init_stddevs': [1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
+                            1. / float(np.sqrt(16)), 0.01],
     'dropouts': [0., 0., 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
@@ -69,7 +79,10 @@ ACNN_PDBBind_core_pocket_temporal = {
     'frac_val': 0.,
     'frac_test': 0.2,
     'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [32, 32, 16],
+    'weight_init_stddevs': [1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
+                            1. / float(np.sqrt(16)), 0.01],
     'dropouts': [0., 0., 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
@@ -88,8 +101,10 @@ ACNN_PDBBind_refined_pocket_random = {
     'frac_train': 0.8,
     'frac_val': 0.,
     'frac_test': 0.2,
-    'batch_size': 16,
+    'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [128, 128, 64],
+    'weight_init_stddevs': [0.125, 0.125, 0.177, 0.01],
     'dropouts': [0.4, 0.4, 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 19., 20., 25., 26., 27., 28.,
@@ -109,8 +124,10 @@ ACNN_PDBBind_refined_pocket_scaffold = {
     'frac_train': 0.8,
     'frac_val': 0.,
     'frac_test': 0.2,
-    'batch_size': 16,
+    'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [128, 128, 64],
+    'weight_init_stddevs': [0.125, 0.125, 0.177, 0.01],
     'dropouts': [0.4, 0.4, 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 19., 20., 25., 26., 27., 28.,
@@ -130,8 +147,10 @@ ACNN_PDBBind_refined_pocket_stratified = {
     'frac_train': 0.8,
     'frac_val': 0.,
     'frac_test': 0.2,
-    'batch_size': 16,
+    'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [128, 128, 64],
+    'weight_init_stddevs': [0.125, 0.125, 0.177, 0.01],
     'dropouts': [0.4, 0.4, 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 19., 20., 25., 26., 27., 28.,
@@ -151,8 +170,10 @@ ACNN_PDBBind_refined_pocket_temporal = {
     'frac_train': 0.8,
     'frac_val': 0.,
     'frac_test': 0.2,
-    'batch_size': 16,
+    'batch_size': 24,
+    'shuffle': False,
     'hidden_sizes': [128, 128, 64],
+    'weight_init_stddevs': [0.125, 0.125, 0.177, 0.01],
     'dropouts': [0.4, 0.4, 0.],
     'atomic_numbers_considered': torch.tensor([
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 19., 20., 25., 26., 27., 28.,
