@@ -2208,7 +2208,7 @@ class DGLGraph(DGLBaseGraph):
             raise DGLError("Group_by should be either src or dst")
 
         if is_all(edges):
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
             eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2270,7 +2270,7 @@ class DGLGraph(DGLBaseGraph):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self.number_of_edges()))
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3339,6 +3339,11 @@ class DGLGraph(DGLBaseGraph):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLGraph
+          Moved DGLGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3348,12 +3353,13 @@ class DGLGraph(DGLBaseGraph):
         >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
-        >>> G.to(torch.device('cuda:0'))
+        >>> G = G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
+        return self
     # pylint: enable=invalid-name
 
     def local_var(self):
