@@ -9,7 +9,7 @@ class RadialPooling(nn.Module):
         super(RadialPooling, self).__init__()
 
         self.interaction_cutoffs = nn.Parameter(
-            interaction_cutoffs.reshape(-1, 1, 1), requires_grad=False)
+            interaction_cutoffs.reshape(-1, 1, 1), requires_grad=True)
         self.rbf_kernel_means = nn.Parameter(
             rbf_kernel_means.reshape(-1, 1, 1), requires_grad=True)
         self.rbf_kernel_scaling = nn.Parameter(
@@ -22,8 +22,8 @@ class RadialPooling(nn.Module):
 
         cos_values = 0.5 * (th.cos(np.pi * distances / self.interaction_cutoffs) + 1) # (K, E, 1)
         cutoff_values = th.where(
-            distances < self.interaction_cutoffs,
-            cos_values, th.zeros(cos_values.shape))                                   # (K, E, 1)
+            distances <= self.interaction_cutoffs,
+            cos_values, th.zeros_like(cos_values))                                    # (K, E, 1)
 
         # Note that there appears to be an inconsistency between the paper and
         # DeepChem's implementation. In the paper, the scaled_euclidean_distance first
@@ -43,12 +43,11 @@ class AtomicConv(nn.Module):
         self.radial_pooling = RadialPooling(interaction_cutoffs=radial_params[:, 0],
                                             rbf_kernel_means=radial_params[:, 1],
                                             rbf_kernel_scaling=radial_params[:, 2])
-        self.features_to_use = features_to_use
+        self.features_to_use = nn.Parameter(features_to_use, requires_grad=False)
         if features_to_use is None:
             self.num_channels = 1
         else:
             self.num_channels = len(features_to_use)
-        self.batch_norm = nn.BatchNorm1d(self.num_channels)
 
     def forward(self, graph, feat, distances):
         # (K, E, 1)
@@ -58,7 +57,7 @@ class AtomicConv(nn.Module):
             # (V * d_in, 1)
             flattened_feat = feat.reshape(-1, 1)
             # (V * d_in, len(self.features_to_use))
-            flattened_feat = (flattened_feat == self.features_to_use).float() * flattened_feat
+            flattened_feat = (flattened_feat == self.features_to_use).float()
             # (V, d_in * len(self.features_to_use))
             feat = flattened_feat.reshape(feat.shape[0], -1)
         # (V, d_in * len(self.features_to_use), 1)
@@ -67,6 +66,6 @@ class AtomicConv(nn.Module):
         graph.edata['he'] = radial_pooled_values.reshape(graph.number_of_edges(), -1)
         graph.update_all(fn.src_mul_edge('hv', 'he', 'm'), fn.sum('m', 'hv_new'))
 
-        # (V, K, d_in * len(self.features_to_use))
-        return self.batch_norm(graph.ndata['hv_new'].reshape(
-            graph.number_of_nodes(), self.num_channels, -1))
+        # (V, K * d_in * len(self.features_to_use))
+        return graph.ndata['hv_new'].reshape(
+            graph.number_of_nodes(), -1).contiguous()

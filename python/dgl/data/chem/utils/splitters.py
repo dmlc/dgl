@@ -10,6 +10,7 @@ from functools import partial
 from itertools import accumulate, chain
 
 from ...utils import split_dataset, Subset
+from .... import backend as F
 
 try:
     from rdkit import Chem
@@ -21,7 +22,8 @@ except ImportError:
 __all__ = ['ConsecutiveSplitter',
            'RandomSplitter',
            'MolecularWeightSplitter',
-           'ScaffoldSplitter']
+           'ScaffoldSplitter',
+           'SingleTaskStratifiedSplitter']
 
 def base_k_fold_split(split_method, dataset, k, log):
     """Split dataset for k-fold cross validation.
@@ -54,11 +56,17 @@ def base_k_fold_split(split_method, dataset, k, log):
         # The training and test subsets will be merged as the training set in one fold.
         train_set1, val_set, train_set2 = split_method(dataset,
                                                        frac_train=i * frac_per_part,
-                                                       frac_val = frac_per_part,
+                                                       frac_val=frac_per_part,
                                                        frac_test=1. - (i + 1) * frac_per_part)
         train_set = Subset(dataset, train_set1.indices + train_set2.indices)
         all_folds.append((train_set, val_set))
     return all_folds
+
+def train_val_test_sanity_check(frac_train, frac_val, frac_test):
+    total_fraction = frac_train + frac_val + frac_test
+    assert np.allclose(total_fraction, 1.), \
+        'Expect the sum of fractions for training, validation and ' \
+        'test to be 1, got {:.4f}'.format(total_fraction)
 
 def indices_split(dataset, frac_train, frac_val, frac_test, indices):
     """Reorder datapoints based on the specified indices and then take consecutive
@@ -359,10 +367,7 @@ class MolecularWeightSplitter(object):
         """
         # Perform sanity check first as molecule instance initialization and descriptor
         # computation can take a long time.
-        total_fraction = frac_train + frac_val + frac_test
-        assert np.allclose(total_fraction, 1.), \
-            'Expect the sum of fractions for training, validation and ' \
-            'test to be 1, got {:.4f}'.format(total_fraction)
+        train_val_test_sanity_check(frac_train, frac_val, frac_test)
         molecules = prepare_mols(dataset, mols, sanitize, log_every_n)
         sorted_indices = MolecularWeightSplitter.molecular_weight_indices(molecules, log_every_n)
 
@@ -515,10 +520,7 @@ class ScaffoldSplitter(object):
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
         # Perform sanity check first as molecule related computation can take a long time.
-        total_fraction = frac_train + frac_val + frac_test
-        assert np.allclose(total_fraction, 1.), \
-            'Expect the sum of fractions for training, validation and ' \
-            'test to be 1, got {:.4f}'.format(total_fraction)
+        train_val_test_sanity_check(frac_train, frac_val, frac_test)
         molecules = prepare_mols(dataset, mols, sanitize)
         scaffold_sets = ScaffoldSplitter.get_ordered_scaffold_sets(
             molecules, include_chirality, log_every_n)
@@ -605,9 +607,47 @@ class ScaffoldSplitter(object):
 
         return all_folds
 
-class MaxMinSplitter(object):
-    """"""
+class SingleTaskStratifiedSplitter(object):
     @staticmethod
-    def train_val_test_split(dataset, mols=None, sanitize=True, distance_func=None,
-                             frac_train=0.8, frac_val=0.1, frac_test=0.1, log_every_n=1000):
-        return NotImplementedError
+    def train_val_test_split(dataset, labels, task_id, frac_train=0.8, frac_val=0.1,
+                             frac_test=0.1, num_buckets=10, random_state=None):
+        train_val_test_sanity_check(frac_train, frac_val, frac_test)
+
+        if random_state is not None:
+            np.random.seed(random_state)
+
+        if not isinstance(labels, np.ndarray):
+            labels = F.asnumpy(labels)
+        task_labels = labels[:, task_id]
+        sorted_indices = np.argsort(task_labels)
+
+        train_bucket_cutoff = int(np.round(frac_train * num_buckets))
+        val_bucket_cutoff = int(np.round(frac_val * num_buckets)) + train_bucket_cutoff
+
+        train_indices, val_indices, test_indices = [], [], []
+
+        while sorted_indices.shape[0] >= num_buckets:
+            current_batch, sorted_indices = np.split(sorted_indices, [num_buckets])
+            shuffled = np.random.permutation(range(num_buckets))
+            train_indices.extend(
+                current_batch[shuffled[:train_bucket_cutoff]].tolist())
+            val_indices.extend(
+                current_batch[shuffled[train_bucket_cutoff:val_bucket_cutoff]].tolist())
+            test_indices.extend(
+                current_batch[shuffled[val_bucket_cutoff:]].tolist())
+
+        # Place rest samples in the training set.
+        train_indices.extend(sorted_indices.tolist())
+
+        return [Subset(dataset, train_indices),
+                Subset(dataset, val_indices),
+                Subset(dataset, test_indices)]
+
+    @staticmethod
+    def k_fold_split(dataset, labels, task_id, k=5, log=True):
+        if not isinstance(labels, np.ndarray):
+            labels = F.asnumpy(labels)
+        task_labels = labels[:, task_id]
+        sorted_indices = np.argsort(task_labels).tolist()
+        
+        return base_k_fold_split(partial(indices_split, indices=sorted_indices), dataset, k, log)

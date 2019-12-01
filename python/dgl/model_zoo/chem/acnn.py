@@ -1,77 +1,32 @@
 import itertools
-import math
 import numpy as np
 import torch
-import torch.nn.init as init
 import torch.nn as nn
 
 from ... import to_hetero
 from ... import backend
 from ...nn.pytorch import AtomicConv
 
-class ParallelLinear(nn.Module):
-    def __init__(self, num_channels, in_feats, out_feats, bias=True):
-        super(ParallelLinear, self).__init__()
-
-        self.num_channels = num_channels
-        self.in_feats = in_feats
-        self.out_feats = out_feats
-        self.weight = nn.Parameter(torch.Tensor(num_channels, out_feats, in_feats))
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(num_channels, out_feats))
-        else:
-            self.bias = None
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        for channel in range(self.num_channels):
-            init.kaiming_uniform_(self.weight[channel], math.sqrt(5))
-
-        if self.bias is not None:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight[0])
-            bound = 1 / math.sqrt(fan_in)
-            for channel in range(self.num_channels):
-                init.uniform_(self.bias[channel], -bound, bound)
-
-    def forward(self, inputs):
-        transformed_inputs = torch.einsum('fba, nfa->nfb', self.weight, inputs)
-        if self.bias is not None:
-            transformed_inputs = transformed_inputs + self.bias
-
-        return transformed_inputs
-
 class ACNNPredictor(nn.Module):
     """"""
-    def __init__(self, in_size, hidden_sizes, features_to_use):
+    def __init__(self, in_size, hidden_sizes, dropouts, features_to_use, num_tasks):
         super(ACNNPredictor, self).__init__()
 
-        if features_to_use is None:
-            self.num_channels = 1
-        else:
-            self.num_channels = len(features_to_use)
-        self.features_to_use = features_to_use
+        if type(features_to_use) != type(None):
+            in_size *= len(features_to_use)
 
-        self.protein_project = self._build_projector(in_size, hidden_sizes)
-        self.ligand_project = self._build_projector(in_size, hidden_sizes)
-        self.complex_project = self._build_projector(in_size, hidden_sizes)
+        self.project = self._build_projector(in_size, hidden_sizes, dropouts, num_tasks)
 
-    def _build_projector(self, in_size, hidden_sizes):
+    def _build_projector(self, in_size, hidden_sizes, dropouts, num_tasks):
         modules = []
-        for h in hidden_sizes:
-            modules.append(ParallelLinear(self.num_channels, in_size, h))
+        for i, h in enumerate(hidden_sizes):
+            modules.append(nn.Linear(in_size, h))
             modules.append(nn.ReLU())
+            modules.append(nn.Dropout(dropouts[i]))
             in_size = h
-        modules.append(ParallelLinear(self.num_channels, in_size, 1))
+        modules.append(nn.Linear(in_size, num_tasks))
 
         return nn.Sequential(*modules)
-
-    def _finalize_features(self, conv_out, projector, node_feats):
-        feats = projector(conv_out)
-        if type(self.features_to_use) != type(None):
-            mask = (node_feats == self.features_to_use).float().unsqueeze(-1)
-            feats = feats * mask
-
-        return feats.sum(dim=1)
 
     @staticmethod
     def sum_nodes(batch_size, batch_num_nodes, feats):
@@ -82,25 +37,18 @@ class ACNNPredictor(nn.Module):
         return backend.unsorted_1d_segment_sum(feats, seg_id, batch_size, 0)
 
     def forward(self, protein_graph, ligand_graph, complex_graph,
-                protein_conv_out, ligand_conv_out, complex_conv_out,
-                protein_node_feats, ligand_node_feats, complex_node_feats):
+                protein_conv_out, ligand_conv_out, complex_conv_out):
         """
         Parameters
         ----------
         graph
-        protein_conv_out : float32 tensor of shape (V1, K, F)
-        ligand_conv_out : float32 tensor of shape (V2, K, F)
-        complex_conv_out : float32 tensor of shape ((V1 + V2), K, F)
-        protein_node_feats : float32 tensor of shape (V1, 1)
-        ligand_node_feats : float32 tensor of shape (V2, 1)
-        complex_node_feats : float32 tensor of shape ((V1 + V2), 1)
+        protein_conv_out : float32 tensor of shape (V1, K * F)
+        ligand_conv_out : float32 tensor of shape (V2, K * F)
+        complex_conv_out : float32 tensor of shape ((V1 + V2), K * F)
         """
-        protein_feats = self._finalize_features(
-            protein_conv_out, self.protein_project, protein_node_feats)
-        ligand_feats = self._finalize_features(
-            ligand_conv_out, self.ligand_project, ligand_node_feats)
-        complex_feats = self._finalize_features(
-            complex_conv_out, self.complex_project, complex_node_feats)
+        protein_feats = self.project(protein_conv_out)
+        ligand_feats = self.project(ligand_conv_out)
+        complex_feats = self.project(complex_conv_out)
 
         protein_energy = self.sum_nodes(protein_graph.batch_size,
                                         protein_graph.batch_num_nodes,
@@ -126,20 +74,19 @@ class ACNNPredictor(nn.Module):
 
 class ACNN(nn.Module):
     """"""
-    def __init__(self, hidden_sizes, features_to_use=None, radial=None):
+    def __init__(self, hidden_sizes, dropouts, features_to_use=None, radial=None, num_tasks=1):
         super(ACNN, self).__init__()
 
         if radial is None:
-            radial = [[1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0,
-                       7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0],
-                      [0.0, 4.0, 8.0], [0.4]]
+            radial = [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]]
         radial_params = [x for x in itertools.product(*radial)]
         radial_params = torch.stack(list(map(torch.tensor, zip(*radial_params))), dim=1)
 
         self.protein_conv = AtomicConv(radial_params, features_to_use)
         self.ligand_conv = AtomicConv(radial_params, features_to_use)
         self.complex_conv = AtomicConv(radial_params, features_to_use)
-        self.predictor = ACNNPredictor(radial_params.shape[0], hidden_sizes, features_to_use)
+        self.predictor = ACNNPredictor(radial_params.shape[0], hidden_sizes, dropouts,
+                                       features_to_use, num_tasks)
 
     def forward(self, graph):
         protein_graph = graph[('protein_atom', 'protein', 'protein_atom')]
@@ -183,5 +130,4 @@ class ACNN(nn.Module):
 
         return self.predictor(
             protein_graph, ligand_graph, complex_graph,
-            protein_conv_out, ligand_conv_out, complex_conv_out,
-            protein_graph_node_feats, ligand_graph_node_feats, complex_graph_node_feats)
+            protein_conv_out, ligand_conv_out, complex_conv_out)

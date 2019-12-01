@@ -78,9 +78,9 @@ def ACNN_graph_construction_and_featurization(protein_mol,
                                               ligand_mol,
                                               protein_coordinates,
                                               ligand_coordinates,
-                                              neighbor_cutoff=4.,
-                                              max_num_neighbors=4,
-                                              strip_hydrogens=True):
+                                              neighbor_cutoff=12.,
+                                              max_num_neighbors=12,
+                                              strip_hydrogens=False):
     assert protein_coordinates is not None, 'Expect protein_coordinates to be provided.'
     assert ligand_coordinates is not None, 'Expect ligand_coordinates to be provided.'
 

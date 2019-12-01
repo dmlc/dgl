@@ -1,4 +1,3 @@
-import datetime
 import dgl
 import numpy as np
 import random
@@ -6,11 +5,12 @@ import torch
 import torch.nn.functional as F
 
 from dgl import model_zoo
-from dgl.data.chem import PDBBind, RandomSplitter
-from sklearn.metrics import r2_score
+from dgl.data.chem import PDBBind, RandomSplitter, ScaffoldSplitter, SingleTaskStratifiedSplitter
+from scipy.stats import pearsonr
 
 def set_random_seed(seed=0):
     """Set random seed.
+
     Parameters
     ----------
     seed : int
@@ -26,11 +26,28 @@ def load_dataset(args):
     assert args['dataset'] in ['PDBBind'], 'Unexpected dataset {}'.format(args['dataset'])
     if args['dataset'] == 'PDBBind':
         dataset = PDBBind(subset=args['subset'], load_binding_pocket=args['load_binding_pocket'])
-        train_set, val_set, test_set = RandomSplitter.train_val_test_split(
-            dataset, rac_train=args['frac_train'], frac_val=args['frac_val'],
-            frac_test=args['frac_test'], random_state=args['random_seed'])
+        # No validation set is used and frac_val = 0.
+        if args['split'] == 'random':
+            train_set, _, test_set = RandomSplitter.train_val_test_split(
+                dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
+                frac_test=args['frac_test'], random_state=args['random_seed'])
+        elif args['split'] == 'scaffold':
+            train_set, _, test_set = ScaffoldSplitter.train_val_test_split(
+                dataset, mols=dataset.ligand_mols, sanitize=False, frac_train=args['frac_train'],
+                frac_val=args['frac_val'], frac_test=args['frac_test'])
+        elif args['split'] == 'stratified':
+            train_set, _, test_set = SingleTaskStratifiedSplitter.train_val_test_split(
+                dataset, labels=dataset.labels, task_id=0, frac_train=args['frac_train'],
+                frac_val=args['frac_val'], frac_test=args['frac_test'],
+                random_state=args['random_seed'])
+        else:
+            raise ValueError('Expect the splitting method '
+                             'to be "random" or "scaffold", got {}'.format(args['split']))
+        train_labels = torch.stack([train_set.dataset.labels[i] for i in train_set.indices])
+        train_set.labels_mean = train_labels.mean(dim=0)
+        train_set.labels_std = train_labels.std(dim=0)
 
-    return dataset, train_set, val_set, test_set
+    return dataset, train_set, test_set
 
 def collate(data):
     """"""
@@ -49,72 +66,11 @@ def load_model(args):
     assert args['model'] in ['ACNN'], 'Unexpected model {}'.format(args['model'])
     if args['model'] == 'ACNN':
         model = model_zoo.chem.ACNN(hidden_sizes=args['hidden_sizes'],
+                                    dropouts=args['dropouts'],
                                     features_to_use=args['atomic_numbers_considered'],
                                     radial=args['radial'])
 
     return model
-
-class EarlyStopping(object):
-    """Early stop performing
-    Parameters
-    ----------
-    mode : str
-        * 'higher': Higher metric suggests a better model
-        * 'lower': Lower metric suggests a better model
-    patience : int
-        Number of epochs to wait before early stop
-        if the metric stops getting improved
-    filename : str or None
-        Filename for storing the model checkpoint
-    """
-    def __init__(self, mode='higher', patience=10, filename=None):
-        if filename is None:
-            dt = datetime.datetime.now()
-            filename = 'early_stop_{}_{:02d}-{:02d}-{:02d}.pth'.format(
-                dt.date(), dt.hour, dt.minute, dt.second)
-
-        assert mode in ['higher', 'lower']
-        self.mode = mode
-        if self.mode == 'higher':
-            self._check = self._check_higher
-        else:
-            self._check = self._check_lower
-
-        self.patience = patience
-        self.counter = 0
-        self.filename = filename
-        self.best_score = None
-        self.early_stop = False
-
-    def _check_higher(self, score, prev_best_score):
-        return (score > prev_best_score)
-
-    def _check_lower(self, score, prev_best_score):
-        return (score < prev_best_score)
-
-    def step(self, score, model):
-        if self.best_score is None:
-            self.best_score = score
-            self.save_checkpoint(model)
-        elif self._check(score, self.best_score):
-            self.best_score = score
-            self.save_checkpoint(model)
-            self.counter = 0
-        else:
-            self.counter += 1
-            print(
-                f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
-                self.early_stop = True
-        return self.early_stop
-
-    def save_checkpoint(self, model):
-        '''Saves model when the metric on the validation set gets improved.'''
-        torch.save({'model_state_dict': model.state_dict()}, self.filename)
-
-    def load_checkpoint(self, model):
-        '''Load model saved with early stopping.'''
-        model.load_state_dict(torch.load(self.filename)['model_state_dict'])
 
 class Meter(object):
     """Track and summarize model performance on a dataset for (multi-label) prediction.
@@ -126,9 +82,16 @@ class Meter(object):
     torch.float32 tensor of shape (T)
         Std of existing training labels across tasks, T for the number of tasks
     """
-    def __init__(self):
+    def __init__(self, mean=None, std=None):
         self.y_pred = []
         self.y_true = []
+
+        if (type(mean) != type(None)) and (type(std) != type(None)):
+            self.mean = mean.cpu()
+            self.std = std.cpu()
+        else:
+            self.mean = None
+            self.std = None
 
     def update(self, y_pred, y_true):
         """Update for the result of an iteration
@@ -144,38 +107,37 @@ class Meter(object):
         self.y_pred.append(y_pred.detach().cpu())
         self.y_true.append(y_true.detach().cpu())
 
-    def r2(self):
-        """Compute R2 (coefficient of determination)
+    def _finalize_labels_and_prediction(self):
+        y_pred = torch.cat(self.y_pred, dim=0)
+        y_true = torch.cat(self.y_true, dim=0)
+
+        if (self.mean is not None) and (self.std is not None):
+            # To compensate for the imbalance between labels during training,
+            # we normalize the ground truth labels with training mean and std.
+            # We need to undo that for evaluation.
+            y_pred = y_pred * self.std + self.mean
+
+        return y_pred, y_true
+
+    def pearson_r2(self):
+        """Compute squared Pearson correlation coefficient
 
         Returns
         -------
         float
         """
-        y_pred = torch.cat(self.y_pred, dim=0)
-        # To compensate for the imbalance between labels during training,
-        # we normalize the ground truth labels with training mean and std.
-        # We need to undo that for evaluation.
-        y_true = torch.cat(self.y_true, dim=0)
+        y_pred, y_true = self._finalize_labels_and_prediction()
 
-        return r2_score(y_true[:, 0].numpy(), y_pred[:, 0].numpy())
+        return pearsonr(y_true[:, 0].numpy(), y_pred[:, 0].numpy())[0] ** 2
 
-    def l1(self):
-        """Compute l1 loss for each task.
+    def mae(self):
+        """Compute MAE for each task.
 
         Returns
         -------
-        list of float
-            l1 loss for all tasks
-        reduction : str
-            * 'mean': average the metric over all labeled data points for each task
-            * 'sum': sum the metric over all labeled data points for each task
+        float
         """
-        y_pred = torch.cat(self.y_pred, dim=0)
-        # To compensate for the imbalance between labels during training,
-        # we normalize the ground truth labels with training mean and std.
-        # We need to undo that for evaluation.
-        y_pred = y_pred * self.std + self.mean
-        y_true = torch.cat(self.y_true, dim=0)
+        y_pred, y_true = self._finalize_labels_and_prediction()
 
         return F.l1_loss(y_true, y_pred).data.item()
 
@@ -187,12 +149,7 @@ class Meter(object):
         -------
         float
         """
-        y_pred = torch.cat(self.y_pred, dim=0)
-        # To compensate for the imbalance between labels during training,
-        # we normalize the ground truth labels with training mean and std.
-        # We need to undo that for evaluation.
-        y_pred = y_pred * self.std + self.mean
-        y_true = torch.cat(self.y_true, dim=0)
+        y_pred, y_true = self._finalize_labels_and_prediction()
 
         return np.sqrt(F.mse_loss(y_pred, y_true).cpu().item())
 
@@ -209,11 +166,11 @@ class Meter(object):
         list of float
             Metric value for each task
         """
-        assert metric_name in ['r2', 'l1', 'rmse'], \
-            'Expect metric name to be "r2", "l1" or "rmse", got {}'.format(metric_name)
-        if metric_name == 'r2':
-            return self.r2()
-        if metric_name == 'l1':
-            return self.l1()
+        assert metric_name in ['pearson_r2', 'mae', 'rmse'], \
+            'Expect metric name to be "pearson_r2", "mae" or "rmse", got {}'.format(metric_name)
+        if metric_name == 'pearson_r2':
+            return self.pearson_r2()
+        if metric_name == 'mae':
+            return self.mae()
         if metric_name == 'rmse':
             return self.rmse()
