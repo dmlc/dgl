@@ -386,20 +386,18 @@ def one_hot(t, num_classes=-1):
     # return th.nn.functional.one_hot(t, num_classes)
 
 
-
-
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                   out_size, lhs_map, rhs_map, out_map):
 
     @tf.custom_gradient
-    def _lambda(lhs, rhs):
+    def _lambda(lhs_data, rhs_data):
         return binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                                   out_size, lhs_map, rhs_map, out_map)
-    return _lambda(lhs, rhs)
+    return _lambda(lhs_data, rhs_data)
 
 
 def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                       out_size, lhs_map, rhs_map, out_map):
     lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
     rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
     feat_shape = K.infer_binary_feature_shape(
@@ -481,7 +479,7 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
 
 
 def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
-                out_map):
+                     out_map):
     out_data = tf.zeros(
         (out_size,) + tuple(in_data.shape[1:]), dtype=in_data.dtype)
     in_data_nd = zerocopy_to_dgl_ndarray(in_data)
