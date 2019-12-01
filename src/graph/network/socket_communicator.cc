@@ -198,7 +198,6 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   if (server_socket_->Listen(kMaxConnection) == false) {
     LOG(FATAL) << "Cannot listen on " << ip << ":" << port;
   }
-  LOG(INFO) << "Listen on " << ip << ":" << port << ", wait sender connect ...";
   // Accept all sender sockets
   std::string accept_ip;
   int accept_port;

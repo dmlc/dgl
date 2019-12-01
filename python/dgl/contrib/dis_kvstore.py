@@ -102,7 +102,10 @@ class KVServer(object):
         self._client_namebook = client_namebook
         self._client_count = len(client_namebook)
         self._addr = server_addr
-        self._global_to_local = F.tensor(global_to_local)
+        if isinstance(global_to_local,list):
+            self._global_to_local = F.tensor(global_to_local)
+        else:
+            self._global_to_local = global_to_local
         self._sender = _create_sender(net_type)
         self._receiver = _create_receiver(net_type)
 
@@ -317,8 +320,14 @@ class KVClient(object):
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
         self._addr = client_addr
-        self._partition_book = F.tensor(partition_book)
-        self._global_to_local = F.tensor(global_to_local)
+        if isinstance(partition_book,list):
+            self._partition_book = F.tensor(partition_book)
+        else:
+            self._partition_book = partition_book
+        if isinstance(global_to_local,list):
+            self._global_to_local = F.tensor(global_to_local)
+        else:
+            self._global_to_local = global_to_local
         self._sender = _create_sender(net_type)
         self._receiver = _create_receiver(net_type)
 
