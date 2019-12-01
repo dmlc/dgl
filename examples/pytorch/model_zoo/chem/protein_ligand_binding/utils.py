@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 from dgl import model_zoo
 from dgl.data.chem import PDBBind, RandomSplitter, ScaffoldSplitter, SingleTaskStratifiedSplitter
+from dgl.data.utils import Subset
+from itertools import accumulate
 from scipy.stats import pearsonr
 
 def set_random_seed(seed=0):
@@ -40,6 +42,16 @@ def load_dataset(args):
                 dataset, labels=dataset.labels, task_id=0, frac_train=args['frac_train'],
                 frac_val=args['frac_val'], frac_test=args['frac_test'],
                 random_state=args['random_seed'])
+        elif args['split'] == 'temporal':
+            years = dataset.df['release_year'].values.astype(np.float32)
+            indices = np.argsort(years).tolist()
+            frac_list = np.array([args['frac_train'], args['frac_val'], args['frac_test']])
+            num_data = len(dataset)
+            lengths = (num_data * frac_list).astype(int)
+            lengths[-1] = num_data - np.sum(lengths[:-1])
+            train_set, val_set, test_set = [
+                Subset(dataset, list(indices[offset - length:offset]))
+                for offset, length in zip(accumulate(lengths), lengths)]
         else:
             raise ValueError('Expect the splitting method '
                              'to be "random" or "scaffold", got {}'.format(args['split']))

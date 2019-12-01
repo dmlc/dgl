@@ -81,8 +81,9 @@ if __name__ == '__main__':
                         help='Model to use')
     parser.add_argument('-d', '--dataset', type=str,
                         choices=['PDBBind_core_pocket_random', 'PDBBind_core_pocket_scaffold',
-                                 'PDBBind_core_pocket_stratified', 'PDBBind_refined_pocket',
-                                 'PDBBind_refined_scaffold', 'PDBBind_refined_stratified'],
+                                 'PDBBind_core_pocket_stratified', 'PDBBind_core_pocket_temporal',
+                                 'PDBBind_refined_pocket', 'PDBBind_refined_scaffold',
+                                 'PDBBind_refined_stratified', 'PDBBind_refined_temporal'],
                         help='Dataset to use')
 
     args = parser.parse_args().__dict__

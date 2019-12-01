@@ -1,5 +1,7 @@
 """PDBBind dataset processed by MoleculeNet."""
+import numpy as np
 import os
+import pandas as pd
 
 from ..utils import multiprocess_load_molecules, ACNN_graph_construction_and_featurization
 from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
@@ -168,14 +170,21 @@ class PDBBind(object):
             Number of worker processes to use. If None,
             then we will use the number of CPUs in the systetm.
         """
-        pdbs, labels = [], []
+        contents = []
         with open(index_label_file, 'r') as f:
             for line in f.readlines():
                 if line[0] != "#":
-                    # Get the location of all ligand-protein pairs
-                    pdbs.append(line[:4])
-                    labels.append(float(line.split()[3]))
-        self.labels = F.reshape(F.tensor(labels), (-1, 1))
+                    splitted_elements = line.split()
+                    if len(splitted_elements) == 8:
+                        # Ignore "//"
+                        contents.append(splitted_elements[:5] + splitted_elements[6:])
+                    else:
+                        print('Incorrect data format.')
+                        print(splitted_elements)
+        self.df = pd.DataFrame(contents, columns=(
+            'PDB_code', 'resolution', 'release_year',
+            '-logKd/Ki', 'Kd/Ki', 'reference', 'ligand_name'))
+        pdbs = self.df['PDB_code'].tolist()
 
         if load_binding_pocket:
             self.protein_files = [os.path.join(
@@ -204,7 +213,8 @@ class PDBBind(object):
                                                      use_conformation=use_conformation,
                                                      num_processes=num_processes)
         self._filter_out_invalid(proteins_loaded, ligands_loaded, use_conformation)
-        self.labels = self.labels[self.indices]
+        self.df = self.df.iloc[self.indices]
+        self.labels = F.zerocopy_from_numpy(self.df[self.task_names].values.astype(np.float32))
         print('Finished cleaning the dataset, '
               'got {:d}/{:d} valid pairs'.format(len(self), len(pdbs)))
 
