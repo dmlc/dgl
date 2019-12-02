@@ -53,7 +53,7 @@ class GCNSampling(gluon.Block):
 
 
     def forward(self, nf):
-        nf.layers[0].data['activation'] = nf.layers[0].data['features']
+        nf.layers[0].data['activation'] = nf.layers[0].data['feature']
 
         for i, layer in enumerate(self.layers):
             h = nf.layers[i].data.pop('activation')
@@ -94,7 +94,7 @@ class GCNInfer(gluon.Block):
 
 
     def forward(self, nf):
-        nf.layers[0].data['activation'] = nf.layers[0].data['features']
+        nf.layers[0].data['activation'] = nf.layers[0].data['feature']
 
         for i, layer in enumerate(self.layers):
             h = nf.layers[i].data.pop('activation')
@@ -106,8 +106,16 @@ class GCNInfer(gluon.Block):
 
         return nf.layers[-1].data.pop('activation')
 
+def copy_from_kvstore(nf, kv, ctx, graph_name, ndata_names):
+    for i in range(nf.num_layers):
+        for name in ndata_names:
+            full_name = graph_name + "_" + name
+            global_id = nf._parent.ndata['global_id']
+            data = kv.pull(name=full_name, id_tensor=global_id[nf.layer_parent_nid(i)])
+            data = data.as_in_context(ctx)
+            nf._node_frames[i][name] = data
 
-def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
+def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
     in_feats = args.n_features
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -147,12 +155,12 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
             #TODO copy from kvstore
-            copy_from_kvstore(nf, kv, ctx, ndata_names)
+            copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
             # forward
             with mx.autograd.record():
                 pred = model(nf)
                 batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = nf.layers[-1].data['labels']
+                batch_labels = nf.layers[-1].data['label']
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -173,10 +181,10 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid):
                                                        neighbor_type='in',
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
-            nf.copy_from_parent(ctx=ctx)
+            copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1)
-            batch_labels = nf.layers[-1].data['labels']
+            batch_labels = nf.layers[-1].data['label']
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
             num_tests += nf.layer_size(-1)
             break
