@@ -1,17 +1,20 @@
 """
 .. currentmodule:: dgl
 
-Batched Graph Classification with DGL
+Tutorial: Batched graph classification with DGL
 =====================================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Minjie Wang <https://jermainewang.github.io/>`_,
 `Zheng Zhang <https://shanghai.nyu.edu/academics/faculty/directory/zheng-zhang>`_.
 
+In this tutorial, you learn how to use DGL to batch multiple graphs of variable size and shape. The 
+tutorial also demonstrates training a graph neural network for a simple graph classification task.
+
 Graph classification is an important problem
-with applications across many fields -- bioinformatics, chemoinformatics, social
-network analysis, urban computing and cyber-security. Applying graph neural
-networks to this problem has been a popular approach recently (
+with applications across many fields, such as bioinformatics, chemoinformatics, social
+network analysis, urban computing, and cybersecurity. Applying graph neural
+networks to this problem has been a popular approach recently. This can be seen in the following reserach references: 
 `Ying et al., 2018 <https://arxiv.org/abs/1806.08804>`_,
 `Cangea et al., 2018 <https://arxiv.org/abs/1811.01287>`_,
 `Knyazev et al., 2018 <https://arxiv.org/abs/1811.09595>`_,
@@ -19,21 +22,18 @@ networks to this problem has been a popular approach recently (
 `Liao et al., 2019 <https://arxiv.org/abs/1901.01484>`_,
 `Gao et al., 2019 <https://openreview.net/forum?id=HJePRoAct7>`_).
 
-This tutorial demonstrates:
- * batching multiple graphs of variable size and shape with DGL
- * training a graph neural network for a simple graph classification task
 """
 
 ###############################################################################
-# Simple Graph Classification Task
+# Simple graph classification task
 # --------------------------------
-# In this tutorial, we will learn how to perform batched graph classification
-# with dgl via a toy example of classifying 8 types of regular graphs as below:
+# In this tutorial, you learn how to perform batched graph classification
+# with DGL. The example task objective is to classify eight types of topologies shown here.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/dataset_overview.png
 #     :align: center
 #
-# We implement a synthetic dataset :class:`data.MiniGCDataset` in DGL. The dataset has 8
+# Implement a synthetic dataset :class:`data.MiniGCDataset` in DGL. The dataset has eight 
 # different types of graphs and each class has the same number of graph samples.
 
 from dgl.data import MiniGCDataset
@@ -51,24 +51,24 @@ plt.show()
 ###############################################################################
 # Form a graph mini-batch
 # -----------------------
-# To train neural networks more efficiently, a common practice is to **batch**
+# To train neural networks efficiently, a common practice is to batch
 # multiple samples together to form a mini-batch. Batching fixed-shaped tensor
-# inputs is quite easy (for example, batching two images of size :math:`28\times 28`
-# gives a tensor of shape :math:`2\times 28\times 28`). By contrast, batching graph inputs
+# inputs is common. For example, batching two images of size 28 x 28
+# gives a tensor of shape 2 x 28 x 28. By contrast, batching graph inputs
 # has two challenges:
 #
 # * Graphs are sparse.
-# * Graphs can have various length (e.g. number of nodes and edges).
+# * Graphs can have various length. For example, number of nodes and edges.
 #
-# To address this, DGL provides a :func:`dgl.batch` API. It leverages the trick that
-# a batch of graphs can be viewed as a large graph that have many disjoint
-# connected components. Below is a visualization that gives the general idea:
+# To address this, DGL provides a :func:`dgl.batch` API. It leverages the idea that
+# a batch of graphs can be viewed as a large graph that has many disjointed 
+# connected components. Below is a visualization that gives the general idea.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/batch.png
 #     :width: 400pt
 #     :align: center
 #
-# We define the following ``collate`` function to form a mini-batch from a given
+# Define the following ``collate`` function to form a mini-batch from a given
 # list of graph and label pairs.
 
 import dgl
@@ -81,34 +81,36 @@ def collate(samples):
     return batched_graph, torch.tensor(labels)
 
 ###############################################################################
-# The return type of :func:`dgl.batch` is still a graph (similar to the fact that
-# a batch of tensors is still a tensor). This means that any code that works
+# The return type of :func:`dgl.batch` is still a graph. In the same way, 
+# a batch of tensors is still a tensor. This means that any code that works
 # for one graph immediately works for a batch of graphs. More importantly,
-# since DGL processes messages on all nodes and edges in parallel, this greatly
+# because DGL processes messages on all nodes and edges in parallel, this greatly
 # improves efficiency.
 #
-# Graph Classifier
+# Graph classifier
 # ----------------
-# The graph classification can be proceeded as follows:
+# Graph classification proceeds as follows.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/graph_classifier.png
 #
-# From a batch of graphs, we first perform message passing/graph convolution
-# for nodes to "communicate" with others. After message passing, we compute a
-# tensor for graph representation from node (and edge) attributes. This step may
-# be called "readout/aggregation" interchangeably. Finally, the graph
-# representations can be fed into a classifier :math:`g` to predict the graph labels.
+# From a batch of graphs, perform message passing and graph convolution
+# for nodes to communicate with others. After message passing, compute a
+# tensor for graph representation from node (and edge) attributes. This step might 
+# be called readout or aggregation. Finally, the graph 
+# representations are fed into a classifier :math:`g` to predict the graph labels.
 #
-# Graph Convolution
+# Graph convolution
 # -----------------
-# Our graph convolution operation is basically the same as that for GCN (checkout our 
-# `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_). The only difference is
-# that we replace :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)` by
-# :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|}\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)`.
+# The graph convolution operation is basically the same as that for graph convolutional network (GCN). To learn more, 
+# see the GCN `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_). The only difference is
+# that we replace :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)` 
+# by
+# :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|}\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)`
+# 
 # The replacement of summation by average is to balance nodes with different
-# degrees, which gives a better performance for this experiment.
+# degrees. This gives a better performance for this experiment.
 #
-# Note that the self edges added in the dataset initialization allows us to
+# The self edges added in the dataset initialization allows you to
 # include the original node feature :math:`h_{v}^{(l)}` when taking the average.
 
 import dgl.function as fn
@@ -150,18 +152,18 @@ class GCN(nn.Module):
         return g.ndata.pop('h')
 
 ###############################################################################
-# Readout and Classification
+# Readout and classification
 # --------------------------
-# For this demonstration, we consider initial node features to be their degrees.
-# After two rounds of graph convolution, we perform a graph readout by averaging
-# over all node features for each graph in the batch
+# For this demonstration, consider initial node features to be their degrees.
+# After two rounds of graph convolution, perform a graph readout by averaging
+# over all node features for each graph in the batch.
 #
 # .. math::
 #
 #    h_g=\frac{1}{|\mathcal{V}|}\sum_{v\in\mathcal{V}}h_{v}
 #
 # In DGL, :func:`dgl.mean_nodes` handles this task for a batch of
-# graphs with variable size. We then feed our graph representations into a
+# graphs with variable size. You then feed the graph representations into a
 # classifier with one linear layer to obtain pre-softmax logits.
 
 import torch.nn.functional as F
@@ -187,9 +189,9 @@ class Classifier(nn.Module):
         return self.classify(hg)
 
 ###############################################################################
-# Setup and Training
+# Setup and training
 # ------------------
-# We create a synthetic dataset of :math:`400` graphs with :math:`10` ~
+# Create a synthetic dataset of :math:`400` graphs with :math:`10` ~
 # :math:`20` nodes. :math:`320` graphs constitute a training set and
 # :math:`80` graphs constitute a test set.
 
@@ -225,15 +227,15 @@ for epoch in range(80):
     epoch_losses.append(epoch_loss)
 
 ###############################################################################
-# The learning curve of a run is presented below:
+# The learning curve of a run is presented below.
 
 plt.title('cross entropy averaged over minibatches')
 plt.plot(epoch_losses)
 plt.show()
 
 ###############################################################################
-# The trained model is evaluated on the test set created. Note that for deployment
-# of the tutorial, we restrict our running time and you are likely to get a higher
+# The trained model is evaluated on the test set created. To deploy
+# the tutorial, restrict the running time to get a higher
 # accuracy (:math:`80` % ~ :math:`90` %) than the ones printed below.
 
 model.eval()
@@ -250,12 +252,11 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
     (test_Y == argmax_Y.float()).sum().item() / len(test_Y) * 100))
 
 ###############################################################################
-# Below is an animation where we plot graphs with the probability a trained model
-# assigns its ground truth label to it:
+# The animation here plots the probability that a trained model predicts the correct graph type.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval4.gif
 #
-# To understand the node/graph representations a trained model learnt,
+# To understand the node and graph representations that a trained model learned,
 # we use `t-SNE, <https://lvdmaaten.github.io/tsne/>`_ for dimensionality reduction
 # and visualization.
 #
@@ -265,24 +266,24 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_graph2.png
 #     :align: center
 #
-# The two small figures on the top separately visualize node representations after :math:`1`,
-# :math:`2` layers of graph convolution and the figure on the bottom visualizes
+# The two small figures on the top separately visualize node representations after one and two
+# layers of graph convolution. The figure on the bottom visualizes
 # the pre-softmax logits for graphs as graph representations.
 #
 # While the visualization does suggest some clustering effects of the node features,
-# it is expected not to be a perfect result as node degrees are deterministic for
-# our node features. Meanwhile, the graph features are way better separated.
+# you would not expect a perfect result. Node degrees are deterministic for
+# these node features. The graph features are improved when separated.
 #
-# What's Next?
+# What's next?
 # ------------
-# Graph classification with graph neural networks is still a very young field
-# waiting for folks to bring more exciting discoveries! It is not easy as it
-# requires mapping different graphs to different embeddings while preserving
-# their structural similarity in the embedding space. To learn more about it,
-# `"How Powerful Are Graph Neural Networks?" <https://arxiv.org/abs/1810.00826>`_
-# in ICLR 2019 might be a good starting point.
+# Graph classification with graph neural networks is still a new field.
+# It's waiting for people to bring more exciting discoveries. The work requires 
+# mapping different graphs to different embeddings, while preserving
+# their structural similarity in the embedding space. To learn more about it, see 
+# `How Powerful Are Graph Neural Networks? <https://arxiv.org/abs/1810.00826>`_ a research paper  
+# published for the International Conference on Learning Representations 2019.
 #
-# With regards to more examples on batched graph processing, see
+# For more examples about batched graph processing, see the following:
 #
-# * our tutorials on `Tree LSTM <https://docs.dgl.ai/tutorials/models/2_small_graph/3_tree-lstm.html>`_ and `Deep Generative Models of Graphs <https://docs.dgl.ai/tutorials/models/3_generative_model/5_dgmg.html>`_
-# * an example implementation of `Junction Tree VAE <https://github.com/dmlc/dgl/tree/master/examples/pytorch/jtnn>`_
+# * Tutorials for `Tree LSTM <https://docs.dgl.ai/tutorials/models/2_small_graph/3_tree-lstm.html>`_ and `Deep Generative Models of Graphs <https://docs.dgl.ai/tutorials/models/3_generative_model/5_dgmg.html>`_
+# * An example implementation of `Junction Tree VAE <https://github.com/dmlc/dgl/tree/master/examples/pytorch/jtnn>`_

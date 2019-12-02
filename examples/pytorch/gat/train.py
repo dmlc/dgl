@@ -1,8 +1,6 @@
 """
 Graph Attention Networks in DGL using SPMV optimization.
 Multiple heads are also batched together for faster training.
-Compared with the original paper, this code does not implement
-early stopping.
 References
 ----------
 Paper: https://arxiv.org/abs/1710.10903
@@ -95,7 +93,8 @@ def main(args):
                 args.negative_slope,
                 args.residual)
     print(model)
-    stopper = EarlyStopping(patience=100)
+    if args.early_stop:
+        stopper = EarlyStopping(patience=100)
     if cuda:
         model.cuda()
     loss_fcn = torch.nn.CrossEntropyLoss()
@@ -127,8 +126,9 @@ def main(args):
             val_acc = accuracy(logits[val_mask], labels[val_mask])
         else:
             val_acc = evaluate(model, features, labels, val_mask)
-            if stopper.step(val_acc, model):   
-                break
+            if args.early_stop:
+                if stopper.step(val_acc, model):   
+                    break
 
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | TrainAcc {:.4f} |"
               " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".
@@ -136,7 +136,8 @@ def main(args):
                      val_acc, n_edges / np.mean(dur) / 1000))
 
     print()
-    model.load_state_dict(torch.load('es_checkpoint.pt'))
+    if args.early_stop:
+        model.load_state_dict(torch.load('es_checkpoint.pt'))
     acc = evaluate(model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
@@ -169,6 +170,8 @@ if __name__ == '__main__':
                         help="weight decay")
     parser.add_argument('--negative-slope', type=float, default=0.2,
                         help="the negative slope of leaky relu")
+    parser.add_argument('--early-stop', action='store_true', default=False,
+                        help="indicates whether to use early stop or not")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
     args = parser.parse_args()
