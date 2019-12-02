@@ -569,7 +569,7 @@ class AddEdge(nn.Module):
         return to_add_edge
 
 #######################################################################################
-# Action 3: Choosing destination
+# Action 3: Choose a destination
 # '''''''''''''''''''''''''''''''''
 #
 # When action 2 returns true, choose a destination for the
