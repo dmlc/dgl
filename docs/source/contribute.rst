@@ -100,8 +100,92 @@ the standard. For example, following variable names are accepted:
 * ``w,x,y``: for representing weight, input, output tensors
 * ``_``: for unused variables
 
+Contributing New Models as Examples
+-----------------------------------
+
+To contribute a new model within a specific supported tensor framework (e.g. PyTorch, or MXNet), simply
+
+1. Make a directory with the name of your model (say ``awesome-gnn``) within the directory
+   ``examples/${DGLBACKEND}`` where ``${DGLBACKEND}`` refers to the framework name.
+   
+2. Populate it with your work, along with a README.  Make a pull request once you are done.  Your README should contain at least these:
+
+   * Instructions for running your program.
+   
+   * The performance results, such as speed or accuracy or any metric, along with comparisons against some alternative implementations (if available).
+   
+     * Your performance metric does not have to beat others' implementation; they are just a signal of your code being *likely* correct.
+     
+     * Your speed also does not have to surpass others'.
+     
+     * However, better numbers are always welcomed.
+   
+3. The committers will review it, suggesting or making changes as necessary.
+
+4. Resolve the suggestions and reviews, and go back to step 3 until approved.
+
+5. Merge it and enjoy your day.
+
+Data hosting
+````````````
+
+One often wishes to upload a dataset when contributing a new runnable model example, especially when covering
+a new field not in our existing examples.
+
+Uploading data file into the Git repository directly is a **bad idea** because we do not want the cloners to
+always download the dataset no matter what.  Instead, we strongly suggest the data files be hosted on a
+permanent cloud storage service (e.g. DropBox, Amazon S3, Baidu, Google Drive, etc.).
+
+One can either
+
+* Make your scripts automatically download your data if possible (e.g. when using Amazon S3), or
+* Clearly state the instructions of downloading your dataset (e.g. when using Baidu, where auto-downloading
+  is hard).
+  
+If you have trouble doing so (e.g. you cannot find a permanent cloud storage), feel free to post in our
+`discussion forum <https://discuss.dgl.ai>`__.
+
+Depending on the commonality of the contributed task, model, or dataset, we (the DGL team) would migrate
+your dataset to the official DGL Dataset Repository on Amazon S3.  If you wish to host a particular dataset,
+you can either
+
+* DIY: make changes in the ``dgl.data`` module; see our :ref:`dataset APIs <apidata>` for more details, or,
+* Post in our `discussion forum <https://discuss.dgl.ai>`__ (again).
+
+Currently, all the datasets of DGL model examples are hosted on Amazon S3.
+
+Contributing Core Features
+--------------------------
+
+We call a feature that goes into the Python ``dgl`` package a *core feature*.
+
+Since DGL supports multiple tensor frameworks, contributing a core feature is no easy job.  However, we do
+**NOT** require knowledge of all tensor frameworks.  Instead,
+
+1. Before making a pull request, please make sure your code is covered with unit tests on **at least one**
+   supported frameworks; see the `Building and Testing`_ section for details.
+2. Once you have done that, make a pull request and summarize your changes, and wait for the CI to finish.
+3. If the CI fails on a tensor platform that you are unfamiliar with (which is well often the case), please
+   refer to `Supporting Multiple Platforms`_ section.
+4. The committers will review it, suggesting or making changes as necessary.
+5. Resolve the suggestions and reviews, and go back to step 3 until approved.
+6. Merge it and enjoy your day.
+
+Supporting Multiple Platforms
+`````````````````````````````
+
+This is the hard one, but you don't have to know PyTorch AND MXNet (maybe AND Tensorflow, AND Chainer, etc.,
+in the future) to do so.  The rule of thumb in supporting Multiple Platforms is simple:
+
+* In the ``dgl`` Python package, **always** avoid using framework-specific operators (*including array indexing!*)
+  directly.  Use the wrappers in ``dgl.backend`` or ``numpy`` arrays instead.
+* If you have trouble doing so (either because ``dgl.backend`` does not cover the necessary operator, or you don't
+  have a GPU, or for whatever reason), please label your PR with the ``backend support`` tag, and one or more DGL
+  team member who understand CPU AND GPU AND PyTorch AND MXNet (AND Tensorflow AND Chainer AND etc.) will
+  look into it.
+
 Building and Testing
---------------------
+````````````````````
 
 To build DGL locally, follow the steps described in :ref:`Install from source <install-from-source>`.
 However, to ease the development, we suggest NOT install DGL but directly working in the source tree.
@@ -127,7 +211,7 @@ You could test the build by running the following command and see the path of yo
    python -c 'import dgl; print(dgl.__path__)'
 
 Unit tests
-``````````
+~~~~~~~~~~
 
 Currently, we use ``nose`` for unit tests.  The organization goes as follows:
 
@@ -172,17 +256,52 @@ To run unit tests, run
 
 where ``<your-backend>`` can be any supported backends (i.e. ``pytorch`` or ``mxnet``).
 
-Building documents
-------------------
+Contributing Documentations
+---------------------------
 
-If the change is about document improvement, we suggest build the document and render it locally
-before pull request. See instructions `here <https://github.com/dmlc/dgl/tree/master/docs>`__.
+If the change is about document improvement, we suggest (and strongly suggest if you change the runnable code
+there) building the document and render it locally before making a pull request.
 
-Data hosting
-------------
+Building Docs Locally
+`````````````````````
 
-If the change is about new models or applications, it is very common to have some data files. Data
-files are not allowed to be uploaded to our repository. Instead, they should be hosted on the
-cloud storage service (e.g. dropbox, Amazon S3) and downloaded on-the-fly. See our :ref:`dataset APIs <apidata>`
-for more details. All the dataset of current DGL models are hosted on Amazon S3. If you want your
-dataset to be hosted as well, please post in our `discussion forum <https://discuss.dgl.ai>`__.
+In general building the docs locally involves the following:
+
+1. Install ``sphinx``, ``sphinx-gallery``, and ``sphinx_rtd_theme``.
+
+2. You need both PyTorch and MXNet because our tutorial contains code from both frameworks.  This does *not*
+   require knowledge of coding with both frameworks, though.
+   
+3. Run the following:
+
+   .. code-block:: bash
+   
+      cd docs
+      ./clean.sh
+      make html
+      cd build/html
+      python3 -m http.server 8080
+      
+4. Open ``http://localhost:8080`` and enjoy your work.
+
+See `here <https://github.com/dmlc/dgl/tree/master/docs>`__ for more details.
+
+Contributing Editorial Changes via GitHub Web Interface
+```````````````````````````````````````````````````````
+
+If one is only changing the wording (i.e. not touching the runnable code at all), one can simply do
+without the usage of Git CLI:
+
+1. Make your fork by clicking on the **Fork** button in the DGL main repository web page.
+2. Make whatever changes in the web interface *within your own fork*.  You can usually tell
+   if you are inside your own fork or in the main repository by checking whether you can commit
+   to the ``master`` branch: if you cannot, you are in the wrong place.
+3. Once done, make a pull request (on the web interface).
+4. The committers will review it, suggesting or making changes as necessary.
+5. Resolve the suggestions and reviews, and go back to step 4 until approved.
+6. Merge it and enjoy your day.
+
+Contributing Code Changes
+`````````````````````````
+
+When changing code, please make sure to build it locally and see if it fails.
