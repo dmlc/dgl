@@ -16,6 +16,7 @@ from ._ffi.base import DGLError, __version__
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .backend import load_backend
 from .batched_graph import *
+from .batched_heterograph import *
 from .convert import *
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
