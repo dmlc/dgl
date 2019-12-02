@@ -572,7 +572,7 @@ class AddEdge(nn.Module):
 # Action 3: Choose a destination
 # '''''''''''''''''''''''''''''''''
 #
-# When action 2 returns true, choose a destination for the
+# When action 2 returns `True`, choose a destination for the
 # latest node :math:`v`.
 #
 # For each possible destination :math:`u\in\{0, \cdots, v-1\}`, the
