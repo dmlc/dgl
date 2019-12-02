@@ -4,7 +4,7 @@ In this example we implement the GraphWriter, [Text Generation from Knowledge Gr
 ## Dependencies
 PyTorch >= 1.2  
 tqdm   
-pycoco (only for testing)
+pycoco (only for testing)  
 multi-bleu.perl and other scripts from mosesdecoder (only for testing)
 
 ## Usage
