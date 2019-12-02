@@ -50,6 +50,10 @@ def generate_rand_graph(n, func_name):
         return g, entity_emb, rel_emb, (12.0, projection_emb, 10, 10)
     elif (func_name == 'TransE'):
         return g, entity_emb, rel_emb, (12.0)
+    elif (func_name == 'TransE_l1'):
+        return g, entity_emb, rel_emb, (12.0, 'l1')
+    elif (func_name == 'TransE_l2'):
+        return g, entity_emb, rel_emb, (12.0, 'l2')
     elif (func_name == 'RESCAL'):
         return g, entity_emb, rel_emb, (10, 10)
     elif (func_name == 'RotatE'):
@@ -58,6 +62,8 @@ def generate_rand_graph(n, func_name):
         return g, entity_emb, rel_emb, None
 
 ke_score_funcs = {'TransE': TransEScore,
+                  'TransE_l1': TransEScore,
+                  'TransE_l2': TransEScore,
                   'DistMult': DistMultScore,
                   'ComplEx': ComplExScore,
                   'RESCAL': RESCALScore,
@@ -149,6 +155,8 @@ def check_score_func(func_name):
 
 def test_score_func_transe():
     check_score_func('TransE')
+    check_score_func('TransE_l1')
+    check_score_func('TransE_l2')
 
 def test_score_func_distmult():
     check_score_func('DistMult')

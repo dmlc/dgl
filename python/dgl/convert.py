@@ -235,7 +235,13 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, **kwargs):
         raise DGLError('Unsupported graph data type:', type(data))
 
 def hetero_from_relations(rel_graphs):
-    """Create a heterograph from per-relation graphs.
+    """Create a heterograph from graphs representing connections of each relation.
+
+    The input is a list of heterographs where the ``i``th graph contains edges of type
+    :math:`(s_i, e_i, d_i)`.
+
+    If two graphs share a same node type, the number of nodes for the corresponding type
+    should be the same. See **Examples** for details.
 
     Parameters
     ----------
@@ -246,6 +252,52 @@ def hetero_from_relations(rel_graphs):
     -------
     DGLHeteroGraph
         A heterograph consisting of all relations.
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows')
+    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game')
+    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
+
+    will raise an error as we have 3 nodes of type 'user' in follows_g and 4 nodes of type
+    'user' in plays_g.
+
+    We have two possible methods to avoid the construction.
+
+    **Method 1**: Manually specify the number of nodes for all types when constructing
+    the relation graphs.
+
+    >>> # A graph with 4 nodes of type 'user'
+    >>> follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', card=4)
+    >>> # A bipartite graph with 4 nodes of src type ('user') and 2 nodes of dst type ('game')
+    >>> plays_g = dgl.bipartite([(0, 0), (3, 1)], 'user', 'plays', 'game', card=(4, 2))
+    >>> devs_g = dgl.bipartite([(0, 0), (1, 1)], 'developer', 'develops', 'game')
+    >>> g = dgl.hetero_from_relations([follows_g, plays_g, devs_g])
+    >>> print(g)
+    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
+          num_edges={('user', 'follows', 'user'): 2, ('user', 'plays', 'game'): 2,
+                     ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
+
+    ``devs_g`` does not have nodes of type ``'user'`` so no error will be raised.
+
+    **Method 2**: Construct a heterograph at once without intermediate relation graphs,
+    in which case we will infer the number of nodes for each type.
+
+    >>> g = dgl.heterograph({
+    >>>     ('user', 'follows', 'user'): [(0, 1), (1, 2)],
+    >>>     ('user', 'plays', 'game'): [(0, 0), (3, 1)],
+    >>>     ('developer', 'develops', 'game'): [(0, 0), (1, 1)]
+    >>> })
+    >>> print(g)
+    Graph(num_nodes={'user': 4, 'game': 2, 'developer': 2},
+          num_edges={('user', 'follows', 'user'): 2,
+                     ('user', 'plays', 'game'): 2,
+                     ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'user'), ('user', 'game'), ('developer', 'game')])
     """
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
@@ -412,18 +464,18 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     >>> hetero_g = dgl.hetero_from_relations([g1, g2])
     >>> print(hetero_g)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-        num_edges={'develops': 2},
-        metagraph=[('user', 'activity'), ('developer', 'game')])
+          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'activity'), ('developer', 'game')])
 
     We first convert the heterogeneous graph to a homogeneous graph.
 
     >>> homo_g = dgl.to_homo(hetero_g)
     >>> print(homo_g)
     Graph(num_nodes=9, num_edges=4,
-        ndata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
-                       '_ID': Scheme(shape=(), dtype=torch.int64)}
-        edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
-                       '_ID': Scheme(shape=(), dtype=torch.int64)})
+          ndata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)}
+          edata_schemes={'_TYPE': Scheme(shape=(), dtype=torch.int64),
+                         '_ID': Scheme(shape=(), dtype=torch.int64)})
     >>> homo_g.ndata
     {'_TYPE': tensor([0, 0, 1, 1, 1, 2, 2, 3, 3]), '_ID': tensor([0, 1, 0, 1, 2, 0, 1, 0, 1])}
     Nodes 0, 1 for 'user', 2, 3, 4 for 'activity', 5, 6 for 'developer', 7, 8 for 'game'
@@ -436,8 +488,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
     >>> hetero_g_2 = dgl.to_hetero(homo_g, hetero_g.ntypes, hetero_g.etypes)
     >>> print(hetero_g_2)
     Graph(num_nodes={'user': 2, 'activity': 3, 'developer': 2, 'game': 2},
-        num_edges={'develops': 2},
-        metagraph=[('user', 'activity'), ('developer', 'game')])
+          num_edges={('user', 'develops', 'activity'): 2, ('developer', 'develops', 'game'): 2},
+          metagraph=[('user', 'activity'), ('developer', 'game')])
 
     See Also
     --------
