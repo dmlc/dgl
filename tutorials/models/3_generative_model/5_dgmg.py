@@ -452,7 +452,7 @@ class GraphProp(nn.Module):
 # which is then used to parametrize a Bernoulli distribution for deciding whether
 # to add a new node.
 #
-# If a new node is to be added,  initialize its feature with
+# If a new node is to be added, initialize its feature with
 #
 # .. math::
 #
