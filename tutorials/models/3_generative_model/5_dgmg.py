@@ -71,7 +71,7 @@ g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
 #
 # .. note::
 #
-#    To be sure, this is not necessarily a hard constraint.Subgraphs can be 
+#    To be sure, this is not necessarily a hard constraint. Subgraphs can be 
 #    built in parallel and then get assembled. But we
 #    will restrict ourselves to the sequential processes for this tutorial.
 #
