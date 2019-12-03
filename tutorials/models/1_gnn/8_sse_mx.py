@@ -1,7 +1,7 @@
 """
 .. _model-sse:
 
-Stochastic Steady-state Embedding (SSE)
+Stochastic steady-state embedding (SSE)
 =======================================
 
 **Author**: Gai Yu, Da Zheng, Quan Gan, Jinjing Zhou, Zheng Zhang
@@ -20,15 +20,15 @@ Stochastic Steady-state Embedding (SSE)
 #    \newcommand{\calv}{{\mathcal{V}}}
 #    \newcommand{\until}{\text{until}\ }
 #
-# In this tutorial we implement in DGL with MXNet
+# In this tutorial, you learn how to use the Deep Graph Library (DGL) with MXNet to implement the following:
 #
-# -  Simple steady-state algorithms with `stochastic steady-state
+# -  Simple, steady-state algorithms with `stochastic steady-state
 #    embedding <https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf>`__
-#    (SSE), and
-# -  Training with subgraph sampling.
+#    (SSE)
+# -  Training with subgraph sampling
 #
-# Subgraph sampling is a generic technique to scale up learning to
-# gigantic graphs (e.g. with billions of nodes and edges). It can apply to
+# Subgraph sampling is a technique to scale-up learning to
+# gigantic graphs (for example, billions of nodes and edges). Subgraph sampling can apply to
 # other algorithms, such as :doc:`Graph convolution
 # network <1_gcn>`
 # and :doc:`Relational graph convolution
@@ -38,19 +38,19 @@ Stochastic Steady-state Embedding (SSE)
 # -----------------------
 #
 # Many algorithms for graph analytics are iterative procedures that
-# terminate when some steady states are reached. Examples include
-# PageRank, and mean-field inference on Markov Random Fields.
+# end when a steady state is reached. Examples include
+# PageRank or mean-field inference on Markov random fields.
 #
 # Flood-fill algorithm
 # ~~~~~~~~~~~~~~~~~~~~
 #
-# *Flood-fill algorithm* (or *infection* algorithm as in Dai et al.) can
-# also be seen as such a procedure. Specifically, the problem is that
+# A *Flood-fill algorithm* (or *infection* algorithm) can
+# also be seen as a procedure. Specifically, the problem is that
 # given a graph :math:`\calg = (\calv, \cale)` and a source node
-# :math:`s \in \calv`, we need to mark all nodes that can be reached from
+# :math:`s \in \calv`, you need to mark all nodes that can be reached from
 # :math:`s`. Let :math:`\calv = \{1, ..., n\}` and let :math:`y_v`
 # indicate whether a node :math:`v` is marked. The flood-fill algorithm
-# proceeds as follows:
+# proceeds as follows.
 #
 # .. math::
 #
@@ -67,7 +67,7 @@ Stochastic Steady-state Embedding (SSE)
 #
 # The flood-fill algorithm first marks the source node :math:`s`, and then
 # repeatedly marks nodes with one or more marked neighbors until no node
-# needs to be marked, i.e. the steady state is reached.
+# needs to be marked, that is, the steady state is reached.
 #
 # Flood-fill algorithm and steady-state operator
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,14 +80,14 @@ Stochastic Steady-state Embedding (SSE)
 # In the case of the flood-fill algorithm, :math:`\hat\calt = \max`. The
 # condition “:math:`\until \bfy^{(t + 1)} = \bfy^{(t)}`” in :math:`(3)`
 # implies that :math:`\bfy^*` is the solution to the problem if and only
-# if :math:`\bfy^* = \calt (\bfy^*)`, i.e. \ :math:`\bfy^*` is steady
+# if :math:`\bfy^* = \calt (\bfy^*)`, that is \ :math:`\bfy^*` is steady
 # under :math:`\calt`. Thus we call :math:`\calt` the *steady-state
 # operator*.
 #
-# Implementation
-# ~~~~~~~~~~~~~~
+# Implementing a flood-fill algorithm
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# We can easily implement flood-fill in DGL:
+# You can implement flood-fill in DGL with the following code.
 
 import mxnet as mx
 import os
@@ -108,8 +108,8 @@ def T(g):
     return g.ndata['y']
 
 ##############################################################################
-# To run the algorithm, let’s create a ``DGLGraph`` consisting of two
-# disjoint chains, each with 10 nodes, and initialize it as specified in
+# To run the algorithm, create a ``DGLGraph`` as in the example code here, consisting of two
+# disjointed chains, each with ten nodes, and initialize it as specified in
 # Eq. :math:`(0)` and Eq. :math:`(1)`.
 #
 import networkx as nx
@@ -134,8 +134,8 @@ y[s] = 1
 g.ndata['y'] = y
 
 ##############################################################################
-# Now let’s apply ``T`` to ``g`` until convergence. You can see that nodes
-# reachable from ``s`` are gradually “infected” (marked).
+# Now apply ``T`` to ``g`` until convergence. You can see that nodes
+# reachable from ``s`` are gradually infected (marked).
 #
 while True:
     prev_y = g.ndata['y']
@@ -154,22 +154,22 @@ while True:
 # Neural flood-fill algorithm
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# Now let’s consider designing a neural network that simulates the
+# Next, you can design a neural network that simulates the
 # flood-fill algorithm.
 #
-# -  Instead of using :math:`\calt` to update the states of nodes, we use
+# Instead of using :math:`\calt` to update the states of nodes, use
 #    :math:`\calt_\Theta`, a graph neural network (and
 #    :math:`\hat\calt_\Theta` instead of :math:`\hat\calt`).
-# -  The state of a node :math:`v` is no longer a boolean value
+# The state of a node :math:`v` is no longer a Boolean value
 #    (:math:`y_v`), but, an embedding :math:`h_v` (a vector of some
 #    reasonable dimension, say, :math:`H`).
-# -  We also associate a feature vector :math:`x_v` with :math:`v`. For
-#    the flood-fill algorithm, we simply use the one-hot encoding of a
+# You can also associate a feature vector :math:`x_v` with :math:`v`. For
+#    the flood-fill algorithm, simply use the one-hot encoding of a
 #    node’s ID as its feature vector, so that our algorithm can
 #    distinguish different nodes.
-# -  We only iterate :math:`T` times instead of iterating until the
+# Only iterate :math:`T` times instead of iterating until the
 #    steady-state condition is satisfied.
-# -  After iteration, we mark the nodes by passing the node embedding
+# After iteration, mark the nodes by passing the node embedding
 #    :math:`h_v` into another neural network to produce a probability
 #    :math:`p_v` of whether the node is reachable.
 #
@@ -198,7 +198,7 @@ while True:
 # Like the naive algorithm, the neural flood-fill algorithm can be
 # partitioned into a ``message_func`` (neighborhood information gathering)
 # and a ``reduce_func`` (:math:`\hat\calt_\Theta`). We define
-# :math:`\hat\calt_\Theta` as a callable ``gluon.Block``:
+# :math:`\hat\calt_\Theta` as a callable ``gluon.Block`` as in this example code.
 #
 import mxnet.gluon as gluon
 
@@ -232,7 +232,7 @@ class FullGraphSteadyStateOperator(gluon.Block):
 #
 #    h_v^{(t + 1)} \leftarrow (1 - \alpha) h_v^{(t)} + \alpha \left[\calt_\Theta (h_0^{(t)}, ..., h_n^{(t)})\right]_v \qquad 0 < \alpha < 1
 #
-# Putting these together we have:
+# Putting these together you have:
 #
 
 def update_embeddings(g, steady_state_operator):
@@ -240,7 +240,7 @@ def update_embeddings(g, steady_state_operator):
     next_h = steady_state_operator(g)
     g.ndata['h'] = (1 - alpha) * prev_h + alpha * next_h
 ##############################################################################
-# The last step involves implementing the predictor:
+# The last step involves implementing the predictor.
 #
 class Predictor(gluon.Block):
     def __init__(self, n_hidden, activation, **kwargs):
@@ -254,7 +254,7 @@ class Predictor(gluon.Block):
 
 ##############################################################################
 # The predictor’s decision rule is just a decision rule for binary
-# classification:
+# classification.
 #
 # .. math::
 #
@@ -274,12 +274,12 @@ class Predictor(gluon.Block):
 # Efficient semi-supervised learning on graph
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# In our setting, we can observe the entire structure of one fixed graph as well
-# as the feature vector of each node. However, we only have access to the
-# labels of some (very few) of the nodes. We will train the neural
+# In this setting, you can observe the entire structure of one fixed graph as well
+# as the feature vector of each node. However, you might only have access to the
+# labels of some (very few) of the nodes. Train the neural
 # flood-fill algorithm in this setting as well.
 #
-# We initialize feature vectors ``'x'`` and node embeddings ``'h'``
+# Initialize feature vectors ``'x'`` and node embeddings ``'h'``
 # first.
 #
 import numpy as np
@@ -312,7 +312,7 @@ nodes_test = np.where(test_bitmap)[0]
 # :math:`T` times. These updated node embeddings are fed to :math:`g_\Phi`
 # as in Eq. :math:`(5)`. These steps are fully differentiable and the
 # neural flood-fill algorithm can thus be trained in an end-to-end
-# fashion. Denoting the binary cross-entropy loss by :math:`l`, we have a
+# fashion. Denoting the binary cross-entropy loss by :math:`l`, you have a
 # loss function in the following form:
 #
 # .. math::
@@ -320,14 +320,14 @@ nodes_test = np.where(test_bitmap)[0]
 #
 #    \call (\Theta, \Phi) = \frac1{\left|\calv_y\right|} \sum_{v \in \calv_y} l \left(g_\Phi \left(\left[\calt_\Theta^T (h_1^{(0)}, ..., h_n^{(0)})\right]_v \right), y_v\right) \tag{7}
 #
-# After computing :math:`\call (\Theta, \Phi)`, we can update
+# After computing :math:`\call (\Theta, \Phi)`, you can update
 # :math:`\Theta` and :math:`\Phi` using the gradients
 # :math:`\nabla_\Theta \call (\Theta, \Phi)` and
 # :math:`\nabla_\Phi \call (\Theta, \Phi)`. One problem with Eq.
 # :math:`(7)` is that computing :math:`\nabla_\Theta \call (\Theta, \Phi)`
 # and :math:`\nabla_\Phi \call (\Theta, \Phi)` requires back-propagating
 # :math:`T` times through :math:`\calt_\Theta`, which may be slow in
-# practice. So we adopt the following “steady-state” loss function, which
+# practice. So, adopt the following steady-state loss function, which
 # only incorporates the last node embedding update in back-propagation:
 #
 # .. math::
@@ -350,17 +350,17 @@ def fullgraph_update_parameters(g, label_nodes, steady_state_operator, predictor
     trainer.step(n)  # divide gradients by the number of labelled nodes
     return loss.asnumpy()[0]
 ##############################################################################
-# We are now ready to implement the training procedure, which is in two
-# phases:
+# You are now ready to implement the training procedure, which is in two
+# phases.
 #
 # -  The first phase updates node embeddings several times using
 #    :math:`\calt_\Theta` to attain an approximately steady state
 # -  The second phase trains :math:`\calt_\Theta` and :math:`g_\Phi` using
 #    this steady state.
 #
-# Note that we update the node embeddings of :math:`\calg` instead of
+# You update the node embeddings of :math:`\calg` instead of
 # :math:`\calg_y` only. The reason lies in the semi-supervised learning
-# setting: to do inference on :math:`\calg`, we need node embeddings on
+# setting. To do inference on :math:`\calg`, you need node embeddings on
 # :math:`\calg` instead of on :math:`\calg_y` only.
 #
 def train(g, label_nodes, steady_state_operator, predictor, trainer):
@@ -373,17 +373,17 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
                                            predictor, trainer)
     return loss
 ##############################################################################
-# Scaling up with Stochastic Subgraph Training
+# Scaling up with stochastic subgraph training
 # --------------------------------------------
 #
 # The computation time per update is linear to the number of edges in a
 # graph. If we have a gigantic graph with billions of nodes and edges, the
 # update function would be inefficient.
 #
-# A possible improvement draws analogy from minibatch training on large
-# datasets: instead of computing gradients on the entire graph, we only
+# A possible improvement draws an analogy from mini-batch training on large
+# datasets. Instead of computing gradients on the entire graph, only
 # consider some subgraphs randomly sampled from the labelled nodes.
-# Mathematically, we have the following loss function:
+# Mathematically, you have the following loss function:
 #
 # .. math::
 #
@@ -393,25 +393,25 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
 # where :math:`\calv_y^{(k)}` is the subset sampled for iteration
 # :math:`k`.
 #
-# In this training procedure, we also update node embeddings only on
+# In this training procedure, you also update node embeddings only on
 # sampled subgraphs, which is perhaps not surprising if you know
 # stochastic fixed-point iteration.
 #
 # Neighbor sampling
 # ~~~~~~~~~~~~~~~~~
 #
-# We use *neighbor sampling* as our subgraph sampling strategy. Neighbor
-# sampling traverses small neighborhoods from seed nodes with BFS. For
+# You can use *neighbor sampling* as a subgraph sampling strategy. Neighbor
+# sampling traverses small neighborhoods from seed nodes with breadth first search. For
 # each newly sampled node, a small subset of neighboring nodes are sampled
 # and added to the subgraph along with the connecting edges, unless the
 # node reaches the maximum of :math:`k` hops from the seeding node.
 #
-# The following shows neighbor sampling with 2 seed nodes at a time, a
-# maximum of 2 hops, and a maximum of 3 neighboring nodes.
+# The following shows neighbor sampling with two seed nodes at a time, a
+# maximum of two hops, and a maximum of three neighboring nodes.
 #
 # |image1|
 #
-# DGL supports very efficient subgraph sampling natively to help users
+# DGL supports very efficient subgraph sampling natively. This helps users
 # scale algorithms to large graphs. Currently, DGL provides the
 # :func:`~dgl.contrib.sampling.sampler.NeighborSampler`
 # API, which returns a subgraph iterator that samples multiple subgraphs
@@ -429,7 +429,7 @@ for subg in sampler:
     seeds.append(subg.layer_parent_nid(-1))
 
 ##############################################################################
-# Sampler with DGL
+# Sample training with DGL
 # ~~~~~~~~~~~~~~~~
 #
 # The code illustrates the training process in mini-batches.
@@ -512,7 +512,7 @@ def train_on_subgraphs(g, label_nodes, batch_size,
     return loss
 
 ##############################################################################
-# We also define a helper function that reports prediction accuracy:
+# You can also define a helper function that reports prediction accuracy.
 
 def test(g, test_nodes, predictor):
     z = predictor(g.ndata['h'][test_nodes])
@@ -522,7 +522,7 @@ def test(g, test_nodes, predictor):
     return accuracy.asnumpy()[0], z
 
 ##############################################################################
-# Some routine preparations for training:
+# Some routine preparations for training.
 #
 lr = 1e-3
 activation = 'relu'
@@ -536,8 +536,8 @@ params.update(predictor.collect_params())
 trainer = gluon.Trainer(params, 'adam', {'learning_rate' : lr})
 
 ##############################################################################
-# Now let’s train it! As before, nodes reachable from :math:`s` are
-# gradually “infected”, except that behind the scene is a neural network!
+# Now train it. As before, nodes reachable from :math:`s` are
+# gradually infected, except that in the background is a neural network.
 #
 n_epochs = 35
 n_embedding_updates = 8
@@ -559,13 +559,13 @@ for i in range(n_epochs):
 ##############################################################################
 # |image2|
 #
-# In this tutorial, we use a very small toy graph to demonstrate the
+# In this tutorial, you used a very small example graph to demonstrate the
 # subgraph training for easy visualization. Subgraph training actually
-# helps us scale to gigantic graphs. For instance, we have successfully
-# scaled SSE to a graph with 50 million nodes and 150 million edges in a
-# single P3.8x large instance and one epoch only takes about 160 seconds.
+# helps you scale to gigantic graphs. For instance, 
+# scaling SSE to a graph with 50 million nodes and 150 million edges in a
+# single P3.8x large instance, and one epoch, only takes about 160 seconds.
 #
-# See full examples `here <https://github.com/dmlc/dgl/tree/master/examples/mxnet/sse>`_.
+# For full examples, see `Benchmark SSE on multi-GPUs <https://github.com/dmlc/dgl/tree/master/examples/mxnet/sse>`_ on Github.
 #
 # .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/floodfill-paths.gif
 # .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/neighbor-sampling.gif

@@ -1,7 +1,7 @@
 """
 .. _model-gat:
 
-Understand Graph Attention Network
+Graph attention network
 ==================================
 
 **Authors:** `Hao Zhang <https://github.com/sufeidechabei/>`_, `Mufei Li
@@ -9,32 +9,29 @@ Understand Graph Attention Network
 <https://jermainewang.github.io/>`_  `Zheng Zhang
 <https://shanghai.nyu.edu/academics/faculty/directory/zheng-zhang>`_
 
-From `Graph Convolutional Network (GCN) <https://arxiv.org/abs/1609.02907>`_,
-we learned that combining local graph structure and node-level features yields
-good performance on node classification task. However, the way GCN aggregates
-is structure-dependent, which may hurt its generalizability.
+In this tutorial, you learn about a graph attention network (GAT) and how it can be 
+implemented in PyTorch. You can also learn to visualize and understand what the attention 
+mechanism has learned.
 
-One workaround is to simply average over all neighbor node features as in
-`GraphSAGE
+The research described in the paper `Graph Convolutional Network (GCN) <https://arxiv.org/abs/1609.02907>`_,
+indicates that combining local graph structure and node-level features yields
+good performance on node classification tasks. However, the way GCN aggregates
+is structure-dependent, which can hurt its generalizability.
+
+One workaround is to simply average over all neighbor node features as described in
+the research paper `GraphSAGE
 <https://www-cs-faculty.stanford.edu/people/jure/pubs/graphsage-nips17.pdf>`_.
-`Graph Attention Network <https://arxiv.org/abs/1710.10903>`_ proposes an
-alternative way by weighting neighbor features with feature dependent and
-structure free normalization, in the style of attention.
-
-The goal of this tutorial:
-
-* Explain what is Graph Attention Network.
-* Demonstrate how it can be implemented in DGL.
-* Understand the attentions learnt.
-* Introduce to inductive learning.
+However, `Graph Attention Network <https://arxiv.org/abs/1710.10903>`_ proposes a
+different type of aggregation. GAN uses weighting neighbor features with feature dependent and
+structure-free normalization, in the style of attention.
 """
 ###############################################################
-# Introducing Attention to GCN
+# Introducing attention to GCN
 # ----------------------------
 #
 # The key difference between GAT and GCN is how the information from the one-hop neighborhood is aggregated.
 #
-# For GCN, a graph convolution operation produces the normalized sum of the node features of neighbors:
+# For GCN, a graph convolution operation produces the normalized sum of the node features of neighbors.
 #
 #
 # .. math::
@@ -56,7 +53,7 @@ The goal of this tutorial:
 # GAT introduces the attention mechanism as a substitute for the statically
 # normalized convolution operation. Below are the equations to compute the node
 # embedding :math:`h_i^{(l+1)}` of layer :math:`l+1` from the embeddings of
-# layer :math:`l`:
+# layer :math:`l`.
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/gat.png
 #   :width: 450px
@@ -77,30 +74,29 @@ The goal of this tutorial:
 #
 # * Equation (1) is a linear transformation of the lower layer embedding :math:`h_i^{(l)}`
 #   and :math:`W^{(l)}` is its learnable weight matrix.
-# * Equation (2) computes a pair-wise *unnormalized* attention score between two neighbors.
+# * Equation (2) computes a pair-wise *un-normalized* attention score between two neighbors.
 #   Here, it first concatenates the :math:`z` embeddings of the two nodes, where :math:`||`
 #   denotes concatenation, then takes a dot product of it and a learnable weight vector
 #   :math:`\vec a^{(l)}`, and applies a LeakyReLU in the end. This form of attention is
 #   usually called *additive attention*, contrast with the dot-product attention in the
 #   Transformer model.
 # * Equation (3) applies a softmax to normalize the attention scores on each node's
-#   in-coming edges.
+#   incoming edges.
 # * Equation (4) is similar to GCN. The embeddings from neighbors are aggregated together,
 #   scaled by the attention scores.
 #
 # There are other details from the paper, such as dropout and skip connections.
-# For the purpose of simplicity, we omit them in this tutorial and leave the
-# link to the full example at the end for interested readers.
-#
+# For the purpose of simplicity, those details are left out of this tutorial. To see more details, 
+# download the `full example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat/gat.py>`_.
 # In its essence, GAT is just a different aggregation function with attention
 # over features of neighbors, instead of a simple mean aggregation.
 #
 # GAT in DGL
 # ----------
 #
-# Let's first have an overall impression about how a ``GATLayer`` module is
-# implemented in DGL. Don't worry, we will break down the four equations above
-# one-by-one.
+# To begin, you can get an overall impression about how a ``GATLayer`` module is
+# implemented in DGL. In this section, the four equations above are broken down 
+# one at a time.
 
 import torch
 import torch.nn as nn
@@ -152,7 +148,7 @@ class GATLayer(nn.Module):
 #
 #   z_i^{(l)}=W^{(l)}h_i^{(l)},(1)
 #
-# The first one is simple. Linear transformation is very common and can be
+# The first one shows linear transformation. It's common and can be
 # easily implemented in Pytorch using ``torch.nn.Linear``.
 #
 # Equation (2)
@@ -162,9 +158,9 @@ class GATLayer(nn.Module):
 #
 #   e_{ij}^{(l)}=\text{LeakyReLU}(\vec a^{(l)^T}(z_i^{(l)}|z_j^{(l)})),(2)
 #
-# The unnormalized attention score :math:`e_{ij}` is calculated using the
+# The un-normalized attention score :math:`e_{ij}` is calculated using the
 # embeddings of adjacent nodes :math:`i` and :math:`j`. This suggests that the
-# attention scores can be viewed as edge data which can be calculated by the
+# attention scores can be viewed as edge data, which can be calculated by the
 # ``apply_edges`` API. The argument to the ``apply_edges`` is an **Edge UDF**,
 # which is defined as below:
 
@@ -176,7 +172,7 @@ def edge_attention(self, edges):
 
 ########################################################################3
 # Here, the dot product with the learnable weight vector :math:`\vec{a^{(l)}}`
-# is implemented again using pytorch's linear transformation ``attn_fc``. Note
+# is implemented again using PyTorch's linear transformation ``attn_fc``. Note
 # that ``apply_edges`` will **batch** all the edge data in one tensor, so the
 # ``cat``, ``attn_fc`` here are applied on all the edges in parallel.
 #
@@ -192,7 +188,7 @@ def edge_attention(self, edges):
 #
 # Similar to GCN, ``update_all`` API is used to trigger message passing on all
 # the nodes. The message function sends out two tensors: the transformed ``z``
-# embedding of the source node and the unnormalized attention score ``e`` on
+# embedding of the source node and the un-normalized attention score ``e`` on
 # each edge. The reduce function then performs two tasks:
 #
 #
@@ -211,7 +207,7 @@ def reduce_func(self, nodes):
     return {'h' : h}
 
 #####################################################################
-# Multi-head Attention
+# Multi-head attention
 # ^^^^^^^^^^^^^^^^^^^^
 #
 # Analogous to multiple channels in ConvNet, GAT introduces **multi-head
@@ -225,10 +221,10 @@ def reduce_func(self, nodes):
 #
 # .. math:: \text{average}: h_{i}^{(l+1)}=\sigma\left(\frac{1}{K}\sum_{k=1}^{K}\sum_{j\in\mathcal{N}(i)}\alpha_{ij}^{k}W^{k}h^{(l)}_{j}\right)
 #
-# where :math:`K` is the number of heads. The authors suggest using
+# where :math:`K` is the number of heads. You can use
 # concatenation for intermediary layers and average for the final layer.
 #
-# We can use the above defined single-head ``GATLayer`` as the building block
+# Use the above defined single-head ``GATLayer`` as the building block
 # for the ``MultiHeadGATLayer`` below:
 
 class MultiHeadGATLayer(nn.Module):
@@ -252,7 +248,7 @@ class MultiHeadGATLayer(nn.Module):
 # Put everything together
 # ^^^^^^^^^^^^^^^^^^^^^^^
 #
-# Now, we can define a two-layer GAT model:
+# Now, you can define a two-layer GAT model.
 
 class GAT(nn.Module):
     def __init__(self, g, in_dim, hidden_dim, out_dim, num_heads):
@@ -270,7 +266,7 @@ class GAT(nn.Module):
         return h
 
 #############################################################################
-# We then load the cora dataset using DGL's built-in data module.
+# We then load the Cora dataset using DGL's built-in data module.
 
 from dgl import DGLGraph
 from dgl.data import citation_graph as citegrh
@@ -327,14 +323,14 @@ for epoch in range(30):
         epoch, loss.item(), np.mean(dur)))
 
 #########################################################################
-# Visualizing and Understanding Attention Learnt
+# Visualizing and understanding attention learned
 # ----------------------------------------------
 #
 # Cora
 # ^^^^
 #
-# The following table summarizes the model performances on Cora reported in
-# `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ and obtained with dgl
+# The following table summarizes the model performance on Cora that is reported in
+# `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ and obtained with DGL 
 # implementations.
 #
 # .. list-table::
@@ -351,10 +347,10 @@ for epoch in range(30):
 #    * - GAT (dgl)
 #      - :math:`83.69\pm 0.529%`
 #
-# *What kind of attention distribution has our model learnt?*
+# *What kind of attention distribution has our model learned?*
 #
-# Because the attention weight :math:`a_{ij}` is associated with edges, we can
-# visualize it by coloring edges. Below we pick a subgraph of Cora and plot the
+# Because the attention weight :math:`a_{ij}` is associated with edges, you can
+# visualize it by coloring edges. Below you can pick a subgraph of Cora and plot the
 # attention weights of the last ``GATLayer``. The nodes are colored according
 # to their labels, whereas the edges are colored according to the magnitude of
 # the attention weights, which can be referred with the colorbar on the right.
@@ -363,8 +359,8 @@ for epoch in range(30):
 #   :width: 600px
 #   :align: center
 #
-# You can that the model seems to learn different attention weights. To
-# understand the distribution more thoroughly, we measure the `entropy
+# You can see that the model seems to learn different attention weights. To
+# understand the distribution more thoroughly, measure the `entropy
 # <https://en.wikipedia.org/wiki/Entropy_(information_theory>`_) of the
 # attention distribution. For any node :math:`i`,
 # :math:`\{\alpha_{ij}\}_{j\in\mathcal{N}(i)}` forms a discrete probability
@@ -372,14 +368,14 @@ for epoch in range(30):
 #
 # .. math:: H({\alpha_{ij}}_{j\in\mathcal{N}(i)})=-\sum_{j\in\mathcal{N}(i)} \alpha_{ij}\log\alpha_{ij}
 #
-# Intuitively, a low entropy means a high degree of concentration, and vice
-# versa; an entropy of 0 means all attention is on one source node. The uniform
+# A low entropy means a high degree of concentration, and vice
+# versa. An entropy of 0 means all attention is on one source node. The uniform
 # distribution has the highest entropy of :math:`\log(\mathcal{N}(i))`.
-# Ideally, we want to see the model learns a distribution of lower entropy
+# Ideally, you want to see the model learns a distribution of lower entropy
 # (i.e, one or two neighbors are much more important than the others).
 #
 # Note that since nodes can have different degrees, the maximum entropy will
-# also be different. Therefore, we plot the aggregated histogram of entropy
+# also be different. Therefore, you plot the aggregated histogram of entropy
 # values of all nodes in the entire graph. Below are the attention histogram of
 # learned by each attention head.
 #
@@ -396,13 +392,13 @@ for epoch in range(30):
 # explains why the performance of GAT is close to that of GCN on Cora
 # (according to `author's reported result
 # <https://arxiv.org/pdf/1710.10903.pdf>`_, the accuracy difference averaged
-# over 100 runs is less than 2%); attention does not matter
-# since it does not differentiate much any ways.
+# over 100 runs is less than 2 percent). Attention does not matter
+# since it does not differentiate much.
 #
 # *Does that mean the attention mechanism is not useful?* No! A different
-# dataset exhibits an entirely different pattern, as we show next.
+# dataset exhibits an entirely different pattern, as you can see next.
 #
-# Protein-Protein Interaction (PPI) networks
+# Protein-protein interaction (PPI) networks
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # The PPI dataset used here consists of :math:`24` graphs corresponding to
@@ -410,13 +406,13 @@ for epoch in range(30):
 # the label of node is represented as a binary tensor of size :math:`121`. The
 # task is to predict node label.
 #
-# We use :math:`20` graphs for training, :math:`2` for validation and :math:`2`
+# Use :math:`20` graphs for training, :math:`2` for validation and :math:`2`
 # for test. The average number of nodes per graph is :math:`2372`. Each node
 # has :math:`50` features that are composed of positional gene sets, motif gene
-# sets and immunological signatures. Critically, test graphs remain completely
+# sets, and immunological signatures. Critically, test graphs remain completely
 # unobserved during training, a setting called "inductive learning".
 #
-# We compare the performance of GAT and GCN for :math:`10` random runs on this
+# Compare the performance of GAT and GCN for :math:`10` random runs on this
 # task and use hyperparameter search on the validation set to find the best
 # model.
 #
@@ -432,7 +428,7 @@ for epoch in range(30):
 #    * - Paper
 #      - :math:`0.973 \pm 0.002`
 #
-# The table above is the result of this experiment, where we use micro `F1
+# The table above is the result of this experiment, where you use micro `F1
 # score <https://en.wikipedia.org/wiki/F1_score>`_ to evaluate the model
 # performance.
 #
@@ -453,7 +449,7 @@ for epoch in range(30):
 #   * :math:`FN_{t}` represents for number of output classes labeled as :math:`t` but predicted as others.
 #   * :math:`n` is the number of labels, i.e. :math:`121` in our case.
 #
-# During training, we use ``BCEWithLogitsLoss`` as the loss function. The
+# During training, use ``BCEWithLogitsLoss`` as the loss function. The
 # learning curves of GAT and GCN are presented below; what is evident is the
 # dramatic performance adavantage of GAT over GCN.
 #
@@ -461,19 +457,19 @@ for epoch in range(30):
 #   :width: 300px
 #   :align: center
 #
-# As before, we can have a statistical understanding of the attentions learnt
+# As before, you can have a statistical understanding of the attentions learned
 # by showing the histogram plot for the node-wise attention entropy. Below are
-# the attention histogram learnt by different attention layers.
+# the attention histograms learned by different attention layers.
 #
-# *Attention learnt in layer 1:*
+# *Attention learned in layer 1:*
 #
 # |image5|
 #
-# *Attention learnt in layer 2:*
+# *Attention learned in layer 2:*
 #
 # |image6|
 #
-# *Attention learnt in final layer:*
+# *Attention learned in final layer:*
 #
 # |image7|
 #
@@ -484,27 +480,27 @@ for epoch in range(30):
 #   :align: center
 #
 # Clearly, **GAT does learn sharp attention weights**! There is a clear pattern
-# over the layers as well: **the attention gets sharper with higher
+# over the layers as well: **the attention gets sharper with a higher
 # layer**.
 #
-# Unlike the Cora dataset where GAT's gain is lukewarm at best, for PPI there
+# Unlike the Cora dataset where GAT's gain is minimal at best, for PPI there
 # is a significant performance gap between GAT and other GNN variants compared
-# in `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ (at least 20%),
+# in `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ (at least 20 percent),
 # and the attention distributions between the two clearly differ. While this
 # deserves further research, one immediate conclusion is that GAT's advantage
 # lies perhaps more in its ability to handle a graph with more complex
 # neighborhood structure.
 #
-# What's Next?
+# What's next?
 # ------------
 #
-# So far, we demonstrated how to use DGL to implement GAT. There are some
-# missing details such as dropout, skip connections and hyper-parameter tuning,
-# which are common practices and do not involve DGL-related concepts. We refer
-# interested readers to the full example.
+# So far, you have seen how to use DGL to implement GAT. There are some
+# missing details such as dropout, skip connections, and hyper-parameter tuning,
+# which are practices that do not involve DGL-related concepts. For more information
+# check out the full example.
 #
-# * See the optimized full example `here <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat/gat.py>`_.
-# * Stay tune for our next tutorial about how to speedup GAT models by parallelizing multiple attention heads and SPMV optimization.
+# * See the optimized `full example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat/gat.py>`_.
+# * The next tutorial describes how to speedup GAT models by parallelizing multiple attention heads and SPMV optimization.
 #
 # .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/cora-attention-hist.png
 # .. |image5| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-first-layer-hist.png
