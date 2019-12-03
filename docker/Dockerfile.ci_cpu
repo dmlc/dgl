@@ -18,10 +18,10 @@ ENV CONDA_ALWAYS_YES="true"
 COPY install/conda_env/torch_cpu.yml /install/conda_env/torch_cpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_cpu.yml"]
 
-COPY install/conda_env/mxnet_cpu.yml /install/conda_env/mxnet_cpu.yml
-RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_cpu.yml"]
-
 COPY install/conda_env/tensorflow_cpu.yml /install/conda_env/tensorflow_cpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_cpu.yml"]
+
+COPY install/conda_env/mxnet_cpu.yml /install/conda_env/mxnet_cpu.yml
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_cpu.yml"]
 
 ENV CONDA_ALWAYS_YES=
