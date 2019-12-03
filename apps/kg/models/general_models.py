@@ -46,8 +46,10 @@ class KEModel(object):
             rel_dim = relation_dim
         self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
 
-        if model_name == 'TransE':
-            self.score_func = TransEScore(gamma)
+        if model_name == 'TransE' or model_name == 'TransE_l2':
+            self.score_func = TransEScore(gamma, 'l2')
+        elif model_name == 'TransE_l1':
+            self.score_func = TransEScore(gamma, 'l1')
         elif model_name == 'TransR':
             projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
                                                F.cpu() if args.mix_cpu_gpu else device)
