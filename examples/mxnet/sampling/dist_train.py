@@ -15,10 +15,23 @@ from gcn_ns_dist import gcn_ns_train
 server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
 
 def load_node_data(args):
-    import pickle
-    ndata = pickle.load(open('reddit_ndata.pkl', 'rb'))
-    print('load reddit ndata')
-    return ndata
+    if args.num_parts > 1:
+        import pickle
+        ndata = pickle.load(open('reddit_ndata.pkl', 'rb'))
+        print('load reddit ndata')
+        return ndata
+    else:
+        data = load_data(args)
+        features = mx.nd.array(data.features)
+        labels = mx.nd.array(data.labels)
+        train_mask = mx.nd.array(data.train_mask)
+        val_mask = mx.nd.array(data.val_mask)
+        test_mask = mx.nd.array(data.test_mask)
+        return {'feature': features,
+                'label': labels,
+                'train_mask': train_mask,
+                'val_mask': val_mask,
+                'test_mask': test_mask}
 
 def start_server(args):
     server = KVServer(
@@ -65,15 +78,23 @@ def load_local_part(args):
     # * mapping to global nodes and global edges.
     # * mapping to the right machine.
     # TODO for now, I use pickle to store partitioned graph.
-    import pickle
-    part, part_nodes, part_loc = pickle.load(open('reddit_part_{}.pkl'.format(args.id), 'rb'))
-    all_locs = np.loadtxt('reddit.adj.part.{}'.format(args.num_parts))
-    g = dgl.DGLGraph(part, readonly=True)
-    g.ndata['global_id'] = mx.nd.array(part_nodes, dtype=np.int64)
-    g.ndata['node_loc'] = mx.nd.array(part_loc, dtype=np.int64)
-    g.ndata['local'] = mx.nd.array(part_loc == args.id, dtype=np.int64)
-    assert np.all(all_locs[part_nodes] == part_loc)
-    return g, mx.nd.array(all_locs, dtype=np.int64)
+    if args.num_parts > 1:
+        import pickle
+        part, part_nodes, part_loc = pickle.load(open('reddit_part_{}.pkl'.format(args.id), 'rb'))
+        all_locs = np.loadtxt('reddit.adj.part.{}'.format(args.num_parts))
+        g = dgl.DGLGraph(part, readonly=True)
+        g.ndata['global_id'] = mx.nd.array(part_nodes, dtype=np.int64)
+        g.ndata['node_loc'] = mx.nd.array(part_loc, dtype=np.int64)
+        g.ndata['local'] = mx.nd.array(part_loc == args.id, dtype=np.int64)
+        assert np.all(all_locs[part_nodes] == part_loc)
+        return g, mx.nd.array(all_locs, dtype=np.int64)
+    else:
+        data = load_data(args)
+        g = dgl.DGLGraph(data.graph, readonly=True)
+        g.ndata['global_id'] = mx.nd.arange(g.number_of_nodes(), dtype=np.int64)
+        g.ndata['node_loc'] = mx.nd.zeros(g.number_of_nodes(), dtype=np.int64)
+        g.ndata['local'] = mx.nd.ones(g.number_of_nodes(), dtype=np.int64)
+        return g, g.ndata['node_loc']
 
 def get_from_kvstore(args, kv, g, name):
     name = args.graph_name + "_" + name
