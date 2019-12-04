@@ -65,21 +65,16 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import dgl
+import dgl.function as fn
 
 
 def init_graph(in_nodes, out_nodes, f_size):
-    g = dgl.DGLGraph()
-    all_nodes = in_nodes + out_nodes
-    g.add_nodes(all_nodes)
-
-    in_indx = list(range(in_nodes))
-    out_indx = list(range(in_nodes, in_nodes + out_nodes))
-    # add edges use edge broadcasting
-    for u in in_indx:
-        g.add_edges(u, out_indx)
-
+    g = dgl.bipartite(
+        (np.repeat(np.arange(in_nodes), out_nodes), np.tile(np.arange(out_nodes), in_nodes)),
+        utype='in', vtype='out'
+    )
     # init states
-    g.ndata['v'] = th.zeros(all_nodes, f_size)
+    g.nodes['in'].data['v'] = th.zeros(in_nodes, f_size)
     g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
     return g
 
@@ -119,22 +114,9 @@ class DGLRoutingLayer(nn.Module):
         self.g = init_graph(in_nodes, out_nodes, f_size)
         self.in_nodes = in_nodes
         self.out_nodes = out_nodes
-        self.in_indx = list(range(in_nodes))
-        self.out_indx = list(range(in_nodes, in_nodes + out_nodes))
 
     def forward(self, u_hat, routing_num=1):
         self.g.edata['u_hat'] = u_hat
-
-        # step 2 (line 5)
-        def cap_message(edges):
-            return {'m': edges.data['c'] * edges.data['u_hat']}
-
-        self.g.register_message_func(cap_message)
-
-        def cap_reduce(nodes):
-            return {'s': th.sum(nodes.mailbox['m'], dim=1)}
-
-        self.g.register_reduce_func(cap_reduce)
 
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
@@ -144,14 +126,17 @@ class DGLRoutingLayer(nn.Module):
             )
 
             # Execute step 1 & 2
-            self.g.update_all()
+            self.g.update_all(
+                lambda edges: {'m': edges.data['c'] * edges.data['u_hat']},
+                fn.sum('m', 's')
+            )
 
             # step 3 (line 6)
-            self.g.nodes[self.out_indx].data['v'] = self.squash(self.g.nodes[self.out_indx].data['s'], dim=1)
+            self.g.nodes['out'].data['v'] = self.squash(self.g.nodes['out'].data['s'], dim=1)
 
             # step 4 (line 7)
-            v = th.cat([self.g.nodes[self.out_indx].data['v']] * self.in_nodes, dim=0)
-            self.g.edata['b'] = self.g.edata['b'] + (self.g.edata['u_hat'] * v).sum(dim=1, keepdim=True)
+            self.g.apply_edges(fn.e_dot_v('u_hat', 'v', 'uv'))
+            self.g.edata['b'] = self.g.edata['b'] + self.g.edata.pop('uv').unsqueeze(-1)
 
     @staticmethod
     def squash(s, dim=1):
@@ -192,6 +177,7 @@ plt.errorbar(np.arange(len(entropy_list)), means, stds, marker='o')
 plt.ylabel("Entropy of Weight Distribution")
 plt.xlabel("Number of Routing")
 plt.xticks(np.arange(len(entropy_list)))
+plt.show()
 plt.close()
 ############################################################################################################
 # |image3|
@@ -214,6 +200,7 @@ def dist_animate(i):
 
 
 ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
+plt.show()
 plt.close()
 
 ############################################################################################################
@@ -224,7 +211,7 @@ plt.close()
 import networkx as nx
 from networkx.algorithms import bipartite
 
-g = routing.g.to_networkx()
+g = dgl.to_homo(routing.g).to_networkx()
 X, Y = bipartite.sets(g)
 height_in = 10
 height_out = height_in * 0.8
@@ -251,6 +238,7 @@ def weight_animate(i):
 
 
 ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
+plt.show()
 plt.close()
 
 ############################################################################################################
