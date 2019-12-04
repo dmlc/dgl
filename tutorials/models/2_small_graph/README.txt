@@ -13,4 +13,4 @@ Batching many small graphs
   a sentence to the maximum length no longer works. Trees of different
   sentences have different sizes and topologies. DGL solves this problem by
   adding the trees to a bigger container graph, and then using message-passing
-  to explore maximum parallelism. Batchin is a key API for this.
+  to explore maximum parallelism. Batching is a key API for this.
