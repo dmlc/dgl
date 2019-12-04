@@ -218,13 +218,17 @@ Transformer Tutorial
 # To speed up the message passing process, we utilize DGL’s builtin
 # function, including:
 #
-# - ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
+# - ``fn.u_dot_v(src_field, dst_field, edges_field)`` computes the dot
+#   product of source's attribute and destination's attribute, and write
+#   the results to edges on ``edges_field``.
+# - ``fn.u_mul_e(src_field, edges_field, out_field)`` multiplies
 #   source’s attribute and edges attribute, and send the result to the
 #   destination node’s mailbox keyed by ``out_field``.
-# - ``fn.copy_edge(edges_field, out_field)`` copies edge’s attribute to
+# - ``fn.copy_e(edges_field, out_field)`` copies edge’s attribute to
 #   destination node’s mailbox.
 # - ``fn.sum(edges_field, out_field)`` sums up
 #   edge’s attribute and sends aggregation to destination node’s mailbox.
+# - ``fn.edge_softmax`` 
 #
 # Here we assemble those built-in function into ``propagate_attention``,
 # which is also the main graph operation function in our final
@@ -234,7 +238,7 @@ Transformer Tutorial
 # 1. Compute attention score by multiply src node’s ``k`` and dst node’s
 #    ``q``
 #
-#    -  ``g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)``
+#    -  ``g.apply_edges(fn.u_dot_v('k', 'q', 'score'), eids)``
 #
 # 2. Scaled Softmax over all dst nodes’ in-coming edges
 #

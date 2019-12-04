@@ -2149,7 +2149,7 @@ class DGLGraph(DGLBaseGraph):
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
         """Group the edges by nodes and apply the function on the grouped edges to
-         update their features.
+        update their features.
 
         Parameters
         ----------

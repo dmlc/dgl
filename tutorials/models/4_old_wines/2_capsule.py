@@ -140,8 +140,10 @@ class DGLRoutingLayer(nn.Module):
 
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
+            self.g.group_apply_edges(
+                func=lambda edges: {'c': F.softmax(edges.data['b'], dim=1)},
+                group_by='src'
+            )
 
             # Execute step 1 & 2
             self.g.update_all()
