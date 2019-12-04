@@ -28,6 +28,7 @@ A summary of part of the model accuracy and training speed with the Pytorch back
 | [JTNN](https://arxiv.org/abs/1802.04364)                         | 96.44%                 | 96.44%            | [1826s (Pytorch)](https://github.com/wengong-jin/icml18-jtnn)                 | 743s                   | 2.5x        |
 | [LGNN](https://arxiv.org/abs/1705.08415)                         | 94%                    | 94%               | n/a                                                                           | 1.45s                  | n/a         |
 | [DGMG](https://arxiv.org/pdf/1803.03324.pdf)                     | 84%                    | 90%               | n/a                                                                           | 238s                   | n/a         |
+| [GraphWriter](https://www.aclweb.org/anthology/N19-1238.pdf)     | 14.3(BLEU)             | 14.31(BLEU)       | [1970s (PyTorch)](https://github.com/rikdz/GraphWriter)                       | 1192s                  | 1.65x       |                  
 
 With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150M edges on a P3.8xlarge instance, 
 with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
@@ -69,6 +70,7 @@ conda install -c dglteam dgl           # cpu version
 conda install -c dglteam dgl-cuda9.0   # CUDA 9.0
 conda install -c dglteam dgl-cuda9.2   # CUDA 9.2
 conda install -c dglteam dgl-cuda10.0  # CUDA 10.0
+conda install -c dglteam dgl-cuda10.1  # CUDA 10.1
 ```
 
 ### Using pip
@@ -78,6 +80,7 @@ pip install dgl       # cpu version
 pip install dgl-cu90  # CUDA 9.0
 pip install dgl-cu92  # CUDA 9.2
 pip install dgl-cu100 # CUDA 10.0
+pip install dgl-cu101 # CUDA 10.1
 ```
 
 ### From source

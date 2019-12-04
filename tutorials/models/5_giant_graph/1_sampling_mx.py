@@ -8,7 +8,7 @@ NodeFlow and Sampling
 """
 ################################################################################################
 #
-# GCN
+# Graph convolutional network
 # ~~~
 #
 # In an :math:`L`-layer graph convolution network (GCN), given a graph
@@ -29,7 +29,7 @@ NodeFlow and Sampling
 # function, and :math:`W^{(l)}` is a trainable parameter of the
 # :math:`l`-th layer.
 #
-# In the node classification task we minimize the following loss:
+# In the node classification task you minimize the following loss:
 #
 # .. math::
 #
@@ -43,11 +43,11 @@ NodeFlow and Sampling
 # features of its neighbors to compute its hidden feature in the next
 # layer.
 #
-# In this tutorial, we will run GCN on the Reddit dataset constructed by `Hamilton et
+# In this tutorial, you run GCN on the Reddit dataset constructed by `Hamilton et
 # al. <https://arxiv.org/abs/1706.02216>`__, wherein the nodes are posts
 # and edges are established if two nodes are commented by a same user. The
 # task is to predict the category that a post belongs to. This graph has
-# 233K nodes, 114.6M edges and 41 categories. Let's first load the Reddit graph.
+# 233,000 nodes, 114.6 million edges and 41 categories. First load the Reddit graph.
 #
 import numpy as np
 import dgl
@@ -73,7 +73,7 @@ g = DGLGraph(data.graph, readonly=True)
 g.ndata['features'] = features
 
 ################################################################################################
-# Here we define the node UDF which has a fully-connected layer:
+# Here you define the node UDF, which has a fully-connected layer:
 #
 
 class NodeUpdate(gluon.Block):
@@ -90,7 +90,7 @@ class NodeUpdate(gluon.Block):
         return {'activation': h}
 
 ################################################################################################
-# In DGL, we implement GCN on the full graph with ``update_all`` in ``DGLGraph``.
+# In DGL, you implement GCN on the full graph with ``update_all`` in ``DGLGraph``.
 # The following code performs two-layer GCN on the Reddit graph.
 #
 
@@ -119,7 +119,7 @@ for i in range(L):
 # As the graph scales up to billions of nodes or edges, training on the
 # full graph would no longer be efficient or even feasible.
 #
-# Mini-batch training allows us to control the computation and memory
+# Mini-batch training allows you to control the computation and memory
 # usage within some budget. The training loss for each iteration is
 #
 # .. math::
@@ -132,7 +132,7 @@ for i in range(L):
 #
 # Stemming from the labeled nodes :math:`\tilde{\mathcal{V}}_\mathcal{L}`
 # in a mini-batch and tracing back to the input forms a computational
-# dependency graph (a directed acyclic graph or DAG in short), which
+# dependency graph (a directed acyclic graph [DAG]), which
 # captures the computation flow of :math:`Z^{(L)}`.
 #
 # In the example below, a mini-batch to compute the hidden features of
@@ -141,16 +141,16 @@ for i in range(L):
 #
 # |image0|
 #
-# For that purpose, we define ``NodeFlow`` to represent this computation
+# For that purpose, you define ``NodeFlow`` to represent this computation
 # flow.
 #
 # ``NodeFlow`` is a type of layered graph, where nodes are organized in
 # :math:`L + 1` sequential *layers*, and edges only exist between adjacent
-# layers, forming *blocks*. We construct ``NodeFlow`` backwards, starting
+# layers, forming *blocks*. You construct ``NodeFlow`` backwards, starting
 # from the last layer with all the nodes whose hidden features are
 # requested. The set of nodes the next layer depends on forms the previous
 # layer. An edge connects a node in the previous layer to another in the
-# next layer iff the latter depends on the former. We repeat such process
+# next layer if the latter depends on the former. Repeat such process
 # until all :math:`L + 1` layers are constructed. The feature of nodes in
 # each layer, and that of edges in each block, are stored as separate
 # tensors.
@@ -163,11 +163,11 @@ for i in range(L):
 #
 
 ##############################################################################
-# Neighbor Sampling
+# Neighbor sampling
 # ~~~~~~~~~~~~~~~~~
 #
 # Real-world graphs often have nodes with large degree, meaning that a
-# moderately deep (e.g. 3 layers) GCN would often depend on input features
+# moderately deep (e.g., three layers) GCN would often depend on input features
 # of the entire graph, even if the computation only depends on outputs of
 # a few nodes, hence its cost-ineffectiveness.
 #
@@ -195,7 +195,7 @@ for i in range(L):
 #
 
 ##############################################################################
-# We then implement *neighbor smapling* by ``NodeFlow``:
+# You then implement *neighbor sampling* by ``NodeFlow``:
 #
 
 class GCNSampling(gluon.Block):
@@ -229,7 +229,7 @@ class GCNSampling(gluon.Block):
             nf.layers[i].data['h'] = h
             # block_compute() computes the feature of layer i given layer
             # i-1, with the given message, reduce, and apply functions.
-            # Here, we essentially aggregate the neighbor node features in
+            # Here, you essentially aggregate the neighbor node features in
             # the previous layer, and update it with the `layer` function.
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
@@ -244,8 +244,8 @@ class GCNSampling(gluon.Block):
 # ``NeighborSampler``
 # returns an iterator that generates a ``NodeFlow`` each time. This function
 # has many options to give users opportunities to customize the behavior
-# of the neighbor sampler, including the number of neighbors to sample,
-# the number of hops to sample, etc. Please see `its API
+# of the neighbor sampler, including the number of neighbors to sample or
+# the number of hops to sample, for example. Please see `its API
 # document <https://doc.dgl.ai/api/python/sampler.html>`__ for more
 # details.
 #
@@ -296,12 +296,12 @@ for epoch in range(num_epochs):
         trainer.step(batch_size=1)
         print("Epoch[{}]: loss {}".format(epoch, loss.asscalar()))
         i += 1
-        # We only train the model with 32 mini-batches just for demonstration.
+        # You only train the model with 32 mini-batches just for demonstration.
         if i >= 32:
             break
 
 ##############################################################################
-# Control Variate
+# Control variate
 # ~~~~~~~~~~~~~~~
 #
 # The unbiased estimator :math:`\hat{Z}^{(\cdot)}` used in *neighbor
@@ -312,8 +312,8 @@ for epoch in range(num_epochs):
 # standard variance reduction technique widely used in Monte Carlo
 # methods, 2 neighbors for a node seems sufficient.
 #
-# *Control variate* method works as follows: given a random variable
-# :math:`X` and we wish to estimate its expectation
+# *Control variate* method works as follows: Given a random variable
+# :math:`X` and you wish to estimate its expectation
 # :math:`\mathbb{E} [X] = \theta`, it finds another random variable
 # :math:`Y` which is highly correlated with :math:`X` and whose
 # expectation :math:`\mathbb{E} [Y]` can be easily computed. The *control
@@ -338,7 +338,7 @@ for epoch in range(num_epochs):
 #    \hat{h}_v^{(l+1)} = \sigma ( \hat{z}_v^{(l+1)} W^{(l)} )
 #
 # This method can also be *conceptually* implemented in DGL as shown
-# below,
+# here.
 #
 
 have_large_memory = False
@@ -348,7 +348,7 @@ if have_large_memory:
     g.ndata['h_0'] = features
     for i in range(L):
         g.ndata['h_{}'.format(i+1)] = mx.nd.zeros((features.shape[0], n_hidden))
-    # With control-variate sampling, we only need to sample 2 neighbors to train GCN.
+    # With control-variate sampling, you only need to sample two neighbors to train GCN.
     for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size, expand_factor=2,
                                                    neighbor_type='in', num_hops=L,
                                                    seed_nodes=train_nid):
@@ -387,7 +387,7 @@ if have_large_memory:
 # Below shows the performance of graph convolution network and GraphSage
 # with neighbor sampling and control variate sampling on the Reddit
 # dataset. Our GraphSage with control variate sampling, when sampling one
-# neighbor, can achieve over 96% test accuracy. |image1|
+# neighbor, can achieve over 96 percent test accuracy. |image1|
 #
 # More APIs
 # ~~~~~~~~~
