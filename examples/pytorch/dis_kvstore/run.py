@@ -1,8 +1,9 @@
-import dgl
-import argparse
-import torch as th
 import os
 import time
+import argparse
+
+import dgl
+import torch as th
 import torch.multiprocessing as mp
 
 NUM_PROC = 8
@@ -24,14 +25,15 @@ data_list.append(th.tensor([[3.,3.],[4.,4.]]))
 data_list.append(th.tensor([[5.,5.],[6.,6.]]))
 data_list.append(th.tensor([[7.,7.],[8.,8.]]))
 
-server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
+server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure(filename='config.txt', format=2, client_num=1)
 
 def start_server(server_id, data_tensor, global_to_local):
     server = dgl.contrib.KVServer(
         server_id=server_id, 
         client_namebook=client_namebook, 
-        global_to_local=global_to_local,
         server_addr=server_namebook[server_id])
+
+    server.set_global_to_local(name='embed', global_to_local=global_to_local)
 
     server.init_data(name='embed', data_tensor=data_tensor)
 
@@ -44,11 +46,13 @@ def start_client(client_id, data_tensor, global_to_local):
         client_id=client_id, 
         local_server_id=client_id, 
         server_namebook=server_namebook, 
-        client_addr=client_namebook[client_id],
-        partition_book=partition_book,
-        global_to_local=global_to_local)
+        client_addr=client_namebook[client_id])
 
-    client.init_local_data(name='embed', data_tensor=data_tensor)
+    client.set_partition_book(name='embed', partition_book=partition_book)
+
+    client.set_global_to_local(name='embed', global_to_local=global_to_local)
+
+    client.init_data(name='embed', data_tensor=data_tensor)
 
     client.connect()
 
