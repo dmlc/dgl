@@ -35,6 +35,8 @@ def load_backend(mod_name):
             setattr(thismod,
                     'reverse_data_type_dict',
                     {v: k for k, v in data_type_dict.items()})
+            # log backend name
+            setattr(thismod, 'backend_name', mod_name)
         else:
             # load functions
             if api in mod.__dict__:
