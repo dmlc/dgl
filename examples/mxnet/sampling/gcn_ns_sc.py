@@ -18,7 +18,6 @@ class NodeUpdate(gluon.Block):
 
     def forward(self, node):
         h = node.data['h']
-        h = h * node.data['norm']
         h = self.dense(h)
         # skip connection
         if self.concat:
@@ -61,11 +60,9 @@ class GCNSampling(gluon.Block):
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
             nf.layers[i].data['h'] = h
-            degs = nf.layer_in_degree(i + 1).astype('float32').as_in_context(h.context)
-            nf.layers[i + 1].data['norm'] = mx.nd.expand_dims(1./degs, 1)
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
+                             fn.mean(msg='m', out='h'),
                              layer)
 
         h = nf.layers[-1].data.pop('activation')
@@ -103,7 +100,7 @@ class GCNInfer(gluon.Block):
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
+                             fn.mean(msg='m', out='h'),
                              layer)
 
         return nf.layers[-1].data.pop('activation')
@@ -113,10 +110,6 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
     n0_feats = g.nodes[0].data['features']
     in_feats = n0_feats.shape[1]
     g_ctx = n0_feats.context
-
-    degs = g.in_degrees().astype('float32').as_in_context(g_ctx)
-    norm = mx.nd.expand_dims(1./degs, 1)
-    g.set_n_repr({'norm': norm})
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
