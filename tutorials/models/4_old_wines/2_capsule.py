@@ -17,7 +17,7 @@ offers a different perspective. The tutorial describes how to implement a Capsul
 # The Capsule model offers two key ideas: Richer representation and dynamic routing.
 #
 # **Richer representation** -- In classic convolutional networks, a scalar
-# value represents the activation of a given feature. By contrast, a
+# value represents the activation of  a given feature. By contrast, a
 # capsule outputs a vector. The vector's length represents the probability
 # of a feature being present. The vector's orientation represents the
 # various properties of the feature (such as pose, deformation, texture
@@ -177,7 +177,6 @@ plt.errorbar(np.arange(len(entropy_list)), means, stds, marker='o')
 plt.ylabel("Entropy of Weight Distribution")
 plt.xlabel("Number of Routing")
 plt.xticks(np.arange(len(entropy_list)))
-plt.show()
 plt.close()
 ############################################################################################################
 # |image3|
@@ -200,7 +199,6 @@ def dist_animate(i):
 
 
 ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
-plt.show()
 plt.close()
 
 ############################################################################################################
@@ -238,7 +236,6 @@ def weight_animate(i):
 
 
 ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
-plt.show()
 plt.close()
 
 ############################################################################################################
