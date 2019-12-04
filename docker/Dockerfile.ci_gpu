@@ -18,11 +18,11 @@ ENV CONDA_ALWAYS_YES="true"
 COPY install/conda_env/torch_gpu.yml /install/conda_env/torch_gpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_gpu.yml"]
 
-COPY install/conda_env/mxnet_gpu.yml /install/conda_env/mxnet_gpu.yml
-RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_gpu.yml"]
-
 COPY install/conda_env/tensorflow_gpu.yml /install/conda_env/tensorflow_gpu.yml
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_gpu.yml"]
+
+COPY install/conda_env/mxnet_gpu.yml /install/conda_env/mxnet_gpu.yml
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_gpu.yml"]
 
 ENV CONDA_ALWAYS_YES=
 
