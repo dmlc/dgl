@@ -19,5 +19,7 @@ pip install requests
 
 ### Usage (make sure that DGLBACKEND is changed into mxnet)
 ```bash
-DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0 --num-heads 8
+DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0
+DGLBACKEND=mxnet python3 train.py --dataset citeseer --gpu 0 --early-stop
+DGLBACKEND=mxnet python3 train.py --dataset pubmed --gpu 0 --early-stop
 ```

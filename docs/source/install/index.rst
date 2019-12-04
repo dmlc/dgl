@@ -123,7 +123,7 @@ users, run:
 .. code:: bash
 
    sudo apt-get update
-   sudo apt-get install -y build-essential build-dep python3-dev make cmake
+   sudo apt-get install -y build-essential python3-dev make cmake
 
 For Fedora/RHEL/CentOS users, run:
 
