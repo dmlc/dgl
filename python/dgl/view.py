@@ -4,10 +4,13 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
+import numpy as np
+
 from .base import ALL, is_all, DGLError
 from . import backend as F
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
+EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class NodeView(object):
     """A NodeView class to act as G.nodes for a DGLGraph.
@@ -57,6 +60,8 @@ class NodeDataView(MutableMapping):
         return self._graph.get_n_repr(self._nodes)[key]
 
     def __setitem__(self, key, val):
+        if isinstance(val, np.ndarray):
+            val = F.zerocopy_from_numpy(val)
         self._graph.set_n_repr({key : val}, self._nodes)
 
     def __delitem__(self, key):
@@ -74,8 +79,6 @@ class NodeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_n_repr(self._nodes)
         return repr({key : data[key] for key in self._graph._node_frame})
-
-EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class EdgeView(object):
     """A EdgeView class to act as G.edges for a DGLGraph.
@@ -125,6 +128,8 @@ class EdgeDataView(MutableMapping):
         return self._graph.get_e_repr(self._edges)[key]
 
     def __setitem__(self, key, val):
+        if isinstance(val, np.ndarray):
+            val = F.zerocopy_from_numpy(val)
         self._graph.set_e_repr({key : val}, self._edges)
 
     def __delitem__(self, key):
@@ -242,3 +247,126 @@ class BlockDataView(MutableMapping):
     def __repr__(self):
         data = self._graph._edge_frames[self._flow]
         return repr({key : data[key] for key in data})
+
+class HeteroNodeView(object):
+    """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
+    __slots__ = ['_graph']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            # slice
+            if not (key.start is None and key.stop is None
+                    and key.step is None):
+                raise DGLError('Currently only full slice ":" is supported')
+            nodes = ALL
+            ntype = None
+        elif isinstance(key, tuple):
+            nodes, ntype = key
+        elif isinstance(key, str):
+            nodes = ALL
+            ntype = key
+        else:
+            nodes = key
+            ntype = None
+        return NodeSpace(data=HeteroNodeDataView(self._graph, ntype, nodes))
+
+    def __call__(self, ntype=None):
+        """Return the nodes."""
+        return F.arange(0, self._graph.number_of_nodes(ntype))
+
+class HeteroNodeDataView(MutableMapping):
+    """The data view class when G.ndata[ntype] is called."""
+    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
+
+    def __init__(self, graph, ntype, nodes):
+        self._graph = graph
+        self._ntype = ntype
+        self._ntid = self._graph.get_ntype_id(ntype)
+        self._nodes = nodes
+
+    def __getitem__(self, key):
+        return self._graph._get_n_repr(self._ntid, self._nodes)[key]
+
+    def __setitem__(self, key, val):
+        self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
+
+    def __delitem__(self, key):
+        self._graph._pop_n_repr(self._ntid, key)
+
+    def __len__(self):
+        return len(self._graph._node_frames[self._ntid])
+
+    def __iter__(self):
+        return iter(self._graph._node_frames[self._ntid])
+
+    def __repr__(self):
+        data = self._graph._get_n_repr(self._ntid, self._nodes)
+        return repr({key : data[key]
+                     for key in self._graph._node_frames[self._ntid]})
+
+class HeteroEdgeView(object):
+    """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
+    __slots__ = ['_graph']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            # slice
+            if not (key.start is None and key.stop is None
+                    and key.step is None):
+                raise DGLError('Currently only full slice ":" is supported')
+            edges = ALL
+            etype = None
+        elif isinstance(key, tuple):
+            if len(key) == 3:
+                edges = ALL
+                etype = key
+            else:
+                edges = key
+                etype = None
+        elif isinstance(key, (str, tuple)):
+            edges = ALL
+            etype = key
+        else:
+            edges = key
+            etype = None
+        return EdgeSpace(data=HeteroEdgeDataView(self._graph, etype, edges))
+
+    def __call__(self, *args, **kwargs):
+        """Return all the edges."""
+        return self._graph.all_edges(*args, **kwargs)
+
+class HeteroEdgeDataView(MutableMapping):
+    """The data view class when G.ndata[etype] is called."""
+    __slots__ = ['_graph', '_etype', '_etid', '_edges']
+
+    def __init__(self, graph, etype, edges):
+        self._graph = graph
+        self._etype = etype
+        self._etid = self._graph.get_etype_id(etype)
+        self._edges = edges
+
+    def __getitem__(self, key):
+        return self._graph._get_e_repr(self._etid, self._edges)[key]
+
+    def __setitem__(self, key, val):
+        self._graph._set_e_repr(self._etid, self._edges, {key : val})
+
+    def __delitem__(self, key):
+        self._graph._pop_e_repr(self._etid, key)
+
+    def __len__(self):
+        return len(self._graph._edge_frames[self._etid])
+
+    def __iter__(self):
+        return iter(self._graph._edge_frames[self._etid])
+
+    def __repr__(self):
+        data = self._graph._get_e_repr(self._etid, self._edges)
+        return repr({key : data[key]
+                     for key in self._graph._edge_frames[self._etid]})

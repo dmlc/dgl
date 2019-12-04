@@ -6,12 +6,12 @@ from contextlib import contextmanager
 import networkx as nx
 
 import dgl
-from .base import ALL, is_all, DGLError
+from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
 from . import graph_index
-from .runtime import ir, scheduler, Runtime
+from .runtime import ir, scheduler, Runtime, GraphAdapter
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
@@ -901,12 +901,17 @@ class DGLGraph(DGLBaseGraph):
                  node_frame=None,
                  edge_frame=None,
                  multigraph=None,
-                 readonly=False):
+                 readonly=False,
+                 sort_csr=False):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
+            if sort_csr:
+                gidx.sort_csr()
         else:
             gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+            if sort_csr:
+                gidx.sort_csr()
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
@@ -2069,9 +2074,9 @@ class DGLGraph(DGLBaseGraph):
         else:
             v = utils.toindex(v)
         with ir.prog() as prog:
-            scheduler.schedule_apply_nodes(graph=self,
-                                           v=v,
+            scheduler.schedule_apply_nodes(v=v,
                                            apply_func=func,
+                                           node_frame=self._node_frame,
                                            inplace=inplace)
             Runtime.run(prog)
 
@@ -2139,12 +2144,7 @@ class DGLGraph(DGLBaseGraph):
             u, v, _ = self._graph.find_edges(eid)
 
         with ir.prog() as prog:
-            scheduler.schedule_apply_edges(graph=self,
-                                           u=u,
-                                           v=v,
-                                           eid=eid,
-                                           apply_func=func,
-                                           inplace=inplace)
+            scheduler.schedule_apply_edges(AdaptedDGLGraph(self), u, v, eid, func, inplace)
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
@@ -2208,7 +2208,7 @@ class DGLGraph(DGLBaseGraph):
             raise DGLError("Group_by should be either src or dst")
 
         if is_all(edges):
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
             eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2221,10 +2221,8 @@ class DGLGraph(DGLBaseGraph):
             u, v, _ = self._graph.find_edges(eid)
 
         with ir.prog() as prog:
-            scheduler.schedule_group_apply_edge(graph=self,
-                                                u=u,
-                                                v=v,
-                                                eid=eid,
+            scheduler.schedule_group_apply_edge(graph=AdaptedDGLGraph(self),
+                                                u=u, v=v, eid=eid,
                                                 apply_func=func,
                                                 group_by=group_by,
                                                 inplace=inplace)
@@ -2272,7 +2270,7 @@ class DGLGraph(DGLBaseGraph):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self.number_of_edges()))
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -2288,7 +2286,7 @@ class DGLGraph(DGLBaseGraph):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
+            scheduler.schedule_send(graph=AdaptedDGLGraph(self), u=u, v=v, eid=eid,
                                     message_func=message_func)
             Runtime.run(prog)
 
@@ -2387,7 +2385,7 @@ class DGLGraph(DGLBaseGraph):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_recv(graph=self,
+            scheduler.schedule_recv(graph=AdaptedDGLGraph(self),
                                     recv_nodes=v,
                                     reduce_func=reduce_func,
                                     apply_func=apply_node_func,
@@ -2495,7 +2493,7 @@ class DGLGraph(DGLBaseGraph):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_snr(graph=self,
+            scheduler.schedule_snr(graph=AdaptedDGLGraph(self),
                                    edge_tuples=(u, v, eid),
                                    message_func=message_func,
                                    reduce_func=reduce_func,
@@ -2598,7 +2596,7 @@ class DGLGraph(DGLBaseGraph):
         if len(v) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_pull(graph=self,
+            scheduler.schedule_pull(graph=AdaptedDGLGraph(self),
                                     pull_nodes=v,
                                     message_func=message_func,
                                     reduce_func=reduce_func,
@@ -2695,7 +2693,7 @@ class DGLGraph(DGLBaseGraph):
         if len(u) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_push(graph=self,
+            scheduler.schedule_push(graph=AdaptedDGLGraph(self),
                                     u=u,
                                     message_func=message_func,
                                     reduce_func=reduce_func,
@@ -2742,7 +2740,7 @@ class DGLGraph(DGLBaseGraph):
         assert reduce_func is not None
 
         with ir.prog() as prog:
-            scheduler.schedule_update_all(graph=self,
+            scheduler.schedule_update_all(graph=AdaptedDGLGraph(self),
                                           message_func=message_func,
                                           reduce_func=reduce_func,
                                           apply_func=apply_node_func)
@@ -3041,7 +3039,7 @@ class DGLGraph(DGLBaseGraph):
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
         return subgraph.DGLSubGraph(self, sgi)
 
-    def adjacency_matrix_scipy(self, transpose=False, fmt='csr', return_edge_ids=None):
+    def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -3067,9 +3065,15 @@ class DGLGraph(DGLBaseGraph):
             The scipy representation of adjacency matrix.
 
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
         return self._graph.adjacency_matrix_scipy(transpose, fmt, return_edge_ids)
 
-    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
+    def adjacency_matrix(self, transpose=None, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the
@@ -3090,6 +3094,12 @@ class DGLGraph(DGLBaseGraph):
         SparseTensor
             The adjacency matrix.
         """
+        if transpose is None:
+            dgl_warning(
+                "Currently adjacency_matrix() returns a matrix with destination as rows"
+                " by default.  In 0.5 the result will have source as rows"
+                " (i.e. transpose=True)")
+            transpose = False
         return self._graph.adjacency_matrix(transpose, ctx)[0]
 
     def incidence_matrix(self, typestr, ctx=F.cpu()):
@@ -3199,7 +3209,7 @@ class DGLGraph(DGLBaseGraph):
             v = utils.toindex(nodes)
 
         n_repr = self.get_n_repr(v)
-        nbatch = NodeBatch(self, v, n_repr)
+        nbatch = NodeBatch(v, n_repr)
         n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
@@ -3257,8 +3267,8 @@ class DGLGraph(DGLBaseGraph):
         filter_nodes
         """
         if is_all(edges):
-            eid = ALL
             u, v, _ = self._graph.edges('eid')
+            eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3272,7 +3282,7 @@ class DGLGraph(DGLBaseGraph):
         src_data = self.get_n_repr(u)
         edge_data = self.get_e_repr(eid)
         dst_data = self.get_n_repr(v)
-        ebatch = EdgeBatch(self, (u, v, eid), src_data, edge_data, dst_data)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
         e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
@@ -3329,6 +3339,11 @@ class DGLGraph(DGLBaseGraph):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLGraph
+          Moved DGLGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3338,12 +3353,13 @@ class DGLGraph(DGLBaseGraph):
         >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
-        >>> G.to(torch.device('cuda:0'))
+        >>> G = G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
+        return self
     # pylint: enable=invalid-name
 
     def local_var(self):
@@ -3472,3 +3488,79 @@ class DGLGraph(DGLBaseGraph):
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
+
+############################################################
+# Internal APIs
+############################################################
+
+class AdaptedDGLGraph(GraphAdapter):
+    """Adapt DGLGraph to interface required by scheduler.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        Graph
+    """
+    def __init__(self, graph):
+        self.graph = graph
+
+    @property
+    def gidx(self):
+        return self.graph._graph
+
+    def num_src(self):
+        """Number of source nodes."""
+        return self.graph.number_of_nodes()
+
+    def num_dst(self):
+        """Number of destination nodes."""
+        return self.graph.number_of_nodes()
+
+    def num_edges(self):
+        """Number of edges."""
+        return self.graph.number_of_edges()
+
+    @property
+    def srcframe(self):
+        """Frame to store source node features."""
+        return self.graph._node_frame
+
+    @property
+    def dstframe(self):
+        """Frame to store source node features."""
+        return self.graph._node_frame
+
+    @property
+    def edgeframe(self):
+        """Frame to store edge features."""
+        return self.graph._edge_frame
+
+    @property
+    def msgframe(self):
+        """Frame to store messages."""
+        return self.graph._msg_frame
+
+    @property
+    def msgindicator(self):
+        """Message indicator tensor."""
+        return self.graph._get_msg_index()
+
+    @msgindicator.setter
+    def msgindicator(self, val):
+        """Set new message indicator tensor."""
+        self.graph._set_msg_index(val)
+
+    def in_edges(self, nodes):
+        return self.graph._graph.in_edges(nodes)
+
+    def out_edges(self, nodes):
+        return self.graph._graph.out_edges(nodes)
+
+    def edges(self, form):
+        return self.graph._graph.edges(form)
+
+    def get_immutable_gidx(self, ctx):
+        return self.graph._graph.get_immutable_gidx(ctx)
+
+    def bits_needed(self):
+        return self.graph._graph.bits_needed()

@@ -30,6 +30,8 @@ struct BcastInfo {
   std::vector<int64_t> lhs_shape, lhs_stride;
   std::vector<int64_t> rhs_shape, rhs_stride;
   std::vector<int64_t> out_shape, out_stride;
+
+  int64_t data_len;
 };
 
 /*

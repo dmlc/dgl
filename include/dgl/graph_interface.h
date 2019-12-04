@@ -346,6 +346,15 @@ class GraphInterface : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
+  /*!
+   * \brief Sort the columns in CSR.
+   *
+   * This sorts the columns in each row based on the column Ids.
+   * The edge ids should be sorted accordingly.
+   */
+  virtual void SortCSR() {
+  }
+
   static constexpr const char* _type_key = "graph.Graph";
   DGL_DECLARE_OBJECT_TYPE_INFO(GraphInterface, runtime::Object);
 };
@@ -354,7 +363,7 @@ class GraphInterface : public runtime::Object {
 DGL_DEFINE_OBJECT_REF(GraphRef, GraphInterface);
 
 /*! \brief Subgraph data structure */
-struct Subgraph {
+struct Subgraph : public runtime::Object {
   /*! \brief The graph. */
   GraphPtr graph;
   /*!
@@ -367,7 +376,25 @@ struct Subgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
+
+  static constexpr const char* _type_key = "graph.Subgraph";
+  DGL_DECLARE_OBJECT_TYPE_INFO(Subgraph, runtime::Object);
 };
+
+/*! \brief Subgraph data structure for negative subgraph */
+struct NegSubgraph: public Subgraph {
+  /*! \brief The existence of the negative edges in the parent graph. */
+  IdArray exist;
+
+  /*! \brief The Ids of head nodes */
+  IdArray head_nid;
+
+  /*! \brief The Ids of tail nodes */
+  IdArray tail_nid;
+};
+
+// Define SubgraphRef
+DGL_DEFINE_OBJECT_REF(SubgraphRef, Subgraph);
 
 }  // namespace dgl
 

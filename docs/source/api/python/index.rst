@@ -5,8 +5,10 @@ API Reference
    :maxdepth: 2
 
    graph
+   heterograph
    init
    batch
+   batch_heterograph
    function
    traversal
    propagate
@@ -18,3 +20,5 @@ API Reference
    subgraph
    graph_store
    nodeflow
+   random
+   model_zoo

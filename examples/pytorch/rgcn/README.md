@@ -32,6 +32,11 @@ BGS: accuracy 82.76% (DGL), 83.10% (paper)
 python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --relabel
 ```
 
+AM: accuracy 87.37% (DGL), 89.29% (paper)
+```
+python3 entity_classify.py -d am --n-bases=40 --n-hidden=10 --l2norm=5e-4 --testing
+```
+
 ### Link Prediction
 FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
 ```

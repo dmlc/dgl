@@ -10,7 +10,6 @@ from . import ir
 from .ir import var
 
 def gen_degree_bucketing_schedule(
-        graph,
         reduce_udf,
         message_ids,
         dst_nodes,
@@ -28,8 +27,6 @@ def gen_degree_bucketing_schedule(
 
     Parameters
     ----------
-    graph : DGLGraph
-        DGLGraph to use
     reduce_udf : callable
         The UDF to reduce messages.
     message_ids : utils.Index
@@ -56,7 +53,7 @@ def gen_degree_bucketing_schedule(
     fd_list = []
     for deg, vbkt, mid in zip(degs, buckets, msg_ids):
         # create per-bkt rfunc
-        rfunc = _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt)
+        rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt)
         # vars
         vbkt = var.IDX(vbkt)
         mid = var.IDX(mid)
@@ -144,7 +141,7 @@ def _process_node_buckets(buckets):
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
 
-def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
+def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
     """Internal function to generate the per degree bucket node UDF."""
     def _rfunc_wrapper(node_data, mail_data):
         def _reshaped_getter(key):
@@ -152,16 +149,16 @@ def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
             new_shape = (len(vbkt), deg) + F.shape(msg)[1:]
             return F.reshape(msg, new_shape)
         reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
-        nbatch = NodeBatch(graph, vbkt, node_data, reshaped_mail_data)
+        nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data)
         return reduce_udf(nbatch)
     return _rfunc_wrapper
 
 def gen_group_apply_edge_schedule(
-        graph,
         apply_func,
         u, v, eid,
         group_by,
-        var_nf,
+        var_src_nf,
+        var_dst_nf,
         var_ef,
         var_out):
     """Create degree bucketing schedule for group_apply_edge
@@ -174,8 +171,6 @@ def gen_group_apply_edge_schedule(
 
     Parameters
     ----------
-    graph : DGLGraph
-        DGLGraph to use
     apply_func: callable
         The edge_apply_func UDF
     u: utils.Index
@@ -186,8 +181,10 @@ def gen_group_apply_edge_schedule(
         Edges to apply
     group_by: str
         If "src", group by u. If "dst", group by v
-    var_nf : var.FEAT_DICT
-        The variable for node feature frame.
+    var_src_nf : var.FEAT_DICT
+        The variable for source feature frame.
+    var_dst_nf : var.FEAT_DICT
+        The variable for destination feature frame.
     var_ef : var.FEAT_DICT
         The variable for edge frame.
     var_out : var.FEAT_DICT
@@ -206,15 +203,15 @@ def gen_group_apply_edge_schedule(
     fd_list = []
     for deg, u_bkt, v_bkt, eid_bkt in zip(degs, uids, vids, eids):
         # create per-bkt efunc
-        _efunc = var.FUNC(_create_per_bkt_efunc(graph, apply_func, deg,
+        _efunc = var.FUNC(_create_per_bkt_efunc(apply_func, deg,
                                                 u_bkt, v_bkt, eid_bkt))
         # vars
         var_u = var.IDX(u_bkt)
         var_v = var.IDX(v_bkt)
         var_eid = var.IDX(eid_bkt)
         # apply edge UDF on each bucket
-        fdsrc = ir.READ_ROW(var_nf, var_u)
-        fddst = ir.READ_ROW(var_nf, var_v)
+        fdsrc = ir.READ_ROW(var_src_nf, var_u)
+        fddst = ir.READ_ROW(var_dst_nf, var_v)
         fdedge = ir.READ_ROW(var_ef, var_eid)
         fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst, ret=fdedge)  # reuse var
         # save for merge
@@ -277,7 +274,7 @@ def _process_edge_buckets(buckets):
     eids = split(eids)
     return degs, uids, vids, eids
 
-def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
+def _create_per_bkt_efunc(apply_func, deg, u, v, eid):
     """Internal function to generate the per degree bucket edge UDF."""
     batch_size = len(u) // deg
     def _efunc_wrapper(src_data, edge_data, dst_data):
@@ -299,7 +296,7 @@ def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
                                             edge_data.keys())
         reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data),
                                            dst_data.keys())
-        ebatch = EdgeBatch(graph, (u, v, eid), reshaped_src_data,
+        ebatch = EdgeBatch((u, v, eid), reshaped_src_data,
                            reshaped_edge_data, reshaped_dst_data)
         return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
     return _efunc_wrapper

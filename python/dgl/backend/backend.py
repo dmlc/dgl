@@ -291,7 +291,7 @@ def copy_to(input, ctx):
 # These functions are performance critical, so it's better to have efficient
 # implementation in each framework.
 
-def sum(input, dim):
+def sum(input, dim, keepdims=False):
     """Reduce sum the input tensor along the given dim.
 
     Parameters
@@ -300,6 +300,8 @@ def sum(input, dim):
         The input tensor.
     dim : int
         The reduce dim.
+    keepdims : bool
+        Whether to keep the summed dimension.
 
     Returns
     -------
@@ -447,8 +449,29 @@ def topk(input, k, dim, descending=True):
     ----------
     input : Tensor
         The input tensor.
+    k : int
+        The number of elements.
     dim : int
         The dim to sort along.
+    descending : bool
+        Controls whether to return largest/smallest elements.
+    """
+    pass
+
+def argtopk(input, k, dim, descending=True):
+    """Return the indices of the k largest elements of the given input tensor
+    along the given dimension.
+
+    If descending is False then the k smallest elements are returned.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    k : int
+        The number of elements.
+    dim : int
+        The dimension to sort along.
     descending : bool
         Controls whether to return largest/smallest elements.
     """
@@ -723,6 +746,23 @@ def reshape(input, shape):
     """
     pass
 
+def swapaxes(input, axis1, axis2):
+    """Interchange the two given axes of a tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    axis1, axis2 : int
+        The two axes.
+
+    Returns
+    -------
+    Tensor
+        The transposed tensor.
+    """
+    pass
+
 def zeros(shape, dtype, ctx):
     """Create a zero tensor.
 
@@ -774,6 +814,26 @@ def ones(shape, dtype, ctx):
     -------
     Tensor
         The one tensor.
+    """
+    pass
+
+def uniform(shape, dtype, ctx, low, high):
+    """Crear a tensor with random value in an uniform 
+    distribution between low (inclusive) and high (exclusive).
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The random tensor.
     """
     pass
 
@@ -1116,6 +1176,27 @@ def zerocopy_from_dgl_ndarray(input):
     Tensor
     """
     pass
+
+
+def one_hot(t, num_classes=-1):
+    """
+    Convert tensor to one-hot tensor
+
+    Parameters
+    --------------
+    t: tensor
+        class values of any shape.
+    num_classes: int (Default: -1)
+        Total number of classes. If set to -1, the number
+        of classes will be inferred as one greater than the largest class
+        value in the input tensor.
+    
+    Returns
+    -------
+    Tensor
+    """
+    pass
+
 
 ###############################################################################
 # Custom Operators for graph level computations.

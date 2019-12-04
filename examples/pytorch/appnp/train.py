@@ -25,9 +25,14 @@ def main(args):
     data = load_data(args)
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    train_mask = torch.ByteTensor(data.train_mask)
-    val_mask = torch.ByteTensor(data.val_mask)
-    test_mask = torch.ByteTensor(data.test_mask)
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = torch.BoolTensor(data.train_mask)
+        val_mask = torch.BoolTensor(data.val_mask)
+        test_mask = torch.BoolTensor(data.test_mask)
+    else:
+        train_mask = torch.ByteTensor(data.train_mask)
+        val_mask = torch.ByteTensor(data.val_mask)
+        test_mask = torch.ByteTensor(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -38,9 +43,9 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-           train_mask.sum().item(),
-           val_mask.sum().item(),
-           test_mask.sum().item()))
+           train_mask.int().sum().item(),
+           val_mask.int().sum().item(),
+           test_mask.int().sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -60,13 +65,6 @@ def main(args):
     g.add_edges(g.nodes(), g.nodes())
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
-    # normalization
-    degs = g.in_degrees().float()
-    norm = torch.pow(degs, -0.5)
-    norm[torch.isinf(norm)] = 0
-    if cuda:
-        norm = norm.cuda()
-    g.ndata['norm'] = norm.unsqueeze(1)
 
     # create APPNP model
     model = APPNP(g,

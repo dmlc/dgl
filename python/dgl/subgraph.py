@@ -46,6 +46,7 @@ class DGLSubGraph(DGLGraph):
         self._parent = parent
         self._parent_nid = sgi.induced_nodes
         self._parent_eid = sgi.induced_edges
+        self._subgraph_index = sgi
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -116,10 +117,10 @@ class DGLSubGraph(DGLGraph):
 
         All old features will be removed.
         """
-        if self._parent._node_frame.num_rows != 0:
+        if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             self._node_frame = FrameRef(Frame(
                 self._parent._node_frame[self._parent_nid]))
-        if self._parent._edge_frame.num_rows != 0:
+        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             self._edge_frame = FrameRef(Frame(
                 self._parent._edge_frame[self._get_parent_eid()]))
 
@@ -136,4 +137,5 @@ class DGLSubGraph(DGLGraph):
         tensor
             The node ID array in the subgraph.
         """
-        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()
+        v = map_to_subgraph_nid(self._subgraph_index, utils.toindex(parent_vids))
+        return v.tousertensor()

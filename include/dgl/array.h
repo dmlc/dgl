@@ -116,6 +116,11 @@ IdArray IndexSelect(IdArray array, IdArray index);
  */
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
+/*!\brief Return whether the array is a valid 1D int array*/
+inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
+  return arr->ndim == 1 && arr->dtype.code == kDLInt;
+}
+
 //////////////////////////////////////////////////////////////////////
 // Sparse matrix
 //////////////////////////////////////////////////////////////////////
@@ -136,6 +141,8 @@ struct CSRMatrix {
   runtime::NDArray indptr, indices;
   /*! \brief data array, could be empty. */
   runtime::NDArray data;
+  /*! \brief indicate that the edges are stored in the sorted order. */
+  bool sorted;
 };
 
 /*!
@@ -243,6 +250,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 
 /*! \return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
+
+/*! Sort the columns in each row in the ascending order. */
+void CSRSort(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
 

@@ -39,6 +39,9 @@ namespace dgl {
 // Communicator handler type
 typedef void* CommunicatorHandle;
 
+// KVstore message handler type
+typedef void* KVMsgHandle;
+
 /*! \brief Enum type for bool value with unknown */
 enum BoolFlag {
   kBoolUnknown = -1,
@@ -51,11 +54,6 @@ enum BoolFlag {
  */
 dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
     const std::vector<dgl::runtime::NDArray>& vec);
-
-/*!\brief Return whether the array is a valid 1D int array*/
-inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
-  return arr->ndim == 1 && arr->dtype.code == kDLInt;
-}
 
 /*!
  * \brief Copy a vector to an int64_t NDArray.

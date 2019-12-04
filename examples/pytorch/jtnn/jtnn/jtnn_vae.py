@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .mol_tree import Vocab
-from .nnutils import create_var, cuda, move_dgl_to_cuda
+from .nnutils import cuda, move_dgl_to_cuda
 from .chemutils import set_atommap, copy_edit_mol, enum_assemble_nx, \
         attach_mols_nx, decode_stereo
 from .jtnn_enc import DGLJTNNEncoder
@@ -11,13 +10,9 @@ from .mpn import DGLMPN
 from .mpn import mol2dgl_single as mol2dgl_enc
 from .jtmpn import DGLJTMPN
 from .jtmpn import mol2dgl_single as mol2dgl_dec
-from .line_profiler_integration import profile
 
-import rdkit
 import rdkit.Chem as Chem
-from rdkit import DataStructs
-from rdkit.Chem import AllChem
-import copy, math
+import copy
 
 from dgl import batch, unbatch
 
@@ -102,7 +97,6 @@ class DGLJTNNVAE(nn.Module):
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 
-        all_vec = torch.cat([tree_vec, mol_vec], dim=1)
         loss = word_loss + topo_loss + assm_loss + 2 * stereo_loss + beta * kl_loss
 
         return loss, kl_loss, word_acc, topo_acc, assm_acc, stereo_acc

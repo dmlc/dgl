@@ -23,16 +23,16 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
     for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.to(args.device)
-        outputs = net(graphs)
+        feat = graphs.ndata['attr'].to(args.device)
+        outputs = net(graphs, feat)
 
         loss = criterion(outputs, labels)
         running_loss += loss.item()
 
         # backprop
-        if optimizer is not None:
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
         # report
         bar.set_description('epoch-{}'.format(epoch))
@@ -50,15 +50,12 @@ def eval_net(args, net, dataloader, criterion):
     total_loss = 0
     total_correct = 0
 
-    # total_iters = len(dataloader)
-
     for data in dataloader:
         graphs, labels = data
+        feat = graphs.ndata['attr'].to(args.device)
         labels = labels.to(args.device)
-
         total += len(labels)
-
-        outputs = net(graphs)
+        outputs = net(graphs, feat)
         _, predicted = torch.max(outputs.data, 1)
 
         total_correct += (predicted == labels.data).sum().item()
@@ -99,8 +96,7 @@ def main(args):
         args.num_layers, args.num_mlp_layers,
         dataset.dim_nfeats, args.hidden_dim, dataset.gclasses,
         args.final_dropout, args.learn_eps,
-        args.graph_pooling_type, args.neighbor_pooling_type,
-        args.device).to(args.device)
+        args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
 
     criterion = nn.CrossEntropyLoss()  # defaul reduce is true
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -147,8 +143,8 @@ def main(args):
                 f.write("\n")
 
         lrbar.set_description(
-            "the learning eps with learn_eps={} is: {}".format(
-                args.learn_eps, model.eps.data))
+            "Learning eps with learn_eps={}: {}".format(
+                args.learn_eps, [layer.eps.data.item() for layer in model.ginlayers]))
 
     tbar.close()
     vbar.close()

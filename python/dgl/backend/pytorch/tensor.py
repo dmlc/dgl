@@ -8,6 +8,7 @@ from torch.utils import dlpack
 
 from ... import ndarray as nd
 from ... import kernel as K
+from ...function.base import TargetCode
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -77,9 +78,9 @@ def astype(input, ty):
 
 def asnumpy(input):
     if isinstance(input, th.sparse.FloatTensor):
-        return input.to_dense().cpu().numpy()
+        return input.to_dense().cpu().detach().numpy()
     else:
-        return input.cpu().numpy()
+        return input.cpu().detach().numpy()
 
 def copy_to(input, ctx):
     if ctx.type == 'cpu':
@@ -91,8 +92,8 @@ def copy_to(input, ctx):
     else:
         raise RuntimeError('Invalid context', ctx)
 
-def sum(input, dim):
-    return th.sum(input, dim=dim)
+def sum(input, dim, keepdims=False):
+    return th.sum(input, dim=dim, keepdim=keepdims)
 
 def reduce_sum(input):
     return input.sum()
@@ -123,6 +124,9 @@ def argsort(input, dim, descending):
 def topk(input, k, dim, descending=True):
     return th.topk(input, k, dim, largest=descending)[0]
 
+def argtopk(input, k, dim, descending=True):
+    return th.topk(input, k, dim, largest=descending)[1]
+
 def exp(input):
     return th.exp(input)
 
@@ -148,14 +152,7 @@ def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
 
 def slice_axis(data, axis, begin, end):
-    dim = data.shape[axis]
-    if begin < 0:
-        begin += dim
-    if end <= 0:
-        end += dim
-    if begin >= end:
-        raise IndexError("Begin index ({}) equals or greater than end index ({})".format(begin, end))
-    return th.index_select(data, axis, th.arange(begin, end, device=data.device))
+    return th.narrow(data, axis, begin, end - begin)
 
 def take(data, indices, dim):
     new_shape = data.shape[:dim] + indices.shape + data.shape[dim+1:]
@@ -179,6 +176,9 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return th.reshape(input ,shape)
 
+def swapaxes(input, axis1, axis2):
+    return th.transpose(input, axis1, axis2)
+
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
@@ -187,6 +187,9 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
+
+def uniform(shape, dtype, ctx, low, high):
+    return th.empty(shape, dtype=dtype, device=ctx).uniform_(low, high)
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     old_shape = input.shape
@@ -270,13 +273,16 @@ def zerocopy_to_numpy(input):
     return asnumpy(input)
 
 def zerocopy_from_numpy(np_array):
-    return th.from_numpy(np_array)
+    return th.as_tensor(np_array)
 
 def zerocopy_to_dgl_ndarray(input):
     return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
 
 def zerocopy_from_dgl_ndarray(input):
     return dlpack.from_dlpack(input.to_dlpack())
+
+def one_hot(t, num_classes=-1):
+    return th.nn.functional.one_hot(t, num_classes)
 
 
 class BinaryReduce(th.autograd.Function):
@@ -285,38 +291,70 @@ class BinaryReduce(th.autograd.Function):
                 out_size, lhs_map, rhs_map, out_map):
         lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
         rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
-        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
-        out_data = lhs_data.new_empty((out_size,) + feat_shape)
+        feat_shape = K.infer_binary_feature_shape(binary_op, lhs_data_nd, rhs_data_nd)
+        out_shape = feat_shape
+        if binary_op == 'dot':
+            out_shape = feat_shape[:-1]
+        out_data = lhs_data.new_empty((out_size,) + out_shape)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.binary_op_reduce(
-            reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+            reducer if reducer != 'mean' else 'sum',
+            binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            degs = lhs_data.new_empty((out_data.shape[0],))
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            if lhs != TargetCode.DST: # src or edge
+                target = lhs
+                n = lhs_data.shape[0]
+                in_map = lhs_map[0]
+            else: # rhs != TargetCode.DST
+                target = rhs
+                n = rhs_data.shape[0]
+                in_map = rhs_map[0]
+            in_ones = lhs_data.new_ones((n,))
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map, out_map[0])
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
+            out_data = out_data / degs
+        else:
+            degs = None
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
                               rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-                              out_data_nd, feat_shape)
+                              feat_shape, degs)
+        ctx.save_for_backward(out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-            lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape \
+            lhs_data_nd, rhs_data_nd, feat_shape, degs \
             = ctx.backward_cache
-        ctx.backward_cache = None
+        out_data, = ctx.saved_variables
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_lhs = None
         grad_rhs = None
+        if reducer == 'mean':
+            grad_out = grad_out / degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[5]:
             grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
             K.backward_lhs_binary_op_reduce(
-                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                reducer if reducer != 'mean' else 'sum',
+                binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
         if ctx.needs_input_grad[6]:
             grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
             K.backward_rhs_binary_op_reduce(
-                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                reducer if reducer != 'mean' else 'sum',
+                binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
                 out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_rhs),
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
@@ -333,24 +371,43 @@ class CopyReduce(th.autograd.Function):
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         K.copy_reduce(
-            reducer, graph, target, in_data_nd, out_data_nd, in_map[0],
-            out_map[0])
+            reducer if reducer != 'mean' else 'sum', 
+            graph, target, in_data_nd, out_data_nd, in_map[0], out_map[0])
+        # normalize if mean reducer
+        # NOTE(zihao): this is a temporary hack and we should have better solution in the future.
+        if reducer == 'mean':
+            in_ones = in_data.new_ones((in_data.shape[0],))
+            degs = in_data.new_empty((out_data.shape[0],))
+            in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
+            degs_nd = zerocopy_to_dgl_ndarray(degs)
+            K.copy_reduce(
+                'sum', graph, target, in_ones_nd, degs_nd, in_map[0], out_map[0]) 
+            # reshape
+            degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
+            out_data = out_data / degs
+        else:
+            degs = None
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, out_data_nd)
+                              in_data_nd, degs)
+        ctx.save_for_backward(out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd \
+        reducer, graph, target, in_map, out_map, in_data_nd, degs \
             = ctx.backward_cache
-        ctx.backward_cache = None
+        out_data, = ctx.saved_variables
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_in = None
+        if reducer == 'mean':
+            grad_out = grad_out / degs
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
             grad_in = grad_out.new_empty(in_data_nd.shape)
             K.backward_copy_reduce(
-                reducer, graph, target, in_data_nd, out_data_nd, grad_out_nd,
+                reducer if reducer != 'mean' else 'sum', 
+                graph, target, in_data_nd, out_data_nd, grad_out_nd, 
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
         return None, None, None, grad_in, None, None, None
 

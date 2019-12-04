@@ -3,6 +3,7 @@
 import mxnet as mx
 
 from ... import function as fn
+from ...base import ALL, is_all
 
 __all__ = ['edge_softmax']
 
@@ -24,8 +25,10 @@ class EdgeSoftmax(mx.autograd.Function):
     the attention weights are computed with such an edgesoftmax operation.
     """
 
-    def __init__(self, g):
+    def __init__(self, g, eids):
         super(EdgeSoftmax, self).__init__()
+        if not is_all(eids):
+            g = g.edge_subgraph(eids.astype('int64'))
         self.g = g
 
     def forward(self, score):
@@ -78,7 +81,7 @@ class EdgeSoftmax(mx.autograd.Function):
         grad_score = g.edata['grad_score'] - g.edata['out']
         return grad_score
 
-def edge_softmax(graph, logits):
+def edge_softmax(graph, logits, eids=ALL):
     r"""Compute edge softmax.
 
     For a node :math:`i`, edge softmax is an operation of computing
@@ -98,8 +101,11 @@ def edge_softmax(graph, logits):
     ----------
     graph : DGLGraph
         The graph to perform edge softmax
-    logits : torch.Tensor
+    logits : mxnet.NDArray
         The input edge feature
+    eids : mxnet.NDArray or ALL, optional
+        Edges on which to apply edge softmax. If ALL, apply edge softmax
+        on all edges in the graph. Default: ALL.
 
     Returns
     -------
@@ -108,9 +114,10 @@ def edge_softmax(graph, logits):
 
     Notes
     -----
-        * Input shape: :math:`(N, *, 1)` where * means any number of
-          additional dimensions, :math:`N` is the number of edges.
-        * Return shape: :math:`(N, *, 1)`
+        * Input shape: :math:`(E, *, 1)` where * means any number of
+          additional dimensions, :math:`E` equals the length of eids.
+          If eids is ALL, :math:`E` equals number of edges in the graph.
+        * Return shape: :math:`(E, *, 1)`
 
     Examples
     --------
@@ -143,6 +150,15 @@ def edge_softmax(graph, logits):
      [0.33333334]
      [0.33333334]]
     <NDArray 6x1 @cpu(0)>
+
+    Apply edge softmax on first 4 edges of g:
+
+    >>> edge_softmax(g, edata, nd.array([0,1,2,3], dtype='int64'))
+    [[1. ]
+     [0.5]
+     [1. ]
+     [0.5]]
+    <NDArray 4x1 @cpu(0)>
     """
-    softmax_op = EdgeSoftmax(graph)
+    softmax_op = EdgeSoftmax(graph, eids)
     return softmax_op(logits)

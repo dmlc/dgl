@@ -19,27 +19,6 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-namespace {
-
-// Convert Subgraph structure to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
-  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        *rv = GraphRef(sg.graph);
-      } else if (which == 1) {
-        *rv = std::move(sg.induced_vertices);
-      } else if (which == 2) {
-        *rv = std::move(sg.induced_edges);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-}  // namespace
-
 ///////////////////////////// Graph API ///////////////////////////////////
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
@@ -312,7 +291,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     const IdArray vids = args[1];
-    *rv = ConvertSubgraphToPackedFunc(g->VertexSubgraph(vids));
+    std::shared_ptr<Subgraph> subg(new Subgraph(g->VertexSubgraph(vids)));
+    *rv = SubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
@@ -320,7 +300,9 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
     GraphRef g = args[0];
     const IdArray eids = args[1];
     bool preserve_nodes = args[2];
-    *rv = ConvertSubgraphToPackedFunc(g->EdgeSubgraph(eids, preserve_nodes));
+    std::shared_ptr<Subgraph> subg(
+        new Subgraph(g->EdgeSubgraph(eids, preserve_nodes)));
+    *rv = SubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
@@ -342,6 +324,32 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     *rv = g->NumBits();
+  });
+
+// Subgraph C APIs
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SubgraphRef subg = args[0];
+    *rv = GraphRef(subg->graph);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SubgraphRef subg = args[0];
+    *rv = subg->induced_vertices;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSubgraphGetInducedEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SubgraphRef subg = args[0];
+    *rv = subg->induced_edges;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLSortAdj")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    g->SortCSR();
   });
 
 }  // namespace dgl
