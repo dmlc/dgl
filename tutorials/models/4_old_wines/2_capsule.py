@@ -1,24 +1,23 @@
 """
 .. _model-capsule:
 
-Capsule Network Tutorial
+Capsule network tutorial
 ===========================
 
 **Author**: Jinjing Zhou, `Jake Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang, Jinyang Li
 
-It is perhaps a little surprising that some of the more classical models
-can also be described in terms of graphs, offering a different
-perspective. This tutorial describes how this can be done for the
+In this tutorial, you learn how to describe one of the more classical models in terms of graphs. The approach
+offers a different perspective. The tutorial describes how to implement a Capsule model for the
 `capsule network <http://arxiv.org/abs/1710.09829>`__.
 """
 #######################################################################################
 # Key ideas of Capsule
 # --------------------
 #
-# The Capsule model offers two key ideas.
+# The Capsule model offers two key ideas: Richer representation and dynamic routing.
 #
-# **Richer representation** In classic convolutional networks, a scalar
-# value represents the activation of a given feature. By contrast, a
+# **Richer representation** -- In classic convolutional networks, a scalar
+# value represents the activation of  a given feature. By contrast, a
 # capsule outputs a vector. The vector's length represents the probability
 # of a feature being present. The vector's orientation represents the
 # various properties of the feature (such as pose, deformation, texture
@@ -26,25 +25,25 @@ perspective. This tutorial describes how this can be done for the
 #
 # |image0|
 #
-# **Dynamic routing** The output of a capsule is preferentially sent to
+# **Dynamic routing** -- The output of a capsule is sent to
 # certain parents in the layer above based on how well the capsule's
 # prediction agrees with that of a parent. Such dynamic
-# "routing-by-agreement" generalizes the static routing of max-pooling.
+# routing-by-agreement generalizes the static routing of max-pooling.
 #
-# During training, routing is done iteratively; each iteration adjusts
-# "routing weights" between capsules based on their observed agreements,
-# in a manner similar to a k-means algorithm or `competitive
+# During training, routing is accomplished iteratively. Each iteration adjusts
+# routing weights between capsules based on their observed agreements.
+# It's a manner similar to a k-means algorithm or `competitive
 # learning <https://en.wikipedia.org/wiki/Competitive_learning>`__.
 #
-# In this tutorial, we show how capsule's dynamic routing algorithm can be
-# naturally expressed as a graph algorithm. Our implementation is adapted
+# In this tutorial, you see how a capsule's dynamic routing algorithm can be
+# naturally expressed as a graph algorithm. The implementation is adapted
 # from `Cedric
 # Chee <https://github.com/cedrickchee/capsule-net-pytorch>`__, replacing
-# only the routing layer. Our version achieves similar speed and accuracy.
+# only the routing layer. This version achieves similar speed and accuracy.
 #
-# Model Implementation
+# Model implementation
 # ----------------------
-# Step 1: Setup and Graph Initialization
+# Step 1: Setup and graph initialization
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # The connectivity between two layers of capsules form a directed,
@@ -66,21 +65,16 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import dgl
+import dgl.function as fn
 
 
 def init_graph(in_nodes, out_nodes, f_size):
-    g = dgl.DGLGraph()
-    all_nodes = in_nodes + out_nodes
-    g.add_nodes(all_nodes)
-
-    in_indx = list(range(in_nodes))
-    out_indx = list(range(in_nodes, in_nodes + out_nodes))
-    # add edges use edge broadcasting
-    for u in in_indx:
-        g.add_edges(u, out_indx)
-
+    g = dgl.bipartite(
+        (np.repeat(np.arange(in_nodes), out_nodes), np.tile(np.arange(out_nodes), in_nodes)),
+        utype='in', vtype='out'
+    )
     # init states
-    g.ndata['v'] = th.zeros(all_nodes, f_size)
+    g.nodes['in'].data['v'] = th.zeros(in_nodes, f_size)
     g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
     return g
 
@@ -89,28 +83,27 @@ def init_graph(in_nodes, out_nodes, f_size):
 # Step 2: Define message passing functions
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# This is the pseudo code for Capsule's routing algorithm as given in the
-# paper:
+# This is the pseudocode for Capsule's routing algorithm.
 #
 # |image2|
-# We implement pseudo code lines 4-7 in the class `DGLRoutingLayer` as the following steps:
+# Implement pseudocode lines 4-7 in the class `DGLRoutingLayer` as the following steps:
 #
-# 1. Calculate coupling coefficients:
+# 1. Calculate coupling coefficients.
 #
-#    -  Coefficients are the softmax over all out-edge of in-capsules:
+#    -  Coefficients are the softmax over all out-edge of in-capsules.
 #       :math:`\textbf{c}_{i,j} = \text{softmax}(\textbf{b}_{i,j})`.
 #
-# 2. Calculate weighted sum over all in-capsules:
+# 2. Calculate weighted sum over all in-capsules.
 #
 #    -  Output of a capsule is equal to the weighted sum of its in-capsules
 #       :math:`s_j=\sum_i c_{ij}\hat{u}_{j|i}`
 #
-# 3. Squash outputs:
+# 3. Squash outputs.
 #
-#    -  Squash the length of a capsule's output vector to range (0,1), so it can represent the probability (of some feature being present).
+#    -  Squash the length of a Capsule's output vector to range (0,1), so it can represent the probability (of some feature being present).
 #    -  :math:`v_j=\text{squash}(s_j)=\frac{||s_j||^2}{1+||s_j||^2}\frac{s_j}{||s_j||}`
 #
-# 4. Update weights by the amount of agreement:
+# 4. Update weights by the amount of agreement.
 #
 #    -  The scalar product :math:`\hat{u}_{j|i}\cdot v_j` can be considered as how well capsule :math:`i` agrees with :math:`j`. It is used to update
 #       :math:`b_{ij}=b_{ij}+\hat{u}_{j|i}\cdot v_j`
@@ -121,37 +114,29 @@ class DGLRoutingLayer(nn.Module):
         self.g = init_graph(in_nodes, out_nodes, f_size)
         self.in_nodes = in_nodes
         self.out_nodes = out_nodes
-        self.in_indx = list(range(in_nodes))
-        self.out_indx = list(range(in_nodes, in_nodes + out_nodes))
 
     def forward(self, u_hat, routing_num=1):
         self.g.edata['u_hat'] = u_hat
 
-        # step 2 (line 5)
-        def cap_message(edges):
-            return {'m': edges.data['c'] * edges.data['u_hat']}
-
-        self.g.register_message_func(cap_message)
-
-        def cap_reduce(nodes):
-            return {'s': th.sum(nodes.mailbox['m'], dim=1)}
-
-        self.g.register_reduce_func(cap_reduce)
-
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
+            self.g.group_apply_edges(
+                func=lambda edges: {'c': F.softmax(edges.data['b'], dim=1)},
+                group_by='src'
+            )
 
             # Execute step 1 & 2
-            self.g.update_all()
+            self.g.update_all(
+                lambda edges: {'m': edges.data['c'] * edges.data['u_hat']},
+                fn.sum('m', 's')
+            )
 
             # step 3 (line 6)
-            self.g.nodes[self.out_indx].data['v'] = self.squash(self.g.nodes[self.out_indx].data['s'], dim=1)
+            self.g.nodes['out'].data['v'] = self.squash(self.g.nodes['out'].data['s'], dim=1)
 
             # step 4 (line 7)
-            v = th.cat([self.g.nodes[self.out_indx].data['v']] * self.in_nodes, dim=0)
-            self.g.edata['b'] = self.g.edata['b'] + (self.g.edata['u_hat'] * v).sum(dim=1, keepdim=True)
+            self.g.apply_edges(fn.e_dot_v('u_hat', 'v', 'uv'))
+            self.g.edata['b'] = self.g.edata['b'] + self.g.edata.pop('uv').unsqueeze(-1)
 
     @staticmethod
     def squash(s, dim=1):
@@ -165,7 +150,7 @@ class DGLRoutingLayer(nn.Module):
 # Step 3: Testing
 # ~~~~~~~~~~~~~~~
 #
-# Let's make a simple 20x10 capsule layer:
+# Make a simple 20x10 capsule layer.
 in_nodes = 20
 out_nodes = 10
 f_size = 4
@@ -173,9 +158,9 @@ u_hat = th.randn(in_nodes * out_nodes, f_size)
 routing = DGLRoutingLayer(in_nodes, out_nodes, f_size)
 
 ############################################################################################################
-# We can visualize a capsule network's behavior by monitoring the entropy
+# You can visualize a Capsule network's behavior by monitoring the entropy
 # of coupling coefficients. They should start high and then drop, as the
-# weights gradually concentrate on fewer edges:
+# weights gradually concentrate on fewer edges.
 entropy_list = []
 dist_list = []
 
@@ -196,7 +181,7 @@ plt.close()
 ############################################################################################################
 # |image3|
 #
-# Alternatively, we can also watch the evolution of histograms:
+# Alternatively, we can also watch the evolution of histograms.
 
 import seaborn as sns
 import matplotlib.animation as animation
@@ -219,12 +204,12 @@ plt.close()
 ############################################################################################################
 # |image4|
 #
-# Or monitor the how lower level capsules gradually attach to one of the
-# higher level ones:
+# You can monitor the how lower-level Capsules gradually attach to one of the
+# higher level ones.
 import networkx as nx
 from networkx.algorithms import bipartite
 
-g = routing.g.to_networkx()
+g = dgl.to_homo(routing.g).to_networkx()
 X, Y = bipartite.sets(g)
 height_in = 10
 height_out = height_in * 0.8
@@ -256,9 +241,9 @@ plt.close()
 ############################################################################################################
 # |image5|
 #
-# The full code of this visualization is provided at
-# `link <https://github.com/dmlc/dgl/blob/master/examples/pytorch/capsule/simple_routing.py>`__; the complete
-# code that trains on MNIST is at `link <https://github.com/dmlc/dgl/tree/tutorial/examples/pytorch/capsule>`__.
+# The full code of this visualization is provided on
+# `GitHub <https://github.com/dmlc/dgl/blob/master/examples/pytorch/capsule/simple_routing.py>`__. The complete
+# code that trains on MNIST is also on `GitHub <https://github.com/dmlc/dgl/tree/tutorial/examples/pytorch/capsule>`__.
 #
 # .. |image0| image:: https://i.imgur.com/55Ovkdh.png
 # .. |image1| image:: https://i.imgur.com/9tc6GLl.png

@@ -73,7 +73,7 @@ class DenseSAGEConv(nn.Module):
         """
         adj = adj.float().to(feat.device)
         feat = self.feat_drop(feat)
-        in_degrees = adj.sum(dim=1).unsqueeze(-1)
+        in_degrees = adj.sum(dim=1, keepdim=True)
         h_neigh = (adj @ feat + feat) / (in_degrees + 1)
         rst = self.fc(h_neigh)
         # activation
