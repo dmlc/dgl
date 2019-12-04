@@ -234,7 +234,7 @@ def test_row3():
         assert F.allclose(v, data[k][newidx])
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_row4():
     # test updating row with empty frame but has preset num_rows
     f = FrameRef(Frame(num_rows=5))
@@ -244,7 +244,7 @@ def test_row4():
     ans[F.tensor([0, 2, 4])] = F.ones((3, 2))
     assert F.allclose(f['h'], ans)
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_sharing():
     data = Frame(create_test_data())
     f1 = FrameRef(data, index=toindex([0, 1, 2, 3]))
@@ -272,7 +272,7 @@ def test_sharing():
     F.narrow_row_set(f2_a1, 0, 2, F.ones([2, D]))
     assert F.allclose(f2['a1'], f2_a1)
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_slicing():
     data = Frame(create_test_data(grad=True))
     f1 = FrameRef(data, index=toindex(slice(1, 5)))
@@ -320,7 +320,7 @@ def test_add_rows():
     ans = F.cat([F.zeros((4, 5)), F.ones((4, 5))], 0)
     assert F.allclose(f1['y'], ans)
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace():
     f = FrameRef(Frame(create_test_data()))
     print(f.schemes)

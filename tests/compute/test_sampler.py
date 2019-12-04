@@ -305,7 +305,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="Core dump")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Core dump")
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)

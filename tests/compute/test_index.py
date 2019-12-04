@@ -5,7 +5,7 @@ import numpy as np
 import backend as F
 import unittest
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_dlpack():
     # test dlpack conversion.
     def nd2th():

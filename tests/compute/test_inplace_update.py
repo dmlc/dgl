@@ -21,7 +21,7 @@ def generate_graph():
     return g
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_recv():
     u = F.tensor([0, 0, 0, 3, 4, 9])
     v = F.tensor([1, 2, 3, 9, 9, 0])
@@ -72,7 +72,7 @@ def test_inplace_recv():
     _test(None)
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_snr():
     u = F.tensor([0, 0, 0, 3, 4, 9])
     v = F.tensor([1, 2, 3, 9, 9, 0])
@@ -133,7 +133,7 @@ def test_inplace_snr():
     _test(None)
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_push():
     nodes = F.tensor([0, 3, 4, 9])
 
@@ -193,7 +193,7 @@ def test_inplace_push():
     _test(None)
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_pull():
     nodes = F.tensor([1, 2, 3, 9])
 
@@ -253,7 +253,7 @@ def test_inplace_pull():
     _test(None)
 
 
-@unittest.skipif(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_apply():
     def apply_node_func(nodes):
         return {'f': nodes.data['f'] * 2}
