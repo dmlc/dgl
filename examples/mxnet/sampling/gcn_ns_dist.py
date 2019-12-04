@@ -60,7 +60,6 @@ class GCNSampling(gluon.Block):
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
             nf.layers[i].data['h'] = h
-            degs = nf.layer_in_degree(i + 1).astype('float32').as_in_context(h.context)
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
                              fn.mean(msg='m', out='h'),
@@ -101,7 +100,7 @@ class GCNInfer(gluon.Block):
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
+                             fn.mean(msg='m', out='h'),
                              layer)
 
         return nf.layers[-1].data.pop('activation')
@@ -147,6 +146,8 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
+        print(epoch)
+        start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
@@ -173,9 +174,12 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
             idx = trainer._param2idx[key]
             trainer._kvstore.pull(idx, out=infer_params[key].data())
 
+        train_time = time.time() - start
+
         num_acc = 0.
         num_tests = 0
 
+        start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
@@ -188,5 +192,7 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
             num_tests += nf.layer_size(-1)
             break
+        eval_time = time.time() - start
 
-        print("Test Accuracy {:.4f}". format(num_acc/num_tests))
+        print("Trainer {}: Test Accuracy {:.4f}, Train Time {:.4f}, Eval time {:.4f}". format(
+            args.id, num_acc/num_tests, train_time, eval_time))
