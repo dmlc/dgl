@@ -7,6 +7,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence,pad_packed_sequence
 
+
 class MSA(nn.Module):
     # multi-head self-attention, three modes
     # the first is the copy, determining which entity should be copied.
@@ -55,6 +56,7 @@ class MSA(nn.Module):
             else:
                 return ret
 
+
 class BiLSTM(nn.Module):
     # for entity encoding or the title encoding
     def __init__(self, args, enc_type='title'):
@@ -77,6 +79,7 @@ class BiLSTM(nn.Module):
             _h = _h[:,-2:].view(_h.size(0), -1) # two directions of the top-layer
             ret = pad(_h.split(ent_len), out_type='tensor')
             return ret
+
 
 class GAT(nn.Module):
     # a graph attention network with dot-product attention
@@ -131,6 +134,7 @@ class GAT(nn.Module):
             # use the same layer norm, see the author's code
         return rst
 
+
 class GraphTrans(nn.Module):
     def __init__(self,args):
         super().__init__()
@@ -157,3 +161,4 @@ class GraphTrans(nn.Module):
         g_root = feats.index_select(0, graphs.filter_nodes(lambda x: x.data['type']==NODE_TYPE['root']).to(device))
         g_ent = pad(feats.index_select(0, graphs.filter_nodes(lambda x: x.data['type']==NODE_TYPE['entity']).to(device)).split(ent_len), out_type='tensor')
         return g_ent, g_root
+

@@ -5,7 +5,9 @@ import json
 import pickle
 import random
 
+
 NODE_TYPE = {'entity': 0, 'root': 1, 'relation':2}
+
 
 def write_txt(batch, seqs, w_file, args):
     # converting the prediction to real text.
@@ -27,6 +29,7 @@ def write_txt(batch, seqs, w_file, args):
         ret.append([' '.join([str(x) for x in txt])])
     return ret 
 
+
 def replace_ent(x, ent, V):
     # replace the entity
     mask = x>=V
@@ -37,11 +40,13 @@ def replace_ent(x, ent, V):
     x = x.masked_scatter(mask, fill_ent)
     return x
 
+
 def len2mask(lens, device):
     max_len = max(lens)
     mask = torch.arange(max_len, device=device).unsqueeze(0).expand(len(lens), max_len)
     mask = mask >= torch.LongTensor(lens).to(mask).unsqueeze(1)
     return mask
+
 
 def pad(var_len_list, out_type='list', flatten=False):
     if flatten:
@@ -60,6 +65,7 @@ def pad(var_len_list, out_type='list', flatten=False):
         else:
             return torch.stack([torch.cat([x, \
             torch.zeros([max_len-len(x)]+list(x.shape[1:])).type_as(x)], 0) for x in var_len_list], 0)
+
 
 class Vocab(object):
     def __init__(self, max_vocab=2**31, min_freq=-1, sp=['<PAD>', '<BOS>', '<EOS>', '<UNK>']):
@@ -276,6 +282,7 @@ class GWdataset(torch.utils.data.Dataset):
             'ent_type': batch_ent_type.to(self.device), 'rel': batch_rel.to(self.device), 'text': batch_text.to(self.device), \
             'tgt_text': batch_tgt_text.to(self.device), 'graph': batch_graph, 'raw_ent_text': batch_raw_ent_text}
         
+
 def get_datasets(fnames, min_freq=-1, sep=';', joint_vocab=True, device=None, save='tmp.pickle'):
     # min_freq : not support now since it's very sensitive to the final results, but you can set it via passing min_freq to the Vocab class.
     # sep : not support now
@@ -305,6 +312,7 @@ def get_datasets(fnames, min_freq=-1, sep=';', joint_vocab=True, device=None, sa
     with open(save, 'wb') as f:
         pickle.dump(datasets, f)
     return datasets
+
 
 if __name__ == '__main__' :
     ds = get_datasets(['data/unprocessed.val.json', 'data/unprocessed.val.json', 'data/unprocessed.test.json'])

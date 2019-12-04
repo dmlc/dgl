@@ -15,6 +15,7 @@ from pycocoevalcap.bleu.bleu import Bleu
 from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.meteor.meteor import Meteor
 
+
 def train_one_epoch(model, dataloader, optimizer, args, epoch):
     model.train()
     tloss = 0.
@@ -38,6 +39,7 @@ def train_one_epoch(model, dataloader, optimizer, args, epoch):
     print('Train Ep ', str(epoch), 'AVG Loss ', tloss/tcnt, 'Steps ', tcnt, 'Time ', time.time()-st_time, 'GPU', torch.cuda.max_memory_cached()/1024.0/1024.0/1024.0)
     torch.save(model, args.save_model+str(epoch%100))
          
+
 val_loss = 2**31
 def eval_it(model, dataloader, args, epoch):
     global val_loss
@@ -60,6 +62,7 @@ def eval_it(model, dataloader, args, epoch):
         print('Saving best model ', 'Ep ', epoch, ' loss ', tloss/tcnt)
         torch.save(model, args.save_model+'best')
         val_loss = tloss/tcnt
+
 
 def test(model, dataloader, args):
     scorer = Bleu(4)
@@ -87,6 +90,8 @@ def test(model, dataloader, args):
     print('ROUGE_L', r_scorer.compute_score(ref, hyp)[0])
     gold_file.close()
     pred_file.close()
+
+
 def main(args):
     if os.path.exists(args.save_dataset):
         train_dataset, valid_dataset, test_dataset = pickle.load(open(args.save_dataset, 'rb'))
@@ -114,6 +119,7 @@ def main(args):
             train_one_epoch(model, train_dataloader, optimizer, args, epoch)
             eval_it(model, valid_dataloader, args, epoch)
     
+
 if __name__ == '__main__':
     args = get_args()
     main(args)

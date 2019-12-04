@@ -1,12 +1,14 @@
 import torch
 import argparse
 
+
 def fill_config(args):
     # dirty work
     args.device = torch.device(args.gpu)
     args.dec_ninp = args.nhid * 3 if args.title else args.nhid * 2 
     args.fnames = [args.train_file, args.valid_file, args.test_file]
     return args
+
 
 def vocab_config(args, ent_vocab, rel_vocab, text_vocab, ent_text_vocab, title_vocab):
     # dirty work
@@ -16,6 +18,7 @@ def vocab_config(args, ent_vocab, rel_vocab, text_vocab, ent_text_vocab, title_v
     args.ent_text_vocab = ent_text_vocab
     args.title_vocab = title_vocab
     return args
+
 
 def get_args():
     args = argparse.ArgumentParser(description='Graph Writer in DGL')
@@ -50,4 +53,3 @@ def get_args():
     args = fill_config(args)
     return args
         
-

@@ -4,6 +4,7 @@ from utlis import *
 from torch import nn
 import dgl
             
+
 class GraphWriter(nn.Module):
     def __init__(self, args):
         super(GraphWriter, self).__init__()
@@ -178,8 +179,4 @@ class GraphWriter(nn.Module):
                     ctx = ctx.view(B,beam_size,-1)[torch.arange(B)[:,None].to(device), new_src].view(BSZ,-1)
 
                 return beam_best_seq
-                  
-            
-            
-            
             
