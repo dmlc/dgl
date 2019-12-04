@@ -237,7 +237,7 @@ def check_head_tail(g):
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
-    g.edata['etype'] = F.tensor(etype)
+    g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
