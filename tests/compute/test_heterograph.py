@@ -6,6 +6,8 @@ import scipy.sparse as ssp
 import itertools
 import backend as F
 import networkx as nx
+from dgl import DGLError
+
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -92,6 +94,36 @@ def test_create():
     assert g.number_of_nodes('l0') == 3
     assert g.number_of_nodes('l1') == 3
     assert g.number_of_nodes('l2') == 4
+
+    # test if validate flag works
+    # homo graph
+    fail = False
+    try:
+        g = dgl.graph(
+            ([0, 0, 0, 1, 1, 2], [0, 1, 2, 0, 1, 2]),
+            card=2,
+            validate=True
+        )
+    except DGLError:
+        fail = True
+    finally:
+        assert fail, "should catch a DGLError because node ID is out of bound."
+    # bipartite graph
+    def _test_validate_bipartite(card):
+        fail = False
+        try:
+            g = dgl.bipartite(
+                ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
+                card=card,
+                validate=True
+            )
+        except DGLError:
+            fail = True
+        finally:
+            assert fail, "should catch a DGLError because node ID is out of bound."
+
+    _test_validate_bipartite((3, 3))
+    _test_validate_bipartite((2, 4))
 
 def test_query():
     g = create_test_heterograph()
