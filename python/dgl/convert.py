@@ -9,7 +9,7 @@ from . import heterograph_index
 from .heterograph import DGLHeteroGraph, combine_frames
 from . import graph_index
 from . import utils
-from .base import NTYPE, ETYPE, NID, EID, DGLError, dgl_warning
+from .base import NTYPE, ETYPE, NID, EID, DGLError
 
 __all__ = [
     'graph',
@@ -105,6 +105,16 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=False, **kwargs):
     ['follows']
     >>> g.canonical_etypes
     [('user', 'follows', 'user')]
+
+    Check if node ids are within cardinality
+
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 0]), card=2, validate=True)
+    ...
+    dgl._ffi.base.DGLError: Invalid node id 2 (should be less than cardinality 2).
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 0]), card=3, validate=True)
+    Graph(num_nodes=3, num_edges=3,
+          ndata_schemes={}
+          edata_schemes={})
     """
     if card is not None:
         urange, vrange = card, card
@@ -223,6 +233,16 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=Fals
     4
     >>> g.edges()
     (tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]), tensor([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]))
+
+    Check if node ids are within cardinality
+    >>> g = dgl.bipartite(([0, 1, 2], [1, 2, 3]), card=(2, 4), validate=True)
+    ...
+    dgl._ffi.base.DGLError: Invalid node id 2 (should be less than cardinality 2).
+    >>> g = dgl.bipartite(([0, 1, 2], [1, 2, 3]), card=(3, 4), validate=True)
+    >>> g
+    Graph(num_nodes={'_U': 3, '_V': 4},
+          num_edges={('_U', '_E', '_V'): 3},
+          metagraph=[('_U', '_V')])
     """
     if utype == vtype:
         raise DGLError('utype should not be equal to vtype. Use ``dgl.graph`` instead.')
