@@ -95,26 +95,26 @@ def test_create():
 
     # test if validate flag works
     # homo graph
+    test = False
     try:
         g = dgl.graph(
             ([0, 0, 0, 1, 1, 2], [0, 1, 2, 0, 1, 2]),
             card=2,
             validate=True
         )
-        fail = False
     except DGLError:
         fail = True
     finally:
         assert fail, "should catch a DGLError because node ID is out of bound."
     # bipartite graph
     def _test_validate_bipartite(card):
+        test = False
         try:
             g = dgl.bipartite(
                 ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
                 card=card,
                 validate=True
             )
-            fail = False
         except DGLError:
             fail = True
         finally:
