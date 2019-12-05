@@ -107,7 +107,7 @@ def test_create():
     finally:
         assert fail, "should catch a DGLError because node ID is out of bound."
     # bipartite graph
-    def _test_validate_bipartite(card)
+    def _test_validate_bipartite(card):
         try:
             g = dgl.bipartite(
                 ([0, 0, 1, 1, 2], [1, 1, 2, 2, 3]),
