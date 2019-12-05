@@ -46,7 +46,7 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=False, **kwargs):
         Cardinality (number of nodes in the graph). If None, infer from input data, i.e.
         the largest node ID plus 1. (Default: None)
     validate : bool, optional
-        If True, check if node ids are within cardinality, the check process may take 
+        If True, check if node ids are within cardinality, the check process may take
         some time.
         If False and card is not None, user would receive a warning. (Default: False)
     kwargs : key-word arguments, optional
@@ -162,7 +162,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=Fals
         Cardinality (number of nodes in the source and destination group). If None,
         infer from input data, i.e. the largest node ID plus 1 for each type. (Default: None)
     validate : bool, optional
-        If True, check if node ids are within cardinality, the check process may take 
+        If True, check if node ids are within cardinality, the check process may take
         some time.
         If False and card is not None, user would receive a warning. (Default: False)
     kwargs : key-word arguments, optional
@@ -730,10 +730,10 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     if validate:
         if urange is not None and urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                           urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
+                urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
         if vrange is not None and vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                           vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
+                vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
     urange = urange or (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1)
     vrange = vrange or (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1)
     if utype == vtype:
