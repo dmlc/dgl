@@ -523,6 +523,25 @@ def remove_self_loop(g):
     return new_g
 
 def partition_graph_with_halo(g, node_part, num_hops):
+    '''
+    This is to partition a graph. Each partition contains HALO nodes
+    so that we can generate NodeFlow in each partition correctly.
+
+    Parameters
+    ------------
+    g: DGLGraph
+        The graph to be partitioned
+
+    node_part: 1D tensor
+        Specify which partition a node is assigned to
+
+    num_hops: int
+        The number of hops a HALO node can be accessed.
+
+    Returns
+    --------
+    a dict of DGLGraphs
+    '''
     if not isinstance(node_part, np.ndarray):
         node_part = F.asnumpy(node_part)
     subgs = {}
