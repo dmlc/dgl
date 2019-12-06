@@ -542,7 +542,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
     graph_ptr->GetInCSR();
     std::vector<std::shared_ptr<HaloSubgraph> > subgs(max_part_id + 1);
 #pragma omp parallel for
-    for (size_t i = 0; i < part_nodes.size(); i++) {
+    for (int i = 0; i < (int) part_nodes.size(); i++) {
       auto nodes = aten::VecToIdArray(part_nodes[i]);
       HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
       std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
