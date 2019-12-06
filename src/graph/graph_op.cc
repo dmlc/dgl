@@ -506,6 +506,56 @@ HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hop
   return halo_subg;
 }
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef graph = args[0];
+    IdArray node_parts = args[1];
+    int num_hops = args[2];
+
+    const dgl_id_t *part_data = static_cast<dgl_id_t *>(node_parts->data);
+    int64_t num_nodes = node_parts->shape[0];
+    std::unordered_map<int, std::vector<dgl_id_t> > part_map;
+    for (int64_t i = 0; i < num_nodes; i++) {
+      dgl_id_t part_id = part_data[i];
+      auto it = part_map.find(part_id);
+      if (it == part_map.end()) {
+        std::vector<dgl_id_t> vec;
+        vec.push_back(i);
+        part_map[part_id] = vec;
+      } else {
+        it->second.push_back(i);
+      }
+    }
+    std::vector<int> part_ids;
+    std::vector<std::vector<dgl_id_t> > part_nodes;
+    int max_part_id = 0;
+    for (auto it = part_map.begin(); it != part_map.end(); it++) {
+      max_part_id = std::max(it->first, max_part_id);
+      part_ids.push_back(it->first);
+      part_nodes.push_back(it->second);
+    }
+    auto graph_ptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    // When we construct subgraphs, we only access in-edges.
+    // We need to make sure the in-CSR exists. Otherwise, we'll
+    // try to construct in-CSR in openmp for loop, which will lead
+    // to some unexpected results.
+    graph_ptr->GetInCSR();
+    std::vector<std::shared_ptr<HaloSubgraph> > subgs(max_part_id + 1);
+#pragma omp parallel for
+    for (size_t i = 0; i < part_nodes.size(); i++) {
+      auto nodes = aten::VecToIdArray(part_nodes[i]);
+      HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
+      std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
+      int part_id = part_ids[i];
+      subgs[part_id] = subg_ptr;
+    }
+    List<SubgraphRef> ret_list;
+    for (size_t i = 0; i < subgs.size(); i++) {
+      ret_list.push_back(SubgraphRef(subgs[i]));
+    }
+    *rv = ret_list;
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGetSubgraphWithHalo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef graph = args[0];

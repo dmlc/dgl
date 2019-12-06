@@ -7,6 +7,8 @@ from .graph import DGLGraph
 from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
+from .graph_index import _get_halo_subgraph_inner_node
+from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
 from .convert import graph, bipartite
 from . import utils
@@ -542,19 +544,18 @@ def partition_graph_with_halo(g, node_part, num_hops):
     --------
     a dict of DGLGraphs
     '''
-    if not isinstance(node_part, np.ndarray):
-        node_part = F.asnumpy(node_part)
-    subgs = {}
-    for part_id in np.unique(node_part):
-        node_ids = utils.toindex(np.nonzero(node_part == part_id)[0])
-        subg, inner_node, inner_edge = g._graph.node_halo_subgraph(node_ids,
-                                                                   num_hops)
+    node_part = utils.toindex(node_part)
+    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), num_hops)
+    subg_dict = {}
+    for i, subg in enumerate(subgs):
+        inner_node = _get_halo_subgraph_inner_node(subg)
+        inner_edge = _get_halo_subgraph_inner_edge(subg)
         subg = DGLSubGraph(g, subg)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
         inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
         subg.edata['inner_edge'] = inner_edge
-        subgs[part_id] = subg
-    return subgs
+        subg_dict[i] = subg
+    return subg_dict
 
 _init_api("dgl.transform")

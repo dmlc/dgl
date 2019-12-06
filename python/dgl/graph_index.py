@@ -1308,4 +1308,10 @@ def create_graph_index(graph_data, multigraph, readonly):
                            % type(graph_data))
         return gidx
 
+def _get_halo_subgraph_inner_node(halo_subg):
+    return _CAPI_GetHaloSubgraphInnerNodes(halo_subg)
+
+def _get_halo_subgraph_inner_edge(halo_subg):
+    return _CAPI_GetHaloSubgraphInnerEdges(halo_subg)
+
 _init_api("dgl.graph_index")
