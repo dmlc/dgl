@@ -1,8 +1,10 @@
+from scipy import sparse as spsp
 import networkx as nx
 import numpy as np
 import dgl
 import dgl.function as fn
 import backend as F
+from dgl.graph_index import from_scipy_sparse_matrix
 
 D = 5
 
@@ -194,6 +196,40 @@ def test_remove_self_loop():
     assert F.allclose(new_g.edges()[0], F.tensor([0]))
     assert F.allclose(new_g.edges()[1], F.tensor([1]))
 
+def create_large_graph_index(num_nodes):
+    row = np.random.choice(num_nodes, num_nodes * 10)
+    col = np.random.choice(num_nodes, num_nodes * 10)
+    spm = spsp.coo_matrix((np.ones(len(row)), (row, col)))
+    return from_scipy_sparse_matrix(spm, True)
+
+def get_nodeflow(g, node_ids, num_layers):
+    batch_size = len(node_ids)
+    expand_factor = g.number_of_nodes()
+    sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size,
+            expand_factor=expand_factor, num_hops=num_layers,
+            seed_nodes=node_ids)
+    return next(iter(sampler))
+
+def test_partition():
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    node_part = np.random.choice(4, g.number_of_nodes())
+    subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
+    for part_id, subg in subgs.items():
+        node_ids = np.nonzero(node_part == part_id)[0]
+        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+        nf = get_nodeflow(g, node_ids, 2)
+        lnf = get_nodeflow(subg, lnode_ids, 2)
+        for i in range(nf.num_layers):
+            layer_nids1 = F.asnumpy(nf.layer_parent_nid(i))
+            layer_nids2 = lnf.layer_parent_nid(i)
+            layer_nids2 = F.asnumpy(subg.parent_nid[layer_nids2])
+            assert np.all(np.sort(layer_nids1) == np.sort(layer_nids2))
+
+        for i in range(nf.num_blocks):
+            block_eids1 = F.asnumpy(nf.block_parent_eid(i))
+            block_eids2 = lnf.block_parent_eid(i)
+            block_eids2 = F.asnumpy(subg.parent_eid[block_eids2])
+            assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
 
 if __name__ == '__main__':
@@ -208,3 +244,4 @@ if __name__ == '__main__':
     test_laplacian_lambda_max()
     test_remove_self_loop()
     test_add_self_loop()
+    test_partition()

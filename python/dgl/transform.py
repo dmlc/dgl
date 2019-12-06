@@ -4,10 +4,12 @@ import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
 from .graph import DGLGraph
+from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
 from .batched_graph import BatchedDGLGraph, unbatch
 from .convert import graph, bipartite
+from . import utils
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
@@ -519,5 +521,21 @@ def remove_self_loop(g):
     non_self_edges_idx = src != dst
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
+
+def partition_graph_with_halo(g, node_part, num_hops):
+    if not isinstance(node_part, np.ndarray):
+        node_part = F.asnumpy(node_part)
+    subgs = {}
+    for part_id in np.unique(node_part):
+        node_ids = utils.toindex(np.nonzero(node_part == part_id)[0])
+        subg, inner_node, inner_edge = g._graph.node_halo_subgraph(node_ids,
+                                                                   num_hops)
+        subg = DGLSubGraph(g, subg)
+        inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
+        subg.ndata['inner_node'] = inner_node
+        inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
+        subg.edata['inner_edge'] = inner_edge
+        subgs[part_id] = subg
+    return subgs
 
 _init_api("dgl.transform")
