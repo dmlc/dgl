@@ -103,13 +103,18 @@ def get_from_kvstore(args, kv, g, name):
 
 def main(args):
     g, all_locs = load_local_part(args)
+    print('graph size:', g.number_of_nodes())
+    print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy())
     kv = connect_to_kvstore(args, all_locs)
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(args.id)
-    train_mask = get_from_kvstore(args, kv, g, 'train_mask')
-    val_mask = get_from_kvstore(args, kv, g, 'val_mask')
-    test_mask = get_from_kvstore(args, kv, g, 'test_mask')
-    print('client gets all masks from servers')
+    local_nodes = np.nonzero(g.ndata['local'].asnumpy())[0]
+    train_mask = get_from_kvstore(args, kv, g, 'train_mask')[local_nodes]
+    val_mask = get_from_kvstore(args, kv, g, 'val_mask')[local_nodes]
+    test_mask = get_from_kvstore(args, kv, g, 'test_mask')[local_nodes]
+    print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
+        mx.nd.sum(val_mask).asnumpy(),
+        mx.nd.sum(test_mask).asnumpy()))
 
     if args.num_gpus > 0:
         ctx = mx.gpu(g.worker_id % args.num_gpus)
