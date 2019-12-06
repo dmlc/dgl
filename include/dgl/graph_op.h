@@ -139,6 +139,8 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+
+  static HaloSubgraph GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops);
 };
 
 }  // namespace dgl

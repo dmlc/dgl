@@ -542,6 +542,13 @@ class GraphIndex(ObjectBase):
         v_array = v.todgltensor()
         return _CAPI_DGLGraphVertexSubgraph(self, v_array)
 
+    def node_halo_subgraph(self, v, num_hops):
+        v_array = v.todgltensor()
+        subg = _CAPI_DGLGetSubgraphWithHalo(self, v_array, num_hops)
+        inner_nodes = _CAPI_GetHaloSubgraphInnerNodes(subg)
+        inner_edges = _CAPI_GetHaloSubgraphInnerEdges(subg)
+        return subg, inner_nodes, inner_edges
+
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
 
