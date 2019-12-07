@@ -1,8 +1,6 @@
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
-import os
-os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 import dgl
