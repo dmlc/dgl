@@ -108,10 +108,10 @@ def main(args):
     kv = connect_to_kvstore(args, all_locs)
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(args.id)
-    local_nodes = np.nonzero(g.ndata['local'].asnumpy())[0]
-    train_mask = get_from_kvstore(args, kv, g, 'train_mask')[local_nodes]
-    val_mask = get_from_kvstore(args, kv, g, 'val_mask')[local_nodes]
-    test_mask = get_from_kvstore(args, kv, g, 'test_mask')[local_nodes]
+    local_mask = g.ndata['local'].astype(np.float32)
+    train_mask = get_from_kvstore(args, kv, g, 'train_mask').astype(np.float32) * local_mask
+    val_mask = get_from_kvstore(args, kv, g, 'val_mask').astype(np.float32) * local_mask
+    test_mask = get_from_kvstore(args, kv, g, 'test_mask').astype(np.float32) * local_mask
     print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
         mx.nd.sum(test_mask).asnumpy()))
