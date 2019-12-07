@@ -58,7 +58,8 @@ class NodeApplyModule(nn.Module):
 
     def forward(self, node):
         h = self.linear(node.data['h'])
-        h = self.activation(h)
+        if self.activation is not None:
+            h = self.activation(h)
         return {'h' : h}
 
 ###############################################################################
@@ -82,13 +83,14 @@ class GCN(nn.Module):
 # model in PyTorch.  We can initialize GCN like any ``nn.Module``. For example,
 # let's define a simple neural network consisting of two GCN layers. Suppose we
 # are training the classifier for the cora dataset (the input feature size is
-# 1433 and the number of classes is 7).
+# 1433 and the number of classes is 7). The last GCN layer computes node embeddings,
+# so the last layer in general doesn't apply activation.
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         self.gcn1 = GCN(1433, 16, F.relu)
-        self.gcn2 = GCN(16, 7, F.relu)
+        self.gcn2 = GCN(16, 7, None)
     
     def forward(self, g, features):
         x = self.gcn1(g, features)
