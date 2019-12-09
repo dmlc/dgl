@@ -16,7 +16,7 @@ def run_a_train_epoch(args, epoch, model, data_loader,
     train_meter = Meter(args['train_mean'], args['train_std'])
     epoch_loss = 0
     for batch_id, batch_data in enumerate(data_loader):
-        indices, protein_mols, ligand_mols, bg, labels = batch_data
+        indices, ligand_mols, protein_mols, bg, labels = batch_data
         labels, bg = labels.to(args['device']), bg.to(args['device'])
         prediction = model(bg)
         loss = loss_criterion(prediction, (labels - args['train_mean']) / args['train_std'])
@@ -37,7 +37,7 @@ def run_an_eval_epoch(args, model, data_loader):
     eval_meter = Meter(args['train_mean'], args['train_std'])
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
-            indices, protein_mols, ligand_mols, bg, labels = batch_data
+            indices, ligand_mols, protein_mols, bg, labels = batch_data
             labels, bg = labels.to(args['device']), bg.to(args['device'])
             prediction = model(bg)
             eval_meter.update(prediction, labels)
@@ -82,8 +82,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset', type=str,
                         choices=['PDBBind_core_pocket_random', 'PDBBind_core_pocket_scaffold',
                                  'PDBBind_core_pocket_stratified', 'PDBBind_core_pocket_temporal',
-                                 'PDBBind_refined_pocket', 'PDBBind_refined_scaffold',
-                                 'PDBBind_refined_stratified', 'PDBBind_refined_temporal'],
+                                 'PDBBind_refined_pocket_random', 'PDBBind_refined_pocket_scaffold',
+                                 'PDBBind_refined_pocket_stratified', 'PDBBind_refined_pocket_temporal'],
                         help='Dataset to use')
 
     args = parser.parse_args().__dict__

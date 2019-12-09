@@ -190,7 +190,7 @@ experiment_configures = {
     'ACNN_PDBBind_core_pocket_scaffold': ACNN_PDBBind_core_pocket_scaffold,
     'ACNN_PDBBind_core_pocket_stratified': ACNN_PDBBind_core_pocket_stratified,
     'ACNN_PDBBind_core_pocket_temporal': ACNN_PDBBind_core_pocket_temporal,
-    'ACNN_PDBBind_refined_pocket': ACNN_PDBBind_refined_pocket_random,
+    'ACNN_PDBBind_refined_pocket_random': ACNN_PDBBind_refined_pocket_random,
     'ACNN_PDBBind_refined_pocket_scaffold': ACNN_PDBBind_refined_pocket_scaffold,
     'ACNN_PDBBind_refined_pocket_stratified': ACNN_PDBBind_refined_pocket_stratified,
     'ACNN_PDBBind_refined_pocket_temporal': ACNN_PDBBind_refined_pocket_temporal

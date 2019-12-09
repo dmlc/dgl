@@ -51,8 +51,8 @@ class ACNNPredictor(nn.Module):
 
         return backend.unsorted_1d_segment_sum(feats, seg_id, batch_size, 0)
 
-    def forward(self, protein_graph, ligand_graph, complex_graph,
-                protein_conv_out, ligand_conv_out, complex_conv_out):
+    def forward(self, ligand_graph, protein_graph, complex_graph,
+                ligand_conv_out, protein_conv_out, complex_conv_out):
         """
         Parameters
         ----------
@@ -61,31 +61,31 @@ class ACNNPredictor(nn.Module):
         ligand_conv_out : float32 tensor of shape (V2, K * F)
         complex_conv_out : float32 tensor of shape ((V1 + V2), K * F)
         """
-        protein_feats = self.project(protein_conv_out)
         ligand_feats = self.project(ligand_conv_out)
+        protein_feats = self.project(protein_conv_out)
         complex_feats = self.project(complex_conv_out)
 
-        protein_energy = self.sum_nodes(protein_graph.batch_size,
-                                        protein_graph.batch_num_nodes,
-                                        protein_feats)
         ligand_energy = self.sum_nodes(ligand_graph.batch_size,
                                        ligand_graph.batch_num_nodes,
                                        ligand_feats)
+        protein_energy = self.sum_nodes(protein_graph.batch_size,
+                                        protein_graph.batch_num_nodes,
+                                        protein_feats)
 
         with complex_graph.local_scope():
             complex_graph.ndata['h'] = complex_feats
             hetero_complex_graph = to_hetero(
                 complex_graph, ntypes=complex_graph.original_ntypes,
                 etypes=complex_graph.original_etypes)
-            complex_energy_protein = self.sum_nodes(
-                complex_graph.batch_size, complex_graph.batch_num_protein_nodes,
-                hetero_complex_graph.nodes['protein_atom'].data['h'])
             complex_energy_ligand = self.sum_nodes(
                 complex_graph.batch_size, complex_graph.batch_num_ligand_nodes,
                 hetero_complex_graph.nodes['ligand_atom'].data['h'])
-            complex_energy = complex_energy_protein + complex_energy_ligand
+            complex_energy_protein = self.sum_nodes(
+                complex_graph.batch_size, complex_graph.batch_num_protein_nodes,
+                hetero_complex_graph.nodes['protein_atom'].data['h'])
+            complex_energy = complex_energy_ligand + complex_energy_protein
 
-        return complex_energy - (protein_energy + ligand_energy)
+        return complex_energy - (ligand_energy + protein_energy)
 
 class ACNN(nn.Module):
     """"""
@@ -98,25 +98,20 @@ class ACNN(nn.Module):
         radial_params = [x for x in itertools.product(*radial)]
         radial_params = torch.stack(list(map(torch.tensor, zip(*radial_params))), dim=1)
 
-        self.protein_conv = AtomicConv(radial_params, features_to_use)
-        self.ligand_conv = AtomicConv(radial_params, features_to_use)
-        self.complex_conv = AtomicConv(radial_params, features_to_use)
+        interaction_cutoffs = radial_params[:, 0]
+        rbf_kernel_means = radial_params[:, 1]
+        rbf_kernel_scaling = radial_params[:, 2]
+
+        self.ligand_conv = AtomicConv(interaction_cutoffs, rbf_kernel_means,
+                                      rbf_kernel_scaling, features_to_use)
+        self.protein_conv = AtomicConv(interaction_cutoffs, rbf_kernel_means,
+                                       rbf_kernel_scaling, features_to_use)
+        self.complex_conv = AtomicConv(interaction_cutoffs, rbf_kernel_means,
+                                       rbf_kernel_scaling, features_to_use)
         self.predictor = ACNNPredictor(radial_params.shape[0], hidden_sizes, weight_init_stddevs,
                                        dropouts, features_to_use, num_tasks)
 
     def forward(self, graph):
-        protein_graph = graph[('protein_atom', 'protein', 'protein_atom')]
-        # Todo (Mufei): remove the two lines below after better built-in support
-        protein_graph.batch_size = graph.batch_size
-        protein_graph.batch_num_nodes = graph.batch_num_nodes('protein_atom')
-
-        protein_graph_node_feats = protein_graph.ndata['atomic_number']
-        assert protein_graph_node_feats.shape[-1] == 1
-        protein_graph_distances = protein_graph.edata['distance']
-        protein_conv_out = self.protein_conv(protein_graph,
-                                             protein_graph_node_feats,
-                                             protein_graph_distances)
-
         ligand_graph = graph[('ligand_atom', 'ligand', 'ligand_atom')]
         # Todo (Mufei): remove the two lines below after better built-in support
         ligand_graph.batch_size = graph.batch_size
@@ -128,6 +123,18 @@ class ACNN(nn.Module):
         ligand_conv_out = self.ligand_conv(ligand_graph,
                                            ligand_graph_node_feats,
                                            ligand_graph_distances)
+
+        protein_graph = graph[('protein_atom', 'protein', 'protein_atom')]
+        # Todo (Mufei): remove the two lines below after better built-in support
+        protein_graph.batch_size = graph.batch_size
+        protein_graph.batch_num_nodes = graph.batch_num_nodes('protein_atom')
+
+        protein_graph_node_feats = protein_graph.ndata['atomic_number']
+        assert protein_graph_node_feats.shape[-1] == 1
+        protein_graph_distances = protein_graph.edata['distance']
+        protein_conv_out = self.protein_conv(protein_graph,
+                                             protein_graph_node_feats,
+                                             protein_graph_distances)
 
         complex_graph = graph[:, 'complex', :]
         # Todo (Mufei): remove the four lines below after better built-in support
@@ -145,5 +152,5 @@ class ACNN(nn.Module):
                                              complex_graph_distances)
 
         return self.predictor(
-            protein_graph, ligand_graph, complex_graph,
-            protein_conv_out, ligand_conv_out, complex_conv_out)
+            ligand_graph, protein_graph, complex_graph,
+            ligand_conv_out, protein_conv_out, complex_conv_out)

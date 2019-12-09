@@ -63,7 +63,7 @@ def load_dataset(args):
 
 def collate(data):
     """"""
-    indices, protein_mols, ligand_mols, graphs, labels = map(list, zip(*data))
+    indices, ligand_mols, protein_mols, graphs, labels = map(list, zip(*data))
     bg = dgl.batch_hetero(graphs)
     for nty in bg.ntypes:
         bg.set_n_initializer(dgl.init.zero_initializer, ntype=nty)
@@ -71,7 +71,7 @@ def collate(data):
         bg.set_e_initializer(dgl.init.zero_initializer, etype=ety)
     labels = torch.stack(labels, dim=0)
 
-    return indices, protein_mols, ligand_mols, bg, labels
+    return indices, ligand_mols, protein_mols, bg, labels
 
 def load_model(args):
     """"""

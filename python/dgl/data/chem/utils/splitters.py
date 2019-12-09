@@ -459,7 +459,7 @@ class ScaffoldSplitter(object):
             count_and_log('Computing Bemis-Murcko for compound',
                           i, len(molecules), log_every_n)
             # For mols that have not been sanitized, we need to compute their ring information
-            mol = FastFindRings(mol)
+            FastFindRings(mol)
             mol_scaffold = MurckoScaffold.MurckoScaffoldSmiles(
                 mol=mol, includeChirality=include_chirality)
             # Group molecules that have the same scaffold

@@ -1,3 +1,4 @@
+"""Torch Module for Atomic Convolution Layer"""
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -5,6 +6,21 @@ import torch.nn as nn
 from .... import function as fn
 
 class RadialPooling(nn.Module):
+    """Radial Pooling from paper `Atomic Convolutional Networks for
+    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
+
+    Let :math:`r_{ij}` be the distance between
+
+    Parameters
+    ----------
+    interaction_cutoffs : float32 tensor of shape (K)
+        :math:`c_k` in the equations above. Roughly they can be considered as learnable cutoffs
+        for deciding if two atoms are neighbors. K for the number of radial filters.
+    rbf_kernel_means : float32 tensor of shape (K)
+        :math:`r_k` in the equations above. K for the number of radial filters.
+    rbf_kernel_scaling : float32 tensor of shape (K)
+        :math:`\gamma_k` in the equations above. K for the number of radial filters.
+    """
     def __init__(self, interaction_cutoffs, rbf_kernel_means, rbf_kernel_scaling):
         super(RadialPooling, self).__init__()
 
@@ -32,17 +48,80 @@ class RadialPooling(nn.Module):
         return rbf_kernel_results * cutoff_values
 
 class AtomicConv(nn.Module):
-    """
+    r"""Atomic Convolution Layer from paper `Atomic Convolutional Networks for
+    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
+
+    We denote the type of atom :math:`i` by :math:`z_i` and the distance between atom
+    :math:`i` and :math:`j` by :math:`r_{ij}`.
+
+    **Distance Transformation**
+
+    An atomic convolution layer first transforms distances with radial filters and
+    then perform a pooling operation.
+
+    For radial filter indexed by :math:`k`, it projects edge distances with
+
+    .. math::
+        h_{ij}^{k} = \exp(-\gamma_{k}|r_{ij}-r_{k}|^2)
+
+    If :math:`r_{ij} < c_k`,
+
+    .. math::
+        f_{ij}^{k} = 0.5 * \cos(\frac{\pi r_{ij}}{c_k} + 1),
+
+    else,
+
+    .. math::
+        f_{ij}^{k} = 0.
+
+    Finally,
+
+    .. math::
+        e_{ij}^{k} = h_{ij}^{k} * f_{ij}^{k}
+
+    **Aggregation**
+
+    For each type :math:`t`, each atom collects distance information from all neighbor atoms
+    of type :math:`t`:
+
+    .. math::
+        p_{i, t}^{k} = \sum_{j\in N(i)} e_{ij}^{k} * 1(z_j == t)
+
+    We concatenate the results for all RBF kernels and atom types.
+
+    Notes
+    -----
+
+    * This convolution operation is designed for molecular graphs in Chemistry, but it might
+      be possible to extend it to more general graphs.
+
+    * There seems to be an inconsistency about the definition of :math:`e_{ij}^{k}` in the
+      paper and the author's implementation. We follow the author's implementation. In the
+      paper, :math:`e_{ij}^{k}` was defined as
+      :math:`\exp(-\gamma_{k}|r_{ij}-r_{k}|^2 * f_{ij}^{k})`.
+
+    * :math:`\gamma_{k}`, :math:`r_k` and :math:`c_k` are all learnable.
+
     Parameters
     ----------
-    features_to_use: None or float32 tensor of shape (T)
+    interaction_cutoffs : float32 tensor of shape (K)
+        :math:`c_k` in the equations above. Roughly they can be considered as learnable cutoffs
+        for deciding if two atoms are neighbors. K for the number of radial filters.
+    rbf_kernel_means : float32 tensor of shape (K)
+        :math:`r_k` in the equations above. K for the number of radial filters.
+    rbf_kernel_scaling : float32 tensor of shape (K)
+        :math:`\gamma_k` in the equations above. K for the number of radial filters.
+    features_to_use : None or float tensor of shape (T)
+        In the original paper, these are atomic numbers to consider, representing the types
+        of atoms. T for the number of types of atomic numbers. Default to None.
     """
-    def __init__(self, radial_params, features_to_use=None):
+    def __init__(self, interaction_cutoffs, rbf_kernel_means,
+                 rbf_kernel_scaling, features_to_use=None):
         super(AtomicConv, self).__init__()
 
-        self.radial_pooling = RadialPooling(interaction_cutoffs=radial_params[:, 0],
-                                            rbf_kernel_means=radial_params[:, 1],
-                                            rbf_kernel_scaling=radial_params[:, 2])
+        self.radial_pooling = RadialPooling(interaction_cutoffs=interaction_cutoffs,
+                                            rbf_kernel_means=rbf_kernel_means,
+                                            rbf_kernel_scaling=rbf_kernel_scaling)
         self.features_to_use = nn.Parameter(features_to_use, requires_grad=False)
         if features_to_use is None:
             self.num_channels = 1
@@ -54,18 +133,19 @@ class AtomicConv(nn.Module):
         radial_pooled_values = self.radial_pooling(distances)
         graph = graph.local_var()
         if self.features_to_use is not None:
-            # (V * d_in, 1)
-            flattened_feat = feat.reshape(-1, 1)
-            # (V * d_in, len(self.features_to_use))
+            # (V, 1)
+            flattened_feat = feat
+            # (V, len(self.features_to_use))
             flattened_feat = (flattened_feat == self.features_to_use).float()
-            # (V, d_in * len(self.features_to_use))
-            feat = flattened_feat.reshape(feat.shape[0], -1)
+            # (V, len(self.features_to_use))
+            feat = flattened_feat
+        else:
+            feat = feat
         # (V, d_in * len(self.features_to_use), 1)
         graph.ndata['hv'] = feat.unsqueeze(-1)
         # (E, K)
-        graph.edata['he'] = radial_pooled_values.reshape(graph.number_of_edges(), -1)
+        graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1)
         graph.update_all(fn.src_mul_edge('hv', 'he', 'm'), fn.sum('m', 'hv_new'))
 
-        # (V, K * d_in * len(self.features_to_use))
-        return graph.ndata['hv_new'].reshape(
-            graph.number_of_nodes(), -1).contiguous()
+        # (V, K * len(self.features_to_use))
+        return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)
