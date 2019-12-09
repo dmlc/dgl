@@ -28,6 +28,7 @@ A summary of part of the model accuracy and training speed with the Pytorch back
 | [JTNN](https://arxiv.org/abs/1802.04364)                         | 96.44%                 | 96.44%            | [1826s (Pytorch)](https://github.com/wengong-jin/icml18-jtnn)                 | 743s                   | 2.5x        |
 | [LGNN](https://arxiv.org/abs/1705.08415)                         | 94%                    | 94%               | n/a                                                                           | 1.45s                  | n/a         |
 | [DGMG](https://arxiv.org/pdf/1803.03324.pdf)                     | 84%                    | 90%               | n/a                                                                           | 238s                   | n/a         |
+| [GraphWriter](https://www.aclweb.org/anthology/N19-1238.pdf)     | 14.3(BLEU)             | 14.31(BLEU)       | [1970s (PyTorch)](https://github.com/rikdz/GraphWriter)                       | 1192s                  | 1.65x       |                  
 
 With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150M edges on a P3.8xlarge instance, 
 with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
