@@ -15,10 +15,6 @@ def init_git_win64() {
   bat "git submodule update --recursive --init"
 }
 
-def activate_conda_env(backend){
-  // sh "conda activate ${backend}-ci"
-}
-
 // pack libraries for later use
 def pack_lib(name, libs) {
   echo "Packing ${libs} into ${name}"
@@ -60,7 +56,6 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  activate_conda_env(backend)
   timeout(time: 5, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
@@ -85,7 +80,6 @@ def kg_test_linux(backend, dev) {
 def example_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  activate_conda_env(backend)
   timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_example_test.sh ${dev}"
   }
@@ -94,7 +88,6 @@ def example_test_linux(backend, dev) {
 def example_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  activate_conda_env(backend)
   timeout(time: 20, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_example_test.bat ${dev}"
   }
@@ -103,7 +96,6 @@ def example_test_win64(backend, dev) {
 def tutorial_test_linux(backend) {
   init_git()
   unpack_lib("dgl-cpu-linux", dgl_linux_libs)
-  activate_conda_env(backend)
   timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
   }
