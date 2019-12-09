@@ -26,11 +26,11 @@ conda activate ${DGLBACKEND}-ci
 export LD_LIBRARY_PATH_OLD=$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 pip install pytest
-python3 -m pytest tests/compute
-python3 -m pytest tests/graph_index 
-python3 -m pytest tests/$DGLBACKEND 
+python3 -m pytest tests/compute || fail "compute"
+python3 -m pytest tests/graph_index || fail "graph_index"
+python3 -m pytest tests/$DGLBACKEND || fail "backend-specific"
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
-    python3 -m pytest tests/distributed
+    python3 -m pytest tests/distributed || fail "distributed"
 fi
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH_OLD
