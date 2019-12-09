@@ -50,25 +50,26 @@ class ACNNPredictor(nn.Module):
         protein_feats = self.project(protein_conv_out)
         complex_feats = self.project(complex_conv_out)
 
-        ligand_energy = self.sum_nodes(ligand_graph.batch_size,
-                                       ligand_graph.batch_num_nodes,
-                                       ligand_feats)
-        protein_energy = self.sum_nodes(protein_graph.batch_size,
-                                        protein_graph.batch_num_nodes,
-                                        protein_feats)
+        ligand_energy = self.sum_nodes(
+            ligand_graph.batch_size,
+            ligand_graph.batch_num_nodes,
+            ligand_feats)
+        protein_energy = self.sum_nodes(
+            protein_graph.batch_size,
+            protein_graph.batch_num_nodes,
+            protein_feats)
 
-        with complex_graph.local_scope():
-            complex_graph.ndata['h'] = complex_feats
-            hetero_complex_graph = to_hetero(
-                complex_graph, ntypes=complex_graph.original_ntypes,
-                etypes=complex_graph.original_etypes)
-            complex_energy_ligand = self.sum_nodes(
-                complex_graph.batch_size, complex_graph.batch_num_ligand_nodes,
-                hetero_complex_graph.nodes['ligand_atom'].data['h'])
-            complex_energy_protein = self.sum_nodes(
-                complex_graph.batch_size, complex_graph.batch_num_protein_nodes,
-                hetero_complex_graph.nodes['protein_atom'].data['h'])
-            complex_energy = complex_energy_ligand + complex_energy_protein
+        batch_num_nodes = {
+            'ligand_atom': ligand_graph.batch_num_nodes,
+            'protein_atom': protein_graph.batch_num_nodes
+        }
+        complex_energy_ = self.sum_nodes(
+            complex_graph.batch_size * 2,
+            list(itertools.chain.from_iterable(
+                [batch_num_nodes[nty] for nty in complex_graph.original_ntypes])),
+            complex_conv_out)
+        complex_energy = complex_energy_[:complex_graph.batch_size] + \
+                         complex_energy_[complex_graph.batch_size:]
 
         return complex_energy - (ligand_energy + protein_energy)
 
@@ -124,7 +125,6 @@ class ACNN(nn.Module):
         # Todo (Mufei): remove the four lines below after better built-in support
         complex_graph.batch_size = graph.batch_size
         complex_graph.original_ntypes = graph.ntypes
-        complex_graph.original_etypes = graph.etypes
         complex_graph.batch_num_protein_nodes = graph.batch_num_nodes('protein_atom')
         complex_graph.batch_num_ligand_nodes = graph.batch_num_nodes('ligand_atom')
 
