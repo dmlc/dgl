@@ -799,14 +799,12 @@ class WeightedEdgeSampler(object):
         if shuffle:
             self._seed_edges = F.rand_shuffle(self._seed_edges)
         self._seed_edges = utils.toindex(self._seed_edges)
-        edge_weight = edge_weight[self._seed_edges]
-        self._edge_weight = edge_weight.todgltensor()
-
+        self._edge_weight = F.zerocopy_to_dgl_ndarray(edge_weight[self._seed_edges])
 
         if node_weight is None:
-            self._node_weight = F.arange(0, 0)
+            self._node_weight = empty((0,), 'float32')
         else:
-            self._node_weight = node_weight.todgltensor()
+            self._node_weight = F.zerocopy_to_dgl_ndarray(node_weight)
 
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
@@ -820,15 +818,15 @@ class WeightedEdgeSampler(object):
         self._sampler = _CAPI_CreateWeightedEdgeSampler(
             self.g._graph,
             self._seed_edges.todgltensor(),
-            self._edge_weight.todgltensor(),
-            self._node_weight.todgltensor(),
+            self._edge_weight,
+            self._node_weight,
             self._batch_size,       # batch size
             self._num_workers,      # num batches
             self._negative_mode,
             self._neg_sample_size,
             self._exclude_positive,
             self._return_false_neg,
-            self._relations);
+            self._relations)
 
     def fetch(self, current_index):
         '''

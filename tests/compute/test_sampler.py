@@ -306,8 +306,11 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
 
 def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
-    etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
-    edge_weight = F.tensor(np.full((g.number_of_edges(),), 1, dtype=np.float32))
+    num_edges = g.number_of_edges()
+    num_nodes = g.number_of_nodes()
+    etype = np.random.randint(0, 10, size=num_edges, dtype=np.int64)
+    edge_weight = F.tensor(np.full((num_edges,), 1, dtype=np.float32))
+    edge_weight[0] = F.sum(edge_weight, dim=0)
     g.edata['etype'] = F.tensor(etype)
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
@@ -319,7 +322,11 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 
     WeightedEdgeSampler = getattr(dgl.contrib.sampling, 'WeightedEdgeSampler')
     # Test the homogeneous graph.
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, 50,
+    batch_size = 50
+    total_samples = 0
+    max_samples = num_edges
+    edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
+    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
                                                     edge_weight=edge_weight,
                                                     negative_mode=mode,
                                                     neg_sample_size=neg_size,
@@ -329,7 +336,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
                            F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
                                                 pos_edges.parent_nid[pos_ldst])))
-
+        np.add.at(edge_sampled, pos_edges.parent_eid[pos_leid], 1)
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
 
         neg_src = neg_edges.parent_nid[neg_lsrc]
@@ -354,9 +361,18 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
+        total_samples += batch_size
+        if (total_samples >= max_samples):
+            break
+    # Check rate here
+    print(edge_sampled.sum())
+    print(edge_sampled[0])
 
-    # Test the knowledge graph.
-    for _, neg_edges in WeightedEdgeSampler(g, 50,
+    # Test the knowledge graph with edge weight provied.
+    batch_size = 50
+    total_samples = 0
+    max_samples = num_edges
+    for pos_edges, neg_edges in WeightedEdgeSampler(g, 50,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -376,6 +392,42 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
+        total_samples += batch_size
+        if (total_samples >= max_samples):
+            break
+    # Check rate here
+
+    # Test the knowledge graph with edge/node weight provied.
+    batch_size = 50
+    total_samples = 0
+    max_samples = num_edges
+    node_weight = F.tensor(np.full((num_nodes,), 1, dtype=np.float32))
+    node_weight[0] = F.sum(node_weight, dim=0)
+    for pos_edges, neg_edges in WeightedEdgeSampler(g, 50,
+                                            edge_weight=edge_weight,
+                                            node_weight=node_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            relations=g.edata['etype'],
+                                            return_false_neg=True):
+        neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
+        exists = neg_edges.edata['false_neg']
+        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        for i in range(len(neg_eid)):
+            u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
+            if g.has_edge_between(u, v):
+                eid = g.edge_id(u, v)
+                etype = g.edata['etype'][eid]
+                exist = neg_edges.edata['etype'][i] == etype
+                assert F.asnumpy(exists[i]) == F.asnumpy(exist)
+        total_samples += batch_size
+        if (total_samples >= max_samples):
+            break
+    # Check rate here
 
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
@@ -389,12 +441,12 @@ def test_negative_sampler():
 
 
 if __name__ == '__main__':
-    test_create_full()
-    test_1neighbor_sampler_all()
-    test_10neighbor_sampler_all()
-    test_1neighbor_sampler()
-    test_10neighbor_sampler()
-    test_layer_sampler()
-    test_nonuniform_neighbor_sampler()
-    test_setseed()
+    #test_create_full()
+    #test_1neighbor_sampler_all()
+    #test_10neighbor_sampler_all()
+    #test_1neighbor_sampler()
+    #test_10neighbor_sampler()
+    #test_layer_sampler()
+    #test_nonuniform_neighbor_sampler()
+    #test_setseed()
     test_negative_sampler()

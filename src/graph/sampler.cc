@@ -30,16 +30,16 @@ class ArrayHeap {
   explicit ArrayHeap(const std::vector<ValueType>& prob) {
     vec_size_ = prob.size();
     bit_len_ = ceil(log2(vec_size_));
-    limit_ = static_cast<size_t>(1) << bit_len_;
+    limit_ = 1L << bit_len_;
     // allocate twice the size
     heap_.resize(limit_ << 1, 0);
     // allocate the leaves
-    for (size_t i = limit_; i < vec_size_+limit_; ++i) {
+    for (int64_t i = limit_; i < vec_size_+limit_; ++i) {
       heap_[i] = prob[i-limit_];
     }
     // iterate up the tree (this is O(m))
-    for (size_t i = bit_len_-1; i >= 0; --i) {
-      for (size_t j = (1 << i); j < (1 << (i + 1)); ++j) {
+    for (int64_t i = bit_len_-1; i >= 0; --i) {
+      for (int64_t j = (1 << i); j < (1 << (i + 1)); ++j) {
         heap_[j] = heap_[j << 1] + heap_[(j << 1) + 1];
       }
     }
@@ -49,10 +49,10 @@ class ArrayHeap {
   /*
    * Remove term from index (this costs O(log m) steps)
    */
-  void Delete(size_t index) {
-    size_t i = index + limit_;
+  void Delete(int64_t index) {
+    int64_t i = index + limit_;
     ValueType w = heap_[i];
-    for (size_t j = bit_len_; j >= 0; --j) {
+    for (int64_t j = bit_len_; j >= 0; --j) {
       heap_[i] -= w;
       i = i >> 1;
     }
@@ -61,9 +61,9 @@ class ArrayHeap {
   /*
    * Add value w to index (this costs O(log m) steps)
    */
-  void Add(size_t index, ValueType w) {
-    size_t i = index + limit_;
-    for (size_t j = bit_len_; j >= 0; --j) {
+  void Add(int64_t index, ValueType w) {
+    int64_t i = index + limit_;
+    for (int64_t j = bit_len_; j >= 0; --j) {
       heap_[i] += w;
       i = i >> 1;
     }
@@ -74,7 +74,7 @@ class ArrayHeap {
    */
   size_t Sample() {
     ValueType xi = heap_[1] * RandomEngine::ThreadLocal()->Uniform<float>();
-    size_t i = 1;
+    int64_t i = 1;
     while (i < limit_) {
       i = i << 1;
       if (xi >= heap_[i]) {
@@ -88,18 +88,18 @@ class ArrayHeap {
   /*
    * Sample a vector by given the size n
    */
-  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
+  void SampleWithoutReplacement(int64_t n, std::vector<size_t>* samples) {
     // sample n elements
-    for (size_t i = 0; i < n; ++i) {
+    for (int64_t i = 0; i < n; ++i) {
       samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
   }
 
  private:
-  size_t vec_size_;  // sample size
-  size_t bit_len_;   // bit size
-  size_t limit_;
+  int64_t vec_size_;  // sample size
+  int64_t bit_len_;   // bit size
+  int64_t limit_;
   std::vector<ValueType> heap_;
 };
 
@@ -1405,8 +1405,8 @@ class WeightedEdgeSamplerObject: public Object {
 public:
   explicit WeightedEdgeSamplerObject(const GraphPtr gptr,
                                      IdArray seed_edges,
-                                     IdArray edge_weight,
-                                     IdArray node_weight,
+                                     NDArray edge_weight,
+                                     NDArray node_weight,
                                      const int64_t batch_size,
                                      const int64_t num_workers,
                                      const std::string neg_mode,
@@ -1456,10 +1456,11 @@ public:
 #pragma omp parallel for
     for (int i = 0; i < num_workers_; i++) {
       const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
-      std::vector<int> edge_ids(batch_size_);
+      std::vector<int64_t> edge_ids(batch_size_);
 
       for (int i = 0; i < batch_size_; ++i) {
-        edge_ids[i] = seed_edge_ids[edge_selector_->Sample()];
+        int64_t edge_id = edge_selector_->Sample();
+        edge_ids[i] = seed_edge_ids[edge_id];
       }
       auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
 
@@ -1492,7 +1493,6 @@ public:
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
-
     return positive_subgs;
   }
 
@@ -1909,8 +1909,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     // arguments
     GraphRef g = args[0];
     IdArray seed_edges = args[1];
-    IdArray edge_weight = args[2];
-    IdArray node_weight = args[3];
+    NDArray edge_weight = args[2];
+    NDArray node_weight = args[3];
     const int64_t batch_size = args[4];
     const int64_t max_num_workers = args[5];
     const std::string neg_mode = args[6];
@@ -1922,8 +1922,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
-    CHECK(aten::IsValidIdArray(edge_weight));
-    CHECK(aten::IsValidIdArray(node_weight));
     CHECK(edge_weight->dtype.code == kDLFloat) << "edge_weight should be FloatType";
     CHECK(edge_weight->dtype.bits == 32) << "WeightedEdgeSampler only support edge weight with 32 bit precision";
     if (node_weight->shape[0] > 0) {
