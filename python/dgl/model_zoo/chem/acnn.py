@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from ... import to_hetero
 from ... import backend
 from ...nn.pytorch import AtomicConv
 
@@ -67,7 +66,7 @@ class ACNNPredictor(nn.Module):
             complex_graph.batch_size * 2,
             list(itertools.chain.from_iterable(
                 [batch_num_nodes[nty] for nty in complex_graph.original_ntypes])),
-            complex_conv_out)
+            complex_feats)
         complex_energy = complex_energy_[:complex_graph.batch_size] + \
                          complex_energy_[complex_graph.batch_size:]
 
