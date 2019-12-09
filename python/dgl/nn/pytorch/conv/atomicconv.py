@@ -47,6 +47,10 @@ class RadialPooling(nn.Module):
         # the practice of DeepChem.
         return rbf_kernel_results * cutoff_values
 
+def msg_func(edges):
+    return {'m': th.einsum(
+        'ij,ik->ijk', edges.src['hv'], edges.data['he']).view(len(edges), -1)}
+
 class AtomicConv(nn.Module):
     r"""Atomic Convolution Layer from paper `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
@@ -141,11 +145,11 @@ class AtomicConv(nn.Module):
             feat = flattened_feat
         else:
             feat = feat
-        # (V, d_in * len(self.features_to_use), 1)
-        graph.ndata['hv'] = feat.unsqueeze(-1)
+        # (V, len(self.features_to_use))
+        graph.ndata['hv'] = feat
         # (E, K)
         graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1)
-        graph.update_all(fn.src_mul_edge('hv', 'he', 'm'), fn.sum('m', 'hv_new'))
+        graph.update_all(msg_func, fn.sum('m', 'hv_new'))
 
         # (V, K * len(self.features_to_use))
         return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)

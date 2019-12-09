@@ -7,39 +7,24 @@ from ... import to_hetero
 from ... import backend
 from ...nn.pytorch import AtomicConv
 
-def truncated_normal_(tensor, mean=0., std=1.):
-    shape = tensor.shape
-    tmp = tensor.new_empty(shape + (4,)).normal_()
-    valid = (tmp < 2) & (tmp > -2)
-    ind = valid.max(-1, keepdim=True)[1]
-    tensor.data.copy_(tmp.gather(-1, ind).squeeze(-1))
-    tensor.data.mul_(std).add_(mean)
-
 class ACNNPredictor(nn.Module):
     """"""
-    def __init__(self, in_size, hidden_sizes, weight_init_stddevs,
-                 dropouts, features_to_use, num_tasks):
+    def __init__(self, in_size, hidden_sizes, dropouts, features_to_use, num_tasks):
         super(ACNNPredictor, self).__init__()
 
         if type(features_to_use) != type(None):
             in_size *= len(features_to_use)
 
-        self.project = self._build_projector(in_size, hidden_sizes,
-                                             weight_init_stddevs, dropouts, num_tasks)
+        self.project = self._build_projector(in_size, hidden_sizes, dropouts, num_tasks)
 
-    def _build_projector(self, in_size, hidden_sizes,
-                         weight_init_stddevs, dropouts, num_tasks):
+    def _build_projector(self, in_size, hidden_sizes, dropouts, num_tasks):
         modules = []
         for i, h in enumerate(hidden_sizes):
-            linear_layer = nn.Linear(in_size, h)
-            truncated_normal_(linear_layer.weight, std=weight_init_stddevs[i])
-            modules.append(linear_layer)
+            modules.append(nn.Linear(in_size, h))
             modules.append(nn.ReLU())
             modules.append(nn.Dropout(dropouts[i]))
             in_size = h
-        linear_layer = nn.Linear(in_size, num_tasks)
-        truncated_normal_(linear_layer.weight, std=weight_init_stddevs[-1])
-        modules.append(linear_layer)
+        modules.append(nn.Linear(in_size, num_tasks))
 
         return nn.Sequential(*modules)
 
@@ -89,8 +74,7 @@ class ACNNPredictor(nn.Module):
 
 class ACNN(nn.Module):
     """"""
-    def __init__(self, hidden_sizes, weight_init_stddevs, dropouts,
-                 features_to_use=None, radial=None, num_tasks=1):
+    def __init__(self, hidden_sizes, dropouts, features_to_use=None, radial=None, num_tasks=1):
         super(ACNN, self).__init__()
 
         if radial is None:
@@ -108,7 +92,7 @@ class ACNN(nn.Module):
                                        rbf_kernel_scaling, features_to_use)
         self.complex_conv = AtomicConv(interaction_cutoffs, rbf_kernel_means,
                                        rbf_kernel_scaling, features_to_use)
-        self.predictor = ACNNPredictor(radial_params.shape[0], hidden_sizes, weight_init_stddevs,
+        self.predictor = ACNNPredictor(radial_params.shape[0], hidden_sizes,
                                        dropouts, features_to_use, num_tasks)
 
     def forward(self, graph):
