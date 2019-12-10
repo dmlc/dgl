@@ -189,8 +189,8 @@ def train(args):
                 if tail_in_edges.shape[0] > 0:
                     tail_subgraphs[t] = tail_in_edges
 
-            head_subgraph = enc_graph.edge_subgraph(head_subgraphs)
-            tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs)
+            head_subgraph = enc_graph.edge_subgraph(head_subgraphs, preserve_nodes=True)
+            tail_subgraph = enc_graph.edge_subgraph(tail_subgraphs, preserve_nodes=True)
             edge_ids = edge_ids.as_in_context(args.ctx)
             true_relation_ratings = train_truths[edge_ids]
             true_relation_labels = train_labels[edge_ids]

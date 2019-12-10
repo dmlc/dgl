@@ -326,15 +326,17 @@ class BinaryReduce(th.autograd.Function):
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
                               rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-                              out_data_nd, feat_shape, degs)
+                              feat_shape, degs)
+        ctx.save_for_backward(out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-            lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape, degs \
+            lhs_data_nd, rhs_data_nd, feat_shape, degs \
             = ctx.backward_cache
-        ctx.backward_cache = None
+        out_data, = ctx.saved_variables
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_lhs = None
         grad_rhs = None
         if reducer == 'mean':
@@ -387,14 +389,16 @@ class CopyReduce(th.autograd.Function):
             degs = None
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, out_data_nd, degs)
+                              in_data_nd, degs)
+        ctx.save_for_backward(out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd, degs \
+        reducer, graph, target, in_map, out_map, in_data_nd, degs \
             = ctx.backward_cache
-        ctx.backward_cache = None
+        out_data, = ctx.saved_variables
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_in = None
         if reducer == 'mean':
             grad_out = grad_out / degs

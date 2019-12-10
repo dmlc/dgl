@@ -1,21 +1,29 @@
 """
 .. _model-transformer:
 
-Transformer Tutorial
+Transformer tutorial
 ====================
 
 **Author**: Zihao Ye, Jinjing Zhou, Qipeng Guo, Quan Gan, Zheng Zhang
 """
 ################################################################################################
+# In this tutorial, you learn about a simplified implementation of the Transformer model.
+# You can see highlights of the most important design points. For instance, there is
+# only single-head attention. The complete code can be found
+# `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__.
+#
+# The overall structure is similar to the one from the research papaer `Annotated
+# Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__.
+#
 # The Transformer model, as a replacement of CNN/RNN architecture for
-# sequence modeling, was introduced in Google’s paper: `Attention is All
+# sequence modeling, was introduced in the research paper: `Attention is All
 # You Need <https://arxiv.org/pdf/1706.03762.pdf>`__. It improved the
 # state of the art for machine translation as well as natural language
 # inference task
 # (`GPT <https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf>`__).
 # Recent work on pre-training Transformer with large scale corpus
 # (`BERT <https://arxiv.org/pdf/1810.04805.pdf>`__) supports that it is
-# capable of learning high quality semantic representation.
+# capable of learning high-quality semantic representation.
 #
 # The interesting part of Transformer is its extensive employment of
 # attention. The classic use of attention comes from machine translation
@@ -27,10 +35,10 @@ Transformer Tutorial
 # different from RNN-based model, where words (in the source sentence) are
 # combined along the chain, which is thought to be too constrained.
 #
-# Attention Layer of Transformer
+# Attention layer of Transformer
 # ------------------------------
 #
-# In Attention Layer of Transformer, for each node the module learns to
+# In the attention layer of Transformer, for each node the module learns to
 # assign weights on its in-coming edges. For node pair :math:`(i, j)`
 # (from :math:`i` to :math:`j`) with node
 # :math:`x_i, x_j \in \mathbb{R}^n`, the score of their connection is
@@ -56,7 +64,7 @@ Transformer Tutorial
 #
 # The score is then used to compute the sum of the incoming values,
 # normalized over the weights of edges, stored in :math:`\textrm{wv}`.
-# Then we apply an affine layer to :math:`\textrm{wv}` to get the output
+# Then apply an affine layer to :math:`\textrm{wv}` to get the output
 # :math:`o`:
 #
 # .. math::
@@ -66,11 +74,11 @@ Transformer Tutorial
 #    \textrm{wv}_i = \sum_{(k, i)\in E} w_{ki} v_k \\
 #    o = W_o\cdot \textrm{wv} \\
 #
-# Multi-Head Attention Layer
+# Multi-head attention layer
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # In Transformer, attention is *multi-headed*. A head is very much like a
-# channel in a convolutional network. The Multi-Head Attention consist of
+# channel in a convolutional network. The multi-head attention consists of
 # multiple attention heads, in which each head refers to a single
 # attention module. :math:`\textrm{wv}^{(i)}` for all the heads are
 # concatenated and mapped to output :math:`o` with an affine layer:
@@ -80,8 +88,8 @@ Transformer Tutorial
 #
 #    o = W_o \cdot \textrm{concat}\left(\left[\textrm{wv}^{(0)}, \textrm{wv}^{(1)}, \cdots, \textrm{wv}^{(h)}\right]\right)
 #
-# The code below wraps necessary components for Multi-Head Attention, and
-# provide two interfaces:
+# The code below wraps necessary components for multi-head attention, and
+# provides two interfaces.
 #
 # -  ``get`` maps state ‘x’, to query, key and value, which is required by
 #    following steps(\ ``propagate_attention``).
@@ -117,24 +125,18 @@ Transformer Tutorial
 #            batch_size = x.shape[0]
 #            return self.linears[3](x.view(batch_size, -1))
 #
-# In this tutorial, we show a simplified version of the implementation in
-# order to highlight the most important design points (for instance we
-# only show single-head attention); the complete code can be found
-# `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__.
-# The overall structure is similar to the one from `The Annotated
-# Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__.
 #
-# How DGL Implements Transformer with a Graph Neural Network
+# How DGL implements Transformer with a graph neural network
 # ----------------------------------------------------------
 #
-# We offer a different perspective of Transformer by treating the
+# You get a different perspective of Transformer by treating the
 # attention as edges in a graph and adopt message passing on the edges to
 # induce the appropriate processing.
 #
-# Graph Structure
+# Graph structure
 # ~~~~~~~~~~~~~~~
 #
-# We construct the graph by mapping tokens of the source and target
+# Construct the graph by mapping tokens of the source and target
 # sentence to nodes. The complete Transformer graph is made up of three
 # subgraphs:   
 # 
@@ -151,17 +153,17 @@ Transformer Tutorial
 #
 # The full picture looks like this: |image3|
 #
-# We pre-build the graphs in dataset preparation stage.
+# Pre-build the graphs in dataset preparation stage.
 #
-# Message Passing
+# Message passing
 # ~~~~~~~~~~~~~~~
 #
-# Once we defined the graph structure, we can move on to defining the
+# Once you define the graph structure, move on to defining the
 # computation for message passing.
 #
-# Assuming that we have already computed all the queries :math:`q_i`, keys
+# Assuming that you have already computed all the queries :math:`q_i`, keys
 # :math:`k_i` and values :math:`v_i`. For each node :math:`i` (no matter
-# whether it is a source token or target token), we can decompose the
+# whether it is a source token or target token), you can decompose the
 # attention computation into two steps:
 #
 # 1. **Message computation:** Compute attention score
@@ -173,10 +175,10 @@ Transformer Tutorial
 # 2. **Message aggregation:** Aggregate the values :math:`v_j` from all
 #    :math:`j` according to the scores :math:`\mathrm{score}_{ij}`.
 #
-# Naive Implementation
+# Simple implementation
 # ^^^^^^^^^^^^^^^^^^^^
 #
-# Message Computation
+# Message computation
 # '''''''''''''''''''
 #
 # Compute ``score`` and send source node’s ``v`` to destination’s mailbox
@@ -188,7 +190,7 @@ Transformer Tutorial
 #                          .sum(-1, keepdim=True)),
 #                'v': edges.src['v']}
 #
-# Message Aggregation
+# Message aggregation
 # '''''''''''''''''''
 #
 # Normalize over all in-edges and weighted sum to get output
@@ -215,8 +217,8 @@ Transformer Tutorial
 # Speeding up with built-in functions
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# To speed up the message passing process, we utilize DGL’s builtin
-# function, including:
+# To speed up the message passing process, use DGL’s built-in
+# functions, including:
 #
 # - ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
 #   source’s attribute and edges attribute, and send the result to the
@@ -226,10 +228,10 @@ Transformer Tutorial
 # - ``fn.sum(edges_field, out_field)`` sums up
 #   edge’s attribute and sends aggregation to destination node’s mailbox.
 #
-# Here we assemble those built-in function into ``propagate_attention``,
-# which is also the main graph operation function in our final
-# implementation. To accelerate, we break the ``softmax`` operation into
-# the following steps. Recall that for each head there are two phases:
+# Here, you assemble those built-in functions into ``propagate_attention``,
+# which is also the main graph operation function in the final
+# implementation. To accelerate it, break the ``softmax`` operation into
+# the following steps. Recall that for each head there are two phases.
 #
 # 1. Compute attention score by multiply src node’s ``k`` and dst node’s
 #    ``q``
@@ -284,7 +286,7 @@ Transformer Tutorial
 #                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
 #                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 #
-# Preprocessing and Postprocessing
+# Preprocessing and postprocessing
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # In Transformer, data needs to be pre- and post-processed before and
@@ -390,12 +392,12 @@ Transformer Tutorial
 # .. note::
 #
 #    The sublayer connection part is little bit different from the
-#    original paper. However our implementation is the same as `The Annotated
+#    original paper. However, this implementation is the same as `The Annotated
 #    Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__
 #    and
 #    `OpenNMT <https://github.com/OpenNMT/OpenNMT-py/blob/cd29c1dbfb35f4a2701ff52a1bf4e5bdcf02802e/onmt/encoders/transformer.py>`__.
 #
-# Main class of Transformer Graph
+# Main class of Transformer graph
 # -------------------------------
 #
 # The processing flow of Transformer can be seen as a 2-stage
@@ -470,32 +472,31 @@ Transformer Tutorial
 #
 # .. note::
 #
-#    By calling ``update_graph`` function, we can “DIY our own
-#    Transformer” on any subgraphs with nearly the same code. This
+#    By calling ``update_graph`` function, you can create your own
+#    Transformer on any subgraphs with nearly the same code. This
 #    flexibility enables us to discover new, sparse structures (c.f. local attention
-#    mentioned `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in our
-#    implementation we does not use mask or padding, which makes the logic
+#    mentioned `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in this
+#    implementation you don't use mask or padding, which makes the logic
 #    more clear and saves memory. The trade-off is that the implementation is
-#    slower; we will improve with future DGL optimizations.
+#    slower.
 #
 # Training
 # --------
 #
 # This tutorial does not cover several other techniques such as Label
 # Smoothing and Noam Optimizations mentioned in the original paper. For
-# detailed description about these modules, we recommend you to read `The
+# detailed description about these modules, read `The
 # Annotated
 # Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__
 # written by Harvard NLP team.
 #
-# Task and the Dataset
+# Task and the dataset
 # ~~~~~~~~~~~~~~~~~~~~
 #
-# The Transformer is a general framework for a variety of NLP tasks. In
-# this tutorial we only focus on the sequence to sequence learning: it’s a
-# typical case to illustrate how it works.
+# The Transformer is a general framework for a variety of NLP tasks. This tutorial focuses 
+# on the sequence to sequence learning: it’s a typical case to illustrate how it works.
 #
-# As for the dataset, we provide two toy tasks: copy and sort, together
+# As for the dataset, there are two example tasks: copy and sort, together
 # with two real-world translation tasks: multi30k en-de task and wmt14
 # en-de task.
 #
@@ -509,18 +510,17 @@ Transformer Tutorial
 #    (Train/Valid/Test: 4500966/3000/3003)
 #
 # .. note::
-#    We are working on training with wmt14, which requires
-#    Multi-GPU support(this would be fixed soon).
+#    Training with wmt14 requires multi-GPU support and is not available. Contributions are welcome!
 #
-# Graph Building
+# Graph building
 # ~~~~~~~~~~~~~~
 #
-# **Batching** Just like how we handle Tree-LSTM. We build a graph pool in
+# **Batching** This is similar to the way you handle Tree-LSTM. Build a graph pool in
 # advance, including all possible combination of input lengths and output
-# lengths. Then for each sample in a batch, we call ``dgl.batch`` to batch
+# lengths. Then for each sample in a batch, call ``dgl.batch`` to batch
 # graphs of their sizes together in to a single large graph.
 #
-# We have wrapped the process of creating graph pool and building
+# You can wrap the process of creating graph pool and building
 # BatchedGraph in ``dataset.GraphPool`` and
 # ``dataset.TranslationDataset``.
 #
@@ -572,13 +572,12 @@ Transformer Tutorial
 # Put it all together
 # -------------------
 #
-# We train a one-head transformer with one layer, 128 dimension on copy
-# task. Other parameters are set to default.
+# Train a one-head transformer with one layer, 128 dimension on copy
+# task. Set other parameters to the default.
 #
-# Note that we do not involve inference module in this tutorial (which
-# requires beam search), please refer to the `Github
-# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__
-# for full implementation.
+# Inference module is not included in this tutorial. It
+# requires beam search. For a full implementation, see the `GitHub
+# repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__.
 #
 # .. code:: python
 #
@@ -638,8 +637,8 @@ Transformer Tutorial
 # Visualization
 # -------------
 #
-# After training, we can visualize the attention our Transformer generates
-# on copy task:
+# After training, you can visualize the attention that the Transformer generates
+# on copy task.
 #
 # .. code:: python
 #
@@ -648,11 +647,11 @@ Transformer Tutorial
 #    # visualize head 0 of encoder-decoder attention
 #    att_animation(att_maps, 'e2d', src_seq, tgt_seq, 0)
 #
-# |image5| from the figure we see the decoder nodes gradually learns to
+# |image5| from the figure you see the decoder nodes gradually learns to
 # attend to corresponding nodes in input sequence, which is the expected
 # behavior.
 #
-# Multi-Head Attention
+# Multi-head attention
 # ~~~~~~~~~~~~~~~~~~~~
 #
 # Besides the attention of a one-head attention trained on toy task. We
@@ -660,9 +659,8 @@ Transformer Tutorial
 # Decoder’s Self Attention and the Encoder-Decoder attention of an
 # one-Layer Transformer network trained on multi-30k dataset.
 #
-# From the visualization we observe the diversity of different heads
-# (which is what we expected: different heads learn different relations
-# between word pairs):
+# From the visualization you see the diversity of different heads, which is what you would
+# expect. Different heads learn different relations between word pairs.
 #
 # -  **Encoder Self-Attention** |image6|
 #
@@ -677,8 +675,8 @@ Transformer Tutorial
 # Adaptive Universal Transformer
 # ------------------------------
 #
-# A recent paper by Google: `Universal
-# Transformer <https://arxiv.org/pdf/1807.03819.pdf>`__ is an example to
+# A recent research paper by Google, `Universal
+# Transformer <https://arxiv.org/pdf/1807.03819.pdf>`__, is an example to
 # show how ``update_graph`` adapts to more complex updating rules.
 #
 # The Universal Transformer was proposed to address the problem that
@@ -696,10 +694,10 @@ Transformer Tutorial
 # (ACT) <https://arxiv.org/pdf/1603.08983.pdf>`__ mechanism to allow the
 # model to dynamically adjust the number of times the representation of
 # each position in a sequence is revised (refereed to as **step**
-# hereinafter). This model is also known as the Adaptive Universal
-# Transformer(referred to as AUT hereinafter).
+# hereafter). This model is also known as the Adaptive Universal
+# Transformer (AUT).
 #
-# In AUT, we maintain an “active nodes” list. In each step :math:`t`, we
+# In AUT, you maintain an active nodes list. In each step :math:`t`, we
 # compute a halting probability: :math:`h (0<h<1)` for all nodes in this
 # list by:
 #
@@ -718,7 +716,7 @@ Transformer Tutorial
 #
 # .. math::  s_i = \sum_{t=1}^{T} h_i^t\cdot x_i^t
 #
-# In DGL, the algorithm is easy to implement, we just need to call
+# In DGL, implement an algorithm by calling
 # ``update_graph`` on nodes that are still active and edges associated
 # with this nodes. The following code shows the Universal Transformer
 # class in DGL:
@@ -839,7 +837,7 @@ Transformer Tutorial
 #
 #            return self.generator(g.ndata['x'][nids['dec']]), act_loss * self.act_loss_weight
 #
-# Here we call ``filter_nodes`` and ``filter_edge`` to find nodes/edges
+# Call ``filter_nodes`` and ``filter_edge`` to find nodes/edges
 # that are still active:
 #
 # .. note::
@@ -851,15 +849,15 @@ Transformer Tutorial
 #      and an edge ID list/tensor as input, then returns a tensor of edge IDs
 #      that satisfy the given predicate.
 #
-# for the full implementation, please refer to our `Github
-# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
+# For the full implementation, see the `GitHub
+# repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
 #
 # The figure below shows the effect of Adaptive Computational
-# Time(different positions of a sentence were revised different times):
+# Time. Different positions of a sentence were revised different times.
 #
 # |image9|
 #
-# We also visualize the dynamics of step distribution on nodes during the
+# You can also visualize the dynamics of step distribution on nodes during the
 # training of AUT on sort task(reach 99.7% accuracy), which demonstrates
 # how AUT learns to reduce recurrence steps during training. |image10|
 #
@@ -876,7 +874,7 @@ Transformer Tutorial
 # .. |image10| image:: https://s1.ax1x.com/2018/12/06/F1r8Cq.gif
 #
 # .. note::
-#     We apologize that this notebook itself is not runnable due to many dependencies,
-#     please download the `7_transformer.py <https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/7_transformer.py>`__, 
+#     The notebook itself is not executable due to many dependencies.
+#     Download `7_transformer.py <https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/7_transformer.py>`__, 
 #     and copy the python script to directory ``examples/pytorch/transformer`` 
 #     then run ``python 7_transformer.py`` to see how it works.
