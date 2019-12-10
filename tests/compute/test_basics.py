@@ -48,7 +48,6 @@ def generate_graph(grad=False):
     return g
 
 def test_batch_setter_getter():
-    assert False
     def _pfc(x):
         return list(F.zerocopy_to_numpy(x)[:,0])
     g = generate_graph()

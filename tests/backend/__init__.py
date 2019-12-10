@@ -17,11 +17,6 @@ for api in backend_unittest.__dict__.keys():
         # Tensor APIs used in unit tests MUST be supported across all backends
         globals()[api] = mod.__dict__[api]
 
-from signal import signal, SIGSEGV
-def handler(sigNum, frame):
-  print("handle signal", sigNum)
-
-signal(SIGSEGV, handler)
 
 # Tensor creation with default dtype and context
 
