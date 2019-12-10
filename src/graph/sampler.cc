@@ -30,16 +30,16 @@ class ArrayHeap {
   explicit ArrayHeap(const std::vector<ValueType>& prob) {
     vec_size_ = prob.size();
     bit_len_ = ceil(log2(vec_size_));
-    limit_ = 1L << bit_len_;
+    limit_ = 1UL << bit_len_;
     // allocate twice the size
     heap_.resize(limit_ << 1, 0);
     // allocate the leaves
-    for (int64_t i = limit_; i < vec_size_+limit_; ++i) {
+    for (size_t i = limit_; i < vec_size_+limit_; ++i) {
       heap_[i] = prob[i-limit_];
     }
     // iterate up the tree (this is O(m))
-    for (int64_t i = bit_len_-1; i >= 0; --i) {
-      for (int64_t j = (1 << i); j < (1 << (i + 1)); ++j) {
+    for (int i = bit_len_-1; i >= 0; --i) {
+      for (size_t j = (1UL << i); j < (1UL << (i + 1)); ++j) {
         heap_[j] = heap_[j << 1] + heap_[(j << 1) + 1];
       }
     }
@@ -49,10 +49,10 @@ class ArrayHeap {
   /*
    * Remove term from index (this costs O(log m) steps)
    */
-  void Delete(int64_t index) {
-    int64_t i = index + limit_;
+  void Delete(size_t index) {
+    size_t i = index + limit_;
     ValueType w = heap_[i];
-    for (int64_t j = bit_len_; j >= 0; --j) {
+    for (size_t j = bit_len_; j >= 0; --j) {
       heap_[i] -= w;
       i = i >> 1;
     }
@@ -61,9 +61,9 @@ class ArrayHeap {
   /*
    * Add value w to index (this costs O(log m) steps)
    */
-  void Add(int64_t index, ValueType w) {
-    int64_t i = index + limit_;
-    for (int64_t j = bit_len_; j >= 0; --j) {
+  void Add(size_t index, ValueType w) {
+    size_t i = index + limit_;
+    for (size_t j = bit_len_; j >= 0; --j) {
       heap_[i] += w;
       i = i >> 1;
     }
@@ -74,7 +74,7 @@ class ArrayHeap {
    */
   size_t Sample() {
     ValueType xi = heap_[1] * RandomEngine::ThreadLocal()->Uniform<float>();
-    int64_t i = 1;
+    size_t i = 1;
     while (i < limit_) {
       i = i << 1;
       if (xi >= heap_[i]) {
@@ -88,18 +88,18 @@ class ArrayHeap {
   /*
    * Sample a vector by given the size n
    */
-  void SampleWithoutReplacement(int64_t n, std::vector<size_t>* samples) {
+  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
     // sample n elements
-    for (int64_t i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
       samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
   }
 
  private:
-  int64_t vec_size_;  // sample size
-  int64_t bit_len_;   // bit size
-  int64_t limit_;
+  size_t vec_size_;  // sample size
+  int bit_len_;   // bit size
+  size_t limit_;
   std::vector<ValueType> heap_;
 };
 
@@ -1414,21 +1414,21 @@ public:
                                      const bool exclude_positive,
                                      const bool check_false_neg,
                                      IdArray relations) {
-    const int64_t num_edges = edge_weight->shape[0];
+    const size_t num_edges = edge_weight->shape[0];
     const ValueType *edge_prob = static_cast<const ValueType*>(edge_weight->data);
     std::vector<ValueType> eprob(num_edges);
-    for (uint64_t i = 0; i < num_edges; ++i) {
+    for (size_t i = 0; i < num_edges; ++i) {
       eprob[i] = edge_prob[i];
     }
     edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
-
-    const int64_t num_nodes = node_weight->shape[0];
+    
+    const size_t num_nodes = node_weight->shape[0];
     if (num_nodes == 0) {
       node_selector_ = nullptr;
     } else {
       const ValueType *node_prob = static_cast<const ValueType*>(node_weight->data);
       std::vector<ValueType> nprob(num_nodes);
-      for (uint64_t i = 0; i < num_nodes; ++i) {
+      for (size_t i = 0; i < num_nodes; ++i) {
         nprob[i] = node_prob[i];
       }
       node_selector_ = std::make_shared<ArrayHeap<ValueType>>(nprob);
@@ -1506,7 +1506,8 @@ protected:
         if (node_selector_ == nullptr) {
           sampled_idxs.insert(RandomEngine::ThreadLocal()->RandInt(set_size));
         } else {
-          sampled_idxs.insert(node_selector_->Sample());
+          size_t id = node_selector_->Sample();
+          sampled_idxs.insert(id);
         }
       }
 
