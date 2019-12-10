@@ -235,6 +235,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=Fals
     (tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]), tensor([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]))
 
     Check if node ids are within cardinality
+
     >>> g = dgl.bipartite(([0, 1, 2], [1, 2, 3]), card=(2, 4), validate=True)
     ...
     dgl._ffi.base.DGLError: Invalid node id 2 (should be less than cardinality 2).
