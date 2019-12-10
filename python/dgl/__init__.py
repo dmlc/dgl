@@ -5,7 +5,7 @@ import socket
 
 # Need to ensure that the backend framework is imported before load dgl libs,
 # otherwise weird cuda problem happens
-from .backend import load_backend 
+from .backend import load_backend
 
 from . import function
 from . import nn
