@@ -18,6 +18,16 @@ namespace aten {
   }                                                             \
 } while (0)
 
+#define ATEN_XPU_SELECT(val, XPU, ...) do {                     \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    constexpr auto XPU = kDLGPU;                                \
+    {__VA_ARGS__}                                               \
+  }                                                             \
+} while (0)
+
 #define ATEN_ID_TYPE_SWITCH(val, IdType, ...) do {            \
   CHECK_EQ((val).code, kDLInt) << "ID must be integer type";  \
   if ((val).bits == 32) {                                     \

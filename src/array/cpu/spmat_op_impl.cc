@@ -82,8 +82,8 @@ inline bool CSRHasData(CSRMatrix csr) {
   return csr.data.defined();
 }
 
-inline bool COOHasData(COOMatrix csr) {
-  return csr.data.defined();
+inline bool COOHasData(COOMatrix coo) {
+  return coo.data.defined();
 }
 }  // namespace
 
@@ -451,19 +451,36 @@ template CSRMatrix CSRTranspose<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOO(CSRMatrix csr) {
   const int64_t nnz = csr.indices->shape[0];
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  const IdType* indptr_data;
+  NDArray tmp_indptr;
+  NDArray tmp_data;;
+  if (XPU == kDLGPU) {
+    CHECK(csr.indptr->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.indices->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.data->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    tmp_indptr = csr.indptr.CopyTo(DLContext{kDLCPU, 0});
+    indptr_data = static_cast<IdType*>(tmp_indptr->data);
+  } else {
+    indptr_data = static_cast<IdType*>(csr.indptr->data);
+  }
+  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
   for (IdType i = 0; i < csr.indptr->shape[0] - 1; ++i) {
     std::fill(ret_row_data + indptr_data[i],
               ret_row_data + indptr_data[i + 1],
               i);
   }
+
+  if (XPU == kDLGPU) {
+    ret_row = ret_row.CopyTo(csr.indptr->ctx);
+  }
   return COOMatrix{csr.num_rows, csr.num_cols, ret_row, csr.indices, csr.data};
 }
 
 template COOMatrix CSRToCOO<kDLCPU, int32_t>(CSRMatrix csr);
 template COOMatrix CSRToCOO<kDLCPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDLGPU, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOO<kDLGPU, int64_t>(CSRMatrix csr);
 
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType>
@@ -472,33 +489,69 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
+
+  // If csr is in GPU, copy it to CPU, generate COO and copy to GPU
+  const IdType* indptr_data;
+  const IdType* indices_data;
   // data array should have the same type as the indices arrays
-  const IdType* data = static_cast<IdType*>(csr.data->data);
-  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
-  NDArray ret_col = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
+  const IdType* data;
+  NDArray tmp_indptr;
+  NDArray tmp_indices;
+  NDArray tmp_data;
+  if (XPU == kDLGPU) {
+    CHECK(csr.indptr->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.indices->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    CHECK(csr.data->ctx.device_type == kDLGPU) << "csr should be in GPU";
+    tmp_indptr = csr.indptr.CopyTo(DLContext{kDLCPU, 0});
+    tmp_indices = csr.indices.CopyTo(DLContext{kDLCPU, 0});
+    tmp_data = csr.data.CopyTo(DLContext{kDLCPU, 0});
+
+    indptr_data = static_cast<IdType*>(tmp_indptr->data);
+    indices_data = static_cast<IdType*>(tmp_indices->data);
+    data = static_cast<IdType*>(tmp_data->data);
+  } else {
+    indptr_data = static_cast<IdType*>(csr.indptr->data);
+    indices_data = static_cast<IdType*>(csr.indices->data);
+    data = static_cast<IdType*>(csr.data->data);
+  }
+
+  NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
+  NDArray ret_col = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
+  NDArray ret_data  = NDArray::Empty({nnz}, csr.indices->dtype, DLContext{kDLCPU, 0});
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
   IdType* ret_col_data = static_cast<IdType*>(ret_col->data);
+  IdType* ret_data_data = static_cast<IdType*>(ret_data->data);
   // scatter using the indices in the data array
   for (IdType row = 0; row < N; ++row) {
     for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
       const IdType col = indices_data[j];
       ret_row_data[data[j]] = row;
       ret_col_data[data[j]] = col;
+      ret_data_data[data[j]] = data[j];
     }
   }
+
   COOMatrix coo;
   coo.num_rows = N;
   coo.num_cols = M;
-  coo.row = ret_row;
-  coo.col = ret_col;
+  if (XPU == kDLGPU) {
+    coo.row = ret_row.CopyTo(csr.indptr->ctx);
+    coo.col = ret_col.CopyTo(csr.indptr->ctx);
+    coo.data = ret_data.CopyTo(csr.indptr->ctx);
+  } else {
+    coo.row = ret_row;
+    coo.col = ret_col;
+    coo.data = ret_data;
+  }
+
   // no data array
   return coo;
 }
 
 template COOMatrix CSRToCOODataAsOrder<kDLCPU, int32_t>(CSRMatrix csr);
 template COOMatrix CSRToCOODataAsOrder<kDLCPU, int64_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDLGPU, int32_t>(CSRMatrix csr);
+template COOMatrix CSRToCOODataAsOrder<kDLGPU, int64_t>(CSRMatrix csr);
 
 ///////////////////////////// CSRSliceRows /////////////////////////////
 

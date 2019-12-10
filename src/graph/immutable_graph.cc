@@ -217,7 +217,7 @@ CSRPtr CSR::Transpose() const {
 
 COOPtr CSR::ToCOO() const {
   const auto& coo = aten::CSRToCOO(adj_, true);
-  return COOPtr(new COO(NumVertices(), coo.row, coo.col));
+  return COOPtr(new COO(NumVertices(), coo.row, coo.col, coo.data));
 }
 
 CSR CSR::CopyTo(const DLContext& ctx) const {
@@ -284,6 +284,13 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst) {
   CHECK(aten::IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
   adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst};
+}
+
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst, IdArray edge_ids) {
+  CHECK(aten::IsValidIdArray(src));
+  CHECK(aten::IsValidIdArray(dst));
+  CHECK_EQ(src->shape[0], dst->shape[0]);
+  adj_ = aten::COOMatrix{num_vertices, num_vertices, src, dst, edge_ids};
 }
 
 COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)

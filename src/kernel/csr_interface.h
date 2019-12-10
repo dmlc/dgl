@@ -24,6 +24,7 @@ class CSRWrapper {
  public:
   virtual aten::CSRMatrix GetInCSRMatrix() const = 0;
   virtual aten::CSRMatrix GetOutCSRMatrix() const = 0;
+  virtual aten::COOMatrix GetCOOMatrix() const = 0;
   virtual DGLContext Context() const = 0;
   virtual int NumBits() const = 0;
 };

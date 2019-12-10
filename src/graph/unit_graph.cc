@@ -945,7 +945,7 @@ UnitGraph::COOPtr UnitGraph::GetCOO() const {
       const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
       const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(
           meta_graph(),
-          aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
+          aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row, newadj.data});
     } else {
       CHECK(out_csr_) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);

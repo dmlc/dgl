@@ -6,7 +6,7 @@
 #ifndef DGL_KERNEL_UTILS_H_
 #define DGL_KERNEL_UTILS_H_
 
-#include <minigun/csr.h>
+#include <minigun/spmat.h>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
 
@@ -65,6 +65,19 @@ minigun::Csr<Idx> CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
   csr.column_indices.data = static_cast<Idx*>(indices->data);
   csr.column_indices.length = indices->shape[0];
   return csr;
+}
+
+/*
+ * !\brief Create minigun COO from two ndarrays.
+ */
+template <typename Idx>
+minigun::Coo<Idx> CreateCoo(runtime::NDArray row, runtime::NDArray col) {
+  minigun::Coo<Idx> coo;
+  coo.row.data = static_cast<Idx*>(row->data);
+  coo.row.length = row->shape[0];
+  coo.column.data = static_cast<Idx*>(col->data);
+  coo.column.length = col->shape[0];
+  return coo;
 }
 
 }  // namespace utils

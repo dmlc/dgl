@@ -159,6 +159,32 @@ void FallbackCallBinaryReduce(
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
+  if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
+    // Out Target is destination Node, we need use CSR_t format
+    // so data are aggregated in columns
+    auto outcsr = graph.GetOutCSRMatrix();
+    minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
+    
+    // If the user-given mapping is none and the target is edge data, we need to
+    // replace the mapping by the edge ids in the csr graph so that the edge
+    // data is correctly read/written.
+    if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
+      gdata->lhs_mapping = static_cast<Idx*>(outcsr.data->data);
+    }
+    if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
+      gdata->rhs_mapping = static_cast<Idx*>(outcsr.data->data);
+    }
+
+    minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
+    // TODO(minjie): allocator
+    minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+      GData<Idx, DType>, UDF>(
+          rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
+  } else {
+    CHECK(false) << "FallbackCallBinaryReduce should only have Reducer target == KDst";
+  }
+
+  /*
   // csr
   auto outcsr = graph.GetOutCSRMatrix();
   minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr.indptr, outcsr.indices);
@@ -178,6 +204,7 @@ void FallbackCallBinaryReduce(
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+  */
 }
 
 template <typename DType>
@@ -192,17 +219,22 @@ void FallbackCallBackwardBinaryReduce(
   typedef SelectNone RightSelector;
   typedef BinaryUseLhs<DType> BinaryOp;
   typedef ReduceSum<kDLGPU, DType> Reducer;
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
   typedef cuda::BackwardFunctorsTempl<Idx, DType,
           typename SwitchSrcDst<LeftSelector>::Type,
           typename SwitchSrcDst<RightSelector>::Type,
           BinaryOp, Reducer> Functors;
   typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
+  // Only Mode == binary_op::kGradLhs
+  // Only LeftSelector::target == binary_op::kSrc)
+  CHECK(Mode == binary_op::kGradLhs) << "Only KGradLhs";
+  CHECK(LeftSelector::target == binary_op::kSrc) << "Only target == kSrc";
+
+  // Out Target is source Node, we need use CSR format
+  // so data are aggregated in rows
+  auto incsr = graph.GetInCSRMatrix();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
+
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
@@ -218,9 +250,12 @@ void FallbackCallBackwardBinaryReduce(
       && gdata->out_mapping == nullptr) {
     gdata->out_mapping = static_cast<Idx*>(incsr.data->data);
   }
+
+  minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+  minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig,
+    BackwardGData<Idx, DType>, UDF>(
+        rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
 }
 
 }  // namespace cuda
@@ -231,6 +266,7 @@ void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectNone,
     const RuntimeConfig& rtcfg,
     const CSRWrapper& graph,
     GData<int32_t, float>* gdata) {
+  LOG(INFO) << "CallBinaryReduce Csrmm2";
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
     cuda::FallbackCallBinaryReduce<float>(rtcfg, graph, gdata);
   } else {

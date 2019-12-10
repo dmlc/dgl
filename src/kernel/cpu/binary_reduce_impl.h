@@ -136,7 +136,10 @@ struct FunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> AdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kSrc> SrcAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> DstAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> EdgeAdvanceConfig;
 
 }  // namespace cpu
 
@@ -167,9 +170,11 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
       && gdata->out_mapping == nullptr) {
     gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
+
+  minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+  minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
+        rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
 }
 
 // Template implementation of BinaryReduce broadcasting operator.
@@ -200,10 +205,12 @@ void CallBinaryReduceBcast(
       && gdata->out_mapping == nullptr) {
     gdata->out_mapping = static_cast<Idx*>(outcsr.data->data);
   }
+
+  minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
+  minigun::advance::Advance<XPU, Idx, DType, cpu::AdvanceConfig,
     BcastGData<NDim, Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
+        rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
 }
 
 // Following macro is used to generate explicit-specialization of the template

@@ -231,6 +231,10 @@ class ImmutableGraphCSRWrapper : public CSRWrapper {
     return gptr_->GetOutCSR()->ToCSRMatrix();
   }
 
+  aten::COOMatrix GetCOOMatrix() const override {
+    return gptr_->GetCOO()->ToCOOMatrix();
+  }
+
   DGLContext Context() const override {
     return gptr_->Context();
   }
@@ -254,6 +258,10 @@ class UnitGraphCSRWrapper : public CSRWrapper {
 
   aten::CSRMatrix GetOutCSRMatrix() const override {
     return gptr_->GetOutCSRMatrix();
+  }
+
+  aten::COOMatrix GetCOOMatrix() const override {
+    return gptr_->GetCOOMatrix();
   }
 
   DGLContext Context() const override {
