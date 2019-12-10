@@ -52,7 +52,7 @@ class ArrayHeap {
   void Delete(size_t index) {
     size_t i = index + limit_;
     ValueType w = heap_[i];
-    for (size_t j = bit_len_; j >= 0; --j) {
+    for (int j = bit_len_; j >= 0; --j) {
       heap_[i] -= w;
       i = i >> 1;
     }
@@ -63,7 +63,7 @@ class ArrayHeap {
    */
   void Add(size_t index, ValueType w) {
     size_t i = index + limit_;
-    for (size_t j = bit_len_; j >= 0; --j) {
+    for (int j = bit_len_; j >= 0; --j) {
       heap_[i] += w;
       i = i >> 1;
     }

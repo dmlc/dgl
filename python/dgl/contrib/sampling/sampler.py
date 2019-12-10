@@ -798,8 +798,8 @@ class WeightedEdgeSampler(object):
             self._seed_edges = seed_edges
         if shuffle:
             self._seed_edges = F.rand_shuffle(self._seed_edges)
-        self._seed_edges = utils.toindex(self._seed_edges)
         self._edge_weight = F.zerocopy_to_dgl_ndarray(edge_weight[self._seed_edges])
+        self._seed_edges = utils.toindex(self._seed_edges)
 
         if node_weight is None:
             self._node_weight = empty((0,), 'float32')
