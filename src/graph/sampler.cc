@@ -1665,7 +1665,8 @@ protected:
         randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
         assert(prev_neg_offset + neg_sample_size == neg_vids.size());
       } else if (exclude_positive) {
-        LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
+        LOG(FATAL) << "We can't exclude positive edges"
+                      "when sampling negative edges with all nodes.";
       } else {
         // We don't need to do anything here.
         // In this case, every edge has the same negative edges. That is,
