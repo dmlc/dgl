@@ -156,7 +156,7 @@ for epoch in range(50):
         dur.append(time.time() - t0)
     
     acc = evaluate(net, g, features, labels, test_mask)
-    print("Epoch {:05d} | Loss {:.4f} | Acc {:.4f} | Time(s) {:.4f}".format(
+    print("Epoch {:05d} | Loss {:.4f} | Test Acc {:.4f} | Time(s) {:.4f}".format(
             epoch, loss.item(), acc, np.mean(dur)))
 
 ###############################################################################
