@@ -1,3 +1,4 @@
+import os
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
@@ -15,7 +16,7 @@ server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt'
 def load_node_data(args):
     if args.num_parts > 1:
         import pickle
-        ndata = pickle.load(open('reddit_ndata.pkl', 'rb'))
+        ndata = pickle.load(open('Reddit/reddit_ndata.pkl', 'rb'))
         print('load reddit ndata')
         return ndata
     else:
@@ -78,8 +79,8 @@ def load_local_part(args):
     # TODO for now, I use pickle to store partitioned graph.
     if args.num_parts > 1:
         import pickle
-        part, part_nodes, part_loc = pickle.load(open('reddit_part_{}.pkl'.format(args.id), 'rb'))
-        all_locs = np.loadtxt('reddit.adj.part.{}'.format(args.num_parts))
+        part, part_nodes, part_loc = pickle.load(open('Reddit/reddit_part_{}.pkl'.format(args.id), 'rb'))
+        all_locs = np.loadtxt('Reddit/reddit.adj.part.{}'.format(args.num_parts))
         g = dgl.DGLGraph(part, readonly=True)
         g.ndata['global_id'] = mx.nd.array(part_nodes, dtype=np.int64)
         g.ndata['node_loc'] = mx.nd.array(part_loc, dtype=np.int64)
@@ -100,6 +101,7 @@ def get_from_kvstore(args, kv, g, name):
     return kv.pull(name=name, id_tensor=g.ndata['global_id'])
 
 def main(args):
+    args.id = int(os.environ['DMLC_TASK_ID'])
     g, all_locs = load_local_part(args)
     print('graph size:', g.number_of_nodes())
     print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy())
@@ -134,8 +136,8 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--model", type=str,
                         help="select a model. Valid models: gcn_ns, gcn_cv, graphsage_cv")
-    parser.add_argument('--server', type=int,
-            help='whether this is a server. 1 means yes, 0 means no.')
+    parser.add_argument('--server', action='store_true',
+            help='whether this is a server.')
     parser.add_argument('--id', type=int,
             help='the partition id')
     parser.add_argument('--num-parts', type=int,
