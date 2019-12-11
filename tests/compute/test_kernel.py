@@ -72,6 +72,7 @@ def generate_feature(g, broadcast='none', binary_op='none'):
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
+
     return u, v, e
 
 
@@ -245,7 +246,7 @@ def test_all_binary_builtins():
             else:
                 g.update_all(builtin_msg(lhs, rhs, 'm'), builtin_red('m', 'r1'))
             r1 = g.ndata.pop('r1')
-            F.backward(r1.sum())
+            F.backward(r1.sum(), F.tensor([1.]))
             lhs_grad_1 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_1 = F.grad(target_feature_switch(g, rhs))
 
@@ -312,12 +313,10 @@ def test_all_binary_builtins():
         assert F.allclose(r1, r2, rtol, atol)
 
         if not F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol):
-            print("left grad")
             _print_error(lhs_grad_1, lhs_grad_2)
         assert(F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol))
 
         if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
-            print("right grad")
             _print_error(rhs_grad_1, rhs_grad_2)
         assert(F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol))
 
@@ -335,20 +334,20 @@ def test_all_binary_builtins():
     g.add_edge(19, 0)
     g.add_edge(19, 1)
     nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19])
-    target = ["u", "v", "e"]
+    target = ["e", "u", "v"]
 
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
         for binary_op in ["add", "sub", "mul", "div", "dot"]:
-            for reducer in ["sum", "max", "min", "prod", "mean"]:
+            for reducer in ["sum", "max", "min", "prod"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
 
 if __name__ == '__main__':
-    #test_copy_src_reduce()
-    #test_copy_edge_reduce()
+    test_copy_src_reduce()
+    test_copy_edge_reduce()
     test_all_binary_builtins()
 

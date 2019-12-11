@@ -324,6 +324,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
   COOMatrix ret;
+  
   if (data_as_order) {
     ATEN_XPU_SELECT(csr.indptr->ctx.device_type, XPU, {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {
@@ -384,6 +385,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
     ret = impl::COOToCSR<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
+NDArray MergeIDMapping(NDArray a, NDArray b) {
+  NDArray ret;
+  ATEN_ID_MAPPING_IDX_SWITCH(a, XPU, IdType, {
+    ret = impl::MergeIDMapping<XPU, IdType>(a, b);
   });
   return ret;
 }

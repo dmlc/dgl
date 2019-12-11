@@ -797,6 +797,54 @@ CSRMatrix COOToCSR(COOMatrix coo) {
 template CSRMatrix COOToCSR<kDLCPU, int32_t, int32_t>(COOMatrix coo);
 template CSRMatrix COOToCSR<kDLCPU, int64_t, int64_t>(COOMatrix coo);
 
+////////////////////////// MergeIDMapping //////////////////////////
+
+template <DLDeviceType XPU, typename IdType>
+NDArray MergeIDMapping(NDArray a, NDArray b) {
+  // If csr is in GPU, copy it to CPU, translate the mapping and copy to GPU
+  const IdType* a_data;
+  const IdType* b_data;
+  NDArray tmp_a;
+  NDArray tmp_b;
+  // CHECK(a->shape == b->shape) << "two mapping should have same shape";
+  CHECK(a->dtype.code == b->dtype.code) << "two mapping should have same dtype";
+  CHECK(a->dtype.bits == b->dtype.bits) << "two mapping should have same dtype";
+  int64_t NMZ = 0;
+  for (dgl_index_t i = 0; i < a->ndim; ++i) {
+    NMZ += a->shape[i];
+  }
+
+  if (XPU == kDLGPU) {
+    CHECK(a->ctx.device_type == kDLGPU) << "a mapping should be in GPU";
+    CHECK(b->ctx.device_type == kDLGPU) << "b mapping should be in GPU";
+    tmp_a = a.CopyTo(DLContext{kDLCPU, 0});
+    tmp_b = b.CopyTo(DLContext{kDLCPU, 0});
+
+    a_data = static_cast<IdType*>(tmp_a->data);
+    b_data = static_cast<IdType*>(tmp_b->data);
+  } else {
+    a_data = static_cast<IdType*>(a->data);
+    b_data = static_cast<IdType*>(b->data);
+  }
+
+  NDArray ret_data = NDArray::Empty({NMZ}, a->dtype, DLContext{kDLCPU, 0});
+  IdType *ret_data_data = static_cast<IdType*>(ret_data->data);
+  for (int64_t i = 0; i < NMZ; ++i) {
+    ret_data_data[i] = b_data[a_data[i]];
+  }
+
+  if (XPU == kDLGPU) {
+    return ret_data.CopyTo(a->ctx);
+  }
+
+  return ret_data;
+}
+
+template NDArray MergeIDMapping<kDLCPU, int32_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLCPU, int64_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLGPU, int32_t>(NDArray a, NDArray b);
+template NDArray MergeIDMapping<kDLGPU, int64_t>(NDArray a, NDArray b);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl

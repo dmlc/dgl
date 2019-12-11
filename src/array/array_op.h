@@ -105,6 +105,9 @@ bool COOHasDuplicate(COOMatrix coo);
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix coo);
 
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray MergeIDMapping(runtime::NDArray a, runtime::NDArray b);
+
 }  // namespace impl
 }  // namespace aten
 }  // namespace dgl

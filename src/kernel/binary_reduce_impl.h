@@ -40,12 +40,15 @@ GData<Idx, DType> AllocGData(const std::string& op,
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
+    gdata.lhs = lhs_mapping;
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
+    gdata.rhs = rhs_mapping;
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
+    gdata.out = out_mapping;
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
 
@@ -143,12 +146,15 @@ BackwardGData<Idx, DType> AllocBackwardGData(
                 static_cast<DType>(0));
   }
   if (!utils::IsNoneArray(lhs_mapping)) {
+    gdata.lhs = lhs_mapping;
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
+    gdata.rhs = rhs_mapping;
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
+    gdata.out = out_mapping;
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
 
@@ -248,12 +254,15 @@ BcastGData<NDim, Idx, DType> AllocBcastGData(
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
+    gdata.lhs = lhs_mapping;
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
+    gdata.rhs = rhs_mapping;
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
+    gdata.out = out_mapping;
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   gdata.data_len = info.data_len;
@@ -345,12 +354,15 @@ BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
   std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
   // mappings
   if (!utils::IsNoneArray(lhs_mapping)) {
+    gdata.lhs = lhs_mapping;
     gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
+    gdata.rhs = rhs_mapping;
     gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
+    gdata.out = out_mapping;
     gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   gdata.data_len = info.data_len;

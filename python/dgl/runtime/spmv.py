@@ -169,11 +169,10 @@ def build_gidx_and_mapping_uv(edge_tuples, num_src, num_dst):
     """
     u, v, eid = edge_tuples
     gidx = create_unitgraph_from_coo(2, num_src, num_dst, u, v)
-    forward, backward = gidx.get_csr_shuffle_order(0)
     eid = eid.tousertensor()
     nbits = gidx.bits_needed(0)
-    forward_map = utils.to_nbits_int(eid[forward.tousertensor()], nbits)
-    backward_map = utils.to_nbits_int(eid[backward.tousertensor()], nbits)
+    forward_map = utils.to_nbits_int(eid, nbits)
+    backward_map = utils.to_nbits_int(eid, nbits)
     forward_map = F.zerocopy_to_dgl_ndarray(forward_map)
     backward_map = F.zerocopy_to_dgl_ndarray(backward_map)
     edge_map = utils.CtxCachedObject(

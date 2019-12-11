@@ -105,6 +105,14 @@ namespace aten {
     });                                                     \
   });
 
+// Macro to dispatch according to device context and index type
+#define ATEN_ID_MAPPING_IDX_SWITCH(map, XPU, IdType, ...)   \
+  ATEN_XPU_SELECT(map->ctx.device_type, XPU, {              \
+    ATEN_ID_TYPE_SWITCH(map->dtype, IdType, {               \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
 }  // namespace aten
 }  // namespace dgl
 

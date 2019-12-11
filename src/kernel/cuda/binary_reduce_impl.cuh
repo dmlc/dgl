@@ -266,23 +266,36 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
-
+  
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-    LOG(INFO) << "target edge";
     // Out Target is Edge, we need use COO format
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
     // If the user-given mapping is none and the target is edge data, we need to
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
-    if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-      gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(coo_matrix.data, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
-    if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-      gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(coo_matrix.data, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
     if (gdata->out_mapping == nullptr) {
       gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    } else {
+      out_map = aten::MergeIDMapping(coo_matrix.data, gdata->out);
+      gdata->out_mapping = static_cast<Idx*>(out_map->data);
     }
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
@@ -293,7 +306,6 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
     CHECK(false) << "BinaryReduce target should not be kSrc";
   } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
-    LOG(INFO) << "target dst";
     // Out Target is destination Node, we need use CSR_t format
     // so data are aggregated in columns
     auto incsr = graph.GetInCSRMatrix();
@@ -302,11 +314,22 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
     // If the user-given mapping is none and the target is edge data, we need to
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
-    if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-      gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
-    if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-      gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        out_map = aten::MergeIDMapping(incsr.data, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
@@ -349,21 +372,37 @@ void CallBinaryReduceBcast(
   typedef cuda::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
 
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
-    LOG(INFO) << "target edge";
     // Out Target is Edge, we need use COO format
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
     // If the user-given mapping is none and the target is edge data, we need to
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
-    if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-      gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        auto target_mapping = coo_matrix.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
-    if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-      gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(coo_matrix.data->data);
+      } else {
+        auto target_mapping = coo_matrix.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
     if (gdata->out_mapping == nullptr) {
       gdata->out_mapping = static_cast<Idx*>(coo_matrix.data->data);
+    } else {
+      auto target_mapping = coo_matrix.data;
+      out_map = aten::MergeIDMapping(target_mapping, gdata->out);
+      gdata->out_mapping = static_cast<Idx*>(out_map->data);
     }
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
@@ -374,7 +413,6 @@ void CallBinaryReduceBcast(
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
     CHECK(false) << "BinaryReduceBcast target should not be kSrc";
   } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
-    LOG(INFO) << "target dest";
     // Out Target is destination Node, we need use CSR_t format
     // so data are aggregated in columns
     auto incsr = graph.GetInCSRMatrix();
@@ -383,11 +421,24 @@ void CallBinaryReduceBcast(
     // If the user-given mapping is none and the target is edge data, we need to
     // replace the mapping by the edge ids in the csr graph so that the edge
     // data is correctly read/written.
-    if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-      gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+    runtime::NDArray out_map;
+    if (LeftSelector::target == binary_op::kEdge) {
+      if (gdata->lhs_mapping == nullptr) {
+        gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        auto target_mapping = incsr.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->lhs);
+        gdata->lhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
-    if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-      gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+    if (RightSelector::target == binary_op::kEdge) {
+      if (gdata->rhs_mapping == nullptr) {
+        gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
+      } else {
+        auto target_mapping = incsr.data;
+        out_map = aten::MergeIDMapping(target_mapping, gdata->rhs);
+        gdata->rhs_mapping = static_cast<Idx*>(out_map->data);
+      }
     }
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};

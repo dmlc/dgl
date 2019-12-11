@@ -285,6 +285,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
+runtime::NDArray MergeIDMapping(runtime::NDArray a, runtime::NDArray b);
+
 }  // namespace aten
 }  // namespace dgl
 
