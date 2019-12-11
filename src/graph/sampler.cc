@@ -1421,7 +1421,7 @@ public:
       eprob[i] = edge_prob[i];
     }
     edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
-    
+
     const size_t num_nodes = node_weight->shape[0];
     if (num_nodes == 0) {
       node_selector_ = nullptr;
@@ -1487,9 +1487,9 @@ public:
                                                      check_false_neg_);
         negative_subgs[i] = ConvertRef(neg_subg);
       } else if (neg_mode_.size() > 0) {
-        NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_, 
+        NegSubgraph neg_subg = genNegEdgeSubgraph(subg, neg_mode_,
                                                   neg_sample_size_,
-                                                  exclude_positive_, 
+                                                  exclude_positive_,
                                                   check_false_neg_);
         negative_subgs[i] = ConvertRef(neg_subg);
       }
@@ -1579,8 +1579,10 @@ protected:
     // These are vids in the positive subgraph.
     const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
     const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-    const dgl_id_t *induced_vid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-    const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+    const dgl_id_t *induced_vid_data =
+        static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+    const dgl_id_t *induced_eid_data =
+        static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
     size_t num_pos_nodes = pos_subg.graph->NumVertices();
     std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
 
@@ -1668,7 +1670,8 @@ protected:
         randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
         assert(prev_neg_offset + neg_sample_size == neg_vids.size());
       } else if (exclude_positive) {
-        LOG(FATAL) << "We can't exclude positive edges when sampling negative edges with all nodes.";
+        LOG(FATAL) << "We can't exclude positive edges"
+                      "when sampling negative edges with all nodes.";
       } else {
         // We don't need to do anything here.
         // In this case, every edge has the same negative edges. That is,
@@ -1767,8 +1770,10 @@ protected:
     // These are vids in the positive subgraph.
     const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
     const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-    const dgl_id_t *induced_vid_data = static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-    const dgl_id_t *induced_eid_data = static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+    const dgl_id_t *induced_vid_data =
+        static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+    const dgl_id_t *induced_eid_data =
+        static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
     int64_t num_pos_nodes = pos_subg.graph->NumVertices();
     std::vector<dgl_id_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
 
@@ -1906,7 +1911,7 @@ class FloatWeightedEdgeSampler: public ObjectRef {
     return CHECK_NOTNULL(std::dynamic_pointer_cast<WeightedEdgeSamplerObject<float>>(obj_));
   }
 
-  operator bool() const { return this->defined(); }  
+  operator bool() const { return this->defined(); }
   using ContainerType = WeightedEdgeSamplerObject<float>;
 };
 
@@ -1929,10 +1934,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
     CHECK(edge_weight->dtype.code == kDLFloat) << "edge_weight should be FloatType";
-    CHECK(edge_weight->dtype.bits == 32) << "WeightedEdgeSampler only support edge weight with 32 bit precision";
+    CHECK(edge_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
     if (node_weight->shape[0] > 0) {
       CHECK(node_weight->dtype.code == kDLFloat) << "node_weight should be FloatType";
-      CHECK(node_weight->dtype.bits == 32) << "WeightedEdgeSampler only support node weight with 32 bit precision";
+      CHECK(node_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
     }
     BuildCoo(*gptr);
 
