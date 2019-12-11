@@ -763,6 +763,8 @@ def test_local_scope():
     foo(g)
 
 def test_issue_1088():
+    # This test ensures that message passing on a heterograph with one edge type
+    # would not crash (GitHub issue #1088).
     import dgl.function as fn
     g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])})
     g.nodes['U'].data['x'] = F.randn((3, 3))
