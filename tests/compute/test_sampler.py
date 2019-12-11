@@ -237,7 +237,7 @@ def check_head_tail(g):
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
-    g.edata['etype'] = F.tensor(etype)
+    g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
@@ -308,10 +308,10 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     num_edges = g.number_of_edges()
     num_nodes = g.number_of_nodes()
-    edge_weight = F.tensor(np.full((num_edges,), 1, dtype=np.float32))
-    node_weight = F.tensor(np.full((num_nodes,), 1, dtype=np.float32))
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
+    node_weight = F.copy_to(F.tensor(np.full((num_nodes,), 1, dtype=np.float32)), F.cpu())
     etype = np.random.randint(0, 10, size=num_edges, dtype=np.int64)
-    g.edata['etype'] = F.tensor(etype)
+    g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
     pos_gsrc, pos_gdst, pos_geid = g.all_edges(form='all', order='eid')
     pos_map = {}
@@ -418,95 +418,19 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
             break
 
     # Check Rate
+    dgl.random.seed(0)
     g = generate_rand_graph(1000)
     num_edges = g.number_of_edges()
     num_nodes = g.number_of_nodes()
-    edge_weight = F.tensor(np.full((num_edges,), 1, dtype=np.float32))
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
     edge_weight[0] = F.sum(edge_weight, dim=0)
-    node_weight = F.tensor(np.full((num_nodes,), 1, dtype=np.float32))
+    node_weight = F.copy_to(F.tensor(np.full((num_nodes,), 1, dtype=np.float32)), F.cpu())
     node_weight[-1] = F.sum(node_weight, dim=0) / 200
     etype = np.random.randint(0, 20, size=num_edges, dtype=np.int64)
-    g.edata['etype'] = F.tensor(etype)
-    dgl.random.seed(0)
+    g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
     # Test w/o node weight.
     max_samples = num_edges / 5
-    total_samples = 0
-    edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
-    node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
-                                                    edge_weight=edge_weight,
-                                                    negative_mode=mode,
-                                                    neg_sample_size=neg_size,
-                                                    exclude_positive=False,
-                                                    return_false_neg=True):
-        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        neg_lsrc, neg_ldst, _ = neg_edges.all_edges(form='all', order='eid')
-        if 'head' in mode:
-            neg_src = neg_edges.parent_nid[neg_lsrc]
-            np.add.at(node_sampled, F.asnumpy(neg_src), 1)
-        else:
-            neg_dst = neg_edges.parent_nid[neg_ldst]
-            np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
-
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
-
-    # Check rate here
-    edge_rate_0 = edge_sampled[0] / edge_sampled.sum()
-    edge_tail_half_cnt = edge_sampled[edge_sampled.shape[0] // 2:-1].sum()
-    edge_rate_tail_half = edge_tail_half_cnt / edge_sampled.sum()
-    assert np.allclose(edge_rate_0, 0.5, atol=0.05)
-    assert np.allclose(edge_rate_tail_half, 0.25, atol=0.05)
-
-    node_rate_0 = node_sampled[-1] / node_sampled.sum()
-    node_head_half_cnt = node_sampled[0:node_sampled.shape[0] // 2].sum()
-    node_head_half_rate = node_head_half_cnt / node_sampled.sum()
-    assert node_rate_0 < 0.002
-    assert np.allclose(node_head_half_rate, 0.5, atol=0.05)
-
-    # Test w node weight.
-    total_samples = 0
-    edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
-    node_sampled = np.full((num_nodes,
-    ), 0, dtype=np.int32)
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
-                                                    edge_weight=edge_weight,
-                                                    node_weight=node_weight,
-                                                    negative_mode=mode,
-                                                    neg_sample_size=neg_size,
-                                                    exclude_positive=False,
-                                                    return_false_neg=True):
-        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        neg_lsrc, neg_ldst, _ = neg_edges.all_edges(form='all', order='eid')
-        if 'head' in mode:
-            neg_src = neg_edges.parent_nid[neg_lsrc]
-            np.add.at(node_sampled, F.asnumpy(neg_src), 1)
-        else:
-            neg_dst = neg_edges.parent_nid[neg_ldst]
-            np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
-
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
-    # Check rate here
-    edge_rate_0 = edge_sampled[0] / edge_sampled.sum()
-    edge_tail_half_cnt = edge_sampled[edge_sampled.shape[0] // 2:-1].sum()
-    edge_rate_tail_half = edge_tail_half_cnt / edge_sampled.sum()
-    assert np.allclose(edge_rate_0, 0.5, atol=0.05)
-    assert np.allclose(edge_rate_tail_half, 0.25, atol=0.01)
-
-    node_rate = node_sampled[-1] / node_sampled.sum()
-    node_rate_a = np.average(node_sampled[:50]) / node_sampled.sum()
-    node_rate_b = np.average(node_sampled[50:100]) / node_sampled.sum()
-    # As neg sampling does not contain duplicate nodes,
-    # this test takes some acceptable variation on the sample rate.
-    assert np.allclose(node_rate, node_rate_a * 5, atol=0.0015)
-    assert np.allclose(node_rate_a, node_rate_b, atol=0.0002)
-
     # Test the knowledge graph with edge weight provied.
     total_samples = 0
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
