@@ -466,7 +466,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     node_tail_half_cnt = node_sampled[node_sampled.shape[0] // 2:-1].sum()
     node_rate_tail_half = node_tail_half_cnt / node_sampled.sum()
     assert node_rate_0 < 0.02
-    assert np.allclose(node_rate_tail_half, 0.5, atol=0.01)
+    assert np.allclose(node_rate_tail_half, 0.5, atol=0.02)
 
     # Test the knowledge graph with edge/node weight provied.
     total_samples = 0
