@@ -1447,11 +1447,6 @@ public:
   }
 
   ~WeightedEdgeSamplerObject() {
-    node_selector_ = nullptr;
-    edge_selector_ = nullptr;
-    gptr_ = nullptr;
-    seed_edges_.reset();
-    relations_.reset();
   }
 
   std::vector<SubgraphRef> fetch() {
