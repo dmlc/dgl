@@ -106,6 +106,8 @@ class GCNInfer(gluon.Block):
         return nf.layers[-1].data.pop('activation')
 
 def copy_from_kvstore(nf, kv, ctx, graph_name, ndata_names):
+    num_bytes = 0
+    start = time.time()
     for i in range(nf.num_layers):
         for name in ndata_names:
             full_name = graph_name + "_" + name
@@ -113,6 +115,8 @@ def copy_from_kvstore(nf, kv, ctx, graph_name, ndata_names):
             data = kv.pull(name=full_name, id_tensor=global_id[nf.layer_parent_nid(i)])
             data = data.as_in_context(ctx)
             nf._node_frames[i][name] = data
+            num_bytes += np.prod(data.shape)
+    return num_bytes * 4, time.time() - start
 
 def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
     in_feats = args.n_features
@@ -141,13 +145,15 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
     print(model.collect_params())
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create('dist_sync'))
 
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
         print(epoch)
         start = time.time()
+        num_bytes = 0
+        copy_time = 0
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
@@ -156,7 +162,9 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
             #TODO copy from kvstore
-            copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
+            nbytes, copy_time1 = copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
+            num_bytes += nbytes
+            copy_time += copy_time1
             # forward
             with mx.autograd.record():
                 pred = model(nf)
@@ -196,3 +204,4 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
 
         print("Trainer {}: Test Accuracy {:.4f}, Train Time {:.4f}, Eval time {:.4f}". format(
             args.id, num_acc/num_tests, train_time, eval_time))
+        print('throughput: {}'.format(num_bytes / copy_time))
