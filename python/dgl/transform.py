@@ -288,7 +288,7 @@ def reverse(g, share_ndata=False, share_edata=False):
         'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
-    g_edges = g.edges()
+    g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
     if share_ndata:
         g_reversed._node_frame = g._node_frame
