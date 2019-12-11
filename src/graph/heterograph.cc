@@ -469,7 +469,12 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetRelationGraph")
     HeteroGraphRef hg = args[0];
     dgl_type_t etype = args[1];
     CHECK_LE(etype, hg->NumEdgeTypes()) << "invalid edge type " << etype;
-    *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
+    // Test if the heterograph is a unit graph.  If so, return itself.
+    auto bg = std::dynamic_pointer_cast<UnitGraph>(hg.sptr());
+    if (bg != nullptr)
+      *rv = bg;
+    else
+      *rv = HeteroGraphRef(hg->GetRelationGraph(etype));
   });
 
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroGetFlattenedGraph")
