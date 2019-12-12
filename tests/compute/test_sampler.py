@@ -518,7 +518,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     node_rate_b = np.average(node_sampled[50:100]) / node_sampled.sum()
     # As neg sampling does not contain duplicate nodes,
     # this test takes some acceptable variation on the sample rate.
-    assert np.allclose(node_rate, node_rate_a * 5, atol=0.0015)
+    assert np.allclose(node_rate, node_rate_a * 5, atol=0.002)
     assert np.allclose(node_rate_a, node_rate_b, atol=0.0002)
 
 def test_negative_sampler():
