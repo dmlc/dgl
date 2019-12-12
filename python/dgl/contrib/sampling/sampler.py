@@ -606,6 +606,17 @@ class EdgeSampler(object):
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
 
+        self._sampler = _CAPI_CreateUniformEdgeSampler(
+            self.g._graph,
+            self.seed_edges.todgltensor(),
+            self.batch_size,        # batch size
+            self._num_workers,      # num batches
+            self._negative_mode,
+            self._neg_sample_size,
+            self._exclude_positive,
+            self._return_false_neg,
+            self._relations)
+
     def fetch(self, current_index):
         '''
         It returns a list of subgraphs if it only samples positive edges.
@@ -615,24 +626,15 @@ class EdgeSampler(object):
         Parameters
         ----------
         current_index : int
-            How many batches the sampler has generated so far.
+            deprecated, not used actually.
 
         Returns
         -------
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
             Next "bunch" of edges to be processed.
         '''
-        subgs = _CAPI_UniformEdgeSampling(
-            self.g._graph,
-            self.seed_edges.todgltensor(),
-            current_index, # start batch id
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
-            self._negative_mode,
-            self._neg_sample_size,
-            self._exclude_positive,
-            self._return_false_neg,
-            self._relations)
+        subgs = _CAPI_FetchUniformEdgeSample(
+            self._sampler)
 
         if len(subgs) == 0:
             return []
@@ -842,7 +844,7 @@ class WeightedEdgeSampler(object):
         Parameters
         ----------
         current_index : int
-            deprecated, not used actually
+            deprecated, not used actually.
 
         Returns
         -------

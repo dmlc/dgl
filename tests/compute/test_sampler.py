@@ -236,6 +236,7 @@ def check_head_tail(g):
 
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
+    num_edges = g.number_of_edges()
     etype = np.random.randint(0, 10, size=g.number_of_edges(), dtype=np.int64)
     g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
@@ -248,7 +249,10 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     # Test the homogeneous graph.
-    for pos_edges, neg_edges in EdgeSampler(g, 50,
+    total_samples = 0
+    batch_size = 50
+    max_samples = num_edges
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=exclude_positive,
@@ -283,8 +287,13 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
 
+        total_samples += batch_size
+        if (total_samples >= max_samples):
+            break
+
     # Test the knowledge graph.
-    for _, neg_edges in EdgeSampler(g, 50,
+    total_samples = 0
+    for _, neg_edges in EdgeSampler(g, batch_size,
                                     negative_mode=mode,
                                     neg_sample_size=neg_size,
                                     exclude_positive=exclude_positive,
@@ -303,6 +312,9 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
+        total_samples += batch_size
+        if (total_samples >= max_samples):
+            break
 
 def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
