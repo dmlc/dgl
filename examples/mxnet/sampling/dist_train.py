@@ -1,4 +1,5 @@
 import os
+os.environ['DGLBACKEND']='mxnet'
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
@@ -101,7 +102,8 @@ def get_from_kvstore(args, kv, g, name):
     return kv.pull(name=name, id_tensor=g.ndata['global_id'])
 
 def main(args):
-    args.id = int(os.environ['DMLC_TASK_ID'])
+    kvstore = mx.kv.create('dist_sync')
+    args.id = kvstore.rank
     g, all_locs = load_local_part(args)
     print('graph size:', g.number_of_nodes())
     print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy())
@@ -125,7 +127,7 @@ def main(args):
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
 
     if args.model == "gcn_ns":
-        gcn_ns_train(g, kv, ctx, args, args.n_classes, train_nid, test_nid)
+        gcn_ns_train(g, kv, kvstore, ctx, args, args.n_classes, train_nid, test_nid)
     else:
         print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
     print("parent ends")
