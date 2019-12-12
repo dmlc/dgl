@@ -605,7 +605,6 @@ class EdgeSampler(object):
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
-
         self._sampler = _CAPI_CreateUniformEdgeSampler(
             self.g._graph,
             self.seed_edges.todgltensor(),
@@ -821,7 +820,6 @@ class WeightedEdgeSampler(object):
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
-
         self._sampler = _CAPI_CreateWeightedEdgeSampler(
             self.g._graph,
             self._seed_edges.todgltensor(),
