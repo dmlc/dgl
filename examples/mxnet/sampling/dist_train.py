@@ -1,5 +1,9 @@
 import os
 os.environ['DGLBACKEND']='mxnet'
+if 'DMLC_ROLE' in os.environ and os.environ['DMLC_ROLE'] == 'worker':
+    os.environ['OMP_NUM_THREADS']='8'
+else:
+    os.environ['OMP_NUM_THREADS']='4'
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
@@ -9,6 +13,7 @@ import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 from dgl.contrib import KVServer
+import socket
 
 from gcn_ns_dist import gcn_ns_train
 
@@ -34,6 +39,10 @@ def load_node_data(args):
                 'test_mask': test_mask}
 
 def start_server(args):
+    host_name = socket.gethostname()
+    host_ip = socket.gethostbyname(host_name)
+    print('Server {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
+
     server = KVServer(
             server_id=args.id,
             client_namebook=client_namebook,
@@ -65,7 +74,7 @@ def connect_to_kvstore(args, partition_book):
     # Initialize data on kvstore, the data_tensor is shared-memory data
     for key, val in ndata.items():
         data_name = graph_name + '_' + key
-        print('client init {} from ndata[{}]'.format(data_name, key))
+        print('client init {} from ndata[{}]'.format(data_name, key), flush=True)
         client.init_local_data(name=data_name, data_tensor=mx.nd.array(ndata[key]))
 
     client.connect()
@@ -98,15 +107,20 @@ def load_local_part(args):
 
 def get_from_kvstore(args, kv, g, name):
     name = args.graph_name + "_" + name
-    print('client pull ' + name)
+    print('client pull ' + name, flush=True)
     return kv.pull(name=name, id_tensor=g.ndata['global_id'])
 
 def main(args):
     kvstore = mx.kv.create('dist_sync')
     args.id = kvstore.rank
+
+    host_name = socket.gethostname()
+    host_ip = socket.gethostbyname(host_name)
+    print('Trainer {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
+
     g, all_locs = load_local_part(args)
-    print('graph size:', g.number_of_nodes())
-    print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy())
+    print('graph size:', g.number_of_nodes(), flush=True)
+    print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy(), flush=True)
     kv = connect_to_kvstore(args, all_locs)
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(args.id)
@@ -116,7 +130,7 @@ def main(args):
     test_mask = get_from_kvstore(args, kv, g, 'test_mask').astype(np.float32) * local_mask
     print('train: {}, val: {}, test: {}'.format(mx.nd.sum(train_mask).asnumpy(),
         mx.nd.sum(val_mask).asnumpy(),
-        mx.nd.sum(test_mask).asnumpy()))
+        mx.nd.sum(test_mask).asnumpy()), flush=True)
 
     if args.num_gpus > 0:
         ctx = mx.gpu(g.worker_id % args.num_gpus)
