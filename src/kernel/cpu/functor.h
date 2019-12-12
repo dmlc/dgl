@@ -19,7 +19,6 @@ namespace kernel {
 template <typename DType>
 struct ReduceSum<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
-#pragma omp atomic
     *addr += val;
   }
   static DType BackwardCall(DType val, DType accum) {
@@ -30,7 +29,6 @@ struct ReduceSum<kDLCPU, DType> {
 template <typename DType>
 struct ReduceMax<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
-#pragma omp critical
     *addr = std::max(*addr, val);
   }
   static DType BackwardCall(DType val, DType accum) {
@@ -41,7 +39,6 @@ struct ReduceMax<kDLCPU, DType> {
 template <typename DType>
 struct ReduceMin<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
-#pragma omp critical
     *addr = std::min(*addr, val);
   }
   static DType BackwardCall(DType val, DType accum) {
@@ -52,7 +49,6 @@ struct ReduceMin<kDLCPU, DType> {
 template <typename DType>
 struct ReduceProd<kDLCPU, DType> {
   static void Call(DType* addr, DType val) {
-#pragma omp atomic
     *addr *= val;
   }
   static DType BackwardCall(DType val, DType accum) {

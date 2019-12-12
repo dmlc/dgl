@@ -7,7 +7,6 @@
 #define DGL_KERNEL_CUDA_FUNCTOR_CUH_
 
 #include "../binary_reduce_common.h"
-#include "./atomic.cuh"
 
 namespace dgl {
 namespace kernel {

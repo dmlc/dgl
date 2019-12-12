@@ -59,18 +59,16 @@ struct BackwardBinaryReduce {
       if (Mode == binary_op::kGradLhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
-          AtomicAdd(gradlhsoff + tx * len + i, grad_lhs);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType *gradlhs_addr = gradlhsoff + tx * len + i;
+          *gradlhs_addr = *gradlhs_addr + grad_lhs;
         }
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
-          AtomicAdd(gradrhsoff + tx * len + i, grad_rhs);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType *gradrhs_addr = gradrhsoff + tx * len + i;
+          *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
       }
       tx += stride_x;
@@ -113,18 +111,14 @@ struct BackwardBinaryReduce {
       if (Mode == binary_op::kGradLhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           DType *gradlhs_addr = gradlhsoff + tx * len + i;
           *gradlhs_addr = *gradlhs_addr + grad_lhs;
         }
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
@@ -182,32 +176,17 @@ struct BackwardBinaryReduceBcast {
 
       DType* lhs_base = lhsoff + lhs_add * len;
       DType* rhs_base = rhsoff + rhs_add * len;
-      if (Mode == binary_op::kGradBoth) {
+      if (Mode == binary_op::kGradLhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
-          DType grad = grad_lhs + grad_rhs;
-          DType *gradlhs_addr = gradlhsoff + tx * len + i;
-          *gradlhs_addr = *gradlhs_addr + grad;
-        }
-      } else if (Mode == binary_op::kGradLhs) {
-#pragma unroll
-        for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           DType *gradlhs_addr = gradlhsoff + tx * len + i;
           *gradlhs_addr = *gradlhs_addr + grad_lhs;
         }
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
@@ -257,18 +236,14 @@ struct BackwardBinaryReduceBcast {
       } else if (Mode == binary_op::kGradLhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           DType *gradlhs_addr = gradlhsoff + tx * len + i;
           *gradlhs_addr = *gradlhs_addr + grad_lhs;
         }
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType lhs = Functors::Read(lhs_base + i);
-          DType rhs = Functors::Read(rhs_base + i);
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
@@ -316,10 +291,47 @@ struct BackwardFunctorsTempl {
   static __device__ __forceinline__ DType BackwardWrite(DType val, DType accum) {
     return Reducer::BackwardCall(val, accum);
   }
-  static __device__ __forceinline__ DType BackwardOpLhs(DType lhs, DType rhs, DType out) {
+  static __device__ __forceinline__ DType BackwardOpLhs(DType* lhs_base,
+                                                        DType* rhs_base,
+                                                        int64_t i,
+                                                        DType out) {
+    DType lhs;
+    DType rhs;
+    switch (BinaryOp::BackwardLhsReadMode) {
+      case binary_op::kBackReadRhs:
+        rhs = Read(rhs_base + i);
+        break;
+      case binary_op::kBackReadLhs:
+        lhs = Read(lhs_base + i);
+        break;
+      case binary_op::kGradBoth:
+        lhs = Read(lhs_base + i);
+        rhs = Read(rhs_base + i);
+        break;
+      default:
+    }
+
     return BinaryOp::BackwardLhs(lhs, rhs, out);
   }
-  static __device__ __forceinline__ DType BackwardOpRhs(DType lhs, DType rhs, DType out) {
+  static __device__ __forceinline__ DType BackwardOpRhs(DType* lhs_base,
+                                                        DType* rhs_base,
+                                                        int64_t i,
+                                                        DType out) {
+    DType lhs;
+    DType rhs;
+    switch (BinaryOp::BackwardRhsReadMode) {
+      case binary_op::kBackReadRhs:
+        rhs = Read(rhs_base + i);
+        break;
+      case binary_op::kBackReadLhs:
+        lhs = Read(lhs_base + i);
+        break;
+      case binary_op::kGradBoth:
+        lhs = Read(lhs_base + i);
+        rhs = Read(rhs_base + i);
+        break;
+      default:
+    }
     return BinaryOp::BackwardRhs(lhs, rhs, out);
   }
 };
@@ -555,27 +567,6 @@ void CallBackwardBinaryReduce(
   } else {
     CHECK(false) << "BackwardBinaryReduce Mode not implemented";
   }
-
-  /*
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge
-      && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  if (RightSelector::target == binary_op::kEdge
-      && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
-  */
 }
 
 // Following macro is used to generate explicit-specialization of the template
@@ -817,28 +808,6 @@ void CallBackwardBinaryReduceBcast(
   } else {
     CHECK(false) << "BackwardBinaryReduce Mode not implemented";
   }
-
-  /*
-  // If the user-given mapping is none and the target is edge data, we need to
-  // replace the mapping by the edge ids in the csr graph so that the edge
-  // data is correctly read/written.
-  if (LeftSelector::target == binary_op::kEdge
-      && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  if (RightSelector::target == binary_op::kEdge
-      && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
-      && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<Idx*>(incsr.data->data);
-  }
-  // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig,
-    BackwardBcastGData<NDim, Idx, DType>, UDF>(
-        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
-  */
 }
 
 // Following macro is used to generate explicit-specialization of the template

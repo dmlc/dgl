@@ -49,6 +49,13 @@ enum BackwardMode {
   kGradRhs,      // compute rhs gradient
   kGradBoth,     // compute both gradients
 };
+
+enum BackwardReader {
+  kBackReadNone = 0, // Both lhs and rhs is required
+  kBackReadLhs,      // Only lhs is required
+  kBackReadRhs,      // Only rhs is required
+  kBackReadBoth,     // Both lhs and rhs is required
+};
 }  // namespace binary_op
 
 //////////////////////////////////////////////////////////////////////////
@@ -133,8 +140,14 @@ struct BinaryAdd {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     return lhs[0] + rhs[0];
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadNone;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadNone;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return 1;
@@ -146,8 +159,14 @@ struct BinaryMul {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     return lhs[0] * rhs[0];
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadRhs;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return rhs;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadLhs;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return lhs;
@@ -159,8 +178,14 @@ struct BinarySub {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     return lhs[0] - rhs[0];
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadNone;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadNone;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return -1;
@@ -172,8 +197,14 @@ struct BinaryDiv {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     return lhs[0] / rhs[0];
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadRhs;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return static_cast<DType>(1) / rhs;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadBoth;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return -lhs / (rhs * rhs);
@@ -185,8 +216,14 @@ struct BinaryUseLhs {
   static DGLDEVICE DGLINLINE DType Call(DType *lhs, DType *rhs, int64_t len) {
     return lhs[0];
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadNone;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return 1;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadNone;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return 0;
@@ -204,8 +241,14 @@ struct BinaryDot {
 
     return out;
   }
+  static DGLDEVICE DGLINLINE int BackwardLhsReadMode() {
+    return binary_op::kBackReadRhs;
+  }
   static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
     return rhs;
+  }
+  static DGLDEVICE DGLINLINE int BackwardRhsReadMode() {
+    return binary_op::kBackReadLhs;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
     return lhs;
