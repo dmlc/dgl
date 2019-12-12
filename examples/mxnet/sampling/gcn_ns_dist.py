@@ -142,7 +142,7 @@ def gcn_ns_train(g, kv, mx_kv, ctx, args, n_classes, train_nid, test_nid):
 
     # use optimizer
     # TODO I need to run distributed kvstore.
-    print(model.collect_params())
+    print(model.collect_params(), flush=True)
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
                             kvstore=mx_kv)
@@ -150,22 +150,28 @@ def gcn_ns_train(g, kv, mx_kv, ctx, args, n_classes, train_nid, test_nid):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        print(epoch)
+        print(epoch, flush=True)
         start = time.time()
         num_bytes = 0
         copy_time = 0
+        for_back_time = 0
+        agg_grad_time = 0
+        def prepare(nf):
+            nbytes, copy_time1 = copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
+            num_bytes += nbytes
+            copy_time += copy_time1
+            return nf
+
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
                                                        num_workers=32,
                                                        num_hops=args.n_layers+1,
-                                                       seed_nodes=train_nid):
-            #TODO copy from kvstore
-            nbytes, copy_time1 = copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
-            num_bytes += nbytes
-            copy_time += copy_time1
+                                                       seed_nodes=train_nid,
+                                                       prepare=prepare):
             # forward
+            start1 = time.time()
             with mx.autograd.record():
                 pred = model(nf)
                 batch_nids = nf.layer_parent_nid(-1)
@@ -174,7 +180,11 @@ def gcn_ns_train(g, kv, mx_kv, ctx, args, n_classes, train_nid, test_nid):
                 loss = loss.sum() / len(batch_nids)
 
             loss.backward()
+            for_back_time += (time.time() - start1)
+
+            start1 = time.time()
             trainer.step(batch_size=1)
+            agg_grad_time += (time.time() - start1)
 
         infer_params = infer_model.collect_params()
 
@@ -187,21 +197,24 @@ def gcn_ns_train(g, kv, mx_kv, ctx, args, n_classes, train_nid, test_nid):
         num_acc = 0.
         num_tests = 0
 
-        start = time.time()
-        for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-                                                       g.number_of_nodes(),
-                                                       neighbor_type='in',
-                                                       num_hops=args.n_layers+1,
-                                                       seed_nodes=test_nid):
-            copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
-            pred = infer_model(nf)
-            batch_nids = nf.layer_parent_nid(-1)
-            batch_labels = nf.layers[-1].data['label']
-            num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
-            num_tests += nf.layer_size(-1)
-            break
-        eval_time = time.time() - start
+        #start = time.time()
+        #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+        #                                               g.number_of_nodes(),
+        #                                               neighbor_type='in',
+        #                                               num_hops=args.n_layers+1,
+        #                                               seed_nodes=test_nid):
+        #    copy_from_kvstore(nf, kv, ctx, args.graph_name, ['feature', 'label'])
+        #    pred = infer_model(nf)
+        #    batch_nids = nf.layer_parent_nid(-1)
+        #    batch_labels = nf.layers[-1].data['label']
+        #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+        #    num_tests += nf.layer_size(-1)
+        #    break
+        #eval_time = time.time() - start
 
-        print("Trainer {}: Test Accuracy {:.4f}, Train Time {:.4f}, Eval time {:.4f}". format(
-            args.id, num_acc/num_tests, train_time, eval_time))
-        print('throughput: {}'.format(num_bytes / copy_time))
+        #print("Trainer {}: Test Accuracy {:.4f}, Train Time {:.4f}, Eval time {:.4f}". format(
+        #    args.id, num_acc/num_tests, train_time, eval_time), flush=True)
+        print('Trainer {}: Train Time {:.4f}, Throughput: {:.4f}'.format(args.id, train_time,
+            num_bytes / copy_time), flush=True)
+        print('Trainer {}: copy {:.4f}, forward_backward: {:.4f}, gradient update:{:.4f}'.format(
+            args.id, copy_time, for_back_time, agg_grad_time))
