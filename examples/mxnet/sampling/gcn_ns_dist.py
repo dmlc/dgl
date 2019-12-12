@@ -118,7 +118,7 @@ def copy_from_kvstore(nf, kv, ctx, graph_name, ndata_names):
             num_bytes += np.prod(data.shape)
     return num_bytes * 4, time.time() - start
 
-def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
+def gcn_ns_train(g, kv, mx_kv, ctx, args, n_classes, train_nid, test_nid):
     in_feats = args.n_features
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -145,7 +145,7 @@ def gcn_ns_train(g, kv, ctx, args, n_classes, train_nid, test_nid):
     print(model.collect_params())
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('dist_sync'))
+                            kvstore=mx_kv)
 
     # initialize graph
     dur = []
