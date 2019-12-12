@@ -110,13 +110,24 @@ def get_from_kvstore(args, kv, g, name):
     print('client pull ' + name, flush=True)
     return kv.pull(name=name, id_tensor=g.ndata['global_id'])
 
-def main(args):
-    kvstore = mx.kv.create('dist_sync')
-    args.id = kvstore.rank
 
+def get_id(kvstore):
     host_name = socket.gethostname()
     host_ip = socket.gethostbyname(host_name)
     print('Trainer {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
+    ids = []
+    for key, val in client_namebook.items():
+        val = val.split(':')
+        val = val[0]
+        if val == host_ip:
+            ids.append(int(key))
+    ids = np.sort(ids)
+    return ids[kvstore.rank % 2]
+
+def main(args):
+    kvstore = mx.kv.create('dist_sync')
+    args.id = get_id(kvstore)
+    print(args.id, flush=True)
 
     g, all_locs = load_local_part(args)
     print('graph size:', g.number_of_nodes(), flush=True)
