@@ -1454,10 +1454,6 @@ public:
     }
 
     batch_curr_id_ += positive_subgs.size();
-    if (batch_curr_id_ >= max_batch_id_) {
-      batch_curr_id_ = 0;
-    }
-
     return positive_subgs;
   }
 
