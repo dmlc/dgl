@@ -188,7 +188,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
@@ -222,7 +222,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   }
@@ -277,7 +277,7 @@ void CallBinaryReduceBcast(
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
       BcastGData<NDim, Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
@@ -313,7 +313,7 @@ void CallBinaryReduceBcast(
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
       BcastGData<NDim, Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   }

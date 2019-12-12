@@ -61,7 +61,7 @@ struct BackwardBinaryReduce {
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           gradrhsoff[tx * len + i] += grad_rhs;
         }
       }
@@ -120,7 +120,7 @@ struct BackwardBinaryReduceBcast {
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
           gradrhsoff[tx * len + i] += grad_rhs;
         }
       }
@@ -165,20 +165,21 @@ struct BackwardFunctorsTempl {
                                     DType* rhs_base,
                                     int64_t i,
                                     DType out) {
-    DType lhs;
-    DType rhs;
-    switch (BinaryOp::BackwardLhsReadMode) {
+    DType lhs = 0;
+    DType rhs = 0;
+    switch (BinaryOp::BackwardLhsReadMode()) {
       case binary_op::kBackReadRhs:
         rhs = Read(rhs_base + i);
         break;
       case binary_op::kBackReadLhs:
         lhs = Read(lhs_base + i);
         break;
-      case binary_op::kGradBoth:
+      case binary_op::kBackReadBoth:
         lhs = Read(lhs_base + i);
         rhs = Read(rhs_base + i);
         break;
       default:
+        break;
     }
 
     return BinaryOp::BackwardLhs(lhs, rhs, out);
@@ -187,20 +188,21 @@ struct BackwardFunctorsTempl {
                                     DType* rhs_base,
                                     int64_t i,
                                     DType out) {
-    DType lhs;
-    DType rhs;
-    switch (BinaryOp::BackwardRhsReadMode) {
+    DType lhs = 0;
+    DType rhs = 0;
+    switch (BinaryOp::BackwardRhsReadMode()) {
       case binary_op::kBackReadRhs:
         rhs = Read(rhs_base + i);
         break;
       case binary_op::kBackReadLhs:
         lhs = Read(lhs_base + i);
         break;
-      case binary_op::kGradBoth:
+      case binary_op::kBackReadBoth:
         lhs = Read(lhs_base + i);
         rhs = Read(rhs_base + i);
         break;
       default:
+        break;
     }
     return BinaryOp::BackwardRhs(lhs, rhs, out);
   }
@@ -269,7 +271,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kSrc) {
@@ -301,7 +303,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kDst) {
@@ -333,7 +335,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -373,7 +375,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kSrc) {
@@ -405,7 +407,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kDst) {
@@ -437,7 +439,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -467,12 +469,6 @@ void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const CSRWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
           typename SwitchSrcDst<LeftSelector>::Type,
           typename SwitchSrcDst<RightSelector>::Type,
@@ -516,7 +512,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig,
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kSrc) {
@@ -548,7 +544,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig,
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kDst) {
@@ -580,7 +576,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -621,7 +617,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kSrc) {
@@ -653,7 +649,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kDst) {
@@ -685,7 +681,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
