@@ -998,30 +998,6 @@ inline SubgraphRef ConvertRef(const NegSubgraph &subg) {
 
 }  // namespace
 
-DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // arguments
-    GraphRef g = args[0];
-    IdArray seed_edges = args[1];
-    const int64_t batch_start_id = args[2];
-    const int64_t batch_size = args[3];
-    const int64_t max_num_workers = args[4];
-    const std::string neg_mode = args[5];
-    const int neg_sample_size = args[6];
-    const bool exclude_positive = args[7];
-    const bool check_false_neg = args[8];
-    IdArray relations = args[9];
-    // process args
-    auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(gptr) << "sampling isn't implemented in mutable graph";
-    CHECK(aten::IsValidIdArray(seed_edges));
-    BuildCoo(*gptr);
-
-    const int64_t num_seeds = seed_edges->shape[0];
-
-  });
-
-
 DGL_REGISTER_GLOBAL("sampling._CAPI_GetNegEdgeExistence")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   SubgraphRef g = args[0];
