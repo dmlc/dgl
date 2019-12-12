@@ -1044,7 +1044,7 @@ public:
 
   ~EdgeSamplerObject() {}
 
-  virtual std::vector<SubgraphRef> fetch() = 0;
+  virtual void fetch(DGLRetValue* rv) = 0;
 
 protected:
   virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
@@ -1412,13 +1412,13 @@ public:
   }
   ~UniformEdgeSamplerObject() {}
 
-  std::vector<SubgraphRef> fetch() {
+  void fetch(DGLRetValue* rv) {
     const int64_t num_workers = std::min(num_workers_, max_batch_id_ - batch_curr_id_);
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers);
     std::vector<SubgraphRef> negative_subgs(num_workers);
 #pragma omp parallel for
-    for (int i = 0; i < num_workers; i++) {
+    for (int64_t i = 0; i < num_workers; i++) {
       const int64_t start = (batch_curr_id_ + i) * batch_size_;
       const int64_t end = std::min(start + batch_size_, num_seeds_);
       const int64_t num_edges = end - start;
@@ -1453,8 +1453,8 @@ public:
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
 
-    batch_curr_id_ += positive_subgs.size();
-    return positive_subgs;
+    batch_curr_id_ += num_workers;
+    *rv = List<SubgraphRef>(positive_subgs);
   }
 
   DGL_DECLARE_OBJECT_TYPE_INFO(UniformEdgeSamplerObject, Object);
@@ -1524,7 +1524,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
 DGL_REGISTER_GLOBAL("sampling._CAPI_FetchUniformEdgeSample")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   UniformEdgeSampler sampler = args[0];
-  *rv = List<SubgraphRef>(sampler->fetch());
+  sampler->fetch(rv);
 });
 
 template<typename ValueType>
@@ -1574,7 +1574,7 @@ public:
   ~WeightedEdgeSamplerObject() {
   }
 
-  std::vector<SubgraphRef> fetch() {
+  void fetch(DGLRetValue* rv) {
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers_);
     std::vector<SubgraphRef> negative_subgs(num_workers_);
@@ -1618,7 +1618,8 @@ public:
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
-    return positive_subgs;
+
+    *rv = List<SubgraphRef>(positive_subgs);
   }
 
   DGL_DECLARE_OBJECT_TYPE_INFO(WeightedEdgeSamplerObject<ValueType>, Object);
@@ -1749,7 +1750,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
 DGL_REGISTER_GLOBAL("sampling._CAPI_FetchWeightedEdgeSample")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FloatWeightedEdgeSampler sampler = args[0];
-  *rv = List<SubgraphRef>(sampler->fetch());
+  sampler->fetch(rv);
 });
 
 }  // namespace dgl
