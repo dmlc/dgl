@@ -22,7 +22,7 @@ server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt'
 def load_node_data(args):
     if args.num_parts > 1:
         import pickle
-        ndata = pickle.load(open('Reddit/reddit_ndata.pkl', 'rb'))
+        ndata = pickle.load(open('Reddit8/reddit_ndata.pkl', 'rb'))
         print('load reddit ndata')
         return ndata
     else:
@@ -89,8 +89,8 @@ def load_local_part(args):
     # TODO for now, I use pickle to store partitioned graph.
     if args.num_parts > 1:
         import pickle
-        part, part_nodes, part_loc = pickle.load(open('Reddit/reddit_part_{}.pkl'.format(args.id), 'rb'))
-        all_locs = np.loadtxt('Reddit/reddit.adj.part.{}'.format(args.num_parts))
+        part, part_nodes, part_loc = pickle.load(open('Reddit8/reddit_part_{}.pkl'.format(args.id), 'rb'))
+        all_locs = np.loadtxt('Reddit8/reddit.adj.part.{}'.format(args.num_parts))
         g = dgl.DGLGraph(part, readonly=True)
         g.ndata['global_id'] = mx.nd.array(part_nodes, dtype=np.int64)
         g.ndata['node_loc'] = mx.nd.array(part_loc, dtype=np.int64)
