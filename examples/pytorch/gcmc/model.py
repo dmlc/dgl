@@ -81,7 +81,7 @@ class GCMCLayer(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.W_r = nn.ParameterDict()
         for rating in rating_vals:
-            rating = str(rating)
+            rating = str(rating).replace('.', '_')
             if share_user_item_param and user_in_units == movie_in_units:
                 self.W_r[rating] = nn.Parameter(th.randn(user_in_units, msg_units))
                 self.W_r['rev-%s' % rating] = self.W_r[rating]
@@ -124,8 +124,8 @@ class GCMCLayer(nn.Module):
         for i, rating in enumerate(self.rating_vals):
             rating = str(rating)
             # W_r * x
-            x_u = dot_or_identity(ufeat, self.W_r[rating])
-            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating])
+            x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')])
+            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')])
             # left norm and dropout
             x_u = x_u * self.dropout(graph.nodes['user'].data['cj'])
             x_i = x_i * self.dropout(graph.nodes['movie'].data['cj'])
