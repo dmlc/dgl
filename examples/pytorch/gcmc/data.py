@@ -164,8 +164,8 @@ class MovieLens(object):
             self.user_feature = None
             self.movie_feature = None
         else:
-            self.user_feature = th.FloatTensor(self._process_user_fea(), device=device)
-            self.movie_feature = th.FloatTensor(self._process_movie_fea(), device=device)
+            self.user_feature = th.FloatTensor(self._process_user_fea().to(device)
+            self.movie_feature = th.FloatTensor(self._process_movie_fea().to(device)
         if self.user_feature is None:
             self.user_feature_shape = (self.num_user, self.num_user)
             self.movie_feature_shape = (self.num_movie, self.num_movie)
@@ -183,23 +183,23 @@ class MovieLens(object):
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
         def _make_labels(ratings):
-            labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings), device=device)
+            labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings).to(device)
             return labels
 
         self.train_enc_graph = self._generate_enc_graph(train_rating_pairs, train_rating_values, add_support=True)
         self.train_dec_graph = self._generate_dec_graph(train_rating_pairs)
         self.train_labels = _make_labels(train_rating_values)
-        self.train_truths = th.FloatTensor(train_rating_values, device=device)
+        self.train_truths = th.FloatTensor(train_rating_values).to(device)
 
         self.valid_enc_graph = self.train_enc_graph
         self.valid_dec_graph = self._generate_dec_graph(valid_rating_pairs)
         self.valid_labels = _make_labels(valid_rating_values)
-        self.valid_truths = th.FloatTensor(valid_rating_values, device=device)
+        self.valid_truths = th.FloatTensor(valid_rating_values).to(device)
 
         self.test_enc_graph = self._generate_enc_graph(all_train_rating_pairs, all_train_rating_values, add_support=True)
         self.test_dec_graph = self._generate_dec_graph(test_rating_pairs)
         self.test_labels = _make_labels(test_rating_values)
-        self.test_truths = th.FloatTensor(test_rating_values, device=device)
+        self.test_truths = th.FloatTensor(test_rating_values).to(device)
 
         def _npairs(graph):
             rst = 0
@@ -282,8 +282,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(sum(user_cj))
                 movie_cj = _calc_norm(sum(movie_cj))
             else:
-                user_cj = th.ones((self.num_user,), device=self._device)
-                movie_cj = th.ones((self.num_movie,), device=self._device)
+                user_cj = th.ones((self.num_user,).to(self._device)
+                movie_cj = th.ones((self.num_movie,).to(self._device)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 

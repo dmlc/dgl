@@ -38,7 +38,7 @@ class Net(nn.Module):
 
 def evaluate(args, net, dataset, segment='valid'):
     possible_rating_values = dataset.possible_rating_values
-    nd_possible_rating_values = th.FloatTensor(possible_rating_values, device=args.device)
+    nd_possible_rating_values = th.FloatTensor(possible_rating_values).to(args.device)
 
     if segment == "valid":
         rating_values = dataset.valid_truths
@@ -76,7 +76,7 @@ def train(args):
     net = Net(args=args)
     #net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
     net = net.to(args.device)
-    nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values, device=args.device)
+    nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values).to(args.device)
     rating_loss_net = nn.CrossEntropyLoss()
     learning_rate = args.train_lr
     optimizer = get_optimizer(args.train_optimizer)(net.parameters(), lr=learning_rate)
