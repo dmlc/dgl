@@ -282,8 +282,8 @@ class MovieLens(object):
                 user_cj = _calc_norm(sum(user_cj))
                 movie_cj = _calc_norm(sum(movie_cj))
             else:
-                user_cj = th.ones((self.num_user,).to(self._device)
-                movie_cj = th.ones((self.num_movie,).to(self._device)
+                user_cj = th.ones(self.num_user,).to(self._device)
+                movie_cj = th.ones(self.num_movie,).to(self._device)
             graph.nodes['user'].data.update({'ci' : user_ci, 'cj' : user_cj})
             graph.nodes['movie'].data.update({'ci' : movie_ci, 'cj' : movie_cj})
 
