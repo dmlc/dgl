@@ -9,8 +9,7 @@ import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import GCMCLayer, BiDecoder
-from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info,\
-    parse_ctx, MetricLogger
+from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger
 
 class Net(nn.Module):
     def __init__(self, args):
@@ -65,7 +64,7 @@ def evaluate(args, net, dataset, segment='valid'):
 
 def train(args):
     print(args)
-    dataset = MovieLens(args.data_name, args.ctx, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
+    dataset = MovieLens(args.data_name, args.device, use_one_hot_fea=args.use_one_hot_fea, symm=args.gcn_agg_norm_symm,
                         test_ratio=args.data_test_ratio, valid_ratio=args.data_valid_ratio)
     print("Loading data finished ...\n")
 
@@ -178,8 +177,8 @@ def train(args):
 def config():
     parser = argparse.ArgumentParser(description='GCMC')
     parser.add_argument('--seed', default=123, type=int)
-    parser.add_argument('--device', dest='device', default='gpu0', type=str,
-                        help='Running device. E.g `--device gpu` or `--device gpu0,gpu1` or `--device cpu`')
+    parser.add_argument('--device', default='0', type=int,
+                        help='Running device. E.g `--device 0`, if using cpu, set `--device -1`')
     parser.add_argument('--save_dir', type=str, help='The saving directory')
     parser.add_argument('--save_id', type=int, help='The saving log id')
     parser.add_argument('--silent', action='store_true')
@@ -208,8 +207,7 @@ def config():
     parser.add_argument('--share_param', default=False, action='store_true')
 
     args = parser.parse_args()
-    args.ctx = parse_ctx(args.ctx)[0]
-
+    args.device = th.device(args.device) if args.device >= 0 else th.device('cpu')
 
     ### configure save_fir to save all the info
     if args.save_dir is None:

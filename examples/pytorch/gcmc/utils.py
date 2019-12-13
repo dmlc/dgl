@@ -23,13 +23,6 @@ class MetricLogger(object):
         self._file.close()
 
 
-def parse_ctx(ctx_args):
-    ctx = re.findall('([a-z]+)(\d*)', ctx_args)
-    ctx = [(device, int(num)) if len(num) > 0 else (device, 0) for device, num in ctx]
-    ctx = [th.device(str(dev) + ':' + str(id)) for dev, id in ctx]
-    return ctx
-
-
 def torch_total_param_num(net):
     return sum([np.prod(p.shape) for p in net.parameters()])
 
