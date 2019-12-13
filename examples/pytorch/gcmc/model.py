@@ -184,7 +184,7 @@ class BiDecoder(nn.Module):
         self.Ps = nn.ParameterList()
         for i in range(num_basis_functions):
             self.Ps.append(nn.Parameter(th.randn(in_units, in_units)))
-        self.rate_out = nn.Linear(self._num_basis_functions, rating_vals, bias=False)
+        self.rate_out = nn.Linear(self._num_basis_functions, len(rating_vals), bias=False)
         self.reset_parameters()
 
     def reset_parameters(self):

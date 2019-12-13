@@ -30,7 +30,7 @@ def torch_total_param_num(net):
 def torch_net_info(net, save_path=None):
     info_str = 'Total Param Number: {}\n'.format(torch_total_param_num(net)) +\
                'Params:\n'
-    for k, v in net.named_parameters().items():
+    for k, v in net.named_parameters():
         info_str += '\t{}: {}, {}\n'.format(k, v.shape, np.prod(v.shape))
     info_str += str(net)
     if save_path is not None:
