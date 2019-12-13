@@ -334,7 +334,7 @@ def test_all_binary_builtins():
     g.add_edge(19, 0)
     g.add_edge(19, 1)
     nid = F.tensor([0, 1, 4, 5, 7, 12, 14, 15, 18, 19])
-    target = ["e", "u", "v"]
+    target = ["u", "v", "e"]
 
     for lhs, rhs in product(target, target):
         if lhs == rhs:
@@ -343,11 +343,12 @@ def test_all_binary_builtins():
             for reducer in ["sum", "max", "min", "prod"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
+                        print("{}_{}_{} {} {} {}".format(lhs, binary_op, rhs, reducer, broadcast, partial))
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
 
 if __name__ == '__main__':
-    test_copy_src_reduce()
-    test_copy_edge_reduce()
+    #test_copy_src_reduce()
+    #test_copy_edge_reduce()
     test_all_binary_builtins()
 

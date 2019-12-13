@@ -223,12 +223,6 @@ void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const CSRWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
-  // For backward computation, we use reverse csr and switch dst and src.
-  // This benefits the most common src_op_edge or copy_src case, because the
-  // gradients of src are now aggregated into destination buffer to reduce
-  // competition of atomic add.
-  auto incsr = graph.GetInCSRMatrix();
-  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr.indptr, incsr.indices);
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
           typename SwitchSrcDst<LeftSelector>::Type,
           typename SwitchSrcDst<RightSelector>::Type,

@@ -156,6 +156,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
   
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
+    LOG(INFO) << "OutSelector kEdge";
     // Out Target is Edge, we need use COO format
     auto coo_matrix = graph.GetCOOMatrix();
     minigun::Coo<Idx> coo = utils::CreateCoo<Idx>(coo_matrix.row, coo_matrix.col);
@@ -194,6 +195,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
     CHECK(false) << "BinaryReduce target should not be kSrc";
   } else if (OutSelector<Reducer>::Type::target == binary_op::kDst) {
+    LOG(INFO) << "OutSelector kDst";
     // Out Target is destination Node, we need use CSR_t format
     // so data are aggregated in columns
     auto incsr = graph.GetInCSRMatrix();
