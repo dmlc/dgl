@@ -1,8 +1,5 @@
 """NN modules"""
-import math
-
 import torch as th
-import torch.functional as F
 import torch.nn as nn
 import dgl.function as fn
 
@@ -81,6 +78,7 @@ class GCMCLayer(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.W_r = nn.ParameterDict()
         for rating in rating_vals:
+            # PyTorch parameter name can't contain "."
             rating = str(rating).replace('.', '_')
             if share_user_item_param and user_in_units == movie_in_units:
                 self.W_r[rating] = nn.Parameter(th.randn(user_in_units, msg_units))
@@ -93,7 +91,8 @@ class GCMCLayer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        for p in self.parameters():
+            nn.init.xavier_uniform_(p)
 
     def forward(self, graph, ufeat=None, ifeat=None):
         """Forward function
@@ -188,7 +187,8 @@ class BiDecoder(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        for p in self.parameters():
+            nn.init.xavier_uniform_(p)
 
     def forward(self, graph, ufeat, ifeat):
         """Forward function.
