@@ -92,7 +92,8 @@ class GCMCLayer(nn.Module):
 
     def reset_parameters(self):
         for p in self.parameters():
-            nn.init.xavier_uniform_(p)
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, graph, ufeat=None, ifeat=None):
         """Forward function
@@ -188,7 +189,8 @@ class BiDecoder(nn.Module):
 
     def reset_parameters(self):
         for p in self.parameters():
-            nn.init.xavier_uniform_(p)
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, graph, ufeat, ifeat):
         """Forward function.
