@@ -517,7 +517,7 @@ class MovieLens(object):
             else:
                 title_context, year = match_res.groups()
             # We use average of glove
-            title_embedding[i, :] = embedding.get_vecs_by_tokens(TEXT.tokenize(title_context)).asnumpy().mean(axis=0)
+            title_embedding[i, :] = embedding.get_vecs_by_tokens(TEXT.tokenize(title_context)).numpy().mean(axis=0)
             release_years[i] = float(year)
         movie_features = np.concatenate((title_embedding,
                                          (release_years - 1950.0) / 100.0,
