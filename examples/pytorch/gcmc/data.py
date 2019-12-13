@@ -258,7 +258,7 @@ class MovieLens(object):
 
         if add_support:
             def _calc_norm(x):
-                x = x.asnumpy().astype('float32')
+                x = x.numpy().astype('float32')
                 x[x == 0.] = np.inf
                 x = th.FloatTensor(1. / np.sqrt(x))
                 return x.to(self._device).unsqueeze(1)
@@ -279,8 +279,8 @@ class MovieLens(object):
             user_ci = _calc_norm(sum(user_ci))
             movie_ci = _calc_norm(sum(movie_ci))
             if self._symm:
-                user_cj = _calc_norm(sum(*user_cj))
-                movie_cj = _calc_norm(sum(*movie_cj))
+                user_cj = _calc_norm(sum(user_cj))
+                movie_cj = _calc_norm(sum(movie_cj))
             else:
                 user_cj = th.ones((self.num_user,), device=self._device)
                 movie_cj = th.ones((self.num_movie,), device=self._device)
