@@ -164,8 +164,8 @@ class MovieLens(object):
             self.user_feature = None
             self.movie_feature = None
         else:
-            self.user_feature = th.FloatTensor(self._process_user_fea().to(device)
-            self.movie_feature = th.FloatTensor(self._process_movie_fea().to(device)
+            self.user_feature = th.FloatTensor(self._process_user_fea()).to(device)
+            self.movie_feature = th.FloatTensor(self._process_movie_fea()).to(device)
         if self.user_feature is None:
             self.user_feature_shape = (self.num_user, self.num_user)
             self.movie_feature_shape = (self.num_movie, self.num_movie)
@@ -183,7 +183,7 @@ class MovieLens(object):
         test_rating_pairs, test_rating_values = self._generate_pair_value(self.test_rating_info)
 
         def _make_labels(ratings):
-            labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings).to(device)
+            labels = th.LongTensor(np.searchsorted(self.possible_rating_values, ratings)).to(device)
             return labels
 
         self.train_enc_graph = self._generate_enc_graph(train_rating_pairs, train_rating_values, add_support=True)
