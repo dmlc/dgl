@@ -61,7 +61,7 @@ struct BackwardBinaryReduce {
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           gradrhsoff[tx * len + i] += grad_rhs;
         }
       }
@@ -120,7 +120,7 @@ struct BackwardBinaryReduceBcast {
         }
       } else if (Mode == binary_op::kGradRhs) {
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           gradrhsoff[tx * len + i] += grad_rhs;
         }
       }
@@ -136,7 +136,7 @@ struct BackwardFunctorsTempl {
   static inline Idx SelectOut(
       Idx src, Idx edge, Idx dst) {
     typedef typename OutSelector<Reducer>::Type OutTarget;
-    return SwitchSrcDst<OutTarget>::Type::Call(src, edge, dst);
+    return OutTarget::Call(src, edge, dst);
   }
   static inline Idx SelectLeft(
       Idx src, Idx edge, Idx dst) {
@@ -208,7 +208,6 @@ struct BackwardFunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> AdvanceConfig;
 typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kSrc> SrcAdvanceConfig;
 typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> DstAdvanceConfig;
 typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> EdgeAdvanceConfig;
@@ -224,11 +223,10 @@ void CallBackwardBinaryReduce(
     const CSRWrapper& graph,
     BackwardGData<Idx, DType>* gdata) {
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
-          typename SwitchSrcDst<LeftSelector>::Type,
-          typename SwitchSrcDst<RightSelector>::Type,
+          LeftSelector, RightSelector,
           BinaryOp, Reducer> Functors;
   typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
-    if (Mode == binary_op::kGradLhs) {
+  if (Mode == binary_op::kGradLhs) {
     if (LeftSelector::target == binary_op::kEdge) {
       // Out Target is Edge, we need use COO format
       auto coo_matrix = graph.GetCOOMatrix();
@@ -464,8 +462,7 @@ void CallBackwardBinaryReduceBcast(
     const CSRWrapper& graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
   typedef cpu::BackwardFunctorsTempl<Idx, DType,
-          typename SwitchSrcDst<LeftSelector>::Type,
-          typename SwitchSrcDst<RightSelector>::Type,
+          LeftSelector, RightSelector,
           BinaryOp, Reducer> Functors;
   typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, Idx, DType, Functors> UDF;
 

@@ -66,7 +66,7 @@ struct BackwardBinaryReduce {
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
@@ -186,7 +186,7 @@ struct BackwardBinaryReduceBcast {
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }
@@ -243,7 +243,7 @@ struct BackwardBinaryReduceBcast {
       } else if (Mode == binary_op::kGradRhs) {
 #pragma unroll
         for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
           DType *gradrhs_addr = gradrhsoff + tx * len + i;
           *gradrhs_addr = *gradrhs_addr + grad_rhs;
         }

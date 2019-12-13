@@ -343,12 +343,12 @@ def test_all_binary_builtins():
             for reducer in ["sum", "max", "min", "prod"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
-                        print("{}_{}_{} {} {} {}".format(lhs, binary_op, rhs, reducer, broadcast, partial))
+                        #print("{}_{}_{} {} {} {}".format(lhs, binary_op, rhs, reducer, broadcast, partial))
                         _test(g, lhs, rhs, binary_op, reducer, partial, nid,
                               broadcast=broadcast)
 
 if __name__ == '__main__':
-    #test_copy_src_reduce()
-    #test_copy_edge_reduce()
+    test_copy_src_reduce()
+    test_copy_edge_reduce()
     test_all_binary_builtins()
 

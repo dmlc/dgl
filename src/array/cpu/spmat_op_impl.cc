@@ -544,7 +544,6 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
     coo.data = ret_data;
   }
 
-  // no data array
   return coo;
 }
 
