@@ -68,6 +68,11 @@ class GCMCLayer(nn.Module):
         self.rating_vals = rating_vals
         self.agg = agg
         self.share_user_item_param = share_user_item_param
+        self.ufc = nn.Linear(msg_units, out_units)
+        if share_user_item_param:
+            self.ifc = self.ufc
+        else:
+            self.ifc = nn.Linear(msg_units, out_units)
         if agg == 'stack':
             # divide the original msg unit size by number of ratings to keep
             # the dimensionality
@@ -83,11 +88,6 @@ class GCMCLayer(nn.Module):
             else:
                 self.W_r[rating] = nn.Parameter(th.randn(user_in_units, msg_units))
                 self.W_r['rev-%s' % rating] = nn.Parameter(th.randn(movie_in_units, msg_units))
-        self.ufc = nn.Linear(user_in_units, out_units)
-        if share_user_item_param:
-            self.ifc = self.ufc
-        else:
-            self.ifc = nn.Linear(movie_in_units, out_units)
         self.agg_act = get_activation(agg_act)
         self.out_act = get_activation(out_act)
         self.reset_parameters()
