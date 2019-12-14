@@ -1420,6 +1420,8 @@ public:
     batch_curr_id_ = 0;
     num_seeds_ = seed_edges->shape[0];
     max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
+    //TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    gptr_->FindEdge(0);
   }
   ~UniformEdgeSamplerObject() {}
 
@@ -1428,6 +1430,7 @@ public:
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers);
     std::vector<SubgraphRef> negative_subgs(num_workers);
+
 #pragma omp parallel for
     for (int64_t i = 0; i < num_workers; i++) {
       const int64_t start = (batch_curr_id_ + i) * batch_size_;
@@ -1580,6 +1583,9 @@ public:
       }
       node_selector_ = std::make_shared<ArrayHeap<ValueType>>(nprob);
     }
+
+    //TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    gptr_->FindEdge(0);
   }
 
   ~WeightedEdgeSamplerObject() {
