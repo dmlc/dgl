@@ -331,14 +331,14 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         pos_d = int(F.asnumpy(pos_gdst[i]))
         pos_e = int(F.asnumpy(pos_geid[i]))
         pos_map[(pos_d, pos_e)] = int(F.asnumpy(pos_gsrc[i]))
-    WeightedEdgeSampler = getattr(dgl.contrib.sampling, 'WeightedEdgeSampler')
+    EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
 
     # Correctness check
     # Test the homogeneous graph.
     batch_size = 50
     total_samples = 0
     max_samples = num_edges
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                                     edge_weight=edge_weight,
                                                     negative_mode=mode,
                                                     neg_sample_size=neg_size,
@@ -378,7 +378,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 
     # Test the knowledge graph with edge weight provied.
     total_samples = 0
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -404,7 +404,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 
     # Test the knowledge graph with edge/node weight provied.
     total_samples = 0
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             node_weight=node_weight,
                                             negative_mode=mode,
@@ -447,7 +447,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     total_samples = 0
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -484,7 +484,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     total_samples = 0
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
-    for pos_edges, neg_edges in WeightedEdgeSampler(g, batch_size,
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             node_weight=node_weight,
                                             negative_mode=mode,

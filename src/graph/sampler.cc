@@ -103,6 +103,62 @@ class ArrayHeap {
   std::vector<ValueType> heap_;
 };
 
+///////////////////////// Samplers //////////////////////////
+class EdgeSamplerObject: public Object {
+public:
+  EdgeSamplerObject(const GraphPtr gptr,
+                    IdArray seed_edges,
+                    const int64_t batch_size,
+                    const int64_t num_workers,
+                    const std::string neg_mode,
+                    const int64_t neg_sample_size,
+                    const bool exclude_positive,
+                    const bool check_false_neg,
+                    IdArray relations) {
+    gptr_ = gptr;
+    seed_edges_ = seed_edges;
+    relations_ = relations;
+
+    batch_size_ = batch_size;
+    num_workers_ = num_workers;
+    neg_mode_ = neg_mode;
+    neg_sample_size_ = neg_sample_size;
+    exclude_positive_ = exclude_positive;
+    check_false_neg_ = check_false_neg;
+  }
+
+  ~EdgeSamplerObject() {}
+
+  virtual void fetch(DGLRetValue* rv) = 0;
+
+protected:
+  virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
+  virtual void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
+                    std::vector<size_t>* out) = 0;
+
+  NegSubgraph genNegEdgeSubgraph(const Subgraph &pos_subg,
+                                 const std::string &neg_mode,
+                                 int64_t neg_sample_size,
+                                 bool exclude_positive,
+                                 bool check_false_neg);
+  NegSubgraph genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
+                                    const std::string &neg_mode,
+                                    int64_t neg_sample_size,
+                                    bool exclude_positive,
+                                    bool check_false_neg);
+
+  GraphPtr gptr_;
+  IdArray seed_edges_;
+  IdArray relations_;
+
+  int64_t batch_size_;
+  int64_t num_workers_;
+  std::string neg_mode_;
+  int64_t neg_sample_size_;
+  bool exclude_positive_;
+  bool check_false_neg_;
+};
+
 /*
  * Uniformly sample integers from [0, set_size) without replacement.
  */
@@ -988,6 +1044,328 @@ std::vector<dgl_id_t> Global2Local(const std::vector<size_t> &ids,
   return local_ids;
 }
 
+NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
+                                                  const std::string &neg_mode,
+                                                  int64_t neg_sample_size,
+                                                  bool exclude_positive,
+                                                  bool check_false_neg) {
+  int64_t num_tot_nodes = gptr_->NumVertices();
+  if (neg_sample_size > num_tot_nodes)
+    neg_sample_size = num_tot_nodes;
+  bool is_multigraph = gptr_->IsMultigraph();
+  std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
+  IdArray coo = adj[0];
+  int64_t num_pos_edges = coo->shape[0] / 2;
+  int64_t num_neg_edges = num_pos_edges * neg_sample_size;
+  IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+  IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
+
+  // These are vids in the positive subgraph.
+  const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
+  const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
+  const dgl_id_t *induced_vid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+  const dgl_id_t *induced_eid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+  size_t num_pos_nodes = pos_subg.graph->NumVertices();
+  std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
+
+  dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
+  dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
+  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
+  dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
+
+  const dgl_id_t *unchanged;
+  dgl_id_t *neg_unchanged;
+  dgl_id_t *neg_changed;
+  if (IsNegativeHeadMode(neg_mode)) {
+    unchanged = dst_data;
+    neg_unchanged = neg_dst_data;
+    neg_changed = neg_src_data;
+  } else {
+    unchanged = src_data;
+    neg_unchanged = neg_src_data;
+    neg_changed = neg_dst_data;
+  }
+
+  std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
+  std::vector<dgl_id_t> local_pos_vids;
+  local_pos_vids.reserve(num_pos_edges);
+
+  dgl_id_t curr_eid = 0;
+  std::vector<size_t> neg_vids;
+  neg_vids.reserve(neg_sample_size);
+  // If we don't exclude positive edges, we are actually sampling more than
+  // the total number of nodes in the graph.
+  if (!exclude_positive && neg_sample_size >= num_tot_nodes) {
+    // We add all nodes as negative nodes.
+    for (int64_t i = 0; i < num_tot_nodes; i++) {
+      neg_vids.push_back(i);
+      neg_map[i] = i;
+    }
+
+    // Get all nodes in the positive side.
+    for (int64_t i = 0; i < num_pos_edges; i++) {
+      dgl_id_t vid = induced_vid_data[unchanged[i]];
+      local_pos_vids.push_back(neg_map[vid]);
+    }
+    // There is no guarantee that the nodes in the vector are unique.
+    std::sort(local_pos_vids.begin(), local_pos_vids.end());
+    auto it = std::unique(local_pos_vids.begin(), local_pos_vids.end());
+    local_pos_vids.resize(it - local_pos_vids.begin());
+  } else {
+    // Collect nodes in the positive side.
+    dgl_id_t local_vid = 0;
+    for (int64_t i = 0; i < num_pos_edges; i++) {
+      dgl_id_t vid = induced_vid_data[unchanged[i]];
+      auto it = neg_map.find(vid);
+      if (it == neg_map.end()) {
+        local_pos_vids.push_back(local_vid);
+        neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
+      }
+    }
+  }
+
+  int64_t prev_neg_offset = 0;
+  for (int64_t i = 0; i < num_pos_edges; i++) {
+    size_t neg_idx = i * neg_sample_size;
+
+    std::vector<size_t> neighbors;
+    DGLIdIters neigh_it;
+    if (IsNegativeHeadMode(neg_mode)) {
+      neigh_it = gptr_->PredVec(induced_vid_data[unchanged[i]]);
+    } else {
+      neigh_it = gptr_->SuccVec(induced_vid_data[unchanged[i]]);
+    }
+
+    // If the number of negative nodes is smaller than the number of total nodes
+    // in the graph.
+    if (exclude_positive && neg_sample_size < num_tot_nodes) {
+      std::vector<size_t> exclude;
+      for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
+        dgl_id_t global_vid = *it;
+        exclude.push_back(global_vid);
+      }
+      prev_neg_offset = neg_vids.size();
+      randomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
+      assert(prev_neg_offset + neg_sample_size == neg_vids.size());
+    } else if (neg_sample_size < num_tot_nodes) {
+      prev_neg_offset = neg_vids.size();
+      randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
+      assert(prev_neg_offset + neg_sample_size == neg_vids.size());
+    } else if (exclude_positive) {
+      LOG(FATAL) << "We can't exclude positive edges"
+                    "when sampling negative edges with all nodes.";
+    } else {
+      // We don't need to do anything here.
+      // In this case, every edge has the same negative edges. That is,
+      // neg_vids contains all nodes of the graph. They have been generated
+      // before the for loop.
+    }
+
+    dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
+    dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
+
+    for (int64_t j = 0; j < neg_sample_size; j++) {
+      neg_unchanged[neg_idx + j] = local_unchanged;
+      neg_eid_data[neg_idx + j] = curr_eid++;
+      dgl_id_t local_changed = global2local_map(neg_vids[j + prev_neg_offset], &neg_map);
+      neg_changed[neg_idx + j] = local_changed;
+      // induced negative eid references to the positive one.
+      induced_neg_eid_data[neg_idx + j] = induced_eid_data[i];
+    }
+  }
+
+  // Now we know the number of vertices in the negative graph.
+  int64_t num_neg_nodes = neg_map.size();
+  IdArray induced_neg_vid = IdArray::Empty({num_neg_nodes}, coo->dtype, coo->ctx);
+  dgl_id_t *induced_neg_vid_data = static_cast<dgl_id_t *>(induced_neg_vid->data);
+  for (auto it = neg_map.begin(); it != neg_map.end(); it++) {
+    induced_neg_vid_data[it->second] = it->first;
+  }
+
+  NegSubgraph neg_subg;
+  // We sample negative vertices without replacement.
+  // There shouldn't be duplicated edges.
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
+  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
+  neg_subg.induced_vertices = induced_neg_vid;
+  neg_subg.induced_edges = induced_neg_eid;
+  // If we didn't sample all nodes to form negative edges, some of the nodes
+  // in the vector might be redundant.
+  if (neg_sample_size < num_tot_nodes) {
+    std::sort(neg_vids.begin(), neg_vids.end());
+    auto it = std::unique(neg_vids.begin(), neg_vids.end());
+    neg_vids.resize(it - neg_vids.begin());
+  }
+  if (IsNegativeHeadMode(neg_mode)) {
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
+  } else {
+    neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+  }
+  // TODO(zhengda) we should provide an array of 1s if exclude_positive
+  if (check_false_neg) {
+    if (relations_->shape[0] == 0) {
+      neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
+    } else {
+      neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
+                                      induced_neg_vid, induced_neg_eid);
+    }
+  }
+  return neg_subg;
+}
+
+NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
+                                                     const std::string &neg_mode,
+                                                     int64_t neg_sample_size,
+                                                     bool exclude_positive,
+                                                     bool check_false_neg) {
+  int64_t num_tot_nodes = gptr_->NumVertices();
+  std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
+  IdArray coo = adj[0];
+  int64_t num_pos_edges = coo->shape[0] / 2;
+  if (neg_sample_size > num_tot_nodes)
+    neg_sample_size = num_tot_nodes;  
+
+  int64_t chunk_size = neg_sample_size;
+  // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
+  // is num_chunks + 1 and the last chunk size is last_chunk_size.
+  // Otherwise, the actual number of chunks is num_chunks, the last chunk size
+  // is 0.
+  int64_t num_chunks = num_pos_edges / chunk_size;
+  int64_t last_chunk_size = num_pos_edges - num_chunks * chunk_size;
+
+  // The number of negative edges.
+  int64_t num_neg_edges = neg_sample_size * chunk_size * num_chunks;
+  int64_t num_neg_edges_last_chunk = neg_sample_size * last_chunk_size;
+  int64_t num_all_neg_edges = num_neg_edges + num_neg_edges_last_chunk;
+
+  // We should include the last chunk.
+  if (last_chunk_size > 0)
+    num_chunks++;
+
+  IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
+  IdArray neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
+  IdArray induced_neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
+
+  // These are vids in the positive subgraph.
+  const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
+  const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
+  const dgl_id_t *induced_vid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
+  const dgl_id_t *induced_eid_data =
+      static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
+  int64_t num_pos_nodes = pos_subg.graph->NumVertices();
+  std::vector<dgl_id_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
+
+  dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
+  dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
+  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
+  dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
+
+  const dgl_id_t *unchanged;
+  dgl_id_t *neg_unchanged;
+  dgl_id_t *neg_changed;
+  if (IsNegativeHeadMode(neg_mode)) {
+    unchanged = dst_data;
+    neg_unchanged = neg_dst_data;
+    neg_changed = neg_src_data;
+  } else {
+    unchanged = src_data;
+    neg_unchanged = neg_src_data;
+    neg_changed = neg_dst_data;
+  }
+
+  // We first sample all negative edges.
+  std::vector<size_t> neg_vids;
+  randomSample(num_tot_nodes,
+               num_chunks * neg_sample_size,
+               &neg_vids);
+
+  dgl_id_t curr_eid = 0;
+  std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
+  dgl_id_t local_vid = 0;
+
+  // Collect nodes in the positive side.
+  std::vector<dgl_id_t> local_pos_vids;
+  local_pos_vids.reserve(num_pos_edges);
+  for (int64_t i = 0; i < num_pos_edges; i++) {
+    dgl_id_t vid = induced_vid_data[unchanged[i]];
+    auto it = neg_map.find(vid);
+    if (it == neg_map.end()) {
+      local_pos_vids.push_back(local_vid);
+      neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
+    }
+  }
+
+  for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
+    // for each chunk.
+    int64_t neg_idx = neg_sample_size * chunk_size * i_chunk;
+    int64_t pos_edge_idx = chunk_size * i_chunk;
+    int64_t neg_node_idx = neg_sample_size * i_chunk;
+    // The actual chunk size. It'll be different for the last chunk.
+    int64_t chunk_size1;
+    if (i_chunk == num_chunks - 1 && last_chunk_size > 0)
+      chunk_size1 = last_chunk_size;
+    else
+      chunk_size1 = chunk_size;
+
+    for (int64_t in_chunk = 0; in_chunk != chunk_size1; ++in_chunk) {
+      // For each positive node in a chunk.
+      dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
+      dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
+      for (int64_t j = 0; j < neg_sample_size; ++j) {
+        neg_unchanged[neg_idx] = local_unchanged;
+        neg_eid_data[neg_idx] = curr_eid++;
+        dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
+
+        // TODO(zhengda) we can avoid the hashtable lookup here.
+        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
+        neg_changed[neg_idx] = local_changed;
+        induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
+        neg_idx++;
+      }
+    }
+  }
+
+  // Now we know the number of vertices in the negative graph.
+  int64_t num_neg_nodes = neg_map.size();
+  IdArray induced_neg_vid = IdArray::Empty({num_neg_nodes}, coo->dtype, coo->ctx);
+  dgl_id_t *induced_neg_vid_data = static_cast<dgl_id_t *>(induced_neg_vid->data);
+  for (auto it = neg_map.begin(); it != neg_map.end(); it++) {
+    induced_neg_vid_data[it->second] = it->first;
+  }
+
+  NegSubgraph neg_subg;
+  // We sample negative vertices without replacement.
+  // There shouldn't be duplicated edges.
+  COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, gptr_->IsMultigraph()));
+  neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
+  neg_subg.induced_vertices = induced_neg_vid;
+  neg_subg.induced_edges = induced_neg_eid;
+  if (IsNegativeHeadMode(neg_mode)) {
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
+  } else {
+    neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+  }
+  if (check_false_neg) {
+    if (relations_->shape[0] == 0) {
+      neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
+    } else {
+      neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
+                                      induced_neg_vid, induced_neg_eid);
+    }
+  }
+  return neg_subg;
+}
+
 inline SubgraphRef ConvertRef(const Subgraph &subg) {
     return SubgraphRef(std::shared_ptr<Subgraph>(new Subgraph(subg)));
 }
@@ -1019,373 +1397,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeSubgraphTail")
   *rv = gptr->tail_nid;
 });
 
-class EdgeSamplerObject: public Object {
-public:
-  EdgeSamplerObject(const GraphPtr gptr,
-                    IdArray seed_edges,
-                    const int64_t batch_size,
-                    const int64_t num_workers,
-                    const std::string neg_mode,
-                    const int64_t neg_sample_size,
-                    const bool exclude_positive,
-                    const bool check_false_neg,
-                    IdArray relations) {
-    gptr_ = gptr;
-    seed_edges_ = seed_edges;
-    relations_ = relations;
-
-    batch_size_ = batch_size;
-    num_workers_ = num_workers;
-    neg_mode_ = neg_mode;
-    neg_sample_size_ = neg_sample_size;
-    exclude_positive_ = exclude_positive;
-    check_false_neg_ = check_false_neg;
-  }
-
-  ~EdgeSamplerObject() {}
-
-  virtual void fetch(DGLRetValue* rv) = 0;
-
-protected:
-  virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
-  virtual void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
-                    std::vector<size_t>* out) = 0;
-
-  NegSubgraph genNegEdgeSubgraph(const Subgraph &pos_subg,
-                                 const std::string &neg_mode,
-                                 int64_t neg_sample_size,
-                                 bool exclude_positive,
-                                 bool check_false_neg) {
-    int64_t num_tot_nodes = gptr_->NumVertices();
-    if (neg_sample_size > num_tot_nodes)
-      neg_sample_size = num_tot_nodes;
-    bool is_multigraph = gptr_->IsMultigraph();
-    std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
-    IdArray coo = adj[0];
-    int64_t num_pos_edges = coo->shape[0] / 2;
-    int64_t num_neg_edges = num_pos_edges * neg_sample_size;
-    IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-    IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-    IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-    IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-
-    // These are vids in the positive subgraph.
-    const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
-    const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-    const dgl_id_t *induced_vid_data =
-        static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-    const dgl_id_t *induced_eid_data =
-        static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
-    size_t num_pos_nodes = pos_subg.graph->NumVertices();
-    std::vector<size_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
-
-    dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
-    dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-    dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
-    dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
-
-    const dgl_id_t *unchanged;
-    dgl_id_t *neg_unchanged;
-    dgl_id_t *neg_changed;
-    if (IsNegativeHeadMode(neg_mode)) {
-      unchanged = dst_data;
-      neg_unchanged = neg_dst_data;
-      neg_changed = neg_src_data;
-    } else {
-      unchanged = src_data;
-      neg_unchanged = neg_src_data;
-      neg_changed = neg_dst_data;
-    }
-
-    std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
-    std::vector<dgl_id_t> local_pos_vids;
-    local_pos_vids.reserve(num_pos_edges);
-
-    dgl_id_t curr_eid = 0;
-    std::vector<size_t> neg_vids;
-    neg_vids.reserve(neg_sample_size);
-    // If we don't exclude positive edges, we are actually sampling more than
-    // the total number of nodes in the graph.
-    if (!exclude_positive && neg_sample_size >= num_tot_nodes) {
-      // We add all nodes as negative nodes.
-      for (int64_t i = 0; i < num_tot_nodes; i++) {
-        neg_vids.push_back(i);
-        neg_map[i] = i;
-      }
-
-      // Get all nodes in the positive side.
-      for (int64_t i = 0; i < num_pos_edges; i++) {
-        dgl_id_t vid = induced_vid_data[unchanged[i]];
-        local_pos_vids.push_back(neg_map[vid]);
-      }
-      // There is no guarantee that the nodes in the vector are unique.
-      std::sort(local_pos_vids.begin(), local_pos_vids.end());
-      auto it = std::unique(local_pos_vids.begin(), local_pos_vids.end());
-      local_pos_vids.resize(it - local_pos_vids.begin());
-    } else {
-      // Collect nodes in the positive side.
-      dgl_id_t local_vid = 0;
-      for (int64_t i = 0; i < num_pos_edges; i++) {
-        dgl_id_t vid = induced_vid_data[unchanged[i]];
-        auto it = neg_map.find(vid);
-        if (it == neg_map.end()) {
-          local_pos_vids.push_back(local_vid);
-          neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
-        }
-      }
-    }
-
-    int64_t prev_neg_offset = 0;
-    for (int64_t i = 0; i < num_pos_edges; i++) {
-      size_t neg_idx = i * neg_sample_size;
-
-      std::vector<size_t> neighbors;
-      DGLIdIters neigh_it;
-      if (IsNegativeHeadMode(neg_mode)) {
-        neigh_it = gptr_->PredVec(induced_vid_data[unchanged[i]]);
-      } else {
-        neigh_it = gptr_->SuccVec(induced_vid_data[unchanged[i]]);
-      }
-
-      // If the number of negative nodes is smaller than the number of total nodes
-      // in the graph.
-      if (exclude_positive && neg_sample_size < num_tot_nodes) {
-        std::vector<size_t> exclude;
-        for (auto it = neigh_it.begin(); it != neigh_it.end(); it++) {
-          dgl_id_t global_vid = *it;
-          exclude.push_back(global_vid);
-        }
-        prev_neg_offset = neg_vids.size();
-        randomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
-        assert(prev_neg_offset + neg_sample_size == neg_vids.size());
-      } else if (neg_sample_size < num_tot_nodes) {
-        prev_neg_offset = neg_vids.size();
-        randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
-        assert(prev_neg_offset + neg_sample_size == neg_vids.size());
-      } else if (exclude_positive) {
-        LOG(FATAL) << "We can't exclude positive edges"
-                      "when sampling negative edges with all nodes.";
-      } else {
-        // We don't need to do anything here.
-        // In this case, every edge has the same negative edges. That is,
-        // neg_vids contains all nodes of the graph. They have been generated
-        // before the for loop.
-      }
-
-      dgl_id_t global_unchanged = induced_vid_data[unchanged[i]];
-      dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
-
-      for (int64_t j = 0; j < neg_sample_size; j++) {
-        neg_unchanged[neg_idx + j] = local_unchanged;
-        neg_eid_data[neg_idx + j] = curr_eid++;
-        dgl_id_t local_changed = global2local_map(neg_vids[j + prev_neg_offset], &neg_map);
-        neg_changed[neg_idx + j] = local_changed;
-        // induced negative eid references to the positive one.
-        induced_neg_eid_data[neg_idx + j] = induced_eid_data[i];
-      }
-    }
-
-    // Now we know the number of vertices in the negative graph.
-    int64_t num_neg_nodes = neg_map.size();
-    IdArray induced_neg_vid = IdArray::Empty({num_neg_nodes}, coo->dtype, coo->ctx);
-    dgl_id_t *induced_neg_vid_data = static_cast<dgl_id_t *>(induced_neg_vid->data);
-    for (auto it = neg_map.begin(); it != neg_map.end(); it++) {
-      induced_neg_vid_data[it->second] = it->first;
-    }
-
-    NegSubgraph neg_subg;
-    // We sample negative vertices without replacement.
-    // There shouldn't be duplicated edges.
-    COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, is_multigraph));
-    neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
-    neg_subg.induced_vertices = induced_neg_vid;
-    neg_subg.induced_edges = induced_neg_eid;
-    // If we didn't sample all nodes to form negative edges, some of the nodes
-    // in the vector might be redundant.
-    if (neg_sample_size < num_tot_nodes) {
-      std::sort(neg_vids.begin(), neg_vids.end());
-      auto it = std::unique(neg_vids.begin(), neg_vids.end());
-      neg_vids.resize(it - neg_vids.begin());
-    }
-    if (IsNegativeHeadMode(neg_mode)) {
-      neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
-      neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
-    } else {
-      neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
-      neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
-    }
-    // TODO(zhengda) we should provide an array of 1s if exclude_positive
-    if (check_false_neg) {
-      if (relations_->shape[0] == 0) {
-        neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
-      } else {
-        neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
-                                        induced_neg_vid, induced_neg_eid);
-      }
-    }
-    return neg_subg;
-  }
-
-  NegSubgraph genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
-                                    const std::string &neg_mode,
-                                    int64_t neg_sample_size,
-                                    bool exclude_positive,
-                                    bool check_false_neg) {
-    int64_t num_tot_nodes = gptr_->NumVertices();
-    std::vector<IdArray> adj = pos_subg.graph->GetAdj(false, "coo");
-    IdArray coo = adj[0];
-    int64_t num_pos_edges = coo->shape[0] / 2;
-    if (neg_sample_size > num_tot_nodes)
-      neg_sample_size = num_tot_nodes;
-
-    int64_t chunk_size = neg_sample_size;
-    // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
-    // is num_chunks + 1 and the last chunk size is last_chunk_size.
-    // Otherwise, the actual number of chunks is num_chunks, the last chunk size
-    // is 0.
-    int64_t num_chunks = num_pos_edges / chunk_size;
-    int64_t last_chunk_size = num_pos_edges - num_chunks * chunk_size;
-
-    // The number of negative edges.
-    int64_t num_neg_edges = neg_sample_size * chunk_size * num_chunks;
-    int64_t num_neg_edges_last_chunk = neg_sample_size * last_chunk_size;
-    int64_t num_all_neg_edges = num_neg_edges + num_neg_edges_last_chunk;
-
-    // We should include the last chunk.
-    if (last_chunk_size > 0)
-      num_chunks++;
-
-    IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-    IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-    IdArray neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-    IdArray induced_neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-
-    // These are vids in the positive subgraph.
-    const dgl_id_t *dst_data = static_cast<const dgl_id_t *>(coo->data);
-    const dgl_id_t *src_data = static_cast<const dgl_id_t *>(coo->data) + num_pos_edges;
-    const dgl_id_t *induced_vid_data =
-        static_cast<const dgl_id_t *>(pos_subg.induced_vertices->data);
-    const dgl_id_t *induced_eid_data =
-        static_cast<const dgl_id_t *>(pos_subg.induced_edges->data);
-    int64_t num_pos_nodes = pos_subg.graph->NumVertices();
-    std::vector<dgl_id_t> pos_nodes(induced_vid_data, induced_vid_data + num_pos_nodes);
-
-    dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
-    dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-    dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
-    dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
-
-    const dgl_id_t *unchanged;
-    dgl_id_t *neg_unchanged;
-    dgl_id_t *neg_changed;
-    if (IsNegativeHeadMode(neg_mode)) {
-      unchanged = dst_data;
-      neg_unchanged = neg_dst_data;
-      neg_changed = neg_src_data;
-    } else {
-      unchanged = src_data;
-      neg_unchanged = neg_src_data;
-      neg_changed = neg_dst_data;
-    }
-
-    // We first sample all negative edges.
-    std::vector<size_t> neg_vids;
-    randomSample(num_tot_nodes,
-                 num_chunks * neg_sample_size,
-                 &neg_vids);
-
-    dgl_id_t curr_eid = 0;
-    std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
-    dgl_id_t local_vid = 0;
-
-    // Collect nodes in the positive side.
-    std::vector<dgl_id_t> local_pos_vids;
-    local_pos_vids.reserve(num_pos_edges);
-    for (int64_t i = 0; i < num_pos_edges; i++) {
-      dgl_id_t vid = induced_vid_data[unchanged[i]];
-      auto it = neg_map.find(vid);
-      if (it == neg_map.end()) {
-        local_pos_vids.push_back(local_vid);
-        neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
-      }
-    }
-
-    for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
-      // for each chunk.
-      int64_t neg_idx = neg_sample_size * chunk_size * i_chunk;
-      int64_t pos_edge_idx = chunk_size * i_chunk;
-      int64_t neg_node_idx = neg_sample_size * i_chunk;
-      // The actual chunk size. It'll be different for the last chunk.
-      int64_t chunk_size1;
-      if (i_chunk == num_chunks - 1 && last_chunk_size > 0)
-        chunk_size1 = last_chunk_size;
-      else
-        chunk_size1 = chunk_size;
-
-      for (int64_t in_chunk = 0; in_chunk != chunk_size1; ++in_chunk) {
-        // For each positive node in a chunk.
-
-        dgl_id_t global_unchanged = induced_vid_data[unchanged[pos_edge_idx + in_chunk]];
-        dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
-        for (int64_t j = 0; j < neg_sample_size; ++j) {
-          neg_unchanged[neg_idx] = local_unchanged;
-          neg_eid_data[neg_idx] = curr_eid++;
-          dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
-
-          // TODO(zhengda) we can avoid the hashtable lookup here.
-          dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
-          neg_changed[neg_idx] = local_changed;
-          induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
-          neg_idx++;
-        }
-      }
-    }
-
-    // Now we know the number of vertices in the negative graph.
-    int64_t num_neg_nodes = neg_map.size();
-    IdArray induced_neg_vid = IdArray::Empty({num_neg_nodes}, coo->dtype, coo->ctx);
-    dgl_id_t *induced_neg_vid_data = static_cast<dgl_id_t *>(induced_neg_vid->data);
-    for (auto it = neg_map.begin(); it != neg_map.end(); it++) {
-      induced_neg_vid_data[it->second] = it->first;
-    }
-
-    NegSubgraph neg_subg;
-    // We sample negative vertices without replacement.
-    // There shouldn't be duplicated edges.
-    COOPtr neg_coo(new COO(num_neg_nodes, neg_src, neg_dst, gptr_->IsMultigraph()));
-    neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
-    neg_subg.induced_vertices = induced_neg_vid;
-    neg_subg.induced_edges = induced_neg_eid;
-    if (IsNegativeHeadMode(neg_mode)) {
-      neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
-      neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
-    } else {
-      neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
-      neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
-    }
-    if (check_false_neg) {
-      if (relations_->shape[0] == 0) {
-        neg_subg.exist = CheckExistence(gptr_, neg_src, neg_dst, induced_neg_vid);
-      } else {
-        neg_subg.exist = CheckExistence(gptr_, relations_, neg_src, neg_dst,
-                                        induced_neg_vid, induced_neg_eid);
-      }
-    }
-    return neg_subg;
-  }
-
-  GraphPtr gptr_;
-  IdArray seed_edges_;
-  IdArray relations_;
-
-  int64_t batch_size_;
-  int64_t num_workers_;
-  std::string neg_mode_;
-  int64_t neg_sample_size_;
-  bool exclude_positive_;
-  bool check_false_neg_;
-};
-
 class UniformEdgeSamplerObject: public EdgeSamplerObject {
 public:
   explicit UniformEdgeSamplerObject(const GraphPtr gptr,
@@ -1397,7 +1408,7 @@ public:
                                     const bool exclude_positive,
                                     const bool check_false_neg,
                                     IdArray relations)
-                                    : EdgeSamplerObject{gptr,
+                                    : EdgeSamplerObject(gptr,
                                         seed_edges,
                                         batch_size,
                                         num_workers,
@@ -1405,7 +1416,7 @@ public:
                                         neg_sample_size,
                                         exclude_positive,
                                         check_false_neg,
-                                        relations} {
+                                        relations) {
     batch_curr_id_ = 0;
     num_seeds_ = seed_edges->shape[0];
     max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
@@ -1541,7 +1552,7 @@ public:
                                      const bool exclude_positive,
                                      const bool check_false_neg,
                                      IdArray relations)
-                                     : EdgeSamplerObject{gptr,
+                                     : EdgeSamplerObject(gptr,
                                         seed_edges,
                                         batch_size,
                                         num_workers,
@@ -1549,7 +1560,7 @@ public:
                                         neg_sample_size,
                                         exclude_positive,
                                         check_false_neg,
-                                        relations} {
+                                        relations) {
     const size_t num_edges = edge_weight->shape[0];
     const ValueType *edge_prob = static_cast<const ValueType*>(edge_weight->data);
     std::vector<ValueType> eprob(num_edges);

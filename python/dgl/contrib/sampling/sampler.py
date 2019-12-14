@@ -19,7 +19,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler', 'WeightedEdgeSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeSampler']
 
 class SamplerIter(object):
     def __init__(self, sampler):
@@ -508,208 +508,13 @@ class EdgeSampler(object):
     The sampler returns EdgeSubgraph, where a user can access the unique head nodes
     and tail nodes directly.
 
-    When the flag return_false_neg is turned on, the sampler will also check
-    if the generated negative edges are true negative edges and will return
-    a vector that indicates false negative edges. The vector is stored in
-    the negative graph as `false_neg` edge data.
-
-    When checking false negative edges, a user can provide edge relations
-    for a knowledge graph. A negative edge is considered as a false negative
-    edge only if the triple (source node, destination node and relation)
-    matches one of the edges in the graph.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The DGLGraph where we sample edges.
-    batch_size : int
-        The batch size (i.e, the number of edges from the graph)
-    seed_edges : tensor, optional
-        A list of edges where we sample from.
-    shuffle : bool, optional
-        whether randomly shuffle the list of edges where we sample from.
-    num_workers : int, optional
-        The number of workers to sample edges in parallel.
-    prefetch : bool, optional
-        If true, prefetch the samples in the next batch. Default: False
-    negative_mode : string, optional
-        The method used to construct negative edges. Possible values are 'head', 'tail'.
-    neg_sample_size : int, optional
-        The number of negative edges to sample for each edge.
-    exclude_positive : int, optional
-        Whether to exclude positive edges from the negative edges.
-    return_false_neg: bool, optional
-        Whether to calculate false negative edges and return them as edge data in negative graphs.
-    relations: tensor, optional
-        relations of the edges if this is a knowledge graph.
-
-    Examples
-    --------
-    >>> for pos_g, neg_g in EdgeSampler(g, batch_size=10):
-    >>>     print(pos_g.head_nid, pos_g.tail_nid)
-    >>>     print(neg_g.head_nid, pos_g.tail_nid)
-    >>>     print(neg_g.edata['false_neg'])
-
-    Class properties
-    ----------------
-    immutable_only : bool
-        Whether the sampler only works on immutable graphs.
-        Subclasses can override this property.
-    '''
-    immutable_only = False
-
-    def __init__(
-            self,
-            g,
-            batch_size,
-            seed_edges=None,
-            shuffle=False,
-            num_workers=1,
-            prefetch=False,
-            negative_mode="",
-            neg_sample_size=0,
-            exclude_positive=False,
-            return_false_neg=False,
-            relations=None):
-        self._g = g
-        if self.immutable_only and not g._graph.is_readonly():
-            raise NotImplementedError("This loader only support read-only graphs.")
-
-        if relations is None:
-            relations = empty((0,), 'int64')
-        else:
-            relations = utils.toindex(relations)
-            relations = relations.todgltensor()
-            assert g.number_of_edges() == len(relations)
-        self._relations = relations
-
-        if batch_size < 0 or neg_sample_size < 0:
-            raise Exception('Invalid arguments')
-
-        self._return_false_neg = return_false_neg
-        self._batch_size = int(batch_size)
-
-        if seed_edges is None:
-            self._seed_edges = F.arange(0, g.number_of_edges())
-        else:
-            self._seed_edges = seed_edges
-        if shuffle:
-            self._seed_edges = F.rand_shuffle(self._seed_edges)
-        self._seed_edges = utils.toindex(self._seed_edges)
-
-        if prefetch:
-            self._prefetching_wrapper_class = ThreadPrefetchingWrapper
-        self._num_prefetch = num_workers * 2 if prefetch else 0
-
-        self._num_workers = int(num_workers)
-        self._negative_mode = negative_mode
-        self._neg_sample_size = neg_sample_size
-        self._exclude_positive = exclude_positive
-        self._sampler = _CAPI_CreateUniformEdgeSampler(
-            self.g._graph,
-            self.seed_edges.todgltensor(),
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
-            self._negative_mode,
-            self._neg_sample_size,
-            self._exclude_positive,
-            self._return_false_neg,
-            self._relations)
-
-    def fetch(self, current_index):
-        '''
-        It returns a list of subgraphs if it only samples positive edges.
-        It returns a list of subgraph pairs if it samples both positive edges
-        and negative edges.
-
-        Parameters
-        ----------
-        current_index : int
-            deprecated, not used actually.
-
-        Returns
-        -------
-        list[GraphIndex] or list[(GraphIndex, GraphIndex)]
-            Next "bunch" of edges to be processed.
-        '''
-        subgs = _CAPI_FetchUniformEdgeSample(
-            self._sampler)
-
-        if len(subgs) == 0:
-            return []
-
-        if self._negative_mode == "":
-            # If no negative subgraphs.
-            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
-        else:
-            rets = []
-            assert len(subgs) % 2 == 0
-            num_pos = int(len(subgs) / 2)
-            for i in range(num_pos):
-                pos_subg = EdgeSubgraph(self.g, subgs[i], False)
-                neg_subg = EdgeSubgraph(self.g, subgs[i + num_pos], True)
-                if self._return_false_neg:
-                    exist = _CAPI_GetNegEdgeExistence(subgs[i + num_pos])
-                    neg_subg.edata['false_neg'] = utils.toindex(exist).tousertensor()
-                rets.append((pos_subg, neg_subg))
-            return rets
-
-    def __iter__(self):
-        it = SamplerIter(self)
-        if self._num_prefetch:
-            return self._prefetching_wrapper_class(it, self._num_prefetch)
-        else:
-            return it
-
-    @property
-    def g(self):
-        return self._g
-
-    @property
-    def seed_edges(self):
-        return self._seed_edges
-
-    @property
-    def batch_size(self):
-        return self._batch_size
-
-class WeightedEdgeSampler(object):
-    '''Weighted Edge sampler for link prediction.
-
-    This samples edges from a given graph according to their weight. The edges 
-    sampled for a batch are placed in a subgraph before returning. In many link 
-    prediction tasks, negative edges are required to train a model. A negative edge is constructed by
-    corrupting an existing edge in the graph. The current implementation
-    support two ways of corrupting an edge: corrupt the head node of
-    an edge (by randomly selecting a node as the head node), or corrupt
-    the tail node of an edge. When we corrupt the head node of an edge, we randomly
-    sample a node from the entire graph as the head node. It's possible the constructed
-    edge exists in the graph. By default, the implementation doesn't explicitly check
-    if the sampled negative edge exists in a graph. However, a user can exclude
-    positive edges from negative edges by specifying 'exclude_positive=True'.
-    When negative edges are created, a batch of negative edges are also placed
-    in a subgraph.
-
-    When sampling positive edges and negative edges (actually, nodes) two tensors 
+    This sampler also allows us sample positive edges and negative edges (actually, 
+    nodes) according to their weight. When doing sample we can provide two tensors 
     representing the weight of each edges and weight of each nodes respectively 
     should be provided. These weights are used to decide the posibility of 
     whether an edge or node will bec chosen. If only edge weight is provided, 
     the sampler will take uniform sampling when sampling negative edges.
 
-    Currently, negative_mode only supports:
-        'head': the negative edges are generated by corrupting head nodes
-            with uniformly randomly sampled nodes,
-        'tail': the negative edges are generated by corrupting tail nodes
-            with uniformly randomly sampled nodes,
-        'PBG-head': the negative edges are generated by corrupting a set
-            of head nodes with the same set of nodes uniformly randomly sampled
-            from the graph. Please see Pytorch-BigGraph for more details.
-        'PBG-tail': the negative edges are generated by corrupting a set
-            of tail nodes with the same set of nodes similar to 'PBG-head'.
-
-    The sampler returns EdgeSubgraph, where a user can access the unique head nodes
-    and tail nodes directly.
-
     When the flag return_false_neg is turned on, the sampler will also check
     if the generated negative edges are true negative edges and will return
     a vector that indicates false negative edges. The vector is stored in
@@ -726,13 +531,13 @@ class WeightedEdgeSampler(object):
         The DGLGraph where we sample edges.
     batch_size : int
         The batch size (i.e, the number of edges from the graph)
-    edge_weight : tensor
+    seed_edges : tensor, optional
+        A list of edges where we sample from.
+    edge_weight : tensor, optional
         The weight of each edge which decide the change of certain edge being sampled.
     node_weight : tensor, optional
         The weight of each node which decide the change of certain node being sampled.
         Used in negative sampling. If not provided, uniform node sampling is used.
-    seed_edges : tensor, optional
-        A list of edges where we sample from.
     shuffle : bool, optional
         whether randomly shuffle the list of edges where we sample from.
     num_workers : int, optional
@@ -769,9 +574,9 @@ class WeightedEdgeSampler(object):
             self,
             g,
             batch_size,
-            edge_weight,
-            node_weight=None,
             seed_edges=None,
+            edge_weight=None,
+            node_weight=None,
             shuffle=False,
             num_workers=1,
             prefetch=False,
@@ -804,13 +609,17 @@ class WeightedEdgeSampler(object):
             self._seed_edges = seed_edges
         if shuffle:
             self._seed_edges = F.rand_shuffle(self._seed_edges)
-        self._edge_weight = F.zerocopy_to_dgl_ndarray(edge_weight[self._seed_edges])
-        self._seed_edges = utils.toindex(self._seed_edges)
-
-        if node_weight is None:
-            self._node_weight = empty((0,), 'float32')
+        if edge_weight is None:
+            self._is_uniform = True
         else:
-            self._node_weight = F.zerocopy_to_dgl_ndarray(node_weight)
+            self._is_uniform = False
+            self._edge_weight = F.zerocopy_to_dgl_ndarray(edge_weight[self._seed_edges])
+            if node_weight is None:
+                self._node_weight = empty((0,), 'float32')
+            else:
+                self._node_weight = F.zerocopy_to_dgl_ndarray(node_weight)
+
+        self._seed_edges = utils.toindex(self._seed_edges)
 
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
@@ -820,18 +629,30 @@ class WeightedEdgeSampler(object):
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
-        self._sampler = _CAPI_CreateWeightedEdgeSampler(
-            self.g._graph,
-            self._seed_edges.todgltensor(),
-            self._edge_weight,
-            self._node_weight,
-            self._batch_size,       # batch size
-            self._num_workers,      # num batches
-            self._negative_mode,
-            self._neg_sample_size,
-            self._exclude_positive,
-            self._return_false_neg,
-            self._relations)
+        if self._is_uniform:
+            self._sampler = _CAPI_CreateUniformEdgeSampler(
+                self.g._graph,
+                self.seed_edges.todgltensor(),
+                self.batch_size,        # batch size
+                self._num_workers,      # num batches
+                self._negative_mode,
+                self._neg_sample_size,
+                self._exclude_positive,
+                self._return_false_neg,
+                self._relations)
+        else:
+            self._sampler = _CAPI_CreateWeightedEdgeSampler(
+                self.g._graph,
+                self._seed_edges.todgltensor(),
+                self._edge_weight,
+                self._node_weight,
+                self._batch_size,       # batch size
+                self._num_workers,      # num batches
+                self._negative_mode,
+                self._neg_sample_size,
+                self._exclude_positive,
+                self._return_false_neg,
+                self._relations)
 
     def fetch(self, current_index):
         '''
@@ -849,8 +670,12 @@ class WeightedEdgeSampler(object):
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
             Next "bunch" of edges to be processed.
         '''
-        subgs = _CAPI_FetchWeightedEdgeSample(
-            self._sampler)
+        if self._is_uniform:
+            subgs = _CAPI_FetchUniformEdgeSample(
+                self._sampler)
+        else:
+            subgs = _CAPI_FetchWeightedEdgeSample(
+                self._sampler)
 
         if len(subgs) == 0:
             return []
@@ -889,7 +714,6 @@ class WeightedEdgeSampler(object):
     @property
     def batch_size(self):
         return self._batch_size
-
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.
