@@ -105,7 +105,7 @@ class ArrayHeap {
 
 ///////////////////////// Samplers //////////////////////////
 class EdgeSamplerObject: public Object {
-public:
+ public:
   EdgeSamplerObject(const GraphPtr gptr,
                     IdArray seed_edges,
                     const int64_t batch_size,
@@ -131,7 +131,7 @@ public:
 
   virtual void fetch(DGLRetValue* rv) = 0;
 
-protected:
+ protected:
   virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
   virtual void randomSample(size_t set_size, size_t num, const std::vector<size_t> &exclude,
                     std::vector<size_t>* out) = 0;
@@ -1229,7 +1229,7 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
   IdArray coo = adj[0];
   int64_t num_pos_edges = coo->shape[0] / 2;
   if (neg_sample_size > num_tot_nodes)
-    neg_sample_size = num_tot_nodes;  
+    neg_sample_size = num_tot_nodes;
 
   int64_t chunk_size = neg_sample_size;
   // If num_pos_edges isn't divisible by chunk_size, the actual number of chunks
