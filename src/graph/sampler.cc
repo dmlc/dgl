@@ -1420,7 +1420,7 @@ public:
     batch_curr_id_ = 0;
     num_seeds_ = seed_edges->shape[0];
     max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
-    //TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
   ~UniformEdgeSamplerObject() {}
@@ -1584,7 +1584,7 @@ public:
       node_selector_ = std::make_shared<ArrayHeap<ValueType>>(nprob);
     }
 
-    //TODO(song): Tricky thing here to make sure gptr_ has coo cache
+    // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
 
