@@ -74,7 +74,6 @@ def train(args):
 
     ### build the net
     net = Net(args=args)
-    #net.initialize(init=mx.init.Xavier(factor_type='in'), ctx=args.ctx)
     net = net.to(args.device)
     nd_possible_rating_values = th.FloatTensor(dataset.possible_rating_values).to(args.device)
     rating_loss_net = nn.CrossEntropyLoss()

@@ -45,7 +45,7 @@ python train.py --data_name=ml-10m --gcn_agg_accum=stack --gcn_dropout=0.3 \
                                  --train_lr=0.001 --train_min_lr=0.0001 --train_max_iter=15000 \
                                  --use_one_hot_fea --gen_r_num_basis_func=4
 ```
-Results: RMSE=0.7875 (0.777 reported)
+Results: RMSE=0.7800 (0.777 reported)
 Speed: 0.9207/epoch (vanilla implementation: OOM)
 
 Testbed: EC2 p3.2xlarge instance(Amazon Linux 2)
