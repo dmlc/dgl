@@ -374,4 +374,4 @@ for epoch in range(epochs):
 ##############################################################################
 # To train the model on a full dataset with different settings (such as CPU or GPU),
 # please refer to the `PyTorch example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/tree_lstm>`__.
-# Besides, you also provide an implementation of the Child-Sum Tree-LSTM.
+# There is also an implementation of the Child-Sum Tree-LSTM.
