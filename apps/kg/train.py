@@ -6,7 +6,7 @@ import os
 import logging
 import time
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     import multiprocessing as mp
     from train_mxnet import load_model

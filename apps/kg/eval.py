@@ -8,7 +8,7 @@ import logging
 import time
 import pickle
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     from train_mxnet import load_model_from_checkpoint
     from train_mxnet import test

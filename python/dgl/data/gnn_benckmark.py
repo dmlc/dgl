@@ -30,7 +30,7 @@ class GNNBenchmarkDataset(object):
 
     @staticmethod
     def load_npz(file_name):
-        with np.load(file_name) as loader:
+        with np.load(file_name, allow_pickle=True) as loader:
             loader = dict(loader)
             num_nodes = loader['adj_shape'][0]
             adj_matrix = sp.csr_matrix((loader['adj_data'], loader['adj_indices'], loader['adj_indptr']),
@@ -116,7 +116,7 @@ class AmazonCoBuy(GNNBenchmarkDataset):
     Parameters
     ---------------
     name: str
-      Name of the dataset, has to be 'computer' or 'photo'
+      Name of the dataset, has to be 'computers' or 'photo'
 
     """
     _url = {

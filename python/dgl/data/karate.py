@@ -18,7 +18,7 @@ class KarateClub(object):
     def __init__(self):
         kG = nx.karate_club_graph()
         self.label = np.array(
-            [kG.node[i]['club'] != 'Mr. Hi' for i in kG.nodes]).astype(np.int64)
+            [kG.nodes[i]['club'] != 'Mr. Hi' for i in kG.nodes]).astype(np.int64)
         g = DGLGraph(kG)
         g.ndata['label'] = self.label
         self.data = [g]
