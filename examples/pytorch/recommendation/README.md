@@ -9,13 +9,13 @@ First, download and extract from https://dgl.ai.s3.us-east-2.amazonaws.com/datas
 One can then run the following to train PinSage on MovieLens-1M:
 
 ```bash
-python3 train.py --opt Adam --lr 1e-3 --sched none --sgd-switch 25
+python3 main.py --opt Adam --lr 1e-3 --sched none --sgd-switch 25
 ```
 
 One can also incorporate user and movie features into training:
 
 ```bash
-python3 train.py --opt Adam --lr 1e-3 --sched none --sgd-switch 25 --use-feature
+python3 main.py --opt Adam --lr 1e-3 --sched none --sgd-switch 25 --use-feature
 ```
 
 Currently, performance of PinSage on MovieLens-1M has the best mean reciprocal rank of
