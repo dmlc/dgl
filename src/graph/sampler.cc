@@ -129,7 +129,7 @@ class EdgeSamplerObject: public Object {
 
   ~EdgeSamplerObject() {}
 
-  virtual void fetch(DGLRetValue* rv) = 0;
+  virtual void Fetch(DGLRetValue* rv) = 0;
 
  protected:
   virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
@@ -1425,7 +1425,7 @@ public:
   }
   ~UniformEdgeSamplerObject() {}
 
-  void fetch(DGLRetValue* rv) {
+  void Fetch(DGLRetValue* rv) {
     const int64_t num_workers = std::min(num_workers_, max_batch_id_ - batch_curr_id_);
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers);
@@ -1538,7 +1538,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
 DGL_REGISTER_GLOBAL("sampling._CAPI_FetchUniformEdgeSample")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   UniformEdgeSampler sampler = args[0];
-  sampler->fetch(rv);
+  sampler->Fetch(rv);
 });
 
 template<typename ValueType>
@@ -1591,7 +1591,7 @@ public:
   ~WeightedEdgeSamplerObject() {
   }
 
-  void fetch(DGLRetValue* rv) {
+  void Fetch(DGLRetValue* rv) {
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers_);
     std::vector<SubgraphRef> negative_subgs(num_workers_);
@@ -1767,7 +1767,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
 DGL_REGISTER_GLOBAL("sampling._CAPI_FetchWeightedEdgeSample")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FloatWeightedEdgeSampler sampler = args[0];
-  sampler->fetch(rv);
+  sampler->Fetch(rv);
 });
 
 }  // namespace dgl

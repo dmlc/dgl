@@ -510,12 +510,15 @@ class EdgeSampler(object):
     The sampler returns EdgeSubgraph, where a user can access the unique head nodes
     and tail nodes directly.
 
-    This sampler also allows us sample positive edges and negative edges (actually, 
-    nodes) according to their weight. When doing sample we can provide two tensors 
-    representing the weight of each edges and weight of each nodes respectively 
-    should be provided. These weights are used to decide the posibility of 
-    whether an edge or node will bec chosen. If only edge weight is provided, 
-    the sampler will take uniform sampling when sampling negative edges.
+    This sampler allows to non-uniformly sample positive edges and negative edges. 
+    For non-uniformly sampling positive edges, users need to provide an array of m 
+    elements (m is the number of edges), i.e. edge_weight, each of which represents 
+    the sampling probability of an edge. For non-uniformly sampling negative edges, 
+    users need to provide an array of n elements, i.e. node_weight and the sampler 
+    samples nodes based on the sampling probability to corrupt a positive edge. If 
+    both edge_weight and node_weight are not provided, a uniformed sampler is used.
+    if only edge_weight is provided, the sampler will take uniform sampling when 
+    corrupt positive edges.
 
     When the flag `return_false_neg` is turned on, the sampler will also check
     if the generated negative edges are true negative edges and will return

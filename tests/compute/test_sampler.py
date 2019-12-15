@@ -339,11 +339,11 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     total_samples = 0
     max_samples = num_edges
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
-                                                    edge_weight=edge_weight,
-                                                    negative_mode=mode,
-                                                    neg_sample_size=neg_size,
-                                                    exclude_positive=exclude_positive,
-                                                    return_false_neg=True):
+                                            edge_weight=edge_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
         assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
                            F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
