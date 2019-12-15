@@ -2,7 +2,7 @@ import os
 import numpy as np
 import dgl.backend as F
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     from .mxnet.tensor_models import logsigmoid
     from .mxnet.tensor_models import get_device
