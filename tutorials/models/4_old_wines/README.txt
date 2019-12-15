@@ -1,7 +1,7 @@
 .. _tutorials4-index:
 
 
-Updates to computer vision and RNNs
+Revisit classic models from a graph perspective
 ====================================
 
 * **Capsule** `[paper] <https://arxiv.org/abs/1710.09829>`__ `[tutorial]
