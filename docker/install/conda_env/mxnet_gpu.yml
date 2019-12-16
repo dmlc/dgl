@@ -1,0 +1,15 @@
+name: mxnet-ci
+dependencies:
+  - cudatoolkit = 9.0
+  - pip
+  - pip:
+    - mxnet-cu90
+  - nose
+  - numpy
+  - cython
+  - scipy
+  - networkx
+  - matplotlib
+  - nltk
+  - requests[security]
+  - tqdm

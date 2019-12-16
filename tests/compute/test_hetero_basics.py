@@ -5,6 +5,7 @@ import backend as F
 import dgl
 import networkx as nx
 from collections import defaultdict as ddict
+import unittest
 
 D = 5
 reduce_msg_shapes = set()
@@ -148,7 +149,7 @@ def test_batch_setter_autograd():
     with F.record_grad():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
-    F.backward(h2, F.ones((10, D)) * 2)
+        F.backward(h2, F.ones((10, D)) * 2)
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
@@ -257,7 +258,7 @@ def test_nx_conversion():
     nxg = nx.cycle_graph(5)
     nxg.remove_nodes_from([0, 4])
     for u in nxg.nodes():
-        nxg.node[u]['h'] = F.tensor([u])
+        nxg.nodes[u]['h'] = F.tensor([u])
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
@@ -599,6 +600,7 @@ def test_repr():
     repr_string = G.__repr__()
     print(repr_string)
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="will core dump")
 def test_group_apply_edges():
     def edge_udf(edges):
         h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
@@ -784,7 +786,7 @@ if __name__ == '__main__':
     test_update_all_0deg()
     test_pull_0deg()
     test_send_multigraph()
-    #test_dynamic_addition()
+    test_dynamic_addition()
     test_repr()
     test_group_apply_edges()
     test_local_var()
