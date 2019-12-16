@@ -1042,6 +1042,7 @@ def _copy_frame(frame, ctx):
 def _update_frame(frame, names, ids, new_frame):
     col_dict = {name: new_frame[name] for name in names}
     if len(col_dict) > 0:
-        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=False)
+        # This will raise error for tensorflow, because inplace update is not supported
+        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
 
 _init_api("dgl.nodeflow", __name__)
