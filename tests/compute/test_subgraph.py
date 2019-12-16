@@ -49,7 +49,7 @@ def test_basics():
     assert len(sg.ndata) == 1
     assert len(sg.edata) == 1
     sh = sg.ndata['h']
-    assert F.allclose(h[nid], sh)
+    assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
     '''
     s, d, eid
     0, 1, 0
