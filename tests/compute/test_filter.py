@@ -11,8 +11,8 @@ def test_filter():
     e_repr = np.zeros((4, 5))
     n_repr[[1, 3]] = 1
     e_repr[[1, 3]] = 1
-    n_repr = F.zerocopy_from_numpy(n_repr)
-    e_repr = F.zerocopy_from_numpy(e_repr)
+    n_repr = F.copy_to(F.zerocopy_from_numpy(n_repr), F.ctx())
+    e_repr = F.copy_to(F.zerocopy_from_numpy(e_repr), F.ctx())
 
     g.ndata['a'] = n_repr
     g.edata['a'] = e_repr

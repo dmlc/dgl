@@ -5,7 +5,6 @@ import scipy.sparse as ssp
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
-import unittest
 
 D = 5
 reduce_msg_shapes = set()
