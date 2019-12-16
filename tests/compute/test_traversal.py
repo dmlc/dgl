@@ -13,7 +13,6 @@ import itertools
 np.random.seed(42)
 
 def toset(x):
-    # F.zerocopy_to_numpy may return a int
     return set(F.zerocopy_to_numpy(x).tolist())
 
 def test_bfs(n=100):

@@ -3,7 +3,6 @@ import numpy as np
 import scipy as sp
 import dgl
 from dgl import utils
-import pytest
 from numpy.testing import assert_array_equal
 
 np.random.seed(42)
@@ -138,12 +137,12 @@ def _test_layer_sampler(prefetch=False):
         sub_src, sub_dst = sub_g.all_edges(order='eid')
         for i in range(sub_g.num_blocks):
             block_eid = sub_g.block_eid(i)
-            block_src = sub_g.map_to_parent_nid(F.gather_row(sub_src, block_eid))
-            block_dst = sub_g.map_to_parent_nid(F.gather_row(sub_dst, block_eid))
+            block_src = sub_g.map_to_parent_nid(sub_src[block_eid])
+            block_dst = sub_g.map_to_parent_nid(sub_dst[block_eid])
 
             block_parent_eid = sub_g.block_parent_eid(i)
-            block_parent_src = F.gather_row(src, block_parent_eid)
-            block_parent_dst = F.gather_row(dst, block_parent_eid)
+            block_parent_src = src[block_parent_eid]
+            block_parent_dst = dst[block_parent_eid]
 
             assert np.all(F.asnumpy(block_src == block_parent_src))
 
@@ -255,25 +254,25 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                                             exclude_positive=exclude_positive,
                                             return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        assert_array_equal(F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)),
-                           F.asnumpy(g.edge_ids(F.gather_row(pos_edges.parent_nid, pos_lsrc),
-                                                F.gather_row(pos_edges.parent_nid, pos_ldst))))
+        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
+                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
+                                                pos_edges.parent_nid[pos_ldst])))
 
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
 
-        neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
-        neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
-        neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
         for i in range(len(neg_eid)):
-            neg_d = int(F.asnumpy(neg_dst)[i])
-            neg_e = int(F.asnumpy(neg_eid)[i])
+            neg_d = int(F.asnumpy(neg_dst[i]))
+            neg_e = int(F.asnumpy(neg_eid[i]))
             assert (neg_d, neg_e) in pos_map
             if exclude_positive:
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
         check_head_tail(neg_edges)
-        pos_tails = F.gather_row(pos_edges.parent_nid, pos_edges.tail_nid)
-        neg_tails = F.gather_row(neg_edges.parent_nid, neg_edges.tail_nid)
+        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
+        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
         pos_tails = np.sort(F.asnumpy(pos_tails))
         neg_tails = np.sort(F.asnumpy(neg_tails))
         np.testing.assert_equal(pos_tails, neg_tails)
@@ -292,9 +291,9 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                                     relations=g.edata['etype'],
                                     return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
-        neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
-        neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
-        neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
+        neg_src = neg_edges.parent_nid[neg_lsrc]
+        neg_dst = neg_edges.parent_nid[neg_ldst]
+        neg_eid = neg_edges.parent_eid[neg_leid]
         exists = neg_edges.edata['false_neg']
         neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
         for i in range(len(neg_eid)):
@@ -305,7 +304,6 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
-@pytest.mark.skipif(dgl.backend.backend_name == "tensorflow", reason="Core dump")
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)
