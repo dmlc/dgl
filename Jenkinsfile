@@ -119,7 +119,7 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu-test" } }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             build_dgl_linux("cpu")
           }
@@ -132,7 +132,7 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu-test"
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
@@ -165,7 +165,7 @@ pipeline {
     stage("Test") {
       parallel {
         stage("C++ CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu-test" } }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             cpp_unit_test_linux()
           }
@@ -187,7 +187,7 @@ pipeline {
           }
         }
         stage("Torch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu-test" } }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("Unit test") {
               steps {
@@ -234,7 +234,7 @@ pipeline {
         stage("Torch GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu-test"
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
@@ -258,7 +258,7 @@ pipeline {
           }
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu-test" } }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("Unit test") {
               steps {
@@ -280,7 +280,7 @@ pipeline {
         stage("MXNet GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu-test"
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
