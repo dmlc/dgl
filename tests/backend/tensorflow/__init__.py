@@ -97,26 +97,17 @@ class record_grad:
 def attach_grad(x):
     cgrad.add_tensor(x)
     return x
-    # if x.grad is not None:
-    #     x.grad.zero_()
-    #     return x
-    # else:
-    #     return x.requires_grad_()
 
 
 def backward(x, head_gradient=None):
     cgrad.backward(x, head_gradient)
-    # x.backward(head_gradient)
 
 
 def grad(x):
     return cgrad.grad(x)
-    # return x.grad
-
 
 def is_no_grad(x):
     return cgrad.is_no_grad(x)
-    # return x.grad is None or (x.grad == 0).all()
 
 
 def full(shape, fill_value, dtype, ctx):

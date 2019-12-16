@@ -10,12 +10,8 @@ import tfdlpack
 import numpy as np
 from tfdlpack import to_dlpack, from_dlpack
 
-from ..._ffi.object import ObjectBase
 from ... import ndarray as nd
 from ... import kernel as K
-# import dgl.graph_index
-# from ... import GraphIndex
-# from dgl.graph_index import GraphIndex
 from ...function.base import TargetCode
 
 TF_VERSION = LooseVersion(tf.__version__)
@@ -154,8 +150,13 @@ def argsort(input, dim, descending):
 
 def topk(input, k, dim, descending=True):
     # tf's topk doesn't support direction and dimension, use sort instead
-    direction = 'DESCENDING' if descending else 'ASCENDING'
-    return slice_axis(tf.sort(input, axis=dim, direction=direction), dim, 0, k)
+    assert descending==True
+    shape = np.arange(input.ndim)
+    shape[dim], shape[-1] = shape[-1], shape[dim]
+    out1 = tf.transpose(input, perm=shape)
+    out2 = tf.math.top_k(out1, k=k, sorted=True)
+    out = tf.transpose(out2[0], shape)
+    return out
 
 
 def argtopk(input, k, dim, descending=True):
@@ -191,7 +192,6 @@ def repeat(input, repeats, dim):
 
 
 def gather_row(data, row_index):
-    # Weird implementation, because tf.gather require one dimension to be batch_dim
     return tf.gather(data, row_index)
 
 
@@ -338,13 +338,10 @@ def sort_1d(input):
     return tf.sort(input), tf.cast(tf.argsort(input), dtype=tf.int64)
 
 
-def arange(start, stop, ctx=None):
-    if ctx is None:
-        return tf.range(start, stop, dtype=tf.int64)
-    else:
-        with tf.device(ctx):
-            t = tf.range(start, stop, dtype=tf.int64)
-        return t
+def arange(start, stop):
+    with tf.device("/cpu:0"):
+        t = tf.range(start, stop, dtype=tf.int64)
+    return t
 
 
 def rand_shuffle(arr):
@@ -356,7 +353,6 @@ def zerocopy_to_dlpack(input):
 
 
 def zerocopy_from_dlpack(dlpack_tensor):
-    # Not zero copy
     return tfdlpack.from_dlpack(dlpack_tensor)
 
 
@@ -379,11 +375,6 @@ def zerocopy_to_dgl_ndarray(input):
 
 def zerocopy_from_dgl_ndarray(input):
     return zerocopy_from_dlpack(input.to_dlpack())
-
-
-def one_hot(t, num_classes=-1):
-    raise NotImplementedError
-    # return th.nn.functional.one_hot(t, num_classes)
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
