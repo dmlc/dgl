@@ -5,7 +5,7 @@ import numpy as np
 import dgl.backend as F
 import dgl
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     import mxnet as mx
     mx.random.seed(42)

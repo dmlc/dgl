@@ -764,6 +764,14 @@ def test_local_scope():
             assert F.allclose(g.edata['w'], F.tensor([[1.], [0.]]))
     foo(g)
 
+def test_issue_1088():
+    # This test ensures that message passing on a heterograph with one edge type
+    # would not crash (GitHub issue #1088).
+    import dgl.function as fn
+    g = dgl.heterograph({('U', 'E', 'V'): ([0, 1, 2], [1, 2, 3])})
+    g.nodes['U'].data['x'] = F.randn((3, 3))
+    g.update_all(fn.copy_u('x', 'm'), fn.sum('m', 'y'))
+
 if __name__ == '__main__':
     test_nx_conversion()
     test_batch_setter_getter()
@@ -783,3 +791,4 @@ if __name__ == '__main__':
     test_group_apply_edges()
     test_local_var()
     test_local_scope()
+    test_issue_1088()
