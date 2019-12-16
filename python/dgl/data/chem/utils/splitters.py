@@ -11,6 +11,7 @@ from itertools import accumulate, chain
 
 from ...utils import split_dataset, Subset
 from .... import backend as F
+from ....base import dgl_warning
 
 try:
     from rdkit import Chem
@@ -459,11 +460,15 @@ class ScaffoldSplitter(object):
             count_and_log('Computing Bemis-Murcko for compound',
                           i, len(molecules), log_every_n)
             # For mols that have not been sanitized, we need to compute their ring information
-            FastFindRings(mol)
-            mol_scaffold = MurckoScaffold.MurckoScaffoldSmiles(
-                mol=mol, includeChirality=include_chirality)
-            # Group molecules that have the same scaffold
-            scaffolds[mol_scaffold].append(i)
+            try:
+                FastFindRings(mol)
+                mol_scaffold = MurckoScaffold.MurckoScaffoldSmiles(
+                    mol=mol, includeChirality=include_chirality)
+                # Group molecules that have the same scaffold
+                scaffolds[mol_scaffold].append(i)
+            except:
+                dgl_warning('Failed to compute the scaffold for molecule {:d} '
+                            'and it will be excluded.'.format(i+1))
 
         # Order groups of molecules by first comparing the size of groups
         # and then the index of the first compound in the group.
