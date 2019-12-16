@@ -156,10 +156,11 @@ class TencentAlchemyDataset(object):
         A function turning an RDKit molecule instance into a DGLGraph.
         Default to :func:`dgl.data.chem.mol_to_complete_graph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for nodes like in a molecule, which can be used to update
-        ndata for a DGLGraph. By default, we store the atom atomic numbers
-        under the name ``"node_type"`` and store the atom features under the
-        name ``"n_feat"``. The atom features include:
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph. By default, we construct graphs where nodes represent atoms
+        and node features represent atom features. We store the atomic numbers under the
+        name ``"node_type"`` and store the atom features under the name ``"n_feat"``.
+        The atom features include:
         * One hot encoding for atom types
         * Atomic number of atoms
         * Whether the atom is a donor
@@ -169,9 +170,10 @@ class TencentAlchemyDataset(object):
         * Total number of Hs on the atom
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
-        edata for a DGLGraph. By default, we store the distance between the
-        end atoms under the name ``"distance"`` and store the bond features under
-        the name ``"e_feat"``. The bond features are one-hot encodings of the bond type.
+        edata for a DGLGraph. By default, we construct edges between every pair of atoms,
+        excluding the self loops. We store the distance between the end atoms under the name
+        ``"distance"`` and store the edge features under the name ``"e_feat"``. The edge
+        features represent one hot encoding of edge types (bond types and non-bond edges).
     """
     def __init__(self, mode='dev', from_raw=False,
                  mol_to_graph=mol_to_complete_graph,

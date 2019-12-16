@@ -93,14 +93,14 @@ def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charg
         Path to file for storing a molecule, which can be of format '.mol2', '.sdf',
         '.pdbqt', or '.pdb'.
     add_hydrogens : bool
-        Whether to add hydrogens via pdbfixer. Default to True.
+        Whether to add hydrogens via pdbfixer. Default to False.
     sanitize : bool
         Whether sanitization is performed in initializing RDKit molecule instances. See
         https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
         Default to False.
     calc_charges : bool
         Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
-        ``add_hydrogens`` and ``sanitize`` to be True. Default to True.
+        ``add_hydrogens`` and ``sanitize`` to be True. Default to False.
     remove_hs : bool
         Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
         slow for large molecules. Default to False.
@@ -161,8 +161,8 @@ def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charg
 
     return mol, coordinates
 
-def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=True, calc_charges=False,
-                                remove_hs=True, use_conformation=True, num_processes=2):
+def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=False, calc_charges=False,
+                                remove_hs=False, use_conformation=True, num_processes=2):
     """Load molecules from files with multiprocessing.
 
     Parameters
@@ -171,14 +171,14 @@ def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=True, calc_
         Each element is a path to a file storing a molecule, which can be of format '.mol2',
         '.sdf', '.pdbqt', or '.pdb'.
     add_hydrogens : bool
-        Whether to add hydrogens via pdbfixer. Default to True.
+        Whether to add hydrogens via pdbfixer. Default to False.
     sanitize : bool
         Whether sanitization is performed in initializing RDKit molecule instances. See
         https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
         Default to False.
     calc_charges : bool
         Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
-        ``add_hydrogens`` and ``sanitize`` to be True. Default to True.
+        ``add_hydrogens`` and ``sanitize`` to be True. Default to False.
     remove_hs : bool
         Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
         slow for large molecules. Default to False.
@@ -187,7 +187,15 @@ def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=True, calc_
         Default to True.
     num_processes : int or None
         Number of worker processes to use. If None,
-        then we will use the number of CPUs in the systetm. Default to None.
+        then we will use the number of CPUs in the systetm. Default to 2.
+
+    Returns
+    -------
+    list of 2-tuples
+        The first element of each 2-tuple is an RDKit molecule instance. The second element
+        of each 2-tuple is the 3D atom coordinates of the corresponding molecule if
+        use_conformation is True and the coordinates has been successfully loaded. Otherwise,
+        it will be None.
     """
     if num_processes == 1:
         mols_loaded = []

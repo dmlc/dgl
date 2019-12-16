@@ -6,16 +6,38 @@ import torch.nn as nn
 from .... import function as fn
 
 class RadialPooling(nn.Module):
-    """Radial Pooling from paper `Atomic Convolutional Networks for
+    r"""Radial pooling from paper `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
 
-    Let :math:`r_{ij}` be the distance between
+    We denote the distance between atom :math:`i` and :math:`j` by :math:`r_{ij}`.
+
+    A radial pooling layer transforms distances with radial filters. For radial filter
+    indexed by :math:`k`, it projects edge distances with
+
+    .. math::
+        h_{ij}^{k} = \exp(-\gamma_{k}|r_{ij}-r_{k}|^2)
+
+    If :math:`r_{ij} < c_k`,
+
+    .. math::
+        f_{ij}^{k} = 0.5 * \cos(\frac{\pi r_{ij}}{c_k} + 1),
+
+    else,
+
+    .. math::
+        f_{ij}^{k} = 0.
+
+    Finally,
+
+    .. math::
+        e_{ij}^{k} = h_{ij}^{k} * f_{ij}^{k}
 
     Parameters
     ----------
     interaction_cutoffs : float32 tensor of shape (K)
         :math:`c_k` in the equations above. Roughly they can be considered as learnable cutoffs
-        for deciding if two atoms are neighbors. K for the number of radial filters.
+        and two atoms are considered as connected if the distance between them is smaller than
+        the cutoffs. K for the number of radial filters.
     rbf_kernel_means : float32 tensor of shape (K)
         :math:`r_k` in the equations above. K for the number of radial filters.
     rbf_kernel_scaling : float32 tensor of shape (K)
@@ -32,6 +54,18 @@ class RadialPooling(nn.Module):
             rbf_kernel_scaling.reshape(-1, 1, 1), requires_grad=True)
 
     def forward(self, distances):
+        """Apply the layer to transform edge distances.
+
+        Parameters
+        ----------
+        distances : Float32 tensor of shape (E, 1)
+            Distance between end nodes of edges. E for the number of edges.
+
+        Returns
+        -------
+        Float32 tensor of shape (K, E, 1)
+            Transformed edge distances. K for the number of radial filters.
+        """
         scaled_euclidean_distance = - self.rbf_kernel_scaling * \
                                     (distances - self.rbf_kernel_means) ** 2          # (K, E, 1)
         rbf_kernel_results = th.exp(scaled_euclidean_distance)                        # (K, E, 1)
@@ -48,6 +82,20 @@ class RadialPooling(nn.Module):
         return rbf_kernel_results * cutoff_values
 
 def msg_func(edges):
+    """Send messages along edges.
+
+    Parameters
+    ----------
+    edges : EdgeBatch
+        A batch of edges.
+
+    Returns
+    -------
+    dict mapping 'm' to Float32 tensor of shape (E, K * T)
+        Messages computed. E for the number of edges, K for the number of
+        radial filters and T for the number of features to use
+        (types of atomic number in the paper).
+    """
     return {'m': th.einsum(
         'ij,ik->ijk', edges.src['hv'], edges.data['he']).view(len(edges), -1)}
 
@@ -110,7 +158,8 @@ class AtomicConv(nn.Module):
     ----------
     interaction_cutoffs : float32 tensor of shape (K)
         :math:`c_k` in the equations above. Roughly they can be considered as learnable cutoffs
-        for deciding if two atoms are neighbors. K for the number of radial filters.
+        and two atoms are considered as connected if the distance between them is smaller than
+        the cutoffs. K for the number of radial filters.
     rbf_kernel_means : float32 tensor of shape (K)
         :math:`r_k` in the equations above. K for the number of radial filters.
     rbf_kernel_scaling : float32 tensor of shape (K)
@@ -126,30 +175,38 @@ class AtomicConv(nn.Module):
         self.radial_pooling = RadialPooling(interaction_cutoffs=interaction_cutoffs,
                                             rbf_kernel_means=rbf_kernel_means,
                                             rbf_kernel_scaling=rbf_kernel_scaling)
-        self.features_to_use = nn.Parameter(features_to_use, requires_grad=False)
         if features_to_use is None:
             self.num_channels = 1
+            self.features_to_use = None
         else:
             self.num_channels = len(features_to_use)
+            self.features_to_use = nn.Parameter(features_to_use, requires_grad=False)
 
     def forward(self, graph, feat, distances):
-        # (K, E, 1)
-        radial_pooled_values = self.radial_pooling(distances)
+        """Apply the atomic convolution layer.
+
+        Parameters
+        ----------
+        graph : DGLGraph or BatchedDGLGraph
+            Topology based on which message passing is performed.
+        feat : Float32 tensor of shape (V, 1)
+            Initial node features, which are atomic numbers in the paper.
+            V for the number of nodes.
+        distances : Float32 tensor of shape (E, 1)
+            Distance between end nodes of edges. E for the number of edges.
+
+        Returns
+        -------
+        Float32 tensor of shape (V, K * T)
+            Updated node representations. V for the number of nodes, K for the
+            number of radial filters, and T for the number of types of atomic numbers.
+        """
+        radial_pooled_values = self.radial_pooling(distances)                # (K, E, 1)
         graph = graph.local_var()
         if self.features_to_use is not None:
-            # (V, 1)
-            flattened_feat = feat
-            # (V, len(self.features_to_use))
-            flattened_feat = (flattened_feat == self.features_to_use).float()
-            # (V, len(self.features_to_use))
-            feat = flattened_feat
-        else:
-            feat = feat
-        # (V, len(self.features_to_use))
+            feat = (feat == self.features_to_use).float()                    # (V, T)
         graph.ndata['hv'] = feat
-        # (E, K)
-        graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1)
+        graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1) # (E, K)
         graph.update_all(msg_func, fn.sum('m', 'hv_new'))
 
-        # (V, K * len(self.features_to_use))
-        return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)
+        return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)       # (V, K * T)

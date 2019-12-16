@@ -1,9 +1,12 @@
 """Convert molecules into DGLGraphs."""
+import numpy as np
+
 from functools import partial
 
 from .... import DGLGraph
 
 try:
+    import mdtraj
     from rdkit import Chem
     from rdkit.Chem import rdmolfiles, rdmolops
 except ImportError:
@@ -13,7 +16,8 @@ __all__ = ['mol_to_graph',
            'smiles_to_bigraph',
            'mol_to_bigraph',
            'smiles_to_complete_graph',
-           'mol_to_complete_graph']
+           'mol_to_complete_graph',
+           'k_nearest_neighbors']
 
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
@@ -239,3 +243,42 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
     """
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_complete_graph(mol, add_self_loop, node_featurizer, edge_featurizer)
+
+def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
+    """Find k nearest neighbors for each atom based on the 3D coordinates.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray of shape (N, 3)
+        The 3D coordinates of atoms in the molecule. N for the number of atoms.
+    neighbor_cutoff : float
+        Distance cutoff to define 'neighboring'.
+    max_num_neighbors : int or None.
+        If not None, then this specifies the maximum number of closest neighbors
+        allowed for each atom.
+
+    Returns
+    -------
+    neighbor_list : dict(int -> list of ints)
+        Mapping atom indices to their k nearest neighbors.
+    """
+    num_atoms = coordinates.shape[0]
+    traj = mdtraj.Trajectory(coordinates.reshape((1, num_atoms, 3)), None)
+    neighbors = mdtraj.geometry.compute_neighborlist(traj, neighbor_cutoff)
+    srcs, dsts, distances = [], [], []
+    for i in range(num_atoms):
+        delta = coordinates[i] - coordinates.take(neighbors[i], axis=0)
+        dist = np.linalg.norm(delta, axis=1)
+        if max_num_neighbors is not None and len(neighbors[i]) > max_num_neighbors:
+            sorted_neighbors = list(zip(dist, neighbors[i]))
+            # Sort neighbors based on distance from smallest to largest
+            sorted_neighbors.sort(key=lambda tup: tup[0])
+            dsts.extend([i for _ in range(max_num_neighbors)])
+            srcs.extend([int(sorted_neighbors[j][1]) for j in range(max_num_neighbors)])
+            distances.extend([float(sorted_neighbors[j][0]) for j in range(max_num_neighbors)])
+        else:
+            dsts.extend([i for _ in range(len(neighbors[i]))])
+            srcs.extend(neighbors[i].tolist())
+            distances.extend(dist.tolist())
+
+    return srcs, dsts, distances

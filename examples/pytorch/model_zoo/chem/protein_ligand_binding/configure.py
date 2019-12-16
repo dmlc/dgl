@@ -134,7 +134,7 @@ ACNN_PDBBind_refined_pocket_scaffold = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 10,
+    'num_epochs': 250,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'scaffold'
 }
@@ -157,7 +157,7 @@ ACNN_PDBBind_refined_pocket_stratified = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 10,
+    'num_epochs': 300,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'stratified'
 }
@@ -180,7 +180,7 @@ ACNN_PDBBind_refined_pocket_temporal = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 10,
+    'num_epochs': 300,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'temporal'
 }

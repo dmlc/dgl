@@ -240,5 +240,25 @@ class PDBBind(object):
         return len(self.indices)
 
     def __getitem__(self, item):
+        """Get the datapoint associated with the index.
+
+        Parameters
+        ----------
+        item : int
+            Index for the datapoint.
+
+        Returns
+        -------
+        int
+            Index for the datapoint.
+        rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for the ligand molecule.
+        rdkit.Chem.rdchem.Mol
+            RDKit molecule instance for the protein molecule.
+        DGLHeteroGraph
+            Pre-processed DGLHeteroGraph with features extracted.
+        Float32 tensor
+            Label for the datapoint.
+        """
         return item, self.ligand_mols[item], self.protein_mols[item], \
                self.graphs[item], self.labels[item]

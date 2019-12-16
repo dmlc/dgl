@@ -229,5 +229,3 @@ Edge Softmax
 
 .. automodule:: dgl.nn.pytorch.softmax
     :members: edge_softmax
-    
-

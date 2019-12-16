@@ -11,7 +11,6 @@ from itertools import accumulate, chain
 
 from ...utils import split_dataset, Subset
 from .... import backend as F
-from ....base import dgl_warning
 
 try:
     from rdkit import Chem
@@ -55,16 +54,31 @@ def base_k_fold_split(split_method, dataset, k, log):
         if log:
             print('Processing fold {:d}/{:d}'.format(i+1, k))
         # We are reusing the code for train-validation-test split.
-        # The training and test subsets will be merged as the training set in one fold.
         train_set1, val_set, train_set2 = split_method(dataset,
                                                        frac_train=i * frac_per_part,
                                                        frac_val=frac_per_part,
                                                        frac_test=1. - (i + 1) * frac_per_part)
+        # For cross validation, each fold consists of only a train subset and
+        # a validation subset.
         train_set = Subset(dataset, train_set1.indices + train_set2.indices)
         all_folds.append((train_set, val_set))
     return all_folds
 
 def train_val_test_sanity_check(frac_train, frac_val, frac_test):
+    """Sanity check for train-val-test split
+
+    Ensure that the fractions of the dataset to use for training,
+    validation and test add up to 1.
+
+    Parameters
+    ----------
+    frac_train : float
+        Fraction of the dataset to use for training.
+    frac_val : float
+        Fraction of the dataset to use for validation.
+    frac_test : float
+        Fraction of the dataset to use for test.
+    """
     total_fraction = frac_train + frac_val + frac_test
     assert np.allclose(total_fraction, 1.), \
         'Expect the sum of fractions for training, validation and ' \
@@ -467,8 +481,8 @@ class ScaffoldSplitter(object):
                 # Group molecules that have the same scaffold
                 scaffolds[mol_scaffold].append(i)
             except:
-                dgl_warning('Failed to compute the scaffold for molecule {:d} '
-                            'and it will be excluded.'.format(i+1))
+                print('Failed to compute the scaffold for molecule {:d} '
+                      'and it will be excluded.'.format(i+1))
 
         # Order groups of molecules by first comparing the size of groups
         # and then the index of the first compound in the group.
@@ -616,9 +630,50 @@ class ScaffoldSplitter(object):
         return all_folds
 
 class SingleTaskStratifiedSplitter(object):
+    """Splits the dataset by stratification on a single task.
+
+    We sort the molecules based on their label values for a task and then repeatedly
+    take buckets of datapoints to augment the training, validation and test subsets.
+    """
     @staticmethod
     def train_val_test_split(dataset, labels, task_id, frac_train=0.8, frac_val=0.1,
-                             frac_test=0.1, num_buckets=10, random_state=None):
+                             frac_test=0.1, bucket_size=10, random_state=None):
+        """Split the dataset into training, validation and test subsets as stated above.
+
+        Parameters
+        ----------
+        dataset
+            We assume ``len(dataset)`` gives the size for the dataset, ``dataset[i]``
+            gives the ith datapoint and ``dataset.smiles[i]`` gives the SMILES for the
+            ith datapoint.
+        labels : tensor of shape (N, T)
+            Dataset labels all tasks. N for the number of datapoints and T for the number
+            of tasks.
+        task_id : int
+            Index for the task.
+        frac_train : float
+            Fraction of data to use for training. By default, we set this to be 0.8, i.e.
+            80% of the dataset is used for training.
+        frac_val : float
+            Fraction of data to use for validation. By default, we set this to be 0.1, i.e.
+            10% of the dataset is used for validation.
+        frac_test : float
+            Fraction of data to use for test. By default, we set this to be 0.1, i.e.
+            10% of the dataset is used for test.
+        bucket_size : int
+            Size of bucket of datapoints. Default to 10.
+        random_state : None, int or array_like, optional
+            Random seed used to initialize the pseudo-random number generator.
+            Can be any integer between 0 and 2**32 - 1 inclusive, an array
+            (or other sequence) of such integers, or None (the default).
+            If seed is None, then RandomState will try to read data from /dev/urandom
+            (or the Windows analogue) if available or seed from the clock otherwise.
+
+        Returns
+        -------
+        list of length 3
+            Subsets for training, validation and test, which are all :class:`Subset` instances.
+        """
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
 
         if random_state is not None:
@@ -629,14 +684,14 @@ class SingleTaskStratifiedSplitter(object):
         task_labels = labels[:, task_id]
         sorted_indices = np.argsort(task_labels)
 
-        train_bucket_cutoff = int(np.round(frac_train * num_buckets))
-        val_bucket_cutoff = int(np.round(frac_val * num_buckets)) + train_bucket_cutoff
+        train_bucket_cutoff = int(np.round(frac_train * bucket_size))
+        val_bucket_cutoff = int(np.round(frac_val * bucket_size)) + train_bucket_cutoff
 
         train_indices, val_indices, test_indices = [], [], []
 
-        while sorted_indices.shape[0] >= num_buckets:
-            current_batch, sorted_indices = np.split(sorted_indices, [num_buckets])
-            shuffled = np.random.permutation(range(num_buckets))
+        while sorted_indices.shape[0] >= bucket_size:
+            current_batch, sorted_indices = np.split(sorted_indices, [bucket_size])
+            shuffled = np.random.permutation(range(bucket_size))
             train_indices.extend(
                 current_batch[shuffled[:train_bucket_cutoff]].tolist())
             val_indices.extend(
@@ -653,6 +708,30 @@ class SingleTaskStratifiedSplitter(object):
 
     @staticmethod
     def k_fold_split(dataset, labels, task_id, k=5, log=True):
+        """Sort molecules based on their label values for a task and then split them
+        for k-fold cross validation by taking consecutive chunks.
+
+        Parameters
+        ----------
+        dataset
+            We assume ``len(dataset)`` gives the size for the dataset, ``dataset[i]``
+            gives the ith datapoint and ``dataset.smiles[i]`` gives the SMILES for the
+            ith datapoint.
+        labels : tensor of shape (N, T)
+            Dataset labels all tasks. N for the number of datapoints and T for the number
+            of tasks.
+        task_id : int
+            Index for the task.
+        k : int
+            Number of folds to use and should be no smaller than 2. Default to be 5.
+        log : bool
+            Whether to print a message at the start of preparing each fold.
+
+        Returns
+        -------
+        list of 2-tuples
+            Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
+        """
         if not isinstance(labels, np.ndarray):
             labels = F.asnumpy(labels)
         task_labels = labels[:, task_id]

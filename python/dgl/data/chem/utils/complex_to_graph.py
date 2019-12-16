@@ -1,24 +1,24 @@
 """Convert complexes into DGLHeteroGraphs"""
 import numpy as np
 
+from ..utils import k_nearest_neighbors
 from .... import graph, bipartite, hetero_from_relations
 from .... import backend as F
 
-try:
-    import mdtraj
-except ImportError:
-    pass
-
-__all__ = ['k_nearest_neighbors',
-           'ACNN_graph_construction_and_featurization']
+__all__ = ['ACNN_graph_construction_and_featurization']
 
 def filter_out_hydrogens(mol):
-    """Return indices for non-hydrogen atoms.
+    """Get indices for non-hydrogen atoms.
 
     Parameters
     ----------
     mol : rdkit.Chem.rdchem.Mol
         RDKit molecule instance.
+
+    Returns
+    -------
+    indices_left : list of int
+        Indices of non-hydrogen atoms.
     """
     indices_left = []
     for i, atom in enumerate(mol.GetAtoms()):
@@ -29,50 +29,25 @@ def filter_out_hydrogens(mol):
     return indices_left
 
 def get_atomic_numbers(mol, indices):
+    """Get the atomic numbers for the specified atoms.
+
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance.
+    indices : list of int
+        Specifying atoms.
+
+    Returns
+    -------
+    list of int
+        Atomic numbers computed.
+    """
     atomic_numbers = []
     for i in indices:
         atom = mol.GetAtomWithIdx(i)
         atomic_numbers.append(atom.GetAtomicNum())
     return atomic_numbers
-
-def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
-    """Find k nearest neighbors for each atom based on the 3D coordinates.
-
-    Parameters
-    ----------
-    coordinates : numpy.ndarray of shape (N, 3)
-        The 3D coordinates of atoms in the molecule. N for the number of atoms.
-    neighbor_cutoff : float
-        Distance cutoff to define 'neighboring'.
-    max_num_neighbors : int or None.
-        If not None, then this specifies the maximum number of closest neighbors
-        allowed for each atom.
-
-    Returns
-    -------
-    neighbor_list : dict(int -> list of ints)
-        Mapping atom indices to their k nearest neighbors.
-    """
-    num_atoms = coordinates.shape[0]
-    traj = mdtraj.Trajectory(coordinates.reshape((1, num_atoms, 3)), None)
-    neighbors = mdtraj.geometry.compute_neighborlist(traj, neighbor_cutoff)
-    srcs, dsts, distances = [], [], []
-    for i in range(num_atoms):
-        delta = coordinates[i] - coordinates.take(neighbors[i], axis=0)
-        dist = np.linalg.norm(delta, axis=1)
-        if max_num_neighbors is not None and len(neighbors[i]) > max_num_neighbors:
-            sorted_neighbors = list(zip(dist, neighbors[i]))
-            # Sort neighbors based on distance from smallest to largest
-            sorted_neighbors.sort(key=lambda tup: tup[0])
-            dsts.extend([i for _ in range(max_num_neighbors)])
-            srcs.extend([int(sorted_neighbors[j][1]) for j in range(max_num_neighbors)])
-            distances.extend([float(sorted_neighbors[j][0]) for j in range(max_num_neighbors)])
-        else:
-            dsts.extend([i for _ in range(len(neighbors[i]))])
-            srcs.extend(neighbors[i].tolist())
-            distances.extend(dist.tolist())
-
-    return srcs, dsts, distances
 
 def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,

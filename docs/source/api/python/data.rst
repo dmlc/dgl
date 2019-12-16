@@ -156,8 +156,8 @@ We adapt several utilities for processing molecules from
     chem.load_molecule
     chem.multiprocess_load_molecules
 
-Featurization Utils
-```````````````````
+Featurization Utils for Single Molecule
+```````````````````````````````````````
 
 For the use of graph neural networks, we need to featurize nodes (atoms) and edges (bonds).
 
@@ -216,8 +216,8 @@ Utils for bond featurization:
     chem.BaseBondFeaturizer.__call__
     chem.CanonicalBondFeaturizer
 
-Graph Construction
-``````````````````
+Graph Construction for Single Molecule
+``````````````````````````````````````
 
 Several methods for constructing DGLGraphs from SMILES/RDKit molecule objects are listed below:
 
@@ -229,6 +229,17 @@ Several methods for constructing DGLGraphs from SMILES/RDKit molecule objects ar
     chem.mol_to_bigraph
     chem.smiles_to_complete_graph
     chem.mol_to_complete_graph
+    chem.k_nearest_neighbors
+
+Graph Construction and Featurization for Ligand-Protein Complex
+```````````````````````````````````````````````````````````````
+
+Constructing DGLHeteroGraphs and featurize for them.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.ACNN_graph_construction_and_featurization
 
 Dataset Classes
 ```````````````
@@ -255,6 +266,7 @@ Currently four datasets are supported:
     :members: __getitem__, __len__
 
 .. autoclass:: dgl.data.chem.PDBBind
+    :members: __getitem__, __len__
 
 Dataset Splitting
 `````````````````
@@ -265,6 +277,7 @@ We provide support for some common data splitting methods:
 * random split
 * molecular weight split
 * Bemis-Murcko scaffold split
+* single-task-stratified split
 
 .. autoclass:: dgl.data.chem.ConsecutiveSplitter
     :members: train_val_test_split, k_fold_split
@@ -276,4 +289,7 @@ We provide support for some common data splitting methods:
     :members: train_val_test_split, k_fold_split
 
 .. autoclass:: dgl.data.chem.ScaffoldSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.SingleTaskStratifiedSplitter
     :members: train_val_test_split, k_fold_split
