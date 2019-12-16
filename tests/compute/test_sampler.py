@@ -296,7 +296,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
         neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
         exists = neg_edges.edata['false_neg']
-        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        neg_edges.edata['etype'] = F.gather_row(g.edata['etype'], neg_eid)
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
@@ -305,7 +305,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Core dump")
+
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)

@@ -600,7 +600,7 @@ def test_repr():
     repr_string = G.__repr__()
     print(repr_string)
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="will core dump")
+
 def test_group_apply_edges():
     def edge_udf(edges):
         h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)

@@ -935,7 +935,6 @@ def test_level1():
     assert fail
 
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Core dump")
 def test_level2():
     #edges = {
     #    'follows': ([0, 1], [1, 2]),
