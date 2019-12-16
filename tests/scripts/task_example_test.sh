@@ -1,7 +1,5 @@
 #!/bin/bash
 
-. /opt/conda/etc/profile.d/conda.sh
-conda activate pytorch-ci
 GCN_EXAMPLE_DIR="./examples/pytorch/"
 
 function fail {

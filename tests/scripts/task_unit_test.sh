@@ -1,7 +1,5 @@
 #!/bin/bash
 
-. /opt/conda/etc/profile.d/conda.sh
-
 function fail {
     echo FAIL: $@
     exit -1
@@ -22,12 +20,10 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
-conda activate ${DGLBACKEND}-ci
-pip install pytest
-python3 -m pytest tests/compute || fail "compute"
-python3 -m pytest tests/graph_index || fail "graph_index"
-python3 -m pytest tests/$DGLBACKEND || fail "backend-specific"
+python3 -m nose -v --with-xunit tests/compute || fail "compute"
+python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
+python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ]; then
-    python3 -m pytest tests/distributed || fail "distributed"
+    python3 -m nose -v --with-xunit tests/distributed || fail "distributed"
 fi
