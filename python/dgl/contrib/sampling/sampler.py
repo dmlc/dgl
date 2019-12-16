@@ -518,7 +518,7 @@ class EdgeSampler(object):
     samples nodes based on the sampling probability to corrupt a positive edge. If 
     both edge_weight and node_weight are not provided, a uniformed sampler is used.
     if only edge_weight is provided, the sampler will take uniform sampling when 
-    corrupt positive edges.
+    corrupt positive edges. 
 
     When the flag `return_false_neg` is turned on, the sampler will also check
     if the generated negative edges are true negative edges and will return
@@ -529,6 +529,11 @@ class EdgeSampler(object):
     for a knowledge graph. A negative edge is considered as a false negative
     edge only if the triple (source node, destination node and relation)
     matches one of the edges in the graph.
+
+    For uniform sampling, the sampler generates only num_of_edges/batch_size 
+    samples. 
+
+    For uniform sampling, the sampler generates samples infinitly.
 
     Parameters
     ----------
