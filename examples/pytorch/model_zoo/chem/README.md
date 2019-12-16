@@ -63,16 +63,16 @@ as front end and Set2Set for output prediction.
 ### Example Usage of Pre-trained Models
 
 ```python
-from dgl.data.chem import Tox21
+from dgl.data.chem import Tox21, smiles_to_bigraph, CanonicalAtomFeaturizer
 from dgl import model_zoo
 
-dataset = Tox21()
+dataset = Tox21(smiles_to_bigraph, CanonicalAtomFeaturizer())
 model = model_zoo.chem.load_pretrained('GCN_Tox21') # Pretrained model loaded
 model.eval()
 
 smiles, g, label, mask = dataset[0]
 feats = g.ndata.pop('h')
-label_pred = model(feats, g)
+label_pred = model(g, feats)
 print(smiles)                   # CCOc1ccc2nc(S(N)(=O)=O)sc2c1
 print(label_pred[:, mask != 0]) # Mask non-existing labels
 # tensor([[-0.7956,  0.4054,  0.4288, -0.5565, -0.0911,  
