@@ -90,8 +90,6 @@ class GCN(layers.Layer):
 
 
 def evaluate(model, features, labels, mask):
-    # model.eval()
-    # with torch.no_grad():
     logits = model(features, training=False)
     logits = logits[mask]
     labels = labels[mask]
