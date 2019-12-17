@@ -97,7 +97,8 @@ class ACNNPredictor(nn.Module):
 
         return backend.unsorted_1d_segment_sum(feats, seg_id, batch_size, 0)
 
-    def forward(self, ligand_graph, protein_graph, complex_graph,
+    def forward(self, batch_size, batch_num_ligand_atoms, batch_num_protein_atoms,
+                frag1_node_indices_in_complex, frag2_node_indices_in_complex,
                 ligand_conv_out, protein_conv_out, complex_conv_out):
         """Perform the prediction.
 
@@ -133,26 +134,14 @@ class ACNNPredictor(nn.Module):
         protein_feats = self.project(protein_conv_out) # (V2, O)
         complex_feats = self.project(complex_conv_out) # (V1+V2, O)
 
-        ligand_energy = self.sum_nodes(                # (B, O)
-            ligand_graph.batch_size,
-            ligand_graph.batch_num_nodes,
-            ligand_feats)
-        protein_energy = self.sum_nodes(               # (B, O)
-            protein_graph.batch_size,
-            protein_graph.batch_num_nodes,
-            protein_feats)
+        ligand_energy = ligand_feats.reshape(batch_size, -1).sum(-1, keepdim=True)   # (B, O)
+        protein_energy = protein_feats.reshape(batch_size, -1).sum(-1, keepdim=True) # (B, O)
 
-        batch_num_nodes = {
-            'ligand_atom': ligand_graph.batch_num_nodes,
-            'protein_atom': protein_graph.batch_num_nodes
-        }
-        complex_energy_ = self.sum_nodes(              # (B, O)
-            complex_graph.batch_size * 2,
-            list(itertools.chain.from_iterable(
-                [batch_num_nodes[nty] for nty in complex_graph.original_ntypes])),
-            complex_feats)
-        complex_energy = complex_energy_[:complex_graph.batch_size] + \
-                         complex_energy_[complex_graph.batch_size:]
+        complex_ligand_energy = complex_feats[frag1_node_indices_in_complex].reshape(
+            batch_size, -1).sum(-1, keepdim=True)
+        complex_protein_energy = complex_feats[frag2_node_indices_in_complex].reshape(
+            batch_size, -1).sum(-1, keepdim=True)
+        complex_energy = complex_ligand_energy + complex_protein_energy
 
         return complex_energy - (ligand_energy + protein_energy)
 
@@ -221,10 +210,6 @@ class ACNN(nn.Module):
             of protein-ligand pairs in the batch and O for the number of tasks.
         """
         ligand_graph = graph[('ligand_atom', 'ligand', 'ligand_atom')]
-        # Todo (Mufei): remove the two lines below after better built-in support
-        ligand_graph.batch_size = graph.batch_size
-        ligand_graph.batch_num_nodes = graph.batch_num_nodes('ligand_atom')
-
         ligand_graph_node_feats = ligand_graph.ndata['atomic_number']
         assert ligand_graph_node_feats.shape[-1] == 1
         ligand_graph_distances = ligand_graph.edata['distance']
@@ -233,10 +218,6 @@ class ACNN(nn.Module):
                                            ligand_graph_distances)
 
         protein_graph = graph[('protein_atom', 'protein', 'protein_atom')]
-        # Todo (Mufei): remove the two lines below after better built-in support
-        protein_graph.batch_size = graph.batch_size
-        protein_graph.batch_num_nodes = graph.batch_num_nodes('protein_atom')
-
         protein_graph_node_feats = protein_graph.ndata['atomic_number']
         assert protein_graph_node_feats.shape[-1] == 1
         protein_graph_distances = protein_graph.edata['distance']
@@ -245,12 +226,6 @@ class ACNN(nn.Module):
                                              protein_graph_distances)
 
         complex_graph = graph[:, 'complex', :]
-        # Todo (Mufei): remove the four lines below after better built-in support
-        complex_graph.batch_size = graph.batch_size
-        complex_graph.original_ntypes = graph.ntypes
-        complex_graph.batch_num_protein_nodes = graph.batch_num_nodes('protein_atom')
-        complex_graph.batch_num_ligand_nodes = graph.batch_num_nodes('ligand_atom')
-
         complex_graph_node_feats = complex_graph.ndata['atomic_number']
         assert complex_graph_node_feats.shape[-1] == 1
         complex_graph_distances = complex_graph.edata['distance']
@@ -258,6 +233,14 @@ class ACNN(nn.Module):
                                              complex_graph_node_feats,
                                              complex_graph_distances)
 
+        frag1_node_indices_in_complex = torch.where(complex_graph.ndata['_TYPE'] == 0)[0]
+        frag2_node_indices_in_complex = list(set(range(complex_graph.number_of_nodes())) -
+                                             set(frag1_node_indices_in_complex.tolist()))
+
         return self.predictor(
-            ligand_graph, protein_graph, complex_graph,
+            graph.batch_size,
+            graph.batch_num_nodes('ligand_atom'),
+            graph.batch_num_nodes('protein_atom'),
+            frag1_node_indices_in_complex,
+            frag2_node_indices_in_complex,
             ligand_conv_out, protein_conv_out, complex_conv_out)

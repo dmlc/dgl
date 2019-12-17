@@ -45,7 +45,9 @@ def load_dataset(args):
     """
     assert args['dataset'] in ['PDBBind'], 'Unexpected dataset {}'.format(args['dataset'])
     if args['dataset'] == 'PDBBind':
-        dataset = PDBBind(subset=args['subset'], load_binding_pocket=args['load_binding_pocket'])
+        dataset = PDBBind(subset=args['subset'],
+                          load_binding_pocket=args['load_binding_pocket'],
+                          zero_padding=True)
         # No validation set is used and frac_val = 0.
         if args['split'] == 'random':
             train_set, _, test_set = RandomSplitter.train_val_test_split(

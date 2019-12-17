@@ -53,9 +53,37 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,
                                               ligand_coordinates,
                                               protein_coordinates,
+                                              max_num_ligand_atoms=None,
+                                              max_num_protein_atoms=None,
                                               neighbor_cutoff=12.,
                                               max_num_neighbors=12,
                                               strip_hydrogens=False):
+    """Graph construction and featurization for `Atomic Convolutional Networks for
+    Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
+
+    Parameters
+    ----------
+    ligand_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance.
+    protein_mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance.
+    ligand_coordinates : Float Tensor of shape (V1, 3)
+        Atom coordinates in a ligand.
+    protein_coordinates : Float Tensor of shape (V2, 3)
+        Atom coordinates in a protein.
+    max_num_ligand_atoms : int or None
+        Maximum number of atoms in ligands for zero padding.
+        If None, no zero padding will be performed. Default to None.
+    max_num_protein_atoms : int or None
+        Maximum number of atoms in proteins for zero padding.
+        If None, no zero padding will be performed. Default to None.
+    neighbor_cutoff : float
+        Distance cutoff to define 'neighboring'. Default to 12.
+    max_num_neighbors : int
+        Maximum number of neighbors allowed for each atom. Default to 12.
+    strip_hydrogens : bool
+        Whether to exclude hydrogen atoms. Default to False.
+    """
     assert ligand_coordinates is not None, 'Expect ligand_coordinates to be provided.'
     assert protein_coordinates is not None, 'Expect protein_coordinates to be provided.'
 
@@ -69,11 +97,22 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
         ligand_atom_indices_left = list(range(ligand_mol.GetNumAtoms()))
         protein_atom_indices_left = list(range(protein_mol.GetNumAtoms()))
 
+    # Compute number of nodes for each type
+    if max_num_ligand_atoms is None:
+        num_ligand_atoms = len(ligand_atom_indices_left)
+    else:
+        num_ligand_atoms = max_num_ligand_atoms
+
+    if max_num_protein_atoms is None:
+        num_protein_atoms = len(protein_atom_indices_left)
+    else:
+        num_protein_atoms = max_num_protein_atoms
+
     # Construct graph for atoms in the ligand
     ligand_srcs, ligand_dsts, ligand_dists = k_nearest_neighbors(
         ligand_coordinates, neighbor_cutoff, max_num_neighbors)
     ligand_graph = graph((ligand_srcs, ligand_dsts),
-                         'ligand_atom', 'ligand', len(ligand_atom_indices_left))
+                         'ligand_atom', 'ligand', num_ligand_atoms)
     ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         np.array(ligand_dists).astype(np.float32)), (-1, 1))
 
@@ -81,7 +120,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_srcs, protein_dsts, protein_dists = k_nearest_neighbors(
         protein_coordinates, neighbor_cutoff, max_num_neighbors)
     protein_graph = graph((protein_srcs, protein_dsts),
-                          'protein_atom', 'protein', len(protein_atom_indices_left))
+                          'protein_atom', 'protein', num_protein_atoms)
     protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         np.array(protein_dists).astype(np.float32)), (-1, 1))
 
@@ -94,7 +133,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     complex_srcs = np.array(complex_srcs)
     complex_dsts = np.array(complex_dsts)
     complex_dists = np.array(complex_dists)
-    offset = len(ligand_atom_indices_left)
+    offset = num_ligand_atoms
 
     # ('ligand_atom', 'complex', 'ligand_atom')
     inter_ligand_indices = np.intersect1d(
@@ -104,7 +143,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     inter_ligand_graph = graph(
         (complex_srcs[inter_ligand_indices].tolist(),
          complex_dsts[inter_ligand_indices].tolist()),
-        'ligand_atom', 'complex', len(ligand_atom_indices_left))
+        'ligand_atom', 'complex', num_ligand_atoms)
     inter_ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         complex_dists[inter_ligand_indices].astype(np.float32)), (-1, 1))
 
@@ -116,7 +155,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     inter_protein_graph = graph(
         ((complex_srcs[inter_protein_indices] - offset).tolist(),
          (complex_dsts[inter_protein_indices] - offset).tolist()),
-        'protein_atom', 'complex', len(protein_atom_indices_left))
+        'protein_atom', 'complex', num_protein_atoms)
     inter_protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         complex_dists[inter_protein_indices].astype(np.float32)), (-1, 1))
 
@@ -129,7 +168,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
         (complex_srcs[ligand_protein_indices].tolist(),
          (complex_dsts[ligand_protein_indices] - offset).tolist()),
         'ligand_atom', 'complex', 'protein_atom',
-        (len(ligand_atom_indices_left), len(protein_atom_indices_left)))
+        (num_ligand_atoms, num_protein_atoms))
     ligand_protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         complex_dists[ligand_protein_indices].astype(np.float32)), (-1, 1))
 
@@ -142,11 +181,11 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
         ((complex_srcs[protein_ligand_indices] - offset).tolist(),
          complex_dsts[protein_ligand_indices].tolist()),
         'protein_atom', 'complex', 'ligand_atom',
-        (len(protein_atom_indices_left), len(ligand_atom_indices_left)))
+        (num_protein_atoms, num_ligand_atoms))
     protein_ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
         complex_dists[protein_ligand_indices].astype(np.float32)), (-1, 1))
 
-    # Get atomic numbers for all atoms left and set node features
+    # Merge the graphs
     g = hetero_from_relations(
         [protein_graph,
          ligand_graph,
@@ -155,11 +194,30 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
          ligand_protein_graph,
          protein_ligand_graph]
     )
+
+    # Get atomic numbers for all atoms left and set node features
     ligand_atomic_numbers = np.array(get_atomic_numbers(ligand_mol, ligand_atom_indices_left))
+    # zero padding
+    ligand_atomic_numbers = np.concatenate([
+        ligand_atomic_numbers, np.zeros(num_ligand_atoms - len(ligand_atom_indices_left))])
     protein_atomic_numbers = np.array(get_atomic_numbers(protein_mol, protein_atom_indices_left))
+    # zero padding
+    protein_atomic_numbers = np.concatenate([
+        protein_atomic_numbers, np.zeros(num_protein_atoms - len(protein_atom_indices_left))])
+
     g.nodes['ligand_atom'].data['atomic_number'] =  F.reshape(F.zerocopy_from_numpy(
         ligand_atomic_numbers.astype(np.float32)), (-1, 1))
     g.nodes['protein_atom'].data['atomic_number'] = F.reshape(F.zerocopy_from_numpy(
         protein_atomic_numbers.astype(np.float32)), (-1, 1))
+
+    # Prepare mask indicating the existence of nodes
+    ligand_masks = np.zeros((num_ligand_atoms, 1))
+    ligand_masks[:len(ligand_atom_indices_left), :] = 1
+    g.nodes['ligand_atom'].data['mask'] = F.zerocopy_from_numpy(
+        ligand_masks.astype(np.float32))
+    protein_masks = np.zeros((num_protein_atoms, 1))
+    protein_masks[:len(protein_atom_indices_left), :] = 1
+    g.nodes['protein_atom'].data['mask'] = F.zerocopy_from_numpy(
+        protein_masks.astype(np.float32))
 
     return g

@@ -59,6 +59,10 @@ class PDBBind(object):
         Construct a DGLHeteroGraph for the use of GNNs. Mapping self.ligand_mols[i],
         self.protein_mols[i], self.ligand_coordinates[i] and self.protein_coordinates[i]
         to a DGLHeteroGraph. Default to :func:`ACNN_graph_construction_and_featurization`.
+    zero_padding : bool
+        Whether to perform zero padding. While DGL does not necessarily require zero padding,
+        pooling operations for variable length inputs can introduce stochastic behaviour, which
+        is not desired for sensitive scenarios. Default to True.
     num_processes : int or None
         Number of worker processes to use. If None,
         then we will use the number of CPUs in the system. Default to 64.
@@ -66,7 +70,7 @@ class PDBBind(object):
     def __init__(self, subset, load_binding_pocket=True, add_hydrogens=False,
                  sanitize=False, calc_charges=False, remove_hs=False, use_conformation=True,
                  construct_graph_and_featurize=ACNN_graph_construction_and_featurization,
-                 num_processes=64):
+                 zero_padding=True, num_processes=64):
         self.task_names = ['-logKd/Ki']
         self.n_tasks = len(self.task_names)
 
@@ -88,7 +92,7 @@ class PDBBind(object):
 
         self._preprocess(extracted_data_path, index_label_file, load_binding_pocket,
                          add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
-                         construct_graph_and_featurize, num_processes)
+                         construct_graph_and_featurize, zero_padding, num_processes)
 
     def _filter_out_invalid(self, ligands_loaded, proteins_loaded, use_conformation):
         """Filter out invalid ligand-protein pairs.
@@ -131,7 +135,7 @@ class PDBBind(object):
 
     def _preprocess(self, root_path, index_label_file, load_binding_pocket,
                     add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
-                    construct_graph_and_featurize, num_processes):
+                    construct_graph_and_featurize, zero_padding, num_processes):
         """Preprocess the dataset.
 
         The pre-processing proceeds as follows:
@@ -166,6 +170,10 @@ class PDBBind(object):
             Construct a DGLHeteroGraph for the use of GNNs. Mapping self.ligand_mols[i],
             self.protein_mols[i], self.ligand_coordinates[i] and self.protein_coordinates[i]
             to a DGLHeteroGraph. Default to :func:`ACNN_graph_construction_and_featurization`.
+        zero_padding : bool
+            Whether to perform zero padding. While DGL does not necessarily require zero padding,
+            pooling operations for variable length inputs can introduce stochastic behaviour, which
+            is not desired for sensitive scenarios.
         num_processes : int or None
             Number of worker processes to use. If None,
             then we will use the number of CPUs in the system.
@@ -221,13 +229,27 @@ class PDBBind(object):
         print('Finished cleaning the dataset, '
               'got {:d}/{:d} valid pairs'.format(len(self), len(pdbs)))
 
+        # Prepare zero padding
+        if zero_padding:
+            max_num_ligand_atoms = 0
+            max_num_protein_atoms = 0
+            for i in range(len(self)):
+                max_num_ligand_atoms = max(
+                    max_num_ligand_atoms, self.ligand_mols[i].GetNumAtoms())
+                max_num_protein_atoms = max(
+                    max_num_protein_atoms, self.protein_mols[i].GetNumAtoms())
+        else:
+            max_num_ligand_atoms = None
+            max_num_protein_atoms = None
+
         print('Start constructing graphs and featurizing them.')
         self.graphs = []
         for i in range(len(self)):
             print('Constructing and featurizing datapoint {:d}/{:d}'.format(i+1, len(self)))
             self.graphs.append(construct_graph_and_featurize(
                 self.ligand_mols[i], self.protein_mols[i],
-                self.ligand_coordinates[i], self.protein_coordinates[i]))
+                self.ligand_coordinates[i], self.protein_coordinates[i],
+                max_num_ligand_atoms, max_num_protein_atoms))
 
     def __len__(self):
         """Get the size of the dataset.
