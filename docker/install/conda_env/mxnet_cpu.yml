@@ -3,6 +3,7 @@ dependencies:
   - pip
   - pip:
     - mxnet
+    - pytest
   - nose
   - numpy
   - cython

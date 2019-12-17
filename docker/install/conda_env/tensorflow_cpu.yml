@@ -4,6 +4,7 @@ dependencies:
   - pip:
     - tf-nightly == 2.1.0.dev20191125
     - tfdlpack
+    - pytest
   - nose
   - numpy
   - cython

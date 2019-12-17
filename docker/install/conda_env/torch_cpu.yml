@@ -3,8 +3,11 @@ channels:
   - pytorch
 dependencies:
   - python = 3.6
-  - pytorch = 1.0.1
   - pip
+  - pip:
+    - torch
+    - torchvision
+    - pytest
   - torchvision
   - nose
   - numpy
