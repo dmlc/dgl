@@ -149,20 +149,29 @@ def argsort(input, dim, descending):
 
 
 def topk(input, k, dim, descending=True):
-    # tf's topk doesn't support direction and dimension, use sort instead
-    assert descending==True
+    if not descending:
+        input = -input
     shape = np.arange(input.ndim)
     shape[dim], shape[-1] = shape[-1], shape[dim]
     out1 = tf.transpose(input, perm=shape)
     out2 = tf.math.top_k(out1, k=k, sorted=True)
     out = tf.transpose(out2[0], shape)
+    if not descending:
+        out = -out
     return out
 
 
 def argtopk(input, k, dim, descending=True):
-    # tf's topk doesn't support direction and dimension, use argsort instead
-    direction = 'DESCENDING' if descending else 'ASCENDING'
-    return slice_axis(tf.argsort(input, axis=dim, direction=direction), dim, 0, k)
+    if not descending:
+        input = -input
+    shape = np.arange(input.ndim)
+    shape[dim], shape[-1] = shape[-1], shape[dim]
+    out1 = tf.transpose(input, perm=shape)
+    out2 = tf.math.top_k(out1, k=k, sorted=True)
+    out = tf.transpose(out2[1], shape)
+    if not descending:
+        out = -out
+    return out
 
 
 def exp(input):
@@ -186,9 +195,7 @@ def split(input, sizes_or_sections, dim):
 
 
 def repeat(input, repeats, dim):
-    tile_shape = np.ones(input.ndim, dtype=np.int32)
-    tile_shape[dim] = repeats
-    return tf.tile(input, tf.constant(tile_shape))
+    return tf.keras.backend.repeat_elements(input, repeats, dim)
 
 
 def gather_row(data, row_index):
