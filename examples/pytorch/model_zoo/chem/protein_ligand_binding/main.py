@@ -1,3 +1,4 @@
+import datetime
 import torch
 import torch.nn as nn
 
@@ -71,6 +72,10 @@ def main(args):
     test_scores = run_an_eval_epoch(args, model, test_loader)
     test_msg = update_msg_from_scores('test results', test_scores)
     print(test_msg)
+
+    dt = datetime.datetime.now()
+    torch.save({'model_state_dict': model.state_dict()}, '{}_{}_{:02d}-{:02d}-{:02d}.pth'.format(
+        args['exp'], dt.date(), dt.hour, dt.minute, dt.second))
 
 if __name__ == '__main__':
     import argparse
