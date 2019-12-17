@@ -1,6 +1,4 @@
 name: pytorch-ci
-channels:
-  - pytorch
 dependencies:
   - python = 3.6
   - pip
