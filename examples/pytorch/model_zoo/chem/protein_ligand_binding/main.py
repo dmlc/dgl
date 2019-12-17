@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-from dgl import model_zoo
 from torch.utils.data import DataLoader
 
 from utils import set_random_seed, load_dataset, collate, load_model, Meter
@@ -61,13 +60,9 @@ def main(args):
                              shuffle=True,
                              collate_fn=collate)
 
-    if args['pre_trained']:
-        args['num_epochs'] = 0
-        model = model_zoo.chem.load_pretrained(args['exp'])
-    else:
-        model = load_model(args)
-        loss_fn = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
+    model = load_model(args)
+    loss_fn = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
     model.to(args['device'])
 
     for epoch in range(args['num_epochs']):
@@ -91,8 +86,6 @@ if __name__ == '__main__':
                                  'PDBBind_refined_pocket_random', 'PDBBind_refined_pocket_scaffold',
                                  'PDBBind_refined_pocket_stratified', 'PDBBind_refined_pocket_temporal'],
                         help='Dataset to use')
-    parser.add_argument('-p', '--pre-trained', action='store_true',
-                        help='Whether to skip training and use a pre-trained model')
 
     args = parser.parse_args().__dict__
     args['exp'] = '_'.join([args['model'], args['dataset']])

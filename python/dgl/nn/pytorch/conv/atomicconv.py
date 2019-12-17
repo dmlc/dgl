@@ -3,8 +3,6 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 
-from .... import function as fn
-
 class RadialPooling(nn.Module):
     r"""Radial pooling from paper `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
@@ -98,6 +96,23 @@ def msg_func(edges):
     """
     return {'m': th.einsum(
         'ij,ik->ijk', edges.src['hv'], edges.data['he']).view(len(edges), -1)}
+
+def reduce_func(nodes):
+    """Collect messages and update node representations.
+
+    Parameters
+    ----------
+    nodes : NodeBatch
+        A batch of nodes.
+
+    Returns
+    -------
+    dict mapping 'hv_new' to Float32 tensor of shape (V, K * T)
+        Updated node representations. V for the number of nodes, K for the number of
+        radial filters and T for the number of features to use
+        (types of atomic number in the paper).
+    """
+    return {'hv_new': nodes.mailbox['m'].sum(1)}
 
 class AtomicConv(nn.Module):
     r"""Atomic Convolution Layer from paper `Atomic Convolutional Networks for
@@ -207,6 +222,6 @@ class AtomicConv(nn.Module):
             feat = (feat == self.features_to_use).float()                    # (V, T)
         graph.ndata['hv'] = feat
         graph.edata['he'] = radial_pooled_values.transpose(1, 0).squeeze(-1) # (E, K)
-        graph.update_all(msg_func, fn.sum('m', 'hv_new'))
+        graph.update_all(msg_func, reduce_func)
 
         return graph.ndata['hv_new'].view(graph.number_of_nodes(), -1)       # (V, K * T)

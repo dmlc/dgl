@@ -16,7 +16,7 @@ def set_random_seed(seed=0):
     Parameters
     ----------
     seed : int
-        Random seed to use
+        Random seed to use. Default to 0.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -25,23 +25,53 @@ def set_random_seed(seed=0):
         torch.cuda.manual_seed(seed)
 
 def load_dataset(args):
+    """Load the dataset.
+
+    Parameters
+    ----------
+    args : dict
+        Input arguments.
+
+    Returns
+    -------
+    dataset
+        Full dataset.
+    train_set
+        Train subset of the dataset.
+    val_set
+        Validation subset of the dataset.
+    """
     assert args['dataset'] in ['PDBBind'], 'Unexpected dataset {}'.format(args['dataset'])
     if args['dataset'] == 'PDBBind':
         dataset = PDBBind(subset=args['subset'], load_binding_pocket=args['load_binding_pocket'])
         # No validation set is used and frac_val = 0.
         if args['split'] == 'random':
             train_set, _, test_set = RandomSplitter.train_val_test_split(
-                dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
-                frac_test=args['frac_test'], random_state=args['random_seed'])
+                dataset,
+                frac_train=args['frac_train'],
+                frac_val=args['frac_val'],
+                frac_test=args['frac_test'],
+                random_state=args['random_seed'])
+
         elif args['split'] == 'scaffold':
             train_set, _, test_set = ScaffoldSplitter.train_val_test_split(
-                dataset, mols=dataset.ligand_mols, sanitize=False, frac_train=args['frac_train'],
-                frac_val=args['frac_val'], frac_test=args['frac_test'])
+                dataset,
+                mols=dataset.ligand_mols,
+                sanitize=False,
+                frac_train=args['frac_train'],
+                frac_val=args['frac_val'],
+                frac_test=args['frac_test'])
+
         elif args['split'] == 'stratified':
             train_set, _, test_set = SingleTaskStratifiedSplitter.train_val_test_split(
-                dataset, labels=dataset.labels, task_id=0, frac_train=args['frac_train'],
-                frac_val=args['frac_val'], frac_test=args['frac_test'],
+                dataset,
+                labels=dataset.labels,
+                task_id=0,
+                frac_train=args['frac_train'],
+                frac_val=args['frac_val'],
+                frac_test=args['frac_test'],
                 random_state=args['random_seed'])
+
         elif args['split'] == 'temporal':
             years = dataset.df['release_year'].values.astype(np.float32)
             indices = np.argsort(years).tolist()
@@ -52,6 +82,7 @@ def load_dataset(args):
             train_set, val_set, test_set = [
                 Subset(dataset, list(indices[offset - length:offset]))
                 for offset, length in zip(accumulate(lengths), lengths)]
+
         else:
             raise ValueError('Expect the splitting method '
                              'to be "random" or "scaffold", got {}'.format(args['split']))
@@ -62,7 +93,6 @@ def load_dataset(args):
     return dataset, train_set, test_set
 
 def collate(data):
-    """"""
     indices, ligand_mols, protein_mols, graphs, labels = map(list, zip(*data))
     bg = dgl.batch_hetero(graphs)
     for nty in bg.ntypes:
@@ -74,7 +104,6 @@ def collate(data):
     return indices, ligand_mols, protein_mols, bg, labels
 
 def load_model(args):
-    """"""
     assert args['model'] in ['ACNN'], 'Unexpected model {}'.format(args['model'])
     if args['model'] == 'ACNN':
         model = model_zoo.chem.ACNN(hidden_sizes=args['hidden_sizes'],
@@ -121,6 +150,10 @@ class Meter(object):
         self.y_true.append(y_true.detach().cpu())
 
     def _finalize_labels_and_prediction(self):
+        """Concatenate the labels and predictions.
+
+        If normalization was performed on the labels, undo the normalization.
+        """
         y_pred = torch.cat(self.y_pred, dim=0)
         y_true = torch.cat(self.y_true, dim=0)
 
@@ -144,7 +177,7 @@ class Meter(object):
         return pearsonr(y_true[:, 0].numpy(), y_pred[:, 0].numpy())[0] ** 2
 
     def mae(self):
-        """Compute MAE for each task.
+        """Compute MAE
 
         Returns
         -------
@@ -167,7 +200,7 @@ class Meter(object):
         return np.sqrt(F.mse_loss(y_pred, y_true).cpu().item())
 
     def compute_metric(self, metric_name):
-        """Compute metric for each task.
+        """Compute metric
 
         Parameters
         ----------
@@ -176,8 +209,8 @@ class Meter(object):
 
         Returns
         -------
-        list of float
-            Metric value for each task
+        float
+            Metric value
         """
         assert metric_name in ['pearson_r2', 'mae', 'rmse'], \
             'Expect metric name to be "pearson_r2", "mae" or "rmse", got {}'.format(metric_name)
