@@ -1,10 +1,8 @@
 """Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity"""
 import itertools
-import numpy as np
 import torch
 import torch.nn as nn
 
-from ... import backend
 from ...nn.pytorch import AtomicConv
 
 def truncated_normal_(tensor, mean=0., std=1.):
@@ -74,29 +72,6 @@ class ACNNPredictor(nn.Module):
         modules.append(linear_layer)
         self.project = nn.Sequential(*modules)
 
-    @staticmethod
-    def sum_nodes(batch_size, batch_num_nodes, feats):
-        """Segment sum for node features.
-
-        Parameters
-        ----------
-        batch_size : int
-            Number of graphs in a batch.
-        batch_num_nodes : list of int
-            The ``i``th element represents the number of nodes in the ``i``th graph.
-        feats : Float32 Tensor of shape (V, O)
-            Updated node features. O for the number of tasks.
-
-        Returns
-        -------
-        Float32 Tensor of shape (batch_size, O)
-            Computed graph representations. O for the number of tasks.
-        """
-        seg_id = torch.from_numpy(np.arange(batch_size, dtype='int64').repeat(batch_num_nodes))
-        seg_id = seg_id.to(feats.device)
-
-        return backend.unsorted_1d_segment_sum(feats, seg_id, batch_size, 0)
-
     def forward(self, batch_size, batch_num_ligand_atoms, batch_num_protein_atoms,
                 frag1_node_indices_in_complex, frag2_node_indices_in_complex,
                 ligand_conv_out, protein_conv_out, complex_conv_out):
@@ -104,6 +79,14 @@ class ACNNPredictor(nn.Module):
 
         Parameters
         ----------
+        batch_size : int
+            Number of datapoints in a batch.
+        batch_num_ligand_atoms : list of int
+            Number of ligand atoms in each graph of the batch.
+        batch_num_protein_atoms : list of int
+            Number of protein atoms in each graph of the batch.
+        frag1_node_indices_in_complex :
+
         ligand_graph : DGLHeteroGraph
             DGLHeteroGraph for the ligand graph.
         protein_graph : DGLHeteroGraph

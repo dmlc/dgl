@@ -2,6 +2,7 @@ import datetime
 import torch
 import torch.nn as nn
 
+from dgl import model_zoo
 from torch.utils.data import DataLoader
 
 from utils import set_random_seed, load_dataset, collate, load_model, Meter
@@ -61,9 +62,13 @@ def main(args):
                              shuffle=True,
                              collate_fn=collate)
 
-    model = load_model(args)
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
+    if args['pre_trained']:
+        args['num_epochs'] = 0
+        model = model_zoo.chem.load_pretrained(args['exp'])
+    else:
+        model = load_model(args)
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
     model.to(args['device'])
 
     for epoch in range(args['num_epochs']):
