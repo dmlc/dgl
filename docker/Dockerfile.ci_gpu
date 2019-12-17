@@ -1,5 +1,5 @@
 # CI docker GPU env
-FROM nvidia/cuda:10.1-cudnn7-devel
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu16.04
 
 RUN apt-get update --fix-missing
 
