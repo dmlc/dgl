@@ -6,7 +6,6 @@ dependencies:
     - torch
     - torchvision
     - pytest
-  - torchvision
   - nose
   - numpy
   - cython
