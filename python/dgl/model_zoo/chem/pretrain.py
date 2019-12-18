@@ -25,15 +25,7 @@ URL = {
     'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
-    'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth',
-    'ACNN_PDBBind_core_pocket_random': 'pre_trained/ACNN_PDBBind_core_pocket_random.pth',
-    'ACNN_PDBBind_core_pocket_scaffold': 'pre_trained/ACNN_PDBBind_core_pocket_scaffold.pth',
-    'ACNN_PDBBind_core_pocket_stratified': 'pre_trained/ACNN_PDBBind_core_pocket_stratified.pth',
-    'ACNN_PDBBind_core_pocket_temporal': 'pre_trained/ACNN_PDBBind_core_pocket_temporal.pth',
-    'ACNN_PDBBind_refined_pocket_random': 'pre_trained/ACNN_PDBBind_refined_pocket_random.pth',
-    'ACNN_PDBBind_refined_pocket_scaffold': 'pre_trained/ACNN_PDBBind_refined_pocket_scaffold.pth',
-    'ACNN_PDBBind_refined_pocket_stratified': 'pre_trained/ACNN_PDBBind_refined_pocket_stratified.pth',
-    'ACNN_PDBBind_refined_pocket_temporal': 'pre_trained/ACNN_PDBBind_refined_pocket_temporal.pth'
+    'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -65,6 +57,9 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
     download(url_to_pretrained, path=local_pretrained_path, log=log)
     checkpoint = torch.load(local_pretrained_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
+
+    if log:
+        print('Pretrained model loaded')
 
     return model
 
@@ -173,17 +168,5 @@ def load_pretrained(model_name, log=True):
                      features_to_use=torch.tensor([
                          1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
                      radial=[[12.0], [0.0, 4.0, 8.0], [4.0]])
-
-    elif model_name.startswith('ACNN_PDBBind_refined_pocket'):
-        model = ACNN(hidden_sizes=[128, 128, 64],
-                     weight_init_stddevs=[0.125, 0.125, 0.177, 0.01],
-                     dropouts=[0.4, 0.4, 0.],
-                     features_to_use=torch.tensor([
-                         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 19., 20., 25., 26., 27.,
-                         28., 29., 30., 34., 35., 38., 48., 53., 55., 80.]),
-                     radial=[[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]])
-
-    if log:
-        print('Pretrained model loaded')
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

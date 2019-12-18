@@ -1,8 +1,6 @@
-import datetime
 import torch
 import torch.nn as nn
 
-from dgl import model_zoo
 from torch.utils.data import DataLoader
 
 from utils import set_random_seed, load_dataset, collate, load_model, Meter
@@ -62,13 +60,9 @@ def main(args):
                              shuffle=True,
                              collate_fn=collate)
 
-    if args['pre_trained']:
-        args['num_epochs'] = 0
-        model = model_zoo.chem.load_pretrained(args['exp'])
-    else:
-        model = load_model(args)
-        loss_fn = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
+    model = load_model(args)
+    loss_fn = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'])
     model.to(args['device'])
 
     for epoch in range(args['num_epochs']):
@@ -77,10 +71,6 @@ def main(args):
     test_scores = run_an_eval_epoch(args, model, test_loader)
     test_msg = update_msg_from_scores('test results', test_scores)
     print(test_msg)
-
-    dt = datetime.datetime.now()
-    torch.save({'model_state_dict': model.state_dict()}, '{}_{}_{:02d}-{:02d}-{:02d}.pth'.format(
-        args['exp'], dt.date(), dt.hour, dt.minute, dt.second))
 
 if __name__ == '__main__':
     import argparse
