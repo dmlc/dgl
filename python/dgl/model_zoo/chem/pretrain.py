@@ -1,6 +1,6 @@
 """Utilities for using pretrained models."""
-import numpy as np
 import os
+import numpy as np
 import torch
 from rdkit import Chem
 

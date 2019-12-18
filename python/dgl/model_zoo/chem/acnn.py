@@ -1,4 +1,5 @@
 """Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity"""
+# pylint: disable=C0103, C0123
 import itertools
 import torch
 import torch.nn as nn
@@ -72,8 +73,7 @@ class ACNNPredictor(nn.Module):
         modules.append(linear_layer)
         self.project = nn.Sequential(*modules)
 
-    def forward(self, batch_size, batch_num_ligand_atoms, batch_num_protein_atoms,
-                frag1_node_indices_in_complex, frag2_node_indices_in_complex,
+    def forward(self, batch_size, frag1_node_indices_in_complex, frag2_node_indices_in_complex,
                 ligand_conv_out, protein_conv_out, complex_conv_out):
         """Perform the prediction.
 
@@ -81,10 +81,6 @@ class ACNNPredictor(nn.Module):
         ----------
         batch_size : int
             Number of datapoints in a batch.
-        batch_num_ligand_atoms : list of int
-            Number of ligand atoms in each graph of the batch.
-        batch_num_protein_atoms : list of int
-            Number of protein atoms in each graph of the batch.
         frag1_node_indices_in_complex : Int64 tensor of shape (V1)
             Indices for atoms in the first fragment (protein) in the batched complex.
         frag2_node_indices_in_complex : list of int of length V2
@@ -218,8 +214,6 @@ class ACNN(nn.Module):
 
         return self.predictor(
             graph.batch_size,
-            graph.batch_num_nodes('ligand_atom'),
-            graph.batch_num_nodes('protein_atom'),
             frag1_node_indices_in_complex,
             frag2_node_indices_in_complex,
             ligand_conv_out, protein_conv_out, complex_conv_out)
