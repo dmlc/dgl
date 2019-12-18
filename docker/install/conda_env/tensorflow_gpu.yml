@@ -3,7 +3,7 @@ name: tensorflow-ci
 dependencies:
   - pip
   - pip:
-    - tf-nightly-gpu == 2.1.0.dev20191125
+    - tensorflow-gpu==2.1.0rc1
     - tfdlpack-gpu
     - pytest
   - nose
