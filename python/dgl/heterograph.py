@@ -2383,7 +2383,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
             eid = utils.toindex(slice(0, self.number_of_edges(etype)))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2468,7 +2468,7 @@ class DGLHeteroGraph(object):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3575,6 +3575,11 @@ class DGLHeteroGraph(object):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLHeteroGraph
+          Moved DGLHeteroGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3583,7 +3588,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
-        >>> g.to(torch.device('cuda:0'))
+        >>> g = g.to(torch.device('cuda:0'))
         """
         for i in range(len(self._node_frames)):
             for k in self._node_frames[i].keys():

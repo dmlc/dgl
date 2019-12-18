@@ -1,0 +1,15 @@
+name: tensorflow-ci
+dependencies:
+  - pip
+  - pip:
+    - tf-nightly == 2.1.0.dev20191125
+    - tfdlpack
+  - nose
+  - numpy
+  - cython
+  - scipy
+  - networkx
+  - matplotlib
+  - nltk
+  - requests[security]
+  - tqdm
