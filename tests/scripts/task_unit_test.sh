@@ -1,5 +1,7 @@
 #!/bin/bash
 
+. /opt/conda/etc/profile.d/conda.sh
+
 function fail {
     echo FAIL: $@
     exit -1
@@ -20,7 +22,7 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
-python3 -m pip install pytest
+conda activate ${DGLBACKEND}-ci
 
 python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
 python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index || fail "graph_index"
