@@ -1,5 +1,7 @@
 import backend as F
 import dgl
+import numpy as np
+import scipy.sparse as ssp
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
@@ -124,6 +126,7 @@ def test_batch_setter_getter():
     v = F.tensor([3, 4, 5])
     assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
+
 def test_batch_setter_autograd():
     g = generate_graph(grad=True)
     h1 = g.ndata['h']
@@ -133,7 +136,7 @@ def test_batch_setter_autograd():
     with F.record_grad():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
-    F.backward(h2, F.ones((10, D)) * 2)
+        F.backward(h2, F.ones((10, D)) * 2)
     assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
@@ -244,7 +247,7 @@ def test_nx_conversion():
     nxg = nx.cycle_graph(5)
     nxg.remove_nodes_from([0, 4])
     for u in nxg.nodes():
-        nxg.node[u]['h'] = F.tensor([u])
+        nxg.nodes[u]['h'] = F.tensor([u])
     for u, v, d in nxg.edges(data=True):
         d['h'] = F.tensor([u, v])
 
@@ -654,6 +657,28 @@ def test_group_apply_edges():
     # test group by destination nodes
     _test('dst')
 
+
+# GitHub issue #1036
+def test_group_apply_edges2():
+    m = ssp.random(10, 10, 0.2)
+    g = DGLGraph(m, readonly=True)
+    g.ndata['deg'] = g.in_degrees()
+    g.ndata['id'] = F.arange(0, g.number_of_nodes())
+    g.edata['id'] = F.arange(0, g.number_of_edges())
+
+    def apply(edges):
+        w = edges.data['id']
+        n_nodes, deg = w.shape
+
+        dst = edges.dst['id'][:, 0]
+        eid1 = F.asnumpy(g.in_edges(dst, 'eid')).reshape(n_nodes, deg).sort(1)
+        eid2 = F.asnumpy(edges.data['id']).sort(1)
+        assert np.array_equal(eid1, eid2)
+        return {'id2': w}
+
+    g.group_apply_edges('dst', apply, inplace=True)
+
+
 def test_local_var():
     g = DGLGraph(nx.path_graph(5))
     g.ndata['h'] = F.zeros((g.number_of_nodes(), 3))
@@ -803,5 +828,6 @@ if __name__ == '__main__':
     test_dynamic_addition()
     test_repr()
     test_group_apply_edges()
+    test_group_apply_edges2()
     test_local_var()
     test_local_scope()

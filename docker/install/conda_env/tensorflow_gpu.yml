@@ -1,0 +1,17 @@
+
+name: tensorflow-ci
+dependencies:
+  - cudatoolkit = 10.1
+  - pip
+  - pip:
+    - tf-nightly-gpu == 2.1.0.dev20191125
+    - tfdlpack-gpu
+  - nose
+  - numpy
+  - cython
+  - scipy
+  - networkx
+  - matplotlib
+  - nltk
+  - requests[security]
+  - tqdm
