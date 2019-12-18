@@ -1476,7 +1476,7 @@ public:
     if (replacement_ == true && batch_curr_id_ >= max_batch_id_) {
       // Now we should shuffle the data and reset the sampler.
       dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seed_edges_->data);
-      std::shuffle(seed_ids, seed_ids + seed_edges_->shape[0], 
+      std::shuffle(seed_ids, seed_ids + seed_edges_->shape[0],
                    std::default_random_engine());
       batch_curr_id_ = 0;
     }
