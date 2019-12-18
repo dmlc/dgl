@@ -1,6 +1,7 @@
 
 name: tensorflow-ci
 dependencies:
+  - python=3.6.0
   - pip
   - pip:
     - tensorflow-gpu==2.1.0rc1

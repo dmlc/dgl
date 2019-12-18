@@ -1,6 +1,6 @@
 name: pytorch-ci
 dependencies:
-  - python = 3.6
+  - python=3.6.0
   - pip
   - pip:
     - torch
