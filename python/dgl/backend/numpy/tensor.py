@@ -110,6 +110,14 @@ def argsort(input, dim, descending):
         return np.argsort(-input, axis=dim)
     return np.argsort(input, axis=dim)
 
+def topk(input, k, dim, descending=True):
+    topk_indices = argtopk(input, k, dim, descending)
+    return np.take_along_axis(input, topk_indices, axis=dim)
+
+def argtopk(input, k, dim, descending=True):
+    sort_indces = argsort(input, dim, descending)
+    return slice_axis(sort_indces, dim, 0, k)
+
 def exp(input):
     return np.exp(input)
 
