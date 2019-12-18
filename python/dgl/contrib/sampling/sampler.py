@@ -530,10 +530,10 @@ class EdgeSampler(object):
     edge only if the triple (source node, destination node and relation)
     matches one of the edges in the graph.
 
-    For uniform sampling, the sampler generates only num_of_edges/batch_size 
-    samples. 
-
-    For uniform sampling, the sampler generates samples infinitly.
+    This sampler samples edges without replacement by default, which means it 
+    returns a fixed number of batches (i.e., num_edges/batch_size). However 
+    it accepts a replacement argument, which can be set to True to let the 
+    sampler generates any number of batches.
 
     Parameters
     ----------
@@ -554,6 +554,8 @@ class EdgeSampler(object):
         The number of workers to sample edges in parallel.
     prefetch : bool, optional
         If true, prefetch the samples in the next batch. Default: False
+    replacement: bool, optional
+        Whether the sampler samples edges with or without palcement. Default False
     negative_mode : string, optional
         The method used to construct negative edges. Possible values are 'head', 'tail'.
     neg_sample_size : int, optional
@@ -641,7 +643,6 @@ class EdgeSampler(object):
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
-        self._
         if self._is_uniform:
             self._sampler = _CAPI_CreateUniformEdgeSampler(
                 self.g._graph,

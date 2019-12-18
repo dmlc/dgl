@@ -1612,14 +1612,14 @@ public:
   }
 
   void Fetch(DGLRetValue* rv) {
-    if (curr_batch_id_ > max_batch_id_) {
-      *rv = List<SubgraphRef>(std::vector<SubgraphRef>{});
-      return;
-    }
-
     // generate subgraphs.
     std::vector<SubgraphRef> positive_subgs(num_workers_);
     std::vector<SubgraphRef> negative_subgs(num_workers_);
+
+    if (replacement_ == false && curr_batch_id_ >= max_batch_id_) {
+      *rv = List<SubgraphRef>(std::vector<SubgraphRef>{});
+      return;
+    }
 #pragma omp parallel for
     for (int i = 0; i < num_workers_; i++) {
       const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
@@ -1757,8 +1757,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     NDArray edge_weight = args[2];
     NDArray node_weight = args[3];
     const int64_t batch_size = args[4];
-    const bool replacement = args[5];
-    const int64_t max_num_workers = args[6];
+    const int64_t max_num_workers = args[5];
+    const bool replacement = args[6];
     const std::string neg_mode = args[7];
     const int64_t neg_sample_size = args[8];
     const bool exclude_positive = args[9];
