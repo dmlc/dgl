@@ -80,9 +80,9 @@ class EdgeGCN(nn.Block):
             for i, layer in enumerate(self.layers):
                 x = layer(sub_g, x)
             sub_g.ndata['emb'] = x
-            # link classification
-            sub_g.apply_edges(self.edge_mlp)
             sub_g.copy_to_parent()
+            # link classification
+            g.apply_edges(self.edge_mlp)
         else:
             # graph conv
             x = g.ndata['node_feat']
