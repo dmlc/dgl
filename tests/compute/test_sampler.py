@@ -250,7 +250,9 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     # Test the homogeneous graph.
+
     batch_size = 50
+    total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -285,8 +287,11 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
+        total_samples += batch_size
+    assert total_samples <= num_edges
 
     # Test the knowledge graph.
+    total_samples = 0
     for _, neg_edges in EdgeSampler(g, batch_size,
                                     negative_mode=mode,
                                     neg_sample_size=neg_size,
@@ -306,22 +311,8 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
-
-    # check replacement = True
-    total_samples = 0
-    max_samples = 2 * num_edges
-    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
-                                            replacement=True,
-                                            negative_mode=mode,
-                                            neg_sample_size=neg_size,
-                                            exclude_positive=exclude_positive,
-                                            return_false_neg=True):
-        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        assert len(pos_leid) == batch_size
         total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
-    assert total_samples >= max_samples
+    assert total_samples <= num_edges
 
 def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
