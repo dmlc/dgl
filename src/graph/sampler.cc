@@ -1661,8 +1661,6 @@ public:
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
-
-
     *rv = List<SubgraphRef>(positive_subgs);
   }
 
