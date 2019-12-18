@@ -85,24 +85,20 @@ class ACNNPredictor(nn.Module):
             Number of ligand atoms in each graph of the batch.
         batch_num_protein_atoms : list of int
             Number of protein atoms in each graph of the batch.
-        frag1_node_indices_in_complex :
-
-        ligand_graph : DGLHeteroGraph
-            DGLHeteroGraph for the ligand graph.
-        protein_graph : DGLHeteroGraph
-            DGLHeteroGraph for the protein graph.
-        complex_graph : DGLHeteroGraph
-            DGLHeteroGraph for the complex graph.
-        ligand_conv_out : Float32 tensor of shape (V1, K * T)
-            Updated ligand node representations. V1 for the number of
-            atoms in the ligand, K for the number of radial filters,
-            and T for the number of types of atomic numbers.
-        protein_conv_out : Float32 tensor of shape (V2, K * T)
-            Updated protein node representations. V2 for the number of
+        frag1_node_indices_in_complex : Int64 tensor of shape (V1)
+            Indices for atoms in the first fragment (protein) in the batched complex.
+        frag2_node_indices_in_complex : list of int of length V2
+            Indices for atoms in the second fragment (ligand) in the batched complex.
+        ligand_conv_out : Float32 tensor of shape (V2, K * T)
+            Updated ligand node representations. V2 for the number of atoms in the
+            ligand, K for the number of radial filters, and T for the number of types
+            of atomic numbers.
+        protein_conv_out : Float32 tensor of shape (V1, K * T)
+            Updated protein node representations. V1 for the number of
             atoms in the protein, K for the number of radial filters,
             and T for the number of types of atomic numbers.
         complex_conv_out : Float32 tensor of shape (V1 + V2, K * T)
-            Updated complex node representations. V1 and V2 seprately
+            Updated complex node representations. V1 and V2 separately
             for the number of atoms in the ligand and protein, K for
             the number of radial filters, and T for the number of
             types of atomic numbers.

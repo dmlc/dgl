@@ -88,7 +88,7 @@ ACNN_PDBBind_core_pocket_temporal = {
         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
     'radial': [[12.0], [0.0, 4.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 100,
+    'num_epochs': 80,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'temporal'
 }
@@ -111,7 +111,7 @@ ACNN_PDBBind_refined_pocket_random = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 100,
+    'num_epochs': 200,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'random'
 }
@@ -134,7 +134,7 @@ ACNN_PDBBind_refined_pocket_scaffold = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 250,
+    'num_epochs': 350,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'scaffold'
 }
@@ -157,7 +157,7 @@ ACNN_PDBBind_refined_pocket_stratified = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 300,
+    'num_epochs': 400,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'stratified'
 }
@@ -180,7 +180,7 @@ ACNN_PDBBind_refined_pocket_temporal = {
         29., 30., 34., 35., 38., 48., 53., 55., 80.]),
     'radial': [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]],
     'lr': 0.001,
-    'num_epochs': 300,
+    'num_epochs': 350,
     'metrics': ['pearson_r2', 'mae'],
     'split': 'temporal'
 }

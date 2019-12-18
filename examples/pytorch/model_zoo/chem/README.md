@@ -4,8 +4,8 @@ With atoms being nodes and bonds being edges, molecular graphs are among the cor
 Deep learning on graphs can be beneficial for various applications in Chemistry like drug and material discovery 
 [1], [2], [12].
 
-To make it easy for domain scientists, the DGL team releases a model zoo for Chemistry, focusing on two particular cases 
--- property prediction and target generation/optimization. 
+To make it easy for domain scientists, the DGL team releases a model zoo for Chemistry, spanning three cases
+-- property prediction, target generation/optimization and binding affinity prediction.
 
 With pre-trained models and training scripts, we hope this model zoo will be helpful for both
 the chemistry community and the deep learning community to further their research.
@@ -39,13 +39,7 @@ Below we provide some reference numbers to show how DGL improves the speed of tr
 | AttentiveFP on Aromaticity | 6.0                     | 1.2                | 5x          |
 | JTNN on ZINC               | 1826                    | 743                | 2.5x        |   
 
-## Property Prediction
-
-To evaluate molecules for drug candidates, we need to know their properties and activities. In practice, this is
-mostly achieved via wet lab experiments. We can cast the problem as a regression or classification problem.
-In practice, this can be quite difficult due to the scarcity of labeled data.
-
-### Featurization and Representation Learning
+## Featurization and Representation Learning
 
 Fingerprint has been a widely used concept in cheminformatics. Chemists developed hand designed rules to convert 
 molecules into binary strings where each bit indicates the presence or absence of a particular substructure. The
@@ -54,6 +48,12 @@ mostly developed based on molecule fingerprints.
 
 Graph neural networks make it possible for a data-driven representation of molecules out of the atoms, bonds and 
 molecular graph topology, which may be viewed as a learned fingerprint [3]. 
+
+## Property Prediction
+
+To evaluate molecules for drug candidates, we need to know their properties and activities. In practice, this is
+mostly achieved via wet lab experiments. We can cast the problem as a regression or classification problem.
+In practice, this can be quite difficult due to the scarcity of labeled data.
 
 ### Models
 - **Graph Convolutional Networks** [3], [9]: Graph Convolutional Networks (GCN) have been one of the most popular graph 
@@ -131,6 +131,17 @@ SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True)
 
 ![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg_model_zoo_example2.png)
 
+## Binding affinity prediction
+
+The interaction of drugs and proteins can be characterized in terms of binding affinity. Given a pair of ligand 
+(drug candidate) and protein with particular conformations, we are interested in predicting the 
+binding affinity between them. 
+
+### Models
+
+- **Atomic Convolutional Networks** [14]: Constructs nearest neighbor graphs separately for the ligand, protein and complex 
+based on the 3D coordinates of the atoms and predicts the binding free energy.
+
 ## References
 
 [1] Chen et al. (2018) The rise of deep learning in drug discovery. *Drug Discov Today* 6, 1241-1250.
@@ -167,3 +178,5 @@ Machine Learning* JMLR. 1263-1272.
 
 [13] Jin et al. (2018) Junction Tree Variational Autoencoder for Molecular Graph Generation. 
 *Proceedings of the 35th International Conference on Machine Learning (ICML)*, 2323-2332.
+
+[14] Gomes et al. (2017) Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity. *arXiv preprint arXiv:1703.10603*.
