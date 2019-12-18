@@ -236,7 +236,6 @@ def check_head_tail(g):
     np.testing.assert_equal(tail_nid, ldst)
 
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     num_edges = g.number_of_edges()
@@ -525,6 +524,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     assert np.allclose(node_rate_a, node_rate_b, atol=0.0002)
 
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)
