@@ -47,16 +47,18 @@ struct BinaryReduce {
     DType* outoff = gdata->out_data + oid * D;
     while (tx < D) {
       DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
-      Functors::Write(outoff + tx, out);
+
+      DType* outaddr = outoff + tx;
+      DType outval = __ldg(outaddr);
+      Functors::Write(outval, out);
+      *outaddr = outval;
       tx += stride_x;
     }
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx outoff_idx, GData<Idx, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
-    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int64_t stride_x = blockDim.x * gridDim.x;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -69,25 +71,24 @@ struct BinaryReduce {
 
     DType* lhsoff = gdata->lhs_data + lid * D * len;
     DType* rhsoff = gdata->rhs_data + rid * D * len;
-    DType* outbuf = gdata->out_data + outoff_idx;
-    while (tx < D) {
-      DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
-      Functors::Write(outbuf + tx, out);
-      tx += stride_x;
-    }
+    DType out = Functors::Op(lhsoff + feat_idx * len, rhsoff + feat_idx * len, len);
+    Functors::Write(outval, out);
   }
 
   static __device__ __forceinline__ Idx GetFeatSize(GData<Idx, DType> *gdata) {
     return gdata->x_length;
   }
 
-  static __device__ __forceinline__ Idx GetOutOff(Idx oid, GData<Idx, DType>* gdata) {
-    const int64_t D = gdata->x_length;
+  static __device__ __forceinline__ DType * GetOutBuf(GData<Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static __device__ __forceinline__ Idx GetOutOffset(Idx oid, GData<Idx, DType> *gdata) {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
 
-    return oid * D;
+    return oid;
   }
 };
 
@@ -175,15 +176,16 @@ struct BinaryReduceBcast {
           gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
 
-      Functors::Write(outoff + tx, out);
+      DType* outaddr = outoff + tx;
+      DType outval = __ldg(outaddr);
+      Functors::Write(outval, out);
+      *outaddr = outval;
       tx += stride_x;
     }
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx outoff_idx, BcastGData<NDim, Idx, DType>* gdata) {
-    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int64_t stride_x = blockDim.x * gridDim.x;
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -195,30 +197,30 @@ struct BinaryReduceBcast {
     }
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
-    DType* outbuf = gdata->out_data + outoff_idx;
-    while (tx < gdata->out_len) {
-      int64_t lhs_add = 0;
-      int64_t rhs_add = 0;
-      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
-          gdata->lhs_shape, gdata->lhs_stride,
-          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
-      DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
 
-      Functors::Write(outbuf + tx, out);
-      tx += stride_x;
-    }
+    int64_t lhs_add = 0;
+    int64_t rhs_add = 0;
+    UnravelRavel(feat_idx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+        gdata->lhs_shape, gdata->lhs_stride,
+        gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+    DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+    Functors::Write(outval, out);
   }
 
   static __device__ __forceinline__ Idx GetFeatSize(BcastGData<NDim, Idx, DType> *gdata) {
-    return gdata->x_length;
+    return gdata->out_len;
   }
 
-  static __device__ __forceinline__ Idx GetOutOff(Idx oid, BcastGData<NDim, Idx, DType>* gdata) {
+  static __device__ __forceinline__ DType * GetOutBuf(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static __device__ __forceinline__ Idx GetOutOffset(Idx oid, BcastGData<NDim, Idx, DType> *gdata) {
     if (gdata->out_mapping) {
       oid = Functors::GetId(oid, gdata->out_mapping);
     }
 
-    return oid * gdata->out_len;
+    return oid;
   }
 };
 
@@ -242,8 +244,8 @@ struct FunctorsTempl {
   static __device__ __forceinline__ DType Op(DType *lhs, DType *rhs, int64_t len) {
     return BinaryOp::Call(lhs, rhs, len);
   }
-  static __device__ __forceinline__ void Write(DType* addr, DType val) {
-    Reducer::Call(addr, val);
+  static __device__ __forceinline__ void Write(DType &outval, DType val) {
+    Reducer::Call(outval, val);
   }
   static __device__ __forceinline__ Idx GetId(Idx id, Idx* id_map) {
     return LDGReader<Idx>::Call(id_map + id);

@@ -76,9 +76,7 @@ struct BackwardBinaryReduce {
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx outoff_idx, BackwardGData<Idx, DType>* gdata) {
-    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int64_t stride_x = blockDim.x * gridDim.x;
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
@@ -96,40 +94,51 @@ struct BackwardBinaryReduce {
     DType* lhsoff = gdata->lhs_data + lid * D * len;
     DType* rhsoff = gdata->rhs_data + rid * D * len;
     DType* outoff = gdata->out_data + oid * D;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * D * len;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * D * len;
     DType* gradoutoff = gdata->grad_out_data + oid * D;
 
-    while (tx < D) {
-      DType out = Functors::Read(outoff + tx);
-      DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
-      DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+    Idx tx = feat_idx/len;
+    DType out = Functors::Read(outoff + tx);
+    DType grad_out = Functors::Read(gradoutoff + tx);
+    DType e = Functors::Op(lhsoff + feat_idx, rhsoff + feat_idx, len);
+    DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff + tx * len;
-      DType* rhs_base = rhsoff + tx * len;
-      if (Mode == binary_op::kGradLhs) {
-#pragma unroll
-        for (int64_t i = 0; i < len; ++i) {
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
-          DType *gradlhs_addr = gradlhsoff + tx * len + i;
-          *gradlhs_addr = *gradlhs_addr + grad_lhs;
-        }
-      } else if (Mode == binary_op::kGradRhs) {
-#pragma unroll
-        for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
-          DType *gradrhs_addr = gradrhsoff + tx * len + i;
-          *gradrhs_addr = *gradrhs_addr + grad_rhs;
-        }
-      }
-      tx += stride_x;
+    DType* lhs_base = lhsoff + tx * len;
+    DType* rhs_base = rhsoff + tx * len;
+    int64_t i = feat_idx%len;
+    if (Mode == binary_op::kGradLhs) {
+      DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+      outval += grad_lhs;
+    } else if (Mode == binary_op::kGradRhs) {
+      DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
+      outval += grad_rhs;
     }
   }
 
-  // useless in backward grad
-  static __device__ __forceinline__ Idx GetOutOff(Idx oid, BackwardGData<Idx, DType>* gdata) {
-    return 0;
+  static __device__ __forceinline__ Idx GetFeatSize(BackwardGData<Idx, DType> *gdata) {
+    return gdata->x_length * gdata->data_len;
+  }
+
+  static __device__ __forceinline__ DType * GetOutBuf(BackwardGData<Idx, DType> *gdata) {
+    if (Mode == binary_op::kGradLhs) {
+      return gdata->grad_lhs_data;
+    } else { // (Mode == binary_op::kGradRhs)
+      return gdata->grad_rhs_data;
+    }
+  }
+
+  static __device__ __forceinline__ Idx GetOutOffset(Idx id, BackwardGData<Idx, DType> *gdata) {
+    if (Mode == binary_op::kGradLhs) {
+      if (gdata->lhs_mapping) {
+        return Functors::GetId(id, gdata->lhs_mapping);
+      }
+
+      return id;
+    } else {// (Mode == binary_op::kGradRhs)
+      if (gdata->rhs_mapping) {
+        return Functors::GetId(id, gdata->rhs_mapping);
+      }
+      return id;
+    }
   }
 };
 
@@ -196,9 +205,7 @@ struct BackwardBinaryReduceBcast {
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx outoff_idx, BackwardBcastGData<NDim, Idx, DType>* gdata) {
-    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int64_t stride_x = blockDim.x * gridDim.x;
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -215,46 +222,56 @@ struct BackwardBinaryReduceBcast {
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len * len;
-    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len * len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
   
-    while (tx < gdata->out_len) {
-      int64_t lhs_add = 0;
-      int64_t rhs_add = 0;
-      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
-          gdata->lhs_shape, gdata->lhs_stride,
-          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
-      DType out = Functors::Read(outoff + tx);
-      DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
-      DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+    int64_t lhs_add = 0;
+    int64_t rhs_add = 0;
+    Idx tx = feat_idx/len;
+    UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+        gdata->lhs_shape, gdata->lhs_stride,
+        gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
+    DType out = Functors::Read(outoff + tx);
+    DType grad_out = Functors::Read(gradoutoff + tx);
+    DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+    DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff + lhs_add * len;
-      DType* rhs_base = rhsoff + rhs_add * len;
-      if (Mode == binary_op::kGradBoth) {
-      } else if (Mode == binary_op::kGradLhs) {
-#pragma unroll
-        for (int64_t i = 0; i < len; ++i) {
-          DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
-          DType *gradlhs_addr = gradlhsoff + tx * len + i;
-          *gradlhs_addr = *gradlhs_addr + grad_lhs;
-        }
-      } else if (Mode == binary_op::kGradRhs) {
-#pragma unroll
-        for (int64_t i = 0; i < len; ++i) {
-          DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
-          DType *gradrhs_addr = gradrhsoff + tx * len + i;
-          *gradrhs_addr = *gradrhs_addr + grad_rhs;
-        }
-      }
-      tx += stride_x;
+    DType* lhs_base = lhsoff + lhs_add * len;
+    DType* rhs_base = rhsoff + rhs_add * len;
+    int64_t i = feat_idx%len;
+    if (Mode == binary_op::kGradLhs) {
+      DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
+      outval += grad_lhs;
+    } else if (Mode == binary_op::kGradRhs) {
+      DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
+      outval += grad_rhs;
     }
   }
 
-  // useless in backward grad
-  static __device__ __forceinline__ Idx GetOutOff(Idx oid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
-    return 0;
+  static __device__ __forceinline__ Idx GetFeatSize(BackwardBcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_len * gdata->data_len;
+  }
+
+  static __device__ __forceinline__ DType * GetOutBuf(BackwardBcastGData<NDim, Idx, DType> *gdata) {
+    if (Mode == binary_op::kGradLhs) {
+      return gdata->grad_lhs_data;
+    } else { // (Mode == binary_op::kGradRhs)
+      return gdata->grad_rhs_data;
+    }
+  }
+
+  static __device__ __forceinline__ Idx GetOutOffset(Idx id, BackwardBcastGData<NDim, Idx, DType> *gdata) {
+    if (Mode == binary_op::kGradLhs) {
+      if (gdata->lhs_mapping) {
+        return Functors::GetId(id, gdata->lhs_mapping);
+      }
+
+      return id;
+    } else { // (Mode == binary_op::kGradRhs)
+      if (gdata->rhs_mapping) {
+        return Functors::GetId(id, gdata->rhs_mapping);
+      }
+      return id;
+    }
   }
 };
 

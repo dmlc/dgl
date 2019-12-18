@@ -462,8 +462,15 @@ template <int XPU, typename DType>
 struct ReduceNone { };
 
 // Macro for dispatching reducer names to Reducer op structure
-#define REDUCER_SWITCH(val, XPU, DType, RedType, ...)   \
-  if (val == binary_op::kReduceSum                 \
+#define REDUCER_SWITCH(val, op, XPU, DType, RedType, ...)   \
+  if (op == binary_op::kDot) {                     \
+    if (val == binary_op::kReduceNone) {           \
+      typedef ReduceNone<XPU, DType> RedType;      \
+      {__VA_ARGS__}                                \
+    } else {                                       \
+      LOG(FATAL) << "Dot doesnot Suppor reducer: " << val;  \
+    }                                              \
+  } else if (val == binary_op::kReduceSum          \
       || val == binary_op::kReduceMean) {          \
     typedef ReduceSum<XPU, DType> RedType;         \
     {__VA_ARGS__}                                  \
@@ -575,8 +582,7 @@ struct OutSelector<ReduceNone<XPU, DType>> {
 // macro for unrolling different backward mode
 #define GEN_BACKWARD_MODE(GEN, ...)        \
   MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradLhs))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradBoth))
+  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))
 
 }  // namespace kernel
 }  // namespace dgl

@@ -102,7 +102,7 @@ void BinaryReduceImpl(
   const auto bits = graph.NumBits();
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+      REDUCER_SWITCH(reducer, op, XPU, DType, Reducer, {
         auto gdata = AllocGData<XPU, Idx, DType, Reducer>(op,
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
@@ -215,7 +215,7 @@ void BackwardBinaryReduceImpl(
           lhs_data, rhs_data, out_data, grad_out_data,
           grad_lhs_data, grad_rhs_data);
       BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-        REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        REDUCER_SWITCH(reducer, op, XPU, DType, Reducer, {
           OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
             CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
               RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
@@ -314,7 +314,7 @@ void BinaryReduceBcastImpl(
   }
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+      REDUCER_SWITCH(reducer, op, XPU, DType, Reducer, {
         BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
           auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
               rtcfg.ctx, info, lhs_mapping, rhs_mapping,
@@ -434,7 +434,7 @@ void BackwardBinaryReduceBcastImpl(
             lhs, rhs, out, grad_out,
             grad_lhs, grad_rhs);
         BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-          REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+          REDUCER_SWITCH(reducer, op, XPU, DType, Reducer, {
             OP_TARGET_SWITCH(op, lhs_tgt, rhs_tgt, DType, BinaryOp, LeftTarget, RightTarget, {
               CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
                 LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
