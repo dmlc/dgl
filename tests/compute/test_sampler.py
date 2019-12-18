@@ -336,8 +336,6 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     # Correctness check
     # Test the homogeneous graph.
     batch_size = 50
-    total_samples = 0
-    max_samples = num_edges
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
@@ -372,12 +370,8 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
 
     # Test the knowledge graph with edge weight provied.
-    total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
@@ -398,9 +392,6 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
 
     # Test the knowledge graph with edge/node weight provied.
     total_samples = 0
@@ -425,9 +416,6 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 etype = g.edata['etype'][eid]
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
 
     # Check Rate
     dgl.random.seed(0)
@@ -464,9 +452,6 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
         np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
 
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
     # Check rate here
     edge_rate_0 = edge_sampled[0] / edge_sampled.sum()
     edge_tail_half_cnt = edge_sampled[edge_sampled.shape[0] // 2:-1].sum()
@@ -501,10 +486,6 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
             neg_dst = neg_edges.parent_nid[neg_ldst]
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
         np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
-
-        total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
 
     # Check rate here
     edge_rate_0 = edge_sampled[0] / edge_sampled.sum()

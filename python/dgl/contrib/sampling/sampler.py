@@ -590,6 +590,7 @@ class EdgeSampler(object):
             shuffle=False,
             num_workers=1,
             prefetch=False,
+            replacement=False,
             negative_mode="",
             neg_sample_size=0,
             exclude_positive=False,
@@ -634,17 +635,20 @@ class EdgeSampler(object):
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
         self._num_prefetch = num_workers * 2 if prefetch else 0
+        self._replacement = replacement
 
         self._num_workers = int(num_workers)
         self._negative_mode = negative_mode
         self._neg_sample_size = neg_sample_size
         self._exclude_positive = exclude_positive
+        self._
         if self._is_uniform:
             self._sampler = _CAPI_CreateUniformEdgeSampler(
                 self.g._graph,
                 self.seed_edges.todgltensor(),
-                self.batch_size,        # batch size
+                self._batch_size,       # batch size
                 self._num_workers,      # num batches
+                self._replacement,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,
@@ -658,6 +662,7 @@ class EdgeSampler(object):
                 self._node_weight,
                 self._batch_size,       # batch size
                 self._num_workers,      # num batches
+                self._replacement,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,
