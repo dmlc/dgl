@@ -158,6 +158,7 @@ def test_layer_sampler():
     _test_layer_sampler()
     _test_layer_sampler(prefetch=True)
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Error occured when multiprocessing")
 def test_nonuniform_neighbor_sampler():
     # Construct a graph with
     # (1) A path (0, 1, ..., 99) with weight 1
