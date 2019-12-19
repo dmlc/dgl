@@ -1,5 +1,5 @@
 #!/bin/bash
-
+. /opt/conda/etc/profile.d/conda.sh
 KG_DIR="./apps/kg/"
 
 function fail {
@@ -31,7 +31,7 @@ export DGLBACKEND=$1
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=${PWD}/python:$KG_DIR:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
-
+conda activate ${DGLBACKEND}-ci
 # test
 
 pushd $KG_DIR> /dev/null
