@@ -1,6 +1,5 @@
 # CI docker CPU env
 # Adapted from github.com/dmlc/tvm/docker/Dockerfile.ci_cpu
-# CI docker CPU env
 FROM ubuntu:16.04
 
 RUN apt-get update --fix-missing
