@@ -18,8 +18,8 @@ namespace kernel {
 // Reducer functor specialization
 template <typename DType>
 struct ReduceSum<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    *addr += val;
+  static void Call(DType &outval, DType val) {
+    outval += val;
   }
   static DType BackwardCall(DType val, DType accum) {
     return 1;
@@ -28,8 +28,8 @@ struct ReduceSum<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceMax<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    *addr = std::max(*addr, val);
+  static void Call(DType &outval, DType val) {
+    outval = std::max(outval, val);
   }
   static DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -38,8 +38,8 @@ struct ReduceMax<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceMin<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    *addr = std::min(*addr, val);
+  static void Call(DType &outval, DType val) {
+    outval = std::min(outval, val);
   }
   static DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -48,8 +48,8 @@ struct ReduceMin<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    *addr *= val;
+  static void Call(DType &outval, DType val) {
+    outval *= val;
   }
   static DType BackwardCall(DType val, DType accum) {
     return accum / val;
@@ -58,8 +58,8 @@ struct ReduceProd<kDLCPU, DType> {
 
 template <typename DType>
 struct ReduceNone<kDLCPU, DType> {
-  static void Call(DType* addr, DType val) {
-    *addr = val;
+  static void Call(DType &outval, DType val) {
+    outval = val;
   }
   static DType BackwardCall(DType val, DType accum) {
     return 1;

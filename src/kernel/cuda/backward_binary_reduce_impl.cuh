@@ -312,8 +312,8 @@ struct BackwardFunctorsTempl {
                                                         DType* rhs_base,
                                                         int64_t i,
                                                         DType out) {
-    DType lhs;
-    DType rhs;
+    DType lhs = 0;
+    DType rhs = 0;
     switch (BinaryOp::BackwardLhsReadMode()) {
       case binary_op::kBackReadRhs:
         rhs = Read(rhs_base + i);
@@ -335,8 +335,8 @@ struct BackwardFunctorsTempl {
                                                         DType* rhs_base,
                                                         int64_t i,
                                                         DType out) {
-    DType lhs;
-    DType rhs;
+    DType lhs = 0;
+    DType rhs = 0;
     switch (BinaryOp::BackwardRhsReadMode()) {
       case binary_op::kBackReadRhs:
         rhs = Read(rhs_base + i);

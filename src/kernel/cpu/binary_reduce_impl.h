@@ -47,10 +47,96 @@ struct BinaryReduce {
     DType* outoff = gdata->out_data + oid * D;
     for (int64_t tx = 0; tx < D; ++tx) {
       DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
-      Functors::Write(outoff + tx, out);
+      DType* outaddr = outoff + tx;
+      DType outval = *outaddr;
+      Functors::Write(outval, out);
+      *outaddr = outval;
     }
   }
+
+  static void ApplyEdgeReduce(
+    Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, GData<Idx, DType>* gdata) {
+    const int64_t D = gdata->x_length;
+    const int64_t len = gdata->data_len;
+    // LOG(INFO) << "inside ApplyEdgeReduce";
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+
+    DType* lhsoff = gdata->lhs_data + lid * D * len;
+    DType* rhsoff = gdata->rhs_data + rid * D * len;
+    DType out = Functors::Op(lhsoff + feat_idx * len, rhsoff + feat_idx * len, len);
+    Functors::Write(outval, out);
+  }
+
+  static inline Idx GetFeatSize(GData<Idx, DType> *gdata) {
+    return gdata->x_length;
+  }
+
+  static inline DType *GetOutBuf(GData<Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static inline Idx GetOutOffset(Idx oid, GData<Idx, DType> *gdata) {
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
+
+    return oid;
+  }
 };
+
+/*
+ * This func do the followings:
+ *   1. Convert flattened index to multi-dimension index
+ *      according to output shape (assume row-major).
+ *   2. Convert multi-dimension index to flattened index for lhs.
+ *   3. Convert multi-dimension index to flattened index for rhs.
+ */
+inline void UnravelRavel(
+    const int64_t idx, const int ndim, const int64_t* out_shape, const int64_t* out_stride,
+    const int64_t* lhs_shape, const int64_t* lhs_stride,
+    const int64_t* rhs_shape, const int64_t* rhs_stride, int64_t *lhs_out, int64_t *rhs_out) {
+  if (out_stride[0] == lhs_stride[0]) {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t rhs_sh = rhs_shape[d];
+      int64_t rhs_st = rhs_stride[d];
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for rhs_out += min(i, rhs_sh - 1) * rhs_st;
+       * rhs_sh be o_sh or 1
+       */
+      if (rhs_sh > i) {
+        *rhs_out += i * rhs_st;
+      }
+    }
+    *lhs_out = idx;
+  } else {
+    for (int d = 0; d < ndim; ++d) {
+      int64_t o_sh = out_shape[d];
+      int64_t o_st = out_stride[d];
+      int64_t lhs_sh = lhs_shape[d];
+      int64_t lhs_st = lhs_stride[d];
+
+      int64_t i = (idx / o_st) % o_sh;
+      /*
+       * Simplfied for lhs_out += min(i, lhs_sh - 1) * lhs_st;
+       * lhs_sh be o_sh or 1
+       */
+      if (lhs_sh > i) {
+        *lhs_out += i * lhs_st;
+      }
+    }
+    *rhs_out = idx;
+  }
+}
 
 // Convert flattened index to multi-dimension index (assume row-major).
 inline void Unravel(int64_t idx, int ndim,
@@ -103,8 +189,50 @@ struct BinaryReduceBcast {
           rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
           len);
 
-      Functors::Write(outoff + tx, out);
+      DType* outaddr = outoff + tx;
+      DType outval = *outaddr;
+      Functors::Write(outval, out);
+      *outaddr = outval;
     }
+  }
+
+  static inline void ApplyEdgeReduce(
+    Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BcastGData<NDim, Idx, DType>* gdata) {
+    const int64_t len = gdata->data_len;
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
+
+    int64_t tmp[NDim];  // store unraveled idx.
+    Unravel(feat_idx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+    int64_t lhs_add = Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride);
+    int64_t rhs_add = Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride);
+    DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
+
+    Functors::Write(outval, out);
+  }
+
+  static inline Idx GetFeatSize(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_len;
+  }
+
+  static inline DType *GetOutBuf(BcastGData<NDim, Idx, DType> *gdata) {
+    return gdata->out_data;
+  }
+
+  static inline Idx GetOutOffset(Idx oid, BcastGData<NDim, Idx, DType> *gdata) {
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
+
+    return oid;
   }
 };
 
@@ -128,7 +256,7 @@ struct FunctorsTempl {
   static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
     return BinaryOp::Call(lhs, rhs, len);
   }
-  static inline void Write(DType* addr, DType val) {
+  static inline void Write(DType &addr, DType val) {
     Reducer::Call(addr, val);
   }
   static inline Idx GetId(Idx id, Idx* id_map) {
