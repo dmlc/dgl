@@ -1,6 +1,6 @@
 name: tensorflow-ci
 dependencies:
-  - python=3.6.0
+  - python=3.6.9
   - pip
   - pip:
     - tensorflow==2.1.0rc1
