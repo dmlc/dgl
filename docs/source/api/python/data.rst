@@ -142,8 +142,22 @@ Molecular Graphs
 
 To work on molecular graphs, make sure you have installed `RDKit 2018.09.3 <https://www.rdkit.org/docs/Install.html>`__.
 
-Featurization Utils
-```````````````````
+Data Loading and Processing Utils
+`````````````````````````````````
+
+We adapt several utilities for processing molecules from
+`DeepChem <https://github.com/deepchem/deepchem/blob/master/deepchem>`__.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.add_hydrogens_to_mol
+    chem.get_mol_3D_coordinates
+    chem.load_molecule
+    chem.multiprocess_load_molecules
+
+Featurization Utils for Single Molecule
+```````````````````````````````````````
 
 For the use of graph neural networks, we need to featurize nodes (atoms) and edges (bonds).
 
@@ -202,8 +216,8 @@ Utils for bond featurization:
     chem.BaseBondFeaturizer.__call__
     chem.CanonicalBondFeaturizer
 
-Graph Construction
-``````````````````
+Graph Construction for Single Molecule
+``````````````````````````````````````
 
 Several methods for constructing DGLGraphs from SMILES/RDKit molecule objects are listed below:
 
@@ -215,6 +229,17 @@ Several methods for constructing DGLGraphs from SMILES/RDKit molecule objects ar
     chem.mol_to_bigraph
     chem.smiles_to_complete_graph
     chem.mol_to_complete_graph
+    chem.k_nearest_neighbors
+
+Graph Construction and Featurization for Ligand-Protein Complex
+```````````````````````````````````````````````````````````````
+
+Constructing DGLHeteroGraphs and featurize for them.
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    chem.ACNN_graph_construction_and_featurization
 
 Dataset Classes
 ```````````````
@@ -224,11 +249,12 @@ If your dataset is stored in a ``.csv`` file, you may find it helpful to use
 .. autoclass:: dgl.data.chem.CSVDataset
     :members: __getitem__, __len__
 
-Currently three datasets are supported:
+Currently four datasets are supported:
 
 * Tox21
 * TencentAlchemyDataset
 * PubChemBioAssayAromaticity
+* PDBBind
 
 .. autoclass:: dgl.data.chem.Tox21
     :members: __getitem__, __len__, task_pos_weights
@@ -238,3 +264,32 @@ Currently three datasets are supported:
 
 .. autoclass:: dgl.data.chem.PubChemBioAssayAromaticity
     :members: __getitem__, __len__
+
+.. autoclass:: dgl.data.chem.PDBBind
+    :members: __getitem__, __len__
+
+Dataset Splitting
+`````````````````
+
+We provide support for some common data splitting methods:
+
+* consecutive split
+* random split
+* molecular weight split
+* Bemis-Murcko scaffold split
+* single-task-stratified split
+
+.. autoclass:: dgl.data.chem.ConsecutiveSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.RandomSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.MolecularWeightSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.ScaffoldSplitter
+    :members: train_val_test_split, k_fold_split
+
+.. autoclass:: dgl.data.chem.SingleTaskStratifiedSplitter
+    :members: train_val_test_split, k_fold_split
