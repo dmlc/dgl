@@ -338,7 +338,7 @@ pipeline {
     stage("App") {
       parallel {
         stage("Knowledge Graph CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { docker { image "dgllib/dgl-ci-cpu-test" } }
           stages {
             stage("Torch test") {
               steps {
@@ -360,7 +360,7 @@ pipeline {
         stage("Knowledge Graph GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              image "dgllib/dgl-ci-gpu-test"
               args "--runtime nvidia"
             }
           }
