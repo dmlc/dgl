@@ -202,7 +202,12 @@ pipeline {
           }
         }
         stage("Tensorflow GPU") {
-          agent { docker { image "dgllib/dgl-ci-gpu-test" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-gpu-test" 
+              args "--runtime nvidia"
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
