@@ -274,8 +274,8 @@ pipeline {
         }
         stage("Torch GPU") {
           agent {
-            label "linux-gpu-node"
             docker {
+              label "linux-gpu-node"
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
             }
