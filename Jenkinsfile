@@ -321,7 +321,7 @@ pipeline {
         }
         stage("MXNet GPU") {
           agent {
-            label "linux-gpu-node"
+            label "linux-gpu-node" 
             docker {
               image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
