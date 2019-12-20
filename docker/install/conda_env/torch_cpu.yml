@@ -1,11 +1,11 @@
 name: pytorch-ci
-channels:
-  - pytorch
 dependencies:
-  - python = 3.6
-  - pytorch = 1.0.1
+  - python=3.6.9
   - pip
-  - torchvision
+  - pip:
+    - torch
+    - torchvision
+    - pytest
   - nose
   - numpy
   - cython
