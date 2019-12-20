@@ -114,6 +114,13 @@ NNConv
 .. autoclass:: dgl.nn.pytorch.conv.NNConv
     :members: forward
     :show-inheritance:
+
+AtomicConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.AtomicConv
+    :members: forward
+    :show-inheritance:
     
 Dense Conv Layers
 ----------------------------------------
@@ -222,5 +229,3 @@ Edge Softmax
 
 .. automodule:: dgl.nn.pytorch.softmax
     :members: edge_softmax
-    
-

@@ -59,3 +59,13 @@ Currently supported model architectures:
 
 .. autoclass:: dgl.model_zoo.chem.DGLJTNNVAE
     :members: forward
+
+Protein Ligand Binding
+``````````````````````
+
+Currently supported model architectures:
+
+* ACNN
+
+.. autoclass:: dgl.model_zoo.chem.ACNN
+    :members: forward
