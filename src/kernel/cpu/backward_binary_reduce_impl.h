@@ -164,21 +164,19 @@ struct BackwardBinaryReduceBcast {
     DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len * len;
     DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len * len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
-      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      int64_t lhs_add = 0;
+      int64_t rhs_add = 0;
+      UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+          gdata->lhs_shape, gdata->lhs_stride,
+          gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
-      DType e = Functors::Op(
-        lhsoff + Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len,
-        rhsoff + Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len,
-        len);
+            DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
 
-      DType* lhs_base = lhsoff +
-          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride) * len;
-      DType* rhs_base = rhsoff +
-          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride) * len;
+      DType* lhs_base = lhsoff + lhs_add * len;
+      DType* rhs_base = rhsoff + rhs_add * len;
       if (Mode == binary_op::kGradLhs) {
         for (int64_t i = 0; i < len; ++i) {
           DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
@@ -213,12 +211,12 @@ struct BackwardBinaryReduceBcast {
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
   
+    int64_t lhs_add = 0;
+    int64_t rhs_add = 0;
     Idx tx = feat_idx/len;
-    int64_t tmp[NDim];  // store unraveled idx.
-    Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
-    int64_t lhs_add = Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride);
-    int64_t rhs_add = Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride);
-
+        UnravelRavel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride,
+        gdata->lhs_shape, gdata->lhs_stride,
+        gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
     DType out = Functors::Read(outoff + tx);
     DType grad_out = Functors::Read(gradoutoff + tx);
     DType e = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
