@@ -73,6 +73,7 @@ class ArrayHeap {
    * Sample from arrayHeap
    */
   size_t Sample() {
+    // heap_ is empty
     ValueType xi = heap_[1] * RandomEngine::ThreadLocal()->Uniform<float>();
     size_t i = 1;
     while (i < limit_) {
@@ -88,12 +89,19 @@ class ArrayHeap {
   /*
    * Sample a vector by given the size n
    */
-  void SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
+  size_t SampleWithoutReplacement(size_t n, std::vector<size_t>* samples) {
     // sample n elements
-    for (size_t i = 0; i < n; ++i) {
+    size_t i = 0;
+    for (; i < n; ++i) {
+      // heap is empty
+      if (heap_[1] == 0) {
+        break;
+      } 
       samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
+
+    return i;
   }
 
  private:
@@ -1425,6 +1433,7 @@ public:
     batch_curr_id_ = 0;
     num_seeds_ = seed_edges->shape[0];
     max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
+
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
@@ -1441,8 +1450,21 @@ public:
       const int64_t start = (batch_curr_id_ + i) * batch_size_;
       const int64_t end = std::min(start + batch_size_, num_seeds_);
       const int64_t num_edges = end - start;
-      IdArray worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-                                                   sizeof(dgl_id_t) * start);
+      IdArray worker_seeds;
+
+      if (replacement_ == false) {
+        worker_seeds = seed_edges_.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+                                              sizeof(dgl_id_t) * start);
+      } else {
+        std::vector<dgl_id_t> seeds;
+        // sampling of each edge is a standalone event
+        for (int64_t i = 0; i < num_edges; ++i) {
+          seeds.push_back(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+        }
+
+        worker_seeds = aten::VecToIdArray(seeds);
+      }
+
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
       const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
       const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
@@ -1471,15 +1493,10 @@ public:
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
-    batch_curr_id_ += num_workers;
 
-    if (replacement_ == true && batch_curr_id_ >= max_batch_id_) {
-      // Now we should shuffle the data and reset the sampler.
-      dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seed_edges_->data);
-      std::shuffle(seed_ids, seed_ids + seed_edges_->shape[0],
-                   std::default_random_engine());
-      batch_curr_id_ = 0;
-    }
+    if (replacement_ == false) {
+      batch_curr_id_ += num_workers;
+    } // do nothing for replacement_ == true
 
     *rv = List<SubgraphRef>(positive_subgs);
   }
@@ -1558,7 +1575,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_FetchUniformEdgeSample")
 
 template<typename ValueType>
 class WeightedEdgeSamplerObject: public EdgeSamplerObject {
-public:
+ public:
   explicit WeightedEdgeSamplerObject(const GraphPtr gptr,
                                      IdArray seed_edges,
                                      NDArray edge_weight,
@@ -1612,22 +1629,31 @@ public:
   }
 
   void Fetch(DGLRetValue* rv) {
+    const int64_t num_workers = std::min(num_workers_, max_batch_id_ - curr_batch_id_);
     // generate subgraphs.
-    std::vector<SubgraphRef> positive_subgs(num_workers_);
-    std::vector<SubgraphRef> negative_subgs(num_workers_);
+    std::vector<SubgraphRef> positive_subgs(num_workers);
+    std::vector<SubgraphRef> negative_subgs(num_workers);
 
-    if (replacement_ == false && curr_batch_id_ >= max_batch_id_) {
-      *rv = List<SubgraphRef>(std::vector<SubgraphRef>{});
-      return;
-    }
 #pragma omp parallel for
-    for (int i = 0; i < num_workers_; i++) {
+    for (int i = 0; i < num_workers; i++) {
       const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
-      std::vector<int64_t> edge_ids(batch_size_);
+      std::vector<size_t> edge_ids(batch_size_);
 
-      for (int i = 0; i < batch_size_; ++i) {
-        int64_t edge_id = edge_selector_->Sample();
-        edge_ids[i] = seed_edge_ids[edge_id];
+#pragma omp critical
+      {
+        if (replacement_ == false) {
+          size_t n = batch_size_;
+          size_t num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
+          while (edge_ids.size() > num_ids) {
+            edge_ids.pop_back();
+          }
+        } else {
+          // sampling of each edge is a standalone event
+          for (int i = 0; i < batch_size_; ++i) {
+            size_t edge_id = edge_selector_->Sample();
+            edge_ids[i] = seed_edge_ids[edge_id];
+          }
+        }
       }
       auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
 
@@ -1657,7 +1683,10 @@ public:
       }
     }
 
-    curr_batch_id_ += num_workers_;
+    if (replacement_ == false) {
+      curr_batch_id_ += num_workers;
+    } // do nothing for replacement_ == true
+
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }

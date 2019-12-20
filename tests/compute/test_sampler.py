@@ -478,6 +478,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -515,6 +516,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
                                             edge_weight=edge_weight,
                                             node_weight=node_weight,
                                             negative_mode=mode,

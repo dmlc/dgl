@@ -530,10 +530,12 @@ class EdgeSampler(object):
     edge only if the triple (source node, destination node and relation)
     matches one of the edges in the graph.
 
-    This sampler samples edges without replacement by default, which means it 
-    returns a fixed number of batches (i.e., num_edges/batch_size). However 
-    it accepts a replacement argument, which can be set to True to let the 
-    sampler generates any number of batches.
+    This sampler samples positive edges without replacement by default, which means 
+    it returns a fixed number of batches (i.e., num_edges/batch_size), and the 
+    positive edges sampled will not be duplicated. However, one can explicitly 
+    specify sampling with replacement (replacement = True), that the sampler will 
+    generates any number of batches, and it treats each sampling of a single positive 
+    edge as a standalone event.
 
     Parameters
     ----------
@@ -684,7 +686,11 @@ class EdgeSampler(object):
         Returns
         -------
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
-            Next "bunch" of edges to be processed.
+            Next "bunch" of edges to be processed. 
+            If negative_mode is specified, a list of (pos_subg, neg_subg) pairs i
+            s returned.
+            If return_false_neg is specified as True, the true negative edges and 
+            false negative edges in neg_subg is identified in neg_subg.edata['false_neg'].
         '''
         if self._is_uniform:
             subgs = _CAPI_FetchUniformEdgeSample(
