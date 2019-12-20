@@ -96,7 +96,7 @@ class ArrayHeap {
       // heap is empty
       if (heap_[1] == 0) {
         break;
-      } 
+      }
       samples->at(i) = this->Sample();
       this->Delete(samples->at(i));
     }
@@ -1496,7 +1496,7 @@ public:
 
     if (replacement_ == false) {
       batch_curr_id_ += num_workers;
-    } // do nothing for replacement_ == true
+    }  // do nothing for replacement_ == true
 
     *rv = List<SubgraphRef>(positive_subgs);
   }
@@ -1685,7 +1685,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
 
     if (replacement_ == false) {
       curr_batch_id_ += num_workers;
-    } // do nothing for replacement_ == true
+    }  // do nothing for replacement_ == true
 
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
