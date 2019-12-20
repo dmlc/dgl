@@ -24,10 +24,16 @@ def iou(boxA, boxB):
  
 	return iou_val
 
+def object_iou_thresh(gt_object, pred_object, iou_thresh=0.5):
+    obj_iou = iou(gt_object[1:5], pred_object[1:5])
+    if obj_iou >= iou_thresh:
+        return True
+    return False
+
 def triplet_iou_thresh(gt_triplet, pred_triplet, iou_thresh=0.5):
-    sub_iou = iou(gt_triplet.sub_bbox, pred_triplet.sub_bbox)
+    sub_iou = iou(gt_triplet[5:9], pred_triplet[5:9])
     if sub_iou >= iou_thresh:
-        ob_iou = iou(gt_triplet.ob_bbox, pred_triplet.ob_bbox)
+        ob_iou = iou(gt_triplet[9:13], pred_triplet[9:13])
         if ob_iou >= iou_thresh:
             return True
     return False
@@ -78,16 +84,22 @@ class PredCls(mx.metric.EvalMetric):
         if labels is None or preds is None:
             self.num_inst += 1
             return
-        preds = sorted(preds, key=attrgetter('score_pred'), reverse=True)
-        m = min(self.topk, len(preds))
+        preds = preds[preds[:,0].argsort()[::-1]]
+        m = min(self.topk, preds.shape[0])
         count = 0
-        for i, pred in enumerate(preds):
-            if i >= m:
-                break
-            for label in labels:
-                if label.rel_class == pred.rel_class:
-                    if triplet_iou_thresh(pred, label, 0.99):
-                        count += 1
+        gt_edge_num = labels.shape[0]
+        label_matched = [False for i in range(gt_edge_num)]
+        for i in range(m):
+            pred = preds[i]
+            for j in range(gt_edge_num):
+                if label_matched[j]:
+                    continue
+                label = labels[j]
+                if int(label[2]) == int(pred[2]) and \
+                   triplet_iou_thresh(pred, label, 0.99):
+                    count += 1
+                    label_matched[j] = True
+
         self.sum_metric += count / len(labels)
         self.num_inst += 1
 
@@ -102,18 +114,23 @@ class PhrCls(mx.metric.EvalMetric):
         if labels is None or preds is None:
             self.num_inst += 1
             return
-        preds = sorted(preds, key=attrgetter('score_phr'), reverse=True)
+        preds = preds[preds[:,1].argsort()[::-1]]
         m = min(self.topk, len(preds))
         count = 0
-        for i, pred in enumerate(preds):
-            if i >= m:
-                break
-            for label in labels:
-                if label.rel_class == pred.rel_class and \
-                   label.sub_class == pred.sub_class and \
-                   label.ob_class == pred.ob_class and \
+        gt_edge_num = labels.shape[0]
+        label_matched = [False for label in labels]
+        for i in range(m):
+            pred = preds[i]
+            for j in range(gt_edge_num):
+                if label_matched[j]:
+                    continue
+                label = labels[j]
+                if int(label[2]) == int(pred[2]) and \
+                   int(label[3]) == int(pred[3]) and \
+                   int(label[4]) == int(pred[4]) and \
                    triplet_iou_thresh(pred, label, 0.99):
                     count += 1
+                    label_matched[j] = True
         self.sum_metric += count / len(labels)
         self.num_inst += 1
 
@@ -128,19 +145,80 @@ class SGDet(mx.metric.EvalMetric):
         if labels is None or preds is None:
             self.num_inst += 1
             return
-        preds = sorted(preds, key=attrgetter('score_phr'), reverse=True)
+        preds = preds[preds[:,1].argsort()[::-1]]
         m = min(self.topk, len(preds))
         count = 0
-        for i, pred in enumerate(preds):
-            if i >= m:
-                break
-            for label in labels:
-                if label.rel_class == pred.rel_class and \
-                   label.sub_class == pred.sub_class and \
-                   label.ob_class == pred.ob_class and \
-                   triplet_iou_thresh(pred, label):
+        gt_edge_num = labels.shape[0]
+        label_matched = [False for label in labels]
+        for i in range(m):
+            pred = preds[i]
+            for j in range(gt_edge_num):
+                if label_matched[j]:
+                    continue
+                label = labels[j]
+                if int(label[2]) == int(pred[2]) and \
+                   int(label[3]) == int(pred[3]) and \
+                   int(label[4]) == int(pred[4]) and \
+                   triplet_iou_thresh(pred, label, 0.5):
                     count += 1
+                    label_matched[j] = True
         self.sum_metric += count / len(labels)
+        self.num_inst += 1
+
+@mx.metric.register
+@mx.metric.alias('sgdet+')
+class SGDetPlus(mx.metric.EvalMetric):
+    def __init__(self, topk=20):
+        super(SGDetPlus, self).__init__('sgdet+@%d'%(topk))
+        self.topk = topk
+
+    def update(self, labels, preds):
+        label_objects, label_triplets = labels
+        pred_objects, pred_triplets = preds
+        if label_objects is None or pred_objects is None:
+            self.num_inst += 1
+            return
+        count = 0
+        # count objects
+        object_matched = [False for obj in label_objects]
+        m = len(pred_objects)
+        gt_obj_num = label_objects.shape[0]
+        for i in range(m):
+            pred = pred_objects[i]
+            for j in range(gt_obj_num):
+                if object_matched[j]:
+                    continue
+                label = label_objects[j]
+                if int(label[0]) == int(pred[0]) and \
+                   object_iou_thresh(pred, label, 0.5):
+                    count += 1
+                    object_matched[j] = True
+        
+        # count predicate and triplet
+        pred_triplets = pred_triplets[pred_triplets[:,1].argsort()[::-1]]
+        m = min(self.topk, len(pred_triplets))
+        gt_triplet_num = label_triplets.shape[0]
+        triplet_matched = [False for label in label_triplets]
+        predicate_matched = [False for label in label_triplets]
+        for i in range(m):
+            pred = pred_triplets[i]
+            for j in range(gt_triplet_num):
+                label = label_triplets[j]
+                if not predicate_matched:
+                    if int(label[2]) == int(pred[2]) and \
+                       triplet_iou_thresh(pred, label, 0.5):
+                        count += 1
+                        predicate_matched[j] = True
+                if not triplet_matched[j]:
+                    if int(label[2]) == int(pred[2]) and \
+                       int(label[3]) == int(pred[3]) and \
+                       int(label[4]) == int(pred[4]) and \
+                       triplet_iou_thresh(pred, label, 0.5):
+                        count += 1
+                        triplet_matched[j] = True
+        # compute sum
+        N = gt_obj_num + 2 * gt_triplet_num
+        self.sum_metric += count / N
         self.num_inst += 1
 
 def merge_res_iou(g_slice, img_batch, scores, bbox, feat_ind, spatial_feat, cls_pred):
@@ -216,72 +294,75 @@ class EdgeTriplet(object):
         return self.__dict__.__repr__()
 
 
-def get_gt_triplet(g, img_size):
+def extract_gt(g, img_size):
     if g is None or g.number_of_nodes() == 0:
-        return None
+        return None, None
     gt_eids = np.where(g.edata['link'].asnumpy() > 0)[0]
+    if len(gt_eids) == 0:
+        return None, None
+
+    gt_class = g.ndata['node_class_ids'][:,0].asnumpy()
+    gt_bbox = g.ndata['bbox'].asnumpy()
+    gt_bbox[:, 0] /= img_size[1] 
+    gt_bbox[:, 1] /= img_size[0] 
+    gt_bbox[:, 2] /= img_size[1] 
+    gt_bbox[:, 3] /= img_size[0] 
+
+    gt_objects = np.vstack([gt_class, gt_bbox.transpose(1, 0)]).transpose(1, 0)
+
     gt_node_ids = g.find_edges(gt_eids)
     gt_node_sub = gt_node_ids[0].asnumpy()
     gt_node_ob = gt_node_ids[1].asnumpy()
     gt_rel_class = g.edata['classes'][gt_eids].asnumpy()
-    gt_sub_class = g.ndata['node_class_ids'][gt_node_sub][:,0].asnumpy()
-    gt_ob_class = g.ndata['node_class_ids'][gt_node_ob][:,0].asnumpy()
+    gt_sub_class = gt_class[gt_node_sub]
+    gt_ob_class = gt_class[gt_node_ob]
 
-    gt_sub_bbox = g.ndata['bbox'][gt_node_sub].asnumpy()
-    gt_sub_bbox[:, 0] /= img_size[1] 
-    gt_sub_bbox[:, 1] /= img_size[0] 
-    gt_sub_bbox[:, 2] /= img_size[1] 
-    gt_sub_bbox[:, 3] /= img_size[0] 
-    gt_ob_bbox = g.ndata['bbox'][gt_node_ob].asnumpy()
-    gt_ob_bbox[:, 0] /= img_size[1] 
-    gt_ob_bbox[:, 1] /= img_size[0] 
-    gt_ob_bbox[:, 2] /= img_size[1] 
-    gt_ob_bbox[:, 3] /= img_size[0] 
+    gt_sub_bbox = gt_bbox[gt_node_sub]
+    gt_ob_bbox = gt_bbox[gt_node_ob]
 
-    gt_triplets = []
-    for rel_class, sub_class, ob_class, sub_bbox, ob_bbox in zip(gt_rel_class, gt_sub_class, gt_ob_class, gt_sub_bbox, gt_ob_bbox):
-        edgetriplet = EdgeTriplet(1, 1, int(rel_class), int(sub_class), int(ob_class),
-                                  (sub_bbox[0], sub_bbox[1], sub_bbox[2], sub_bbox[3]),
-                                  (ob_bbox[0], ob_bbox[1], ob_bbox[2], ob_bbox[3]))
-        gt_triplets.append(edgetriplet)
-    return gt_triplets
+    n = len(gt_eids)
+    gt_triplets = np.vstack([np.ones(n), np.ones(n),
+                             gt_rel_class, gt_sub_class, gt_ob_class,
+                             gt_sub_bbox.transpose(1, 0),
+                             gt_ob_bbox.transpose(1, 0)]).transpose(1, 0)
+    return gt_objects, gt_triplets
 
-def get_pred_triplet(g):
+def extract_pred(g, topk=100):
     if g is None or g.number_of_nodes() == 0:
-        return None
-    pred_node_ids = g.edges()
+        return None, None
+
+    pred_prob = g.ndata['node_class_prob'].asnumpy()
+    pred_class = pred_prob.argmax(axis=1)
+    pred_class_prob = pred_prob.max(axis=1)
+    pred_bbox = g.ndata['pred_bbox'].asnumpy()
+
+    pred_objects = np.vstack([pred_class, pred_bbox.transpose(1, 0)]).transpose(1, 0)
+
+    score_pred = g.edata['score_pred'].asnumpy()
+    score_phr = g.edata['score_phr'].asnumpy()
+    score_pred_topk_eids = (-score_pred).argsort()[0:topk].tolist()
+    score_phr_topk_eids = (-score_phr).argsort()[0:topk].tolist()
+    topk_eids = sorted(list(set(score_pred_topk_eids + score_phr_topk_eids)))
+
+    pred_rel_prob = g.edata['preds'][topk_eids].asnumpy()
+    pred_rel_class = pred_rel_prob.argmax(axis=1)
+
+    pred_node_ids = g.find_edges(topk_eids)
     pred_node_sub = pred_node_ids[0].asnumpy()
     pred_node_ob = pred_node_ids[1].asnumpy()
 
-    pred_link_prob = nd.softmax(g.edata['link_preds']).asnumpy()
-    pred_rel_prob = nd.softmax(g.edata['preds']).asnumpy()
-    pred_rel_class = pred_rel_prob.argmax(axis=1)
+    pred_sub_prob = pred_prob[pred_node_sub]
+    pred_sub_class = pred_class[pred_node_sub]
+    pred_sub_class_prob = pred_class_prob[pred_node_sub]
+    pred_sub_bbox = pred_bbox[pred_node_sub]
 
-    pred_sub_prob = g.ndata['node_class_prob'][pred_node_sub].asnumpy()
-    pred_sub_class = pred_sub_prob.argmax(axis=1)
-    pred_sub_bbox = g.ndata['pred_bbox'][pred_node_sub].asnumpy()
+    pred_ob_prob = pred_prob[pred_node_ob]
+    pred_ob_class = pred_class[pred_node_ob]
+    pred_ob_class_prob = pred_class_prob[pred_node_ob]
+    pred_ob_bbox = pred_bbox[pred_node_ob]
 
-    pred_ob_prob = g.ndata['node_class_prob'][pred_node_ob].asnumpy()
-    pred_ob_class = pred_ob_prob.argmax(axis=1)
-    pred_ob_bbox = g.ndata['pred_bbox'][pred_node_ob].asnumpy()
-
-    n = g.number_of_edges()
-    pred_triplets = []
-    for i in range(n):
-        rel_class = pred_rel_class[i]
-        score_pred = pred_link_prob[i, 1] * pred_rel_prob[i, rel_class]
-
-        sub_class = pred_sub_class[i]
-        ob_class = pred_ob_class[i]
-        score_phr = score_pred
-        score_phr *= pred_sub_prob[i, sub_class]
-        score_phr *= pred_ob_prob[i, ob_class]
-
-        sub_bbox = pred_sub_bbox[i]
-        ob_bbox = pred_ob_bbox[i]
-
-        edgetriplet = EdgeTriplet(score_pred, score_phr, int(rel_class), int(sub_class), int(ob_class),
-                                  (sub_bbox[0], sub_bbox[1], sub_bbox[2], sub_bbox[3]),
-                                  (ob_bbox[0], ob_bbox[1], ob_bbox[2], ob_bbox[3]))
-        pred_triplets.append(edgetriplet)
-    return pred_triplets
+    pred_triplets = np.vstack([score_pred[topk_eids], score_phr[topk_eids],
+                               pred_rel_class, pred_sub_class, pred_ob_class,
+                               pred_sub_bbox.transpose(1, 0),
+                               pred_ob_bbox.transpose(1, 0)]).transpose(1, 0)
+    return pred_objects, pred_triplets

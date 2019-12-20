@@ -65,7 +65,15 @@ def get_data_batch(g_list, img_list, ctx_list):
     img_list = [img.as_in_context(ctx) for img in img_list]
     return G_list, img_list
 
-def validate(net, val_data, ctx, mode=['predcls']):
+def batch_verbose(i, num_batches, metric_list, verbose_freq):
+    if (i+1) % verbose_freq == 0:
+        print_txt = 'Batch %d / %d\t'%(i, num_batches)
+        for metric in metric_list:
+            name, pred = metric.get()
+            print_txt += '%s=%.4f '%(name, pred)
+        logger.info(print_txt)
+
+def validate(net, val_data, ctx, mode=['predcls'], verbose_freq=100):
     metric_list = []
     topk_list = [20, 50, 100]
     if 'predcls' in mode:
@@ -77,17 +85,15 @@ def validate(net, val_data, ctx, mode=['predcls']):
     if 'sgdet' in mode:
         for topk in topk_list:
             metric_list.append(SGDet(topk=topk))
+    if 'sgdet+' in mode:
+        for topk in topk_list:
+            metric_list.append(SGDetPlus(topk=topk))
     for metric in metric_list:
         metric.reset()
     for i, (g_list, img_list) in enumerate(val_data):
         G_list, img_list = get_data_batch(g_list, img_list, ctx)
         if G_list is None or img_list is None:
-            if (i+1) % 100 == 0:
-                print_txt = 'Batch %d / %d\t'%(i, len(val_data))
-                for metric in metric_list:
-                    name, pred = metric.get()
-                    print_txt += '%s=%.4f '%(name, pred)
-                logger.info(print_txt)
+            batch_verbose(i, len(val_data), metric_list, verbose_freq)
             continue
 
         detector_res_list = []
@@ -104,21 +110,23 @@ def validate(net, val_data, ctx, mode=['predcls']):
                 ids, scores, bbox, feat, feat_ind, spatial_feat, cls_pred = detector(img)
                 G_pred.append(build_graph_pred(G_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pred))
 
+        nd.waitall()
         if len(G_pred) > 0:
             G_pred = [dgl.unbatch(net(G)) for G in G_pred]
 
+        nd.waitall()
         for G_gt_slice, G_pred_slice, img_slice in zip(G_list, G_pred, img_list):
-            for G_gt, G_pred in zip(G_gt_slice, G_pred_slice) :
-                gt_triplet = get_gt_triplet(G_gt, img_slice.shape[2:4])
-                pred_triplet = get_pred_triplet(G_pred)
+            for G_gt, G_pred in zip(G_gt_slice, G_pred_slice):
+                gt_objects, gt_triplet = extract_gt(G_gt, img_slice.shape[2:4])
+                pred_objects, pred_triplet = extract_pred(G_pred)
                 for metric in metric_list:
-                    metric.update(gt_triplet, pred_triplet)
-        if (i+1) % 1 == 0:
-            print_txt = 'Batch %d / %d\t'%(i, len(val_data))
-            for metric in metric_list:
-                name, pred = metric.get()
-                print_txt += '%s=%.4f '%(name, pred)
-            logger.info(print_txt)
+                    if isinstance(metric, PredCls) or \
+                       isinstance(metric, PhrCls) or \
+                       isinstance(metric, SGDet):
+                        metric.update(gt_triplet, pred_triplet)
+                    else:
+                        metric.update((gt_objects, gt_triplet), (pred_objects, pred_triplet))
+        batch_verbose(i, len(val_data), metric_list, verbose_freq)
     print_txt = 'Validation Set Performance: '
     for metric in metric_list:
         name, pred = metric.get()
@@ -128,4 +136,4 @@ def validate(net, val_data, ctx, mode=['predcls']):
 '''
 validate(net, val_data, ctx, mode=['predcls', 'phrcls'])
 '''
-validate(net, val_data, ctx, mode='sgdet')
+validate(net, val_data, ctx, mode=['sgdet', 'sgdet+'], verbose_freq=100)

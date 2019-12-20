@@ -43,6 +43,16 @@ class EdgeMLP(nn.Block):
         out = self.mlp3(out)
         return {'preds': out}
 
+class EdgeConfMLP(nn.Block):
+    def __init__(self):
+        super(EdgeConfMLP, self).__init__()
+
+    def forward(self, edges):
+        score_pred = nd.softmax(edges.data['link_preds'])[:,1] * nd.softmax(edges.data['preds']).max(axis=1)
+        score_phr = score_pred * edges.src['node_class_prob'].max(axis=1) * edges.dst['node_class_prob'].max(axis=1)
+        return {'score_pred': score_pred,
+                'score_phr': score_phr}
+
 class EdgeGCN(nn.Block):
     def __init__(self,
                  in_feats,
@@ -62,6 +72,7 @@ class EdgeGCN(nn.Block):
         # output layer
         self.edge_link_mlp = EdgeLinkMLP(50, 2)
         self.edge_mlp = EdgeMLP(100, n_classes)
+        self.edge_conf_mlp = EdgeConfMLP()
 
     def forward(self, g):
         if g is None or g.number_of_nodes() == 0:
@@ -91,4 +102,5 @@ class EdgeGCN(nn.Block):
             g.ndata['emb'] = x
             # link classification
             g.apply_edges(self.edge_mlp)
+        g.apply_edges(self.edge_conf_mlp)
         return g

@@ -471,7 +471,7 @@ class FasterRCNN(RCNN):
                 res = res.reshape((1, -1, 0))
             # res (C, self.nms_topk, 6)
             res = F.contrib.box_nms(
-                res, overlap_thresh=self.nms_thresh, topk=self.nms_topk, valid_thresh=0.0001,
+                res, overlap_thresh=self.nms_thresh, topk=self.nms_topk, valid_thresh=0.001,
                 id_index=0, score_index=1, coord_start=2, force_suppress=self.force_nms)
             # res (C * self.nms_topk, 6)
             res = res.reshape((-3, 0))
@@ -568,7 +568,7 @@ def faster_rcnn_resnet50_v1b_coco(pretrained=False, pretrained_base=True, **kwar
         name='resnet50_v1b', dataset='coco', pretrained=pretrained,
         features=features, top_features=top_features, classes=classes,
         short=800, max_size=1333, train_patterns=train_patterns,
-        nms_thresh=1, nms_topk=-1, post_nms=-1,
+        nms_thresh=0.7, nms_topk=-1, post_nms=-1,
         roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
         rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
         ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,
@@ -622,7 +622,7 @@ def faster_rcnn_resnet50_v1b_custom(classes, transfer=None, pretrained_base=True
             name='resnet50_v1b', dataset='custom', pretrained=pretrained,
             features=features, top_features=top_features, classes=classes,
             short=600, max_size=1000, train_patterns=train_patterns,
-            nms_thresh=1, nms_topk=400, post_nms=100,
+            nms_thresh=0.7, nms_topk=400, post_nms=100,
             roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
             rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
             ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,
@@ -676,7 +676,7 @@ def faster_rcnn_resnet101_v1d_coco(pretrained=False, pretrained_base=True, **kwa
         name='resnet101_v1d', dataset='coco', pretrained=pretrained,
         features=features, top_features=top_features, classes=classes,
         short=800, max_size=1333, train_patterns=train_patterns,
-        nms_thresh=1, nms_topk=-1, post_nms=-1,
+        nms_thresh=0.7, nms_topk=-1, post_nms=-1,
         roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
         rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
         ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,
@@ -727,7 +727,7 @@ def faster_rcnn_resnet101_v1d_custom(classes, transfer=None, pretrained_base=Tru
             name='resnet101_v1d', dataset='custom', pretrained=pretrained,
             features=features, top_features=top_features, classes=classes,
             short=600, max_size=1000, train_patterns=train_patterns,
-            nms_thresh=1, nms_topk=400, post_nms=100,
+            nms_thresh=0.7, nms_topk=400, post_nms=100,
             roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
             rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
             ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,

@@ -31,7 +31,7 @@ def build_graph_gt(g_slice, img, bbox, spatial_feat, cls_pred):
         g_batch.append(g)
     return dgl.batch(g_batch)
 
-def build_graph_pred(g_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pred):
+def build_graph_pred(g_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pred, node_topk=100):
     img_size = img.shape[2:4]
     bbox[:, :, 0] /= img_size[1]
     bbox[:, :, 1] /= img_size[0]
@@ -41,9 +41,12 @@ def build_graph_pred(g_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pre
     n_graph = len(g_slice)
     g_batch = []
     for i in range(n_graph):
-        inds = np.where(scores[i, :, 0].asnumpy() > 0)[0].tolist()
+        inds = np.where(scores[i, :, 0].asnumpy() > 0)[0]
         if len(inds) == 0:
             g = None
+        if len(inds) > node_topk:
+            topk_inds = scores[i, inds, 0].argsort()[::-1][0:node_topk].asnumpy().astype(np.int)
+            inds = inds[topk_inds]
         n_nodes = len(inds)
         g = build_complete_graph(n_nodes)
         g.ndata['pred_bbox'] = bbox[i, inds]
