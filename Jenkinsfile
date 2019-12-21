@@ -101,13 +101,12 @@ def tutorial_test_linux(backend) {
   }
 }
 
-lint_agent = docker { image "dgllib/dgl-ci-lint" }
 
 pipeline {
   agent any
   stages {
     stage("Lint Check") {
-      agent {  lint_agent }
+      agent {  docker {image "dgllib/dgl-ci-lint"} }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
