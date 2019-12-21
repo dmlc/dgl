@@ -107,7 +107,7 @@ pipeline {
   agent any
   stages {
     stage("Lint Check") {
-      agent { docker { lint_agend }
+      agent {  lint_agent }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
