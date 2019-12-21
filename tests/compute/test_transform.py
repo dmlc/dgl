@@ -222,13 +222,13 @@ def test_partition():
         for i in range(nf.num_layers):
             layer_nids1 = F.asnumpy(nf.layer_parent_nid(i))
             layer_nids2 = lnf.layer_parent_nid(i)
-            layer_nids2 = F.asnumpy(subg.parent_nid[layer_nids2])
+            layer_nids2 = F.asnumpy(F.gather_row(subg.parent_nid, layer_nids2))
             assert np.all(np.sort(layer_nids1) == np.sort(layer_nids2))
 
         for i in range(nf.num_blocks):
             block_eids1 = F.asnumpy(nf.block_parent_eid(i))
             block_eids2 = lnf.block_parent_eid(i)
-            block_eids2 = F.asnumpy(subg.parent_eid[block_eids2])
+            block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
 
