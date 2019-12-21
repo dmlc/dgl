@@ -101,11 +101,13 @@ def tutorial_test_linux(backend) {
   }
 }
 
+def lint_agent = docker { image "dgllib/dgl-ci-lint" }
+
 pipeline {
   agent any
   stages {
     stage("Lint Check") {
-      agent { docker { image "dgllib/dgl-ci-lint" } }
+      agent { docker { lint_agend }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
@@ -134,6 +136,7 @@ pipeline {
             docker {
               label "linux-cpu-node"
               image "dgllib/dgl-ci-gpu:conda"
+              args "-u root"
             }
           }
           steps {
