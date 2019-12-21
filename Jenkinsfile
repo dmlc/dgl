@@ -101,7 +101,7 @@ def tutorial_test_linux(backend) {
   }
 }
 
-def lint_agent = docker { image "dgllib/dgl-ci-lint" }
+lint_agent = docker { image "dgllib/dgl-ci-lint" }
 
 pipeline {
   agent any
