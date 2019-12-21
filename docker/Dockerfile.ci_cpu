@@ -10,22 +10,19 @@ RUN bash /install/ubuntu_install_core.sh
 COPY install/ubuntu_install_build.sh /install/ubuntu_install_build.sh
 RUN bash /install/ubuntu_install_build.sh
 
-# ANTLR deps
-COPY install/ubuntu_install_java.sh /install/ubuntu_install_java.sh
-RUN bash /install/ubuntu_install_java.sh
-
-COPY install/ubuntu_install_antlr.sh /install/ubuntu_install_antlr.sh
-RUN bash /install/ubuntu_install_antlr.sh
-
 # python
-COPY install/ubuntu_install_python.sh /install/ubuntu_install_python.sh
-RUN bash /install/ubuntu_install_python.sh
+COPY install/ubuntu_install_conda.sh /install/ubuntu_install_conda.sh
+RUN bash /install/ubuntu_install_conda.sh
 
-COPY install/ubuntu_install_python_package.sh /install/ubuntu_install_python_package.sh
-RUN bash /install/ubuntu_install_python_package.sh
+ENV CONDA_ALWAYS_YES="true"
 
-COPY install/ubuntu_install_torch.sh /install/ubuntu_install_torch.sh
-RUN bash /install/ubuntu_install_torch.sh
+COPY install/conda_env/torch_cpu.yml /install/conda_env/torch_cpu.yml
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_cpu.yml"]
 
-COPY install/ubuntu_install_mxnet_cpu.sh /install/ubuntu_install_mxnet_cpu.sh
-RUN bash /install/ubuntu_install_mxnet_cpu.sh
+COPY install/conda_env/tensorflow_cpu.yml /install/conda_env/tensorflow_cpu.yml
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_cpu.yml"]
+
+COPY install/conda_env/mxnet_cpu.yml /install/conda_env/mxnet_cpu.yml
+RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_cpu.yml"]
+
+ENV CONDA_ALWAYS_YES=

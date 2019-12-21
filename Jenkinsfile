@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
+dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-36m-x86_64-linux-gnu.so"
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe"
 
@@ -56,7 +56,7 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 5, unit: 'MINUTES') {
+  timeout(time: 10, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
@@ -119,7 +119,7 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
           steps {
             build_dgl_linux("cpu")
           }
@@ -132,7 +132,7 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
             }
           }
@@ -165,7 +165,7 @@ pipeline {
     stage("Test") {
       parallel {
         stage("C++ CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
           steps {
             cpp_unit_test_linux()
           }
@@ -186,8 +186,43 @@ pipeline {
             }
           }
         }
+        stage("Tensorflow CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "cpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+        stage("Tensorflow GPU") {
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-gpu:conda" 
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_linux("tensorflow", "gpu")
+              }
+            }
+          }
+          post {
+            always {
+              cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
         stage("Torch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
           stages {
             stage("Unit test") {
               steps {
@@ -234,7 +269,7 @@ pipeline {
         stage("Torch GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
             }
           }
@@ -258,7 +293,7 @@ pipeline {
           }
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
           stages {
             stage("Unit test") {
               steps {
@@ -280,7 +315,7 @@ pipeline {
         stage("MXNet GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
             }
           }
@@ -303,7 +338,7 @@ pipeline {
     stage("App") {
       parallel {
         stage("Knowledge Graph CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:torch-1.2.0" } }
+          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
           stages {
             stage("Torch test") {
               steps {
@@ -325,7 +360,7 @@ pipeline {
         stage("Knowledge Graph GPU") {
           agent {
             docker {
-              image "dgllib/dgl-ci-gpu:torch-1.2.0"
+              image "dgllib/dgl-ci-gpu:conda"
               args "--runtime nvidia"
             }
           }

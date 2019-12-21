@@ -628,7 +628,7 @@ class EdgeSampler(object):
             self._is_uniform = True
         else:
             self._is_uniform = False
-            self._edge_weight = F.zerocopy_to_dgl_ndarray(edge_weight[self._seed_edges])
+            self._edge_weight = F.zerocopy_to_dgl_ndarray(F.gather_row(edge_weight, self._seed_edges))
             if node_weight is None:
                 self._node_weight = empty((0,), 'float32')
             else:
