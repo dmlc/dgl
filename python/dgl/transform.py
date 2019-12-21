@@ -535,7 +535,9 @@ def partition_graph_with_halo(g, node_part, num_hops):
         The graph to be partitioned
 
     node_part: 1D tensor
-        Specify which partition a node is assigned to
+        Specify which partition a node is assigned to. The length of this tensor
+        needs to be the same as the number of nodes of the graph. Each element
+        indicates the partition Id of a node.
 
     num_hops: int
         The number of hops a HALO node can be accessed.
@@ -543,7 +545,9 @@ def partition_graph_with_halo(g, node_part, num_hops):
     Returns
     --------
     a dict of DGLGraphs
+        The key is the partition Id and the value is the DGLGraph of the partition.
     '''
+    assert len(node_part) == g.number_of_nodes()
     node_part = utils.toindex(node_part)
     subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), num_hops)
     subg_dict = {}
