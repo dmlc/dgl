@@ -339,8 +339,7 @@ class NodeFlow(DGLBaseGraph):
             The parent node id array.
         """
         nid = utils.toindex(nid)
-        # TODO(minjie): should not directly use []
-        return self._node_mapping.tousertensor()[nid.tousertensor()]
+        return F.gather_row(self._node_mapping.tousertensor(), nid.tousertensor())
 
     def map_to_parent_eid(self, eid):
         """This maps the child edge Ids to the parent Ids.
@@ -356,8 +355,7 @@ class NodeFlow(DGLBaseGraph):
             The parent edge id array.
         """
         eid = utils.toindex(eid)
-        # TODO(minjie): should not directly use []
-        return self._edge_mapping.tousertensor()[eid.tousertensor()]
+        return F.gather_row(self._edge_mapping.tousertensor(), eid.tousertensor())
 
     def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
@@ -509,7 +507,7 @@ class NodeFlow(DGLBaseGraph):
         ret = self._edge_mapping.tousertensor()[start:end]
         # If `add_self_loop` is enabled, the returned parent eid can be -1.
         # We have to make sure this case doesn't happen.
-        assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
+        assert F.asnumpy(ret == -1).sum(0) == 0, "The eid in the parent graph is invalid."
         return ret
 
     def block_edges(self, block_id, remap_local=False):
@@ -1025,7 +1023,7 @@ def _copy_to_like(arr1, arr2):
 def _get_frame(frame, names, ids, ctx):
     col_dict = {}
     for name in names:
-        col = frame[name][_copy_to_like(ids, frame[name])]
+        col = F.gather_row(frame[name], _copy_to_like(ids, frame[name]))
         if ctx:
             col = F.copy_to(col, ctx)
         col_dict[name] = col
@@ -1044,6 +1042,7 @@ def _copy_frame(frame, ctx):
 def _update_frame(frame, names, ids, new_frame):
     col_dict = {name: new_frame[name] for name in names}
     if len(col_dict) > 0:
+        # This will raise error for tensorflow, because inplace update is not supported
         frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
 
 _init_api("dgl.nodeflow", __name__)

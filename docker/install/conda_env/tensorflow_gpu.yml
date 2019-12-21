@@ -1,0 +1,18 @@
+
+name: tensorflow-ci
+dependencies:
+  - python=3.6.9
+  - pip
+  - pip:
+    - tensorflow-gpu==2.1.0rc1
+    - tfdlpack-gpu
+    - pytest
+  - nose
+  - numpy
+  - cython
+  - scipy
+  - networkx
+  - matplotlib
+  - nltk
+  - requests[security]
+  - tqdm

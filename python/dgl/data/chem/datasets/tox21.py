@@ -1,9 +1,9 @@
 import sys
 
 from .csv_dataset import MoleculeCSVDataset
-from .utils import smiles_to_bigraph
-from ..utils import get_download_dir, download, _get_dgl_url
-from ... import backend as F
+from ..utils import smiles_to_bigraph
+from ...utils import get_download_dir, download, _get_dgl_url
+from .... import backend as F
 
 try:
     import pandas as pd
@@ -32,18 +32,18 @@ class Tox21(MoleculeCSVDataset):
     smiles_to_graph: callable, str -> DGLGraph
         A function turning smiles into a DGLGraph.
         Default to :func:`dgl.data.chem.smiles_to_bigraph`.
-    atom_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for atoms in a molecule, which can be used to update
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
-    bond_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for bonds in a molecule, which can be used to update
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
     """
     def __init__(self, smiles_to_graph=smiles_to_bigraph,
-                 atom_featurizer=None,
-                 bond_featurizer=None):
+                 node_featurizer=None,
+                 edge_featurizer=None):
         if 'pandas' not in sys.modules:
-            from ...base import dgl_warning
+            from ....base import dgl_warning
             dgl_warning("Please install pandas")
 
         self._url = 'dataset/tox21.csv.gz'
@@ -54,7 +54,7 @@ class Tox21(MoleculeCSVDataset):
 
         df = df.drop(columns=['mol_id'])
 
-        super(Tox21, self).__init__(df, smiles_to_graph, atom_featurizer, bond_featurizer,
+        super(Tox21, self).__init__(df, smiles_to_graph, node_featurizer, edge_featurizer,
                                     "smiles", "tox21_dglgraph.bin")
         self._weight_balancing()
 

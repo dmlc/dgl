@@ -26,6 +26,9 @@ def attach_grad(x):
         return x.requires_grad_()
 
 def backward(x, head_gradient=None):
+    if head_gradient is not None and head_gradient.shape[0] == 1 and len(head_gradient.shape) == 1:
+        # Fix for torch 1.3.1
+        head_gradient = th.tensor(head_gradient.item()).to(head_gradient.device)
     x.backward(head_gradient)
 
 def grad(x):
