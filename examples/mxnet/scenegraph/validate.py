@@ -110,7 +110,6 @@ def validate(net, val_data, ctx, mode=['predcls'], verbose_freq=100):
                 ids, scores, bbox, feat, feat_ind, spatial_feat, cls_pred = detector(img)
                 G_pred.append(build_graph_pred(G_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pred))
 
-        nd.waitall()
         if len(G_pred) > 0:
             G_pred = [dgl.unbatch(net(G)) for G in G_pred]
 

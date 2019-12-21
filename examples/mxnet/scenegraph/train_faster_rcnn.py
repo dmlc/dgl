@@ -24,6 +24,9 @@ from gluoncv.utils.parallel import Parallelizable, Parallel
 from gluoncv.utils.metrics.rcnn import RPNAccMetric, RPNL1LossMetric, RCNNAccMetric, \
     RCNNL1LossMetric
 
+from data import *
+from model import EdgeGCN, faster_rcnn_resnet101_v1d_custom
+
 try:
     import horovod.mxnet as hvd
 except ImportError:
@@ -122,8 +125,8 @@ def parse_args():
         hvd.init()
 
     if args.dataset == 'voc' or args.dataset == 'visualgenome':
-        args.epochs = int(args.epochs) if args.epochs else 10
-        args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '5,8'
+        args.epochs = int(args.epochs) if args.epochs else 20
+        args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '14,20'
         args.lr = float(args.lr) if args.lr else 0.001
         args.lr_warmup = args.lr_warmup if args.lr_warmup else -1
         args.wd = float(args.wd) if args.wd else 5e-4
@@ -148,8 +151,8 @@ def get_dataset(dataset, args):
         val_dataset = gdata.COCODetection(splits='instances_val2017', skip_empty=False)
         val_metric = COCODetectionMetric(val_dataset, args.save_prefix + '_eval', cleanup=True)
     elif dataset.lower() == 'visualgenome':
-        train_dataset = gdata.VGObject(split='train')
-        val_dataset = gdata.VGObject(split='val')
+        train_dataset = VGObject(split='train')
+        val_dataset = VGObject(split='val')
         val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=val_dataset._obj_classes)
     else:
         raise NotImplementedError('Dataset: {} not implemented.'.format(dataset))
@@ -493,9 +496,14 @@ if __name__ == '__main__':
     # net_name = '_'.join(('faster_rcnn', *module_list, args.network, args.dataset))
     net_name = '_'.join(('faster_rcnn', *module_list, args.network, 'custom'))
     args.save_prefix += net_name
+    '''
     net = get_model(net_name, pretrained_base=False, transfer='coco',
                     classes=train_dataset._obj_classes,
                     per_device_batch_size=args.batch_size // len(ctx), **kwargs)
+    '''
+    net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset._obj_classes, transfer='coco',
+                                           pretrained_base=False, additional_output=False,
+                                           per_device_batch_size=args.batch_size // len(ctx), **kwargs)
     if args.resume.strip():
         net.load_parameters(args.resume.strip())
     else:

@@ -37,8 +37,8 @@ net = EdgeGCN(in_feats=49, n_hidden=32, n_classes=N_relations,
 net.edge_mlp.initialize(ctx=ctx)
 net.edge_link_mlp.initialize(ctx=ctx)
 net.layers.initialize(ctx=ctx)
-trainer = gluon.Trainer(net.collect_params(), 'adam', 
-                        {'learning_rate': 0.01, 'wd': 0.00001})
+net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
+                            {'learning_rate': 0.01, 'wd': 0.00001})
 
 # dataset and dataloader
 vg_train = VGRelation(top_frequent_rel=N_relations, top_frequent_obj=N_objects,
@@ -55,6 +55,8 @@ for k, v in detector.collect_params().items():
     v.grad_req = 'null'
 for k, v in detector.class_predictor.collect_params().items():
     v.grad_req = 'write'
+cls_trainer = gluon.Trainer(detector.class_predictor.collect_params(), 'adam', 
+                            {'learning_rate': 0.01, 'wd': 0.00001})
 
 def get_data_batch(g_list, img_list, ctx_list):
     if g_list is None or len(g_list) == 0:
@@ -102,7 +104,8 @@ for epoch in range(nepoch):
     train_metric_auc.reset()
     train_metric_r100.reset()
     if epoch == 8:
-        trainer.set_learning_rate(trainer.learning_rate*0.1)
+        net_trainer.set_learning_rate(trainer.learning_rate*0.1)
+        cls_trainer.set_learning_rate(trainer.learning_rate*0.1)
     n_batches = len(train_data)
     for i, (G_list, img_list) in enumerate(train_data):
         G_list, img_list = get_data_batch(G_list, img_list, ctx)
@@ -119,21 +122,33 @@ for epoch in range(nepoch):
                 bbox_list = [G.ndata['bbox'] for G in G_slice]
                 bbox_stack = bbox_pad(bbox_list).as_in_context(cur_ctx)
                 bbox, spatial_feat, cls_pred = detector((img, bbox_stack))
-                G_batch.append(merge_res(G_slice, img, bbox, spatial_feat, cls_pred))
+                G_batch.append(build_graph_gt(G_slice, img, bbox, spatial_feat, cls_pred, training=True))
 
             G_batch = [net(G) for G in G_batch]
 
-            for G in G_batch:
-                if G is not None and G.number_of_nodes() > 0:
-                    loss_rel = L_rel(G.edata['preds'], G.edata['classes'], G.edata['link'])
-                    loss_link = L_link(G.edata['link_preds'], G.edata['link'], G.edata['weights'])
-                    loss_cls = L_link(G.ndata['node_class_pred'], G.ndata['node_class_ids'])
-                    loss.append(loss_rel.sum() + loss_link.sum() + loss_cls.sum())
+            for G_slice, G_pred, img in zip(G_list, G_batch, img_list):
+                if G_pred is not None or G_pred.number_of_nodes() == 0:
+                    continue
+                G_gt = dgl.batch(G_slice)
+                loss_rel = L_rel(G_slice.edata['preds'], G_gt.edata['classes'], G_gt.edata['link'])
+                loss_link = L_link(G_slice.edata['link_preds'], G_gt.edata['link'], G_gt.edata['weights'])
+                loss_cls = L_cls(G_slice.ndata['node_class_pred'], G_gt.ndata['node_class_ids']+1)
+                loss.append(loss_rel.sum() + loss_link.sum() + loss_cls.sum())
 
         for l in loss:
             l.backward()
-        trainer.step(batch_size)
+        net_trainer.step(batch_size)
+        cls_trainer.step(batch_size)
         loss_val += sum([l.mean().asscalar() for l in loss]) / num_gpus
+        for G_slice, G_pred, img in zip(G_list, G_batch, img_list):
+            if G_pred is not None or G_pred.number_of_nodes() == 0:
+                continue
+            """
+            work on it
+            """
+
+
+
         for G in G_batch:
             if G is None or G.number_of_nodes() == 0:
                 continue
@@ -142,11 +157,12 @@ for epoch in range(nepoch):
                 continue
             train_metric.update([G.edata['classes'][link_ind]], [G.edata['preds'][link_ind]])
             train_metric_top5.update([G.edata['classes'][link_ind]], [G.edata['preds'][link_ind]])
-            train_metric_node.update([G.ndata['node_class_ids']], [G.ndata['node_class_pred']])
-            train_metric_node_top5.update([G.ndata['node_class_ids']], [G.ndata['node_class_pred']])
+            train_metric_node.update([G.ndata['node_class_ids'] + 1], [G.ndata['node_class_pred']])
+            train_metric_node_top5.update([G.ndata['node_class_ids'] + 1], [G.ndata['node_class_pred']])
             train_metric_f1.update([G.edata['link']], [G.edata['link_preds']])
             train_metric_auc.update([G.edata['link']], [G.edata['link_preds']])
-            gt_triplet, pred_triplet = get_triplet(G)
+            gt_objects, gt_triplet = extract_gt(G_gt, img_slice.shape[2:4])
+            pred_objects, pred_triplet = extract_pred(G_pred)
             train_metric_r100.update(gt_triplet, pred_triplet)
         if (i+1) % batch_verbose_freq == 0:
             _, acc = train_metric.get()

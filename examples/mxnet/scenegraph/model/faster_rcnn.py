@@ -456,16 +456,21 @@ class FasterRCNN(RCNN):
         # per batch predict, nms, each class has topk outputs
         results = []
         # add feat index
-        sizes = scores[0].shape[0:2]
-        # ind = mx.nd.array(list(range(sizes[1])))
-        ind = mx.nd.linspace(0, 999, 1000)
-        ind = mx.nd.repeat(ind, repeats=sizes[0])
-        ind = ind.reshape(sizes[1], sizes[0]).transpose((1, 0)).expand_dims(axis=2)
+        if self._additional_output:
+            sizes = scores[0].shape[0:2]
+            # ind = mx.nd.array(list(range(sizes[1])))
+            ind = mx.nd.linspace(0, 999, 1000)
+            ind = mx.nd.repeat(ind, repeats=sizes[0])
+            ind = ind.reshape(sizes[1], sizes[0]).transpose((1, 0)).expand_dims(axis=2)
         for rpn_box, cls_id, score, box_pred in zip(rpn_boxes, cls_ids, scores, box_preds):
             # box_pred (C, N, 4) rpn_box (1, N, 4) -> bbox (C, N, 4)
             bbox = self.box_decoder(box_pred, rpn_box)
-            # res (C, N, 7)
-            res = F.concat(*[cls_id, score, bbox, ind], dim=-1)
+            if self._additional_output:
+                # res (C, N, 7)
+                res = F.concat(*[cls_id, score, bbox, ind], dim=-1)
+            else:
+                # res (C, N, 6)
+                res = F.concat(*[cls_id, score, bbox], dim=-1)
             if self.force_nms:
                 # res (1, C*N, 6), to allow cross-catogory suppression
                 res = res.reshape((1, -1, 0))
@@ -482,11 +487,9 @@ class FasterRCNN(RCNN):
         ids = F.slice_axis(result, axis=-1, begin=0, end=1)
         scores = F.slice_axis(result, axis=-1, begin=1, end=2)
         bboxes = F.slice_axis(result, axis=-1, begin=2, end=6)
-        feat_ind = F.slice_axis(result, axis=-1, begin=6, end=7)
         if self._additional_output:
-            # box_feat = F.reshape(box_feat.expand_dims(0), (batch_size, -1, 0))
+            feat_ind = F.slice_axis(result, axis=-1, begin=6, end=7)
             spatial_feat = top_feat.mean(axis=1).expand_dims(0).reshape(batch_size, 0, -1)
-            # return ids, scores, bboxes, feat, feat_ind, box_feat, cls_pred
             return ids, scores, bboxes, feat, feat_ind, spatial_feat, cls_pred
         return ids, scores, bboxes
 
@@ -676,7 +679,7 @@ def faster_rcnn_resnet101_v1d_coco(pretrained=False, pretrained_base=True, **kwa
         name='resnet101_v1d', dataset='coco', pretrained=pretrained,
         features=features, top_features=top_features, classes=classes,
         short=800, max_size=1333, train_patterns=train_patterns,
-        nms_thresh=0.7, nms_topk=-1, post_nms=-1,
+        nms_thresh=0.5, nms_topk=-1, post_nms=-1,
         roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
         rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
         ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,
@@ -727,7 +730,7 @@ def faster_rcnn_resnet101_v1d_custom(classes, transfer=None, pretrained_base=Tru
             name='resnet101_v1d', dataset='custom', pretrained=pretrained,
             features=features, top_features=top_features, classes=classes,
             short=600, max_size=1000, train_patterns=train_patterns,
-            nms_thresh=0.7, nms_topk=400, post_nms=100,
+            nms_thresh=0.5, nms_topk=400, post_nms=100,
             roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
             rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
             ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,
@@ -736,8 +739,7 @@ def faster_rcnn_resnet101_v1d_custom(classes, transfer=None, pretrained_base=Tru
             num_sample=128, pos_iou_thresh=0.5, pos_ratio=0.25, max_num_gt=3000,
             **kwargs)
     else:
-        from gluoncv.model_zoo import get_model
-        net = get_model('faster_rcnn_resnet101_v1d_' + str(transfer), pretrained=True, **kwargs)
+        net = faster_rcnn_resnet101_v1d_coco(pretrained=True)
         reuse_classes = [x for x in classes if x in net.classes]
         net.reset_class(classes, reuse_weights=reuse_classes)
     return net

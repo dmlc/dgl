@@ -279,21 +279,6 @@ def merge_res(g_slice, img, bbox, spatial_feat, cls_pred):
         g.ndata['node_feat'] = spatial_feat[i, 0:n_node]
     return dgl.batch(g_slice)
 
-class EdgeTriplet(object):
-    def __init__(self, score_pred, score_phr, rel_class, sub_class, ob_class, sub_bbox, ob_bbox):
-        super(EdgeTriplet, self).__init__()
-        self.score_pred = score_pred
-        self.score_phr = score_phr
-        self.rel_class = rel_class
-        self.sub_class = sub_class
-        self.ob_class = ob_class
-        self.sub_bbox = sub_bbox
-        self.ob_bbox = ob_bbox
-
-    def __repr__(self):
-        return self.__dict__.__repr__()
-
-
 def extract_gt(g, img_size):
     if g is None or g.number_of_nodes() == 0:
         return None, None
