@@ -444,20 +444,24 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvNodeFlow")
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    CommunicatorHandle chandle = args[0];
-    int recv_id = args[1];
+    int args_count = 0;
+    CommunicatorHandle chandle = args[args_count++];
+    int recv_id = args[args_count++];
     KVStoreMsg kv_msg;
-    kv_msg.msg_type = args[2];
-    kv_msg.rank = args[3];
+    kv_msg.msg_type = args[args_count++];
+    kv_msg.rank = args[args_count++];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     if (kv_msg.msg_type != kFinalMsg && kv_msg.msg_type != kBarrierMsg) {
-      std::string name = args[4];
+      std::string name = args[args_count++];
       kv_msg.name = name;
-      kv_msg.id = args[5];
-      if (kv_msg.msg_type != kPullMsg) {
-        kv_msg.data = args[6];
+      if (kv_msg.msg_type != kIPIDMsg) {
+        kv_msg.id = args[args_count++];
+      }
+      if (kv_msg.msg_type != kPullMsg && kv_msg.msg_type != kIPIDMsg) {
+        kv_msg.data = args[args_count++];
       }
     }
+ 
     int64_t kv_size = 0;
     char* kv_data = kv_msg.Serialize(&kv_size);
     // Send kv_data
@@ -466,7 +470,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
     send_kv_msg.size = kv_size;
     send_kv_msg.deallocator = DefaultMessageDeleter;
     CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
-    if (kv_msg.msg_type != kFinalMsg && kv_msg.msg_type != kBarrierMsg) {
+
+    if (kv_msg.msg_type != kFinalMsg && 
+        kv_msg.msg_type != kBarrierMsg && 
+        kv_msg.msg_type != kIPIDMsg) {
       // Send ArrayMeta
       ArrayMeta meta(kv_msg.msg_type);
       meta.AddArray(kv_msg.id);
@@ -510,7 +517,9 @@ DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
     CHECK_EQ(receiver->Recv(&recv_kv_msg, &send_id), REMOVE_SUCCESS);
     kv_msg->Deserialize(recv_kv_msg.data, recv_kv_msg.size);
     recv_kv_msg.deallocator(&recv_kv_msg);
-    if (kv_msg->msg_type == kFinalMsg || kv_msg->msg_type == kBarrierMsg) {
+    if (kv_msg->msg_type == kFinalMsg || 
+        kv_msg->msg_type == kBarrierMsg || 
+        kv_msg->msg_type == kIPIDMsg) {
       *rv = kv_msg;
       return;
     }

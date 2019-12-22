@@ -64,7 +64,11 @@ enum MessageType {
   /*!
    * \brief Barrier msg for KVStore
    */
-  kBarrierMsg = 6
+  kBarrierMsg = 6,
+  /*!
+   * \brief IP and ID msg for KVStore
+   */  
+  kIPIDMsg = 7
 };
 
 /*!
