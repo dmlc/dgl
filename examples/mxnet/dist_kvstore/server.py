@@ -1,30 +1,32 @@
 # This is a simple MXNet server demo shows how to use DGL distributed kvstore.
-# In this demo, we initialize two embeddings on server and push/pull data to/from it.
 import dgl
 import argparse
 import mxnet as mx
 
-server_namebook = dgl.contrib.read_ip_config('ip_config.txt')
+ndata_g2l = []
+edata_g2l = []
 
-global2local = []
-global2local.append(mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64'))
+ndata_g2l.append({'ndata':mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64')})
+
+edata_g2l.append({'edata':mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64')})
 
 def start_server(args):
-    server = dgl.contrib.KVServer(
-        server_id=args.id, 
-        server_addr=server_namebook[args.id],
-        num_client=4)
+    
+    dgl.contrib.start_server(
+        server_id=args.id,
+        ip_config='ip_config.txt',
+        num_client=4,
+        ndata={'ndata':mx.nd.array([[0.,0.,0.],[0.,0.,0.]])},
+        edata={'edata':mx.nd.array([[0.,0.,0.],[0.,0.,0.]])},
+        ndata_g2l=ndata_g2l[args.id],
+        edata_g2l=edata_g2l[args.id])
 
-    server.init_data(name='embed', data_tensor=mx.nd.array([[0.,0.,0.],[0.,0.,0.]]))
-
-    server.set_global2local(name='embed', global2local=global2local[args.id])
-
-    print("start server %d" % args.id)
-
-    server.start()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='kvstore')

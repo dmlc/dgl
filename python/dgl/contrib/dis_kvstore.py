@@ -91,23 +91,23 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     for name, data in edata_g2l.items():
         server.set_global2local(name=name, global2local=data)
 
-    print("start server %d ..." % args.id)
+    print("start server %d on %s" % (server.get_id(), server.get_addr()))
 
     server.start()
 
 
-def start_client(client_id, ip_config, partition_book):
+def start_client(ip_config, ndata_partition_book, edata_partition_book):
     """Start kvclient
 
     Parameters
     ----------
-    client_id : int
-        ID of current client node
     ip_config : str
         filename of server IP configuration
-    partition_book : dict of tensor (mx.ndarray or torch.tensor)
-        data mapping of data ID to server ID
-
+    ndata_partition_book : dict of tensor (mx.ndarray or torch.tensor)
+        data mapping of node data ID to server ID
+    edata_partition_book : dict of tensor (mx.ndarray or torch.tensor)
+        data mapping of edge data ID to server ID
+        
     Returns
     -------
     KVClient
@@ -115,16 +115,19 @@ def start_client(client_id, ip_config, partition_book):
     """
     server_namebook = read_ip_config(ip_config)
 
-    client = KVClient(
-        server_namebook=server_namebook,
-        client_id=client_id)
+    client = KVClient(server_namebook=server_namebook)
 
-    for name, data in partition_book:
+    for name, data in ndata_partition_book.items():
+        client.set_partition_book(name=name, partition_book=data)
+
+    for name, data in edata_partition_book.items():
         client.set_partition_book(name=name, partition_book=data)
 
     client.connect()
 
-    print("Client %d connected to kvstore ..." % args.id)
+    print("Client %d (%s) connected to kvstore ..." % (client.get_id(), client.get_addr()))
+
+    return client
     
 
 class KVServer(object):
@@ -235,6 +238,17 @@ class KVServer(object):
         return self._server_id
 
 
+    def get_addr(self):
+        """Get server IP address
+
+        Return
+        ------
+        str
+            IP address
+        """
+        return self._addr
+
+
     def start(self):
         """Start service of KVServer
         """
@@ -242,11 +256,15 @@ class KVServer(object):
         server_ip, server_port = self._addr.split(':')
         _receiver_wait(self._receiver, server_ip, int(server_port), self._client_count)
 
+        addr_list = []
         for i in range(self._client_count):
             msg = _recv_kv_msg(self._receiver)
             assert msg.type == KVMsgType.IP_ID
-            client_id = msg.rank
-            self._client_namebook[client_id] = msg.name # ip in msg.name, e.g. '127.0.0.1:50051'
+            addr_list.append(msg.name)
+
+        self._sort_addr(addr_list)
+        for ID in range(len(addr_list)):
+            self._client_namebook[ID] = addr_list[ID]
 
         _network_wait()
 
@@ -257,6 +275,16 @@ class KVServer(object):
         _sender_connect(self._sender)
 
         if self._server_id == 0:
+            # assign ID to client nodes
+            for client_id, addr in self._client_namebook.items():
+                msg = KVStoreMsg(
+                    type=KVMsgType.IP_ID,
+                    rank=self._server_id,
+                    name=str(client_id),
+                    id=None,
+                    data=None)
+                _send_kv_msg(self._sender, msg, client_id)
+
             # send name of shared-memory tensor to clients
             shared_tensor = ''
             for name in self._has_data:
@@ -394,6 +422,17 @@ class KVServer(object):
         return str_data
 
 
+    def _sort_addr(self, addr_list):
+        """Sort client address list
+
+        Parameters
+        ----------
+        addr_list : list of str
+            address list
+        """
+        return addr_list.sort()
+
+
 class KVClient(object):
     """KVClient is used to push/pull tensors to/from KVServer.
 
@@ -403,8 +442,6 @@ class KVClient(object):
 
     Parameters
     ----------
-    client_id : int
-        ID of current client node.
     server_namebook: dict
         IP address namebook of KVServer, where key is the KVServer's ID 
         (start from 0) and value is the server's IP address and port, e.g.,
@@ -415,9 +452,8 @@ class KVClient(object):
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
-    def __init__(self, client_id, server_namebook, net_type='socket'):
+    def __init__(self, server_namebook, net_type='socket'):
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
-        assert client_id >= 0, 'client_id (%d) cannot be a negative number.' % client_id
         assert net_type == 'socket' or net_type == 'mpi', 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
 
         # check if target data has a ID mapping for global ID to local ID
@@ -426,8 +462,6 @@ class KVClient(object):
         self._data_store = {}
         # This is used to check if we can access server data locally
         self._local_server_id = set()
-        # client_id starts from 0
-        self._client_id = client_id
         # Server information
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
@@ -478,8 +512,6 @@ class KVClient(object):
         self._addr = self._get_local_addr()
         client_ip, client_port = self._addr.split(':')
 
-        print("Get IP address %s for client %d" % (self._addr, self._client_id))
-
         # find local server nodes
         for ID, addr in self._server_namebook.items():
             server_ip, server_port = addr.split(':')
@@ -489,7 +521,7 @@ class KVClient(object):
         # send addr to server nodes
         msg = KVStoreMsg(
             type=KVMsgType.IP_ID,
-            rank=self._client_id,
+            rank=0,
             name=self._addr,
             id=None,
             data=None)
@@ -498,6 +530,11 @@ class KVClient(object):
             _send_kv_msg(self._sender, msg, server_id)
 
         _receiver_wait(self._receiver, client_ip, int(client_port), self._server_count)
+
+        # recv client id
+        msg = _recv_kv_msg(self._receiver)
+        assert msg.rank == 0
+        self._client_id = int(msg.name)
 
         # recv name of shared tensor from server 0
         msg = _recv_kv_msg(self._receiver)
@@ -684,6 +721,17 @@ class KVClient(object):
             KVClient ID
         """
         return self._client_id
+
+
+    def get_addr(self):
+        """Get client IP address
+
+        Return
+        ------
+        str
+            IP address
+        """
+        return self._addr
 
 
     def _get_local_addr(self):

@@ -3,15 +3,6 @@
 import dgl
 import argparse
 import mxnet as mx
-import time
-
-server_namebook = dgl.contrib.read_ip_config('ip_config.txt')
-
-global2local = []
-global2local.append(mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64'))
-global2local.append(mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64'))
 
 ID = []
 ID.append(mx.nd.array([0,1], dtype='int64'))
@@ -19,35 +10,34 @@ ID.append(mx.nd.array([2,3], dtype='int64'))
 ID.append(mx.nd.array([4,5], dtype='int64'))
 ID.append(mx.nd.array([6,7], dtype='int64'))
 
-partition_book = mx.nd.array([0,0,1,1,2,2,3,3], dtype='int64')
+edata_partition_book = {'edata':mx.nd.array([0,0,1,1,2,2,3,3], dtype='int64')}
+ndata_partition_book = {'ndata':mx.nd.array([0,0,1,1,2,2,3,3], dtype='int64')}
 
-def start_client(args):
-    client = dgl.contrib.KVClient(
-        server_namebook=server_namebook, 
-        client_id=args.id)
-
-    client.set_partition_book(name='embed', partition_book=partition_book)
-
-    client.connect()
-
-    print("Client %d connected to kvstore ..." % args.id)
+def start_client():
     
-    client.push(name='embed', id_tensor=ID[args.id], data_tensor=mx.nd.array([[1.,1.,1.],[1.,1.,1.]]))
+    client = dgl.contrib.start_client(ip_config='ip_config.txt', 
+                                      ndata_partition_book=ndata_partition_book, 
+                                      edata_partition_book=edata_partition_book)
+
+    client.push(name='edata', id_tensor=ID[client.get_id()], data_tensor=mx.nd.array([[1.,1.,1.],[1.,1.,1.]]))
+    client.push(name='ndata', id_tensor=ID[client.get_id()], data_tensor=mx.nd.array([[2.,2.,2.],[2.,2.,2.]]))
 
     client.barrier()
 
-    tensor = client.pull(name='embed', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
+    tensor_edata = client.pull(name='edata', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
+    tensor_ndata = client.pull(name='ndata', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
 
-    print(tensor)
+    print(tensor_edata)
 
     client.barrier()
 
-    if args.id == 0:
+    print(tensor_ndata)
+
+    client.barrier()
+
+    if client.get_id() == 0:
         client.shut_down()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='kvstore')
-    parser.add_argument("--id", type=int, default=0, help="node ID")
-    args = parser.parse_args()
 
-    start_client(args)
+    start_client()
