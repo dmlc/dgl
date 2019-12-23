@@ -120,7 +120,12 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          agent { 
+            docker {
+              label "linux-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+            }
+          }
           steps {
             build_dgl_linux("cpu")
           }
@@ -194,7 +199,12 @@ pipeline {
           }
         }
         stage("Tensorflow CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          agent { 
+            docker {
+              label "linux-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -230,7 +240,12 @@ pipeline {
           }
         }
         stage("Torch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          agent { 
+            docker {
+              label "linux-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -302,7 +317,12 @@ pipeline {
           }
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          agent { 
+            docker {
+              label "linux-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -348,7 +368,12 @@ pipeline {
     stage("App") {
       parallel {
         stage("Knowledge Graph CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu:conda" } }
+          agent { 
+            docker {
+              label "linux-cpu-node"
+              image "dgllib/dgl-ci-cpu:conda" 
+            }
+          }
           stages {
             stage("Torch test") {
               steps {
