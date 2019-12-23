@@ -44,8 +44,8 @@ def run_an_eval_epoch(args, model, data_loader):
     return np.mean(eval_meter.compute_metric(args['metric_name']))
 
 def main(args):
-    args['device'] = "cuda" if torch.cuda.is_available() else "cpu"
-    set_random_seed()
+    args['device'] = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    set_random_seed(args['random_seed'])
 
     # Interchangeable with other datasets
     dataset, train_set, val_set, test_set = load_dataset_for_classification(args)
