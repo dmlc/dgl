@@ -106,7 +106,12 @@ pipeline {
   agent any
   stages {
     stage("Lint Check") {
-      agent {  docker {image "dgllib/dgl-ci-lint"} }
+      agent { 
+        docker {
+          label "linux-cpu-node"
+          image "dgllib/dgl-ci-cpu:conda" 
+        }
+      }
       steps {
         init_git()
         sh "bash tests/scripts/task_lint.sh"
