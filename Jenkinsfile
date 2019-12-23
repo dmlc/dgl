@@ -109,7 +109,7 @@ pipeline {
       agent { 
         docker {
           label "linux-cpu-node"
-          image "dgllib/dgl-ci-cpu:conda" 
+          image "dgllib/dgl-ci-lint" 
         }
       }
       steps {
