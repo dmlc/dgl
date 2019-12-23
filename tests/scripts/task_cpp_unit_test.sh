@@ -1,6 +1,6 @@
 #!/bin/bash
 echo $PWD
-ls -lh
 pushd build
-./runUnitTests
+ls -lh
+./runUnitTests || fail "CPP unit test"
 popd
