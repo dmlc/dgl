@@ -535,7 +535,8 @@ class EdgeSampler(object):
     positive edges sampled will not be duplicated. However, one can explicitly 
     specify sampling with replacement (replacement = True), that the sampler will 
     generates any number of batches, and it treats each sampling of a single positive 
-    edge as a standalone event.
+    edge as a standalone event. The default action for both with or w/o replacement 
+    is to sample num_edges before stop.
 
     Parameters
     ----------
@@ -558,6 +559,11 @@ class EdgeSampler(object):
         If true, prefetch the samples in the next batch. Default: False
     replacement: bool, optional
         Whether the sampler samples edges with or without palcement. Default False
+    max_samples: int, optional
+        Max number of samples (positive edges) the sampler will return. For repalcement=False,
+        max_smaples will forced to max_samples = num_edges. For repalcement=True, it can 
+        be any positive value. If max_samples <= 0 provided, it will take a default action: 
+        max_samples = num_edges.
     negative_mode : string, optional
         The method used to construct negative edges. Possible values are 'head', 'tail'.
     neg_sample_size : int, optional
@@ -595,6 +601,7 @@ class EdgeSampler(object):
             num_workers=1,
             prefetch=False,
             replacement=False,
+            max_samples=0,
             negative_mode="",
             neg_sample_size=0,
             exclude_positive=False,
@@ -622,6 +629,15 @@ class EdgeSampler(object):
             self._seed_edges = F.arange(0, g.number_of_edges())
         else:
             self._seed_edges = seed_edges
+
+        if replacement == False:
+            if max_samples > self._seed_edges.shape[0] or max_samples <= 0:
+                max_samples = self._seed_edges.shape[0]
+        else:
+            if max_samples <= 0:
+                max_samples = self._seed_edges.shape[0]
+        self._max_samples = max_samples
+
         if shuffle:
             self._seed_edges = F.rand_shuffle(self._seed_edges)
         if edge_weight is None:
@@ -652,6 +668,7 @@ class EdgeSampler(object):
                 self._batch_size,       # batch size
                 self._num_workers,      # num batches
                 self._replacement,
+                self._max_samples,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,
@@ -666,6 +683,7 @@ class EdgeSampler(object):
                 self._batch_size,       # batch size
                 self._num_workers,      # num batches
                 self._replacement,
+                self._max_samples,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,

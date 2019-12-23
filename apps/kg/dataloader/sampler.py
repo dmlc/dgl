@@ -4,6 +4,7 @@ import scipy as sp
 import dgl.backend as F
 import dgl
 import os
+import sys
 import pickle
 import time
 
@@ -111,6 +112,7 @@ class TrainDataset(object):
         return EdgeSampler(self.graphs[rank],
                            batch_size=batch_size,
                            replacement=True,
+                           max_samples=sys.maxsize, #  max pos int in system
                            neg_sample_size=neg_sample_size,
                            negative_mode=mode,
                            num_workers=num_workers,
