@@ -461,7 +461,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
         kv_msg.data = args[args_count++];
       }
     }
- 
     int64_t kv_size = 0;
     char* kv_data = kv_msg.Serialize(&kv_size);
     // Send kv_data
@@ -471,8 +470,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
     send_kv_msg.deallocator = DefaultMessageDeleter;
     CHECK_EQ(sender->Send(send_kv_msg, recv_id), ADD_SUCCESS);
 
-    if (kv_msg.msg_type != kFinalMsg && 
-        kv_msg.msg_type != kBarrierMsg && 
+    if (kv_msg.msg_type != kFinalMsg &&
+        kv_msg.msg_type != kBarrierMsg &&
         kv_msg.msg_type != kIPIDMsg) {
       // Send ArrayMeta
       ArrayMeta meta(kv_msg.msg_type);
@@ -517,8 +516,8 @@ DGL_REGISTER_GLOBAL("network.CAPI_ReceiverRecvKVMsg")
     CHECK_EQ(receiver->Recv(&recv_kv_msg, &send_id), REMOVE_SUCCESS);
     kv_msg->Deserialize(recv_kv_msg.data, recv_kv_msg.size);
     recv_kv_msg.deallocator(&recv_kv_msg);
-    if (kv_msg->msg_type == kFinalMsg || 
-        kv_msg->msg_type == kBarrierMsg || 
+    if (kv_msg->msg_type == kFinalMsg ||
+        kv_msg->msg_type == kBarrierMsg ||
         kv_msg->msg_type == kIPIDMsg) {
       *rv = kv_msg;
       return;
