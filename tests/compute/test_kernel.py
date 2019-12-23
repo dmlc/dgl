@@ -303,6 +303,8 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
                   format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            print("Nodes", g.nodes())
+            print("Edges:" ,g.edges())
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
