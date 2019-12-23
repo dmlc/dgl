@@ -63,8 +63,10 @@ def test_multi_send():
     expected = F.copy_to(F.zeros((g.number_of_edges(),), dtype=F.int64), F.cpu())
     eid = g.edge_ids([0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
                      [1, 2, 3, 4, 5, 9, 9, 9, 9, 9])
+    expected = F.asnumpy(expected)
+    eid = F.asnumpy(eid)
     expected[eid] = 1
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
 def test_multi_recv():
     # basic recv test
@@ -79,21 +81,24 @@ def test_multi_recv():
     v = [9]
     g.send((u, v))
     eid = g.edge_ids(u, v)
+    expected = F.asnumpy(expected)
+    eid = F.asnumpy(eid)
     expected[eid] = 1
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
     u = [0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
+    eid = F.asnumpy(eid)
     expected[eid] = 1
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
     h1 = g.ndata['h']
 
@@ -103,20 +108,23 @@ def test_multi_recv():
     v = F.tensor([1, 2, 3, 9, 9, 9])
     g.send((u, v))
     eid = g.edge_ids(u, v)
+    eid = F.asnumpy(eid)
     expected[eid] = 1
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     u = [4, 5, 6]
     v = [9]
     g.recv(v)
     eid = g.edge_ids(u, v)
+    eid = F.asnumpy(eid)
     expected[eid] = 0
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     u = [0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)
+    eid = F.asnumpy(eid)
     expected[eid] = 0
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
     h2 = g.ndata['h']
     assert F.allclose(h1, h2)
@@ -127,7 +135,7 @@ def test_multi_recv_0deg():
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+        return {'h' : nodes.data['h'] + F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
         return {'h' : nodes.data['h'] * 2}
     def _init2(shape, dtype, ctx, ids):
@@ -280,11 +288,12 @@ def test_recv_no_send():
     g.ndata['h'] = F.randn((3, D))
     g.send((1, 2), message_func)
     expected = F.copy_to(F.zeros(2, dtype=F.int64), F.cpu())
+    expected = F.asnumpy(expected)
     expected[1] = 1
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
     g.recv(2, reduce_func)
     expected[1] = 0
-    assert F.array_equal(g._get_msg_index().tousertensor(), expected)
+    assert np.array_equal(g._get_msg_index().tonumpy(), expected)
 
 def test_send_recv_after_conversion():
     # test send and recv after converting from a graph with edges
