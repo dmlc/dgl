@@ -139,6 +139,16 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+
+  /*!
+   * \brief Get a induced subgraph with HALO nodes.
+   * The HALO nodes are the ones that can be reached from `nodes` within `num_hops`.
+   * \param graph The input graph.
+   * \param nodes The input nodes that form the core of the induced subgraph.
+   * \param num_hops The number of hops to reach.
+   * \return the induced subgraph with HALO nodes.
+   */
+  static HaloSubgraph GetSubgraphWithHalo(GraphPtr graph, IdArray nodes, int num_hops);
 };
 
 }  // namespace dgl
