@@ -74,13 +74,14 @@ class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
         self.g = ConstructGraph(triples, dataset.n_entities, args)
-        print('|Train|:', len(triples))
+        num_train = len(triples[0])
+        print('|Train|:', num_train)
         if ranks > 1 and args.rel_part:
             self.edge_parts = RelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
-            self.edge_parts = [np.arange(len(triples))]
+            self.edge_parts = [np.arange(num_train)]
         if weighting:
             # TODO: weight to be added
             count = self.count_freq(triples)
