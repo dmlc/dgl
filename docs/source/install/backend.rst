@@ -26,14 +26,17 @@ Tensorflow backend
 
 Export ``DGLBACKEND`` as ``tensorflow`` to specify Tensorflow backend. The required Tensorflow
 version is 2.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
-instructions. In addition, Tensorflow backend requires ``tfdlpack`` package installed as follows:
+instructions. In addition, Tensorflow backend requires ``tfdlpack`` package installed as follows and set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`` to prevent Tensorflow take over the whole GPU memory:
 
 .. code:: bash
 
-   pip install tfdlpack  # when using tensorflow
+   pip install tfdlpack  # when using tensorflow cpu version
+
 
 or
 
 .. code:: bash
 
-   pip install tfdlpack-gpu  # when using tensorflow-gpu
+   pip install tfdlpack-gpu  # when using tensorflow gpu version
+   export TF_FORCE_GPU_ALLOW_GROWTH=true # and add this to your .bashrc/.zshrc file if needed
+
