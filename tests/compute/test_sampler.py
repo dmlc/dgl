@@ -158,6 +158,7 @@ def test_layer_sampler():
     _test_layer_sampler()
     _test_layer_sampler(prefetch=True)
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Error occured when multiprocessing")
 def test_nonuniform_neighbor_sampler():
     # Construct a graph with
     # (1) A path (0, 1, ..., 99) with weight 1
@@ -235,6 +236,7 @@ def check_head_tail(g):
     assert len(tail_nid) == len(g.tail_nid)
     np.testing.assert_equal(tail_nid, ldst)
 
+
 def check_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
     num_edges = g.number_of_edges()
@@ -305,7 +307,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
         neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
         neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
         exists = neg_edges.edata['false_neg']
-        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        neg_edges.edata['etype'] = F.gather_row(g.edata['etype'], neg_eid)
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
@@ -346,14 +348,14 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                                             exclude_positive=exclude_positive,
                                             return_false_neg=True):
         pos_lsrc, pos_ldst, pos_leid = pos_edges.all_edges(form='all', order='eid')
-        assert_array_equal(F.asnumpy(pos_edges.parent_eid[pos_leid]),
-                           F.asnumpy(g.edge_ids(pos_edges.parent_nid[pos_lsrc],
-                                                pos_edges.parent_nid[pos_ldst])))
+        assert_array_equal(F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)),
+                           F.asnumpy(g.edge_ids(F.gather_row(pos_edges.parent_nid, pos_lsrc),
+                                                F.gather_row(pos_edges.parent_nid, pos_ldst))))
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
 
-        neg_src = neg_edges.parent_nid[neg_lsrc]
-        neg_dst = neg_edges.parent_nid[neg_ldst]
-        neg_eid = neg_edges.parent_eid[neg_leid]
+        neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
+        neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
+        neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
         for i in range(len(neg_eid)):
             neg_d = int(F.asnumpy(neg_dst[i]))
             neg_e = int(F.asnumpy(neg_eid[i]))
@@ -362,8 +364,8 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 assert int(F.asnumpy(neg_src[i])) != pos_map[(neg_d, neg_e)]
 
         check_head_tail(neg_edges)
-        pos_tails = pos_edges.parent_nid[pos_edges.tail_nid]
-        neg_tails = neg_edges.parent_nid[neg_edges.tail_nid]
+        pos_tails = F.gather_row(pos_edges.parent_nid, pos_edges.tail_nid)
+        neg_tails = F.gather_row(neg_edges.parent_nid, neg_edges.tail_nid)
         pos_tails = np.sort(F.asnumpy(pos_tails))
         neg_tails = np.sort(F.asnumpy(neg_tails))
         np.testing.assert_equal(pos_tails, neg_tails)
@@ -387,11 +389,11 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                                             relations=g.edata['etype'],
                                             return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
-        neg_src = neg_edges.parent_nid[neg_lsrc]
-        neg_dst = neg_edges.parent_nid[neg_ldst]
-        neg_eid = neg_edges.parent_eid[neg_leid]
+        neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
+        neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
+        neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
         exists = neg_edges.edata['false_neg']
-        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        neg_edges.edata['etype'] = F.gather_row(g.edata['etype'], neg_eid)
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
@@ -414,11 +416,11 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                                             relations=g.edata['etype'],
                                             return_false_neg=True):
         neg_lsrc, neg_ldst, neg_leid = neg_edges.all_edges(form='all', order='eid')
-        neg_src = neg_edges.parent_nid[neg_lsrc]
-        neg_dst = neg_edges.parent_nid[neg_ldst]
-        neg_eid = neg_edges.parent_eid[neg_leid]
+        neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
+        neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
+        neg_eid = F.gather_row(neg_edges.parent_eid, neg_leid)
         exists = neg_edges.edata['false_neg']
-        neg_edges.edata['etype'] = g.edata['etype'][neg_eid]
+        neg_edges.edata['etype'] = F.gather_row(g.edata['etype'], neg_eid)
         for i in range(len(neg_eid)):
             u, v = F.asnumpy(neg_src[i]), F.asnumpy(neg_dst[i])
             if g.has_edge_between(u, v):
@@ -463,7 +465,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         else:
             neg_dst = neg_edges.parent_nid[neg_ldst]
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
+        np.add.at(edge_sampled, F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)), 1)
 
         total_samples += batch_size
         if (total_samples >= max_samples):
@@ -496,12 +498,12 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
         neg_lsrc, neg_ldst, _ = neg_edges.all_edges(form='all', order='eid')
         if 'head' in mode:
-            neg_src = neg_edges.parent_nid[neg_lsrc]
+            neg_src = F.gather_row(neg_edges.parent_nid, neg_lsrc)
             np.add.at(node_sampled, F.asnumpy(neg_src), 1)
         else:
-            neg_dst = neg_edges.parent_nid[neg_ldst]
+            neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
+        np.add.at(edge_sampled, F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)), 1)
 
         total_samples += batch_size
         if (total_samples >= max_samples):
@@ -522,7 +524,8 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     assert np.allclose(node_rate, node_rate_a * 5, atol=0.002)
     assert np.allclose(node_rate_a, node_rate_b, atol=0.0002)
 
-@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Core dump")
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def test_negative_sampler():
     check_negative_sampler('PBG-head', False, 10)
     check_negative_sampler('head', True, 10)

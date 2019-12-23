@@ -384,7 +384,7 @@ def build_relabel_map(x, is_sorted=False):
         unique_x = x
     map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
-    F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
+    old_to_new = F.scatter_row(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
 def build_relabel_dict(x):

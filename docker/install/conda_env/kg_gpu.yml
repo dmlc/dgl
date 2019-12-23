@@ -1,9 +1,11 @@
-name: mxnet-ci
+name: kg-ci
 dependencies:
   - python=3.6.9
   - pip
   - pip:
-    - mxnet
+    - torch
+    - torchvision
+    - mxnet-cu101
     - pytest
   - nose
   - numpy

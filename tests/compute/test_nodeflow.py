@@ -9,20 +9,24 @@ from dgl import utils
 import dgl.function as fn
 from functools import partial
 import itertools
+import unittest
+
 
 def generate_rand_graph(n, connect_more=False, complete=False, add_self_loop=False):
     if complete:
-        cord = [(i,j) for i, j in itertools.product(range(n), range(n)) if i != j]
+        cord = [(i, j)
+                for i, j in itertools.product(range(n), range(n)) if i != j]
         row = [t[0] for t in cord]
         col = [t[1] for t in cord]
         data = np.ones((len(row),))
         arr = sp.sparse.coo_matrix((data, (row, col)), shape=(n, n))
     else:
-        arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
+        arr = (sp.sparse.random(n, n, density=0.1,
+                                format='coo') != 0).astype(np.int64)
         # having one node to connect to all other nodes.
         if connect_more:
             arr[0] = 1
-            arr[:,0] = 1
+            arr[:, 0] = 1
     if add_self_loop:
         g = dgl.DGLGraph(arr, readonly=False)
         nodes = np.arange(g.number_of_nodes())
@@ -57,14 +61,16 @@ def test_self_loop():
         for eid in parent_loop_eid:
             assert eid in parent_eid
 
+
 def create_mini_batch(g, num_hops, add_self_loop=False):
     seed_ids = np.array([1, 2, 0, 3])
     sampler = NeighborSampler(g, batch_size=4, expand_factor=g.number_of_nodes(),
-            num_hops=num_hops, seed_nodes=seed_ids, add_self_loop=add_self_loop)
+                              num_hops=num_hops, seed_nodes=seed_ids, add_self_loop=add_self_loop)
     nfs = list(sampler)
     assert len(nfs) == 1
     assert_array_equal(F.asnumpy(nfs[0].layer_parent_nid(-1)), seed_ids)
     return nfs[0]
+
 
 def check_basic(g, nf):
     num_nodes = 0
@@ -81,7 +87,8 @@ def check_basic(g, nf):
     assert np.all(F.asnumpy(nf.has_nodes(list(range(num_nodes)))))
     for i in range(num_nodes):
         assert nf.has_node(i)
-    assert np.all(F.asnumpy(nf.has_nodes(list(range(num_nodes, 2 * num_nodes)))) == 0)
+    assert np.all(F.asnumpy(nf.has_nodes(
+        list(range(num_nodes, 2 * num_nodes)))) == 0)
     for i in range(num_nodes, 2 * num_nodes):
         assert not nf.has_node(i)
 
@@ -114,7 +121,6 @@ def check_basic(g, nf):
         data1 = g.edges[nf.block_parent_eid(i)].data['h2']
         assert_array_equal(F.asnumpy(data), F.asnumpy(data1))
 
-
     # negative layer Ids.
     for i in range(-1, -nf.num_layers, -1):
         in_deg = nf.layer_in_degree(i)
@@ -140,7 +146,8 @@ def test_basic():
     # should also work for negative layer ids
     for l in range(-1, -num_layers, -1):
         nids1 = nf.map_from_parent_nid(l, parent_nids, remap_local=True)
-        nids2 = nf.map_from_parent_nid(l + num_layers, parent_nids, remap_local=True)
+        nids2 = nf.map_from_parent_nid(
+            l + num_layers, parent_nids, remap_local=True)
         assert_array_equal(F.asnumpy(nids1), F.asnumpy(nids2))
 
     g = generate_rand_graph(100)
@@ -162,16 +169,20 @@ def check_apply_nodes(create_node_flow, use_negative_block_id):
         nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
         new_feats = F.randn((nf.layer_size(l), 5))
+
         def update_func(nodes):
-            return {'h1' : new_feats}
+            return {'h1': new_feats}
         nf.apply_layer(l, update_func)
-        assert_array_equal(F.asnumpy(nf.layers[l].data['h1']), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.layers[l].data['h1']), F.asnumpy(new_feats))
 
         new_feats = F.randn((4, 5))
+
         def update_func1(nodes):
-            return {'h1' : new_feats}
+            return {'h1': new_feats}
         nf.apply_layer(l, update_func1, v=nf.layer_nid(l)[0:4])
-        assert_array_equal(F.asnumpy(nf.layers[l].data['h1'][0:4]), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.layers[l].data['h1'][0:4]), F.asnumpy(new_feats))
 
 
 def test_apply_nodes():
@@ -194,16 +205,19 @@ def check_apply_edges(create_node_flow):
             return {'h2': new_feats, "f2": edges.src["f"] + edges.dst["f"]}
 
         nf.apply_block(i, update_func)
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
 
         # should also work for negative block ids
         nf.apply_block(-num_layers + i, update_func)
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
 
         eids = nf.block_parent_eid(i)
         srcs, dsts = g.find_edges(eids)
         expected_f_sum = g.nodes[srcs].data["f"] + g.nodes[dsts].data["f"]
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
 
 
 def check_apply_edges1(create_node_flow):
@@ -220,18 +234,21 @@ def check_apply_edges1(create_node_flow):
 
         nf.register_apply_edge_func(update_func, i)
         nf.apply_block(i)
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
 
         # should also work for negative block ids
         nf.register_apply_edge_func(update_func, -num_layers + i)
         nf.apply_block(-num_layers + i)
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['h2']), F.asnumpy(new_feats))
 
         eids = nf.block_parent_eid(i)
         srcs, dsts = g.find_edges(eids)
         expected_f_sum = g.nodes[srcs].data["f"] + g.nodes[dsts].data["f"]
         #expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
-        assert_array_equal(F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
+        assert_array_equal(
+            F.asnumpy(nf.blocks[i].data['f2']), F.asnumpy(expected_f_sum))
 
 
 def test_apply_edges():
@@ -251,11 +268,12 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
     for i in range(num_layers):
         l = -num_layers + i if use_negative_block_id else i
         nf.block_compute(l, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                         lambda nodes: {'h' : nodes.data['t'] + 1})
+                         lambda nodes: {'h': nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h']),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
                         rtol=1e-4, atol=1e-4)
 
     # Test the computation when only a few nodes are active in a layer.
@@ -264,12 +282,14 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
         l = -num_layers + i if use_negative_block_id else i
         vs = nf.layer_nid(i+1)[0:4]
         nf.block_compute(l, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                        lambda nodes: {'h' : nodes.data['t'] + 1}, v=vs)
+                         lambda nodes: {'h': nodes.data['t'] + 1}, v=vs)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
         data1 = nf.layers[i + 1].data['h'][0:4]
         data2 = g.nodes[nf.map_to_parent_nid(vs)].data['h']
-        assert_allclose(F.asnumpy(data1), F.asnumpy(data2), rtol=1e-4, atol=1e-4)
+        assert_allclose(F.asnumpy(data1), F.asnumpy(
+            data2), rtol=1e-4, atol=1e-4)
+
 
 def check_flow_compute1(create_node_flow, use_negative_block_id=False):
     num_layers = 2
@@ -284,12 +304,14 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
         l = -num_layers + i if use_negative_block_id else i
         nf.register_message_func(fn.copy_src(src='h', out='m'), l)
         nf.register_reduce_func(fn.sum(msg='m', out='t'), l)
-        nf.register_apply_node_func(lambda nodes: {'h' : nodes.data['t'] + 1}, l)
+        nf.register_apply_node_func(
+            lambda nodes: {'h': nodes.data['t'] + 1}, l)
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h']),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
                         rtol=1e-4, atol=1e-4)
 
     # test the case that we register UDFs in all blocks.
@@ -299,15 +321,17 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
     nf.layers[0].data['h'] = nf.layers[0].data['h1']
     nf.register_message_func(fn.copy_src(src='h', out='m'))
     nf.register_reduce_func(fn.sum(msg='m', out='t'))
-    nf.register_apply_node_func(lambda nodes: {'h' : nodes.data['t'] + 1})
+    nf.register_apply_node_func(lambda nodes: {'h': nodes.data['t'] + 1})
     for i in range(num_layers):
         l = -num_layers + i if use_negative_block_id else i
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h']),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
                         rtol=1e-4, atol=1e-4)
+
 
 class SrcMulEdgeMessageFunction(object):
     def __init__(self, src_field, edge_field, out_field):
@@ -327,7 +351,8 @@ class SrcMulEdgeMessageFunction(object):
         sdata = F.reshape(sdata, sshape + (1,) * (rank - F.ndim(sdata)))
         edata = F.reshape(edata, eshape + (1,) * (rank - F.ndim(edata)))
         ret = self.mul_op(sdata, edata)
-        return {self.out_field : ret}
+        return {self.out_field: ret}
+
 
 def check_flow_compute2(create_node_flow):
     num_layers = 2
@@ -339,14 +364,16 @@ def check_flow_compute2(create_node_flow):
     g.ndata['h'] = g.ndata['h1']
     nf.layers[0].data['h'] = nf.layers[0].data['h1']
     for i in range(num_layers):
-        nf.block_compute(i, SrcMulEdgeMessageFunction('h', 'h', 't'), fn.sum('t', 'h1'))
+        nf.block_compute(i, SrcMulEdgeMessageFunction(
+            'h', 'h', 't'), fn.sum('t', 'h1'))
         nf.block_compute(i, fn.src_mul_edge('h', 'h', 'h'), fn.sum('h', 'h'))
         g.update_all(fn.src_mul_edge('h', 'h', 'h'), fn.sum('h', 'h'))
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h1']),
                         F.asnumpy(nf.layers[i + 1].data['h']),
                         rtol=1e-4, atol=1e-4)
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h']),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
                         rtol=1e-4, atol=1e-4)
 
     nf = create_node_flow(g, num_layers)
@@ -358,8 +385,10 @@ def check_flow_compute2(create_node_flow):
         nf.block_compute(i, fn.u_mul_v('h', 'h', 't'), fn.sum('t', 's'))
         g.update_all(fn.u_mul_v('h', 'h', 't'), fn.sum('t', 's'))
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['s']),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['s']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['s']),
                         rtol=1e-4, atol=1e-4)
+
 
 def test_flow_compute():
     check_flow_compute(create_full_nodeflow)
@@ -380,11 +409,11 @@ def check_prop_flows(create_node_flow):
     # Test the computation on a layer at a time.
     for i in range(num_layers):
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
 
     # Test the computation on all layers.
     nf2.prop_flow(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                  lambda nodes: {'h' : nodes.data['t'] + 1})
+                  lambda nodes: {'h': nodes.data['t'] + 1})
     assert_allclose(F.asnumpy(nf2.layers[-1].data['h']),
                     F.asnumpy(g.nodes[nf2.layer_parent_nid(-1)].data['h']),
                     rtol=1e-4, atol=1e-4)
@@ -395,6 +424,8 @@ def test_prop_flows():
     check_prop_flows(create_mini_batch)
 
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow",
+                 reason="TF doesn't support inplace update, nf.copy_to_parent will trigger this")
 def test_copy():
     num_layers = 2
     g = generate_rand_graph(100)
@@ -417,7 +448,8 @@ def test_copy():
     nf = create_mini_batch(g, num_layers)
     node_embed_names = [['h'], ['h1'], ['h']]
     edge_embed_names = [['h2'], ['h2']]
-    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=edge_embed_names)
+    nf.copy_from_parent(node_embed_names=node_embed_names,
+                        edge_embed_names=edge_embed_names)
     for i in range(nf.num_layers):
         assert len(node_embed_names[i]) == len(nf.layers[i].data.keys())
         for key in node_embed_names[i]:
@@ -434,14 +466,16 @@ def test_copy():
     nf = create_mini_batch(g, num_layers)
     g.ndata['h0'] = F.clone(g.ndata['h'])
     node_embed_names = [['h0'], [], []]
-    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
+    nf.copy_from_parent(node_embed_names=node_embed_names,
+                        edge_embed_names=None)
     for i in range(num_layers):
         nf.block_compute(i, fn.copy_src(src='h%d' % i, out='m'), fn.sum(msg='m', out='t'),
-                         lambda nodes: {'h%d' % (i+1) : nodes.data['t'] + 1})
+                         lambda nodes: {'h%d' % (i+1): nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                     lambda nodes: {'h' : nodes.data['t'] + 1})
+                     lambda nodes: {'h': nodes.data['t'] + 1})
         assert_allclose(F.asnumpy(nf.layers[i + 1].data['h%d' % (i+1)]),
-                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
+                        F.asnumpy(
+                            g.nodes[nf.layer_parent_nid(i + 1)].data['h']),
                         rtol=1e-4, atol=1e-4)
     nf.copy_to_parent(node_embed_names=[['h0'], ['h1'], ['h2']])
     for i in range(num_layers + 1):
@@ -453,17 +487,20 @@ def test_copy():
     g.ndata['h1'] = F.clone(g.ndata['h'])
     g.ndata['h2'] = F.clone(g.ndata['h'])
     node_embed_names = [['h0'], ['h1'], ['h2']]
-    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
+    nf.copy_from_parent(node_embed_names=node_embed_names,
+                        edge_embed_names=None)
 
     def msg_func(edge, ind):
         assert 'h%d' % ind in edge.src.keys()
-        return {'m' : edge.src['h%d' % ind]}
+        return {'m': edge.src['h%d' % ind]}
+
     def reduce_func(node, ind):
         assert 'h%d' % (ind + 1) in node.data.keys()
-        return {'h' : F.sum(node.mailbox['m'], 1) + node.data['h%d' % (ind + 1)]}
+        return {'h': F.sum(node.mailbox['m'], 1) + node.data['h%d' % (ind + 1)]}
 
     for i in range(num_layers):
-        nf.block_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
+        nf.block_compute(i, partial(msg_func, ind=i),
+                         partial(reduce_func, ind=i))
 
 
 def test_block_edges():
@@ -523,7 +560,7 @@ def test_block_incidence_matrix():
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
-        typestrs = ["in", "out"] # todo need fix for "both"
+        typestrs = ["in", "out"]  # todo need fix for "both"
         adjs = []
         for typestr in typestrs:
             adj, _ = nf.block_incidence_matrix(i, typestr, F.cpu())
@@ -533,7 +570,8 @@ def test_block_incidence_matrix():
         # should work for negative block ids
         adjs_by_neg = []
         for typestr in typestrs:
-            adj_by_neg, _ = nf.block_incidence_matrix(-nf.num_blocks + i, typestr, F.cpu())
+            adj_by_neg, _ = nf.block_incidence_matrix(
+                -nf.num_blocks + i, typestr, F.cpu())
             adj_by_neg = F.sparse_to_numpy(adj_by_neg)
             adjs_by_neg.append(adj_by_neg)
 
