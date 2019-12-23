@@ -41,7 +41,7 @@ class NodeView(object):
 
     def __call__(self):
         """Return the nodes."""
-        return F.arange(0, len(self))
+        return F.copy_to(F.arange(0, len(self)), F.cpu())
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.

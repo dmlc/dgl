@@ -117,15 +117,15 @@ WorkspacePool::WorkspacePool(DLDeviceType device_type, std::shared_ptr<DeviceAPI
 }
 
 WorkspacePool::~WorkspacePool() {
-  for (size_t i = 0; i < array_.size(); ++i) {
-    if (array_[i] != nullptr) {
-      DGLContext ctx;
-      ctx.device_type = device_type_;
-      ctx.device_id = static_cast<int>(i);
-      array_[i]->Release(ctx, device_.get());
-      delete array_[i];
-    }
-  }
+  // for (size_t i = 0; i < array_.size(); ++i) {
+  //   if (array_[i] != nullptr) {
+  //     DGLContext ctx;
+  //     ctx.device_type = device_type_;
+  //     ctx.device_id = static_cast<int>(i);
+  //     array_[i]->Release(ctx, device_.get());
+  //     delete array_[i];
+  //   }
+  // }
 }
 
 void* WorkspacePool::AllocWorkspace(DGLContext ctx, size_t size) {

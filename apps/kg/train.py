@@ -6,7 +6,7 @@ import os
 import logging
 import time
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     import multiprocessing as mp
     from train_mxnet import load_model
@@ -23,8 +23,8 @@ class ArgParser(argparse.ArgumentParser):
         super(ArgParser, self).__init__()
 
         self.add_argument('--model_name', default='TransE',
-                          choices=['TransE', 'TransH', 'TransR', 'TransD',
-                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE'],
+                          choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransR',
+                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE'],
                           help='model to use')
         self.add_argument('--data_path', type=str, default='data',
                           help='root path of all dataset')
