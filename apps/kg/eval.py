@@ -2,17 +2,18 @@ from dataloader import EvalDataset, TrainDataset
 from dataloader import get_dataset
 
 import argparse
-import torch.multiprocessing as mp
 import os
 import logging
 import time
 import pickle
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
+    import multiprocessing as mp
     from train_mxnet import load_model_from_checkpoint
     from train_mxnet import test
 else:
+    import torch.multiprocessing as mp
     from train_pytorch import load_model_from_checkpoint
     from train_pytorch import test
 

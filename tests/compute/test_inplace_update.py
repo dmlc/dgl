@@ -3,6 +3,7 @@ import scipy.sparse as sp
 import dgl
 import dgl.function as fn
 import backend as F
+import unittest
 
 D = 5
 
@@ -19,6 +20,8 @@ def generate_graph():
     g.edata['e'] = F.randn((17, D))
     return g
 
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_recv():
     u = F.tensor([0, 0, 0, 3, 4, 9])
     v = F.tensor([1, 2, 3, 9, 9, 0])
@@ -68,6 +71,8 @@ def test_inplace_recv():
     # test send_and_recv without apply_func
     _test(None)
 
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_snr():
     u = F.tensor([0, 0, 0, 3, 4, 9])
     v = F.tensor([1, 2, 3, 9, 9, 0])
@@ -127,6 +132,8 @@ def test_inplace_snr():
     # test send_and_recv without apply_func
     _test(None)
 
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_push():
     nodes = F.tensor([0, 3, 4, 9])
 
@@ -185,6 +192,8 @@ def test_inplace_push():
     # test send_and_recv without apply_func
     _test(None)
 
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_pull():
     nodes = F.tensor([1, 2, 3, 9])
 
@@ -243,6 +252,8 @@ def test_inplace_pull():
     # test send_and_recv without apply_func
     _test(None)
 
+
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
 def test_inplace_apply():
     def apply_node_func(nodes):
         return {'f': nodes.data['f'] * 2}
