@@ -17,7 +17,7 @@ def read_ip_config(filename):
 
     Format:
 
-        [server_id] [server_ip] [server_port]
+        [server_id] [ip] [port]
 
         0 172.31.40.143 50050
         1 172.31.36.140 50050
@@ -42,16 +42,20 @@ def read_ip_config(filename):
     assert len(filename) > 0, 'filename cannot be empty.'
 
     server_namebook = {}
-    lines = [line.rstrip('\n') for line in open(filename)]
-    for line in lines:
-        ID, ip, port = line.split(' ')
-        server_namebook[int(ID)] = ip+':'+port
+
+    try:
+        lines = [line.rstrip('\n') for line in open(filename)]
+        for line in lines:
+            ID, ip, port = line.split(' ')
+            server_namebook[int(ID)] = ip+':'+port
+    except:
+        print("Incorrect format IP configure file, the data format on each line should be: [server_id] [ip] [port]")
 
     return server_namebook
 
 
 def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None, edata_g2l=None):
-    """Start kvserver. 
+    """Start a kvserver node. 
 
     This function will be blocked by server.start() api.
 
@@ -60,18 +64,22 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     server_id : int
         ID of current server node (start from 0)
     ip_config : str
-        filename of server IP configuration
+        Filename of server IP configure file.
     num_client : int
-        total number of client nodes
-    ndata : dict of tensor
+        Total number of client nodes
+    ndata : dict of tensor (mx.ndarray or torch.tensor)
         node data
-    edata : dict of tensor
+    edata : dict of tensor (mx.ndarray or torch.tensor)
         edge data
-    ndata_g2l : tensor (mx.ndarray or torch.tensor)
+    ndata_g2l : dict of tensor (mx.ndarray or torch.tensor)
         global2local mapping of node data
-    edata_g2l : tensor (mx.ndarray or torch.tensor)
+    edata_g2l : dict of tensor (mx.ndarray or torch.tensor)
         global2local mapping of edge data
     """
+    assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
+    assert len(ip_config) > 0, 'ip_config cannot be empty.'
+    assert num_client > 0, 'num_client (%d) cnanot be a negative number.' % num_client
+
     server_namebook = read_ip_config(ip_config)
 
     server = KVServer(
@@ -85,37 +93,45 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     for name, data in edata.items():
         server.init_data(name=name, data_tensor=data)
 
-    for name, data in ndata_g2l.items():
-        server.set_global2local(name=name, global2local=data)
+    if ndata_g2l is not None:
+        for name, data in ndata_g2l.items():
+            server.set_global2local(name=name, global2local=data)
 
-    for name, data in edata_g2l.items():
-        server.set_global2local(name=name, global2local=data)
+    if edata_g2l is not None:
+        for name, data in edata_g2l.items():
+            server.set_global2local(name=name, global2local=data)
 
     print("start server %d on %s" % (server.get_id(), server.get_addr()))
 
     server.start()
 
 
-def start_client(ip_config, ndata_partition_book, edata_partition_book):
-    """Start kvclient
+def start_client(ip_config, ndata_partition_book, edata_partition_book, close_shared_mem=False):
+    """Start a kvclient node.
 
     Parameters
     ----------
     ip_config : str
-        filename of server IP configuration
+        Filename of server IP configure file.
     ndata_partition_book : dict of tensor (mx.ndarray or torch.tensor)
-        data mapping of node data ID to server ID
+        Data mapping of node ID to server ID
     edata_partition_book : dict of tensor (mx.ndarray or torch.tensor)
-        data mapping of edge data ID to server ID
+        Data mapping of edge ID to server ID
+    close_shared_mem : bool
+        Close local shared-memory tensor access.
         
     Returns
     -------
     KVClient
         client handle
     """
+    assert len(ip_config) > 0, 'ip_config cannot be empty.'
+    assert len(ndata_partition_book) > 0, 'ndata_partition_book cannot be empty.'
+    assert len(edata_partition_book) > 0, 'edata_partition_book cannot be empty.'
+
     server_namebook = read_ip_config(ip_config)
 
-    client = KVClient(server_namebook=server_namebook)
+    client = KVClient(server_namebook=server_namebook, close_shared_mem=close_shared_mem)
 
     for name, data in ndata_partition_book.items():
         client.set_partition_book(name=name, partition_book=data)
@@ -139,16 +155,16 @@ class KVServer(object):
 
     Note that, DO NOT use KVServer in multiple threads on Python because this behavior is not defined.
 
-    For now, KVServer can only run in CPU, we will support GPU KVServer in the future.
+    For now, KVServer can only run in CPU, and we will support GPU KVServer in the future.
 
     Parameters
     ----------
     server_id : int
-        KVServer's ID (start from 0).
+        ID of current kvserver node (start from 0).
     server_addr : str
         IP address and port of current KVServer node, e.g., '127.0.0.1:50051'.
     num_client : int
-        Total number of clients that will connect to server.
+        Total number of clients connecting to server.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
@@ -184,15 +200,15 @@ class KVServer(object):
 
 
     def set_global2local(self, name, global2local):
-        """Set a data mapping of global ID to local ID with data name.
+        """Set a data mapping of global ID to local ID.
 
         Parameters
         ----------
         name : str
             data name
         global2local : list or tensor (mx.ndarray or torch.tensor)
-            A book mapping of global ID to local ID. 
-            KVStore will use global ID automatically if this global2local is not been set.
+            A data mapping of global ID to local ID. KVStore will use global ID automatically 
+            if this global2local is not been set.
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert len(global2local) > 0, 'global2local cannot be empty.'
@@ -228,7 +244,7 @@ class KVServer(object):
 
 
     def get_id(self):
-        """Get server id
+        """Get current server id.
 
         Return
         ------
@@ -239,7 +255,7 @@ class KVServer(object):
 
 
     def get_addr(self):
-        """Get server IP address
+        """Get current server IP address
 
         Return
         ------
@@ -252,10 +268,11 @@ class KVServer(object):
     def start(self):
         """Start service of KVServer
         """
-        # Get connect with all client nodes
+        # Get connected with all client nodes
         server_ip, server_port = self._addr.split(':')
         _receiver_wait(self._receiver, server_ip, int(server_port), self._client_count)
 
+        # recv client addr and assign ID for clients
         addr_list = []
         for i in range(self._client_count):
             msg = _recv_kv_msg(self._receiver)
@@ -285,7 +302,7 @@ class KVServer(object):
                     data=None)
                 _send_kv_msg(self._sender, msg, client_id)
 
-            # send name of shared-memory tensor to clients
+            # send serilaized shared-memory tensor information to clients
             shared_tensor = ''
             for name in self._has_data:
                 shared_tensor += self._serialize_shared_tensor(
@@ -353,7 +370,7 @@ class KVServer(object):
     def _push_handler(self, name, ID, data, target):
         """Default handler for PUSH message. 
 
-        On default, _push_handler perform SET operation for the tensor.
+        On default, _push_handler perform SET operation on the target tensor.
 
         Parameters
         ----------
@@ -428,17 +445,19 @@ class KVServer(object):
         Parameters
         ----------
         addr_list : list of str
-            address list
+            IP address list
         """
         return addr_list.sort()
 
 
 class KVClient(object):
-    """KVClient is used to push/pull tensors to/from KVServer.
+    """KVClient is used to push/pull tensors to/from KVServer. If one server node and one client node
+    are on the same machine, they can commuincated using shared-memory tensor (close_shared_mem=False), 
+    instead of TCP/IP connections.
 
     Note that, DO NOT use KVClient in multiple threads on Python because this behavior is not defined.
 
-    For now, KVClient can only run in CPU, we will support GPU KVClient in the future.
+    For now, KVClient can only run in CPU, and we will support GPU KVClient in the future.
 
     Parameters
     ----------
@@ -449,12 +468,17 @@ class KVClient(object):
         { 0:'168.12.23.45:50051', 
           1:'168.12.23.21:50051', 
           2:'168.12.46.12:50051' }
+    close_shared_mem : bool
+        DO NOT use shared-memory access on local machine.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
-    def __init__(self, server_namebook, net_type='socket'):
+    def __init__(self, server_namebook, close_shared_mem=False, net_type='socket'):
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert net_type == 'socket' or net_type == 'mpi', 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
+
+        if close_shared_mem == True:
+            print("The shared-memory tensor has been closed, all data connections will go through TCP/IP network.")
 
         # check if target data has a ID mapping for global ID to local ID
         self._has_data = set()
@@ -465,6 +489,9 @@ class KVClient(object):
         # Server information
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
+        self._close_shared_mem = close_shared_mem
+        # client ID will be assign by server after connecting to server
+        self._client_id = -1
         # create C communicator of sender and receiver
         self._sender = _create_sender(net_type)
         self._receiver = _create_receiver(net_type)
@@ -479,9 +506,9 @@ class KVClient(object):
 
 
     def set_partition_book(self, name, partition_book):
-        """Initialize partition book for KVClient. 
-        Using partition book, client can know the corresponding server ID 
-        of each element in a target data tensor.
+        """Set partition book for KVClient. 
+
+        Using partition book, client can know the corresponded server ID of each data.
 
         Parameters
         ----------
@@ -542,13 +569,14 @@ class KVClient(object):
         data_str = msg.name.split('|')
         # open shared tensor on local machine
         for data in data_str:
-            if data != '':
+            if data != '' and self._close_shared_mem == False:
                 tensor_name, shape, dtype = self._deserialize_shared_tensor(data)
                 for server_id in self._local_server_id:
                     shared_data = empty_shared_mem(tensor_name+str(server_id), False, shape, dtype)
                     dlpack = shared_data.to_dlpack()
                     self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
                     self._has_data.add(tensor_name)
+
 
     def push(self, name, id_tensor, data_tensor):
         """Push message to KVServer.
@@ -584,7 +612,7 @@ class KVClient(object):
             partial_id = id_tensor[start:end]
             partial_data = data_tensor[start:end]
 
-            if server[idx] in self._local_server_id:
+            if server[idx] in self._local_server_id and self._close_shared_mem == False:
                 if (name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[name+'-g2l-'][partial_id]
                 else:
@@ -638,7 +666,7 @@ class KVClient(object):
                 continue
             partial_id = id_tensor[start:end]
 
-            if server[idx] in self._local_server_id:
+            if server[idx] in self._local_server_id and self._close_shared_mem == False:
                 if (name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[name+'-g2l-'][partial_id]
                 else:
