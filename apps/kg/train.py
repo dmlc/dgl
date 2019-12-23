@@ -1,18 +1,19 @@
 from dataloader import EvalDataset, TrainDataset, NewBidirectionalOneShotIterator
 from dataloader import get_dataset
-import torch.multiprocessing as mp
 
 import argparse
 import os
 import logging
 import time
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
+    import multiprocessing as mp
     from train_mxnet import load_model
     from train_mxnet import train
     from train_mxnet import test
 else:
+    import torch.multiprocessing as mp
     from train_pytorch import load_model
     from train_pytorch import train
     from train_pytorch import test
@@ -22,8 +23,8 @@ class ArgParser(argparse.ArgumentParser):
         super(ArgParser, self).__init__()
 
         self.add_argument('--model_name', default='TransE',
-                          choices=['TransE', 'TransH', 'TransR', 'TransD',
-                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE'],
+                          choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransR',
+                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE'],
                           help='model to use')
         self.add_argument('--data_path', type=str, default='data',
                           help='root path of all dataset')

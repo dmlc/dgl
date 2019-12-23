@@ -280,7 +280,7 @@ class LazyDict(Mapping):
         self._keys = keys
 
     def __getitem__(self, key):
-        if not key in self._keys:
+        if key not in self._keys:
             raise KeyError(key)
         return self._fn(key)
 
@@ -384,7 +384,7 @@ def build_relabel_map(x, is_sorted=False):
         unique_x = x
     map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
-    F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
+    old_to_new = F.scatter_row(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
 def build_relabel_dict(x):
@@ -422,7 +422,7 @@ class CtxCachedObject(object):
         self._ctx_dict = {}
 
     def __call__(self, ctx):
-        if not ctx in self._ctx_dict:
+        if ctx not in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
 
@@ -445,7 +445,7 @@ def cached_member(cache, prefix):
         def wrapper(self, *args):
             dic = getattr(self, cache)
             key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
-            if not key in dic:
+            if key not in dic:
                 dic[key] = func(self, *args)
             return dic[key]
         return wrapper

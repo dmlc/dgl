@@ -26,6 +26,7 @@ Currently supported model architectures:
 * MPNN
 * SchNet
 * MGCN
+* AttentiveFP
 
 .. autoclass:: dgl.model_zoo.chem.GCNClassifier
     :members: forward
@@ -42,6 +43,9 @@ Currently supported model architectures:
 .. autoclass:: dgl.model_zoo.chem.MGCNModel
     :members: forward
 
+.. autoclass:: dgl.model_zoo.chem.AttentiveFP
+    :members: forward
+
 Generative Models
 `````````````````
 
@@ -54,4 +58,14 @@ Currently supported model architectures:
     :members: forward
 
 .. autoclass:: dgl.model_zoo.chem.DGLJTNNVAE
+    :members: forward
+
+Protein Ligand Binding
+``````````````````````
+
+Currently supported model architectures:
+
+* ACNN
+
+.. autoclass:: dgl.model_zoo.chem.ACNN
     :members: forward

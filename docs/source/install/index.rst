@@ -1,37 +1,35 @@
 Install DGL
 ============
 
-At this stage, we recommend installing DGL from ``conda`` or ``pip``.
+This topic explains how to install DGL. We recommend installing DGL by using ``conda`` or ``pip``.
 
 System requirements
 -------------------
-Currently DGL is tested on
+DGL works with the following operating systems:
 
 * Ubuntu 16.04
 * macOS X
 * Windows 10
 
-DGL is expected to work on all Linux distributions later than Ubuntu 16.04, macOS X, and
-Windows 10.
+DGL requires Python version 3.5 or later. Python 3.4 or earlier is not
+tested. Python 2 support is coming.
 
-DGL also requires the Python version to be 3.5 or later.  Python 3.4 or less is not
-tested, and Python 2 support is coming.
+DGL supports multiple tensor libraries as backends, e.g., PyTorch, MXNet. For requirements on backends and how to select one, see
+`Working with different backends`_.
 
-DGL supports multiple tensor libraries (e.g. PyTorch, MXNet) as backends; refer
-`Working with different backends`_ for requirements on backends and how to select a
-backend.
-
-Starting from 0.3 DGL is separated into CPU and CUDA builds.  The builds share the
-same Python package name, so installing DGL with CUDA 9 build after installing the
-CPU build will overwrite the latter.
+Starting at version 0.3, DGL is separated into CPU and CUDA builds.  The builds share the
+same Python package name. If you install DGL with a CUDA 9 build after you install the
+CPU build, then the CPU build is overwritten.
 
 Install from conda
 ----------------------
-One can either grab `miniconda <https://conda.io/miniconda.html>`_ or
-the full `anaconda <https://www.anaconda.com/download/>`_ if ``conda``
-has not been installed.
+If ``conda`` is not yet installed, get either `miniconda <https://conda.io/miniconda.html>`_ or
+the full `anaconda <https://www.anaconda.com/download/>`_.
 
-Once the conda environment is activated, run
+With ``conda`` installed, you will want install DGL into Python 3.5 ``conda`` environment.
+Run `conda create -n dgl python=3.5` to create the environment.
+Activate the environment by running `source activate dgl`.
+After the ``conda`` environment is activated, run one of the following commands.
 
 .. code:: bash
 
@@ -41,13 +39,13 @@ Once the conda environment is activated, run
 
 Install from pip
 ----------------
-For CPU builds, one can simply run the following command to install via ``pip``:
+For CPU builds, run the following command to install with ``pip``.
 
 .. code:: bash
 
    pip install dgl
    
-For CUDA builds, one needs to specify the CUDA version:
+For CUDA builds, run one of the following commands and specify the CUDA version.
 
 .. code:: bash
 
@@ -56,7 +54,7 @@ For CUDA builds, one needs to specify the CUDA version:
    pip install dgl-cu92      # For CUDA 9.2 Build
    pip install dgl-cu100     # For CUDA 10.0 Build
 
-We also provides nightly build from master branch, you can install it by:
+For the most current nightly build from master branch, run one of the following commands.
 
 .. code:: bash
 
@@ -69,27 +67,27 @@ We also provides nightly build from master branch, you can install it by:
 Working with different backends
 -------------------------------
 
-Currently DGL supports PyTorch and MXNet.
+DGL supports PyTorch and MXNet. Here's how to change them.
 
 Switching backend
 `````````````````
 
 The backend is controlled by ``DGLBACKEND`` environment variable, which defaults to
-``pytorch``.  Currently it supports the following values:
+``pytorch``.  The following values are supported.
 
 +---------+---------+--------------------------------------------------+
-| Value   | Backend | Memo                                             |
+| Value   | Backend | Constraints                                      |
 +=========+=========+==================================================+
-| pytorch | PyTorch | Requires 0.4.1 or later; see                     |
-|         |         | `official website <https://pytorch.org>`_        |
+| pytorch | PyTorch | Requires 0.4.1 or later. See                     |
+|         |         | `pytorch.org <https://pytorch.org>`_             |
 +---------+---------+--------------------------------------------------+
-| mxnet   | MXNet   | Requires MXNet 1.5                               |
+| mxnet   | MXNet   | Requires either MXNet 1.5 for CPU                   |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
 |         |         |    pip install mxnet                             |
 |         |         |                                                  |
-|         |         | or cuda version (e.g. for cuda 9.0)              |
+|         |         | or MXNet for GPU with CUDA version, e.g. for CUDA 9.2               |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
@@ -103,13 +101,13 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 
 Install from source
 -------------------
-First, download the source files from GitHub:
+Download the source files from GitHub.
 
 .. code:: bash
 
    git clone --recursive https://github.com/dmlc/dgl.git
 
-One can also clone the repository first and run the following:
+(Optional) Clone the repository first, and then run the following:
 
 .. code:: bash
 
@@ -119,13 +117,13 @@ One can also clone the repository first and run the following:
 Linux
 `````
 
-Install the system packages for building the shared library, for Debian/Ubuntu
+Install the system packages for building the shared library. For Debian and Ubuntu
 users, run:
 
 .. code:: bash
 
    sudo apt-get update
-   sudo apt-get install -y build-essential build-dep python3-dev make cmake
+   sudo apt-get install -y build-essential python3-dev make cmake
 
 For Fedora/RHEL/CentOS users, run:
 
@@ -136,17 +134,17 @@ For Fedora/RHEL/CentOS users, run:
 Build the shared library. Use the configuration template ``cmake/config.cmake``.
 Copy it to either the project directory or the build directory and change the
 configuration as you wish. For example, change ``USE_CUDA`` to ``ON`` will
-enable cuda build. You could also pass ``-DKEY=VALUE`` to the cmake command
+enable a CUDA build. You could also pass ``-DKEY=VALUE`` to the cmake command
 for the same purpose.
 
-- CPU-only build:
+- CPU-only build
    .. code:: bash
 
       mkdir build
       cd build
       cmake ..
       make -j4
-- Cuda build:
+- CUDA build
    .. code:: bash
 
       mkdir build
@@ -164,53 +162,48 @@ Finally, install the Python binding.
 macOS
 `````
 
-Installation on macOS is similar to Linux. But macOS users need to install
-building tools like clang, GNU Make, cmake first.
+Installation on macOS is similar to Linux. But macOS users need to install build tools like clang, GNU Make, and cmake first. These installation steps were tested on macOS X with clang 10.0.0, GNU Make 3.81, and cmake 3.13.1.
 
 Tools like clang and GNU Make are packaged in **Command Line Tools** for macOS. To
-install:
+install, run the following:
 
 .. code:: bash
 
    xcode-select --install
 
 To install other needed packages like cmake, we recommend first installing
-**Homebrew**, which is a popular package manager for macOS. Detailed
-instructions can be found on its `homepage <https://brew.sh/>`_.
+**Homebrew**, which is a popular package manager for macOS. To learn more, see the `Homebrew website <https://brew.sh/>`_.
 
-After installation of Homebrew, install cmake by:
+After you install Homebrew, install cmake.
 
 .. code:: bash
 
    brew install cmake
 
-Then go to root directory of DGL repository, build shared library and
-install Python binding for DGL:
+Go to root directory of the DGL repository, build a shared library, and
+install the Python binding for DGL.
 
 .. code:: bash
 
    mkdir build
    cd build
-   cmake ..
+   cmake -DUSE_OPENMP=off ..
    make -j4
    cd ../python
    python setup.py install
 
-We tested installation on macOS X with clang 10.0.0, GNU Make 3.81, and cmake
-3.13.1.
-
 Windows
 ```````
 
-Currently Windows source build is tested with CMake and MinGW/GCC.  We highly recommend
+The Windows source build is tested with CMake and MinGW/GCC.  We highly recommend
 using CMake and GCC from `conda installations <https://conda.io/miniconda.html>`_.  To
-do so, run
+get started, run the following:
 
 .. code:: bash
 
    conda install cmake m2w64-gcc m2w64-make
 
-Then build the shared library and install the Python binding:
+Build the shared library and install the Python binding.
 
 .. code::
 
@@ -221,9 +214,9 @@ Then build the shared library and install the Python binding:
    cd ..\python
    python setup.py install
 
-We also support building DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/fwlink/?linkid=840931>`_
+You can also build DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/fwlink/?linkid=840931>`_
 and `CMake on Windows <https://cmake.org/download/>`_ installed, run the following
-in VS2017 x64 Native tools command prompt:
+in VS2017 x64 Native tools command prompt.
 
 .. code::
 

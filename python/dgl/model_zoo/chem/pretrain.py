@@ -1,5 +1,6 @@
 """Utilities for using pretrained models."""
 import os
+import numpy as np
 import torch
 from rdkit import Chem
 
@@ -9,19 +10,22 @@ from .dgmg import DGMG
 from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .schnet import SchNet
+from .attentive_fp import AttentiveFP
+from .acnn import ACNN
 from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 
 URL = {
-    'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
-    'GAT_Tox21' : 'pre_trained/gat_tox21.pth',
+    'GCN_Tox21': 'pre_trained/gcn_tox21.pth',
+    'GAT_Tox21': 'pre_trained/gat_tox21.pth',
     'MGCN_Alchemy': 'pre_trained/mgcn_alchemy.pth',
     'SCHNET_Alchemy': 'pre_trained/schnet_alchemy.pth',
     'MPNN_Alchemy': 'pre_trained/mpnn_alchemy.pth',
-    'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
-    'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
-    'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
-    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
-    'JTNN_ZINC':'pre_trained/JTNN_ZINC.pth'
+    'AttentiveFP_Aromaticity': 'pre_trained/attentivefp_aromaticity.pth',
+    'DGMG_ChEMBL_canonical': 'pre_trained/dgmg_ChEMBL_canonical.pth',
+    'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
+    'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
+    'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
+    'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -54,6 +58,9 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
     checkpoint = torch.load(local_pretrained_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
 
+    if log:
+        print('Pretrained model loaded')
+
     return model
 
 def load_pretrained(model_name, log=True):
@@ -69,11 +76,20 @@ def load_pretrained(model_name, log=True):
         * ``'MGCN_Alchemy'``
         * ``'SCHNET_Alchemy'``
         * ``'MPNN_Alchemy'``
+        * ``'AttentiveFP_Aromaticity'``
         * ``'DGMG_ChEMBL_canonical'``
         * ``'DGMG_ChEMBL_random'``
         * ``'DGMG_ZINC_canonical'``
         * ``'DGMG_ZINC_random'``
         * ``'JTNN_ZINC'``
+        * ``'ACNN_PDBBind_core_pocket_random'``
+        * ``'ACNN_PDBBind_core_pocket_scaffold'``
+        * ``'ACNN_PDBBind_core_pocket_stratified'``
+        * ``'ACNN_PDBBind_core_pocket_temporal'``
+        * ``'ACNN_PDBBind_refined_pocket_random'``
+        * ``'ACNN_PDBBind_refined_pocket_scaffold'``
+        * ``'ACNN_PDBBind_refined_pocket_stratified'``
+        * ``'ACNN_PDBBind_refined_pocket_temporal'``
 
     log : bool
         Whether to print progress for model loading
@@ -122,6 +138,15 @@ def load_pretrained(model_name, log=True):
     elif model_name == 'MPNN_Alchemy':
         model = MPNNModel(output_dim=12)
 
+    elif model_name == 'AttentiveFP_Aromaticity':
+        model = AttentiveFP(node_feat_size=39,
+                            edge_feat_size=10,
+                            num_layers=2,
+                            num_timesteps=2,
+                            graph_feat_size=200,
+                            output_size=1,
+                            dropout=0.2)
+
     elif model_name == "JTNN_ZINC":
         default_dir = get_download_dir()
         vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
@@ -135,7 +160,13 @@ def load_pretrained(model_name, log=True):
                            hidden_size=450,
                            latent_size=56)
 
-    if log:
-        print('Pretrained model loaded')
+    elif model_name.startswith('ACNN_PDBBind_core_pocket'):
+        model = ACNN(hidden_sizes=[32, 32, 16],
+                     weight_init_stddevs=[1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
+                                          1. / float(np.sqrt(16)), 0.01],
+                     dropouts=[0., 0., 0.],
+                     features_to_use=torch.tensor([
+                         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
+                     radial=[[12.0], [0.0, 4.0, 8.0], [4.0]])
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

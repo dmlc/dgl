@@ -448,7 +448,7 @@ def get_atom_and_bond_types(smiles, log=True):
 
     for i, s in enumerate(smiles):
         if log:
-            print('Processing smile {:d}/{:d}'.format(i + 1, n_smiles))
+            print('Processing smiles {:d}/{:d}'.format(i + 1, n_smiles))
 
         mol = smiles_to_standard_mol(s)
         if mol is None:
@@ -517,7 +517,7 @@ def eval_decisions(env, decisions):
     return env.get_current_smiles()
 
 def get_DGMG_smile(env, mol):
-    """Mimics the reproduced SMILE with DGMG for a molecule.
+    """Mimics the reproduced SMILES with DGMG for a molecule.
 
     Given a molecule, we are interested in what SMILES we will
     get if we want to generate it with DGMG. This is an important

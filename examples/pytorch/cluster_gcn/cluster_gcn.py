@@ -4,6 +4,7 @@ import time
 import random
 
 import numpy as np
+import networkx as nx
 import sklearn.preprocessing
 import torch
 import torch.nn as nn
@@ -12,7 +13,7 @@ from dgl import DGLGraph
 from dgl.data import register_data_args
 from torch.utils.tensorboard import SummaryWriter
 
-from modules import GCNCluster, GraphSAGE
+from modules import GraphSAGE
 from sampler import ClusterIter
 from utils import Logger, evaluate, save_log_dir, load_data
 
@@ -24,16 +25,13 @@ def main(args):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    multitask_data = set(['ppi', 'amazon', 'amazon-0.1',
-                          'amazon-0.3', 'amazon2M', 'amazon2M-47'])
-
+    multitask_data = set(['ppi'])
     multitask = args.dataset in multitask_data
 
     # load and preprocess dataset
     data = load_data(args)
 
     train_nid = np.nonzero(data.train_mask)[0].astype(np.int64)
-    test_nid = np.nonzero(data.test_mask)[0].astype(np.int64)
 
     # Normalize features
     if args.normalize:
@@ -49,16 +47,21 @@ def main(args):
         labels = torch.LongTensor(data.labels)
     else:
         labels = torch.FloatTensor(data.labels)
-    train_mask = torch.ByteTensor(data.train_mask).type(torch.bool)
-    val_mask = torch.ByteTensor(data.val_mask).type(torch.bool)
-    test_mask = torch.ByteTensor(data.test_mask).type(torch.bool)
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = torch.BoolTensor(data.train_mask)
+        val_mask = torch.BoolTensor(data.val_mask)
+        test_mask = torch.BoolTensor(data.test_mask)
+    else:
+        train_mask = torch.ByteTensor(data.train_mask)
+        val_mask = torch.ByteTensor(data.val_mask)
+        test_mask = torch.ByteTensor(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
-    n_train_samples = train_mask.sum().item()
-    n_val_samples = val_mask.sum().item()
-    n_test_samples = test_mask.sum().item()
+    n_train_samples = train_mask.int().sum().item()
+    n_val_samples = val_mask.int().sum().item()
+    n_test_samples = test_mask.int().sum().item()
 
     print("""----Data statistics------'
     #Edges %d
@@ -73,7 +76,7 @@ def main(args):
     # create GCN model
     g = data.graph
     if args.self_loop and not args.dataset.startswith('reddit'):
-        g.remove_edges_from(g.selfloop_edges())
+        g.remove_edges_from(nx.selfloop_edges(g))
         g.add_edges_from(zip(g.nodes(), g.nodes()))
         print("adding self-loop edges")
     g = DGLGraph(g, readonly=True)
@@ -102,16 +105,13 @@ def main(args):
 
     print("features shape, ", features.shape)
 
-    model_sel = {'GCN': GCNCluster, 'graphsage': GraphSAGE}
-    model_class = model_sel[args.model_type]
-    print('using model:', model_class)
-
-    model = model_class(in_feats,
-                        args.n_hidden,
-                        n_classes,
-                        args.n_layers,
-                        F.relu,
-                        args.dropout, args.use_pp)
+    model = GraphSAGE(in_feats,
+                      args.n_hidden,
+                      n_classes,
+                      args.n_layers,
+                      F.relu,
+                      args.dropout,
+                      args.use_pp)
 
     if cuda:
         model.cuda()
@@ -134,9 +134,6 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=args.lr,
                                  weight_decay=args.weight_decay)
-
-    # initialize graph
-    dur = []
 
     # set train_nids to cuda tensor
     if cuda:
@@ -164,7 +161,8 @@ def main(args):
             # in PPI case, `log_every` is chosen to log one time per epoch. 
             # Choose your log freq dynamically when you want more info within one epoch
             if j % args.log_every == 0:
-                print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/{len(cluster_iterator)}:training loss", loss.item())
+                print(f"epoch:{epoch}/{args.n_epochs}, Iteration {j}/"
+                      f"{len(cluster_iterator)}:training loss", loss.item())
                 writer.add_scalar('train/loss', loss.item(),
                                   global_step=j + epoch * len(cluster_iterator))
         print("current memory:",
@@ -193,11 +191,9 @@ def main(args):
             log_dir, 'best_model.pkl')))
     test_f1_mic, test_f1_mac = evaluate(
         model, g, labels, test_mask, multitask)
-    print(
-        "Test F1-mic{:.4f}, Test F1-mac{:.4f}". format(test_f1_mic, test_f1_mac))
+    print("Test F1-mic{:.4f}, Test F1-mac{:.4f}". format(test_f1_mic, test_f1_mac))
     writer.add_scalar('test/f1-mic', test_f1_mic)
     writer.add_scalar('test/f1-mac', test_f1_mac)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -236,8 +232,6 @@ if __name__ == '__main__':
                         help="whether to use validated best model to test")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
-    parser.add_argument("--model-type", type=str, default='GCN',
-                        help="model to be used")
     parser.add_argument("--note", type=str, default='none',
                         help="note for log dir")
 

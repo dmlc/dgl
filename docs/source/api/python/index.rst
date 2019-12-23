@@ -5,8 +5,10 @@ API Reference
    :maxdepth: 2
 
    graph
+   heterograph
    init
    batch
+   batch_heterograph
    function
    traversal
    propagate

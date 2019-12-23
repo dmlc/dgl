@@ -3,7 +3,6 @@ import numpy as np
 
 def _download_and_extract(url, path, filename):
     import shutil, zipfile
-    from tqdm import tqdm
     import requests
 
     fn = os.path.join(path, filename)
@@ -20,7 +19,7 @@ def _download_and_extract(url, path, filename):
             sz = f_remote.headers.get('content-length')
             assert f_remote.status_code == 200, 'fail to open {}'.format(url)
             with open(fn, 'wb') as writer:
-                for chunk in tqdm(f_remote.iter_content(chunk_size=1024*1024)):
+                for chunk in f_remote.iter_content(chunk_size=1024*1024):
                     writer.write(chunk)
             print('Download finished. Unzipping the file...')
 

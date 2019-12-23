@@ -1,8 +1,6 @@
 """
 Graph Attention Networks in DGL using SPMV optimization.
 Multiple heads are also batched together for faster training.
-Compared with the original paper, this code does not implement
-early stopping.
 References
 ----------
 Paper: https://arxiv.org/abs/1710.10903
@@ -12,6 +10,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 
 import argparse
 import numpy as np
+import networkx as nx
 import time
 import torch
 import torch.nn.functional as F
@@ -41,9 +40,14 @@ def main(args):
     data = load_data(args)
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    train_mask = torch.ByteTensor(data.train_mask)
-    val_mask = torch.ByteTensor(data.val_mask)
-    test_mask = torch.ByteTensor(data.test_mask)
+    if hasattr(torch, 'BoolTensor'):
+        train_mask = torch.BoolTensor(data.train_mask)
+        val_mask = torch.BoolTensor(data.val_mask)
+        test_mask = torch.BoolTensor(data.test_mask)
+    else:
+        train_mask = torch.ByteTensor(data.train_mask)
+        val_mask = torch.ByteTensor(data.val_mask)
+        test_mask = torch.ByteTensor(data.test_mask)
     num_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -54,9 +58,9 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-           train_mask.sum().item(),
-           val_mask.sum().item(),
-           test_mask.sum().item()))
+           train_mask.int().sum().item(),
+           val_mask.int().sum().item(),
+           test_mask.int().sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -71,7 +75,7 @@ def main(args):
 
     g = data.graph
     # add self loop
-    g.remove_edges_from(g.selfloop_edges())
+    g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
     n_edges = g.number_of_edges()
@@ -89,7 +93,8 @@ def main(args):
                 args.negative_slope,
                 args.residual)
     print(model)
-    stopper = EarlyStopping(patience=100)
+    if args.early_stop:
+        stopper = EarlyStopping(patience=100)
     if cuda:
         model.cuda()
     loss_fcn = torch.nn.CrossEntropyLoss()
@@ -121,8 +126,9 @@ def main(args):
             val_acc = accuracy(logits[val_mask], labels[val_mask])
         else:
             val_acc = evaluate(model, features, labels, val_mask)
-            if stopper.step(val_acc, model):   
-                break
+            if args.early_stop:
+                if stopper.step(val_acc, model):   
+                    break
 
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | TrainAcc {:.4f} |"
               " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".
@@ -130,7 +136,8 @@ def main(args):
                      val_acc, n_edges / np.mean(dur) / 1000))
 
     print()
-    model.load_state_dict(torch.load('es_checkpoint.pt'))
+    if args.early_stop:
+        model.load_state_dict(torch.load('es_checkpoint.pt'))
     acc = evaluate(model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(acc))
 
@@ -163,6 +170,8 @@ if __name__ == '__main__':
                         help="weight decay")
     parser.add_argument('--negative-slope', type=float, default=0.2,
                         help="the negative slope of leaky relu")
+    parser.add_argument('--early-stop', action='store_true', default=False,
+                        help="indicates whether to use early stop or not")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
     args = parser.parse_args()
