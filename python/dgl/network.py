@@ -31,27 +31,31 @@ def _network_wait():
     """
     time.sleep(_WAIT_TIME_SEC)
 
-def _create_sender(net_type):
+def _create_sender(net_type, msg_queue_size=2000*1024*1024*1024):
     """Create a Sender communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLSenderCreate(net_type)
+    return _CAPI_DGLSenderCreate(net_type, msg_queue_size)
 
-def _create_receiver(net_type):
+def _create_receiver(net_type, msg_queue_size=2000*1024*1024*1024):
     """Create a Receiver communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLReceiverCreate(net_type)
+    return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
 def _finalize_sender(sender):
     """Finalize Sender communicator
@@ -188,6 +192,7 @@ class KVMsgType(Enum):
     PULL = 4
     PULL_BACK = 5
     BARRIER = 6
+    IP_ID = 7
 
 KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
 """Message of DGL kvstore
@@ -227,6 +232,13 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id)
+    elif msg.type == KVMsgType.IP_ID:
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank,
+            msg.name)
     elif msg.type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         _CAPI_SenderSendKVMsg(
             sender,
@@ -269,6 +281,15 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
+            data=None)
+        return msg
+    elif msg_type == KVMsgType.IP_ID:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=None,
             data=None)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
