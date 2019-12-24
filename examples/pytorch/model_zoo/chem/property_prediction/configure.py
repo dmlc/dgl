@@ -6,11 +6,14 @@ from functools import partial
 from utils import chirality
 
 GCN_Tox21 = {
+    'random_seed': 0,
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
     'atom_data_field': 'h',
-    'train_val_test_split': [0.8, 0.1, 0.1],
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
     'in_feats': 74,
     'gcn_hidden_feats': [64, 64],
     'classifier_hidden_feats': 64,
@@ -20,11 +23,14 @@ GCN_Tox21 = {
 }
 
 GAT_Tox21 = {
+    'random_seed': 0,
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
     'atom_data_field': 'h',
-    'train_val_test_split': [0.8, 0.1, 0.1],
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
     'in_feats': 74,
     'gat_hidden_feats': [32, 32],
     'classifier_hidden_feats': 64,
@@ -35,6 +41,7 @@ GAT_Tox21 = {
 }
 
 MPNN_Alchemy = {
+    'random_seed': 0,
     'batch_size': 16,
     'num_epochs': 250,
     'node_in_feats': 15,
@@ -47,6 +54,7 @@ MPNN_Alchemy = {
 }
 
 SCHNET_Alchemy = {
+    'random_seed': 0,
     'batch_size': 16,
     'num_epochs': 250,
     'norm': True,
@@ -58,6 +66,7 @@ SCHNET_Alchemy = {
 }
 
 MGCN_Alchemy = {
+    'random_seed': 0,
     'batch_size': 16,
     'num_epochs': 250,
     'norm': True,
@@ -81,7 +90,9 @@ AttentiveFP_Aromaticity = {
     'lr': 10 ** (-2.5),
     'batch_size': 128,
     'num_epochs': 800,
-    'train_val_test_split': [0.8, 0.1, 0.1],
+    'frac_train': 0.8,
+    'frac_val': 0.1,
+    'frac_test': 0.1,
     'patience': 80,
     'metric_name': 'rmse',
     # Follow the atom featurization in the original work

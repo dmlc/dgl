@@ -1,5 +1,5 @@
 #!/bin/bash
-
+. /opt/conda/etc/profile.d/conda.sh
 KG_DIR="./apps/kg/"
 
 function fail {
@@ -31,12 +31,12 @@ export DGLBACKEND=$1
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=${PWD}/python:$KG_DIR:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
-
+conda activate ${DGLBACKEND}-ci
 # test
 
 pushd $KG_DIR> /dev/null
 
-python3 -m nose -v --with-xunit tests/test_score.py || fail "run test_score.py on $1"
+python3 -m pytest tests/test_score.py || fail "run test_score.py on $1"
 
 if [ "$2" == "cpu" ]; then
     # verify CPU training DistMult

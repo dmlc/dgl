@@ -264,7 +264,7 @@ class DGLHeteroGraph(object):
                    '      metagraph={meta})')
             nnode_dict = {self.ntypes[i] : self._graph.number_of_nodes(i)
                           for i in range(len(self.ntypes))}
-            nedge_dict = {self.etypes[i] : self._graph.number_of_edges(i)
+            nedge_dict = {self.canonical_etypes[i] : self._graph.number_of_edges(i)
                           for i in range(len(self.etypes))}
             meta = str(self.metagraph.edges())
             return ret.format(node=nnode_dict, edge=nedge_dict, meta=meta)
@@ -1501,7 +1501,7 @@ class DGLHeteroGraph(object):
         >>> sub_g = g.subgraph({'user': [1, 2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 0},
-              num_edges={'plays': 0, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 0, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
@@ -1582,7 +1582,7 @@ class DGLHeteroGraph(object):
         >>>                          ('user', 'plays', 'game'): [2]})
         >>> print(sub_g)
         Graph(num_nodes={'user': 2, 'game': 1},
-              num_edges={'plays': 1, 'follows': 2},
+              num_edges={('user', 'plays', 'game'): 1, ('user', 'follows', 'user'): 2},
               metagraph=[('user', 'game'), ('user', 'user')])
 
         Get the original node/edge indices.
@@ -2383,7 +2383,7 @@ class DGLHeteroGraph(object):
         etid = self.get_etype_id(etype)
         stid, dtid = self._graph.metagraph.find_edge(etid)
         if is_all(edges):
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
             eid = utils.toindex(slice(0, self.number_of_edges(etype)))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -2468,7 +2468,7 @@ class DGLHeteroGraph(object):
 
         if is_all(edges):
             eid = utils.toindex(slice(0, self._graph.number_of_edges(etid)))
-            u, v, _ = self._graph.edges(etid)
+            u, v, _ = self._graph.edges(etid, 'eid')
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -3575,6 +3575,11 @@ class DGLHeteroGraph(object):
         ctx : framework-specific context object
             The context to move data to.
 
+        Returns
+        -------
+        g : DGLHeteroGraph
+          Moved DGLHeteroGraph of the targeted mode.
+
         Examples
         --------
         The following example uses PyTorch backend.
@@ -3583,7 +3588,7 @@ class DGLHeteroGraph(object):
         >>> g = dgl.bipartite([(0, 0), (1, 0), (1, 2), (2, 1)], 'user', 'plays', 'game')
         >>> g.nodes['user'].data['h'] = torch.tensor([[0.], [1.], [2.]])
         >>> g.edges['plays'].data['h'] = torch.tensor([[0.], [1.], [2.], [3.]])
-        >>> g.to(torch.device('cuda:0'))
+        >>> g = g.to(torch.device('cuda:0'))
         """
         for i in range(len(self._node_frames)):
             for k in self._node_frames[i].keys():
@@ -3591,6 +3596,7 @@ class DGLHeteroGraph(object):
         for i in range(len(self._edge_frames)):
             for k in self._edge_frames[i].keys():
                 self._edge_frames[i][k] = F.copy_to(self._edge_frames[i][k], ctx)
+        return self
 
     def local_var(self):
         """Return a heterograph object that can be used in a local function scope.

@@ -1016,7 +1016,8 @@ def _build_idx_map(idx, nbits):
     x = idx.tousertensor()
     map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
     old_to_new = F.full_1d(map_len, -1, dtype=F.int64, ctx=F.cpu())
-    F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
+    # Use out-place update due to tensorflow compatibility
+    old_to_new = F.scatter_row(old_to_new, x, F.arange(0, len(x)))
     old_to_new = utils.to_nbits_int(old_to_new, nbits)
     old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
     return utils.CtxCachedObject(lambda ctx: nd.array(old_to_new, ctx=ctx))

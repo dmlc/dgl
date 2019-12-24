@@ -58,7 +58,8 @@ class NodeApplyModule(nn.Module):
 
     def forward(self, node):
         h = self.linear(node.data['h'])
-        h = self.activation(h)
+        if self.activation is not None:
+            h = self.activation(h)
         return {'h' : h}
 
 ###############################################################################
@@ -82,13 +83,14 @@ class GCN(nn.Module):
 # model in PyTorch.  We can initialize GCN like any ``nn.Module``. For example,
 # let's define a simple neural network consisting of two GCN layers. Suppose we
 # are training the classifier for the cora dataset (the input feature size is
-# 1433 and the number of classes is 7).
+# 1433 and the number of classes is 7). The last GCN layer computes node embeddings,
+# so the last layer in general doesn't apply activation.
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         self.gcn1 = GCN(1433, 16, F.relu)
-        self.gcn2 = GCN(16, 7, F.relu)
+        self.gcn2 = GCN(16, 7, None)
     
     def forward(self, g, features):
         x = self.gcn1(g, features)
@@ -106,29 +108,45 @@ def load_cora_data():
     data = citegrh.load_cora()
     features = th.FloatTensor(data.features)
     labels = th.LongTensor(data.labels)
-    mask = th.ByteTensor(data.train_mask)
+    train_mask = th.ByteTensor(data.train_mask)
+    test_mask = th.ByteTensor(data.test_mask)
     g = data.graph
     # add self loop
     g.remove_edges_from(nx.selfloop_edges(g))
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
-    return g, features, labels, mask
+    return g, features, labels, train_mask, test_mask
+
+###############################################################################
+# When a model is trained, we can use the following method to evaluate
+# the performance of the model on the test dataset:
+
+def evaluate(model, g, features, labels, mask):
+    model.eval()
+    with th.no_grad():
+        logits = model(g, features)
+        logits = logits[mask]
+        labels = labels[mask]
+        _, indices = th.max(logits, dim=1)
+        correct = th.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
 
 ###############################################################################
 # We then train the network as follows:
 
 import time
 import numpy as np
-g, features, labels, mask = load_cora_data()
+g, features, labels, train_mask, test_mask = load_cora_data()
 optimizer = th.optim.Adam(net.parameters(), lr=1e-3)
 dur = []
-for epoch in range(30):
+for epoch in range(50):
     if epoch >=3:
         t0 = time.time()
-        
+
+    net.train()
     logits = net(g, features)
     logp = F.log_softmax(logits, 1)
-    loss = F.nll_loss(logp[mask], labels[mask])
+    loss = F.nll_loss(logp[train_mask], labels[train_mask])
     
     optimizer.zero_grad()
     loss.backward()
@@ -137,8 +155,9 @@ for epoch in range(30):
     if epoch >=3:
         dur.append(time.time() - t0)
     
-    print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f}".format(
-            epoch, loss.item(), np.mean(dur)))
+    acc = evaluate(net, g, features, labels, test_mask)
+    print("Epoch {:05d} | Loss {:.4f} | Test Acc {:.4f} | Time(s) {:.4f}".format(
+            epoch, loss.item(), acc, np.mean(dur)))
 
 ###############################################################################
 # .. _math:
