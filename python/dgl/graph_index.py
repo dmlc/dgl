@@ -542,6 +542,32 @@ class GraphIndex(ObjectBase):
         v_array = v.todgltensor()
         return _CAPI_DGLGraphVertexSubgraph(self, v_array)
 
+    def node_halo_subgraph(self, v, num_hops):
+        """Return an induced subgraph with halo nodes.
+
+        Parameters
+        ----------
+        v : utils.Index
+            The nodes.
+
+        num_hops : int
+            The number of hops in which a HALO node can be accessed.
+
+        Returns
+        -------
+        SubgraphIndex
+            The subgraph index.
+        DGLTensor
+            Indicate if a node belongs to a partition.
+        DGLTensor
+            Indicate if an edge belongs to a partition.
+        """
+        v_array = v.todgltensor()
+        subg = _CAPI_DGLGetSubgraphWithHalo(self, v_array, num_hops)
+        inner_nodes = _CAPI_GetHaloSubgraphInnerNodes(subg)
+        inner_edges = _CAPI_GetHaloSubgraphInnerEdges(subg)
+        return subg, inner_nodes, inner_edges
+
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
 
@@ -1281,5 +1307,11 @@ def create_graph_index(graph_data, multigraph, readonly):
             raise DGLError('Error while creating graph from input of type "%s".'
                            % type(graph_data))
         return gidx
+
+def _get_halo_subgraph_inner_node(halo_subg):
+    return _CAPI_GetHaloSubgraphInnerNodes(halo_subg)
+
+def _get_halo_subgraph_inner_edge(halo_subg):
+    return _CAPI_GetHaloSubgraphInnerEdges(halo_subg)
 
 _init_api("dgl.graph_index")

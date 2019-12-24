@@ -14,10 +14,10 @@ def udf_copy_edge(edges):
     return {'m': edges.data['e']}
 
 def udf_mean(nodes):
-    return {'r2': nodes.mailbox['m'].mean(1)}
+    return {'r2': F.mean(nodes.mailbox['m'], 1)}
 
 def udf_sum(nodes):
-    return {'r2': nodes.mailbox['m'].sum(1)}
+    return {'r2': F.sum(nodes.mailbox['m'], 1)}
 
 def udf_max(nodes):
     return {'r2': F.max(nodes.mailbox['m'], 1)}
@@ -98,7 +98,7 @@ def test_copy_src_reduce():
                 g.update_all(fn.copy_src(src='u', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
-            F.backward(r1.sum())
+            F.backward(F.reduce_sum(r1))
             n_grad1 = F.grad(g.ndata['u'])
 
         # reset grad
@@ -112,7 +112,7 @@ def test_copy_src_reduce():
             else:
                 g.update_all(udf_copy_src, udf_reduce[red])
             r2 = g.ndata['r2']
-            F.backward(r2.sum())
+            F.backward(F.reduce_sum(r2))
             n_grad2 = F.grad(g.ndata['u'])
 
         def _print_error(a, b):
@@ -159,7 +159,7 @@ def test_copy_edge_reduce():
                 g.update_all(fn.copy_edge(edge='e', out='m'),
                              builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
-            F.backward(r1.sum())
+            F.backward(F.reduce_sum(r1))
             e_grad1 = F.grad(g.edata['e'])
 
         # reset grad
@@ -173,7 +173,7 @@ def test_copy_edge_reduce():
             else:
                 g.update_all(udf_copy_edge, udf_reduce[red])
             r2 = g.ndata['r2']
-            F.backward(r2.sum())
+            F.backward(F.reduce_sum(r2))
             e_grad2 = F.grad(g.edata['e'])
 
         def _print_error(a, b):
@@ -246,7 +246,7 @@ def test_all_binary_builtins():
             else:
                 g.update_all(builtin_msg(lhs, rhs, 'm'), builtin_red('m', 'r1'))
             r1 = g.ndata.pop('r1')
-            F.backward(r1.sum(), F.tensor([1.]))
+            F.backward(F.reduce_sum(r1))
             lhs_grad_1 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_1 = F.grad(target_feature_switch(g, rhs))
 
@@ -287,7 +287,7 @@ def test_all_binary_builtins():
             else:
                 g.update_all(mfunc, rfunc)
             r2 = g.ndata.pop('r2')
-            F.backward(r2.sum(), F.tensor([1.]))
+            F.backward(F.reduce_sum(r2), F.tensor([1.]))
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
@@ -304,6 +304,8 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
                   format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            print("lhs", F.asnumpy(lhs).tolist())
+            print("rhs", F.asnumpy(rhs).tolist())
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
