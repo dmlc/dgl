@@ -21,10 +21,6 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-// Max size of message queue for communicator is 2 GB
-// TODO(chao): Make this number configurable
-const int64_t kQueueSize = 2000000000;
-
 /*!
  * \brief Create NDArray from raw data
  */
