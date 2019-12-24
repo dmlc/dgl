@@ -4,6 +4,7 @@
  * \brief Graph operation implementation
  */
 #include <dgl/graph_op.h>
+#include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
@@ -398,6 +399,187 @@ GraphPtr GraphOp::ToBidirectedImmutableGraph(GraphPtr g) {
   return ImmutableGraph::CreateFromCOO(
       g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph());
 }
+
+HaloSubgraph GraphOp::GetSubgraphWithHalo(GraphPtr g, IdArray nodes, int num_hops) {
+  const dgl_id_t *nid = static_cast<dgl_id_t *>(nodes->data);
+  const auto id_len = nodes->shape[0];
+  std::unordered_map<dgl_id_t, bool> all_nodes;
+  std::vector<std::vector<dgl_id_t>> outer_nodes(num_hops);
+  for (int64_t i = 0; i < id_len; i++)
+    all_nodes[nid[i]] = true;
+  auto orig_nodes = all_nodes;
+
+  std::vector<dgl_id_t> edge_src, edge_dst, edge_eid;
+  std::vector<int> inner_edges;
+
+  // When we deal with in-edges, we need to do two things:
+  // * find the edges inside the partition and the edges between partitions.
+  // * find the nodes outside the partition that connect the partition.
+  EdgeArray in_edges = g->InEdges(nodes);
+  auto src = in_edges.src;
+  auto dst = in_edges.dst;
+  auto eid = in_edges.id;
+  auto num_edges = eid->shape[0];
+  const dgl_id_t *src_data = static_cast<dgl_id_t *>(src->data);
+  const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
+  const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
+  for (int64_t i = 0; i < num_edges; i++) {
+    edge_src.push_back(src_data[i]);
+    edge_dst.push_back(dst_data[i]);
+    edge_eid.push_back(eid_data[i]);
+    // We check if the source node is in the original node.
+    auto it1 = orig_nodes.find(src_data[i]);
+    inner_edges.push_back(it1 != orig_nodes.end());
+    // We need to expand only if the node hasn't been seen before.
+    auto it = all_nodes.find(src_data[i]);
+    if (it == all_nodes.end()) {
+      all_nodes[src_data[i]] = false;
+      outer_nodes[0].push_back(src_data[i]);
+    }
+  }
+
+  // Now we need to traverse the graph with the in-edges to access nodes
+  // and edges more hops away.
+  for (int k = 1; k < num_hops; k++) {
+    const std::vector<dgl_id_t> &nodes = outer_nodes[k-1];
+    EdgeArray in_edges = g->InEdges(aten::VecToIdArray(nodes));
+    auto src = in_edges.src;
+    auto dst = in_edges.dst;
+    auto eid = in_edges.id;
+    auto num_edges = eid->shape[0];
+    const dgl_id_t *src_data = static_cast<dgl_id_t *>(src->data);
+    const dgl_id_t *dst_data = static_cast<dgl_id_t *>(dst->data);
+    const dgl_id_t *eid_data = static_cast<dgl_id_t *>(eid->data);
+    for (int64_t i = 0; i < num_edges; i++) {
+      edge_src.push_back(src_data[i]);
+      edge_dst.push_back(dst_data[i]);
+      edge_eid.push_back(eid_data[i]);
+      inner_edges.push_back(false);
+      // If we haven't seen this node.
+      auto it = all_nodes.find(src_data[i]);
+      if (it == all_nodes.end()) {
+        all_nodes[src_data[i]] = false;
+        outer_nodes[k].push_back(src_data[i]);
+      }
+    }
+  }
+
+  // We assign new Ids to the nodes in the subgraph. We ensure that nodes
+  // with smaller Ids in the original graph will also get smaller Ids in
+  // the subgraph.
+
+  // Move all nodes to a vector.
+  std::vector<dgl_id_t> old_node_ids;
+  old_node_ids.reserve(all_nodes.size());
+  for (auto it = all_nodes.begin(); it != all_nodes.end(); it++) {
+    old_node_ids.push_back(it->first);
+  }
+  std::sort(old_node_ids.begin(), old_node_ids.end());
+  std::unordered_map<dgl_id_t, dgl_id_t> old2new;
+  for (size_t i = 0; i < old_node_ids.size(); i++) {
+    old2new[old_node_ids[i]] = i;
+  }
+
+  num_edges = edge_src.size();
+  IdArray new_src = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray new_dst = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t *new_src_data = static_cast<dgl_id_t *>(new_src->data);
+  dgl_id_t *new_dst_data = static_cast<dgl_id_t *>(new_dst->data);
+  for (size_t i = 0; i < edge_src.size(); i++) {
+    new_src_data[i] = old2new[edge_src[i]];
+    new_dst_data[i] = old2new[edge_dst[i]];
+  }
+
+  std::vector<int> inner_nodes(old_node_ids.size());
+  for (size_t i = 0; i < old_node_ids.size(); i++) {
+    dgl_id_t old_nid = old_node_ids[i];
+    inner_nodes[i] = all_nodes[old_nid];
+  }
+
+  GraphPtr subg = ImmutableGraph::CreateFromCOO(old_node_ids.size(), new_src, new_dst);
+  HaloSubgraph halo_subg;
+  halo_subg.graph = subg;
+  halo_subg.induced_vertices = aten::VecToIdArray(old_node_ids);
+  halo_subg.induced_edges = aten::VecToIdArray(edge_eid);
+  halo_subg.inner_nodes = aten::VecToIdArray<int>(inner_nodes, 32);
+  halo_subg.inner_edges = aten::VecToIdArray<int>(inner_edges, 32);
+  return halo_subg;
+}
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLPartitionWithHalo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef graph = args[0];
+    IdArray node_parts = args[1];
+    int num_hops = args[2];
+
+    const dgl_id_t *part_data = static_cast<dgl_id_t *>(node_parts->data);
+    int64_t num_nodes = node_parts->shape[0];
+    std::unordered_map<int, std::vector<dgl_id_t> > part_map;
+    for (int64_t i = 0; i < num_nodes; i++) {
+      dgl_id_t part_id = part_data[i];
+      auto it = part_map.find(part_id);
+      if (it == part_map.end()) {
+        std::vector<dgl_id_t> vec;
+        vec.push_back(i);
+        part_map[part_id] = vec;
+      } else {
+        it->second.push_back(i);
+      }
+    }
+    std::vector<int> part_ids;
+    std::vector<std::vector<dgl_id_t> > part_nodes;
+    int max_part_id = 0;
+    for (auto it = part_map.begin(); it != part_map.end(); it++) {
+      max_part_id = std::max(it->first, max_part_id);
+      part_ids.push_back(it->first);
+      part_nodes.push_back(it->second);
+    }
+    auto graph_ptr = std::dynamic_pointer_cast<ImmutableGraph>(graph.sptr());
+    // When we construct subgraphs, we only access in-edges.
+    // We need to make sure the in-CSR exists. Otherwise, we'll
+    // try to construct in-CSR in openmp for loop, which will lead
+    // to some unexpected results.
+    graph_ptr->GetInCSR();
+    std::vector<std::shared_ptr<HaloSubgraph> > subgs(max_part_id + 1);
+    int num_partitions = part_nodes.size();
+#pragma omp parallel for
+    for (int i = 0; i < num_partitions; i++) {
+      auto nodes = aten::VecToIdArray(part_nodes[i]);
+      HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph_ptr, nodes, num_hops);
+      std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
+      int part_id = part_ids[i];
+      subgs[part_id] = subg_ptr;
+    }
+    List<SubgraphRef> ret_list;
+    for (size_t i = 0; i < subgs.size(); i++) {
+      ret_list.push_back(SubgraphRef(subgs[i]));
+    }
+    *rv = ret_list;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGetSubgraphWithHalo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef graph = args[0];
+    IdArray nodes = args[1];
+    int num_hops = args[2];
+    HaloSubgraph subg = GraphOp::GetSubgraphWithHalo(graph.sptr(), nodes, num_hops);
+    std::shared_ptr<HaloSubgraph> subg_ptr(new HaloSubgraph(subg));
+    *rv = SubgraphRef(subg_ptr);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerNodes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  SubgraphRef g = args[0];
+  auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  *rv = gptr->inner_nodes;
+});
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_GetHaloSubgraphInnerEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  SubgraphRef g = args[0];
+  auto gptr = std::dynamic_pointer_cast<HaloSubgraph>(g.sptr());
+  *rv = gptr->inner_edges;
+});
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
