@@ -210,7 +210,7 @@ struct BackwardBinaryReduceBcast {
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
     DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
-  
+
     int64_t lhs_add = 0;
     int64_t rhs_add = 0;
     Idx tx = feat_idx/len;
@@ -397,7 +397,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kSrc) {
@@ -429,7 +429,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (LeftSelector::target == binary_op::kDst) {
@@ -461,7 +461,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -501,7 +501,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kSrc) {
@@ -533,7 +533,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kDst) {
@@ -565,7 +565,7 @@ void CallBackwardBinaryReduce(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
         BackwardGData<Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -701,7 +701,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }
@@ -742,7 +742,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kSrc) {
@@ -774,7 +774,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::SrcAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     } else if (RightSelector::target == binary_op::kDst) {
@@ -806,7 +806,7 @@ void CallBackwardBinaryReduceBcast(
 
       minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
       // TODO(minjie): allocator
-      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+      minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
         BackwardBcastGData<NDim, Idx, DType>, UDF>(
             rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
     }

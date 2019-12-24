@@ -163,7 +163,6 @@ struct BinaryReduceBcast {
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
-    int64_t tmp[NDim];  // store unraveled idx.
     for (int64_t tx = 0; tx < gdata->out_len; ++tx) {
       int64_t lhs_add = 0;
       int64_t rhs_add = 0;
@@ -264,7 +263,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
-  
+
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge) {
     // Out Target is Edge, we need use COO format
     auto coo_matrix = graph.GetCOOMatrix();
@@ -298,7 +297,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
@@ -332,7 +331,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   }
@@ -387,7 +386,7 @@ void CallBinaryReduceBcast(
 
     minigun::SpMat<Idx> spmat = {NULL, NULL, &coo};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::EdgeAdvanceConfig,
       BcastGData<NDim, Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   } else if (OutSelector<Reducer>::Type::target == binary_op::kSrc) {
@@ -423,7 +422,7 @@ void CallBinaryReduceBcast(
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cpu::DstAdvanceConfig,
       BcastGData<NDim, Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   }

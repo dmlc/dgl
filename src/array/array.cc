@@ -324,7 +324,7 @@ CSRMatrix CSRTranspose(CSRMatrix csr) {
 
 COOMatrix CSRToCOO(CSRMatrix csr, bool data_as_order) {
   COOMatrix ret;
-  
+
   if (data_as_order) {
     ATEN_XPU_SELECT(csr.indptr->ctx.device_type, XPU, {
       ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {

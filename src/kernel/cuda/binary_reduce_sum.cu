@@ -188,7 +188,7 @@ void FallbackCallBinaryReduce(
 
     minigun::SpMat<Idx> spmat = {NULL, &csr, NULL};
     // TODO(minjie): allocator
-    minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig, 
+    minigun::advance::Advance<XPU, Idx, DType, cuda::DstAdvanceConfig,
       GData<Idx, DType>, UDF>(
           rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
   } else {
@@ -246,7 +246,7 @@ void FallbackCallBackwardBinaryReduce(
 
   minigun::SpMat<Idx> spmat = {&csr, NULL, NULL};
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig, 
+  minigun::advance::Advance<XPU, Idx, DType, cuda::SrcAdvanceConfig,
     BackwardGData<Idx, DType>, UDF>(
         rtcfg, spmat, gdata, minigun::IntArray1D<Idx>());
 }
