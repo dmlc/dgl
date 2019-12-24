@@ -323,17 +323,17 @@ class BinaryReduce(th.autograd.Function):
             degs = None
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
-                              rhs_map, out_map, lhs_data_nd, rhs_data_nd,
-                              feat_shape, degs)
-        ctx.save_for_backward(out_data)
+                              rhs_map, out_map, feat_shape, degs)
+        ctx.save_for_backward(lhs_data, rhs_data, out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
-            lhs_data_nd, rhs_data_nd, feat_shape, degs \
-            = ctx.backward_cache
-        out_data, = ctx.saved_variables
+            feat_shape, degs = ctx.backward_cache
+        lhs_data, rhs_data, out_data = ctx.saved_variables
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_lhs = None
         grad_rhs = None
@@ -386,16 +386,15 @@ class CopyReduce(th.autograd.Function):
         else:
             degs = None
         # save_for_backward can only save variables
-        ctx.backward_cache = (reducer, graph, target, in_map, out_map,
-                              in_data_nd, degs)
-        ctx.save_for_backward(out_data)
+        ctx.backward_cache = (reducer, graph, target, in_map, out_map, degs)
+        ctx.save_for_backward(in_data, out_data)
         return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, graph, target, in_map, out_map, in_data_nd, degs \
-            = ctx.backward_cache
-        out_data, = ctx.saved_variables
+        reducer, graph, target, in_map, out_map, degs = ctx.backward_cache
+        in_data, out_data = ctx.saved_variables
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         grad_in = None
         if reducer == 'mean':
