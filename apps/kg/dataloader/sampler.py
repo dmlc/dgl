@@ -111,8 +111,6 @@ class TrainDataset(object):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         return EdgeSampler(self.graphs[rank],
                            batch_size=batch_size,
-                           replacement=True,
-                           max_samples=sys.maxsize, #  max pos int in system
                            neg_sample_size=neg_sample_size,
                            negative_mode=mode,
                            num_workers=num_workers,
@@ -170,7 +168,6 @@ class EvalSampler(object):
         self.sampler = EdgeSampler(g,
                                    batch_size=batch_size,
                                    seed_edges=edges,
-                                   replacement=False,
                                    neg_sample_size=neg_sample_size,
                                    negative_mode=mode,
                                    num_workers=num_workers,

@@ -119,7 +119,7 @@ class EdgeSamplerObject: public Object {
                     const int64_t batch_size,
                     const int64_t num_workers,
                     const bool replacement,
-                    const int64_t max_samples,
+                    const bool reset,
                     const std::string neg_mode,
                     const int64_t neg_sample_size,
                     const bool exclude_positive,
@@ -132,7 +132,7 @@ class EdgeSamplerObject: public Object {
     batch_size_ = batch_size;
     num_workers_ = num_workers;
     replacement_ = replacement;
-    max_samples_ = max_samples;
+    reset_ = reset;
     neg_mode_ = neg_mode;
     neg_sample_size_ = neg_sample_size;
     exclude_positive_ = exclude_positive;
@@ -142,6 +142,7 @@ class EdgeSamplerObject: public Object {
   ~EdgeSamplerObject() {}
 
   virtual void Fetch(DGLRetValue* rv) = 0;
+  virtual void Reset() = 0;
 
  protected:
   virtual void randomSample(size_t set_size, size_t num, std::vector<size_t>* out) = 0;
@@ -166,7 +167,7 @@ class EdgeSamplerObject: public Object {
   int64_t batch_size_;
   int64_t num_workers_;
   bool replacement_;
-  int64_t max_samples_;
+  int64_t reset_;
   std::string neg_mode_;
   int64_t neg_sample_size_;
   bool exclude_positive_;
@@ -1418,7 +1419,7 @@ public:
                                     const int64_t batch_size,
                                     const int64_t num_workers,
                                     const bool replacement,
-                                    const int64_t max_samples,
+                                    const bool reset,
                                     const std::string neg_mode,
                                     const int64_t neg_sample_size,
                                     const bool exclude_positive,
@@ -1429,7 +1430,7 @@ public:
                                         batch_size,
                                         num_workers,
                                         replacement,
-                                        max_samples,
+                                        reset,
                                         neg_mode,
                                         neg_sample_size,
                                         exclude_positive,
@@ -1437,11 +1438,7 @@ public:
                                         relations) {
     batch_curr_id_ = 0;
     num_seeds_ = seed_edges->shape[0];
-    if (replacement_ == false) {
-      max_samples_ = std::min(num_seeds_, max_samples_);
-    }
-    // handle int64 overflow here
-    max_batch_id_ = max_samples_ / batch_size + (max_samples_ % batch_size > 0 ? 1 : 0);
+    max_batch_id_ = (num_seeds_ + batch_size - 1) / batch_size;
 
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
@@ -1457,7 +1454,7 @@ public:
 #pragma omp parallel for
     for (int64_t i = 0; i < num_workers; i++) {
       const int64_t start = (batch_curr_id_ + i) * batch_size_;
-      const int64_t end = std::min(start + batch_size_, max_samples_);
+      const int64_t end = std::min(start + batch_size_, num_seeds_);
       const int64_t num_edges = end - start;
       IdArray worker_seeds;
 
@@ -1504,7 +1501,21 @@ public:
     }
     batch_curr_id_ += num_workers;
 
+    if (batch_curr_id_ >= max_batch_id_ && reset_ == true) {
+      Reset();
+    }
+
     *rv = List<SubgraphRef>(positive_subgs);
+  }
+
+  void Reset() {
+    batch_curr_id_ = 0;
+    if (replacement_ == false) {
+      // Now we should shuffle the data and reset the sampler.
+      dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seed_edges_->data);
+      std::shuffle(seed_ids, seed_ids + seed_edges_->shape[0],
+                   std::default_random_engine());
+    }
   }
 
   DGL_DECLARE_OBJECT_TYPE_INFO(UniformEdgeSamplerObject, Object);
@@ -1549,7 +1560,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
     const int64_t batch_size = args[2];
     const int64_t max_num_workers = args[3];
     const bool replacement = args[4];
-    const int64_t max_samples = args[5];
+    const bool reset = args[5];
     const std::string neg_mode = args[6];
     const int neg_sample_size = args[7];
     const bool exclude_positive = args[8];
@@ -1559,7 +1570,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
-    CHECK(max_samples > 0) << "Max number of samples should > 0";
     BuildCoo(*gptr);
 
     auto o = std::make_shared<UniformEdgeSamplerObject>(gptr,
@@ -1567,7 +1577,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
                                                         batch_size,
                                                         max_num_workers,
                                                         replacement,
-                                                        max_samples,
+                                                        reset,
                                                         neg_mode,
                                                         neg_sample_size,
                                                         exclude_positive,
@@ -1582,6 +1592,12 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_FetchUniformEdgeSample")
   sampler->Fetch(rv);
 });
 
+DGL_REGISTER_GLOBAL("sampling._CAPI_ResetUniformEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  UniformEdgeSampler sampler = args[0];
+  sampler->Reset();
+});
+
 template<typename ValueType>
 class WeightedEdgeSamplerObject: public EdgeSamplerObject {
  public:
@@ -1592,7 +1608,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
                                      const int64_t batch_size,
                                      const int64_t num_workers,
                                      const bool replacement,
-                                     const int64_t max_samples,
+                                     const bool reset,
                                      const std::string neg_mode,
                                      const int64_t neg_sample_size,
                                      const bool exclude_positive,
@@ -1603,7 +1619,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
                                         batch_size,
                                         num_workers,
                                         replacement,
-                                        max_samples,
+                                        reset,
                                         neg_mode,
                                         neg_sample_size,
                                         exclude_positive,
@@ -1616,6 +1632,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       eprob[i] = edge_prob[i];
     }
     edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
+    edge_weight_ = edge_weight;
 
     const size_t num_nodes = node_weight->shape[0];
     if (num_nodes == 0) {
@@ -1630,11 +1647,8 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
     }
 
     curr_batch_id_ = 0;
-    if (replacement_ == false) {
-      max_samples_ = std::min(num_edges, max_samples_);
-    }
     // handle int64 overflow here
-    max_batch_id_ = max_samples_ / batch_size + (max_samples_ % batch_size > 0 ? 1 : 0);
+    max_batch_id_ = (num_edges + batch_size - 1) / batch_size;
 
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
@@ -1698,10 +1712,29 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
     }
     curr_batch_id_ += num_workers;
 
+    if (curr_batch_id_ >= max_batch_id_ && reset_ == true) {
+      Reset();
+    }
+
     if (neg_mode_.size() > 0) {
       positive_subgs.insert(positive_subgs.end(), negative_subgs.begin(), negative_subgs.end());
     }
     *rv = List<SubgraphRef>(positive_subgs);
+  }
+
+  void Reset() {
+    curr_batch_id_ = 0;
+    if (replacement_ == false) {
+      const int64_t num_edges = edge_weight_->shape[0];
+      const ValueType *edge_prob = static_cast<const ValueType*>(edge_weight_->data);
+      std::vector<ValueType> eprob(num_edges);
+      for (int64_t i = 0; i < num_edges; ++i) {
+        eprob[i] = edge_prob[i];
+      }
+
+      // rebuild the edge_selector_
+      edge_selector_ = std::make_shared<ArrayHeap<ValueType>>(eprob);
+    }
   }
 
   DGL_DECLARE_OBJECT_TYPE_INFO(WeightedEdgeSamplerObject<ValueType>, Object);
@@ -1765,6 +1798,7 @@ private:
   std::shared_ptr<ArrayHeap<ValueType>> edge_selector_;
   std::shared_ptr<ArrayHeap<ValueType>> node_selector_;
 
+  NDArray edge_weight_;
   int64_t curr_batch_id_;
   int64_t max_batch_id_;
 };
@@ -1798,7 +1832,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     const int64_t batch_size = args[4];
     const int64_t max_num_workers = args[5];
     const bool replacement = args[6];
-    const int64_t max_samples = args[7];
+    const bool reset = args[7];
     const std::string neg_mode = args[8];
     const int64_t neg_sample_size = args[9];
     const bool exclude_positive = args[10];
@@ -1814,7 +1848,6 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
       CHECK(node_weight->dtype.code == kDLFloat) << "node_weight should be FloatType";
       CHECK(node_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
     }
-    CHECK(max_samples > 0) << "Max number of samples should > 0";
     BuildCoo(*gptr);
 
     const int64_t num_seeds = seed_edges->shape[0];
@@ -1828,7 +1861,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
                                                                 batch_size,
                                                                 num_workers,
                                                                 replacement,
-                                                                max_samples,
+                                                                reset,
                                                                 neg_mode,
                                                                 neg_sample_size,
                                                                 exclude_positive,
@@ -1841,6 +1874,12 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_FetchWeightedEdgeSample")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
   FloatWeightedEdgeSampler sampler = args[0];
   sampler->Fetch(rv);
+});
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_ResetWeightedEdgeSample")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+  FloatWeightedEdgeSampler sampler = args[0];
+  sampler->Reset();
 });
 
 }  // namespace dgl
