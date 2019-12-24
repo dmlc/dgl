@@ -2,6 +2,7 @@
 import dgl
 import argparse
 import torch as th
+import time
 
 ID = []
 ID.append(th.tensor([0,1]))
@@ -13,7 +14,8 @@ edata_partition_book = {'edata':th.tensor([0,0,1,1,2,2,3,3])}
 ndata_partition_book = {'ndata':th.tensor([0,0,1,1,2,2,3,3])}
 
 def start_client():
-    
+    time.sleep(3)
+
     client = dgl.contrib.start_client(ip_config='ip_config.txt', 
                                       ndata_partition_book=ndata_partition_book, 
                                       edata_partition_book=edata_partition_book)
