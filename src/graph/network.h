@@ -21,10 +21,6 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-// Max size of message queue for communicator is 200 MB
-// TODO(chao): Make this number configurable
-const int64_t kQueueSize = 200 * 1024 * 1024;
-
 /*!
  * \brief Create NDArray from raw data
  */
@@ -64,7 +60,11 @@ enum MessageType {
   /*!
    * \brief Barrier msg for KVStore
    */
-  kBarrierMsg = 6
+  kBarrierMsg = 6,
+  /*!
+   * \brief IP and ID msg for KVStore
+   */  
+  kIPIDMsg = 7
 };
 
 /*!
