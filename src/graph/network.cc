@@ -171,9 +171,10 @@ void KVStoreMsg::Deserialize(char* buffer, int64_t size) {
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string type = args[0];
+    int64_t msg_queue_size = args[1];
     network::Sender* sender = nullptr;
     if (type == "socket") {
-      sender = new network::SocketSender(kQueueSize);
+      sender = new network::SocketSender(msg_queue_size);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }
@@ -184,9 +185,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string type = args[0];
+    int64_t msg_queue_size = args[1];
     network::Receiver* receiver = nullptr;
     if (type == "socket") {
-      receiver = new network::SocketReceiver(kQueueSize);
+      receiver = new network::SocketReceiver(msg_queue_size);
     } else {
       LOG(FATAL) << "Unknown communicator type: " << type;
     }

@@ -31,27 +31,31 @@ def _network_wait():
     """
     time.sleep(_WAIT_TIME_SEC)
 
-def _create_sender(net_type):
+def _create_sender(net_type, msg_queue_size=2000*1024*1024*1024):
     """Create a Sender communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLSenderCreate(net_type)
+    return _CAPI_DGLSenderCreate(net_type, msg_queue_size)
 
-def _create_receiver(net_type):
+def _create_receiver(net_type, msg_queue_size=2000*1024*1024*1024):
     """Create a Receiver communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLReceiverCreate(net_type)
+    return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
 def _finalize_sender(sender):
     """Finalize Sender communicator

@@ -54,7 +54,7 @@ def read_ip_config(filename):
     return server_namebook
 
 
-def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None, edata_g2l=None):
+def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None, edata_g2l=None, msg_queue_size=2*1024*1024*1024):
     """Start a kvserver node. 
 
     This function will be blocked by server.start() api.
@@ -75,6 +75,8 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
         global2local mapping of node data
     edata_g2l : dict of tensor (mx.ndarray or torch.tensor)
         global2local mapping of edge data
+    msg_queue_size : int
+        Size of message queue
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert len(ip_config) > 0, 'ip_config cannot be empty.'
@@ -85,7 +87,8 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     server = KVServer(
         server_id=server_id, 
         server_addr=server_namebook[server_id],
-        num_client=num_client)
+        num_client=num_client,
+        msg_queue_size=msg_queue_size)
 
     for name, data in ndata.items():
         server.init_data(name=name, data_tensor=data)
@@ -106,7 +109,7 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     server.start()
 
 
-def start_client(ip_config, ndata_partition_book, edata_partition_book, close_shared_mem=False):
+def start_client(ip_config, ndata_partition_book, edata_partition_book, close_shared_mem=False, msg_queue_size=2*1024*1024*1024):
     """Start a kvclient node.
 
     Parameters
@@ -119,7 +122,9 @@ def start_client(ip_config, ndata_partition_book, edata_partition_book, close_sh
         Data mapping of edge ID to server ID
     close_shared_mem : bool
         Close local shared-memory tensor access.
-        
+    msg_queue_size : int
+        Size of message queue
+
     Returns
     -------
     KVClient
@@ -131,7 +136,7 @@ def start_client(ip_config, ndata_partition_book, edata_partition_book, close_sh
 
     server_namebook = read_ip_config(ip_config)
 
-    client = KVClient(server_namebook=server_namebook, close_shared_mem=close_shared_mem)
+    client = KVClient(server_namebook=server_namebook, close_shared_mem=close_shared_mem, msg_queue_size=msg_queue_size)
 
     for name, data in ndata_partition_book.items():
         client.set_partition_book(name=name, partition_book=data)
@@ -165,10 +170,12 @@ class KVServer(object):
         IP address and port of current KVServer node, e.g., '127.0.0.1:50051'.
     num_client : int
         Total number of clients connecting to server.
+    msg_queue_size : int
+        Size of message queue
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, server_addr, num_client, net_type='socket'):
+    def __init__(self, server_id, server_addr, num_client, msg_queue_size=2 * 1024 * 1024 * 1024, net_type='socket'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(server_addr.split(':')) == 2, 'Incorrect IP format: %s' % server_addr
         assert num_client >= 0, 'num_client (%d) cannot be a negative number.' % num_client
@@ -187,8 +194,8 @@ class KVServer(object):
         self._client_namebook = {}
         self._client_count = num_client
         # Create C communicator of sender and receiver
-        self._sender = _create_sender(net_type)
-        self._receiver = _create_receiver(net_type)
+        self._sender = _create_sender(net_type, msg_queue_size)
+        self._receiver = _create_receiver(net_type, msg_queue_size)
 
 
     def __del__(self):
@@ -470,10 +477,12 @@ class KVClient(object):
           2:'168.12.46.12:50051' }
     close_shared_mem : bool
         DO NOT use shared-memory access on local machine.
+    msg_queue_size : int
+        Size of message queue.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
-    def __init__(self, server_namebook, close_shared_mem=False, net_type='socket'):
+    def __init__(self, server_namebook, close_shared_mem=False,  msg_queue_size=2 * 1024 * 1024 * 1024, net_type='socket'):
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert net_type == 'socket' or net_type == 'mpi', 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
 
@@ -493,8 +502,8 @@ class KVClient(object):
         # client ID will be assign by server after connecting to server
         self._client_id = -1
         # create C communicator of sender and receiver
-        self._sender = _create_sender(net_type)
-        self._receiver = _create_receiver(net_type)
+        self._sender = _create_sender(net_type, msg_queue_size)
+        self._receiver = _create_receiver(net_type, msg_queue_size)
 
 
     def __del__(self):
