@@ -287,7 +287,7 @@ def _recv_kv_msg(receiver):
             name=name,
             id=None,
             data=None)
-        return msg     
+        return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
             type=msg_type,
