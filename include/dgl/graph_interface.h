@@ -393,6 +393,15 @@ struct NegSubgraph: public Subgraph {
   IdArray tail_nid;
 };
 
+/*! \brief Subgraph data structure for halo subgraph */
+struct HaloSubgraph: public Subgraph {
+  /*! \brief Indicate if a node belongs to the partition. */
+  IdArray inner_nodes;
+
+  /*! \brief Indicate if an edge belongs to the partition. */
+  IdArray inner_edges;
+};
+
 // Define SubgraphRef
 DGL_DEFINE_OBJECT_REF(SubgraphRef, Subgraph);
 
