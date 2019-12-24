@@ -530,10 +530,17 @@ class EdgeSampler(object):
     edge only if the triple (source node, destination node and relation)
     matches one of the edges in the graph.
 
-    For uniform sampling, the sampler generates only num_of_edges/batch_size 
-    samples. 
+    This sampler samples positive edges without replacement by default, which means 
+    it returns a fixed number of batches (i.e., num_edges/batch_size), and the 
+    positive edges sampled will not be duplicated. However, one can explicitly 
+    specify sampling with replacement (replacement = True), that the sampler treats 
+    each sampling of a single positive edge as a standalone event. 
 
-    For uniform sampling, the sampler generates samples infinitly.
+    To contorl how many samples the sampler can return, a reset parameter can be used.
+    If it is set to true, the sampler will generate samples infinitely. For the sampler 
+    with replacement, it will reshuffle the seed edges each time it consumes all the 
+    edges and reset the replacement state. If it is set to false, the sampler will only 
+    generate num_edges/batch_size samples.
 
     Parameters
     ----------
@@ -554,6 +561,14 @@ class EdgeSampler(object):
         The number of workers to sample edges in parallel.
     prefetch : bool, optional
         If true, prefetch the samples in the next batch. Default: False
+    replacement: bool, optional
+        Whether the sampler samples edges with or without repalcement. Default False
+    reset: bool, optional
+        If true, the sampler will generate samples infinitely, and for the sampler with 
+        replacement, it will reshuffle the edges each time it consumes all the edges and 
+        reset the replacement state. 
+        If false, the sampler will only generate num_edges/batch_size samples by default.
+        Default: False.
     negative_mode : string, optional
         The method used to construct negative edges. Possible values are 'head', 'tail'.
     neg_sample_size : int, optional
@@ -590,6 +605,8 @@ class EdgeSampler(object):
             shuffle=False,
             num_workers=1,
             prefetch=False,
+            replacement=False,
+            reset=False,
             negative_mode="",
             neg_sample_size=0,
             exclude_positive=False,
@@ -617,6 +634,7 @@ class EdgeSampler(object):
             self._seed_edges = F.arange(0, g.number_of_edges())
         else:
             self._seed_edges = seed_edges
+
         if shuffle:
             self._seed_edges = F.rand_shuffle(self._seed_edges)
         if edge_weight is None:
@@ -634,6 +652,8 @@ class EdgeSampler(object):
         if prefetch:
             self._prefetching_wrapper_class = ThreadPrefetchingWrapper
         self._num_prefetch = num_workers * 2 if prefetch else 0
+        self._replacement = replacement
+        self._reset = reset
 
         self._num_workers = int(num_workers)
         self._negative_mode = negative_mode
@@ -643,8 +663,10 @@ class EdgeSampler(object):
             self._sampler = _CAPI_CreateUniformEdgeSampler(
                 self.g._graph,
                 self.seed_edges.todgltensor(),
-                self.batch_size,        # batch size
+                self._batch_size,       # batch size
                 self._num_workers,      # num batches
+                self._replacement,
+                self._reset,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,
@@ -658,6 +680,8 @@ class EdgeSampler(object):
                 self._node_weight,
                 self._batch_size,       # batch size
                 self._num_workers,      # num batches
+                self._replacement,
+                self._reset,
                 self._negative_mode,
                 self._neg_sample_size,
                 self._exclude_positive,
@@ -678,7 +702,11 @@ class EdgeSampler(object):
         Returns
         -------
         list[GraphIndex] or list[(GraphIndex, GraphIndex)]
-            Next "bunch" of edges to be processed.
+            Next "bunch" of edges to be processed. 
+            If negative_mode is specified, a list of (pos_subg, neg_subg) pairs i
+            s returned.
+            If return_false_neg is specified as True, the true negative edges and 
+            false negative edges in neg_subg is identified in neg_subg.edata['false_neg'].
         '''
         if self._is_uniform:
             subgs = _CAPI_FetchUniformEdgeSample(
@@ -708,6 +736,13 @@ class EdgeSampler(object):
 
     def __iter__(self):
         it = SamplerIter(self)
+        if self._is_uniform:
+            subgs = _CAPI_ResetUniformEdgeSample(
+                self._sampler)
+        else:
+            subgs = _CAPI_ResetWeightedEdgeSample(
+                self._sampler)
+
         if self._num_prefetch:
             return self._prefetching_wrapper_class(it, self._num_prefetch)
         else:
