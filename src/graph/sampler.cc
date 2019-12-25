@@ -123,7 +123,7 @@ class ArrayHeap {
 template <
     typename Idx,
     typename DType,
-    bool replace = true>
+    bool replace>
 class AliasSampler {
 private:
   Idx N;
@@ -239,7 +239,7 @@ public:
 template <
     typename Idx,
     typename DType,
-    bool replace = true>
+    bool replace>
 class CDFSampler {
 private:
   Idx N;
@@ -319,7 +319,7 @@ public:
 template <
     typename Idx,
     typename DType,
-    bool replace = false>
+    bool replace>
 class TreeSampler {
 private:
   std::vector<DType> weight;      // accumulated
