@@ -224,7 +224,7 @@ def evaluate(model, nf, labels):
     model.train()
     return compute_acc(pred, labels)
 
-def run(proc_id, n_gpus, args, devices):
+def run(proc_id, n_gpus, args, devices, data):
     #th.manual_seed(1234)
     #np.random.seed(1234)
     #th.cuda.manual_seed_all(1234)
@@ -247,6 +247,8 @@ def run(proc_id, n_gpus, args, devices):
     th.set_num_threads(args.num_workers * 2 if args.prefetch else args.num_workers)
 
     # Prepare data
+    train_nid, val_nid, in_feats, labels, n_classes, g = data
+    """
     data = RedditDataset(self_loop=True)
     train_nid = th.LongTensor(np.nonzero(data.train_mask)[0])
     val_nid = th.LongTensor(np.nonzero(data.val_mask)[0])
@@ -261,6 +263,9 @@ def run(proc_id, n_gpus, args, devices):
     # Construct graph
     g = dgl.DGLGraph(data.graph, readonly=True)
     g.ndata['features'] = features
+    """
+    # Split train_nid
+    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
 
     # Create sampler
     sampler = dgl.contrib.sampling.NeighborSampler(
@@ -369,8 +374,23 @@ if __name__ == '__main__':
     
     devices = list(map(int, args.gpu.split(',')))
     n_gpus = len(devices)
+
+    # load reddit data
+    data = RedditDataset(self_loop=True)
+    train_nid = th.LongTensor(np.nonzero(data.train_mask)[0])
+    val_nid = th.LongTensor(np.nonzero(data.val_mask)[0])
+    features = th.Tensor(data.features)
+    in_feats = features.shape[1]
+    labels = th.LongTensor(data.labels)
+    n_classes = data.num_labels
+    # Construct graph
+    g = dgl.DGLGraph(data.graph, readonly=True)
+    g.ndata['features'] = features
+    # pack
+    data = train_nid, val_nid, in_feats, labels, n_classes, g
+
     if n_gpus == 1:
-        run(0, n_gpus, args, devices)
+        run(0, n_gpus, args, devices, data)
     else:
         mp = th.multiprocessing
-        mp.spawn(run, args=(n_gpus, args, devices), nprocs=n_gpus)
+        mp.spawn(run, args=(n_gpus, args, devices, data), nprocs=n_gpus)
