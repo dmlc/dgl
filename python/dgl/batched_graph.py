@@ -349,14 +349,14 @@ class BatchedDGLGraph(DGLGraph):
         sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
         sync_frame_initializer(local_edge_frame._frame, self._edge_frame._frame)
 
-        bg = BatchedDGLGraph([DGLGraph()], ALL, ALL)
-        bg._graph = self._graph
-        bg._node_frame = local_node_frame
-        bg._edge_frame = local_edge_frame
-        bg._batch_size = self._batch_size
-        bg._batch_num_nodes = self._batch_num_nodes
-        bg._batch_num_edges = self._batch_num_edges
-        return bg
+        batched_graph = BatchedDGLGraph([DGLGraph()], ALL, ALL)
+        batched_graph._graph = self._graph
+        batched_graph._node_frame = local_node_frame
+        batched_graph._edge_frame = local_edge_frame
+        batched_graph._batch_size = self._batch_size
+        batched_graph._batch_num_nodes = self._batch_num_nodes
+        batched_graph._batch_num_edges = self._batch_num_edges
+        return batched_graph
 
 def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
     """Split the batch."""
