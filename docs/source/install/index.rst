@@ -1,5 +1,5 @@
 Install DGL
-============
+===========
 
 This topic explains how to install DGL. We recommend installing DGL by using ``conda`` or ``pip``.
 
@@ -36,6 +36,8 @@ After the ``conda`` environment is activated, run one of the following commands.
    conda install -c dglteam dgl              # For CPU Build
    conda install -c dglteam dgl-cuda9.0      # For CUDA 9.0 Build
    conda install -c dglteam dgl-cuda10.0     # For CUDA 10.0 Build
+   conda install -c dglteam dgl-cuda10.1     # For CUDA 10.1 Build
+
 
 Install from pip
 ----------------
@@ -52,7 +54,8 @@ For CUDA builds, run one of the following commands and specify the CUDA version.
    pip install dgl           # For CPU Build
    pip install dgl-cu90      # For CUDA 9.0 Build
    pip install dgl-cu92      # For CUDA 9.2 Build
-   pip install dgl-cu100     # For CUDA 10.0 Build
+   pip install dgl-cu100     # For CUDA 10.0 Build   
+   pip install dgl-cu101     # For CUDA 10.1 Build
 
 For the most current nightly build from master branch, run one of the following commands.
 
@@ -62,40 +65,8 @@ For the most current nightly build from master branch, run one of the following 
    pip install --pre dgl-cu90      # For CUDA 9.0 Build
    pip install --pre dgl-cu92      # For CUDA 9.2 Build
    pip install --pre dgl-cu100     # For CUDA 10.0 Build
+   pip install --pre dgl-cu101     # For CUDA 10.1 Build
 
-
-Working with different backends
--------------------------------
-
-DGL supports PyTorch and MXNet. Here's how to change them.
-
-Switching backend
-`````````````````
-
-The backend is controlled by ``DGLBACKEND`` environment variable, which defaults to
-``pytorch``.  The following values are supported.
-
-+---------+---------+--------------------------------------------------+
-| Value   | Backend | Constraints                                      |
-+=========+=========+==================================================+
-| pytorch | PyTorch | Requires 0.4.1 or later. See                     |
-|         |         | `pytorch.org <https://pytorch.org>`_             |
-+---------+---------+--------------------------------------------------+
-| mxnet   | MXNet   | Requires either MXNet 1.5 for CPU                   |
-|         |         |                                                  |
-|         |         | .. code:: bash                                   |
-|         |         |                                                  |
-|         |         |    pip install mxnet                             |
-|         |         |                                                  |
-|         |         | or MXNet for GPU with CUDA version, e.g. for CUDA 9.2               |
-|         |         |                                                  |
-|         |         | .. code:: bash                                   |
-|         |         |                                                  |
-|         |         |    pip install mxnet-cu90                        |
-|         |         |                                                  |
-+---------+---------+--------------------------------------------------+
-| numpy   | NumPy   | Does not support gradient computation            |
-+---------+---------+--------------------------------------------------+
 
 .. _install-from-source:
 
