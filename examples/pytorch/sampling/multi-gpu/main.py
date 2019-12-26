@@ -8,6 +8,7 @@ import dgl.function as fn
 import time
 import argparse
 from dgl.data import RedditDataset
+from torch.nn.parallel import DistributedDataParallel
 
 ##################################################################################
 # GCN using mean reducer
@@ -242,6 +243,7 @@ def run(proc_id, n_gpus, args, devices):
                                           init_method=dist_init_method,
                                           world_size=world_size,
                                           rank=dev_id)
+    th.cuda.set_device(dev_id)
     th.set_num_threads(args.num_workers * 2 if args.prefetch else args.num_workers)
 
     # Prepare data
@@ -281,7 +283,7 @@ def run(proc_id, n_gpus, args, devices):
         val_nf = list(val_sampler)[0]
         val_nf.copy_from_parent()
         for i in range(val_nf.num_layers):
-            val_nf.layers[i].data['features'] = val_nf.layers[i].data['features'].to(0)
+            val_nf.layers[i].data['features'] = val_nf.layers[i].data['features'].to(dev_id)
 
     # Define model and optimizer
     if args.model == 'gcn':
@@ -293,6 +295,7 @@ def run(proc_id, n_gpus, args, devices):
     else:
         raise ValueError('Unknown model name:', args.model)
     model = model.to(dev_id)
+    model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(dev_id)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
