@@ -18,7 +18,7 @@ Run with the following procedures:
 
 if you want to run Aminer example:
 ```bash
-python metapath2vec.py"
+python metapath2vec.py
 ```
 
 if you want to run your own file:
