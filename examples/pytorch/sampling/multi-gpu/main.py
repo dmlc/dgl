@@ -246,24 +246,8 @@ def run(proc_id, n_gpus, args, devices, data):
     th.cuda.set_device(dev_id)
     th.set_num_threads(args.num_workers * 2 if args.prefetch else args.num_workers)
 
-    # Prepare data
+    # Unpack data
     train_nid, val_nid, in_feats, labels, n_classes, g = data
-    """
-    data = RedditDataset(self_loop=True)
-    train_nid = th.LongTensor(np.nonzero(data.train_mask)[0])
-    val_nid = th.LongTensor(np.nonzero(data.val_mask)[0])
-    features = th.Tensor(data.features)
-    # Split train_nid
-    train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
-
-    in_feats = features.shape[1]
-    labels = th.LongTensor(data.labels)
-    n_classes = data.num_labels
-
-    # Construct graph
-    g = dgl.DGLGraph(data.graph, readonly=True)
-    g.ndata['features'] = features
-    """
     # Split train_nid
     train_nid = th.split(train_nid, len(train_nid) // n_gpus)[dev_id]
 
@@ -387,7 +371,7 @@ if __name__ == '__main__':
     # Construct graph
     g = dgl.DGLGraph(data.graph, readonly=True)
     g.ndata['features'] = features
-    # pack
+    # Pack data
     data = train_nid, val_nid, in_feats, labels, n_classes, g
 
     if n_gpus == 1:
