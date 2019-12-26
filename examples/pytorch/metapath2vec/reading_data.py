@@ -120,13 +120,10 @@ class Metapath2vecDataset(Dataset):
                     pair_catch = []
                     for i, u in enumerate(word_ids):
                         for j, v in enumerate(
-                                #word_ids[max(i - self.window_size, 0):i + self.window_size]):
                                 word_ids[max(i - self.window_size, 0):i] + word_ids[i+1:i+self.window_size]):
 
                             assert u < self.data.word_count
                             assert v < self.data.word_count
-                            #if i == j:
-                                #continue
                             pair_catch.append((u, v, self.data.getNegatives(v,5)))
                     return pair_catch
 

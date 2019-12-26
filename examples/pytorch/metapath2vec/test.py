@@ -3,7 +3,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 import urllib.request
 import os
-...
 
 def trivial_test(test_path, output_file):
     venue_count = 133
