@@ -48,14 +48,12 @@ struct BinaryReduce {
     for (int64_t tx = 0; tx < D; ++tx) {
       DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
       DType* outaddr = outoff + tx;
-      DType outval = *outaddr;
-      Functors::Write(outval, out);
-      *outaddr = outval;
+      Functors::Write(outaddr, out);
     }
   }
 
   static void ApplyEdgeReduce(
-    Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, GData<Idx, DType>* gdata) {
+    Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     const int64_t len = gdata->data_len;
     // LOG(INFO) << "inside ApplyEdgeReduce";
@@ -170,16 +168,13 @@ struct BinaryReduceBcast {
           gdata->lhs_shape, gdata->lhs_stride,
           gdata->rhs_shape, gdata->rhs_stride, &lhs_add, &rhs_add);
       DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
-
       DType* outaddr = outoff + tx;
-      DType outval = *outaddr;
-      Functors::Write(outval, out);
-      *outaddr = outval;
+      Functors::Write(outaddr, out);
     }
   }
 
   static inline void ApplyEdgeReduce(
-    Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BcastGData<NDim, Idx, DType>* gdata) {
+    Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, BcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -189,7 +184,7 @@ struct BinaryReduceBcast {
     if (gdata->rhs_mapping) {
       rid = Functors::GetId(rid, gdata->rhs_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len; //data with len size
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  //data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
 
     int64_t lhs_add = 0;
@@ -238,7 +233,7 @@ struct FunctorsTempl {
   static inline DType Op(DType *lhs, DType *rhs, int64_t len) {
     return BinaryOp::Call(lhs, rhs, len);
   }
-  static inline void Write(DType &addr, DType val) {
+  static inline void Write(DType *addr, DType val) {
     Reducer::Call(addr, val);
   }
   static inline Idx GetId(Idx id, Idx* id_map) {
@@ -246,9 +241,12 @@ struct FunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kSrc> SrcAdvanceConfig;
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> DstAdvanceConfig;
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> EdgeAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kSrc> SrcAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kDst> DstAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kEdge> EdgeAdvanceConfig;
 
 }  // namespace cpu
 

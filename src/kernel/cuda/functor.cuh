@@ -29,8 +29,8 @@ struct LDGReader {
 // Reducer functor specialization
 template <typename DType>
 struct ReduceSum<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType &outval, DType val) {
-    outval += val;
+  static __device__ __forceinline__ void Call(DType *outval, DType val) {
+    *outval = *outval + val;
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return 1;
@@ -39,8 +39,8 @@ struct ReduceSum<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceMax<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType &outval, DType val) {
-    outval = max(outval, val);
+  static __device__ __forceinline__ void Call(DType *outval, DType val) {
+    *outval = max(*outval, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -49,8 +49,8 @@ struct ReduceMax<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceMin<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType &outval, DType val) {
-    outval = min(outval, val);
+  static __device__ __forceinline__ void Call(DType *outval, DType val) {
+    *outval = min(*outval, val);
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return static_cast<DType>(val == accum);
@@ -59,8 +59,8 @@ struct ReduceMin<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceProd<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType &outval, DType val) {
-    outval *= val;
+  static __device__ __forceinline__ void Call(DType *outval, DType val) {
+    *outval = *outval * val;
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return accum / val;
@@ -69,8 +69,8 @@ struct ReduceProd<kDLGPU, DType> {
 
 template <typename DType>
 struct ReduceNone<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType &outval, DType val) {
-    outval = val;
+  static __device__ __forceinline__ void Call(DType *outval, DType val) {
+    *outval = val;
   }
   static __device__ __forceinline__ DType BackwardCall(DType val, DType accum) {
     return 1;

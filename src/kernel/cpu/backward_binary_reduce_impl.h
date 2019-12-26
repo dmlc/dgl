@@ -69,7 +69,7 @@ struct BackwardBinaryReduce {
   }
 
   static inline void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BackwardGData<Idx, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
@@ -100,10 +100,10 @@ struct BackwardBinaryReduce {
     int64_t i = feat_idx%len;
     if (Mode == binary_op::kGradLhs) {
       DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
-      outval += grad_lhs;
+      *outval += grad_lhs;
     } else if (Mode == binary_op::kGradRhs) {
       DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
-      outval += grad_rhs;
+      *outval += grad_rhs;
     }
   }
 
@@ -114,7 +114,7 @@ struct BackwardBinaryReduce {
   static inline DType * GetOutBuf(BackwardGData<Idx, DType> *gdata) {
     if (Mode == binary_op::kGradLhs) {
       return gdata->grad_lhs_data;
-    } else { // (Mode == binary_op::kGradRhs)
+    } else {  // (Mode == binary_op::kGradRhs)
       return gdata->grad_rhs_data;
     }
   }
@@ -126,7 +126,7 @@ struct BackwardBinaryReduce {
       }
 
       return id;
-    } else {// (Mode == binary_op::kGradRhs)
+    } else {  // (Mode == binary_op::kGradRhs)
       if (gdata->rhs_mapping) {
         return Functors::GetId(id, gdata->rhs_mapping);
       }
@@ -192,7 +192,8 @@ struct BackwardBinaryReduceBcast {
   }
 
   static inline void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BackwardBcastGData<NDim, Idx, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval,
+      BackwardBcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -227,10 +228,10 @@ struct BackwardBinaryReduceBcast {
     int64_t i = feat_idx%len;
     if (Mode == binary_op::kGradLhs) {
       DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs_base, rhs_base, i, e);
-      outval += grad_lhs;
+      *outval += grad_lhs;
     } else if (Mode == binary_op::kGradRhs) {
       DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs_base, rhs_base, i, e);
-      outval += grad_rhs;
+      *outval += grad_rhs;
     }
   }
 
@@ -241,7 +242,7 @@ struct BackwardBinaryReduceBcast {
   static inline DType * GetOutBuf(BackwardBcastGData<NDim, Idx, DType> *gdata) {
     if (Mode == binary_op::kGradLhs) {
       return gdata->grad_lhs_data;
-    } else { // (Mode == binary_op::kGradRhs)
+    } else {  // (Mode == binary_op::kGradRhs)
       return gdata->grad_rhs_data;
     }
   }
@@ -253,7 +254,7 @@ struct BackwardBinaryReduceBcast {
       }
 
       return id;
-    } else { // (Mode == binary_op::kGradRhs)
+    } else {  // (Mode == binary_op::kGradRhs)
       if (gdata->rhs_mapping) {
         return Functors::GetId(id, gdata->rhs_mapping);
       }
@@ -342,9 +343,12 @@ struct BackwardFunctorsTempl {
   }
 };
 
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kSrc> SrcAdvanceConfig;
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> DstAdvanceConfig;
-typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> EdgeAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kSrc> SrcAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kDst> DstAdvanceConfig;
+typedef minigun::advance::Config<true, minigun::advance::kV2N,
+  minigun::advance::kEdge> EdgeAdvanceConfig;
 
 }  // namespace cpu
 

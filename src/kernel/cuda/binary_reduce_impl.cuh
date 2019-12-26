@@ -49,15 +49,13 @@ struct BinaryReduce {
       DType out = Functors::Op(lhsoff + tx * len, rhsoff + tx * len, len);
 
       DType* outaddr = outoff + tx;
-      DType outval = __ldg(outaddr);
-      Functors::Write(outval, out);
-      *outaddr = outval;
+      Functors::Write(outaddr, out);
       tx += stride_x;
     }
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, GData<Idx, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
@@ -177,15 +175,13 @@ struct BinaryReduceBcast {
       DType out = Functors::Op(lhsoff + lhs_add * len, rhsoff + rhs_add * len, len);
 
       DType* outaddr = outoff + tx;
-      DType outval = __ldg(outaddr);
-      Functors::Write(outval, out);
-      *outaddr = outval;
+      Functors::Write(outaddr, out);
       tx += stride_x;
     }
   }
 
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      Idx src, Idx dst, Idx eid, Idx feat_idx, DType &outval, BcastGData<NDim, Idx, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, Idx feat_idx, DType *outval, BcastGData<NDim, Idx, DType>* gdata) {
     const int64_t len = gdata->data_len;
     Idx lid = Functors::SelectLeft(src, eid, dst);
     Idx rid = Functors::SelectRight(src, eid, dst);
@@ -244,7 +240,7 @@ struct FunctorsTempl {
   static __device__ __forceinline__ DType Op(DType *lhs, DType *rhs, int64_t len) {
     return BinaryOp::Call(lhs, rhs, len);
   }
-  static __device__ __forceinline__ void Write(DType &outval, DType val) {
+  static __device__ __forceinline__ void Write(DType *outval, DType val) {
     Reducer::Call(outval, val);
   }
   static __device__ __forceinline__ Idx GetId(Idx id, Idx* id_map) {

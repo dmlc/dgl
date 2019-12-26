@@ -51,8 +51,8 @@ enum BackwardMode {
 };
 
 enum BackwardReader {
-  kBackReadNone = 0, // Both lhs and rhs is required
-  kBackReadLhs,      // Only lhs is required
+  kBackReadNone = 0,  // Both lhs and rhs is required
+  kBackReadLhs,       // Only lhs is required
   kBackReadRhs,      // Only rhs is required
   kBackReadBoth,     // Both lhs and rhs is required
 };
