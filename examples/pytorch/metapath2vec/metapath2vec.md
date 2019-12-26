@@ -15,8 +15,15 @@ Run with the following procedures:
 1, Run sampler.py on your graph dataset. Note that: the input text file should be list of mappings so you probably need to preprocess your graph dataset. Files with sample format are available in "net_dbis" file. Of course you could also use your own metapath sampler implementation.
 
 2, Run the following command:
+
+if you want to run Aminer example:
 ```bash
-python metapath2vec.py --download "where/you/want/to/download" --output_file "your_output_file_path"
+python metapath2vec.py"
+```
+
+if you want to run your own file:
+```bash
+python metapath2vec.py --download "your_data_file_path" --output_file "your_output_embedding_file_path"
 ```
 
 Tips: Change num_workers based on your GPU instances; Running 3 or 4 epochs is actually enough. 
@@ -44,8 +51,6 @@ Author Classfication Results for Metapath2vec:
 | Micro-F1 | 0.9279 | 0.9319 | 0.9346 | 0.9356 | 0.9361 | 0.9365 | 0.9365 | 0.9365 | 0.9367 | 0.9369 |
 
 Note that: 
-
-Testing files are available in "label 2" file;
 
 The above are results listed in the paper, in real experiments, exact numbers might be slightly different:
 
