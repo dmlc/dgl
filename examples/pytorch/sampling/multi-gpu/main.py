@@ -295,7 +295,8 @@ def run(proc_id, n_gpus, args, devices):
     else:
         raise ValueError('Unknown model name:', args.model)
     model = model.to(dev_id)
-    model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+    if n_gpus > 1:
+        model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
     loss_fcn = nn.CrossEntropyLoss()
     loss_fcn = loss_fcn.to(dev_id)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
