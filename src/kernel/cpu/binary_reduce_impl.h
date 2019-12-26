@@ -184,7 +184,7 @@ struct BinaryReduceBcast {
     if (gdata->rhs_mapping) {
       rid = Functors::GetId(rid, gdata->rhs_mapping);
     }
-    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  //data with len size
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len * len;  // data with len size
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len * len;
 
     int64_t lhs_add = 0;
