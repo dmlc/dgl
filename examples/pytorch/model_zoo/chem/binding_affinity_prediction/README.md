@@ -49,9 +49,14 @@ roughly 3.3 for training time per epoch (from 1.40s to 0.42s). If we do not care
 randomness introduced by some kernel optimization, we can achieve a speedup by roughly 4.4 (from 1.40s to 0.32s).
 
 ## References
+
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.
+
 [2] Wang et al. (2004) The PDBbind database: collection of binding affinities for protein-ligand complexes 
 with known three-dimensional structures. *J Med Chem* 3;47(12):2977-80.
+
 [3] Wang et al. (2005) The PDBbind database: methodologies and updates. *J Med Chem* 16;48(12):4111-9.
+
 [4] Liu et al. (2015) PDB-wide collection of binding data: current status of the PDBbind database. *Bioinformatics* 1;31(3):405-12.
+
 [5] Gomes et al. (2017) Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity. *arXiv preprint arXiv:1703.10603*.

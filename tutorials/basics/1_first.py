@@ -23,7 +23,7 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 
 ###############################################################################
 # Tutorial problem description
-# ---------------------------
+# ----------------------------
 #
 # The tutorial is based on the "Zachary's karate club" problem. The karate club
 # is a social network that includes 34 members and documents pairwise links
