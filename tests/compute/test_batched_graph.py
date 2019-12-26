@@ -220,7 +220,7 @@ def test_local_var():
         g.edata['w'] = F.ones((g.number_of_edges(), 4))
         assert g.batch_size == 2
         assert g.batch_num_nodes == [2, 3]
-        assert g.batch_num_edges == [4, 6]
+        assert g.batch_num_edges == [2, 4]
     foo1(bg)
     assert F.allclose(bg.ndata['h'], F.zeros((bg.number_of_nodes(), 3)))
     assert F.allclose(bg.edata['w'], F.zeros((bg.number_of_edges(), 4)))
