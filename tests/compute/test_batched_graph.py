@@ -1,5 +1,6 @@
 import dgl
 import backend as F
+import networkx as nx
 
 def tree1():
     """Generate a tree
@@ -203,9 +204,58 @@ def test_batch_no_edge():
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
+def test_local_var():
+    g1 = dgl.DGLGraph(nx.path_graph(2))
+    g1.ndata['h'] = F.zeros((g1.number_of_nodes(), 3))
+    g1.edata['w'] = F.zeros((g1.number_of_edges(), 4))
+    g2 = dgl.DGLGraph(nx.path_graph(3))
+    g2.ndata['h'] = F.zeros((g2.number_of_nodes(), 3))
+    g2.edata['w'] = F.zeros((g2.number_of_edges(), 4))
+    bg = dgl.batch([g1, g2])
+
+    # test override and information about the batch
+    def foo1(g):
+        g = g.local_var()
+        g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['w'] = F.ones((g.number_of_edges(), 4))
+        assert g.batch_size == 2
+        assert g.batch_num_nodes == [2, 3]
+        assert g.batch_num_edges == [4, 6]
+    foo1(bg)
+    assert F.allclose(bg.ndata['h'], F.zeros((bg.number_of_nodes(), 3)))
+    assert F.allclose(bg.edata['w'], F.zeros((bg.number_of_edges(), 4)))
+
+    # test out-place update
+    def foo2(g):
+        g = g.local_var()
+        g.nodes[[2, 3]].data['h'] = F.ones((2, 3))
+        g.edges[[2, 3]].data['w'] = F.ones((2, 4))
+    foo2(bg)
+    assert F.allclose(bg.ndata['h'], F.zeros((bg.number_of_nodes(), 3)))
+    assert F.allclose(bg.edata['w'], F.zeros((bg.number_of_edges(), 4)))
+
+    # test out-place update 2
+    def foo3(g):
+        g = g.local_var()
+        g.apply_nodes(lambda nodes: {'h' : nodes.data['h'] + 10}, [2, 3])
+        g.apply_edges(lambda edges: {'w' : edges.data['w'] + 10}, [2, 3])
+    foo3(bg)
+    assert F.allclose(bg.ndata['h'], F.zeros((bg.number_of_nodes(), 3)))
+    assert F.allclose(bg.edata['w'], F.zeros((bg.number_of_edges(), 4)))
+
+    # test auto-pop
+    def foo4(g):
+        g = g.local_var()
+        g.ndata['hh'] = F.ones((g.number_of_nodes(), 3))
+        g.edata['ww'] = F.ones((g.number_of_edges(), 4))
+    foo4(bg)
+    assert 'hh' not in bg.ndata
+    assert 'ww' not in bg.edata
+
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
+    test_local_var()
     #test_batch_unbatch2()
     #test_batched_edge_ordering()
     #test_batch_send_then_recv()

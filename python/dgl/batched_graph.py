@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from .base import ALL, is_all, DGLError
-from .frame import FrameRef, Frame
+from .frame import FrameRef, Frame, sync_frame_initializer
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
@@ -272,6 +272,91 @@ class BatchedDGLGraph(DGLGraph):
         """Set the value of the slice. The graph size cannot be changed."""
         # TODO
         raise NotImplementedError
+
+    def local_var(self):
+        """Return a :class:`BatchedDGLGraph` object that can be used in a local function scope.
+
+        The returned :class:`BatchedDGLGraph` object shares the feature data, graph structure
+        and information about the graphs in the batch. However, any out-place mutation to the
+        feature data will not reflect to this graph, thus making it easier to use in a
+        function scope.
+
+        If set, the local graph object will use same initializers for node features and
+        edge features.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Avoid accidentally overriding existing feature data. This is quite common when
+        implementing a NN module:
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     g.ndata['h'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['h']
+        >>>
+        >>> g = ... # some graph
+        >>> g.ndata['h'] = torch.zeros((g.number_of_nodes(), 3))
+        >>> newh = foo(g)  # get tensor of all ones
+        >>> print(g.ndata['h'])  # still get tensor of all zeros
+
+        Automatically garbage collect locally-defined tensors without the need to manually
+        ``pop`` the tensors.
+
+        >>> def foo(g):
+        >>>     g = g.local_var()
+        >>>     # This 'xxx' feature will stay local and be GCed when the function exits
+        >>>     g.ndata['xxx'] = torch.ones((g.number_of_nodes(), 3))
+        >>>     return g.ndata['xxx']
+        >>>
+        >>> g = ... # some graph
+        >>> xxx = foo(g)
+        >>> print('xxx' in g.ndata)
+        False
+
+        We still have access to the information of graphs in the batch.
+
+        >>> g = g.local_var()
+        >>> assert isinstance(g, dgl.BatchedDGLGraph)
+        >>> print(g.batch_size)
+        >>> print(g.batch_num_nodes)
+        >>> print(g.batch_num_edges)
+        >>> g_list = dgl.unbatch(g)
+
+        Notes
+        -----
+        Internally, the returned graph shares the same feature tensors, but construct a new
+        dictionary structure (aka. Frame) so adding/removing feature tensors from the returned
+        graph will not reflect to the original graph. However, inplace operations do change
+        the shared tensor values, so will be reflected to the original graph. This function
+        also has little overhead when the number of feature tensors in this graph is small.
+
+        See Also
+        --------
+        local_var
+
+        Returns
+        -------
+        BatchedDGLGraph
+            The :class:`BatchedDGLGraph` object that can be used as a local variable.
+        """
+        local_node_frame = FrameRef(Frame(self._node_frame._frame))
+        local_edge_frame = FrameRef(Frame(self._edge_frame._frame))
+        # Use same per-column initializers and default initializer.
+        # If registered, a column (based on key) initializer will be used first,
+        # otherwise the default initializer will be used.
+        sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
+        sync_frame_initializer(local_edge_frame._frame, self._edge_frame._frame)
+
+        bg = BatchedDGLGraph([DGLGraph()], ALL, ALL)
+        bg._graph = self._graph
+        bg._node_frame = local_node_frame
+        bg._edge_frame = local_edge_frame
+        bg._batch_size = self._batch_size
+        bg._batch_num_nodes = self._batch_num_nodes
+        bg._batch_num_edges = self._batch_num_edges
+        return bg
 
 def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
     """Split the batch."""
