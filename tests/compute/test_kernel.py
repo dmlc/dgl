@@ -304,8 +304,6 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
                   format(lhs, binary_op, rhs, reducer, broadcast, partial))
-            print("lhs", F.asnumpy(lhs).tolist())
-            print("rhs", F.asnumpy(rhs).tolist())
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
@@ -342,7 +340,7 @@ def test_all_binary_builtins():
         if lhs == rhs:
             continue
         for binary_op in ["add", "sub", "mul", "div", "dot"]:
-            for reducer in ["sum", "max", "min", "prod"]:
+            for reducer in ["sum", "max", "min", "prod", "mean"]:
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         #print("{}_{}_{} {} {} {}".format(lhs, binary_op, rhs, reducer, broadcast, partial))

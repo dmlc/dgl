@@ -331,7 +331,7 @@ class BinaryReduce(th.autograd.Function):
                     in_ones_nd = zerocopy_to_dgl_ndarray(in_ones)
                     degs_nd = zerocopy_to_dgl_ndarray(degs)
                     K.copy_reduce(
-                        'sum', graph, target, out_cache_data_nd, degs_nd, None, out_map[0])
+                        'sum', graph, target, in_ones_nd, degs_nd, None, out_map[0])
                     # reshape
                     degs = degs.reshape((out_data.shape[0],) + (1,) * (out_data.dim() - 1)).clamp(min=1)
                     out_data = out_data / degs
