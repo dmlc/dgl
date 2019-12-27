@@ -356,11 +356,11 @@ class BinaryReduce(th.autograd.Function):
                 lhs_map[1], rhs_map[1], out_map[1])
             grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
 
-        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
+        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, None, \
             None, None
 
 
-def binary_reduce(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                   out_size, lhs_map, rhs_map, out_map):
     lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
     rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
@@ -372,7 +372,7 @@ def binary_reduce(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     out_data = lhs_data.new_empty((out_size,) + out_shape)
 
     return BinaryReduce.apply(
-            ctx, reducer, binary_op, lhs, rhs, lhs_data, rhs_data, out_data,
+            reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
             out_size, lhs_map, rhs_map, out_map)
 
 
@@ -420,12 +420,12 @@ class CopyReduce(th.autograd.Function):
                 reducer if reducer != 'mean' else 'sum',
                 graph, target, in_data_nd, out_data_nd, grad_out_nd,
                 zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
-        return None, None, None, grad_in, None, None, None
+        return None, None, None, grad_in, None, None, None, None
 
 
 def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
-    return CopyReduce.apply(reducer, graph, target, in_data, out_data, in_map, out_map)
+    return CopyReduce.apply(reducer, graph, target, in_data, out_data, out_size, in_map, out_map)
 
 
 def _reduce_grad(grad, shape):
