@@ -11,6 +11,8 @@ from .._ffi.ndarray import empty_shared_mem
 
 import numpy as np
 import socket
+import fcntl
+import struct
 
 def read_ip_config(filename):
     """Read networking configuration from file.
