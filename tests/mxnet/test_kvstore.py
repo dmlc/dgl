@@ -1,6 +1,6 @@
 import dgl
 import argparse
-import torch as th
+import mxnet as mx
 import time
 import backend as F
 
