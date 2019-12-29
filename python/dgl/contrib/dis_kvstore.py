@@ -6,12 +6,11 @@ from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
 from ..network import KVMsgType, KVStoreMsg
 
+from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
 import numpy as np
-from .. import backend as F
 import socket
-import psutil
 
 def read_ip_config(filename):
     """Read networking configuration from file.
@@ -799,14 +798,28 @@ class KVClient(object):
         return IP + ':' + str(port)
 
 
-    def _ip4_addr_list(self):
-        ip_list = set()
-        for interface, snics in psutil.net_if_addrs().items():
-            for snic in snics:
-                if snic.family == socket.AF_INET:
-                    ip_list.add(snic.address)
+    def _get_ip_address(self, NICname):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return socket.inet_ntoa(fcntl.ioctl(
+            s.fileno(),
+            0x8915,  # SIOCGIFADDR
+            struct.pack('256s', NICname[:15].encode("UTF-8"))
+        )[20:24])
 
-        return ip_list
+
+    def _ip4_addr_list():
+        """
+        Return a set of IPv4 address
+        """
+        nic = set()
+
+        for ix in socket.if_nameindex():
+            name = ix[1]
+            ip = self._get_ip_address(name)
+
+            nic.append(ip)
+
+        return nic
 
 
     def _takeId(self, elem):
