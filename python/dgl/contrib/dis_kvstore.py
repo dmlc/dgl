@@ -799,6 +799,8 @@ class KVClient(object):
 
 
     def _get_ip_address(self, NICname):
+        """Return IP by given a NIC name
+        """
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
             s.fileno(),
@@ -807,9 +809,8 @@ class KVClient(object):
         )[20:24])
 
 
-    def _ip4_addr_list():
-        """
-        Return a set of IPv4 address
+    def _ip4_addr_list(self):
+        """Return a set of IPv4 address
         """
         nic = set()
 
