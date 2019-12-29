@@ -9,10 +9,12 @@ from ..network import KVMsgType, KVStoreMsg
 from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
+import os
 import numpy as np
 import socket
-import fcntl
-import struct
+if os.name != 'nt'
+    import fcntl
+    import struct
 
 def read_ip_config(filename):
     """Read networking configuration from file.
