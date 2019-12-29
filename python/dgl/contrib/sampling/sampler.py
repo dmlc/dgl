@@ -737,11 +737,9 @@ class EdgeSampler(object):
     def __iter__(self):
         it = SamplerIter(self)
         if self._is_uniform:
-            subgs = _CAPI_ResetUniformEdgeSample(
-                self._sampler)
+            _CAPI_ResetUniformEdgeSample(self._sampler)
         else:
-            subgs = _CAPI_ResetWeightedEdgeSample(
-                self._sampler)
+            _CAPI_ResetWeightedEdgeSample(self._sampler)
 
         if self._num_prefetch:
             return self._prefetching_wrapper_class(it, self._num_prefetch)

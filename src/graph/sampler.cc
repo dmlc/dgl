@@ -1649,7 +1649,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
     curr_batch_id_ = 0;
     // handle int64 overflow here
     max_batch_id_ = (num_edges + batch_size - 1) / batch_size;
-
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
@@ -1673,8 +1672,10 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
         size_t num_ids = 0;
 #pragma omp critical
         num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
-        while (edge_ids.size() > num_ids) {
-          edge_ids.pop_back();
+
+        edge_ids.resize(num_ids);
+        for (size_t i = 0; i < num_ids; ++i) {
+          edge_ids[i] = seed_edge_ids[edge_ids[i]];
         }
       } else {
         // sampling of each edge is a standalone event
