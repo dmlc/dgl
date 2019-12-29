@@ -12,7 +12,7 @@ from .._ffi.ndarray import empty_shared_mem
 import os
 import numpy as np
 import socket
-if os.name != 'nt'
+if os.name != 'nt':
     import fcntl
     import struct
 
