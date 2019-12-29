@@ -11,8 +11,8 @@ import time
 # This partitions a list of edges based on relations to make sure
 # each partition has roughly the same number of edges and relations.
 def RelationPartition(edges, n):
-    print('relation partition {} edges into {} parts'.format(len(edges), n))
     heads, rels, tails = edges
+    print('relation partition {} edges into {} parts'.format(len(heads), n))
     uniq, cnts = np.unique(rels, return_counts=True)
     idx = np.flip(np.argsort(cnts))
     cnts = cnts[idx]
@@ -43,15 +43,16 @@ def RelationPartition(edges, n):
     return parts
 
 def RandomPartition(edges, n):
-    print('random partition {} edges into {} parts'.format(len(edges), n))
     heads, rels, tails = edges
-    idx = np.random.permutation(len(edges))
+    print('random partition {} edges into {} parts'.format(len(heads), n))
+    idx = np.random.permutation(len(heads))
     part_size = int(math.ceil(len(idx) / n))
     parts = []
     for i in range(n):
         start = part_size * i
         end = min(part_size * (i + 1), len(idx))
         parts.append(idx[start:end])
+        print('part {} has {} edges'.format(i, len(parts[-1])))
     return parts
 
 def ConstructGraph(edges, n_entities, args):
