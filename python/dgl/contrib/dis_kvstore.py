@@ -11,7 +11,7 @@ from .._ffi.ndarray import empty_shared_mem
 import numpy as np
 import dgl.backend as F
 import socket
-import psutil
+#import psutil
 
 def read_ip_config(filename):
     """Read networking configuration from file.
