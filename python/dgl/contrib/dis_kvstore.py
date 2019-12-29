@@ -11,6 +11,7 @@ from .._ffi.ndarray import empty_shared_mem
 import numpy as np
 import dgl.backend as F
 import socket
+import psutil
 
 def read_ip_config(filename):
     """Read networking configuration from file.
@@ -551,7 +552,7 @@ class KVClient(object):
         # find local server nodes
         for ID, addr in self._server_namebook.items():
             server_ip, server_port = addr.split(':')
-            if client_ip == server_ip or server_ip == '127.0.0.1':
+            if server_ip in self._ip4_addr_list():
                 self._local_server_id.add(ID)
 
         # send addr to server nodes
@@ -583,8 +584,8 @@ class KVClient(object):
                 for server_id in self._local_server_id:
                     shared_data = empty_shared_mem(tensor_name+str(server_id), False, shape, dtype)
                     dlpack = shared_data.to_dlpack()
-                    self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
-                    self._has_data.add(tensor_name)
+                    self._data_store[tensor_name+str(server_id)] = F.zerocopy_from_dlpack(dlpack)
+                    self._has_data.add(tensor_name+str(server_id))
 
 
     def push(self, name, id_tensor, data_tensor):
@@ -622,11 +623,11 @@ class KVClient(object):
             partial_data = data_tensor[start:end]
 
             if server[idx] in self._local_server_id and self._close_shared_mem == False:
-                if (name+'-g2l-' in self._has_data) == True:
-                    local_id = self._data_store[name+'-g2l-'][partial_id]
+                if (name+'-g2l-'+str(server[idx]) in self._has_data) == True:
+                    local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                self._push_handler(name+'-data-', local_id, data_tensor, self._data_store)
+                self._push_handler(name+'-data-'+str(server[idx]), local_id, data_tensor, self._data_store)
             else:
                 msg = KVStoreMsg(
                     type=KVMsgType.PUSH, 
@@ -676,11 +677,11 @@ class KVClient(object):
             partial_id = id_tensor[start:end]
 
             if server[idx] in self._local_server_id and self._close_shared_mem == False:
-                if (name+'-g2l-' in self._has_data) == True:
-                    local_id = self._data_store[name+'-g2l-'][partial_id]
+                if (name+'-g2l-'+str(server[idx]) in self._has_data) == True:
+                    local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                local_data[server[idx]] = self._pull_handler(name+'-data-', local_id, self._data_store)
+                local_data[server[idx]] = self._pull_handler(name+'-data-'+str(server[idx]), local_id, self._data_store)
             else:
                 msg = KVStoreMsg(
                     type=KVMsgType.PULL, 
@@ -796,6 +797,16 @@ class KVClient(object):
         s.close()
 
         return IP + ':' + str(port)
+
+
+    def _ip4_addr_list(self):
+        ip_list = set()
+        for interface, snics in psutil.net_if_addrs().items():
+            for snic in snics:
+                if snic.family == socket.AF_INET:
+                    ip_list.add(snic.address)
+
+        return ip_list
 
 
     def _takeId(self, elem):
