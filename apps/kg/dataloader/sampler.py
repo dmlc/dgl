@@ -111,7 +111,7 @@ class TrainDataset(object):
                        shuffle=True, exclude_positive=False, rank=0):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         return EdgeSampler(self.g,
-                           seed_edges=self.edge_parts[rank],
+                           seed_edges=F.tensor(self.edge_parts[rank]),
                            batch_size=batch_size,
                            neg_sample_size=neg_sample_size,
                            negative_mode=mode,
