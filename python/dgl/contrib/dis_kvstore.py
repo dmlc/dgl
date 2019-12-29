@@ -820,7 +820,7 @@ class KVClient(object):
             name = ix[1]
             ip = self._get_ip_address(name)
 
-            nic.append(ip)
+            nic.add(ip)
 
         return nic
 
