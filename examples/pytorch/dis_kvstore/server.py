@@ -1,21 +1,32 @@
-# This is a simple pytorch server demo shows how to use DGL distributed kvstore.
-# In this demo, we initialize two embeddings on server and push/pull data to/from it.
+# This is a simple MXNet server demo shows how to use DGL distributed kvstore.
 import dgl
-import torch
 import argparse
 import torch as th
 
-server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
+ndata_g2l = []
+edata_g2l = []
+
+ndata_g2l.append({'ndata':th.tensor([0,1,0,0,0,0,0,0])})
+ndata_g2l.append({'ndata':th.tensor([0,0,0,1,0,0,0,0])})
+ndata_g2l.append({'ndata':th.tensor([0,0,0,0,0,1,0,0])})
+ndata_g2l.append({'ndata':th.tensor([0,0,0,0,0,0,0,1])})
+
+edata_g2l.append({'edata':th.tensor([0,1,0,0,0,0,0,0])})
+edata_g2l.append({'edata':th.tensor([0,0,0,1,0,0,0,0])})
+edata_g2l.append({'edata':th.tensor([0,0,0,0,0,1,0,0])})
+edata_g2l.append({'edata':th.tensor([0,0,0,0,0,0,0,1])})
 
 def start_server(args):
-    server = dgl.contrib.KVServer(
-        server_id=args.id, 
-        client_namebook=client_namebook, 
-        server_addr=server_namebook[args.id])
+    
+    dgl.contrib.start_server(
+        server_id=args.id,
+        ip_config='ip_config.txt',
+        num_client=4,
+        ndata={'ndata':th.tensor([[0.,0.,0.],[0.,0.,0.]])},
+        edata={'edata':th.tensor([[0.,0.,0.],[0.,0.,0.]])},
+        ndata_g2l=ndata_g2l[args.id],
+        edata_g2l=edata_g2l[args.id])
 
-    server.init_data(name='server_embed', data_tensor=th.tensor([0., 0., 0., 0., 0.]))
-
-    server.start()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='kvstore')

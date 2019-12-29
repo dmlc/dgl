@@ -252,11 +252,12 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
 
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     # Test the homogeneous graph.
-    total_samples = 0
+
     batch_size = 50
-    max_samples = num_edges
+    total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
                                             negative_mode=mode,
+                                            reset=False,
                                             neg_sample_size=neg_size,
                                             exclude_positive=exclude_positive,
                                             return_false_neg=True):
@@ -289,15 +290,80 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
             assert np.sum(F.asnumpy(exist) == 0) == len(exist)
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
-
         total_samples += batch_size
+    assert total_samples <= num_edges
+
+    # check replacement = True
+    # with reset = False (default setting)
+    total_samples = 0
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
+                                            reset=False,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+    assert total_samples == num_edges
+
+    # check replacement = False
+    # with reset = False (default setting)
+    total_samples = 0
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=False,
+                                            reset=False,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+    assert total_samples == num_edges
+
+    # check replacement = True
+    # with reset = True
+    total_samples = 0
+    max_samples = 2 * num_edges
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
+                                            reset=True,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) <= batch_size
+        total_samples += len(pos_leid)
         if (total_samples >= max_samples):
             break
+    assert total_samples >= max_samples
+
+    # check replacement = False
+    # with reset = True
+    total_samples = 0
+    max_samples = 2 * num_edges
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=False,
+                                            reset=True,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) <= batch_size
+        total_samples += len(pos_leid)
+        if (total_samples >= max_samples):
+            break
+    assert total_samples >= max_samples
 
     # Test the knowledge graph.
     total_samples = 0
     for _, neg_edges in EdgeSampler(g, batch_size,
                                     negative_mode=mode,
+                                    reset=False,
                                     neg_sample_size=neg_size,
                                     exclude_positive=exclude_positive,
                                     relations=g.edata['etype'],
@@ -316,8 +382,7 @@ def check_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
         total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
+    assert total_samples <= num_edges
 
 def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g = generate_rand_graph(100)
@@ -339,9 +404,10 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     # Correctness check
     # Test the homogeneous graph.
     batch_size = 50
+    # Test the knowledge graph with edge weight provied.
     total_samples = 0
-    max_samples = num_edges
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            reset=False,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -376,12 +442,12 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         else:
             assert F.array_equal(g.has_edges_between(neg_src, neg_dst), exist)
         total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
+    assert total_samples <= num_edges
 
     # Test the knowledge graph with edge weight provied.
     total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            reset=False,
                                             edge_weight=edge_weight,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
@@ -402,12 +468,12 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
         total_samples += batch_size
-        if (total_samples >= max_samples):
-            break
+    assert total_samples <= num_edges
 
     # Test the knowledge graph with edge/node weight provied.
     total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            reset=False,
                                             edge_weight=edge_weight,
                                             node_weight=node_weight,
                                             negative_mode=mode,
@@ -429,8 +495,80 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
                 exist = neg_edges.edata['etype'][i] == etype
                 assert F.asnumpy(exists[i]) == F.asnumpy(exist)
         total_samples += batch_size
-        if (total_samples >= max_samples):
+    assert total_samples <= num_edges
+
+    # check replacement = True with pos edges no-uniform sample
+    # with reset = False
+    total_samples = 0
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
+                                            reset=False,
+                                            edge_weight=edge_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+    assert total_samples == num_edges
+
+    # check replacement = True with pos edges no-uniform sample
+    # with reset = True
+    total_samples = 0
+    max_samples = 4 * num_edges
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
+                                            reset=True,
+                                            edge_weight=edge_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+        if total_samples >= max_samples:
             break
+    assert total_samples == max_samples
+
+    # check replacement = False with pos/neg edges no-uniform sample
+    # reset = False
+    total_samples = 0
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=False,
+                                            reset=False,
+                                            edge_weight=edge_weight,
+                                            node_weight=node_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            relations=g.edata['etype'],
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+    assert total_samples == num_edges
+
+    # check replacement = False with pos/neg edges no-uniform sample
+    # reset = True
+    total_samples = 0
+    for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=False,
+                                            reset=True,
+                                            edge_weight=edge_weight,
+                                            node_weight=node_weight,
+                                            negative_mode=mode,
+                                            neg_sample_size=neg_size,
+                                            exclude_positive=exclude_positive,
+                                            relations=g.edata['etype'],
+                                            return_false_neg=True):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        assert len(pos_leid) == batch_size
+        total_samples += len(pos_leid)
+        if total_samples >= max_samples:
+            break
+    assert total_samples == max_samples
 
     # Check Rate
     dgl.random.seed(0)
@@ -445,13 +583,15 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     g.edata['etype'] = F.copy_to(F.tensor(etype), F.cpu())
 
     # Test w/o node weight.
-    max_samples = num_edges / 5
-    # Test the knowledge graph with edge weight provied.
+    max_samples = num_edges // 5
     total_samples = 0
+    # Test the knowledge graph with edge weight provied.
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
                                             edge_weight=edge_weight,
+                                            shuffle=True,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=False,
@@ -465,11 +605,11 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         else:
             neg_dst = neg_edges.parent_nid[neg_ldst]
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)), 1)
-
+        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
         total_samples += batch_size
-        if (total_samples >= max_samples):
+        if total_samples > max_samples:
             break
+
     # Check rate here
     edge_rate_0 = edge_sampled[0] / edge_sampled.sum()
     edge_tail_half_cnt = edge_sampled[edge_sampled.shape[0] // 2:-1].sum()
@@ -484,12 +624,14 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     assert np.allclose(node_rate_tail_half, 0.5, atol=0.02)
 
     # Test the knowledge graph with edge/node weight provied.
-    total_samples = 0
     edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
     node_sampled = np.full((num_nodes,), 0, dtype=np.int32)
+    total_samples = 0
     for pos_edges, neg_edges in EdgeSampler(g, batch_size,
+                                            replacement=True,
                                             edge_weight=edge_weight,
                                             node_weight=node_weight,
+                                            shuffle=True,
                                             negative_mode=mode,
                                             neg_sample_size=neg_size,
                                             exclude_positive=False,
@@ -503,10 +645,9 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
         else:
             neg_dst = F.gather_row(neg_edges.parent_nid, neg_ldst)
             np.add.at(node_sampled, F.asnumpy(neg_dst), 1)
-        np.add.at(edge_sampled, F.asnumpy(F.gather_row(pos_edges.parent_eid, pos_leid)), 1)
-
+        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
         total_samples += batch_size
-        if (total_samples >= max_samples):
+        if total_samples > max_samples:
             break
 
     # Check rate here

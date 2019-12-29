@@ -118,7 +118,7 @@ def pagerank_naive(g):
 
 ###############################################################################
 # Batching semantics for a large graph
-# -----------------------------------
+# ------------------------------------
 # The above code does not scale to a large graph because it iterates over all
 # the nodes. DGL solves this by allowing you to compute on a *batch* of nodes or
 # edges. For example, the following codes trigger message and reduce functions
