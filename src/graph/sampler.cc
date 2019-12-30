@@ -123,7 +123,7 @@ class ArrayHeap {
 template <
   typename Idx,
   typename DType,
-  bool replace = true>
+  bool replace>
 class AliasSampler {
  private:
   RandomEngine *re;
@@ -240,6 +240,10 @@ class AliasSampler {
  * Sampler building complexity: O(n)
  * Sample w/ and w/o replacement complexity: O(log n)
  */
+template <
+  typename Idx,
+  typename DType,
+  bool replace>
 class CDFSampler {
  private:
   RandomEngine *re;
@@ -320,6 +324,10 @@ class CDFSampler {
  * Sampler building complexity: O(n)
  * Sample w/ and w/o replacement complexity: O(log n)
  */
+template <
+  typename Idx,
+  typename DType,
+  bool replace>
 class TreeSampler {
  private:
   RandomEngine *re;
