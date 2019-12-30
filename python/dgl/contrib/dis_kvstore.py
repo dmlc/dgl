@@ -558,6 +558,9 @@ class KVClient(object):
             if server_ip in self._ip4_addr_list():
                 self._local_server_id.add(ID)
 
+        print("local server id: ")
+        print(self._local_server_id)
+
         # send addr to server nodes
         msg = KVStoreMsg(
             type=KVMsgType.IP_ID,
