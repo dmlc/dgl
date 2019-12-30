@@ -6,7 +6,6 @@
 #ifndef DGL_SAMPLE_UTILS_H_
 #define DGL_SAMPLE_UTILS_H_
 
-#include <dmlc/logging.h>
 #include <random.h>
 #include <algorithm>
 #include <utility>
@@ -14,6 +13,8 @@
 #include <cstdlib>
 #include <cmath>
 #include <numeric>
+#include <limits>
+#include <vector>
 
 namespace dgl {
 
@@ -285,4 +286,4 @@ class TreeSampler {
 
 };  // namespace dgl
 
-#endif //DGL_SAMPLE_UTILS_H_
+#endif  // DGL_SAMPLE_UTILS_H_
