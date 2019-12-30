@@ -16,7 +16,7 @@ def track_gcn_time(dataset, gpu_id):
     time_list = []
     for line in lines:
         if 'Time ' in line:
-            time_str = lines.strip().split('|')[1]
+            time_str = line.strip().split('|')[1]
             time = float(time_str.split()[-1])
             time_list.append(time)
     return np.array(time_list)[-10:].mean()
@@ -30,7 +30,7 @@ def track_gcn_accuracy(dataset, gpu_id):
     acc_list = []
     for line in lines:
         if 'Test accuracy' in line:
-            acc_str = lines.strip().split('|')[3]
+            acc_str = line.strip().split('|')[3]
             acc = float(time_str.split()[-1])
             acc_list.append(acc)
     return np.array(acc_list)[-10:].mean()
