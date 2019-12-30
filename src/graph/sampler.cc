@@ -1670,9 +1670,10 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       if (replacement_ == false) {
         size_t n = batch_size_;
         size_t num_ids = 0;
-#pragma omp critical
-        num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
-
+#pragma omp critical (edge_sample)
+        {
+          num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
+        }
         edge_ids.resize(num_ids);
         for (size_t i = 0; i < num_ids; ++i) {
           edge_ids[i] = seed_edge_ids[edge_ids[i]];
@@ -1684,6 +1685,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
           edge_ids[i] = seed_edge_ids[edge_id];
         }
       }
+
       auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);

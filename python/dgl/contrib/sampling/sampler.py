@@ -542,6 +542,10 @@ class EdgeSampler(object):
     edges and reset the replacement state. If it is set to false, the sampler will only 
     generate num_edges/batch_size samples.
 
+    Note: If node_weight is extremely imbalanced, the sampler will take much longer 
+    time to return a minibatch, as sampled negative nodes must not be duplicated for 
+    one corruptted positive edge.
+
     Parameters
     ----------
     g : DGLGraph
