@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <dgl/random.h>
 #include <dgl/sample_utils.h>
 #include <vector>
 #include <algorithm>
@@ -12,7 +11,6 @@ void _TestWithReplacement(RandomEngine *re) {
   Idx n_categories = 1000;
   Idx n_rolls = 100000;
   std::vector<DType> prob;
-  std::vector<bool> counter(n_categories);
   DType accum = 0.;
   for (Idx i = 0; i < n_categories; ++i) {
     prob.push_back(re->Uniform<DType>());
@@ -21,9 +19,9 @@ void _TestWithReplacement(RandomEngine *re) {
   for (Idx i = 0; i < n_categories; ++i)
     prob[i] /= accum;
 
-  auto _test_given_sampler = [n_categories, n_rolls, &counter, &prob](
+  auto _test_given_sampler = [n_categories, n_rolls, &prob](
       BaseSampler<Idx, DType, true> *s) {
-    std::fill(counter.begin(), counter.end(), 0);
+    std::vector<bool> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = s->draw();
       counter[dice]++;
