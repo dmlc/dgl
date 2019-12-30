@@ -346,9 +346,11 @@ class TreeSampler {
 
   inline Idx draw(RandomEngine *re) {
     Idx cur = 1;
+    DType p = re->Uniform<DType>(0., weight[cur]);
+    DType accum = 0;
     while (cur < num_leafs) {
-      DType p = re->Uniform<DType>(0., weight[cur]);
-      cur = cur * 2 + static_cast<Idx>(p > weight[cur * 2]);
+      accum += weight[cur * 2];
+      cur = cur * 2 + static_cast<Idx>(p > accum);
     }
     Idx rst = cur - num_leafs;
     if (!replace) {
