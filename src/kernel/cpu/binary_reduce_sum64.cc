@@ -12,7 +12,7 @@ namespace kernel {
 #define REDUCER ReduceSum
 #define XPU kDLCPU
 
-#define IDX int32_t
+#define IDX int64_t
 EVAL(GEN_DTYPE, GEN_OP_TARGET, GEN_DEFINE);
 EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_OP_TARGET, GEN_BACKWARD_DEFINE);
 #undef IDX
