@@ -324,6 +324,6 @@ def _clear_kv_msg(msg):
         kvstore message
     """
     if msg.data is not None:
-        F.sync(msg.data)
+        F.sync()
         data = F.zerocopy_to_dgl_ndarray(msg.data)
         _CAPI_DeleteNDArrayData(data)
