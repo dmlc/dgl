@@ -421,6 +421,7 @@ class KVServer(object):
         """
         return target[name][ID]
 
+
     def _serialize_shared_tensor(self, name, shape, dtype):
         """Serialize shared tensor
 
