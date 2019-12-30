@@ -1282,7 +1282,6 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
 
   IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
@@ -1297,7 +1296,6 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
@@ -1314,10 +1312,11 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
   }
 
   // We first sample all negative edges.
-  std::vector<size_t> neg_vids;
+  std::vector<size_t> global_neg_vids;
+  std::vector<size_t> local_neg_vids;
   randomSample(num_tot_nodes,
                num_chunks * neg_sample_size,
-               &neg_vids);
+               &global_neg_vids);
 
   dgl_id_t curr_eid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
@@ -1333,6 +1332,13 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
       local_pos_vids.push_back(local_vid);
       neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
     }
+  }
+
+  // We should map the global negative nodes to local Ids in advance
+  // to reduce computation overhead.
+  local_neg_vids.resize(global_neg_vids.size());
+  for (size_t i = 0; i < global_neg_vids.size(); i++) {
+    local_neg_vids[i] = global2local_map(global_neg_vids[i], &neg_map);;
   }
 
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
@@ -1353,12 +1359,7 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
       dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
       for (int64_t j = 0; j < neg_sample_size; ++j) {
         neg_unchanged[neg_idx] = local_unchanged;
-        neg_eid_data[neg_idx] = curr_eid++;
-        dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
-
-        // TODO(zhengda) we can avoid the hashtable lookup here.
-        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
-        neg_changed[neg_idx] = local_changed;
+        neg_changed[neg_idx] = local_neg_vids[neg_node_idx + j];
         induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
         neg_idx++;
       }
@@ -1381,11 +1382,11 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
   } else {
     neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
-    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
   }
   if (check_false_neg) {
     if (relations_->shape[0] == 0) {
