@@ -88,7 +88,7 @@ template <typename Idx, typename DType>
 void _TestWithoutReplacementUnique(RandomEngine *re) {
   Idx N = 100000;
   std::vector<DType> likelihood;
-  for (Idx i = 0; i < n_categories; ++i)
+  for (Idx i = 0; i < N; ++i)
     likelihood.push_back(re->Uniform<DType>());
 
   auto _check_given_sampler = [N](
