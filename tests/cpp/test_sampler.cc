@@ -16,7 +16,7 @@ TEST(SampleUtilsTest, TestWithReplacement) {
   re.SetSeed(42);
   _TestWithReplacement<int32_t, double>(&re);
   re.SetSeed(42);
-  _TestWithReplacement<int64_t, float)(&re);
+  _TestWithReplacement<int64_t, float>(&re);
   re.SetSeed(42);
   _TestWithReplacement<int64_t, double>(&re);
 };
@@ -47,7 +47,7 @@ void _TestWithReplacement(RandomEngine *re) {
   void _TestGivenSampler(BaseSampler *s, std::vector<bool>& counter) {
     std::fill(counter.begin(), counter.end(), 0);
     for (Idx i = 0; i < n_rolls; ++i) {
-      Idx dice = as.draw();
+      Idx dice = s->draw();
       counter[dice]++;
     }
     for (Idx i = 0; i < n_categories; ++i)
@@ -57,7 +57,7 @@ void _TestWithReplacement(RandomEngine *re) {
   AliasSampler<Idx, DType, true> as(&re, prob);
   CDFSampler<Idx, DType, true> cs(&re, prob);
   TreeSampler<Idx, DType, true> ts(&re, prob);
-  _TestWithReplacement(&as);
-  _TestWithReplacement(&cs);
-  _TestWithReplacement(&ts);
+  _TestGivenSampler(&as);
+  _TestGivenSampler(&cs);
+  _TestGivenSampler(&ts);
 }
