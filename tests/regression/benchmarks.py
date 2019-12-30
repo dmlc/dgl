@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 base_path = Path("~/regression/dgl/")
+# base_path = Path("~/dev/csr/dgl/")
 
 class GCNBenchmark:
 
@@ -14,7 +15,7 @@ class GCNBenchmark:
     param_names = ['dataset', 'gpu_id']
     timeout = 120
 
-    def setup(self):
+    def setup(self, dataset, gpu_id):
         gcn_path = base_path / "examples/pytorch/gcn/train.py"
         bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(gcn_path.expanduser(), dataset, gpu_id)
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
