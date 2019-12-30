@@ -51,7 +51,6 @@ class ArrayHeap {
    */
   void Delete(size_t index) {
     size_t i = index + limit_;
-    ValueType w = heap_[i];
     heap_[i] = 0;
     i /= 2;
     for (int j = bit_len_-1; j >= 0; --j) {
@@ -1465,12 +1464,14 @@ public:
                                               sizeof(dgl_id_t) * start);
       } else {
         std::vector<dgl_id_t> seeds;
+        const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
         // sampling of each edge is a standalone event
         for (int64_t i = 0; i < num_edges; ++i) {
-          seeds.push_back(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          int64_t seed = static_cast<const int64_t>(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          seeds.push_back(seed_edge_ids[seed]);
         }
 
-        worker_seeds = aten::VecToIdArray(seeds);
+        worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
       }
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
