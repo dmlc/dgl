@@ -378,7 +378,7 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
-            _clear_kv_msg(msg)
+            #_clear_kv_msg(msg)
 
 
     def _push_handler(self, name, ID, data, target):
@@ -718,8 +718,8 @@ class KVClient(object):
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
 
-        #for msg in msg_list:
-        #    _clear_kv_msg(msg)
+        for msg in msg_list:
+            _clear_kv_msg(msg)
 
         return data_tensor[back_sorted_id] # return data with original index order
 
