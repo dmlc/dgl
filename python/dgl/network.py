@@ -1,6 +1,7 @@
 """DGL Distributed Training Infrastructure."""
 from __future__ import absolute_import
 
+import os
 import time
 import signal
 from enum import Enum
