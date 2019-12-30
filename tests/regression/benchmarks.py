@@ -11,7 +11,7 @@ class GCNBenchmark:
 
     def setup(self):
         print(os.getcwd())
-        bashCommand = "python examples/pytorch/gcn/train.py --dataset cora --gpu -1"
+        bashCommand = "python {} --dataset cora --gpu -1".format(base_path / "examples/pytorch/gcn/train.py")
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
         self.output = output
