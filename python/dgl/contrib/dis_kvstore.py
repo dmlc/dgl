@@ -558,9 +558,6 @@ class KVClient(object):
             if server_ip in self._ip4_addr_list():
                 self._local_server_id.add(ID)
 
-        print("local server id: ")
-        print(self._local_server_id)
-
         # send addr to server nodes
         msg = KVStoreMsg(
             type=KVMsgType.IP_ID,
@@ -633,7 +630,6 @@ class KVClient(object):
                     local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                print("push: " + name + '-data-'+str(server[idx]))
                 self._push_handler(name+'-data-'+str(server[idx]), local_id, data_tensor, self._data_store)
             else:
                 msg = KVStoreMsg(
@@ -688,7 +684,6 @@ class KVClient(object):
                     local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                print("pull: " + name + '-data-'+str(server[idx]))
                 local_data[server[idx]] = self._pull_handler(name+'-data-'+str(server[idx]), local_id, self._data_store)
             else:
                 msg = KVStoreMsg(
