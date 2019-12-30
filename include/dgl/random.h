@@ -12,9 +12,9 @@
 #include <random>
 #include <thread>
 
-using namespace dgl::runtime;
-
 namespace dgl {
+
+using namespace dgl::runtime;
 
 namespace {
 

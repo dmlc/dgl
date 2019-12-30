@@ -14,7 +14,7 @@
 #include <numeric>
 #include <limits>
 #include <vector>
-#include "./random.h"
+#include "random.h"
 
 namespace dgl {
 
