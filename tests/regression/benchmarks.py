@@ -5,7 +5,7 @@ import subprocess
 import os
 from pathlib import Path
 
-base_path = "~/regression/dgl/"
+base_path = Path("~/regression/dgl/")
 
 class GCNBenchmark:
 
