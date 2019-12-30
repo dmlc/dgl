@@ -1484,7 +1484,8 @@ public:
         const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
         // sampling of each edge is a standalone event
         for (int64_t i = 0; i < num_edges; ++i) {
-          int64_t seed = static_cast<const int64_t>(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          int64_t seed = static_cast<const int64_t>(
+              RandomEngine::ThreadLocal()->RandInt(num_seeds_));
           seeds.push_back(seed_edge_ids[seed]);
         }
 
