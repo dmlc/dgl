@@ -54,6 +54,8 @@ class ArrayHeap {
     heap_[i] = 0;
     i /= 2;
     for (int j = bit_len_-1; j >= 0; --j) {
+      // Using heap_[i] = heap_[i] - w will loss some precision in float.
+      // Using addition to re-calculate the weight layer by layer.
       heap_[i] = heap_[i << 1] + heap_[(i << 1) + 1];
       i /= 2;
     }
