@@ -378,7 +378,7 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
-            #_clear_kv_msg(msg)
+            _clear_kv_msg(msg)
 
 
     def _push_handler(self, name, ID, data, target):

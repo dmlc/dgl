@@ -13,6 +13,7 @@ from . import utils
 
 _init_api("dgl.network")
 
+kv_backend = os.environ.get('DGLBACKEND', 'pytorch')
 
 ################################ Common Network Components ##################################
 
@@ -324,5 +325,7 @@ def _clear_kv_msg(msg):
         kvstore message
     """
     if msg.data is not None:
+        if kv_backend.lower() == 'mxnet':
+            msg.data.waitall()
         data = F.zerocopy_to_dgl_ndarray(msg.data)
         _CAPI_DeleteNDArrayData(data)
