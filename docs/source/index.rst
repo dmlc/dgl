@@ -47,6 +47,7 @@ Get Started
    :glob:
 
    install/index
+   install/backend
 
 Follow the :doc:`instructions<install/index>` to install DGL. The :doc:`DGL at a glance<tutorials/basics/1_first>`
 is the most common place to get started with. Each tutorial is accompanied with a runnable

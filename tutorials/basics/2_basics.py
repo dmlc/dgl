@@ -12,7 +12,7 @@ In this tutorial, you learn how to create a graph and how to read and write node
 
 ###############################################################################
 # Creating a graph
-# --------------
+# ----------------
 # The design of :class:`DGLGraph` was influenced by other graph libraries. You 
 # can create a graph from networkx and convert it into a :class:`DGLGraph` and 
 # vice versa.
@@ -71,7 +71,7 @@ plt.show()
 
 ###############################################################################
 # Assigning a feature
-# ------------------
+# -------------------
 # You can also assign features to nodes and edges of a :class:`DGLGraph`.  The
 # features are represented as dictionary of names (strings) and tensors,
 # called **fields**.
@@ -138,7 +138,7 @@ g.edata.pop('w')
 
 ###############################################################################
 # Working with multigraphs
-# ~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 # Many graph applications need parallel edges. To enable this, construct :class:`DGLGraph`
 # with ``multigraph=True``.
 
