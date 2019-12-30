@@ -1672,7 +1672,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       if (replacement_ == false) {
         size_t n = batch_size_;
         size_t num_ids = 0;
-#pragma omp critical (edge_sample)
+#pragma omp critical
         {
           num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
         }
