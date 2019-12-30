@@ -125,7 +125,7 @@ template <
   typename DType,
   bool replace = true>
 class AliasSampler {
-private:
+ private:
   RandomEngine *re;
   Idx N;
   DType accum, taken;             // accumulated likelihood
@@ -135,7 +135,7 @@ private:
   std::vector<bool> used;         // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;    // index mapping, activated when replace=false;
 
-  inline Idx map(Idx x) const{
+  inline Idx map(Idx x) const {
     if (replace)
       return x;
     else
@@ -159,7 +159,7 @@ private:
     K.resize(N);
     U.resize(N);
     DType avg = accum / static_cast<DType>(N);
-    std::fill(U.begin(), U.end(), avg); // initialize U
+    std::fill(U.begin(), U.end(), avg);     // initialize U
     std::queue<std::pair<Idx, DType> > under, over;
     for (Idx i = 0; i < N; ++i) {
       DType p = prob[map(i)];
@@ -167,7 +167,7 @@ private:
         over.push(std::make_pair(i, p));
       else
         under.push(std::make_pair(i, p));
-      K[i] = i;                       // initialize K
+      K[i] = i;                             // initialize K
     }
     while (!under.empty() && !over.empty()) {
       auto u_pair = under.front(), o_pair = over.front();
@@ -184,7 +184,7 @@ private:
     }
   }
 
-public:
+ public:
   void reinit_state(const std::vector<DType>& prob) {
     used.resize(prob.size());
     if (!replace)
@@ -241,7 +241,7 @@ public:
  * Sample w/ and w/o replacement complexity: O(log n)
  */
 class CDFSampler {
-private:
+ private:
   RandomEngine *re;
   Idx N;
   DType accum, taken;
@@ -250,7 +250,7 @@ private:
   std::vector<bool> used;       // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;  // indicate index mapping, activated when replace=false;
 
-  inline Idx map(Idx x) const{
+  inline Idx map(Idx x) const {
     if (replace)
       return x;
     else
@@ -275,7 +275,8 @@ private:
       }
     if (N == 0) LOG(FATAL) << "Cannot take more sample than population when 'replace=false'";
   }
-public:
+
+ public:
   void reinit_state(const std::vector<DType>& prob) {
     used.resize(prob.size());
     if (!replace)
@@ -320,11 +321,12 @@ public:
  * Sample w/ and w/o replacement complexity: O(log n)
  */
 class TreeSampler {
-private:
+ private:
   RandomEngine *re;
   std::vector<DType> weight;    // accumulated likelihood of subtrees.
   int64_t N, num_leafs;
-public:
+
+ public:
   void reinit_state(const std::vector<DType>& prob) {
     std::fill(weight.begin(), weight.end(), 0);
     for (int i = 0; i < prob.size(); ++i)
