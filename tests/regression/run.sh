@@ -16,6 +16,7 @@ pip install --pre dgl-cu101
 done
 
 conda activate base
+cd dgl
 asv machine --config tests/regression/.asv-machine.json
 asv run
 asv publish
