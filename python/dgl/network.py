@@ -327,3 +327,4 @@ def _clear_kv_msg(msg):
         F.sync()
         data = F.zerocopy_to_dgl_ndarray(msg.data)
         _CAPI_DeleteNDArrayData(data)
+        
