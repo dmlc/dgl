@@ -39,7 +39,7 @@ DGLBACKEND=pytorch python3 gcn_ns_sc_train.py --dataset cora --self-loop --num-n
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset cora --self-loop --num-neighbors 2 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset cora --self-loop --num-neighbors 2 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### citeseer 
@@ -53,7 +53,7 @@ DGLBACKEND=pytorch python3 gcn_ns_sc_train.py --dataset citeseer --self-loop --n
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### pubmed 
@@ -67,7 +67,7 @@ DGLBACKEND=pytorch python3 gcn_ns_sc_train.py --dataset pubmed --self-loop --num
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_ns --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 ### Control Variate & Skip Connection
@@ -83,7 +83,7 @@ DGLBACKEND=pytorch python3 gcn_cv_sc_train.py --dataset cora --self-loop --num-n
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### citeseer
@@ -97,7 +97,7 @@ DGLBACKEND=pytorch python3 gcn_cv_sc_train.py --dataset citeseer --self-loop --n
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### pubmed
@@ -111,5 +111,5 @@ DGLBACKEND=pytorch python3 gcn_cv_sc_train.py --dataset pubmed --self-loop --num
 
 Sampler side:
 ```
-DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
+OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 sampler.py --model gcn_cv --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```

@@ -76,7 +76,7 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     edata_g2l : dict of tensor (mx.ndarray or torch.tensor)
         global2local mapping of edge data
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert len(ip_config) > 0, 'ip_config cannot be empty.'
@@ -123,7 +123,7 @@ def start_client(ip_config, ndata_partition_book, edata_partition_book, close_sh
     close_shared_mem : bool
         Close local shared-memory tensor access.
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
 
     Returns
     -------
@@ -171,7 +171,7 @@ class KVServer(object):
     num_client : int
         Total number of clients connecting to server.
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
@@ -478,7 +478,7 @@ class KVClient(object):
     close_shared_mem : bool
         DO NOT use shared-memory access on local machine.
     msg_queue_size : int
-        Size of message queue.
+        Size of message queue (2GB by default).
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
