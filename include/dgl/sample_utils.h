@@ -6,7 +6,6 @@
 #ifndef DGL_SAMPLE_UTILS_H_
 #define DGL_SAMPLE_UTILS_H_
 
-#include "./random.h"
 #include <algorithm>
 #include <utility>
 #include <queue>
@@ -15,6 +14,7 @@
 #include <numeric>
 #include <limits>
 #include <vector>
+#include "./random.h"
 
 namespace dgl {
 
@@ -25,7 +25,7 @@ template <
   typename DType,
   bool replace>
 class BaseSampler {
-public:
+ public:
   inline Idx draw() {
     LOG(INFO) << "Not implemented yet.";
     return 0;
