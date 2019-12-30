@@ -7,33 +7,33 @@ from pathlib import Path
 import numpy as np
 
 base_path = Path("~/regression/dgl/")
-# base_path = Path("~/dev/csr/dgl/")
+
 
 class GCNBenchmark:
 
-    params = [['cora', 'pubmed'], ['0', '-1']]
-    param_names = ['dataset', 'gpu_id']
+    params = [['pytorch'], ['cora', 'pubmed'], ['0', '-1']]
+    param_names = ['backend','dataset', 'gpu_id']
     timeout = 120
 
-    def setup(self, dataset, gpu_id):
-        gcn_path = base_path / "examples/pytorch/gcn/train.py"
-        bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(gcn_path.expanduser(), dataset, gpu_id)
+    def setup(self, backend, dataset, gpu_id):
+        gcn_path = base_path / "examples/{}/gcn/train.py".format(backend)
+        bashCommand = "/opt/conda/envs/{}-ci/bin/python {} --dataset {} --gpu {} --n-epochs 50".format(backend, gcn_path.expanduser(), dataset, gpu_id)
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
         self.output = output
 
-    def track_gcn_time(self, dataset, gpu_id):
+    def track_gcn_time(self, backend, dataset, gpu_id):
         lines = str(self.output).split("\\n")
         time_list = []
         for line in lines:
-            print(line)
+            # print(line)
             if 'Time' in line:
                 time_str = line.strip().split('|')[1]
                 time = float(time_str.split()[-1])
                 time_list.append(time)
         return np.array(time_list)[-10:].mean()
         
-    def track_gcn_accuracy(self, dataset, gpu_id):
+    def track_gcn_accuracy(self, backend, dataset, gpu_id):
         lines = str(self.output).split("\\n")
         test_acc = -1
         for line in lines:
