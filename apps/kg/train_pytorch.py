@@ -37,11 +37,14 @@ def train(args, model, train_sampler, valid_samplers=None):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
     start = time.time()
+    sample_time = 0
     update_time = 0
     forward_time = 0
     backward_time = 0
     for step in range(args.init_step, args.max_step):
+        start1 = time.time()
         pos_g, neg_g = next(train_sampler)
+        sample_time += time.time() - start1
         args.step = step
 
         start1 = time.time()
@@ -64,9 +67,8 @@ def train(args, model, train_sampler, valid_samplers=None):
             logs = []
             print('[Train] {} steps take {:.3f} seconds'.format(args.log_interval,
                                                             time.time() - start))
-            print('forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(forward_time,
-                                                                             backward_time,
-                                                                             update_time))
+            print('sample: {:.3f}, forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(
+                sample_time, forward_time, backward_time, update_time))
             update_time = 0
             forward_time = 0
             backward_time = 0
