@@ -24,7 +24,7 @@ template <
   bool replace>
 class BaseSampler {
  public:
-  inline Idx draw() {
+  virtual Idx draw() {
     LOG(INFO) << "Not implemented yet.";
     return 0;
   }
@@ -116,7 +116,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
 
   ~AliasSampler() {}
 
-  inline Idx draw() {
+  Idx draw() {
     DType avg = accum / N;
     if (!replace) {
       if (2 * taken >= accum)
@@ -212,7 +212,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
 
   ~CDFSampler() {}
 
-  inline Idx draw() {
+  Idx draw() {
     DType eps = std::numeric_limits<DType>::min();
     if (!replace) {
       if (2 * taken >= accum)
@@ -269,7 +269,7 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
     reinit_state(prob);
   }
 
-  inline Idx draw() {
+  Idx draw() {
     int64_t cur = 1;
     DType p = re->Uniform<DType>(0., weight[cur]);
     DType accum = 0.;
