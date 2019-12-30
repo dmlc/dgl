@@ -21,7 +21,7 @@ void _TestWithReplacement(RandomEngine *re) {
   for (Idx i = 0; i < n_categories; ++i)
     prob[i] /= accum;
 
-  auto _test_given_sampler = [](BaseSampler *s) {
+  auto _test_given_sampler = [&counter, &prob](BaseSampler *s) {
     std::fill(counter.begin(), counter.end(), 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = s->draw();
@@ -31,24 +31,24 @@ void _TestWithReplacement(RandomEngine *re) {
       ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
   };
 
-  AliasSampler<Idx, DType, true> as(&re, prob);
-  CDFSampler<Idx, DType, true> cs(&re, prob);
-  TreeSampler<Idx, DType, true> ts(&re, prob);
+  AliasSampler<Idx, DType, true> as(re, prob);
+  CDFSampler<Idx, DType, true> cs(re, prob);
+  TreeSampler<Idx, DType, true> ts(re, prob);
   _test_given_sampler(&as);
   _test_given_sampler(&cs);
   _test_given_sampler(&ts);
 }
 
 TEST(SampleUtilsTest, TestWithReplacement) {
-  RandomEngine re();
-  re.SetSeed(42);
-  _TestWithReplacement<int32_t, float>(&re);
-  re.SetSeed(42);
-  _TestWithReplacement<int32_t, double>(&re);
-  re.SetSeed(42);
-  _TestWithReplacement<int64_t, float>(&re);
-  re.SetSeed(42);
-  _TestWithReplacement<int64_t, double>(&re);
+  RandomEngine* re = RandomEngine::ThreadLocal();
+  re->SetSeed(42);
+  _TestWithReplacement<int32_t, float>(re);
+  re->SetSeed(42);
+  _TestWithReplacement<int32_t, double>(re);
+  re->SetSeed(42);
+  _TestWithReplacement<int64_t, float>(re);
+  re->SetSeed(42);
+  _TestWithReplacement<int64_t, double>(re);
 };
 
 TEST(SampleUtilsTest, TestWithoutReplacementOrder) {
