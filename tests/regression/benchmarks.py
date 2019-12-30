@@ -5,13 +5,13 @@ import subprocess
 import os
 from pathlib import Path
 
-base_path = Path("~/regression/dgl/")
+base_path = Path("~/regression/dgl/examples/pytorch/gcn/train.py")
 
 class GCNBenchmark:
 
     def setup(self):
         print(os.getcwd())
-        bashCommand = "python {} --dataset cora --gpu -1".format((base_path / "examples/pytorch/gcn/train.py").absolute())
+        bashCommand = "python {} --dataset cora --gpu -1".format(base_path.expanduser()())
         process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
         self.output = output
