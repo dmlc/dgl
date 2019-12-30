@@ -2,7 +2,7 @@ import dgl
 import mxnet as mx
 import numpy as np
 import logging, time
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 from mxnet import nd, gluon
 from mxnet.gluon import nn
 from dgl.utils import toindex
@@ -11,18 +11,23 @@ from gluoncv.model_zoo import get_model
 from gluoncv.data.batchify import Pad
 
 def iou(boxA, boxB):
-	# determine the (x, y)-coordinates of the intersection rectangle
-	xA = max(boxA[0], boxB[0])
-	yA = max(boxA[1], boxB[1])
-	xB = min(boxA[2], boxB[2])
-	yB = min(boxA[3], boxB[3])
+    # determine the (x, y)-coordinates of the intersection rectangle
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
  
-	interArea = max(0, xB - xA) * max(0, yB - yA)
-	boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
-	boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
-	iou_val = interArea / float(boxAArea + boxBArea - interArea)
- 
-	return iou_val
+    interArea = max(0, xB - xA) * max(0, yB - yA)
+    if interArea < 1e-7 :
+        return 0
+
+    boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+    boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+    if boxAArea + boxBArea - interArea < 1e-7:
+        return 0
+
+    iou_val = interArea / float(boxAArea + boxBArea - interArea)
+    return iou_val
 
 def object_iou_thresh(gt_object, pred_object, iou_thresh=0.5):
     obj_iou = iou(gt_object[1:5], pred_object[1:5])
@@ -41,8 +46,8 @@ def triplet_iou_thresh(gt_triplet, pred_triplet, iou_thresh=0.5):
 @mx.metric.register
 @mx.metric.alias('auc')
 class AUCMetric(mx.metric.EvalMetric):
-    def __init__(self, eps=1e-12):
-        super(AUCMetric, self).__init__('auc')
+    def __init__(self, name='auc', eps=1e-12):
+        super(AUCMetric, self).__init__(name)
         self.eps = eps
 
     def update(self, labels, preds):
@@ -76,9 +81,10 @@ class AUCMetric(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('predcls')
 class PredCls(mx.metric.EvalMetric):
-    def __init__(self, topk=20):
+    def __init__(self, topk=20, iou_thresh=0.99):
         super(PredCls, self).__init__('predcls@%d'%(topk))
         self.topk = topk
+        self.iou_thresh = iou_thresh
 
     def update(self, labels, preds):
         if labels is None or preds is None:
@@ -96,7 +102,7 @@ class PredCls(mx.metric.EvalMetric):
                     continue
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
-                   triplet_iou_thresh(pred, label, 0.99):
+                   triplet_iou_thresh(pred, label, self.iou_thresh):
                     count += 1
                     label_matched[j] = True
 
@@ -106,16 +112,17 @@ class PredCls(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('phrcls')
 class PhrCls(mx.metric.EvalMetric):
-    def __init__(self, topk=20):
+    def __init__(self, topk=20, iou_thresh=0.99):
         super(PhrCls, self).__init__('phrcls@%d'%(topk))
         self.topk = topk
+        self.iou_thresh = iou_thresh
 
     def update(self, labels, preds):
         if labels is None or preds is None:
             self.num_inst += 1
             return
         preds = preds[preds[:,1].argsort()[::-1]]
-        m = min(self.topk, len(preds))
+        m = min(self.topk, preds.shape[0])
         count = 0
         gt_edge_num = labels.shape[0]
         label_matched = [False for label in labels]
@@ -128,7 +135,7 @@ class PhrCls(mx.metric.EvalMetric):
                 if int(label[2]) == int(pred[2]) and \
                    int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
-                   triplet_iou_thresh(pred, label, 0.99):
+                   triplet_iou_thresh(pred, label, self.iou_thresh):
                     count += 1
                     label_matched[j] = True
         self.sum_metric += count / len(labels)
@@ -137,9 +144,10 @@ class PhrCls(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('sgdet')
 class SGDet(mx.metric.EvalMetric):
-    def __init__(self, topk=20):
+    def __init__(self, topk=20, iou_thresh=0.5):
         super(SGDet, self).__init__('sgdet@%d'%(topk))
         self.topk = topk
+        self.iou_thresh = iou_thresh
 
     def update(self, labels, preds):
         if labels is None or preds is None:
@@ -159,7 +167,7 @@ class SGDet(mx.metric.EvalMetric):
                 if int(label[2]) == int(pred[2]) and \
                    int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
-                   triplet_iou_thresh(pred, label, 0.5):
+                   triplet_iou_thresh(pred, label, self.iou_thresh):
                     count += 1
                     label_matched[j] = True
         self.sum_metric += count / len(labels)
@@ -168,9 +176,10 @@ class SGDet(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('sgdet+')
 class SGDetPlus(mx.metric.EvalMetric):
-    def __init__(self, topk=20):
+    def __init__(self, topk=20, iou_thresh=0.5):
         super(SGDetPlus, self).__init__('sgdet+@%d'%(topk))
         self.topk = topk
+        self.iou_thresh = iou_thresh
 
     def update(self, labels, preds):
         label_objects, label_triplets = labels
@@ -190,7 +199,7 @@ class SGDetPlus(mx.metric.EvalMetric):
                     continue
                 label = label_objects[j]
                 if int(label[0]) == int(pred[0]) and \
-                   object_iou_thresh(pred, label, 0.5):
+                   object_iou_thresh(pred, label, self.iou_thresh):
                     count += 1
                     object_matched[j] = True
         
@@ -312,14 +321,14 @@ def extract_gt(g, img_size):
                              gt_ob_bbox.transpose(1, 0)]).transpose(1, 0)
     return gt_objects, gt_triplets
 
-def extract_pred(g, topk=100):
+def extract_pred(g, topk=100, joint_preds=False):
     if g is None or g.number_of_nodes() == 0:
         return None, None
 
     pred_prob = g.ndata['node_class_prob'].asnumpy()
     pred_class = pred_prob.argmax(axis=1)
     pred_class_prob = pred_prob.max(axis=1)
-    pred_bbox = g.ndata['pred_bbox'].asnumpy()
+    pred_bbox = g.ndata['pred_bbox'][:,0:4].asnumpy()
 
     pred_objects = np.vstack([pred_class, pred_bbox.transpose(1, 0)]).transpose(1, 0)
 
@@ -330,7 +339,10 @@ def extract_pred(g, topk=100):
     topk_eids = sorted(list(set(score_pred_topk_eids + score_phr_topk_eids)))
 
     pred_rel_prob = g.edata['preds'][topk_eids].asnumpy()
-    pred_rel_class = pred_rel_prob.argmax(axis=1)
+    if joint_preds:
+        pred_rel_class = pred_rel_prob[:,1:].argmax(axis=1)
+    else:
+        pred_rel_class = pred_rel_prob.argmax(axis=1)
 
     pred_node_ids = g.find_edges(topk_eids)
     pred_node_sub = pred_node_ids[0].asnumpy()

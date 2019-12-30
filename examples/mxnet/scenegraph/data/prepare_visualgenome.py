@@ -158,7 +158,7 @@ def extract_obj_rel_classes(path):
     return vg_obj_classes, vg_rel_classes
 
 if __name__ == '__main__':
-    random.seed(1024)
+    random.seed(2048)
     args = parse_args()
     path = os.path.expanduser(args.download_dir)
     if not os.path.isdir(path):

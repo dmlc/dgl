@@ -20,7 +20,8 @@ class EdgeLinkMLP(nn.Block):
 
     def forward(self, edges):
         feat = nd.concat(edges.src['node_class_prob'], edges.src['pred_bbox'],
-                         edges.dst['node_class_prob'], edges.dst['pred_bbox'])
+                         edges.dst['node_class_prob'], edges.dst['pred_bbox'], 
+                         edges.data['pred_bbox_additional'])
         out = self.relu1(self.mlp1(feat))
         out = self.relu2(self.mlp2(out))
         out = self.mlp3(out)
@@ -37,7 +38,8 @@ class EdgeMLP(nn.Block):
 
     def forward(self, edges):
         feat = nd.concat(edges.src['node_class_prob'], edges.src['emb'], edges.src['pred_bbox'],
-                         edges.dst['node_class_prob'], edges.dst['emb'], edges.dst['pred_bbox'])
+                         edges.dst['node_class_prob'], edges.dst['emb'], edges.dst['pred_bbox'],
+                         edges.data['pred_bbox_additional'])
         out = self.relu1(self.mlp1(feat))
         out = self.relu2(self.mlp2(out))
         out = self.mlp3(out)
@@ -48,10 +50,46 @@ class EdgeConfMLP(nn.Block):
         super(EdgeConfMLP, self).__init__()
 
     def forward(self, edges):
-        score_pred = nd.softmax(edges.data['link_preds'])[:,1] * nd.softmax(edges.data['preds']).max(axis=1)
-        score_phr = score_pred * edges.src['node_class_prob'].max(axis=1) * edges.dst['node_class_prob'].max(axis=1)
+        score_pred = nd.softmax(edges.data['link_preds'])[:,1] * \
+                     nd.softmax(edges.data['preds']).max(axis=1)
+        score_phr = score_pred * \
+                    edges.src['node_class_prob'].max(axis=1) * \
+                    edges.dst['node_class_prob'].max(axis=1)
         return {'score_pred': score_pred,
                 'score_phr': score_phr}
+
+class EdgeBBoxExtend(nn.Block):
+    def __init__(self):
+        super(EdgeBBoxExtend, self).__init__()
+
+    def bbox_delta(self, bbox_a, bbox_b):
+        n = bbox_a.shape[0]
+        result = nd.zeros((n, 4), ctx=bbox_a.context)
+        result[:,0] = bbox_a[:,0] - bbox_b[:,0]
+        result[:,1] = bbox_a[:,1] - bbox_b[:,1]
+        result[:,2] = nd.log((bbox_a[:,2] - bbox_a[:,0]) / (bbox_b[:,2] - bbox_b[:,0]))
+        result[:,3] = nd.log((bbox_a[:,3] - bbox_a[:,1]) / (bbox_b[:,3] - bbox_b[:,1]))
+        return result
+
+    def forward(self, edges):
+        ctx = edges.src['pred_bbox'].context
+        n = edges.src['pred_bbox'].shape[0]
+        edge_bbox = nd.zeros((n, 5), ctx=ctx)
+        stack_bbox = nd.stack(edges.src['pred_bbox'], edges.dst['pred_bbox'])
+        edge_bbox[:,0] = nd.stack(edges.src['pred_bbox'][:,0], edges.dst['pred_bbox'][:,0]).min(axis=0)
+        edge_bbox[:,1] = nd.stack(edges.src['pred_bbox'][:,1], edges.dst['pred_bbox'][:,1]).min(axis=0)
+        edge_bbox[:,2] = nd.stack(edges.src['pred_bbox'][:,2], edges.dst['pred_bbox'][:,2]).min(axis=0)
+        edge_bbox[:,3] = nd.stack(edges.src['pred_bbox'][:,3], edges.dst['pred_bbox'][:,3]).min(axis=0)
+        edge_bbox[:,4] = (edge_bbox[:,2] - edge_bbox[:,0]) * (edge_bbox[:,3] - edge_bbox[:,1])
+        delta_src_obj = self.bbox_delta(edges.src['pred_bbox'], edges.dst['pred_bbox'])
+        delta_src_rel = self.bbox_delta(edges.src['pred_bbox'], edge_bbox)
+        delta_rel_obj = self.bbox_delta(edge_bbox, edges.dst['pred_bbox'])
+        result = nd.zeros((n, 17), ctx=ctx)
+        result[:,0:5] = edge_bbox
+        result[:,5:9] = delta_src_obj
+        result[:,9:13] = delta_src_rel
+        result[:,13:17] = delta_rel_obj
+        return {'pred_bbox_additional': result}
 
 class EdgeGCN(nn.Block):
     def __init__(self,
@@ -73,18 +111,21 @@ class EdgeGCN(nn.Block):
         self.edge_link_mlp = EdgeLinkMLP(50, 2)
         self.edge_mlp = EdgeMLP(100, n_classes)
         self.edge_conf_mlp = EdgeConfMLP()
+        self.edge_bbox_extend = EdgeBBoxExtend()
 
     def forward(self, g):
         if g is None or g.number_of_nodes() == 0:
             return g
         cls = g.ndata['node_class_pred']
         g.ndata['node_class_prob'] = nd.softmax(cls)
+        # bbox extension
+        g.apply_edges(self.edge_bbox_extend)
         # link pred
         g.apply_edges(self.edge_link_mlp)
         # subgraph for gconv
         if mx.autograd.is_training():
-            eids = np.where(g.edata['link'].asnumpy() > 0)
-            sub_g = g.edge_subgraph(toindex(eids[0].tolist()))
+            eids = np.where(g.edata['link'].asnumpy() > 0)[0]
+            sub_g = g.edge_subgraph(toindex(eids.tolist()))
             sub_g.copy_from_parent()
             # graph conv
             x = sub_g.ndata['node_feat']

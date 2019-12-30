@@ -29,7 +29,7 @@ logger.addHandler(streamhandler)
 
 net = EdgeGCN(in_feats=49, n_hidden=32, n_classes=N_relations,
               n_layers=2, activation=nd.relu, pretrained_base=False, ctx=ctx)
-net.load_parameters('params/model-9.params', ctx=ctx)
+net.load_parameters('params/model-7.params', ctx=ctx)
 
 vg_val = VGRelation(top_frequent_rel=N_relations, top_frequent_obj=N_objects,
                     balancing='weight', split='val')
@@ -39,9 +39,9 @@ val_data = gluon.data.DataLoader(vg_val, batch_size=1, shuffle=False, num_worker
 
 detector = faster_rcnn_resnet101_v1d_custom(classes=vg_val._obj_classes,
                                             pretrained_base=False, pretrained=False, additional_output=True)
-params_path = 'faster_rcnn_resnet101_v1d_custom_0005_0.2528.params'
+params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
 detector.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
-detector.class_predictor.load_parameters('params/class_predictor-9.params', ctx=ctx)
+detector.class_predictor.load_parameters('params/class_predictor-7.params', ctx=ctx)
 
 def get_data_batch(g_list, img_list, ctx_list):
     if g_list is None or len(g_list) == 0:
@@ -132,7 +132,7 @@ def validate(net, val_data, ctx, mode=['predcls'], verbose_freq=100):
         print_txt += '%s=%.4f '%(name, pred)
     logger.info(print_txt)
 
-'''
 validate(net, val_data, ctx, mode=['predcls', 'phrcls'])
 '''
 validate(net, val_data, ctx, mode=['sgdet', 'sgdet+'], verbose_freq=100)
+'''
