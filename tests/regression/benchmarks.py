@@ -6,16 +6,17 @@ import os
 from pathlib import Path
 import numpy as np
 
-base_path = Path("~/regression/dgl/examples/pytorch/gcn/train.py")
-    
+# base_path = Path("~/regression/dgl/examples/pytorch/gcn/train.py")
+base_path = Path("/home/ubuntu/dev/csr/dgl/examples/pytorch/gcn/train.py")
 def track_gcn_time(dataset, gpu_id):
     bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(base_path.expanduser(), dataset, gpu_id)
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    lines = str(output).split("\n")
+    lines = str(output).split("\\n")
     time_list = []
     for line in lines:
-        if 'Time ' in line:
+        print(line)
+        if 'Time' in line:
             time_str = line.strip().split('|')[1]
             time = float(time_str.split()[-1])
             time_list.append(time)
@@ -23,17 +24,16 @@ def track_gcn_time(dataset, gpu_id):
 
     
 def track_gcn_accuracy(dataset, gpu_id):
-    bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(base_path.expanduser(), dataset, gpu_id)
+    bashCommand = "python {} --dataset {} --gpu {} --n-epochs 100".format(base_path.expanduser(), dataset, gpu_id)
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    lines = str(output).split("\n")
-    acc_list = []
+    lines = str(output).split("\\n")
+    test_acc = -1
     for line in lines:
         if 'Test accuracy' in line:
-            acc_str = line.strip().split('|')[3]
-            acc = float(time_str.split()[-1])
-            acc_list.append(acc)
-    return np.array(acc_list)[-10:].mean()
+            test_acc = float(line.split()[-1][:-1])
+            print(test_acc)
+    return test_acc
 
 
 track_gcn_time.unit = 's'
