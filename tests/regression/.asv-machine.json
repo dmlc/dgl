@@ -1,0 +1,11 @@
+{
+    "d4a2e5937e1b": {
+        "arch": "x86_64",
+        "cpu": "Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz",
+        "machine": "d4a2e5937e1b",
+        "num_cpu": "4",
+        "os": "Linux 4.4.0-1087-aws",
+        "ram": "62879872"
+    },
+    "version": 1
+}
