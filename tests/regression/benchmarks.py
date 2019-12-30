@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 import numpy as np
 
-# base_path = Path("~/regression/dgl/examples/pytorch/gcn/train.py")
-base_path = Path("/home/ubuntu/dev/csr/dgl/examples/pytorch/gcn/train.py")
+base_path = Path("~/regression/dgl/examples/pytorch/gcn/train.py")
+
 def track_gcn_time(dataset, gpu_id):
     bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(base_path.expanduser(), dataset, gpu_id)
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
