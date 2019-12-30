@@ -6,7 +6,7 @@
 #ifndef DGL_SAMPLE_UTILS_H_
 #define DGL_SAMPLE_UTILS_H_
 
-#include <random.h>
+#include "./random.h"
 #include <algorithm>
 #include <utility>
 #include <queue>
@@ -20,6 +20,18 @@ namespace dgl {
 
 using namespace dgl::runtime;
 
+template <
+  typename Idx,
+  typename DType,
+  bool replace>
+class BaseSampler {
+public:
+  inline Idx draw() {
+    LOG(INFO) << "Not implemented yet.";
+    return 0;
+  }
+};
+
 /*
  * AliasSampler is used to sample elements from a given discrete categorical distribution.
  * Algorithm: Alias Method(https://en.wikipedia.org/wiki/Alias_method)
@@ -31,7 +43,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class AliasSampler {
+class AliasSampler: public BaseSampler<Idx, DType, replace> {
  private:
   RandomEngine *re;
   Idx N;
@@ -151,7 +163,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class CDFSampler {
+class CDFSampler: public BaseSampler<Idx, DType, replace> {
  private:
   RandomEngine *re;
   Idx N;
@@ -178,7 +190,7 @@ class CDFSampler {
     cdf.push_back(0);
     for (Idx i = 0; i < prob.size(); ++i)
       if (!used[i]) {
-        ++N;
+        N++;
         accum += prob[i];
         if (!replace)
           id_mapping.push_back(i);
@@ -235,7 +247,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class TreeSampler {
+class TreeSampler: public BaseSampler<Idx, DType, replace> {
  private:
   RandomEngine *re;
   std::vector<DType> weight;    // accumulated likelihood of subtrees.
