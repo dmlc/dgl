@@ -18,8 +18,6 @@
 
 namespace dgl {
 
-using namespace dgl::runtime;
-
 template <
   typename Idx,
   typename DType,
