@@ -14,7 +14,7 @@
 
 namespace dgl {
 
-//using namespace dgl::runtime;
+// using namespace dgl::runtime;
 
 namespace {
 
