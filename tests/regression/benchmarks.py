@@ -12,7 +12,7 @@ def track_gcn_time(dataset, gpu_id):
     bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(base_path.expanduser(), dataset, gpu_id)
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    lines = self.output.split("\n")
+    lines = output.split("\n")
     time_list = []
     for line in lines:
         if 'Time ' in line:
@@ -26,7 +26,7 @@ def track_gcn_accuracy(dataset, gpu_id):
     bashCommand = "python {} --dataset {} --gpu {} --n-epochs 50".format(base_path.expanduser(), dataset, gpu_id)
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
-    lines = self.output.split("\n")
+    lines = output.split("\n")
     acc_list = []
     for line in lines:
         if 'Test accuracy' in line:
