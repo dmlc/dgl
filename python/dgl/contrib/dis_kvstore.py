@@ -630,6 +630,7 @@ class KVClient(object):
                     local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
+                print("push: " + name + '-data-'+str(server[idx]))
                 self._push_handler(name+'-data-'+str(server[idx]), local_id, data_tensor, self._data_store)
             else:
                 msg = KVStoreMsg(
@@ -646,7 +647,7 @@ class KVClient(object):
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
 
-        Parameters
+        Parameters 
         ----------
         name : str
             data name
@@ -684,6 +685,7 @@ class KVClient(object):
                     local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
+                print("pull: " + name + '-data-'+str(server[idx]))
                 local_data[server[idx]] = self._pull_handler(name+'-data-'+str(server[idx]), local_id, self._data_store)
             else:
                 msg = KVStoreMsg(
