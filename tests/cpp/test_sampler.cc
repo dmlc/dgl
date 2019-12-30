@@ -53,10 +53,10 @@ TEST(SampleUtilsTest, TestWithReplacement) {
 template <typename Idx, typename DType>
 void _TestWithoutReplacementOrder(RandomEngine *re) {
   Idx N = 4;
-  DType prob[] = {1e6, 1e-6, 1e-2, 1e2};
-  Idx ground_truth[] = {0, 3, 2, 1};
+  std::vector<DType> prob = {1e6, 1e-6, 1e-2, 1e2};
+  std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
-  auto _check_given_sampler = [=](
+  auto _check_given_sampler = [N, &prob, &ground_truth](
       BaseSampler<Idx, DType, false> *s) {
     for (Idx i = 0; i < N; ++i) {
       Idx dice = s->draw();
