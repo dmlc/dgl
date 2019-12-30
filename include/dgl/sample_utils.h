@@ -4,9 +4,10 @@
  * \brief Random number generators
  */
 
-#ifndef DGL_SAMPLE_UTILS_H
-#define DGL_SAMPLE_UTILS_H
+#ifndef DGL_SAMPLE_UTILS_H_
+#define DGL_SAMPLE_UTILS_H_
 
+#include <dmlc/logging.h>
 #include <random.h>
 #include <algorithm>
 #include <utility>
@@ -285,4 +286,4 @@ class TreeSampler {
 
 };  // namespace dgl
 
-#endif //DGL_SAMPLE_UTILS_H
+#endif //DGL_SAMPLE_UTILS_H_

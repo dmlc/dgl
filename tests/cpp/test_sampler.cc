@@ -5,6 +5,8 @@
 using namespace dgl;
 using namespace dgl::runtime;
 
+
+
 TEST(SampleUtilsTest, TestAliasSampler) {
 
 };

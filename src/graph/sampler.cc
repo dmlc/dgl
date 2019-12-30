@@ -111,7 +111,6 @@ class ArrayHeap {
   std::vector<ValueType> heap_;
 };
 
-
 ///////////////////////// Samplers //////////////////////////
 class EdgeSamplerObject: public Object {
  public:
