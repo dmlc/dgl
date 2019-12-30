@@ -52,9 +52,11 @@ class ArrayHeap {
   void Delete(size_t index) {
     size_t i = index + limit_;
     ValueType w = heap_[i];
-    for (int j = bit_len_; j >= 0; --j) {
-      heap_[i] -= w;
-      i = i >> 1;
+    heap_[i] = 0;
+    i /= 2;
+    for (int j = bit_len_-1; j >= 0; --j) {
+      heap_[i] = heap_[i << 1] + heap_[(i << 1) + 1];
+      i /= 2;
     }
   }
 
@@ -1694,7 +1696,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + batch_size_);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + batch_size_);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-
       Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
       positive_subgs[i] = ConvertRef(subg);
       // For PBG negative sampling, we accept "PBG-head" for corrupting head
