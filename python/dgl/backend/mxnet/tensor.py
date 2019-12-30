@@ -390,7 +390,7 @@ class BinaryReduce(mx.autograd.Function):
                         lhs_data_nd, rhs_data_nd, out_data_nd,
                         self.lhs_map[0], self.rhs_map[0], self.out_map[0])
                 self.save_for_backward(lhs_data_nd, rhs_data_nd, None, out_data_nd,
-                               feat_shape, degs)
+                               feat_shape, None)
             else:
                 try:
                     num_edges = self.graph.number_of_edges()

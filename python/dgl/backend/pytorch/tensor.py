@@ -302,7 +302,7 @@ class BinaryReduce(th.autograd.Function):
                 # save_for_backward can only save variables
                 ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
                                     rhs_map, out_map, lhs_data_nd, rhs_data_nd, None,
-                                    out_data_nd, feat_shape, degs)
+                                    out_data_nd, feat_shape, None)
             else:
                 try:
                     num_edges = graph.number_of_edges()
