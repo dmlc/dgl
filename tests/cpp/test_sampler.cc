@@ -21,7 +21,8 @@ void _TestWithReplacement(RandomEngine *re) {
   for (Idx i = 0; i < n_categories; ++i)
     prob[i] /= accum;
 
-  auto _test_given_sampler = [&counter, &prob](BaseSampler *s) {
+  auto _test_given_sampler = [n_categories, n_rolls, &counter, &prob](
+      BaseSampler<Idx, DType, true> *s) {
     std::fill(counter.begin(), counter.end(), 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = s->draw();
