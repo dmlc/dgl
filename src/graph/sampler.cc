@@ -1132,6 +1132,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
+    CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "UniformSampler only support CPU sampling";
+
     std::vector<NodeFlow> nflows = NeighborSamplingImpl<float>(
         gptr, seed_nodes, batch_start_id, batch_size, max_num_workers,
         expand_factor, num_hops, neigh_type, add_self_loop, nullptr);
@@ -1156,12 +1160,18 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_NeighborSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
+    CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "NeighborSampler only support CPU sampling";
+
     std::vector<NodeFlow> nflows;
 
     CHECK(probability->dtype.code == kDLFloat)
       << "transition probability must be float";
     CHECK(probability->ndim == 1)
       << "transition probability must be a 1-dimensional vector";
+    CHECK_EQ(probability->ctx.device_type, kDLCPU)
+      << "NeighborSampling only support CPU sampling";
 
     ATEN_FLOAT_TYPE_SWITCH(
       probability->dtype,
@@ -1202,6 +1212,13 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_nodes));
+    CHECK_EQ(seed_nodes->ctx.device_type, kDLCPU)
+      << "LayerSampler only support CPU sampling";
+
+    CHECK(aten::IsValidIdArray(layer_sizes));
+    CHECK_EQ(layer_sizes->ctx.device_type, kDLCPU)
+      << "LayerSampler only support CPU sampling";
+
     const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
@@ -1825,6 +1842,14 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateUniformEdgeSampler")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
+    CHECK_EQ(seed_edges->ctx.device_type, kDLCPU)
+      << "UniformEdgeSampler only support CPU sampling";
+
+    if (relations->shape[0] > 0) {
+      CHECK(aten::IsValidIdArray(relations));
+      CHECK_EQ(relations->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
+    }
     BuildCoo(*gptr);
 
     auto o = std::make_shared<UniformEdgeSamplerObject>(gptr,
@@ -2097,11 +2122,22 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_CreateWeightedEdgeSampler")
     auto gptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
     CHECK(gptr) << "sampling isn't implemented in mutable graph";
     CHECK(aten::IsValidIdArray(seed_edges));
+    CHECK_EQ(seed_edges->ctx.device_type, kDLCPU)
+      << "WeightedEdgeSampler only support CPU sampling";
     CHECK(edge_weight->dtype.code == kDLFloat) << "edge_weight should be FloatType";
     CHECK(edge_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
+    CHECK_EQ(edge_weight->ctx.device_type, kDLCPU)
+      << "WeightedEdgeSampler only support CPU sampling";
     if (node_weight->shape[0] > 0) {
       CHECK(node_weight->dtype.code == kDLFloat) << "node_weight should be FloatType";
       CHECK(node_weight->dtype.bits == 32) << "WeightedEdgeSampler only support float weight";
+      CHECK_EQ(node_weight->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
+    }
+    if (relations->shape[0] > 0) {
+      CHECK(aten::IsValidIdArray(relations));
+      CHECK_EQ(relations->ctx.device_type, kDLCPU)
+        << "WeightedEdgeSampler only support CPU sampling";
     }
     BuildCoo(*gptr);
 
