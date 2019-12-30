@@ -16,14 +16,20 @@ edata_g2l.append({'edata':th.tensor([0,0,0,1,0,0,0,0])})
 edata_g2l.append({'edata':th.tensor([0,0,0,0,0,1,0,0])})
 edata_g2l.append({'edata':th.tensor([0,0,0,0,0,0,0,1])})
 
+DATA = []
+DATA.append(th.tensor([[4.,4.,4.,],[4.,4.,4.,]]))
+DATA.append(th.tensor([[3.,3.,3.,],[3.,3.,3.,]]))
+DATA.append(th.tensor([[2.,2.,2.,],[2.,2.,2.,]]))
+DATA.append(th.tensor([[1.,1.,1.,],[1.,1.,1.,]]))
+
 def start_server(args):
     
     dgl.contrib.start_server(
         server_id=args.id,
         ip_config='ip_config.txt',
         num_client=4,
-        ndata={'ndata':th.tensor([[0.,0.,0.],[0.,0.,0.]])},
-        edata={'edata':th.tensor([[0.,0.,0.],[0.,0.,0.]])},
+        ndata={'ndata':DATA[args.id]},
+        edata={'edata':DATA[args.id]},
         ndata_g2l=ndata_g2l[args.id],
         edata_g2l=edata_g2l[args.id])
 
