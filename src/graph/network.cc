@@ -591,5 +591,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
     *rv = msg->data;
   });
 
+DGL_REGISTER_GLOBAL("network._CAPI_DeleteNDArrayData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray data = args[0];
+    delete [] data->data;
+  });
+
+
 }  // namespace network
 }  // namespace dgl
