@@ -109,6 +109,12 @@ class KEModel(object):
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
 
+            # When we train a batch, we could use the head nodes of the positive edges to
+            # construct negative edges. We construct a negative edge between a positive head
+            # node and every positive tail node.
+            # When we construct negative edges like this, we know there is one positive
+            # edge for a positive head node among the negative edges. We need to mask
+            # them.
             if train and self.args.neg_deg_sample:
                 head = pos_g.ndata['emb'][head_ids]
                 head = head.reshape(num_chunks, chunk_size, -1)
@@ -129,6 +135,7 @@ class KEModel(object):
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
 
+            # This is negative edge construction similar to the above.
             if train and self.args.neg_deg_sample:
                 tail = pos_g.ndata['emb'][tail_ids]
                 tail = tail.reshape(num_chunks, chunk_size, -1)
