@@ -51,10 +51,13 @@ class ArrayHeap {
    */
   void Delete(size_t index) {
     size_t i = index + limit_;
-    ValueType w = heap_[i];
-    for (int j = bit_len_; j >= 0; --j) {
-      heap_[i] -= w;
-      i = i >> 1;
+    heap_[i] = 0;
+    i /= 2;
+    for (int j = bit_len_-1; j >= 0; --j) {
+      // Using heap_[i] = heap_[i] - w will loss some precision in float.
+      // Using addition to re-calculate the weight layer by layer.
+      heap_[i] = heap_[i << 1] + heap_[(i << 1) + 1];
+      i /= 2;
     }
   }
 
@@ -1091,7 +1094,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   int64_t num_neg_edges = num_pos_edges * neg_sample_size;
   IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
@@ -1106,7 +1108,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
@@ -1126,7 +1127,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   std::vector<dgl_id_t> local_pos_vids;
   local_pos_vids.reserve(num_pos_edges);
 
-  dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   // If we don't exclude positive edges, we are actually sampling more than
@@ -1202,7 +1202,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
 
     for (int64_t j = 0; j < neg_sample_size; j++) {
       neg_unchanged[neg_idx + j] = local_unchanged;
-      neg_eid_data[neg_idx + j] = curr_eid++;
       dgl_id_t local_changed = global2local_map(neg_vids[j + prev_neg_offset], &neg_map);
       neg_changed[neg_idx + j] = local_changed;
       // induced negative eid references to the positive one.
@@ -1282,7 +1281,6 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
 
   IdArray neg_dst = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_all_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
@@ -1297,7 +1295,6 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
@@ -1314,12 +1311,12 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
   }
 
   // We first sample all negative edges.
-  std::vector<size_t> neg_vids;
+  std::vector<size_t> global_neg_vids;
+  std::vector<size_t> local_neg_vids;
   randomSample(num_tot_nodes,
                num_chunks * neg_sample_size,
-               &neg_vids);
+               &global_neg_vids);
 
-  dgl_id_t curr_eid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   dgl_id_t local_vid = 0;
 
@@ -1333,6 +1330,13 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
       local_pos_vids.push_back(local_vid);
       neg_map.insert(std::pair<dgl_id_t, dgl_id_t>(vid, local_vid++));
     }
+  }
+
+  // We should map the global negative nodes to local Ids in advance
+  // to reduce computation overhead.
+  local_neg_vids.resize(global_neg_vids.size());
+  for (size_t i = 0; i < global_neg_vids.size(); i++) {
+    local_neg_vids[i] = global2local_map(global_neg_vids[i], &neg_map);;
   }
 
   for (int64_t i_chunk = 0; i_chunk < num_chunks; i_chunk++) {
@@ -1353,12 +1357,7 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
       dgl_id_t local_unchanged = global2local_map(global_unchanged, &neg_map);
       for (int64_t j = 0; j < neg_sample_size; ++j) {
         neg_unchanged[neg_idx] = local_unchanged;
-        neg_eid_data[neg_idx] = curr_eid++;
-        dgl_id_t global_changed_vid = neg_vids[neg_node_idx + j];
-
-        // TODO(zhengda) we can avoid the hashtable lookup here.
-        dgl_id_t local_changed = global2local_map(global_changed_vid, &neg_map);
-        neg_changed[neg_idx] = local_changed;
+        neg_changed[neg_idx] = local_neg_vids[neg_node_idx + j];
         induced_neg_eid_data[neg_idx] = induced_eid_data[pos_edge_idx + in_chunk];
         neg_idx++;
       }
@@ -1381,11 +1380,11 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
   if (IsNegativeHeadMode(neg_mode)) {
-    neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.head_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);
   } else {
     neg_subg.head_nid = aten::VecToIdArray(local_pos_vids);
-    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
+    neg_subg.tail_nid = aten::VecToIdArray(Global2Local(global_neg_vids, neg_map));
   }
   if (check_false_neg) {
     if (relations_->shape[0] == 0) {
@@ -1480,12 +1479,15 @@ public:
                                               sizeof(dgl_id_t) * start);
       } else {
         std::vector<dgl_id_t> seeds;
+        const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
         // sampling of each edge is a standalone event
         for (int64_t i = 0; i < num_edges; ++i) {
-          seeds.push_back(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          int64_t seed = static_cast<const int64_t>(
+              RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          seeds.push_back(seed_edge_ids[seed]);
         }
 
-        worker_seeds = aten::VecToIdArray(seeds);
+        worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
       }
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
@@ -1674,7 +1676,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
     curr_batch_id_ = 0;
     // handle int64 overflow here
     max_batch_id_ = (num_edges + batch_size - 1) / batch_size;
-
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
@@ -1697,9 +1698,12 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
         size_t n = batch_size_;
         size_t num_ids = 0;
 #pragma omp critical
-        num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
-        while (edge_ids.size() > num_ids) {
-          edge_ids.pop_back();
+        {
+          num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
+        }
+        edge_ids.resize(num_ids);
+        for (size_t i = 0; i < num_ids; ++i) {
+          edge_ids[i] = seed_edge_ids[edge_ids[i]];
         }
       } else {
         // sampling of each edge is a standalone event
@@ -1708,6 +1712,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
           edge_ids[i] = seed_edge_ids[edge_id];
         }
       }
+
       auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
@@ -1716,7 +1721,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + batch_size_);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + batch_size_);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-
       Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
       positive_subgs[i] = ConvertRef(subg);
       // For PBG negative sampling, we accept "PBG-head" for corrupting head
