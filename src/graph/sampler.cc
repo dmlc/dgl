@@ -51,10 +51,13 @@ class ArrayHeap {
    */
   void Delete(size_t index) {
     size_t i = index + limit_;
-    ValueType w = heap_[i];
-    for (int j = bit_len_; j >= 0; --j) {
-      heap_[i] -= w;
-      i = i >> 1;
+    heap_[i] = 0;
+    i /= 2;
+    for (int j = bit_len_-1; j >= 0; --j) {
+      // Using heap_[i] = heap_[i] - w will loss some precision in float.
+      // Using addition to re-calculate the weight layer by layer.
+      heap_[i] = heap_[i << 1] + heap_[(i << 1) + 1];
+      i /= 2;
     }
   }
 
@@ -1480,12 +1483,15 @@ public:
                                               sizeof(dgl_id_t) * start);
       } else {
         std::vector<dgl_id_t> seeds;
+        const dgl_id_t *seed_edge_ids = static_cast<const dgl_id_t *>(seed_edges_->data);
         // sampling of each edge is a standalone event
         for (int64_t i = 0; i < num_edges; ++i) {
-          seeds.push_back(RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          int64_t seed = static_cast<const int64_t>(
+              RandomEngine::ThreadLocal()->RandInt(num_seeds_));
+          seeds.push_back(seed_edge_ids[seed]);
         }
 
-        worker_seeds = aten::VecToIdArray(seeds);
+        worker_seeds = aten::VecToIdArray(seeds, seed_edges_->dtype.bits);
       }
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
@@ -1674,7 +1680,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
     curr_batch_id_ = 0;
     // handle int64 overflow here
     max_batch_id_ = (num_edges + batch_size - 1) / batch_size;
-
     // TODO(song): Tricky thing here to make sure gptr_ has coo cache
     gptr_->FindEdge(0);
   }
@@ -1697,9 +1702,12 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
         size_t n = batch_size_;
         size_t num_ids = 0;
 #pragma omp critical
-        num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
-        while (edge_ids.size() > num_ids) {
-          edge_ids.pop_back();
+        {
+          num_ids = edge_selector_->SampleWithoutReplacement(n, &edge_ids);
+        }
+        edge_ids.resize(num_ids);
+        for (size_t i = 0; i < num_ids; ++i) {
+          edge_ids[i] = seed_edge_ids[edge_ids[i]];
         }
       } else {
         // sampling of each edge is a standalone event
@@ -1708,6 +1716,7 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
           edge_ids[i] = seed_edge_ids[edge_id];
         }
       }
+
       auto worker_seeds = aten::VecToIdArray(edge_ids, seed_edges_->dtype.bits);
 
       EdgeArray arr = gptr_->FindEdges(worker_seeds);
@@ -1716,7 +1725,6 @@ class WeightedEdgeSamplerObject: public EdgeSamplerObject {
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + batch_size_);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + batch_size_);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-
       Subgraph subg = gptr_->EdgeSubgraph(worker_seeds, false);
       positive_subgs[i] = ConvertRef(subg);
       // For PBG negative sampling, we accept "PBG-head" for corrupting head

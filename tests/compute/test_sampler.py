@@ -665,6 +665,38 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
     assert np.allclose(node_rate, node_rate_a * 5, atol=0.002)
     assert np.allclose(node_rate_a, node_rate_b, atol=0.0002)
 
+def check_positive_edge_sampler():
+    g = generate_rand_graph(1000)
+    num_edges = g.number_of_edges()
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
+
+    edge_weight[num_edges-1] = num_edges ** 2
+    EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+
+    # Correctness check
+    # Test the homogeneous graph.
+    batch_size = 128
+    edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
+    for pos_edges in EdgeSampler(g, batch_size,
+                                    reset=False,
+                                    edge_weight=edge_weight):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
+    truth = np.full((num_edges,), 1, dtype=np.int32)
+    edge_sampled = edge_sampled[:num_edges]
+    assert np.array_equal(truth, edge_sampled)
+
+    edge_sampled = np.full((num_edges,), 0, dtype=np.int32)
+    for pos_edges in EdgeSampler(g, batch_size,
+                                    reset=False,
+                                    shuffle=True,
+                                    edge_weight=edge_weight):
+        _, _, pos_leid = pos_edges.all_edges(form='all', order='eid')
+        np.add.at(edge_sampled, F.asnumpy(pos_edges.parent_eid[pos_leid]), 1)
+    truth = np.full((num_edges,), 1, dtype=np.int32)
+    edge_sampled = edge_sampled[:num_edges]
+    assert np.array_equal(truth, edge_sampled)
+
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def test_negative_sampler():
@@ -674,6 +706,7 @@ def test_negative_sampler():
     check_weighted_negative_sampler('PBG-head', False, 10)
     check_weighted_negative_sampler('head', True, 10)
     check_weighted_negative_sampler('head', False, 10)
+    check_positive_edge_sampler()
     #disable this check for now. It might take too long time.
     #check_negative_sampler('head', False, 100)
 
