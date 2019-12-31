@@ -69,6 +69,7 @@ def train(args, model, train_sampler, valid_samplers=None):
                                                             time.time() - start))
             print('sample: {:.3f}, forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(
                 sample_time, forward_time, backward_time, update_time))
+            sample_time = 0
             update_time = 0
             forward_time = 0
             backward_time = 0
