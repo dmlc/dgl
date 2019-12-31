@@ -109,7 +109,7 @@ class KEModel(object):
             tail = pos_g.ndata['emb'][tail_ids]
             rel = pos_g.edata['emb']
 
-            if train and self.args.neg_deg_sample:
+            if train:
                 head = pos_g.ndata['emb'][head_ids]
                 head = head.reshape(num_chunks, chunk_size, -1)
                 neg_head = neg_head.reshape(num_chunks, neg_sample_size, -1)
@@ -129,7 +129,7 @@ class KEModel(object):
             head = pos_g.ndata['emb'][head_ids]
             rel = pos_g.edata['emb']
 
-            if train and self.args.neg_deg_sample:
+            if train:
                 tail = pos_g.ndata['emb'][tail_ids]
                 tail = tail.reshape(num_chunks, chunk_size, -1)
                 neg_tail = neg_tail.reshape(num_chunks, neg_sample_size, -1)
@@ -141,8 +141,8 @@ class KEModel(object):
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
-        if train and self.args.neg_deg_sample:
-            neg_g.neg_sample_size = neg_sample_size
+        neg_g.neg_sample_size = neg_sample_size
+        if train:
             mask = mask.reshape(num_chunks, chunk_size, neg_sample_size)
             return neg_score * mask
         else:

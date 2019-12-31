@@ -47,8 +47,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=128,
                           help='negative sampling size')
-        self.add_argument('--neg_deg_sample', action='store_true',
-                          help='negative sample proportional to vertex degree')
         self.add_argument('--neg_sample_size_valid', type=int, default=1000,
                           help='negative sampling size for validation')
         self.add_argument('--neg_sample_size_test', type=int, default=-1,
