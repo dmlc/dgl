@@ -270,11 +270,13 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
 
   Idx draw() {
     int64_t cur = 1;
-    DType p = re->Uniform<DType>(0., weight[cur]);
+    DType p = re->Uniform<DType>(0, weight[cur]);
     DType accum = 0.;
     while (cur < num_leafs) {
-      DType pivot = accum + weight[cur * 2];
-      Idx shift = static_cast<Idx>(p > pivot);
+      DType w_l = weight[cur * 2], w_r = weight[cur * 2 + 1];
+      DType pivot = accum + w_l;
+      // w_r > 0 can depress some numerical problems.
+      Idx shift = static_cast<Idx>(p > pivot && w_r > 0);
       cur = cur * 2 + shift;
       if (shift == 1)
         accum = pivot;

@@ -2,14 +2,15 @@
 #include <dgl/sample_utils.h>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 #include "./common.h"
 
 using namespace dgl;
 
 template <typename Idx, typename DType>
 void _TestWithReplacement(RandomEngine *re) {
-  Idx n_categories = 1000;
-  Idx n_rolls = 100000;
+  Idx n_categories = 100;
+  Idx n_rolls = 1000000;
   std::vector<DType> prob;
   DType accum = 0.;
   for (Idx i = 0; i < n_categories; ++i) {
@@ -85,7 +86,7 @@ TEST(SampleUtilsTest, TestWithoutReplacementOrder) {
 
 template <typename Idx, typename DType>
 void _TestWithoutReplacementUnique(RandomEngine *re) {
-  Idx N = 100000;
+  Idx N = 1000000;
   std::vector<DType> likelihood;
   for (Idx i = 0; i < N; ++i)
     likelihood.push_back(re->Uniform<DType>());
