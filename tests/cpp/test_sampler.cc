@@ -92,13 +92,13 @@ void _TestWithoutReplacementUnique(RandomEngine *re) {
 
   auto _check_given_sampler = [N](
       BaseSampler<Idx, DType, false> *s) {
-    std::vector<bool> visit(N, false);
+    std::vector<int> cnt(N, 0);
     for (Idx i = 0; i < N; ++i) {
       Idx dice = s->draw();
-      visit[dice] = true;
+      cnt[dice]++;
     }
     for (Idx i = 0; i < N; ++i)
-      ASSERT_EQ(visit[i], true);
+      ASSERT_EQ(cnt[i], 1);
   };
 
   AliasSampler<Idx, DType, false> as(re, likelihood);

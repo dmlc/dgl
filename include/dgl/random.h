@@ -14,8 +14,6 @@
 
 namespace dgl {
 
-// using namespace dgl::runtime;
-
 namespace {
 
 inline uint32_t GetThreadId() {
