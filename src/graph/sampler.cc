@@ -1091,7 +1091,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   int64_t num_neg_edges = num_pos_edges * neg_sample_size;
   IdArray neg_dst = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray neg_src = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
-  IdArray neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
   IdArray induced_neg_eid = IdArray::Empty({num_neg_edges}, coo->dtype, coo->ctx);
 
   // These are vids in the positive subgraph.
@@ -1106,7 +1105,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
 
   dgl_id_t *neg_dst_data = static_cast<dgl_id_t *>(neg_dst->data);
   dgl_id_t *neg_src_data = static_cast<dgl_id_t *>(neg_src->data);
-  dgl_id_t *neg_eid_data = static_cast<dgl_id_t *>(neg_eid->data);
   dgl_id_t *induced_neg_eid_data = static_cast<dgl_id_t *>(induced_neg_eid->data);
 
   const dgl_id_t *unchanged;
@@ -1126,7 +1124,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   std::vector<dgl_id_t> local_pos_vids;
   local_pos_vids.reserve(num_pos_edges);
 
-  dgl_id_t curr_eid = 0;
   std::vector<size_t> neg_vids;
   neg_vids.reserve(neg_sample_size);
   // If we don't exclude positive edges, we are actually sampling more than
@@ -1202,7 +1199,6 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
 
     for (int64_t j = 0; j < neg_sample_size; j++) {
       neg_unchanged[neg_idx + j] = local_unchanged;
-      neg_eid_data[neg_idx + j] = curr_eid++;
       dgl_id_t local_changed = global2local_map(neg_vids[j + prev_neg_offset], &neg_map);
       neg_changed[neg_idx + j] = local_changed;
       // induced negative eid references to the positive one.
@@ -1318,7 +1314,6 @@ NegSubgraph EdgeSamplerObject::genPBGNegEdgeSubgraph(const Subgraph &pos_subg,
                num_chunks * neg_sample_size,
                &global_neg_vids);
 
-  dgl_id_t curr_eid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   dgl_id_t local_vid = 0;
 
