@@ -124,14 +124,13 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
       while (true) {
         DType dice = re->Uniform<DType>(0, N);
         Idx i = static_cast<Idx>(dice), rst;
-        DType p = (dice - i) * avg, cap;
+        DType p = (dice - i) * avg;
         if (p <= U[map(i)]) {
-          cap = U[map(i)];
           rst = map(i);
         } else {
-          cap = avg - U[map(i)];
           rst = map(K[i]);
         }
+        DType cap = _prob[rst];
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
