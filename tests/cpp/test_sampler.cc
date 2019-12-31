@@ -52,13 +52,12 @@ TEST(SampleUtilsTest, TestWithReplacement) {
 
 template <typename Idx, typename DType>
 void _TestWithoutReplacementOrder(RandomEngine *re) {
-  Idx N = 4;
   std::vector<DType> prob = {1e6, 1e-6, 1e-2, 1e2};
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
-  auto _check_given_sampler = [N, &prob, &ground_truth](
+  auto _check_given_sampler = [&ground_truth](
       BaseSampler<Idx, DType, false> *s) {
-    for (Idx i = 0; i < N; ++i) {
+    for (size_t i = 0; i < ground_truth.size(); ++i) {
       Idx dice = s->draw();
       ASSERT_EQ(dice, ground_truth[i]);
     }
