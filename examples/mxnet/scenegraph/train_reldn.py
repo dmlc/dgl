@@ -24,14 +24,14 @@ logger.addHandler(streamhandler)
 
 # Hyperparams
 num_gpus = 1
-batch_size = num_gpus * 8
+batch_size = num_gpus * 1
 ctx = [mx.gpu(i) for i in range(num_gpus)]
 nepoch = 10
 N_relations = 50
 N_objects = 150
 save_dir = 'params'
 makedirs(save_dir)
-batch_verbose_freq = 100
+batch_verbose_freq = 1000
 
 net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl')
 # net.initialize(ctx=ctx)
@@ -64,12 +64,10 @@ params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
 detector_feat.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 for k, v in detector_feat.collect_params().items():
     v.grad_req = 'null'
-'''
 for k, v in detector_feat.features.collect_params().items():
     v.grad_req = 'write'
 det_trainer = gluon.Trainer(detector_feat.features.collect_params(), 'adam', 
                             {'learning_rate': 0.001, 'wd': 0.00001})
-'''
 
 def get_data_batch(g_list, img_list, ctx_list):
     if g_list is None or len(g_list) == 0:
@@ -109,7 +107,7 @@ for epoch in range(nepoch):
     train_metric_r100.reset()
     if epoch == 8:
         net_trainer.set_learning_rate(net_trainer.learning_rate*0.1)
-        # det_trainer.set_learning_rate(det_trainer.learning_rate*0.1)
+        det_trainer.set_learning_rate(det_trainer.learning_rate*0.1)
     for i, (G_list, img_list) in enumerate(train_data):
         G_list, img_list = get_data_batch(G_list, img_list, ctx)
         if G_list is None or img_list is None:
@@ -175,7 +173,7 @@ for epoch in range(nepoch):
         for l in loss:
             l.backward()
         net_trainer.step(batch_size)
-        # det_trainer.step(batch_size)
+        det_trainer.step(batch_size)
         for G_slice, G_pred, img_slice in zip(G_list, G_batch, img_list):
             for G_gt, G_pred_one in zip(G_slice, [G_pred]):
                 if G_pred_one is None or G_pred_one.number_of_nodes() == 0:

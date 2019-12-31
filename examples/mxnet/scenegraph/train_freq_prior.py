@@ -57,7 +57,7 @@ for i, (G_list, img_list) in enumerate(train_data):
         np.add.at(neg_count, (src_id, dst_id, rel_id), 1)
 
 total_count = (pos_count + neg_count).sum(axis=2, keepdims=True)
-freq_prior = pos_count / (total_count + 1e-7)
+freq_prior = np.log(pos_count / (total_count + 1e-8) + 1e-3)
 
 with open('freq_prior.pkl', 'wb') as f:
     pickle.dump(freq_prior, f)

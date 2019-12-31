@@ -52,15 +52,20 @@ class EdgeBBoxExtend(nn.Block):
 class EdgeSemantic(nn.Block):
     def __init__(self, n_classes, use_prior=False):
         super(EdgeSemantic, self).__init__()
+        '''
         self.mlp = nn.Dense(n_classes)
         self.use_prior = use_prior
+        '''
 
     def forward(self, edges):
+        '''
         if self.use_prior:
             feat = nd.concat(edges.src['node_class_prob'], edges.dst['node_class_prob'], edges.data['freq_prior'])
         else:
             feat = nd.concat(edges.src['node_class_prob'], edges.dst['node_class_prob'])
         out = self.mlp(feat)
+        '''
+        out = edges.data['freq_prior']
         return {'semantic': out}
 
 class EdgeFreqPrior(nn.Block):
