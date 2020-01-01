@@ -94,7 +94,8 @@ class KEModel(object):
         self.score_func(g)
         return g.edata['score']
 
-    def predict_neg_score(self, pos_g, neg_g, to_device=None, gpu_id=-1, trace=False, train=True):
+    def predict_neg_score(self, pos_g, neg_g, to_device=None, gpu_id=-1, trace=False,
+                          neg_deg_sample=False):
         num_chunks = neg_g.num_chunks
         chunk_size = neg_g.chunk_size
         neg_sample_size = neg_g.neg_sample_size
@@ -115,7 +116,7 @@ class KEModel(object):
             # When we construct negative edges like this, we know there is one positive
             # edge for a positive head node among the negative edges. We need to mask
             # them.
-            if train and self.args.neg_deg_sample:
+            if neg_deg_sample:
                 head = pos_g.ndata['emb'][head_ids]
                 head = head.reshape(num_chunks, chunk_size, -1)
                 neg_head = neg_head.reshape(num_chunks, neg_sample_size, -1)
@@ -136,7 +137,7 @@ class KEModel(object):
             rel = pos_g.edata['emb']
 
             # This is negative edge construction similar to the above.
-            if train and self.args.neg_deg_sample:
+            if neg_deg_sample:
                 tail = pos_g.ndata['emb'][tail_ids]
                 tail = tail.reshape(num_chunks, chunk_size, -1)
                 neg_tail = neg_tail.reshape(num_chunks, neg_sample_size, -1)
@@ -148,7 +149,7 @@ class KEModel(object):
             neg_score = self.tail_neg_score(head, rel, neg_tail,
                                             num_chunks, chunk_size, neg_sample_size)
 
-        if train and self.args.neg_deg_sample:
+        if neg_deg_sample:
             neg_g.neg_sample_size = neg_sample_size
             mask = mask.reshape(num_chunks, chunk_size, neg_sample_size)
             return neg_score * mask
@@ -166,7 +167,8 @@ class KEModel(object):
         pos_scores = reshape(logsigmoid(pos_scores), batch_size, -1)
 
         neg_scores = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
-                                            gpu_id=gpu_id, trace=False, train=False)
+                                            gpu_id=gpu_id, trace=False,
+                                            neg_deg_sample=self.args.neg_deg_sample_eval)
         neg_scores = reshape(logsigmoid(neg_scores), batch_size, -1)
 
         # We need to filter the positive edges in the negative graph.
@@ -201,9 +203,11 @@ class KEModel(object):
         pos_score = logsigmoid(pos_score)
         if gpu_id >= 0:
             neg_score = self.predict_neg_score(pos_g, neg_g, to_device=cuda,
-                                               gpu_id=gpu_id, trace=True, train=True)
+                                               gpu_id=gpu_id, trace=True,
+                                               neg_deg_sample=self.args.neg_deg_sample)
         else:
-            neg_score = self.predict_neg_score(pos_g, neg_g, trace=True, train=True)
+            neg_score = self.predict_neg_score(pos_g, neg_g, trace=True,
+                                               neg_deg_sample=self.args.neg_deg_sample)
 
         neg_score = reshape(neg_score, -1, neg_g.neg_sample_size)
         # Adversarial sampling

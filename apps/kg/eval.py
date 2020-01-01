@@ -38,6 +38,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=-1,
                           help='negative sampling size for testing')
+        self.add_argument('--neg_deg_sample', action='store_true',
+                          help='negative sampling proportional to vertex degree for testing')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
@@ -99,6 +101,7 @@ def main(args):
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
     args.neg_sample_size_test = args.neg_sample_size
+    args.neg_deg_sample_eval = args.neg_deg_sample
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
     args.eval_filter = not args.no_eval_filter
