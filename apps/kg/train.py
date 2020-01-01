@@ -47,14 +47,20 @@ class ArgParser(argparse.ArgumentParser):
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=128,
                           help='negative sampling size')
+        self.add_argument('--neg_chunk_size', type=int, default=-1,
+                          help='chunk size of the negative edges.')
         self.add_argument('--neg_deg_sample', action='store_true',
                           help='negative sample proportional to vertex degree in the training')
         self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree in the evaluation')
         self.add_argument('--neg_sample_size_valid', type=int, default=1000,
                           help='negative sampling size for validation')
+        self.add_argument('--neg_chunk_size_valid', type=int, default=-1,
+                          help='chunk size of the negative edges.')
         self.add_argument('--neg_sample_size_test', type=int, default=-1,
                           help='negative sampling size for testing')
+        self.add_argument('--neg_chunk_size_test', type=int, default=-1,
+                          help='chunk size of the negative edges.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
@@ -142,37 +148,49 @@ def run(args, logger):
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = n_entities
     args.eval_filter = not args.no_eval_filter
+    if args.neg_chunk_size < 0:
+        args.neg_chunk_size = args.neg_sample_size
+    if args.neg_chunk_size_valid < 0:
+        args.neg_chunk_size = args.neg_sample_size_valid
+    if args.neg_chunk_size_test < 0:
+        args.neg_chunk_size_test = args.neg_sample_size_test
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
             train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           args.neg_chunk_size,
                                                            mode='chunk-head',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
                                                            exclude_positive=True,
                                                            rank=i)
             train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           args.neg_chunk_size,
                                                            mode='chunk-tail',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
                                                            exclude_positive=True,
                                                            rank=i)
             train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                                  args.neg_chunk_size,
                                                                   True, n_entities))
     else:
         train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       args.neg_chunk_size,
                                                        mode='chunk-head',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
                                                        exclude_positive=True)
         train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       args.neg_chunk_size,
                                                        mode='chunk-tail',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
                                                        exclude_positive=True)
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                        args.neg_chunk_size,
                                                         True, n_entities)
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
@@ -191,12 +209,14 @@ def run(args, logger):
             for i in range(args.num_proc):
                 valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
+                                                                 args.neg_chunk_size_valid,
                                                                  args.eval_filter,
                                                                  mode='chunk-head',
                                                                  num_workers=num_workers,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
+                                                                 args.neg_chunk_size_valid,
                                                                  args.eval_filter,
                                                                  mode='chunk-tail',
                                                                  num_workers=num_workers,
@@ -206,12 +226,14 @@ def run(args, logger):
         else:
             valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
+                                                             args.neg_chunk_size_valid,
                                                              args.eval_filter,
                                                              mode='chunk-head',
                                                              num_workers=num_workers,
                                                              rank=0, ranks=1)
             valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
+                                                             args.neg_chunk_size_valid,
                                                              args.eval_filter,
                                                              mode='chunk-tail',
                                                              num_workers=num_workers,
@@ -225,12 +247,14 @@ def run(args, logger):
             for i in range(args.num_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
+                                                                args.neg_chunk_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
                                                                 num_workers=num_workers,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
+                                                                args.neg_chunk_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
                                                                 num_workers=num_workers,
@@ -240,12 +264,14 @@ def run(args, logger):
         else:
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
+                                                            args.neg_chunk_size_test,
                                                             args.eval_filter,
                                                             mode='chunk-head',
                                                             num_workers=num_workers,
                                                             rank=0, ranks=1)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
+                                                            args.neg_chunk_size_test,
                                                             args.eval_filter,
                                                             mode='chunk-tail',
                                                             num_workers=num_workers,
