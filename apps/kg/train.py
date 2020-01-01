@@ -263,16 +263,32 @@ def run(args, logger):
 
     # test
     if args.test:
+        start = time.time()
         if args.num_proc > 1:
+            queue = mp.Queue(args.num_proc)
             procs = []
             for i in range(args.num_proc):
-                proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
+                proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
+                                  'Test', queue))
                 procs.append(proc)
                 proc.start()
+
+            total_metrics = {}
+            for i in range(args.num_proc):
+                metrics = queue.get()
+                for k, v in metrics.items():
+                    if i == 0:
+                        total_metrics[k] = v / args.num_proc
+                    else:
+                        total_metrics[k] += v / args.num_proc
+            for k, v in metrics.items():
+                print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+
             for proc in procs:
                 proc.join()
         else:
             test(args, model, [test_sampler_head, test_sampler_tail])
+        print('test:', time.time() - start)
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()

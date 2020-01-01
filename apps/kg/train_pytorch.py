@@ -80,10 +80,9 @@ def train(args, model, train_sampler, valid_samplers=None):
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
-def test(args, model, test_samplers, mode='Test'):
+def test(args, model, test_samplers, mode='Test', queue=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
-    start = time.time()
     with th.no_grad():
         logs = []
         for sampler in test_samplers:
@@ -96,9 +95,10 @@ def test(args, model, test_samplers, mode='Test'):
         if len(logs) > 0:
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-
-        for k, v in metrics.items():
-            print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
-    print('test:', time.time() - start)
+        if queue is not None:
+            queue.put(metrics)
+        else:
+            for k, v in metrics.items():
+                print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
