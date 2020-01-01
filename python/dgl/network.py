@@ -313,3 +313,18 @@ def _recv_kv_msg(receiver):
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
+
+
+def _clear_kv_msg(msg):
+    """Clear data of kvstore message
+
+    Parameters
+    ----------
+    msg : KVStoreMsg
+        kvstore message
+    """
+    if msg.data is not None:
+        F.sync()
+        data = F.zerocopy_to_dgl_ndarray(msg.data)
+        _CAPI_DeleteNDArrayData(data)
+        
