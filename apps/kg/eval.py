@@ -117,13 +117,13 @@ def main(args):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             args.eval_filter,
-                                                            mode='PBG-head',
+                                                            mode='chunk-head',
                                                             num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             args.eval_filter,
-                                                            mode='PBG-tail',
+                                                            mode='chunk-tail',
                                                             num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
@@ -132,13 +132,13 @@ def main(args):
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
                                                         args.eval_filter,
-                                                        mode='PBG-head',
+                                                        mode='chunk-head',
                                                         num_workers=num_workers,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
                                                         args.eval_filter,
-                                                        mode='PBG-tail',
+                                                        mode='chunk-tail',
                                                         num_workers=num_workers,
                                                         rank=0, ranks=1)
 

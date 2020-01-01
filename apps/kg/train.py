@@ -148,13 +148,13 @@ def run(args, logger):
         train_samplers = []
         for i in range(args.num_proc):
             train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           mode='PBG-head',
+                                                           mode='chunk-head',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
                                                            exclude_positive=True,
                                                            rank=i)
             train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           mode='PBG-tail',
+                                                           mode='chunk-tail',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
                                                            exclude_positive=True,
@@ -163,12 +163,12 @@ def run(args, logger):
                                                                   True, n_entities))
     else:
         train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       mode='PBG-head',
+                                                       mode='chunk-head',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
                                                        exclude_positive=True)
         train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       mode='PBG-tail',
+                                                       mode='chunk-tail',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
                                                        exclude_positive=True)
@@ -192,13 +192,13 @@ def run(args, logger):
                 valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
                                                                  args.eval_filter,
-                                                                 mode='PBG-head',
+                                                                 mode='chunk-head',
                                                                  num_workers=num_workers,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
                                                                  args.eval_filter,
-                                                                 mode='PBG-tail',
+                                                                 mode='chunk-tail',
                                                                  num_workers=num_workers,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_heads.append(valid_sampler_head)
@@ -207,13 +207,13 @@ def run(args, logger):
             valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
                                                              args.eval_filter,
-                                                             mode='PBG-head',
+                                                             mode='chunk-head',
                                                              num_workers=num_workers,
                                                              rank=0, ranks=1)
             valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
                                                              args.eval_filter,
-                                                             mode='PBG-tail',
+                                                             mode='chunk-tail',
                                                              num_workers=num_workers,
                                                              rank=0, ranks=1)
     if args.test:
@@ -226,13 +226,13 @@ def run(args, logger):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
-                                                                mode='PBG-head',
+                                                                mode='chunk-head',
                                                                 num_workers=num_workers,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
-                                                                mode='PBG-tail',
+                                                                mode='chunk-tail',
                                                                 num_workers=num_workers,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_heads.append(test_sampler_head)
@@ -241,13 +241,13 @@ def run(args, logger):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             args.eval_filter,
-                                                            mode='PBG-head',
+                                                            mode='chunk-head',
                                                             num_workers=num_workers,
                                                             rank=0, ranks=1)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             args.eval_filter,
-                                                            mode='PBG-tail',
+                                                            mode='chunk-tail',
                                                             num_workers=num_workers,
                                                             rank=0, ranks=1)
 

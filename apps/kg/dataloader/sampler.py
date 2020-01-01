@@ -121,10 +121,10 @@ class TrainDataset(object):
                            return_false_neg=False)
 
 
-class PBGNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
+class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     def __init__(self, subg, num_chunks, chunk_size,
                  neg_sample_size, neg_head):
-        super(PBGNegEdgeSubgraph, self).__init__(subg._parent, subg.sgi)
+        super(ChunkNegEdgeSubgraph, self).__init__(subg._parent, subg.sgi)
         self.subg = subg
         self.num_chunks = num_chunks
         self.chunk_size = chunk_size
@@ -140,7 +140,7 @@ class PBGNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
         return self.subg.tail_nid
 
 
-def create_neg_subgraph(pos_g, neg_g, is_pbg, neg_head, num_nodes):
+def create_neg_subgraph(pos_g, neg_g, is_chunked, neg_head, num_nodes):
     assert neg_g.number_of_edges() % pos_g.number_of_edges() == 0
     neg_sample_size = int(neg_g.number_of_edges() / pos_g.number_of_edges())
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
@@ -149,7 +149,7 @@ def create_neg_subgraph(pos_g, neg_g, is_pbg, neg_head, num_nodes):
        or (not neg_head and len(neg_g.tail_nid) == num_nodes):
         num_chunks = 1
         chunk_size = pos_g.number_of_edges()
-    elif is_pbg:
+    elif is_chunked:
         if pos_g.number_of_edges() < neg_sample_size:
             num_chunks = 1
             chunk_size = pos_g.number_of_edges()
@@ -162,8 +162,8 @@ def create_neg_subgraph(pos_g, neg_g, is_pbg, neg_head, num_nodes):
     else:
         num_chunks = pos_g.number_of_edges()
         chunk_size = 1
-    return PBGNegEdgeSubgraph(neg_g, num_chunks, chunk_size,
-                              neg_sample_size, neg_head)
+    return ChunkNegEdgeSubgraph(neg_g, num_chunks, chunk_size,
+                                neg_sample_size, neg_head)
 
 class EvalSampler(object):
     def __init__(self, g, edges, batch_size, neg_sample_size, mode, num_workers,
@@ -193,7 +193,7 @@ class EvalSampler(object):
             pos_g, neg_g = next(self.sampler_iter)
             if self.filter_false_neg:
                 neg_positive = neg_g.edata['false_neg']
-            neg_g = create_neg_subgraph(pos_g, neg_g, 'PBG' in self.mode,
+            neg_g = create_neg_subgraph(pos_g, neg_g, 'chunk' in self.mode,
                                         self.neg_head, self.g.number_of_nodes())
             if neg_g is not None:
                 break
@@ -290,12 +290,12 @@ class EvalDataset(object):
                            mode, num_workers, filter_false_neg)
 
 class NewBidirectionalOneShotIterator:
-    def __init__(self, dataloader_head, dataloader_tail, is_pbg, num_nodes):
+    def __init__(self, dataloader_head, dataloader_tail, is_chunked, num_nodes):
         self.sampler_head = dataloader_head
         self.sampler_tail = dataloader_tail
-        self.iterator_head = self.one_shot_iterator(dataloader_head, is_pbg,
+        self.iterator_head = self.one_shot_iterator(dataloader_head, is_chunked,
                                                     True, num_nodes)
-        self.iterator_tail = self.one_shot_iterator(dataloader_tail, is_pbg,
+        self.iterator_tail = self.one_shot_iterator(dataloader_tail, is_chunked,
                                                     False, num_nodes)
         self.step = 0
 
@@ -308,10 +308,10 @@ class NewBidirectionalOneShotIterator:
         return pos_g, neg_g
 
     @staticmethod
-    def one_shot_iterator(dataloader, is_pbg, neg_head, num_nodes):
+    def one_shot_iterator(dataloader, is_chunked, neg_head, num_nodes):
         while True:
             for pos_g, neg_g in dataloader:
-                neg_g = create_neg_subgraph(pos_g, neg_g, is_pbg, neg_head, num_nodes)
+                neg_g = create_neg_subgraph(pos_g, neg_g, is_chunked, neg_head, num_nodes)
                 if neg_g is None:
                     continue
 

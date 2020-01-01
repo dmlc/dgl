@@ -137,7 +137,7 @@ def check_score_func(func_name):
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     sampler = EdgeSampler(g, batch_size=batch_size,
                           neg_sample_size=neg_sample_size,
-                          negative_mode='PBG-head',
+                          negative_mode='chunk-head',
                           num_workers=1,
                           shuffle=False,
                           exclude_positive=False,
