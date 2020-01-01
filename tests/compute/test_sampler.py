@@ -700,10 +700,10 @@ def check_positive_edge_sampler():
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def test_negative_sampler():
-    check_negative_sampler('PBG-head', False, 10)
+    check_negative_sampler('chunk-head', False, 10)
     check_negative_sampler('head', True, 10)
     check_negative_sampler('head', False, 10)
-    check_weighted_negative_sampler('PBG-head', False, 10)
+    check_weighted_negative_sampler('chunk-head', False, 10)
     check_weighted_negative_sampler('head', True, 10)
     check_weighted_negative_sampler('head', False, 10)
     check_positive_edge_sampler()
