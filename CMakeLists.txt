@@ -41,7 +41,6 @@ include_directories("include")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
-include_directories("third_party/minigun/third_party/moderngpu/src")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
