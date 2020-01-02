@@ -1320,6 +1320,7 @@ NegSubgraph EdgeSamplerObject::genChunkedNegEdgeSubgraph(const Subgraph &pos_sub
   randomSample(num_tot_nodes,
                num_chunks * neg_sample_size,
                &global_neg_vids);
+  CHECK_EQ(num_chunks * neg_sample_size, global_neg_vids.size());
 
   std::unordered_map<dgl_id_t, dgl_id_t> neg_map;
   dgl_id_t local_vid = 0;
