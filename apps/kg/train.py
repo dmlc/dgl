@@ -59,6 +59,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='margin value')
         self.add_argument('--eval_percent', type=float, default=1,
                           help='sample some percentage for evaluation.')
+        self.add_argument('--no_eval_filter', action='store_true',
+                          help='do not filter positive edges among negative edges for evaluation')
 
         self.add_argument('--gpu', type=int, default=-1,
                           help='use GPU')
@@ -135,6 +137,7 @@ def run(args, logger):
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = n_entities
+    args.eval_filter = not args.no_eval_filter
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     if args.num_proc > 1:
@@ -179,11 +182,13 @@ def run(args, logger):
             for i in range(args.num_proc):
                 valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
+                                                                 args.eval_filter,
                                                                  mode='PBG-head',
                                                                  num_workers=args.num_worker,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
+                                                                 args.eval_filter,
                                                                  mode='PBG-tail',
                                                                  num_workers=args.num_worker,
                                                                  rank=i, ranks=args.num_proc)
@@ -192,11 +197,13 @@ def run(args, logger):
         else:
             valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
+                                                             args.eval_filter,
                                                              mode='PBG-head',
                                                              num_workers=args.num_worker,
                                                              rank=0, ranks=1)
             valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
+                                                             args.eval_filter,
                                                              mode='PBG-tail',
                                                              num_workers=args.num_worker,
                                                              rank=0, ranks=1)
@@ -209,11 +216,13 @@ def run(args, logger):
             for i in range(args.num_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
+                                                                args.eval_filter,
                                                                 mode='PBG-head',
                                                                 num_workers=args.num_worker,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
+                                                                args.eval_filter,
                                                                 mode='PBG-tail',
                                                                 num_workers=args.num_worker,
                                                                 rank=i, ranks=args.num_proc)
@@ -222,11 +231,13 @@ def run(args, logger):
         else:
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
+                                                            args.eval_filter,
                                                             mode='PBG-head',
                                                             num_workers=args.num_worker,
                                                             rank=0, ranks=1)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
+                                                            args.eval_filter,
                                                             mode='PBG-tail',
                                                             num_workers=args.num_worker,
                                                             rank=0, ranks=1)

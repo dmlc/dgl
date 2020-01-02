@@ -44,6 +44,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='margin value')
         self.add_argument('--eval_percent', type=float, default=1,
                           help='sample some percentage for evaluation.')
+        self.add_argument('--no_eval_filter', action='store_true',
+                          help='do not filter positive edges among negative edges for evaluation')
 
         self.add_argument('--gpu', type=int, default=-1,
                           help='use GPU')
@@ -99,17 +101,20 @@ def main(args):
     args.neg_sample_size_test = args.neg_sample_size
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
+    args.eval_filter = not args.no_eval_filter
     if args.num_proc > 1:
         test_sampler_tails = []
         test_sampler_heads = []
         for i in range(args.num_proc):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
+                                                            args.eval_filter,
                                                             mode='PBG-head',
                                                             num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
+                                                            args.eval_filter,
                                                             mode='PBG-tail',
                                                             num_workers=args.num_worker,
                                                             rank=i, ranks=args.num_proc)
@@ -118,11 +123,13 @@ def main(args):
     else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
+                                                        args.eval_filter,
                                                         mode='PBG-head',
                                                         num_workers=args.num_worker,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
+                                                        args.eval_filter,
                                                         mode='PBG-tail',
                                                         num_workers=args.num_worker,
                                                         rank=0, ranks=1)
