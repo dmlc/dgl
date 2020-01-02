@@ -151,7 +151,7 @@ def run(args, logger):
     if args.neg_chunk_size < 0:
         args.neg_chunk_size = args.neg_sample_size
     if args.neg_chunk_size_valid < 0:
-        args.neg_chunk_size = args.neg_sample_size_valid
+        args.neg_chunk_size_valid = args.neg_sample_size_valid
     if args.neg_chunk_size_test < 0:
         args.neg_chunk_size_test = args.neg_sample_size_test
 

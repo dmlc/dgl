@@ -114,7 +114,7 @@ class TrainDataset(object):
                            seed_edges=F.tensor(self.edge_parts[rank]),
                            batch_size=batch_size,
                            neg_sample_size=neg_sample_size,
-                           chunk_size=neg_chunk_size
+                           chunk_size=neg_chunk_size,
                            negative_mode=mode,
                            num_workers=num_workers,
                            shuffle=shuffle,
@@ -151,7 +151,7 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_node
         num_chunks = 1
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
-        if pos_g.number_of_edges() < neg_sample_size:
+        if pos_g.number_of_edges() < chunk_size:
             num_chunks = 1
             chunk_size = pos_g.number_of_edges()
         else:
