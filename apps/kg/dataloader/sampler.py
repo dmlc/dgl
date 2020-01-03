@@ -166,7 +166,8 @@ def create_neg_subgraph(pos_g, neg_g, is_pbg, neg_head, num_nodes):
                               neg_sample_size, neg_head)
 
 class EvalSampler(object):
-    def __init__(self, g, edges, batch_size, neg_sample_size, mode, num_workers):
+    def __init__(self, g, edges, batch_size, neg_sample_size, mode, num_workers,
+                 filter_false_neg):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         self.sampler = EdgeSampler(g,
                                    batch_size=batch_size,
@@ -177,11 +178,12 @@ class EvalSampler(object):
                                    shuffle=False,
                                    exclude_positive=False,
                                    relations=g.edata['id'],
-                                   return_false_neg=True)
+                                   return_false_neg=filter_false_neg)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
         self.neg_head = 'head' in mode
         self.g = g
+        self.filter_false_neg = filter_false_neg
 
     def __iter__(self):
         return self
@@ -189,7 +191,8 @@ class EvalSampler(object):
     def __next__(self):
         while True:
             pos_g, neg_g = next(self.sampler_iter)
-            neg_positive = neg_g.edata['false_neg']
+            if self.filter_false_neg:
+                neg_positive = neg_g.edata['false_neg']
             neg_g = create_neg_subgraph(pos_g, neg_g, 'PBG' in self.mode,
                                         self.neg_head, self.g.number_of_nodes())
             if neg_g is not None:
@@ -197,7 +200,8 @@ class EvalSampler(object):
 
         pos_g.copy_from_parent()
         neg_g.copy_from_parent()
-        neg_g.edata['bias'] = F.astype(-neg_positive, F.float32)
+        if self.filter_false_neg:
+            neg_g.edata['bias'] = F.astype(-neg_positive, F.float32)
         return pos_g, neg_g
 
     def reset(self):
@@ -276,14 +280,15 @@ class EvalDataset(object):
         np.testing.assert_equal(F.asnumpy(dst_id), orig_dst)
         np.testing.assert_equal(F.asnumpy(etype), orig_etype)
 
-    def create_sampler(self, eval_type, batch_size, neg_sample_size, mode='head',
-                       num_workers=5, rank=0, ranks=1):
+    def create_sampler(self, eval_type, batch_size, neg_sample_size,
+                       filter_false_neg, mode='head', num_workers=5, rank=0, ranks=1):
         edges = self.get_edges(eval_type)
         beg = edges.shape[0] * rank // ranks
         end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
         edges = edges[beg: end]
         print("eval on {} edges".format(len(edges)))
-        return EvalSampler(self.g, edges, batch_size, neg_sample_size, mode, num_workers)
+        return EvalSampler(self.g, edges, batch_size, neg_sample_size,
+                           mode, num_workers, filter_false_neg)
 
 class NewBidirectionalOneShotIterator:
     def __init__(self, dataloader_head, dataloader_tail, is_pbg, num_nodes):

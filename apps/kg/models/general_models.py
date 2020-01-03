@@ -140,10 +140,11 @@ class KEModel(object):
         neg_scores = reshape(logsigmoid(neg_scores), batch_size, -1)
 
         # We need to filter the positive edges in the negative graph.
-        filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
-        if self.args.gpu >= 0:
-            filter_bias = cuda(filter_bias, self.args.gpu)
-        neg_scores += filter_bias
+        if self.args.eval_filter:
+            filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
+            if self.args.gpu >= 0:
+                filter_bias = cuda(filter_bias, self.args.gpu)
+            neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
         # the positive edge.
