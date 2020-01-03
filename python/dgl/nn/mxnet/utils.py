@@ -1,7 +1,7 @@
 """Utilities for pytorch NN package"""
 #pylint: disable=no-member, invalid-name
 
-from mxnet import nd
+from mxnet import nd, gluon
 import numpy as np
 
 def matmul_maybe_select(A, B):
@@ -105,3 +105,12 @@ def normalize(x, p=2, axis=1, eps=1e-12):
     """
     denom = nd.clip(nd.norm(x, ord=p, axis=axis, keepdims=True), eps, float('inf'))
     return x / denom
+
+class Sequential(gluon.nn.Sequential):
+    def __init__(self, prefix=None, params=None):
+        super(Sequential, self).__init__(prefix=prefix, params=params)
+
+    def forward(self, graph, feat):
+        for block in self._children.values():
+            feat = block(graph, feat)
+        return feat
