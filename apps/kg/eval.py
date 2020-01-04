@@ -102,6 +102,11 @@ def main(args):
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
     args.eval_filter = not args.no_eval_filter
+    num_workers = args.num_worker
+    # for multiprocessing evaluation, we don't need to sample multiple batches at a time
+    # in each process.
+    if args.num_proc > 1:
+        num_workers = 1
     if args.num_proc > 1:
         test_sampler_tails = []
         test_sampler_heads = []
@@ -110,13 +115,13 @@ def main(args):
                                                             args.neg_sample_size,
                                                             args.eval_filter,
                                                             mode='PBG-head',
-                                                            num_workers=args.num_worker,
+                                                            num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             args.eval_filter,
                                                             mode='PBG-tail',
-                                                            num_workers=args.num_worker,
+                                                            num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
             test_sampler_tails.append(test_sampler_tail)
@@ -125,13 +130,13 @@ def main(args):
                                                         args.neg_sample_size,
                                                         args.eval_filter,
                                                         mode='PBG-head',
-                                                        num_workers=args.num_worker,
+                                                        num_workers=num_workers,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
                                                         args.eval_filter,
                                                         mode='PBG-tail',
-                                                        num_workers=args.num_worker,
+                                                        num_workers=num_workers,
                                                         rank=0, ranks=1)
 
     # load model
@@ -145,6 +150,7 @@ def main(args):
     # test
     args.step = 0
     args.max_step = 0
+    start = time.time()
     if args.num_proc > 1:
         queue = mp.Queue(args.num_proc)
         procs = []
@@ -168,6 +174,7 @@ def main(args):
             print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
     else:
         test(args, model, [test_sampler_head, test_sampler_tail])
+    print('Test takes {:.3f} seconds'.format(time.time() - start))
 
 
 if __name__ == '__main__':

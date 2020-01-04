@@ -286,7 +286,6 @@ class EvalDataset(object):
         beg = edges.shape[0] * rank // ranks
         end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
         edges = edges[beg: end]
-        print("eval on {} edges".format(len(edges)))
         return EvalSampler(self.g, edges, batch_size, neg_sample_size,
                            mode, num_workers, filter_false_neg)
 
