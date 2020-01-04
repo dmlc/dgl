@@ -171,6 +171,11 @@ def run(args, logger):
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
                                                         True, n_entities)
 
+    # for multiprocessing evaluation, we don't need to sample multiple batches at a time
+    # in each process.
+    num_workers = args.num_worker
+    if args.num_proc > 1:
+        num_workers = 1
     if args.valid or args.test:
         eval_dataset = EvalDataset(dataset, args)
     if args.valid:
@@ -184,13 +189,13 @@ def run(args, logger):
                                                                  args.neg_sample_size_valid,
                                                                  args.eval_filter,
                                                                  mode='PBG-head',
-                                                                 num_workers=args.num_worker,
+                                                                 num_workers=num_workers,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                                  args.neg_sample_size_valid,
                                                                  args.eval_filter,
                                                                  mode='PBG-tail',
-                                                                 num_workers=args.num_worker,
+                                                                 num_workers=num_workers,
                                                                  rank=i, ranks=args.num_proc)
                 valid_sampler_heads.append(valid_sampler_head)
                 valid_sampler_tails.append(valid_sampler_tail)
@@ -199,13 +204,13 @@ def run(args, logger):
                                                              args.neg_sample_size_valid,
                                                              args.eval_filter,
                                                              mode='PBG-head',
-                                                             num_workers=args.num_worker,
+                                                             num_workers=num_workers,
                                                              rank=0, ranks=1)
             valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                              args.neg_sample_size_valid,
                                                              args.eval_filter,
                                                              mode='PBG-tail',
-                                                             num_workers=args.num_worker,
+                                                             num_workers=num_workers,
                                                              rank=0, ranks=1)
     if args.test:
         # Here we want to use the regualr negative sampler because we need to ensure that
@@ -218,13 +223,13 @@ def run(args, logger):
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='PBG-head',
-                                                                num_workers=args.num_worker,
+                                                                num_workers=num_workers,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='PBG-tail',
-                                                                num_workers=args.num_worker,
+                                                                num_workers=num_workers,
                                                                 rank=i, ranks=args.num_proc)
                 test_sampler_heads.append(test_sampler_head)
                 test_sampler_tails.append(test_sampler_tail)
@@ -233,13 +238,13 @@ def run(args, logger):
                                                             args.neg_sample_size_test,
                                                             args.eval_filter,
                                                             mode='PBG-head',
-                                                            num_workers=args.num_worker,
+                                                            num_workers=num_workers,
                                                             rank=0, ranks=1)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                             args.neg_sample_size_test,
                                                             args.eval_filter,
                                                             mode='PBG-tail',
-                                                            num_workers=args.num_worker,
+                                                            num_workers=num_workers,
                                                             rank=0, ranks=1)
 
     # We need to free all memory referenced by dataset.
