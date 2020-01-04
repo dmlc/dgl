@@ -41,6 +41,12 @@ def build_dgl_win64(dev) {
   pack_lib("dgl-${dev}-win64", dgl_win64_libs)
 }
 
+def python_lint_linux() {
+  init_git()
+  unpack_lib("dgl-cpu-linux", dgl_linux_libs)
+  sh "pip install flake8 ; flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
+}
+
 def cpp_unit_test_linux() {
   init_git()
   unpack_lib("dgl-cpu-linux", dgl_linux_libs)
@@ -184,6 +190,7 @@ pipeline {
             }
           }
           steps {
+            python_lint_linux()
             cpp_unit_test_linux()
           }
           post {
