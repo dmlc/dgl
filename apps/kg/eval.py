@@ -38,6 +38,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=-1,
                           help='negative sampling size for testing')
+        self.add_argument('--neg_deg_sample', action='store_true',
+                          help='negative sampling proportional to vertex degree for testing')
+        self.add_argument('--neg_chunk_size', type=int, default=-1,
+                          help='chunk size of the negative edges.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
@@ -86,6 +90,10 @@ def get_logger(args):
     return logger
 
 def main(args):
+    args.eval_filter = not args.no_eval_filter
+    if args.neg_deg_sample:
+        assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
+
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     args.pickle_graph = False
@@ -98,10 +106,14 @@ def main(args):
     # Here we want to use the regualr negative sampler because we need to ensure that
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
+
     args.neg_sample_size_test = args.neg_sample_size
+    args.neg_deg_sample_eval = args.neg_deg_sample
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
-    args.eval_filter = not args.no_eval_filter
+    if args.neg_chunk_size < 0:
+        args.neg_chunk_size = args.neg_sample_size
+
     num_workers = args.num_worker
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
@@ -113,14 +125,16 @@ def main(args):
         for i in range(args.num_proc):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
+                                                            args.neg_chunk_size,
                                                             args.eval_filter,
-                                                            mode='PBG-head',
+                                                            mode='chunk-head',
                                                             num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
+                                                            args.neg_chunk_size,
                                                             args.eval_filter,
-                                                            mode='PBG-tail',
+                                                            mode='chunk-tail',
                                                             num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
@@ -128,14 +142,16 @@ def main(args):
     else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
+                                                        args.neg_chunk_size,
                                                         args.eval_filter,
-                                                        mode='PBG-head',
+                                                        mode='chunk-head',
                                                         num_workers=num_workers,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
+                                                        args.neg_chunk_size,
                                                         args.eval_filter,
-                                                        mode='PBG-tail',
+                                                        mode='chunk-tail',
                                                         num_workers=num_workers,
                                                         rank=0, ranks=1)
 
