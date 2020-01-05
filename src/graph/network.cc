@@ -591,11 +591,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
     *rv = msg->data;
   });
 
-DGL_REGISTER_GLOBAL("network._CAPI_DeleteNDArrayData")
+DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray data = args[0];
-    delete [] data->data;
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
+    delete msg;
   });
+
 
 
 }  // namespace network
