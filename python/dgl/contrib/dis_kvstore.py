@@ -313,7 +313,8 @@ class KVServer(object):
                     rank=self._server_id,
                     name=str(client_id),
                     id=None,
-                    data=None)
+                    data=None,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, client_id)
 
             # send serilaized shared-memory tensor information to clients
@@ -331,7 +332,8 @@ class KVServer(object):
                 rank=self._server_id,
                 name=shared_tensor,
                 id=None,
-                data=None)
+                data=None,
+                c_ptr=None)
 
             for client_id in range(len(self._client_namebook)):
                 _send_kv_msg(self._sender, msg, client_id)
@@ -358,7 +360,8 @@ class KVServer(object):
                     rank=self._server_id,
                     name=msg.name,
                     id=msg.id,
-                    data=res_tensor)
+                    data=res_tensor,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
             # Barrier message
             elif msg.type == KVMsgType.BARRIER:
@@ -369,7 +372,8 @@ class KVServer(object):
                         rank=self._server_id,
                         name=None,
                         id=None,
-                        data=None)
+                        data=None,
+                        c_ptr=None)
                     for i in range(self._client_count):
                         _send_kv_msg(self._sender, back_msg, i)
                     self._barrier_count = 0
@@ -575,7 +579,8 @@ class KVClient(object):
             rank=0,
             name=self._addr,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=None)
 
         for server_id in range(self._server_count):
             _send_kv_msg(self._sender, msg, server_id)
@@ -648,7 +653,8 @@ class KVClient(object):
                     rank=self._client_id, 
                     name=name,
                     id=partial_id, 
-                    data=partial_data)
+                    data=partial_data,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, server[idx])
 
             start += count[idx]
@@ -705,7 +711,8 @@ class KVClient(object):
                     rank=self._client_id, 
                     name=name, 
                     id=partial_id, 
-                    data=None)
+                    data=None,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, server[idx])
                 pull_count += 1
 
@@ -718,7 +725,8 @@ class KVClient(object):
                 rank=server_id, 
                 name=name, 
                 id=None,
-                data=data)
+                data=data,
+                c_ptr=None)
             msg_list.append(local_msg)
             self._garbage_msg.append(local_msg)
 
@@ -745,7 +753,8 @@ class KVClient(object):
             rank=self._client_id,
             name=None,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=None)
 
         for server_id in range(self._server_count):
             _send_kv_msg(self._sender, msg, server_id)
@@ -766,7 +775,8 @@ class KVClient(object):
                 rank=self._client_id,
                 name=None,
                 id=None,
-                data=None)
+                data=None,
+                c_ptr=None)
             _send_kv_msg(self._sender, msg, server_id)
 
 
