@@ -61,7 +61,7 @@ def train(args, model, train_sampler, valid_samplers=None):
     # clear cache
     logs = []
 
-def test(args, model, test_samplers, mode='Test'):
+def test(args, model, test_samplers, mode='Test', queue=None):
     logs = []
 
     for sampler in test_samplers:

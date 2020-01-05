@@ -37,11 +37,14 @@ def train(args, model, train_sampler, valid_samplers=None):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
     start = time.time()
+    sample_time = 0
     update_time = 0
     forward_time = 0
     backward_time = 0
     for step in range(args.init_step, args.max_step):
+        start1 = time.time()
         pos_g, neg_g = next(train_sampler)
+        sample_time += time.time() - start1
         args.step = step
 
         start1 = time.time()
@@ -64,9 +67,9 @@ def train(args, model, train_sampler, valid_samplers=None):
             logs = []
             print('[Train] {} steps take {:.3f} seconds'.format(args.log_interval,
                                                             time.time() - start))
-            print('forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(forward_time,
-                                                                             backward_time,
-                                                                             update_time))
+            print('sample: {:.3f}, forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(
+                sample_time, forward_time, backward_time, update_time))
+            sample_time = 0
             update_time = 0
             forward_time = 0
             backward_time = 0
@@ -77,10 +80,9 @@ def train(args, model, train_sampler, valid_samplers=None):
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
-def test(args, model, test_samplers, mode='Test'):
+def test(args, model, test_samplers, mode='Test', queue=None):
     if args.num_proc > 1:
         th.set_num_threads(1)
-    start = time.time()
     with th.no_grad():
         logs = []
         for sampler in test_samplers:
@@ -93,9 +95,10 @@ def test(args, model, test_samplers, mode='Test'):
         if len(logs) > 0:
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-
-        for k, v in metrics.items():
-            print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
-    print('test:', time.time() - start)
+        if queue is not None:
+            queue.put(metrics)
+        else:
+            for k, v in metrics.items():
+                print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
