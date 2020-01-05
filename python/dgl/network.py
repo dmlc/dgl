@@ -314,7 +314,6 @@ def _clear_kv_msg(garbage_msg):
     """Clear data of kvstore message
     """
     F.sync()
-    for msg in garbage_msg:
-        _CAPI_DeleteKVMsg(msg.c_ptr)
-    garbage_msg = []
+    for i in range(5000):
+        _CAPI_DeleteKVMsg(garbage_msg[i].c_ptr)
         
