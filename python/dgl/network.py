@@ -17,6 +17,7 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
+Garbage_msg = [] # A naive garbage collection
 
 def _network_wait():
     """Sleep for a few seconds
@@ -274,6 +275,7 @@ def _recv_kv_msg(receiver):
             name=name,
             id=tensor_id,
             data=None)
+        Garbage_msg.append(msg_ptr)
         return msg
     elif msg_type == KVMsgType.IP_ID:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -283,6 +285,7 @@ def _recv_kv_msg(receiver):
             name=name,
             id=None,
             data=None)
+        Garbage_msg.append(msg_ptr)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
@@ -291,6 +294,7 @@ def _recv_kv_msg(receiver):
             name=None,
             id=None,
             data=None)
+        Garbage_msg.append(msg_ptr)
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -302,19 +306,17 @@ def _recv_kv_msg(receiver):
             name=name,
             id=tensor_id,
             data=data)
+        Garbage_msg.append(msg_ptr)
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
 
 
-def _clear_kv_msg(msg):
+def _clear_kv_msg():
     """Clear data of kvstore message
-
-    Parameters
-    ----------
-    msg : KVStoreMsg
-        kvstore message
     """
     F.sync()
-    _CAPI_DeleteKVMsg(msg)
+    for msg_ptr in Garbage_msg:
+        _CAPI_DeleteKVMsg(msg_ptr)
+    Garbage_msg = []
         
