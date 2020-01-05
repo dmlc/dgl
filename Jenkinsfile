@@ -184,7 +184,6 @@ pipeline {
             }
           }
           steps {
-            python_lint_linux()
             cpp_unit_test_linux()
           }
           post {
