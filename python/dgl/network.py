@@ -17,8 +17,6 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
-Garbage_msg = [] # A naive garbage collection
-
 def _network_wait():
     """Sleep for a few seconds
     """
@@ -187,7 +185,7 @@ class KVMsgType(Enum):
     BARRIER = 6
     IP_ID = 7
 
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data, c_ptr")
 """Message of DGL kvstore
 
 Data Field
@@ -274,8 +272,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=None)
-        Garbage_msg.append(msg_ptr)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     elif msg_type == KVMsgType.IP_ID:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -284,8 +282,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=None,
-            data=None)
-        Garbage_msg.append(msg_ptr)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
@@ -293,8 +291,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=None,
             id=None,
-            data=None)
-        Garbage_msg.append(msg_ptr)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -305,18 +303,18 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=data)
-        Garbage_msg.append(msg_ptr)
+            data=data,
+            c_ptr=msg_ptr)
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
 
 
-def _clear_kv_msg():
+def _clear_kv_msg(garbage_msg):
     """Clear data of kvstore message
     """
     F.sync()
-    for msg_ptr in Garbage_msg:
-        _CAPI_DeleteKVMsg(msg_ptr)
-    Garbage_msg = []
+    for msg in garbage_msg:
+        _CAPI_DeleteKVMsg(msg.c_ptr)
+    garbage_msg = []
         

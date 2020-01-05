@@ -201,8 +201,8 @@ class KVServer(object):
         # Create C communicator of sender and receiver
         self._sender = _create_sender(net_type, msg_queue_size)
         self._receiver = _create_receiver(net_type, msg_queue_size)
-        # Count for message
-        self._msg_count = 0
+        # A naive garbage collocetion for kvstore
+        self._garbage_msg = []
 
 
     def __del__(self):
@@ -380,9 +380,9 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
-            self._msg_count += 1
-            if self._msg_count > 5000:
-                _clear_kv_msg()
+            self._garbage_msg.append(msg)
+            if len(self._garbage_msg) > 5000:
+                _clear_kv_msg(self._garbage_msg)
 
 
     def _push_handler(self, name, ID, data, target):
@@ -518,8 +518,6 @@ class KVClient(object):
         self._receiver = _create_receiver(net_type, msg_queue_size)
         # A naive garbage collocetion for kvstore
         self._garbage_msg = []
-        # count for message
-        self._msg_count = 0
 
 
 
@@ -674,6 +672,9 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
+        if len(self._garbage_msg) > 5000:
+            _clear_kv_msg(self._garbage_msg)
+
         # partition data (we can move this part of code into C-api if needed)
         server_id = self._data_store[name+'-part-'][id_tensor]
         # sort index by server id
@@ -719,20 +720,17 @@ class KVClient(object):
                 id=None,
                 data=data)
             msg_list.append(local_msg)
-            self._msg_count += 1
+            self._garbage_msg.append(local_msg)
 
         # wait message from server nodes
         for idx in range(pull_count):
             remote_msg = _recv_kv_msg(self._receiver)
             msg_list.append(remote_msg)
-            self._msg_count += 1
+            self._garbage_msg.append(remote_msg)
 
         # sort msg by server id
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
-
-        if self._msg_count > 5000:
-            _clear_kv_msg()
 
         return data_tensor[back_sorted_id] # return data with original index order
 
