@@ -201,6 +201,8 @@ class KVServer(object):
         # Create C communicator of sender and receiver
         self._sender = _create_sender(net_type, msg_queue_size)
         self._receiver = _create_receiver(net_type, msg_queue_size)
+        # A naive garbage collocetion for kvstore
+        self._garbage_msg = []
 
 
     def __del__(self):
@@ -378,7 +380,9 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
-            _clear_kv_msg(msg)
+            self._garbage_msg.append(msg)
+            if len(self._garbage_msg) > 10000:
+                self._clear_garbage_msg()
 
 
     def _push_handler(self, name, ID, data, target):
@@ -465,6 +469,14 @@ class KVServer(object):
         return addr_list.sort()
 
 
+    def _clear_garbage_msg(self):
+        """clear garbage kvstore message
+        """
+        for msg in self._garbage_msg:
+            _clear_kv_msg(msg)
+        self._garbage_msg = []
+
+
 class KVClient(object):
     """KVClient is used to push/pull tensors to/from KVServer. If one server node and one client node
     are on the same machine, they can commuincated using shared-memory tensor (close_shared_mem=False), 
@@ -512,6 +524,9 @@ class KVClient(object):
         # create C communicator of sender and receiver
         self._sender = _create_sender(net_type, msg_queue_size)
         self._receiver = _create_receiver(net_type, msg_queue_size)
+        # A naive garbage collocetion for kvstore
+        self._garbage_msg = []
+
 
 
     def __del__(self):
@@ -711,16 +726,20 @@ class KVClient(object):
                 data=data)
             msg_list.append(local_msg)
 
+            self._garbage_msg.append(local_msg)
+
         # wait message from server nodes
         for idx in range(pull_count):
-            msg_list.append(_recv_kv_msg(self._receiver))
+            remote_msg = _recv_kv_msg(self._receiver)
+            msg_list.append(remote_msg)
+            self._garbage_msg.append(remote_msg)
 
         # sort msg by server id
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
 
-        for msg in msg_list:
-            _clear_kv_msg(msg)
+        if len(self._garbage_msg) > 10000:
+            self._clear_garbage_msg()
 
         return data_tensor[back_sorted_id] # return data with original index order
 
@@ -907,3 +926,11 @@ class KVClient(object):
         tensor_shape = tuple(tensor_shape)
 
         return tensor_name, tensor_shape, data_type
+
+
+    def _clear_garbage_msg(self):
+        """clear garbage kvstore message
+        """
+        for msg in self._garbage_msg:
+            _clear_kv_msg(msg)
+        self._garbage_msg = []
