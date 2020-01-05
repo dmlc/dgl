@@ -150,6 +150,11 @@ def run(args, logger):
     args.eval_filter = not args.no_eval_filter
     if args.neg_deg_sample_eval:
         assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
+
+    # When we generate a batch of negative edges from a set of positive edges,
+    # we first divide the positive edges into chunks and corrupt the edges in a chunk
+    # together. By default, the chunk size is equal to the negative sample size.
+    # Usually, this works well. But we also allow users to specify the chunk size themselves.
     if args.neg_chunk_size < 0:
         args.neg_chunk_size = args.neg_sample_size
     if args.neg_chunk_size_valid < 0:
