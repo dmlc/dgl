@@ -18,13 +18,6 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
-def keyboard_interrupt_handler(my_signal):
-    """Users can use [Ctl + C] to exit loop service
-    """
-    print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up DGL ...".format(my_signal))
-    exit(0)
-
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 def _network_wait():
     """Sleep for a few seconds
