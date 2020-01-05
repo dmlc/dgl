@@ -141,6 +141,10 @@ class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
         return self.subg.tail_nid
 
 
+# KG models need to know the number of chunks, the chunk size and negative sample size
+# of a negative subgraph to perform the computation more efficiently.
+# This function tries to infer all of these information of the negative subgraph
+# and create a wrapper class that contains all of the information.
 def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_nodes):
     assert neg_g.number_of_edges() % pos_g.number_of_edges() == 0
     neg_sample_size = int(neg_g.number_of_edges() / pos_g.number_of_edges())
