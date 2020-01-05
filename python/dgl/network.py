@@ -315,5 +315,6 @@ def _clear_kv_msg(msg):
     msg : KVStoreMsg
         kvstore message
     """
+    F.sync()
     _CAPI_DeleteKVMsg(msg)
         
