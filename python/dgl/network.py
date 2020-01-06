@@ -321,4 +321,5 @@ def _clear_kv_msg(garbage_msg):
             print("delete")
             _CAPI_DeleteKVMsg(msg.c_ptr)
         i += 1
+    garbage_msg = []
         
