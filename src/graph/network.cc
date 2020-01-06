@@ -24,6 +24,14 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace network {
 
+
+static void NaiveDeleter(DLManagedTensor* managed_tensor) {
+  delete [] managed_tensor->dl_tensor.shape;
+  delete [] managed_tensor->dl_tensor.strides;
+  delete [] managed_tensor->dl_tensor.data;
+  delete managed_tensor;
+}
+
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DLDataType dtype,
                              DLContext ctx,
@@ -46,6 +54,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   tensor.data = raw;
   DLManagedTensor *managed_tensor = new DLManagedTensor();
   managed_tensor->dl_tensor = tensor;
+  managed_tensor->deleter = NaiveDeleter;
   return NDArray::FromDLPack(managed_tensor);
 }
 
