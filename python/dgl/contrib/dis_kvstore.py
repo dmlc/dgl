@@ -385,7 +385,7 @@ class KVServer(object):
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
             self._garbage_msg.append(msg)
-            if len(self._garbage_msg) > 5000:
+            if len(self._garbage_msg) > 1000:
                 _clear_kv_msg(self._garbage_msg)
                 self._garbage_msg = []
 
@@ -679,8 +679,9 @@ class KVClient(object):
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
-        if len(self._garbage_msg) > 5000:
+        if len(self._garbage_msg) > 1000:
             _clear_kv_msg(self._garbage_msg)
+            self._garbage_msg = []
 
         # partition data (we can move this part of code into C-api if needed)
         server_id = self._data_store[name+'-part-'][id_tensor]
