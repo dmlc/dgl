@@ -53,8 +53,8 @@ class ExternalEmbedding:
 
     def __call__(self, idx, gpu_id=-1, trace=True):
         s = self.emb[idx]
-        if self.gpu >= 0:
-            s = s.cuda(self.gpu)
+        if gpu_id >= 0:
+            s = s.cuda(gpu_id)
         # During the training, we need to trace the computation.
         # In this case, we need to record the computation path and compute the gradients.
         if trace:
@@ -64,7 +64,7 @@ class ExternalEmbedding:
             data = s
         return data
 
-    def update(self):
+    def update(self, gpu_id=-1):
         self.state_step += 1
         with th.no_grad():
             for idx, data in self.trace:
@@ -86,8 +86,8 @@ class ExternalEmbedding:
                 self.state_sum.index_add_(0, grad_indices, grad_sum)
                 std = self.state_sum[grad_indices]  # _sparse_mask
                 std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-                if self.gpu >= 0:
-                    std_values = std_values.cuda(self.args.gpu)
+                if gpu_id >= 0:
+                    std_values = std_values.cuda(gpu_id)
                 tmp = (-clr * grad_values / std_values)
                 if tmp.device != device:
                     tmp = tmp.to(device)

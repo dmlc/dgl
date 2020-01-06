@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
 import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
 from _thread import start_new_thread
 
 from distutils.version import LooseVersion
@@ -14,6 +15,7 @@ if TH_VERSION.version[0] == 1 and TH_VERSION.version[1] < 2:
 import os
 import logging
 import time
+from functools import wraps
 
 def thread_wrapped_func(func):
     @wraps(func)
@@ -60,7 +62,7 @@ def train(args, model, train_sampler, rank=0, valid_samplers=None):
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
-    if len(args.gpu > 0):
+    if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
@@ -88,7 +90,7 @@ def train(args, model, train_sampler, rank=0, valid_samplers=None):
         backward_time += time.time() - start1
 
         start1 = time.time()
-        model.update()
+        model.update(gpu_id)
         update_time += time.time() - start1
         logs.append(log)
 
@@ -120,7 +122,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     if args.num_proc > 1:
         th.set_num_threads(8)
 
-    if len(args.gpu > 0):
+    if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1

@@ -28,6 +28,7 @@ class KEModel(object):
         super(KEModel, self).__init__()
         self.args = args
         self.n_entities = n_entities
+        self.n_relations = n_relations
         self.model_name = model_name
         self.hidden_dim = hidden_dim
         self.eps = 2.0
@@ -45,6 +46,7 @@ class KEModel(object):
         else:
             rel_dim = relation_dim
 
+        self.rel_dim = rel_dim
         self.rel_part = args.rel_part
         if not self.rel_part:
             self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
@@ -81,7 +83,11 @@ class KEModel(object):
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
         self.entity_emb.share_memory()
-        self.relation_emb.share_memory()
+        if not self.rel_part:
+            self.relation_emb.share_memory()
+        else:
+            for relation_emb in self.relation_embs:
+                relation_emb.share_memory()
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
@@ -184,8 +190,8 @@ class KEModel(object):
         # We need to filter the positive edges in the negative graph.
         if self.args.eval_filter:
             filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
-            if self.args.gpu >= 0:
-                filter_bias = cuda(filter_bias, self.args.gpu)
+            if gpu_id >= 0:
+                filter_bias = cuda(filter_bias, gpu_id)
             neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
@@ -254,10 +260,10 @@ class KEModel(object):
 
         return loss, log
 
-    def update(self):
-        self.entity_emb.update()
-        self.relation_emb.update()
-        self.score_func.update()
+    def update(self, gpu_id=-1):
+        self.entity_emb.update(gpu_id)
+        self.relation_emb.update(gpu_id)
+        self.score_func.update(gpu_id)
 
     def prepare_relation(self, gpu_id=-1):
         device = th.device('cuda:' + str(gpu_id))
@@ -265,7 +271,7 @@ class KEModel(object):
         self.relation_emb.init(self.emb_init)
 
     def writeback_relation(self, rank=0):
-        self.relation_embs[rank][:] = self.relation_emb[:]
+        self.relation_embs[rank].emb[:] = self.relation_emb.emb[:]
 
     def load_relation(self, rank=0):
         self.relation_emb = self.relation_embs[rank]

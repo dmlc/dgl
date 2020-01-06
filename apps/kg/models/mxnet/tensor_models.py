@@ -44,14 +44,14 @@ class ExternalEmbedding:
         if self.emb.context != idx.context:
             idx = idx.as_in_context(self.emb.context)
         data = nd.take(self.emb, idx)
-        if self.gpu >= 0:
-            data = data.as_in_context(mx.gpu(self.gpu))
+        if gpu_id >= 0:
+            data = data.as_in_context(mx.gpu(gpu_id))
         data.attach_grad()
         if trace:
             self.trace.append((idx, data))
         return data
 
-    def update(self):
+    def update(self, gpu_id=-1):
         self.state_step += 1
         for idx, data in self.trace:
             grad = data.grad
@@ -72,8 +72,8 @@ class ExternalEmbedding:
             self.state_sum[grad_indices] += grad_sum
             std = self.state_sum[grad_indices]  # _sparse_mask
             std_values = nd.expand_dims(nd.sqrt(std) + 1e-10, 1)
-            if self.gpu >= 0:
-                std_values = std_values.as_in_context(mx.gpu(self.args.gpu))
+            if gpu_id >= 0:
+                std_values = std_values.as_in_context(mx.gpu(gpu_id))
             tmp = (-clr * grad_values / std_values)
             if tmp.context != ctx:
                 tmp = tmp.as_in_context(ctx)
