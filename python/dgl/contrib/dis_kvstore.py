@@ -930,10 +930,3 @@ class KVClient(object):
 
         return tensor_name, tensor_shape, data_type
 
-
-    def _clear_garbage_msg(self):
-        """clear garbage kvstore message
-        """
-        for msg in self._garbage_msg:
-            _clear_kv_msg(msg)
-        self._garbage_msg = []
