@@ -4,6 +4,7 @@ from ..network import _finalize_sender, _finalize_receiver
 from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
+from ..network import _clear_kv_msg
 from ..network import KVMsgType, KVStoreMsg
 
 from .. import backend as F
@@ -377,6 +378,8 @@ class KVServer(object):
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
+            _clear_kv_msg(msg)
+
 
     def _push_handler(self, name, ID, data, target):
         """Default handler for PUSH message. 
@@ -417,6 +420,7 @@ class KVServer(object):
             a tensor with the same row size of ID.
         """
         return target[name][ID]
+
 
     def _serialize_shared_tensor(self, name, shape, dtype):
         """Serialize shared tensor
@@ -714,6 +718,9 @@ class KVClient(object):
         # sort msg by server id
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
+
+        for msg in msg_list:
+            _clear_kv_msg(msg)
 
         return data_tensor[back_sorted_id] # return data with original index order
 
