@@ -23,7 +23,7 @@ from .. import *
 logsigmoid = functional.logsigmoid
 
 def get_device(args):
-    return th.device('cpu') if args.gpu < 0 else th.device('cuda:' + str(args.gpu))
+    return th.device('cpu') if args.gpu[0] < 0 else th.device('cuda:' + str(args.gpu[0]))
 
 norm = lambda x, p: x.norm(p=p)**p
 

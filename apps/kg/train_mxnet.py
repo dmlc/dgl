@@ -28,20 +28,25 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None):
-    if args.num_proc > 1:
-        os.environ['OMP_NUM_THREADS'] = '1'
+def train(args, model, train_sampler, rank=0, valid_samplers=None):
+    assert args.num_proc == 1, "MXNet KGE does not support multi-process now"
+    assert args.rel_part == False, "No need for relation partition in single process for MXNet KGE"
     logs = []
 
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
+    if len(args.gpu > 0):
+        gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
+    else:
+        gpu_id = -1
 
     start = time.time()
     for step in range(args.init_step, args.max_step):
         pos_g, neg_g = next(train_sampler)
         args.step = step
         with mx.autograd.record():
-            loss, log = model.forward(pos_g, neg_g, args.gpu)
+            loss, log = model.forward(pos_g, neg_g, gpu_id)
         loss.backward()
         logs.append(log)
         model.update()
@@ -61,7 +66,7 @@ def train(args, model, train_sampler, valid_samplers=None):
     # clear cache
     logs = []
 
-def test(args, model, test_samplers, mode='Test', queue=None):
+def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     logs = []
 
     for sampler in test_samplers:

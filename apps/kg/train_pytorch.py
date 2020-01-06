@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
 import torch.multiprocessing as mp
+from _thread import start_new_thread
 
 from distutils.version import LooseVersion
 TH_VERSION = LooseVersion(th.__version__)
@@ -13,6 +14,28 @@ if TH_VERSION.version[0] == 1 and TH_VERSION.version[1] < 2:
 import os
 import logging
 import time
+
+def thread_wrapped_func(func):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function
 
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
     model = KEModel(args, args.model_name, n_entities, n_relations,
@@ -29,12 +52,21 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None):
+@thread_wrapped_func
+def train(args, model, train_sampler, rank=0, valid_samplers=None):
     if args.num_proc > 1:
-        th.set_num_threads(1)
+        th.set_num_threads(8)
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
+    if len(args.gpu > 0):
+        gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
+    else:
+        gpu_id = -1
+
+    if args.rel_part:
+        model.prepare_relation(gpu_id)
 
     start = time.time()
     sample_time = 0
@@ -48,7 +80,7 @@ def train(args, model, train_sampler, valid_samplers=None):
         args.step = step
 
         start1 = time.time()
-        loss, log = model.forward(pos_g, neg_g)
+        loss, log = model.forward(pos_g, neg_g, gpu_id)
         forward_time += time.time() - start1
 
         start1 = time.time()
@@ -80,16 +112,29 @@ def train(args, model, train_sampler, valid_samplers=None):
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
-def test(args, model, test_samplers, mode='Test', queue=None):
+    if args.rel_part:
+        model.writeback_relation(gpu_id)
+
+@thread_wrapped_func
+def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     if args.num_proc > 1:
-        th.set_num_threads(1)
+        th.set_num_threads(8)
+
+    if len(args.gpu > 0):
+        gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
+    else:
+        gpu_id = -1
+
+    if args.rel_part:
+        model.load_relation(rank)
+
     with th.no_grad():
         logs = []
         for sampler in test_samplers:
             count = 0
             for pos_g, neg_g in sampler:
                 with th.no_grad():
-                    model.forward_test(pos_g, neg_g, logs, args.gpu)
+                    model.forward_test(pos_g, neg_g, logs, gpu_id)
 
         metrics = {}
         if len(logs) > 0:

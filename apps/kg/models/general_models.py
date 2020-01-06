@@ -44,7 +44,15 @@ class KEModel(object):
             rel_dim = relation_dim * entity_dim
         else:
             rel_dim = relation_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+
+        self.rel_part = args.rel_part
+        if not self.rel_part:
+            self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+        else:
+            self.relation_embs = [None] * args.num_proc
+            for i in range(args.num_proc):
+                relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
+                self.relation_embs[i] = relation_emb
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -87,8 +95,10 @@ class KEModel(object):
 
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
-        self.relation_emb.init(self.emb_init)
         self.score_func.reset_parameters()
+
+        if not self.rel_part:
+            self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
         self.score_func(g)
@@ -248,3 +258,14 @@ class KEModel(object):
         self.entity_emb.update()
         self.relation_emb.update()
         self.score_func.update()
+
+    def prepare_relation(self, gpu_id=-1):
+        device = th.device('cuda:' + str(gpu_id))
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, F.cpu() if gpu_id == -1 else device)
+        self.relation_emb.init(self.emb_init)
+
+    def writeback_relation(self, rank=0):
+        self.relation_embs[rank][:] = self.relation_emb[:]
+
+    def load_relation(self, rank=0):
+        self.relation_emb = self.relation_embs[rank]
