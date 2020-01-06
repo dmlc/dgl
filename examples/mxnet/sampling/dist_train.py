@@ -17,8 +17,6 @@ import socket
 
 from gcn_ns_dist import gcn_ns_train
 
-server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
-
 def load_node_data(args):
     if args.num_parts > 1:
         import pickle
@@ -43,43 +41,12 @@ def start_server(args):
     host_ip = socket.gethostbyname(host_name)
     print('Server {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
 
-    server = KVServer(
-            server_id=args.id,
-            client_namebook=client_namebook,
-            server_addr=server_namebook[args.id])
-
     ndata = load_node_data(args)
-    graph_name = args.graph_name
+    dgl.contrib.start_server(server_id=args.id,
+                             ip_config='ip_config.txt',
+                             num_client=4,
+                             ndata=ndata)
 
-    # Initialize data on kvstore, the data_tensor is shared-memory data
-    for key, val in ndata.items():
-        data_name = graph_name + '_' + key
-        print('server init {} from ndata[{}]'.format(data_name, key))
-        server.init_data(name=data_name, data_tensor=mx.nd.array(ndata[key]))
-
-    server.start()
-
-    exit()  # exit program directly when finishing training
-
-def connect_to_kvstore(args, partition_book):
-    client = dgl.contrib.KVClient(
-        client_id=args.id,
-        local_server_id=args.id,
-        server_namebook=server_namebook,
-        client_addr=client_namebook[args.id],
-        partition_book=partition_book)
-
-    ndata = load_node_data(args)
-    graph_name = args.graph_name
-    # Initialize data on kvstore, the data_tensor is shared-memory data
-    for key, val in ndata.items():
-        data_name = graph_name + '_' + key
-        print('client init {} from ndata[{}]'.format(data_name, key), flush=True)
-        client.init_local_data(name=data_name, data_tensor=mx.nd.array(ndata[key]))
-
-    client.connect()
-
-    return client
 
 def load_local_part(args):
     # We need to know:
@@ -111,28 +78,12 @@ def get_from_kvstore(args, kv, g, name):
     return kv.pull(name=name, id_tensor=g.ndata['global_id'])
 
 
-def get_id(kvstore):
-    host_name = socket.gethostname()
-    host_ip = socket.gethostbyname(host_name)
-    print('Trainer {}: host name: {}, ip: {}'.format(args.id, host_name, host_ip))
-    ids = []
-    for key, val in client_namebook.items():
-        val = val.split(':')
-        val = val[0]
-        if val == host_ip:
-            ids.append(int(key))
-    ids = np.sort(ids)
-    return ids[kvstore.rank % 2]
-
 def main(args):
-    kvstore = mx.kv.create('dist_sync')
-    args.id = get_id(kvstore)
-    print(args.id, flush=True)
-
     g, all_locs = load_local_part(args)
     print('graph size:', g.number_of_nodes(), flush=True)
     print('#inner nodes:', mx.nd.sum(g.ndata['local']).asnumpy(), flush=True)
-    kv = connect_to_kvstore(args, all_locs)
+    kv = dgl.contrib.KVClient(ip_config='ip_config.txt', ndata_partition_book=all_locs)
+
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(args.id)
     local_mask = g.ndata['local'].astype(np.float32)
@@ -152,7 +103,7 @@ def main(args):
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
 
     if args.model == "gcn_ns":
-        gcn_ns_train(g, kv, kvstore, ctx, args, args.n_classes, train_nid, test_nid)
+        gcn_ns_train(g, kv, ctx, args, args.n_classes, train_nid, test_nid)
     else:
         print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
     print("parent ends")
