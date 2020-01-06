@@ -315,6 +315,7 @@ def _clear_kv_msg(garbage_msg):
     """
     F.sync()
     for msg in garbage_msg:
+        print('delete')
         if msg.c_ptr is not None:
             _CAPI_DeleteKVMsg(msg.c_ptr)
         
