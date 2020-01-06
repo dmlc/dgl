@@ -55,9 +55,13 @@ class ExternalEmbedding:
         s = self.emb[idx]
         if self.gpu >= 0:
             s = s.cuda(self.gpu)
-        data = s.clone().detach().requires_grad_(True)
+        # During the training, we need to trace the computation.
+        # In this case, we need to record the computation path and compute the gradients.
         if trace:
+            data = s.clone().detach().requires_grad_(True)
             self.trace.append((idx, data))
+        else:
+            data = s
         return data
 
     def update(self):
