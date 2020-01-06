@@ -186,7 +186,7 @@ class KVMsgType(Enum):
     BARRIER = 6
     IP_ID = 7
 
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data, c_ptr")
 """Message of DGL kvstore
 
 Data Field
@@ -273,7 +273,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=None)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     elif msg_type == KVMsgType.IP_ID:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -282,7 +283,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
@@ -290,7 +292,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=None,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -301,22 +304,19 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=data)
+            data=data,
+            c_ptr=msg_ptr)
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
 
 
-def _clear_kv_msg(msg):
+def _clear_kv_msg(garbage_msg):
     """Clear data of kvstore message
-
-    Parameters
-    ----------
-    msg : KVStoreMsg
-        kvstore message
     """
-    if msg.data is not None:
-        F.sync()
-        data = F.zerocopy_to_dgl_ndarray(msg.data)
-        _CAPI_DeleteNDArrayData(data)
+    F.sync()
+    for msg in garbage_msg:
+        if msg.c_ptr is not None:
+            _CAPI_DeleteKVMsg(msg.c_ptr)
+    garbage_msg = []
         
