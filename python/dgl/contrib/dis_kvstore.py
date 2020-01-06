@@ -387,7 +387,7 @@ class KVServer(object):
             self._garbage_msg.append(msg)
             if len(self._garbage_msg) > 5000:
                 _clear_kv_msg(self._garbage_msg)
-            self._garbage_msg = []
+                self._garbage_msg = []
 
 
     def _push_handler(self, name, ID, data, target):
