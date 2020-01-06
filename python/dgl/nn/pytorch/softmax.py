@@ -75,8 +75,6 @@ class EdgeSoftmax(th.autograd.Function):
         g = ctx.backward_cache
         g = g.local_var()
         out, = ctx.saved_tensors
-        # clear backward cache explicitly
-        ctx.backward_cache = None
         g.edata['out'] = out
         g.edata['grad_s'] = out * grad_out
         g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
