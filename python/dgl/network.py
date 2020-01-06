@@ -17,6 +17,7 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
+
 def _network_wait():
     """Sleep for a few seconds
     """
