@@ -2,8 +2,11 @@
 
 cd ~
 cd regression
-rm dgl -rf
-git clone --recursive https://github.com/dmlc/dgl.git 
+cd dgl
+# git clone --recursive https://github.com/dmlc/dgl.git 
+git pull 
+git submodule init
+git submodule update --recursive
 
 conda activate base
 pip install asv
@@ -16,7 +19,6 @@ pip install --pre dgl-cu101
 done
 
 conda activate base
-cd dgl
 asv machine --config tests/regression/.asv-machine.json
 asv run
 asv publish
