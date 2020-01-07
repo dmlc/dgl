@@ -32,7 +32,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
-    if len(args.gpu > 0):
+    if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
@@ -63,7 +63,13 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     logs = []
 
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
+    assert args.num_proc == 1, "MXNet KGE does not support multi-process now"
     logs = []
+
+    if len(args.gpu) > 0:
+        gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
+    else:
+        gpu_id = -1
 
     for sampler in test_samplers:
         #print('Number of tests: ' + len(sampler))
