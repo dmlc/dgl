@@ -46,7 +46,7 @@ class TransEScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -171,8 +171,8 @@ class TransRScore(nn.Block):
     def reset_parameters(self):
         self.projection_emb.init(1.0)
 
-    def update(self):
-        self.projection_emb.update()
+    def update(self, gpu_id=-1):
+        self.projection_emb.update(gpu_id)
 
     def save(self, path, name):
         self.projection_emb.save(path, name+'projection')
@@ -219,7 +219,7 @@ class DistMultScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -276,7 +276,7 @@ class ComplExScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -344,7 +344,7 @@ class RESCALScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -412,7 +412,7 @@ class RotatEScore(nn.Block):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
