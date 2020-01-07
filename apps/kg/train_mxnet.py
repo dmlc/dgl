@@ -75,7 +75,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
         #print('Number of tests: ' + len(sampler))
         count = 0
         for pos_g, neg_g in sampler:
-            model.forward_test(pos_g, neg_g, logs, args.gpu)
+            model.forward_test(pos_g, neg_g, logs, gpu_id)
 
     metrics = {}
     if len(logs) > 0:
