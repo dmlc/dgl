@@ -30,7 +30,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     return model
 
 @thread_wrapped_func
-def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None):
+def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None, queue=None):
     if args.num_proc > 1:
         th.set_num_threads(4)
     logs = []
@@ -52,6 +52,8 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     update_time = 0
     forward_time = 0
     backward_time = 0
+
+    valid_metrics = []
     for step in range(args.init_step, args.max_step):
         start1 = time.time()
         with th.no_grad():
@@ -72,7 +74,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         update_time += time.time() - start1
         logs.append(log)
 
-        if step % args.log_interval == 0:
+        if (step + 1) % args.log_interval == 0:
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
                 print('[Train]({}/{}) average {}: {}'.format(step, args.max_step, k, v))
@@ -87,11 +89,14 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             backward_time = 0
             start = time.time()
 
-        if args.valid and step % args.eval_interval == 0 and step > 1 and valid_samplers is not None:
+        if args.valid and (step + 1) % args.eval_interval == 0 and valid_samplers is not None:
             start = time.time()
-            test(args, model, valid_samplers, mode='Valid')
+            metrics = test(args, model, valid_samplers, mode='Valid')
+            valid_metrics.append(metrics)
             print('test:', time.time() - start)
     print('train {} takes {:.3f} seconds'.format(rank, time.time() - train_start))
+    if queue is not None:
+        queue.put(valid_metrics)
 
     if args.async_update:
         model.finish_async_update()
@@ -121,13 +126,13 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
 
         metrics = {}
         if len(logs) > 0:
-            if queue is not None:
-                queue.put(logs)
-            else:
-                for metric in logs[0].keys():
-                    metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-
-                for k, v in metrics.items():
-                    print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+        if queue is not None:
+            queue.put(metrics)
+        #else:
+        #    for k, v in metrics.items():
+        #        print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
+    return metrics
