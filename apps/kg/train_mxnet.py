@@ -28,7 +28,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, rank=0, valid_samplers=None):
+def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None):
     assert args.num_proc == 1, "MXNet KGE does not support multi-process now"
     assert args.rel_part == False, "No need for relation partition in single process for MXNet KGE"
     logs = []

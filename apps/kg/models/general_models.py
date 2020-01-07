@@ -51,10 +51,7 @@ class KEModel(object):
         if not self.rel_part:
             self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
         else:
-            self.relation_embs = [None] * args.num_proc
-            for i in range(args.num_proc):
-                relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
-                self.relation_embs[i] = relation_emb
+            self.global_relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -86,8 +83,7 @@ class KEModel(object):
         if not self.rel_part:
             self.relation_emb.share_memory()
         else:
-            for relation_emb in self.relation_embs:
-                relation_emb.share_memory()
+            self.global_relation_emb.share_memory()
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
@@ -265,13 +261,14 @@ class KEModel(object):
         self.relation_emb.update(gpu_id)
         self.score_func.update(gpu_id)
 
-    def prepare_relation(self, gpu_id=-1):
-        device = th.device('cuda:' + str(gpu_id))
-        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, F.cpu() if gpu_id == -1 else device)
+    def prepare_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
         self.relation_emb.init(self.emb_init)
 
-    def writeback_relation(self, rank=0):
-        self.relation_embs[rank].emb[:] = self.relation_emb.emb[:]
+    def writeback_relation(self, rank=0, rel_parts=None):
+        idx = rel_parts[rank]
+        self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
 
-    def load_relation(self, rank=0):
-        self.relation_emb = self.relation_embs[rank]
+    def load_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
+        self.relation_emb.emb = F.copy_to(self.global_relation_emb.emb, device)
