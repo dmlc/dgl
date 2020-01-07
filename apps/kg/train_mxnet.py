@@ -45,7 +45,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             loss, log = model.forward(pos_g, neg_g, gpu_id)
         loss.backward()
         logs.append(log)
-        model.update()
+        model.update(gpu_id)
 
         if step % args.log_interval == 0:
             for k in logs[0].keys():
