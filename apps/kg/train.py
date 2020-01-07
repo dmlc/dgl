@@ -298,7 +298,7 @@ def run(args, logger):
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
-            rel_parts = train_data.rel_parts
+            rel_parts = train_data.rel_parts if args.rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
             proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers))
             procs.append(proc)

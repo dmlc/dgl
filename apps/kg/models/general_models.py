@@ -49,7 +49,7 @@ class KEModel(object):
         self.rel_dim = rel_dim
         self.rel_part = args.rel_part
         if not self.rel_part:
-            self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+            self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
         else:
             self.global_relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
 
@@ -87,7 +87,10 @@ class KEModel(object):
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
-        self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        if not self.rel_part:
+            self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        else:
+            self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
         self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):

@@ -44,8 +44,7 @@ def load_model(logger, args, n_entities, n_relations, ckpt=None):
                     args.hidden_dim, args.gamma,
                     double_entity_emb=args.double_ent, double_relation_emb=args.double_rel)
     if ckpt is not None:
-        # TODO: loading model emb only work for genernal Embedding, not for ExternalEmbedding
-        model.load_state_dict(ckpt['model_state_dict'])
+        assert False, "We do not support loading model emb for genernal Embedding"
     return model
 
 
