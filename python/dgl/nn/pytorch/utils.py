@@ -104,10 +104,28 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
+    """A squential container for dgl nn modules.
+
+    The function of this module is similar to torch.nn.Sequential,
+    the difference is that dgl.nn.pytorch.Sequential accepts a list of
+    dgl nn modules as input.
+
+    Parameters
+    ----------
+
+
+    Examples
+    --------
+
+    >>> import dgl
+    >>>
+
+    """
     def __init__(self, *args):
         super(Sequential, self).__init__(*args)
     
     def forward(self, graph, feat):
+        """Sequentially apply modules to the input"""
         for module in self:
             feat = module(graph, feat)
         return feat
