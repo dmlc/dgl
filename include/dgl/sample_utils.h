@@ -171,14 +171,14 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   std::vector<bool> used;       // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;  // indicate index mapping, activated when replace=false;
 
-  inline Idx Map(Idx x) const { // Map consecutive indices to unused elements
+  inline Idx Map(Idx x) const {   // Map consecutive indices to unused elements
     if (replace)
       return x;
     else
       return id_mapping[x];
   }
 
-  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct cumulative distribution function
+  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct CDF
     N = 0;
     accum = 0.;
     taken = 0.;
