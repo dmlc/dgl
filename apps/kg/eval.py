@@ -64,7 +64,7 @@ class ArgParser(argparse.ArgumentParser):
 
         self.add_argument('--num_worker', type=int, default=16,
                           help='number of workers used for loading data')
-        self.add_argument('--num_proc', type=int, default=0,
+        self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
 
     def parse_args(self):
