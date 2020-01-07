@@ -16,7 +16,7 @@ Data Repository
     * Values: String (default='https://data.dgl.ai/')
     * The repository url to be used for DGL datasets and pre-trained models.
     * Suggested values:
-        * 'https://s3.us-east-2.amazonaws.com/dgl.ai/': DGL repo for U.S.
+        * 'https://data.dgl.ai/': DGL repo for Global Region.
         * 'https://dgl-data.s3.cn-north-1.amazonaws.com.cn/': DGL repo for Mainland China
 * ``DGL_DOWNLOAD_DIR``:
     * Values: String (default="${HOME}/.dgl")
