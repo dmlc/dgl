@@ -51,7 +51,7 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--no_eval_filter', action='store_true',
                           help='do not filter positive edges among negative edges for evaluation')
 
-        self.add_argument('--gpu', type=int, default=[0], nargs='+',
+        self.add_argument('--gpu', type=int, default=[-1], nargs='+',
                           help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
