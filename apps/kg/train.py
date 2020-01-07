@@ -311,25 +311,12 @@ def run(args, logger):
             procs.append(proc)
             proc.start()
 
-        metrics = []
-        for i in range(args.num_proc):
-            metrics.append(queue.get())
-        num_epochs = len(metrics[0])
-        print('#epochs:', num_epochs)
-
-        epoch_metrics = []
-        for _ in range(num_epochs):
-            epoch_metrics.append([])
-
-        for i in range(args.num_proc):
-            for epoch, m in enumerate(metrics[i]):
-                epoch_metrics[epoch].append(m)
-
-        for epoch in range(num_epochs):
-            metrics = epoch_metrics[epoch]
+        print('#eval:', int(args.max_step / args.eval_interval))
+        for epoch in range(int(args.max_step / args.eval_interval)):
             total_metrics = {}
             for i in range(args.num_proc):
-                for k, v in metrics[i].items():
+                metrics = queue.get()
+                for k, v in metrics.items():
                     if i == 0:
                         total_metrics[k] = v / args.num_proc
                     else:

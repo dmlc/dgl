@@ -53,7 +53,6 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     forward_time = 0
     backward_time = 0
 
-    valid_metrics = []
     for step in range(args.init_step, args.max_step):
         start1 = time.time()
         with th.no_grad():
@@ -90,13 +89,10 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             start = time.time()
 
         if args.valid and (step + 1) % args.eval_interval == 0 and valid_samplers is not None:
-            start = time.time()
             metrics = test(args, model, valid_samplers, mode='Valid')
-            valid_metrics.append(metrics)
-            print('test:', time.time() - start)
+            if queue is not None:
+                queue.put(metrics)
     print('train {} takes {:.3f} seconds'.format(rank, time.time() - train_start))
-    if queue is not None:
-        queue.put(valid_metrics)
 
     if args.async_update:
         model.finish_async_update()
