@@ -56,7 +56,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
 @thread_wrapped_func
 def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None):
     if args.num_proc > 1:
-        th.set_num_threads(8)
+        th.set_num_threads(4)
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
@@ -113,7 +113,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
 @thread_wrapped_func
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     if args.num_proc > 1:
-        th.set_num_threads(8)
+        th.set_num_threads(4)
 
     if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]

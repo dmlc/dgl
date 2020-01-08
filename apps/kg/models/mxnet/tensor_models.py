@@ -71,9 +71,9 @@ class ExternalEmbedding:
                 grad_sum = grad_sum.as_in_context(ctx)
             self.state_sum[grad_indices] += grad_sum
             std = self.state_sum[grad_indices]  # _sparse_mask
-            std_values = nd.expand_dims(nd.sqrt(std) + 1e-10, 1)
             if gpu_id >= 0:
-                std_values = std_values.as_in_context(mx.gpu(gpu_id))
+                std = std.as_in_context(mx.gpu(gpu_id))
+                std_values = nd.expand_dims(nd.sqrt(std) + 1e-10, 1)
             tmp = (-clr * grad_values / std_values)
             if tmp.context != ctx:
                 tmp = tmp.as_in_context(ctx)
