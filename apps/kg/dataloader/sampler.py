@@ -21,26 +21,31 @@ def RelationPartition(edges, n):
     edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
     rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
     rel_dict = {}
+    rel_parts = []
+    for _ in range(n):
+        rel_parts.append([])
     for i in range(len(cnts)):
         cnt = cnts[i]
         r = uniq[i]
         idx = np.argmin(edge_cnts)
         rel_dict[r] = idx
+        rel_parts[idx].append(r)
         edge_cnts[idx] += cnt
         rel_cnts[idx] += 1
     for i, edge_cnt in enumerate(edge_cnts):
         print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
 
     parts = []
-    for _ in range(n):
+    for i in range(n):
         parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
     # let's store the edge index to each partition first.
     for i, r in enumerate(rels):
         part_idx = rel_dict[r]
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
-    return parts
+    return parts, rel_parts
 
 def RandomPartition(edges, n):
     heads, rels, tails = edges
@@ -79,7 +84,7 @@ class TrainDataset(object):
         num_train = len(triples[0])
         print('|Train|:', num_train)
         if ranks > 1 and args.rel_part:
-            self.edge_parts = RelationPartition(triples, ranks)
+            self.edge_parts, self.rel_parts = RelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
