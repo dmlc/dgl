@@ -37,11 +37,11 @@ class HeteroGraphIndex(ObjectBase):
         self._cache = {}
         # loop over etypes and recover unit graphs
         rel_graphs = []
-        for i in range(len(edges)):
+        for i, edges_per_type in enumerate(edges):
             src_ntype, dst_ntype = metagraph.find_edge(i)
             num_src = number_of_nodes[src_ntype]
             num_dst = number_of_nodes[dst_ntype]
-            src_id, dst_id, _ = edges[i]
+            src_id, dst_id, _ = edges_per_type
             rel_graphs.append(create_unitgraph_from_coo(
                 1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id))
         self.__init_handle_by_constructor__(
