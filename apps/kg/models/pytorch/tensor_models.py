@@ -87,7 +87,7 @@ class ExternalEmbedding:
                 std = self.state_sum[grad_indices]  # _sparse_mask
                 if gpu_id >= 0:
                     std = std.cuda(gpu_id)
-                    std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+                std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
                 tmp = (-clr * grad_values / std_values)
                 if tmp.device != device:
                     tmp = tmp.to(device)
