@@ -512,7 +512,7 @@ def test_rgcn():
 def test_sequential():
     ctx = F.ctx()
     # test single graph
-    class ExampleLayer(nn.Block):
+    class ExampleLayer(gluon.nn.Block):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
 
@@ -540,7 +540,7 @@ def test_sequential():
     assert e_feat.shape == (9, 4)
 
     # test multiple graphs
-    class ExampleLayer(nn.Block):
+    class ExampleLayer(gluon.nn.Block):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
 

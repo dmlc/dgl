@@ -543,7 +543,7 @@ def test_dense_cheb_conv():
 def test_sequential():
     ctx = F.ctx()
     # Test single graph
-    class ExampleLayer(nn.Module):
+    class ExampleLayer(th.nn.Module):
         def __init__(self):
             super().__init__()
 
@@ -568,7 +568,7 @@ def test_sequential():
     assert e_feat.shape == (9, 4)
 
     # Test multiple graph
-    class ExampleLayer(nn.Module):
+    class ExampleLayer(th.nn.Module):
         def __init__(self):
             super().__init__()
 
