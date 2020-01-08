@@ -28,6 +28,7 @@ class KEModel(object):
         super(KEModel, self).__init__()
         self.args = args
         self.n_entities = n_entities
+        self.n_relations = n_relations
         self.model_name = model_name
         self.hidden_dim = hidden_dim
         self.eps = 2.0
@@ -44,7 +45,9 @@ class KEModel(object):
             rel_dim = relation_dim * entity_dim
         else:
             rel_dim = relation_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, device)
+
+        self.rel_dim = rel_dim
+        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -87,8 +90,8 @@ class KEModel(object):
 
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
-        self.relation_emb.init(self.emb_init)
         self.score_func.reset_parameters()
+        self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
         self.score_func(g)
@@ -174,8 +177,8 @@ class KEModel(object):
         # We need to filter the positive edges in the negative graph.
         if self.args.eval_filter:
             filter_bias = reshape(neg_g.edata['bias'], batch_size, -1)
-            if self.args.gpu >= 0:
-                filter_bias = cuda(filter_bias, self.args.gpu)
+            if gpu_id >= 0:
+                filter_bias = cuda(filter_bias, gpu_id)
             neg_scores += filter_bias
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
@@ -244,7 +247,8 @@ class KEModel(object):
 
         return loss, log
 
-    def update(self):
-        self.entity_emb.update()
-        self.relation_emb.update()
-        self.score_func.update()
+    def update(self, gpu_id=-1):
+        self.entity_emb.update(gpu_id)
+        self.relation_emb.update(gpu_id)
+        self.score_func.update(gpu_id)
+

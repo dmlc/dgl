@@ -51,8 +51,8 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--no_eval_filter', action='store_true',
                           help='do not filter positive edges among negative edges for evaluation')
 
-        self.add_argument('--gpu', type=int, default=-1,
-                          help='use GPU')
+        self.add_argument('--gpu', type=int, default=[-1], nargs='+',
+                          help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
         self.add_argument('-de', '--double_ent', action='store_true',
@@ -100,6 +100,7 @@ def main(args):
     args.train = False
     args.valid = False
     args.test = True
+    args.rel_part = False
     args.batch_size_eval = args.batch_size
 
     logger = get_logger(args)
@@ -172,7 +173,7 @@ def main(args):
         procs = []
         for i in range(args.num_proc):
             proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
-                              'Test', queue))
+                              i, 'Test', queue))
             procs.append(proc)
             proc.start()
         for proc in procs:
