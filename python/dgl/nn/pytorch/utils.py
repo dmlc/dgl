@@ -98,7 +98,6 @@ class Identity(nn.Module):
     """
     def __init__(self):
         super(Identity, self).__init__()
-        x = nn.Sequential
 
     def forward(self, x):
         """Return input"""
@@ -192,7 +191,7 @@ class Sequential(nn.Sequential):
     """
     def __init__(self, *args):
         super(Sequential, self).__init__(*args)
-    
+
     def forward(self, graph, *feats):
         """Sequentially apply modules to the input.
 

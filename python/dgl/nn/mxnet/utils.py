@@ -204,11 +204,6 @@ class Sequential(gluon.nn.Sequential):
     def __init__(self, prefix=None, params=None):
         super(Sequential, self).__init__(prefix=prefix, params=params)
 
-    def forward(self, graph, feat):
-        for block in self._children.values():
-            feat = block(graph, feat)
-        return feat
-
     def forward(self, graph, *feats):
         """Sequentially apply modules to the input.
 
