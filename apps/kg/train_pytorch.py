@@ -66,9 +66,6 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     else:
         gpu_id = -1
 
-    if args.rel_part:
-        model.prepare_relation(th.device('cuda:' + str(gpu_id)))
-
     start = time.time()
     sample_time = 0
     update_time = 0
@@ -113,9 +110,6 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
 
-    if args.rel_part:
-        model.writeback_relation(gpu_id, rel_parts)
-
 @thread_wrapped_func
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     if args.num_proc > 1:
@@ -125,9 +119,6 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
-
-    if args.rel_part:
-        model.load_relation(th.device('cuda:' + str(gpu_id)))
 
     with th.no_grad():
         logs = []
