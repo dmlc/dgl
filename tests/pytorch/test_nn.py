@@ -453,7 +453,6 @@ def test_agnn_conv():
     agnn = nn.AGNNConv(1)
     feat = F.randn((100, 5))
     agnn = agnn.to(ctx)
-    feat = feat.to(ctx)
     h = agnn(g, feat)
     assert h.shape[-1] == 5
 
