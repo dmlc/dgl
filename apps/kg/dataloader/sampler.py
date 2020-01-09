@@ -8,9 +8,9 @@ import sys
 import pickle
 import time
 
-# This partitions a list of edges based on relations to make sure
-# each partition may not has the same number of edges and relations.
-def OptRelationPartition(edges, n):
+# This partitions a list of edges based on relations and make sure
+# each relation only fall into one partition.
+def StrictRelationPartition(edges, n):
     heads, rels, tails = edges
     uniq, cnts = np.unique(rels, return_counts=True)
     idx = np.flip(np.argsort(cnts))
@@ -31,57 +31,6 @@ def OptRelationPartition(edges, n):
             num = 0
     print(">{}:{}".format(threashold, num))
 
-    assert cnts[0] > cnts[-1]
-    edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
-    rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
-    rel_dict = {}
-    rel_parts = []
-    for _ in range(n):
-        rel_parts.append([])
-
-    average_edges = (len(rels)) // n
-    print('relation partition {} edges into {} parts'
-          ' with avg {} edges per part'.format(len(rels), n, average_edges))
-    upperbound = int(average_edges * 1.01)
-    total = 0
-    total2 = 0
-    for i in range(len(cnts)):
-        cnt = cnts[i]
-        total += cnt
-        r = uniq[i]
-        for idx in range(n):
-            # put relation into first aviliable bucket
-            if edge_cnts[idx] + cnt < upperbound:
-                edge_cnts[idx] += cnt
-                rel_dict[r] = idx
-                rel_parts[idx].append(r)
-                rel_cnts[idx] += 1
-                break
-
-    for i, edge_cnt in enumerate(edge_cnts):
-        print('part {} has {}/{} edges and {} relations'.format(i, edge_cnts[i], total, rel_cnts[i]))
-
-    parts = []
-    for i in range(n):
-        parts.append([])
-        rel_parts[i] = np.array(rel_parts[i])
-    # let's store the edge index to each partition first.
-    for i, r in enumerate(rels):
-        part_idx = rel_dict[r]
-        parts[part_idx].append(i)
-    for i, part in enumerate(parts):
-        parts[i] = np.array(part, dtype=np.int64)
-    return parts, rel_parts
-
-# This partitions a list of edges based on relations to make sure
-# each partition has roughly the same number of edges and relations.
-def RelationPartition(edges, n):
-    heads, rels, tails = edges
-    print('relation partition {} edges into {} parts'.format(len(heads), n))
-    uniq, cnts = np.unique(rels, return_counts=True)
-    idx = np.flip(np.argsort(cnts))
-    cnts = cnts[idx]
-    uniq = uniq[idx]
     assert cnts[0] > cnts[-1]
     edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
     rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
@@ -110,6 +59,73 @@ def RelationPartition(edges, n):
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
+    return parts, rel_parts
+
+# This partitions a list of edges based on relations to make sure
+# each partition has roughly the same number of edges and relations.
+def BalancedRelationPartition(edges, n):
+    heads, rels, tails = edges
+    print('relation partition {} edges into {} parts'.format(len(heads), n))
+    uniq, cnts = np.unique(rels, return_counts=True)
+    idx = np.flip(np.argsort(cnts))
+    cnts = cnts[idx]
+    uniq = uniq[idx]
+    assert cnts[0] > cnts[-1]
+    edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_dict = {}
+    rel_parts = []
+    for _ in range(n):
+        rel_parts.append([])
+
+    max_edges = (len(rels) // n) + 1
+    num_div = 0
+    for i in range(len(cnts)):
+        cnt = cnts[i]
+        r = uniq[i]
+        r_parts = []
+
+        while cnt > 0:
+            idx = np.argmin(edge_cnts)
+            if edge_cnts[idx] + cnt <= max_edges:
+                r_parts.append([idx, cnt])
+                rel_parts[idx].append(r)
+                edge_cnts[idx] += cnt
+                rel_cnts[idx] += 1
+                cnt = 0
+            else:
+                cur_cnt = max_edges - edge_cnts[idx]
+                r_parts.append([idx, cur_cnt])
+                rel_parts[idx].append(r)
+                edge_cnts[idx] += cur_cnt
+                rel_cnts[idx] += 1
+                num_div += 1
+                cnt -= cur_cnt
+        rel_dict[r] = r_parts
+
+    for i, edge_cnt in enumerate(edge_cnts):
+        print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
+    print('{}/{} duplicated relation across partitions'.format(num_div, len(cnts)))
+
+    parts = []
+    for i in range(n):
+        parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
+
+    for i, r in enumerate(rels):
+        r_part = rel_dict[r][0]
+        part_idx = r_part[0]
+        cnt = r_part[1]
+        parts[part_idx].append(i)
+        cnt -= 1
+        if cnt == 0:
+            rel_dict[r].pop(0)
+        else:
+            rel_dict[r][0][1] = cnt
+
+    for i, part in enumerate(parts):
+        parts[i] = np.array(part, dtype=np.int64)
+        print(parts[i].shape)
     return parts, rel_parts
 
 def RandomPartition(edges, n):
@@ -148,10 +164,10 @@ class TrainDataset(object):
         self.g = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
-        if ranks > 1 and args.rel_part_opt:
-            self.edge_parts, self.rel_parts = OptRelationPartition(triples, ranks)
+        if ranks > 1 and args.strict_rel_part:
+            self.edge_parts, self.rel_parts = StrictRelationPartition(triples, ranks)
         elif ranks > 1 and args.rel_part:
-            self.edge_parts, self.rel_parts = RelationPartition(triples, ranks)
+            self.edge_parts, self.rel_parts = BalancedRelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:

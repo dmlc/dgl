@@ -269,8 +269,12 @@ class KEModel(object):
         self.relation_emb.init(self.emb_init)
 
     def writeback_relation(self, rank=0, rel_parts=None):
-        idx = rel_parts[rank]
-        self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
+        # rel_parts is None: All in one partition
+        if rel_parts is None:
+            self.global_relation_emb.emb = F.copy_to(self.relation_emb.emb, F.cpu())
+        else:
+            idx = rel_parts[rank]
+            self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
 
     def load_relation(self, device=None):
         self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
