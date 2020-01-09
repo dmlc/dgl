@@ -77,9 +77,9 @@ class EdgeFreqPrior(nn.Block):
         self.freq_prior = freq_prior
 
     def forward(self, edges):
-        ctx = edges.src['node_class_ids'].context
-        src_ind = edges.src['node_class_ids'][:,0].asnumpy().astype(int)
-        dst_ind = edges.dst['node_class_ids'][:,0].asnumpy().astype(int)
+        ctx = edges.src['node_class'].context
+        src_ind = edges.src['node_class'][:,0].asnumpy().astype(int)
+        dst_ind = edges.dst['node_class'][:,0].asnumpy().astype(int)
         prob = self.freq_prior[src_ind, dst_ind]
         out = nd.array(prob, ctx=ctx)
         return {'freq_prior': out}

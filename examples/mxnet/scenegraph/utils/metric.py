@@ -291,11 +291,11 @@ def merge_res(g_slice, img, bbox, spatial_feat, cls_pred):
 def extract_gt(g, img_size):
     if g is None or g.number_of_nodes() == 0:
         return None, None
-    gt_eids = np.where(g.edata['link'].asnumpy() > 0)[0]
+    gt_eids = np.where(g.edata['rel_class'].asnumpy() > 0)[0]
     if len(gt_eids) == 0:
         return None, None
 
-    gt_class = g.ndata['node_class_ids'][:,0].asnumpy()
+    gt_class = g.ndata['node_class'][:,0].asnumpy()
     gt_bbox = g.ndata['bbox'].asnumpy()
     gt_bbox[:, 0] /= img_size[1] 
     gt_bbox[:, 1] /= img_size[0] 
@@ -307,7 +307,7 @@ def extract_gt(g, img_size):
     gt_node_ids = g.find_edges(gt_eids)
     gt_node_sub = gt_node_ids[0].asnumpy()
     gt_node_ob = gt_node_ids[1].asnumpy()
-    gt_rel_class = g.edata['classes'][gt_eids].asnumpy()
+    gt_rel_class = g.edata['rel_class'][gt_eids,0].asnumpy() - 1
     gt_sub_class = gt_class[gt_node_sub]
     gt_ob_class = gt_class[gt_node_ob]
 

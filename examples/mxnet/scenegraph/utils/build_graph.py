@@ -61,7 +61,7 @@ def build_graph_gt(g_slice, img, bbox, spatial_feat, cls_pred, l0_w_slice=None,
         g.ndata['node_feat'] = spatial_feat[i, 0:n_nodes]
         g.ndata['node_class_pred'] = cls_pred[i, 0:n_nodes, 1:]
         if training:
-            g.edata['link'] = g_slice[i].edata['link']
+            g.edata['rel_class'] = g_slice[i].edata['rel_class']
         if l0_w_slice is not None:
             g.edata['sample'] = l0_w_slice[i]
         g_batch.append(g)

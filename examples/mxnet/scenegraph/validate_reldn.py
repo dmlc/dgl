@@ -32,25 +32,27 @@ save_dir = 'params'
 makedirs(save_dir)
 batch_verbose_freq = 100
 
-net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl')
+net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl', semantic_only=True)
+net.initialize(ctx=ctx)
+'''
+net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl', semantic_only=True)
 net.load_parameters('params/model-9.params', ctx=ctx)
-# net.initialize(ctx=ctx)
+'''
 
 # dataset and dataloader
-vg_train = VGRelation(top_frequent_rel=N_relations, top_frequent_obj=N_objects,
-                      balancing='weight', split='val')
+vg_train = VGRelationCOCO(split='val')
 logger.info('data loaded!')
 val_data = gluon.data.DataLoader(vg_train, batch_size=batch_size, shuffle=False, num_workers=8*num_gpus,
                                  batchify_fn=dgl_mp_batchify_fn)
 n_batches = len(val_data)
 
-detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train._obj_classes,
+detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)
 params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
 detector.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 
-detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_train._obj_classes,
+detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)
 params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
@@ -70,11 +72,9 @@ def get_data_batch(g_list, img_list, ctx_list):
     for G_slice, ctx in zip(G_list, ctx_list):
         for G in G_slice:
             G.ndata['bbox'] = G.ndata['bbox'].as_in_context(ctx)
-            G.ndata['node_class_ids'] = G.ndata['node_class_ids'].as_in_context(ctx)
+            G.ndata['node_class'] = G.ndata['node_class'].as_in_context(ctx)
             G.ndata['node_class_vec'] = G.ndata['node_class_vec'].as_in_context(ctx)
-            G.edata['classes'] = G.edata['classes'].as_in_context(ctx)
-            G.edata['link'] = G.edata['link'].as_in_context(ctx)
-            G.edata['weights'] = G.edata['weights'].expand_dims(1).as_in_context(ctx)
+            G.edata['rel_class'] = G.edata['rel_class'].as_in_context(ctx)
     img_list = [img.as_in_context(ctx) for img in img_list]
     return G_list, img_list
 

@@ -5,8 +5,8 @@ import numpy as np
 
 def l0_sample(g, positive_max=128, negative_ratio=3):
     n_eids = g.number_of_edges()
-    pos_eids = np.where(g.edata['link'].asnumpy() > 0)[0]
-    neg_eids = np.where(g.edata['link'].asnumpy() > 0)[0]
+    pos_eids = np.where(g.edata['rel_class'].asnumpy() > 0)[0]
+    neg_eids = np.where(g.edata['rel_class'].asnumpy() > 0)[0]
     assert len(pos_eids) > 0
     assert len(neg_eids) > 0
     positive_num = min(len(pos_eids), positive_max)
@@ -25,5 +25,5 @@ def l0_sample(g, positive_max=128, negative_ratio=3):
     sub_g = g.edge_subgraph(toindex(eids.tolist()))
     sub_g.copy_from_parent()
     sub_g.edata['sample_weights'] = mx.nd.array(weights[eids],
-                                                ctx=g.edata['link'].context)
+                                                ctx=g.edata['rel_class'].context)
     return sub_g
