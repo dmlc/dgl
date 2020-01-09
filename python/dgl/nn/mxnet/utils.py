@@ -127,7 +127,6 @@ class Sequential(gluon.nn.Sequential):
     >>> class ExampleLayer(nn.Block):
     >>>     def __init__(self, **kwargs):
     >>>         super().__init__(**kwargs)
-    >>>
     >>>     def forward(self, graph, n_feat, e_feat):
     >>>         graph = graph.local_var()
     >>>         graph.ndata['h'] = n_feat
@@ -176,7 +175,6 @@ class Sequential(gluon.nn.Sequential):
     >>> class ExampleLayer(nn.Block):
     >>>     def __init__(self, **kwargs):
     >>>         super().__init__(**kwargs)
-    >>>
     >>>     def forward(self, graph, n_feat):
     >>>         graph = graph.local_var()
     >>>         graph.ndata['h'] = n_feat

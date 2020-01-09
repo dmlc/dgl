@@ -128,7 +128,6 @@ class Sequential(nn.Sequential):
     >>> class ExampleLayer(nn.Module):
     >>>     def __init__(self):
     >>>         super().__init__()
-    >>>
     >>>     def forward(self, graph, n_feat, e_feat):
     >>>         graph = graph.local_var()
     >>>         graph.ndata['h'] = n_feat
@@ -169,7 +168,6 @@ class Sequential(nn.Sequential):
     >>> class ExampleLayer(nn.Module):
     >>>     def __init__(self):
     >>>         super().__init__()
-    >>>
     >>>     def forward(self, graph, n_feat):
     >>>         graph = graph.local_var()
     >>>         graph.ndata['h'] = n_feat
