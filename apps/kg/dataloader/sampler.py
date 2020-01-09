@@ -164,6 +164,7 @@ class TrainDataset(object):
         self.g = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
+
         if ranks > 1 and args.strict_rel_part:
             self.edge_parts, self.rel_parts = StrictRelationPartition(triples, ranks)
         elif ranks > 1 and args.rel_part:

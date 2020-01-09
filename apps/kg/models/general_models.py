@@ -47,12 +47,11 @@ class KEModel(object):
             rel_dim = relation_dim
 
         self.rel_dim = rel_dim
-        self.rel_part_opt = args.rel_part_opt
-        if not self.rel_part_opt:
+        self.strict_rel_part = args.strict_rel_part
+        if not self.strict_rel_part:
             self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
         else:
             self.global_relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
-
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -102,7 +101,7 @@ class KEModel(object):
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
         self.score_func.reset_parameters()
-        if not self.rel_part_opt:
+        if not self.strict_rel_part:
             self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):

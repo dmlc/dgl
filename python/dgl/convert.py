@@ -397,17 +397,22 @@ def heterograph(data_dict, num_nodes_dict=None):
         num_nodes_dict = defaultdict(int)
         for (srctype, etype, dsttype), data in data_dict.items():
             if isinstance(data, tuple):
-                nsrc = max(data[0]) + 1
-                ndst = max(data[1]) + 1
+                nsrc = (max(data[0]) + 1) if len(data[0]) > 0 else 0
+                ndst = (max(data[1]) + 1) if len(data[1]) > 0 else 0
             elif isinstance(data, list):
-                src, dst = zip(*data)
-                nsrc = max(src) + 1
-                ndst = max(dst) + 1
+                if len(data) == 0:
+                    nsrc = ndst = 0
+                else:
+                    src, dst = zip(*data)
+                    nsrc = max(src) + 1
+                    ndst = max(dst) + 1
             elif isinstance(data, sp.sparse.spmatrix):
                 nsrc = data.shape[0]
                 ndst = data.shape[1]
             elif isinstance(data, nx.Graph):
-                if srctype == dsttype:
+                if data.number_of_nodes() == 0:
+                    nsrc = ndst = 0
+                elif srctype == dsttype:
                     nsrc = ndst = data.number_of_nodes()
                 else:
                     nsrc = len({n for n, d in data.nodes(data=True) if d['bipartite'] == 0})
@@ -728,6 +733,7 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     """
     u = utils.toindex(u)
     v = utils.toindex(v)
+
     if validate:
         if urange is not None and urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
@@ -735,8 +741,11 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         if vrange is not None and vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
-    urange = urange or (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1)
-    vrange = vrange or (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1)
+    urange = urange or (
+        0 if len(u) == 0 else (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1))
+    vrange = vrange or (
+        0 if len(v) == 0 else (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1))
+
     if utype == vtype:
         urange = vrange = max(urange, vrange)
         num_ntypes = 1
