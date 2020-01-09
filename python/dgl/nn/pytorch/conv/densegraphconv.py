@@ -8,8 +8,8 @@ from torch.nn import init
 class DenseGraphConv(nn.Module):
     """Graph Convolutional Network layer where the graph structure
     is given by an adjacency matrix.
-    We recommend user to use this module when inducing graph convolution
-    on dense graphs / k-hop graphs.
+    We recommend user to use this module when applying graph convolution on
+    dense graphs.
 
     Parameters
     ----------
