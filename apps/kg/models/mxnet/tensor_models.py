@@ -12,7 +12,7 @@ def logsigmoid(val):
     z = nd.exp(-max_elem) + nd.exp(-val - max_elem)
     return -(max_elem + nd.log(z))
 
-get_device = lambda args : mx.gpu(args.gpu) if args.gpu >= 0 else mx.cpu()
+get_device = lambda args : mx.gpu(args.gpu[0]) if args.gpu[0] >= 0 else mx.cpu()
 norm = lambda x, p: nd.sum(nd.abs(x) ** p)
 
 get_scalar = lambda x: x.detach().asscalar()
@@ -44,14 +44,14 @@ class ExternalEmbedding:
         if self.emb.context != idx.context:
             idx = idx.as_in_context(self.emb.context)
         data = nd.take(self.emb, idx)
-        if self.gpu >= 0:
-            data = data.as_in_context(mx.gpu(self.gpu))
+        if gpu_id >= 0:
+            data = data.as_in_context(mx.gpu(gpu_id))
         data.attach_grad()
         if trace:
             self.trace.append((idx, data))
         return data
 
-    def update(self):
+    def update(self, gpu_id=-1):
         self.state_step += 1
         for idx, data in self.trace:
             grad = data.grad
@@ -71,9 +71,9 @@ class ExternalEmbedding:
                 grad_sum = grad_sum.as_in_context(ctx)
             self.state_sum[grad_indices] += grad_sum
             std = self.state_sum[grad_indices]  # _sparse_mask
+            if gpu_id >= 0:
+                std = std.as_in_context(mx.gpu(gpu_id))
             std_values = nd.expand_dims(nd.sqrt(std) + 1e-10, 1)
-            if self.gpu >= 0:
-                std_values = std_values.as_in_context(mx.gpu(self.args.gpu))
             tmp = (-clr * grad_values / std_values)
             if tmp.context != ctx:
                 tmp = tmp.as_in_context(ctx)
