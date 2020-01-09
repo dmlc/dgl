@@ -574,7 +574,7 @@ def test_sequential():
             graph.ndata['h'] = n_feat
             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
             n_feat += graph.ndata['h']
-            return n_feat.view(graph.number_of_nodes(), 2, -1).sum(-2)
+            return n_feat.view(graph.number_of_nodes() // 2, 2, -1).sum(1)
 
     g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
     g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))
