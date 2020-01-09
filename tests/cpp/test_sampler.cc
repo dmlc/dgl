@@ -21,19 +21,19 @@ void _TestWithReplacement(RandomEngine *re) {
     prob[i] /= accum;
 
   auto _check_given_sampler = [n_categories, n_rolls, &prob](
-      BaseSampler<Idx, DType, true> *s) {
+      utils::BaseSampler<Idx, DType, true> *s) {
     std::vector<Idx> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
-      Idx dice = s->draw();
+      Idx dice = s->Draw();
       counter[dice]++;
     }
     for (Idx i = 0; i < n_categories; ++i)
       ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
   };
 
-  AliasSampler<Idx, DType, true> as(re, prob);
-  CDFSampler<Idx, DType, true> cs(re, prob);
-  TreeSampler<Idx, DType, true> ts(re, prob);
+  utils::AliasSampler<Idx, DType, true> as(re, prob);
+  utils::CDFSampler<Idx, DType, true> cs(re, prob);
+  utils::TreeSampler<Idx, DType, true> ts(re, prob);
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);
@@ -57,16 +57,16 @@ void _TestWithoutReplacementOrder(RandomEngine *re) {
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
   auto _check_given_sampler = [&ground_truth](
-      BaseSampler<Idx, DType, false> *s) {
+      utils::BaseSampler<Idx, DType, false> *s) {
     for (size_t i = 0; i < ground_truth.size(); ++i) {
-      Idx dice = s->draw();
+      Idx dice = s->Draw();
       ASSERT_EQ(dice, ground_truth[i]);
     }
   };
 
-  AliasSampler<Idx, DType, false> as(re, prob);
-  CDFSampler<Idx, DType, false> cs(re, prob);
-  TreeSampler<Idx, DType, false> ts(re, prob);
+  utils::AliasSampler<Idx, DType, false> as(re, prob);
+  utils::CDFSampler<Idx, DType, false> cs(re, prob);
+  utils::TreeSampler<Idx, DType, false> ts(re, prob);
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);
@@ -92,19 +92,19 @@ void _TestWithoutReplacementUnique(RandomEngine *re) {
     likelihood.push_back(re->Uniform<DType>());
 
   auto _check_given_sampler = [N](
-      BaseSampler<Idx, DType, false> *s) {
+      utils::BaseSampler<Idx, DType, false> *s) {
     std::vector<int> cnt(N, 0);
     for (Idx i = 0; i < N; ++i) {
-      Idx dice = s->draw();
+      Idx dice = s->Draw();
       cnt[dice]++;
     }
     for (Idx i = 0; i < N; ++i)
       ASSERT_EQ(cnt[i], 1);
   };
 
-  AliasSampler<Idx, DType, false> as(re, likelihood);
-  CDFSampler<Idx, DType, false> cs(re, likelihood);
-  TreeSampler<Idx, DType, false> ts(re, likelihood);
+  utils::AliasSampler<Idx, DType, false> as(re, likelihood);
+  utils::CDFSampler<Idx, DType, false> cs(re, likelihood);
+  utils::TreeSampler<Idx, DType, false> ts(re, likelihood);
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);

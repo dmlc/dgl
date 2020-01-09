@@ -72,8 +72,8 @@ class ArgParser(argparse.ArgumentParser):
         self.add_argument('--no_eval_filter', action='store_true',
                           help='do not filter positive edges among negative edges for evaluation')
 
-        self.add_argument('--gpu', type=int, default=-1,
-                          help='use GPU')
+        self.add_argument('--gpu', type=int, default=[-1], nargs='+', 
+                          help='a list of active gpu ids, e.g. 0 1 2 4')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
         self.add_argument('-de', '--double_ent', action='store_true',
@@ -298,8 +298,9 @@ def run(args, logger):
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
+            rel_parts = train_data.rel_parts if args.rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-            proc = mp.Process(target=train, args=(args, model, train_samplers[i], valid_samplers))
+            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers))
             procs.append(proc)
             proc.start()
         for proc in procs:
@@ -322,7 +323,7 @@ def run(args, logger):
             procs = []
             for i in range(args.num_proc):
                 proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
-                                  'Test', queue))
+                                  i, 'Test', queue))
                 procs.append(proc)
                 proc.start()
 
