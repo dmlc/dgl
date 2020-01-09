@@ -104,7 +104,7 @@ class Identity(nn.Module):
         return x
 
 class Sequential(nn.Sequential):
-    """A squential container for stacking graph neural network modules.
+    r"""A squential container for stacking graph neural network modules.
 
     We support two modes: sequentially apply GNN modules on the same graph or
     a list of given graphs. In the second case, the number of graphs equals the
@@ -112,7 +112,8 @@ class Sequential(nn.Sequential):
 
     Parameters
     ----------
-    *args : sub-modules of type torch.nn.Module, will be added to the container in
+    *args :
+        Sub-modules of type torch.nn.Module, will be added to the container in
         the order they are passed in the constructor.
 
     Examples
@@ -144,7 +145,6 @@ class Sequential(nn.Sequential):
     >>> n_feat = torch.rand(3, 4)
     >>> e_feat = torch.rand(9, 4)
     >>> net(g, n_feat, e_feat)
-
     (tensor([[39.8597, 45.4542, 25.1877, 30.8086],
         [40.7095, 45.3985, 25.4590, 30.0134],
         [40.7894, 45.2556, 25.5221, 30.4220]]), tensor([[80.3772, 89.7752, 50.7762, 60.5520],
@@ -181,7 +181,6 @@ class Sequential(nn.Sequential):
     >>> net = Sequential(ExampleLayer(), ExampleLayer(), ExampleLayer())
     >>> n_feat = torch.rand(32, 4)
     >>> net([g1, g2, g3], n_feat)
-
     tensor([[209.6221, 225.5312, 193.8920, 220.1002],
             [250.0169, 271.9156, 240.2467, 267.7766],
             [220.4007, 239.7365, 213.8648, 234.9637],
@@ -191,15 +190,17 @@ class Sequential(nn.Sequential):
         super(Sequential, self).__init__(*args)
 
     def forward(self, graph, *feats):
-        """Sequentially apply modules to the input.
+        r"""Sequentially apply modules to the input.
 
         Parameters
         ----------
-        graph: a DGLGraph or a list of DGLGraphs.
+        graph : DGLGraph or list of DGLGraphs
+            The graph(s) to apply modules on.
 
-        *feats: input features.
-            The output of i-th block should match that of the input
-            of (i+1)-th block.
+        *feats :
+            Input features.
+            The output of :math:`i`-th block should match that of the input
+            of :math:`(i+1)`-th block.
         """
         if isinstance(graph, list):
             for graph_i, module in zip(graph, self):

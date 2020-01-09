@@ -108,7 +108,7 @@ def normalize(x, p=2, axis=1, eps=1e-12):
     return x / denom
 
 class Sequential(gluon.nn.Sequential):
-    """A squential container for stacking graph neural network blocks.
+    r"""A squential container for stacking graph neural network blocks.
 
     We support two modes: sequentially apply GNN blocks on the same graph or
     a list of given graphs. In the second case, the number of graphs equals the
@@ -147,7 +147,6 @@ class Sequential(gluon.nn.Sequential):
     >>> n_feat = nd.random.randn(3, 4)
     >>> e_feat = nd.random.randn(9, 4)
     >>> net(g, n_feat, e_feat)
-
     (
     [[ 12.412863   99.61184    21.472883  -57.625923 ]
      [ 10.08097   100.68611    20.627377  -60.13458  ]
@@ -192,7 +191,6 @@ class Sequential(gluon.nn.Sequential):
     >>> net.initialize()
     >>> n_feat = nd.random.randn(32, 4)
     >>> net([g1, g2, g3], n_feat)
-
     [[-101.289566  -22.584694  -89.25348  -151.6447  ]
      [-130.74239   -49.494812 -120.250854 -199.81546 ]
      [-112.32089   -50.036713 -116.13266  -190.38638 ]
@@ -203,15 +201,17 @@ class Sequential(gluon.nn.Sequential):
         super(Sequential, self).__init__(prefix=prefix, params=params)
 
     def forward(self, graph, *feats):
-        """Sequentially apply modules to the input.
+        r"""Sequentially apply modules to the input.
 
         Parameters
         ----------
-        graph: a DGLGraph or a list of DGLGraphs.
+        graph : DGLGraph or list of DGLGraphs
+            The graph(s) to apply modules on.
 
-        *feats: input features.
-            The output of i-th block should match that of the input
-            of (i+1)-th block.
+        *feats :
+            Input features.
+            The output of :math:`i`-th block should match that of the input
+            of :math:`(i+1)`-th block.
         """
         if isinstance(graph, list):
             for graph_i, module in zip(graph, self):
