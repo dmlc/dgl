@@ -39,13 +39,25 @@ class VGObject(VisionDataset):
         for i, obj in enumerate(self._obj_classes):
             self._obj_classes_dict[obj] = i
 
+        obj_alias_path = os.path.join(path, 'object_alias.txt')
+        with open(obj_alias_path) as f:
+            obj_alias = f.read().split('\n')
+        obj_alias_dict = {}
+        for obj in obj_alias:
+            if len(obj) > 0:
+                k, v = obj.split(',')
+                obj_alias_dict[k] = v
+        self.obj_alias_dict = obj_alias_dict
+
         _dict = []
         for it in self._ori_dict:
             label = []
             for objects in it['objects']:
-                if len(objects['synsets']) <= 0:
+                if len(objects['names']) <= 0:
                     continue
-                obj_cls = objects['synsets'][0].split('.')[0]
+                obj_cls = objects['names'][0]
+                if obj_cls in self.obj_alias_dict:
+                    obj_cls = self.obj_alias_dict[obj_cls]
                 if obj_cls not in self._obj_classes_dict:
                     continue
                 cls = self._obj_classes_dict[obj_cls]

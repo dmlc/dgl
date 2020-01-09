@@ -35,7 +35,6 @@ batch_verbose_freq = 100
 net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl', semantic_only=True)
 net.initialize(ctx=ctx)
 '''
-net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl', semantic_only=True)
 net.load_parameters('params/model-9.params', ctx=ctx)
 '''
 

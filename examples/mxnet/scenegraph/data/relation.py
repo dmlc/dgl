@@ -13,6 +13,14 @@ from gluoncv.data.base import VisionDataset
 from collections import Counter
 from gluoncv.data.transforms.presets.rcnn import FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform
 
+def get_name(obj):
+    if 'name' in obj:
+        return obj['name']
+    elif 'names' in obj:
+        return obj['names'][0]
+    else:
+        return ''
+
 class VGRelation(VisionDataset):
     def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'),
                  top_frequent_rel=50, top_frequent_obj=150,
@@ -60,6 +68,30 @@ class VGRelation(VisionDataset):
             self.img_transform = FasterRCNNDefaultTrainTransform(short=600, max_size=1000)
         self.split = split
 
+        obj_alias_path = os.path.join(self._root, 'object_alias.txt')
+        rel_alias_path = os.path.join(self._root, 'relationship_alias.txt')
+        with open(obj_alias_path) as f:
+            obj_alias = f.read().split('\n')
+        obj_alias_dict = {}
+        for obj in obj_alias:
+            if len(obj) > 0:
+                tmp = obj.split(',')
+                k = tmp[0]
+                v = tmp[1]
+                obj_alias_dict[k] = v
+        self.obj_alias_dict = obj_alias_dict
+
+        with open(rel_alias_path) as f:
+            rel_alias = f.read().split('\n')
+        rel_alias_dict = {}
+        for rel in rel_alias:
+            if len(rel) > 0:
+                tmp = rel.split(',')
+                k = tmp[0]
+                v = tmp[1]
+                rel_alias_dict[k] = v
+        self.rel_alias_dict = rel_alias_dict
+
     def __len__(self):
         return len(self._dict)
 
@@ -75,30 +107,31 @@ class VGRelation(VisionDataset):
             if sub['object_id'] == ob['object_id']:
                 continue
 
-            if len(sub['synsets']) == 0:
+            k = get_name(sub)
+            if len(k) == 0:
                 continue
-            k = sub['synsets'][0].split('.')[0]
+            if k in self.obj_alias_dict:
+                k = self.obj_alias_dict[k]
             if not k in self._obj_classes_dict:
                 continue
 
-            if len(ob['synsets']) == 0:
+            k = get_name(ob)
+            if len(k) == 0:
                 continue
-            k = ob['synsets'][0].split('.')[0]
+            if k in self.obj_alias_dict:
+                k = self.obj_alias_dict[k]
             if k not in self._obj_classes_dict:
                 continue
 
-            if len(rl['synsets']) == 0:
+            if len(rl['predicate']) == 0:
                 continue
             else:
-                synset = rl['synsets'][0].split('.')[0]
+                synset = rl['predicate']
+                if synset in self.rel_alias_dict:
+                    synset = self.rel_alias_dict[synset]
                 if synset not in self._relations_dict:
                     continue
 
-            if len(rl['synsets']) == 0:
-                continue
-            synset = rl['synsets'][0].split('.')[0]
-            if synset not in self._relations_dict:
-                continue
             object_ids.append(sub['object_id'])
             object_ids.append(ob['object_id'])
             keep_inds.append(i)
@@ -135,18 +168,24 @@ class VGRelation(VisionDataset):
                 visit_ind.add(sub_ind)
                 bbox[sub_ind,] = mx.nd.array([sub['x'], sub['y'],
                                               sub['w'] + sub['x'], sub['h'] + sub['y']])
-                k = sub['synsets'][0].split('.')[0]
+                k = get_name(sub)
+                if k in self.obj_alias_dict:
+                    k = self.obj_alias_dict[k]
                 node_class[sub_ind] = self._obj_classes_dict[k]
 
             if ob_ind not in visit_ind:
                 visit_ind.add(ob_ind)
                 bbox[ob_ind,] = mx.nd.array([ob['x'], ob['y'],
                                              ob['w'] + ob['x'], ob['h'] + ob['y']])
-                k = ob['synsets'][0].split('.')[0]
+                k = get_name(ob)
+                if k in self.obj_alias_dict:
+                    k = self.obj_alias_dict[k]
                 node_class[ob_ind] = self._obj_classes_dict[k]
 
             # relational label id of the edge
-            synset = rl['synsets'][0].split('.')[0]
+            synset = rl['predicate']
+            if synset in self.rel_alias_dict:
+                synset = self.rel_alias_dict[synset]
             rel_idx = self._relations_dict[synset]
 
             edges['src'].append(sub_ind)
