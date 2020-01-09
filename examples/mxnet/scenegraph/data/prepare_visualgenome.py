@@ -49,7 +49,7 @@ def download_vg(path, overwrite=False):
 def download_json(path, overwrite=False):
     url = 'https://drive.google.com/uc?id=1VDuba95vIPVhg5DiriPtwuVA6mleYGad'
     output = 'vg.zip'
-    gdown.download(url, output, quiet=False, proxy=None)
+    gdown.download(url, output=output, quiet=False, proxy=None)
     with zipfile.ZipFile(output) as zf:
         zf.extractall(path=path)
     json_path = os.path.join(path, 'vg')
@@ -57,7 +57,7 @@ def download_json(path, overwrite=False):
     for fl in json_files:
         shutil.move(os.path.join(json_path, fl),
                     os.path.join(path, fl))
-    os.remove(json_path)
+    os.rmdir(json_path)
 
 if __name__ == '__main__':
     args = parse_args()
@@ -73,5 +73,5 @@ if __name__ == '__main__':
     # make symlink
     makedirs(os.path.expanduser('~/.mxnet/datasets'))
     if os.path.isdir(_TARGET_DIR):
-        os.remove(_TARGET_DIR)
+        os.rmdir(_TARGET_DIR)
     os.symlink(path, _TARGET_DIR)

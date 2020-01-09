@@ -1,109 +1,79 @@
-import dgl
-import mxnet as mx
 import numpy as np
-import logging, time, pickle
-from mxnet import nd, gluon
+import os, pickle, json
 
-from utils import *
-from data import *
+PATH_TO_DATASETS = os.path.expanduser('~/.mxnet/datasets/visualgenome')
+path_to_json = os.path.join(PATH_TO_DATASETS, 'rel_annotations_val.json')
 
-filehandler = logging.FileHandler('output.log')
-streamhandler = logging.StreamHandler()
-logger = logging.getLogger('')
-logger.setLevel(logging.INFO)
-logger.addHandler(filehandler)
-logger.addHandler(streamhandler)
-
-# Hyperparams
-ctx = [mx.cpu()]
-batch_size = 1
-N_relations = 50
-N_objects = 150
-batch_verbose_freq = 100
-
-# dataset and dataloader
-vg_train = VGRelationCOCO(split='val')
-logger.info('data loaded!')
-val_data = gluon.data.DataLoader(vg_train, batch_size=batch_size, shuffle=False, num_workers=8,
-                                   batchify_fn=dgl_mp_batchify_fn)
-n_batches = len(val_data)
+with open(path_to_json, 'r') as f:
+    tmp = f.read()
+    val_data = json.loads(tmp)
 
 with open('freq_prior.pkl', 'rb') as f:
-    freq_prior = pickle.load(f)
+    pred_dist = pickle.load(f)
 
-metric_list = []
-for k in [20, 50, 100]:
-    metric_list.append(PredCls(topk=k))
-# metric = PredCls(topk=100)
-for metric in metric_list:
-    metric.reset()
+pred_cls = 0
+for i, (_, item) in enumerate(val_data.items()):
+    if (i+1) % 1000 == 0:
+        print('%d\t%f'%(i, pred_cls/(i+1)))
+    gt_box_to_label = {}
+    gt_triplet = []
+    node_id = 0
+    for rel in item:
+        sub_bbox = rel['subject']['bbox']
+        ob_bbox = rel['object']['bbox']
+        sub_class = rel['subject']['category']
+        ob_class = rel['object']['category']
+        rel_class = rel['predicate']
 
-for i, (G_list, img_list) in enumerate(val_data):
-    if G_list is None or len(G_list) == 0:
-        continue
-    G = dgl.batch(G_list)
-    img_size = img_list.shape[2:4]
-    # eids = np.where(G.edata['rel_class'].asnumpy() > 0)[0]
-    # src, dst = G.find_edges(eids)
-    src, dst = G.all_edges(order='eid')
-    src_ind = G.ndata['node_class'][src,0].asnumpy().astype(int)
-    dst_ind = G.ndata['node_class'][dst,0].asnumpy().astype(int)
-    prob = nd.array(freq_prior[src_ind, dst_ind])
-    G.ndata['node_class_prob'] = G.ndata['node_class_vec']
-    G.ndata['pred_bbox'] = G.ndata['bbox'].copy()
-    G.ndata['pred_bbox'][:, 0] /= img_size[1]
-    G.ndata['pred_bbox'][:, 1] /= img_size[0]
-    G.ndata['pred_bbox'][:, 2] /= img_size[1]
-    G.ndata['pred_bbox'][:, 3] /= img_size[0]
-    G.edata['preds'] = prob
-    G.edata['score_pred'] = G.edata['preds'][:,1:].max(axis=1)
-    G.edata['score_phr'] = G.edata['preds'][:,1:].max(axis=1)
+        gt_triplet.append((sub_class, ob_class, rel_class))
 
-    gt_objects, gt_triplet = extract_gt(G, img_size)
-    pred_objects, pred_triplet = extract_pred(G, joint_preds=True)
+        sub_node = tuple(sub_bbox)
+        ob_node = tuple(ob_bbox)
+        if sub_node not in gt_box_to_label:
+            gt_box_to_label[sub_node] = (sub_class, node_id)
+            node_id += 1
+        if ob_node not in gt_box_to_label:
+            gt_box_to_label[ob_node] = (ob_class, node_id)
+            node_id += 1
 
-    for metric in metric_list:
-        metric.update(gt_triplet, pred_triplet)
+    n_node = len(gt_box_to_label)
 
-    if (i+1) % batch_verbose_freq == 0:
-        print_txt = 'Batch[%d/%d] '%(i, n_batches)
-        for metric in metric_list:
-            name, acc = metric.get()
-            print_txt += '%s=%.6f'%(name, acc)
-        # name, acc = metric.get()
-        # print('Batch[%d/%d] %s=%f'%(i, n_batches, name, acc))
-        print(print_txt)
+    pred_matrix = np.zeros((n_node, n_node), dtype=np.int)
+    pred_score_matrix = np.zeros((n_node, n_node), dtype=np.float32) - 1000
+    sub_class_matrix = np.zeros((n_node, n_node), dtype=np.int)
+    ob_class_matrix = np.zeros((n_node, n_node), dtype=np.int)
+    for b1, (l1, id1) in gt_box_to_label.items():
+        for b2, (l2, id2) in gt_box_to_label.items():
+            if id1 == id2:
+                continue
+            pred_matrix[id1, id2] = pred_dist[l1, l2, 1:].argmax()
+            pred_score_matrix[id1, id2] = pred_dist[l1, l2, 1:].max()
+            sub_class_matrix[id1, id2] = l1
+            ob_class_matrix[id1, id2] = l2
 
+    pred_vec = pred_matrix.reshape(-1)
+    pred_score_vec = pred_score_matrix.reshape(-1)
+    sub_class_matrix = sub_class_matrix.reshape(-1)
+    ob_class_matrix = ob_class_matrix.reshape(-1)
+    m = min(100, len(pred_vec))
+    topk_ind = pred_score_vec.argsort()[::-1][0:m]
 
+    count = 0
+    num_rels = len(gt_triplet)
+    matched = [False for i in range(num_rels)]
+    for ind in topk_ind:
+        pred_sub = sub_class_matrix[ind]
+        pred_ob = ob_class_matrix[ind]
+        pred_rel = pred_vec[ind]
+        for i in range(num_rels):
+            if matched[i]:
+                continue
+            gt_sub, gt_ob, gt_rel = gt_triplet[i]
+            if pred_sub == gt_sub and pred_ob == gt_ob and pred_rel == gt_rel:
+                count += 1
+                matched[i] = True
 
+    denom = len(item)
+    pred_cls += count / denom
 
-    '''
-    pos_eids = np.where(G.edata['rel_class'].asnumpy() > 0)[0]
-    if len(pos_eids) > 0:
-        src, dst = G.find_edges(pos_eids.tolist())
-        src_id = G.ndata['node_class'][src, 0].asnumpy().astype(int)
-        dst_id = G.ndata['node_class'][dst, 0].asnumpy().astype(int)
-        rel_id = G.edata['rel_class'][pos_eids, 0].asnumpy().astype(int)
-        np.add.at(pos_count, (src_id, dst_id, rel_id), 1)
-
-    neg_eids = np.where(G.edata['rel_class'].asnumpy() == 0)[0]
-    if len(neg_eids) > 0:
-        src, dst = G.find_edges(neg_eids.tolist())
-        src_id = G.ndata['node_class'][src, 0].asnumpy().astype(int)
-        dst_id = G.ndata['node_class'][dst, 0].asnumpy().astype(int)
-        rel_id = G.edata['rel_class'][neg_eids, 0].asnumpy().astype(int)
-        np.add.at(neg_count, (src_id, dst_id, rel_id), 1)
-
-total_count = (pos_count + neg_count).sum(axis=2, keepdims=True)
-freq_prior = np.log(pos_count / (total_count + 1e-8) + 1e-8)
-
-with open('freq_prior.pkl', 'wb') as f:
-    pickle.dump(freq_prior, f)
-
-total_prior = freq_prior.mean()
-total_count_average = total_count.mean()
-bayesian_freq_prior = (pos_count + total_prior * total_count_average) / (total_count + total_count_average)
-with open('bayesian_freq_prior.pkl', 'wb') as f:
-    pickle.dump(bayesian_freq_prior, f)
-
-    '''
+print('Recall@100: %f'%(pred_cls/len(val_data)))

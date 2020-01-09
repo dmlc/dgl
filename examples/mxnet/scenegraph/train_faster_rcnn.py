@@ -124,7 +124,13 @@ def parse_args():
             raise SystemExit("Horovod not found, please check if you installed it correctly.")
         hvd.init()
 
-    if args.dataset == 'voc' or args.dataset == 'visualgenome':
+    if args.dataset == 'voc':
+        args.epochs = int(args.epochs) if args.epochs else 20
+        args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '14,20'
+        args.lr = float(args.lr) if args.lr else 0.001
+        args.lr_warmup = args.lr_warmup if args.lr_warmup else -1
+        args.wd = float(args.wd) if args.wd else 5e-4
+    elif args.dataset == 'visualgenome':
         args.epochs = int(args.epochs) if args.epochs else 20
         args.lr_decay_epoch = args.lr_decay_epoch if args.lr_decay_epoch else '14,20'
         args.lr = float(args.lr) if args.lr else 0.001
@@ -151,9 +157,11 @@ def get_dataset(dataset, args):
         val_dataset = gdata.COCODetection(splits='instances_val2017', skip_empty=False)
         val_metric = COCODetectionMetric(val_dataset, args.save_prefix + '_eval', cleanup=True)
     elif dataset.lower() == 'visualgenome':
-        train_dataset = VGObject(split='train')
-        val_dataset = VGObject(split='val')
-        val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=val_dataset._obj_classes)
+        train_dataset = VGObject(root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'),
+                                 splits='detections_train', use_crowd=False)
+        val_dataset = VGObject(root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'),
+                               splits='detections_val', skip_empty=False)
+        val_metric = COCODetectionMetric(val_dataset, args.save_prefix + '_eval', cleanup=True)
     else:
         raise NotImplementedError('Dataset: {} not implemented.'.format(dataset))
     if args.mixup:
@@ -501,7 +509,7 @@ if __name__ == '__main__':
                     classes=train_dataset._obj_classes,
                     per_device_batch_size=args.batch_size // len(ctx), **kwargs)
     '''
-    net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset._obj_classes, transfer='coco',
+    net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset.classes, transfer='coco',
                                            pretrained_base=False, additional_output=False,
                                            per_device_batch_size=args.batch_size // len(ctx), **kwargs)
     if args.resume.strip():
