@@ -734,18 +734,17 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     u = utils.toindex(u)
     v = utils.toindex(v)
 
-    if len(u) == 0 and len(v) == 0:
-        urange = vrange = 0
-    else:
-        if validate:
-            if urange is not None and urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
-                raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                    urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
-            if vrange is not None and vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
-                raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
-                    vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
-        urange = urange or (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1)
-        vrange = vrange or (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1)
+    if validate:
+        if urange is not None and urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
+            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
+                urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
+        if vrange is not None and vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
+            raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
+                vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
+    urange = urange or (
+        0 if len(u) == 0 else (int(F.asnumpy(F.max(u.tousertensor(), dim=0))) + 1))
+    vrange = vrange or (
+        0 if len(v) == 0 else (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1))
 
     if utype == vtype:
         urange = vrange = max(urange, vrange)

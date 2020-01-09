@@ -1245,6 +1245,18 @@ def test_empty_heterograph():
     # empty networkx graph
     assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
 
+    g = dgl.heterograph({('user', 'follows', 'user'): []})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('follows') == 0
+
+    # empty relation graph with others
+    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [(0, 0), (1, 1)]})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('plays') == 0
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('develops') == 2
+    assert g.number_of_nodes('developer') == 2
+
 if __name__ == '__main__':
     test_create()
     test_query()
