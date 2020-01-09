@@ -1230,6 +1230,21 @@ def test_backward():
                                               [2., 2., 2., 2., 2.],
                                               [2., 2., 2., 2., 2.]]))
 
+def test_empty_heterograph():
+    def assert_empty(g):
+        assert g.number_of_nodes('user') == 0
+        assert g.number_of_edges('plays') == 0
+        assert g.number_of_nodes('game') == 0
+
+    # empty edge list
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): []}))
+    # empty src-dst pair
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ([], [])}))
+    # empty sparse matrix
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ssp.coo_matrix((0, 0))}))
+    # empty networkx graph
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1247,3 +1262,4 @@ if __name__ == '__main__':
     test_level2()
     test_updates()
     test_backward()
+    test_empty_heterograph()
