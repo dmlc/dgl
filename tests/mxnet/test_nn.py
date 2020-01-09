@@ -561,7 +561,7 @@ def test_sequential():
     net.initialize(ctx=ctx)
     n_feat = F.randn((32, 4))
     n_feat = net([g1, g2, g3], n_feat)
-    assert n_feat.shape == (8, 4)
+    assert n_feat.shape == (4, 4)
 
 if __name__ == '__main__':
     test_graph_conv()

@@ -169,7 +169,6 @@ def test_simple_pool():
     avg_pool = avg_pool.to(ctx)
     max_pool = max_pool.to(ctx)
     sort_pool = sort_pool.to(ctx)
-    h0 = h0.to(ctx)
     h1 = sum_pool(g, h0)
     assert F.allclose(h1, F.sum(h0, 0))
     h1 = avg_pool(g, h0)
@@ -183,8 +182,6 @@ def test_simple_pool():
     g_ = dgl.DGLGraph(nx.path_graph(5))
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.number_of_nodes(), 5))
-    h0 = h0.to(ctx)
-
     h1 = sum_pool(bg, h0)
     truth = th.stack([F.sum(h0[:15], 0),
                       F.sum(h0[15:20], 0),
@@ -586,7 +583,7 @@ def test_sequential():
     net = net.to(ctx)
     n_feat = F.randn((32, 4))
     n_feat = net([g1, g2, g3], n_feat)
-    assert n_feat.shape == (8, 4)
+    assert n_feat.shape == (4, 4)
 
 if __name__ == '__main__':
     test_graph_conv()
