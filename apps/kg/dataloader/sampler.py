@@ -309,13 +309,27 @@ class NewBidirectionalOneShotIterator:
         self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, is_chunked,
                                                     False, num_nodes)
         self.step = 0
+        self.tot_sample_time = 0
+        self.tot_copy_time = 0
 
     def __next__(self):
         self.step += 1
+        start = time.time()
         if self.step % 2 == 0:
-            pos_g, neg_g = next(self.iterator_head)
+            pos_g, neg_g, copy_time = next(self.iterator_head)
         else:
-            pos_g, neg_g = next(self.iterator_tail)
+            pos_g, neg_g, copy_time = next(self.iterator_tail)
+        self.tot_sample_time += time.time() - start
+        self.tot_copy_time += copy_time
+
+        if self.step % 1000 == 0:
+            c_sample_time = self.sampler_head.sample_time + self.sampler_tail.sample_time
+            #self.sampler_head.sample_time = 0
+            #self.sampler_tail.sample_time = 0
+            print('sample {}: {:.3f} seconds, copy: {:.3f} seconds: c_sampler: {:.3f} seconds'.format(self.step, self.tot_sample_time,
+                self.tot_copy_time, c_sample_time))
+            #self.tot_sample_time = 0
+            #self.tot_copy_time = 0
         return pos_g, neg_g
 
     @staticmethod
@@ -327,7 +341,8 @@ class NewBidirectionalOneShotIterator:
                 if neg_g is None:
                     continue
 
+                start = time.time()
                 pos_g.ndata['id'] = pos_g.parent_nid
                 neg_g.ndata['id'] = neg_g.parent_nid
                 pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
-                yield pos_g, neg_g
+                yield pos_g, neg_g, time.time() - start
