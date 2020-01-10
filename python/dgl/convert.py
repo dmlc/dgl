@@ -746,10 +746,12 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     vrange = vrange or (
         0 if len(v) == 0 else (int(F.asnumpy(F.max(v.tousertensor(), dim=0))) + 1))
 
-    assert urange > int(F.asnumpy(F.max(u.tousertensor(), dim=0))), \
-        "The urange from card should be larger than max u node_id"
-    assert vrange > int(F.asnumpy(F.max(v.tousertensor(), dim=0))), \
-        "The vrange from card should be larger than max v node_id"
+    if len(u) > 0:
+        assert urange > int(F.asnumpy(F.max(u.tousertensor(), dim=0))), \
+            "The urange from card should be larger than max u node_id"
+    if len(v) > 0:
+        assert vrange > int(F.asnumpy(F.max(v.tousertensor(), dim=0))), \
+            "The vrange from card should be larger than max v node_id"
 
     if utype == vtype:
         urange = vrange = max(urange, vrange)
