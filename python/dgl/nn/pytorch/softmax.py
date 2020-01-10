@@ -2,7 +2,6 @@
 # pylint: disable= no-member, arguments-differ
 import torch as th
 
-from ... import function as fn
 from ...function import TargetCode
 from ...base import ALL, is_all
 from ... import backend as F
@@ -50,20 +49,21 @@ class EdgeSoftmax(th.autograd.Function):
 
         n_nodes = g.number_of_nodes()
         n_edges = g.number_of_edges()
-        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(score.device))
-        ctx.backward_cache = n_nodes, n_edges, gi
+        gidx = g._graph.get_immutable_gidx(utils.to_dgl_context(score.device))
+        ctx.backward_cache = n_nodes, n_edges, gidx
 
         #g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        smax = F.copy_reduce('max', gi, TargetCode.EDGE, score, n_nodes)
+        smax = F.copy_reduce('max', gidx, TargetCode.EDGE, score, n_nodes)
         #g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
         out = F.binary_reduce(
-            'none', 'sub', gi, TargetCode.EDGE, TargetCode.DST, score, smax, n_edges)
+            'none', 'sub', gidx, TargetCode.EDGE, TargetCode.DST, score, smax, n_edges)
         #g.edata['out'] = th.exp(g.edata['out'])
         out = th.exp(out)
         #g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        out_sum = F.copy_reduce('sum', gi, TargetCode.EDGE, out, n_nodes)
+        out_sum = F.copy_reduce('sum', gidx, TargetCode.EDGE, out, n_nodes)
         #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = F.binary_reduce('none', 'div', gi, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
+        out = F.binary_reduce(
+            'none', 'div', gidx, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
 
         ctx.save_for_backward(out)
         return out
@@ -84,16 +84,16 @@ class EdgeSoftmax(th.autograd.Function):
             grad_score = sds - sds * sds_sum  # multiple expressions
             return grad_score.data
         """
-        n_nodes, n_edges, gi = ctx.backward_cache
+        n_nodes, n_edges, gidx = ctx.backward_cache
         out, = ctx.saved_tensors
 
         #g.edata['grad_s'] = out * grad_out
         grad_s = out * grad_out
         #g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-        accum = F.copy_reduce('sum', gi, TargetCode.EDGE, grad_s, n_nodes)
+        accum = F.copy_reduce('sum', gidx, TargetCode.EDGE, grad_s, n_nodes)
         #g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
         out = F.binary_reduce(
-            'none', 'mul', gi, TargetCode.EDGE, TargetCode.DST, out, accum, n_edges)
+            'none', 'mul', gidx, TargetCode.EDGE, TargetCode.DST, out, accum, n_edges)
         #grad_score = g.edata['grad_s'] - g.edata['out']
         grad_score = grad_s - out
 
