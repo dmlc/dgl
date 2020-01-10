@@ -80,14 +80,14 @@ class KEModel(object):
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
         self.entity_emb.share_memory()
-        if not self.rel_part_opt:
+        if not self.strict_rel_part:
             self.relation_emb.share_memory()
         else:
             self.global_relation_emb.share_memory()
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
-        if not self.rel_part_opt:
+        if not self.strict_rel_part:
             self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
         else:
             self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
