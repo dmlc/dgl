@@ -61,8 +61,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='negative sampling size for testing')
         self.add_argument('--neg_chunk_size_test', type=int, default=-1,
                           help='chunk size of the negative edges.')
-        self.add_argument('--exclude_false_neg', action='store_true',
-                          help='exclude false sampled negative edges.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
@@ -170,21 +168,39 @@ def run(args, logger):
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
-            train_sampler = train_data.create_chunk_sampler(args.batch_size,
-                                                            args.neg_sample_size,
-                                                            args.neg_chunk_size,
-                                                            n_entities,
-                                                            args.exclude_false_neg,
-                                                            args.num_worker,
-                                                            rank=i)
-            train_samplers.append(train_sampler)
+            train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           args.neg_chunk_size,
+                                                           mode='chunk-head',
+                                                           num_workers=args.num_worker,
+                                                           shuffle=True,
+                                                           exclude_positive=True,
+                                                           rank=i)
+            train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                           args.neg_chunk_size,
+                                                           mode='chunk-tail',
+                                                           num_workers=args.num_worker,
+                                                           shuffle=True,
+                                                           exclude_positive=True,
+                                                           rank=i)
+            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                                  args.neg_chunk_size,
+                                                                  True, n_entities))
     else:
-        train_sampler = train_data.create_chunk_sampler(args.batch_size,
-                                                        args.neg_sample_size,
+        train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       args.neg_chunk_size,
+                                                       mode='chunk-head',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+        train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       args.neg_chunk_size,
+                                                       mode='chunk-tail',
+                                                       num_workers=args.num_worker,
+                                                       shuffle=True,
+                                                       exclude_positive=True)
+        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
                                                         args.neg_chunk_size,
-                                                        n_entities,
-                                                        args.exclude_false_neg,
-                                                        args.num_worker)
+                                                        True, n_entities)
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
