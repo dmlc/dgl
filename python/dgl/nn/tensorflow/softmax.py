@@ -9,6 +9,7 @@ __all__ = ['edge_softmax']
 
 
 def edge_softmax_real(graph, score, eids=ALL):
+    """Edge Softmax function"""
     if not is_all(eids):
         graph = graph.edge_subgraph(eids.long())
     g = graph.local_var()
@@ -34,9 +35,10 @@ def edge_softmax_real(graph, score, eids=ALL):
 
 
 def edge_softmax(graph, logits, eids=ALL):
+    """Closure for tf.custom_gradient"""
 
     @tf.custom_gradient
     def _lambda(logits):
-        return edge_softmax_real(graph, logits, eids=ALL)
+        return edge_softmax_real(graph, logits, eids=eids)
 
     return _lambda(logits)

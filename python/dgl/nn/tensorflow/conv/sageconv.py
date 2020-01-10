@@ -3,10 +3,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
-
 from .... import function as fn
-from ..softmax import edge_softmax
-from ..utils import Identity
 
 
 class SAGEConv(layers.Layer):
@@ -40,6 +37,7 @@ class SAGEConv(layers.Layer):
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -69,7 +67,7 @@ class SAGEConv(layers.Layer):
         NOTE(zihao): lstm reducer with default schedule (degree bucketing)
         is slow, we could accelerate this with degree padding in the future.
         """
-        m = nodes.mailbox['m'] # (B, L, D)
+        m = nodes.mailbox['m']  # (B, L, D)
         rst = self.lstm(m)
         return {'neigh': rst}
 
@@ -102,7 +100,8 @@ class SAGEConv(layers.Layer):
             graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
             # divide in_degrees
             degs = tf.cast(graph.in_degrees(), tf.float32)
-            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']) / (tf.expand_dims(degs, -1) + 1)
+            h_neigh = (graph.ndata['neigh'] + graph.ndata['h']
+                       ) / (tf.expand_dims(degs, -1) + 1)
         elif self._aggre_type == 'pool':
             graph.ndata['h'] = tf.nn.relu(self.fc_pool(feat))
             graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
@@ -112,7 +111,8 @@ class SAGEConv(layers.Layer):
             graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
             h_neigh = graph.ndata['neigh']
         else:
-            raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
+            raise KeyError(
+                'Aggregator type {} not recognized.'.format(self._aggre_type))
         # GraphSAGE GCN does not require fc_self.
         if self._aggre_type == 'gcn':
             rst = self.fc_neigh(h_neigh)

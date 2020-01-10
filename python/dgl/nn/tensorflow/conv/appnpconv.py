@@ -64,7 +64,7 @@ class APPNPConv(layers.Layer):
             feat = feat * norm
             graph.ndata['h'] = feat
             graph.edata['w'] = self.edge_drop(
-                tf.ones(graph.number_of_edges(), 1)
+                tf.ones(graph.number_of_edges(), 1))
             graph.update_all(fn.u_mul_e('h', 'w', 'm'),
                              fn.sum('m', 'h'))
             feat = graph.ndata.pop('h')

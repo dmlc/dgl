@@ -1,11 +1,10 @@
 """tf Module for Simplifying Graph Convolution layer"""
-# pylint: disable= no-member, arguments-differ, invalid-name
+# pylint: disable= no-member, arguments-differ, invalid-name, W0613
 import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 
 from .... import function as fn
-
 
 
 class SGConv(layers.Layer):
@@ -36,6 +35,7 @@ class SGConv(layers.Layer):
     norm : callable activation function/layer or None, optional
         If not None, applies normalization to the updated node features.
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -49,7 +49,6 @@ class SGConv(layers.Layer):
         self._cached_h = None
         self._k = k
         self.norm = norm
-
 
     def call(self, graph, feat):
         r"""Compute Simplifying Graph Convolution layer.
@@ -78,7 +77,8 @@ class SGConv(layers.Layer):
             feat = self._cached_h
         else:
             # compute normalization
-            degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1, clip_value_max=np.inf)
+            degs = tf.clip_by_value(tf.cast(
+                graph.in_degrees(), tf.float32), clip_value_min=1, clip_value_max=np.inf)
             norm = tf.pow(degs, -0.5)
             norm = tf.expand_dims(norm, 1)
             # compute (D^-1 A^k D)^k X

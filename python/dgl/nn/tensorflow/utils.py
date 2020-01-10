@@ -1,4 +1,5 @@
-
+"""Utilities for tf NN package"""
+#pylint: disable=no-member, invalid-name
 from tensorflow.keras import layers# pylint: disable=W0235
 import tensorflow as tf
 
@@ -89,9 +90,7 @@ def bmm_maybe_select(A, B, index):
 class Identity(layers.Layer):
     """A placeholder identity operator that is argument-insensitive.
     """
-    def __init__(self):
-        super(Identity, self).__init__()
-
+    
     def call(self, x):
         """Return input"""
         return x

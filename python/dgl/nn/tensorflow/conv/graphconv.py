@@ -7,6 +7,8 @@ import numpy as np
 from .... import function as fn
 
 # pylint: disable=W0235
+
+
 class GraphConv(layers.Layer):
     r"""Apply graph convolution over an input signal.
 
@@ -57,6 +59,7 @@ class GraphConv(layers.Layer):
     bias : tf.Tensor
         The learnable bias tensor.
     """
+
     def __init__(self,
                  in_feats,
                  out_feats,
@@ -71,7 +74,7 @@ class GraphConv(layers.Layer):
         xinit = tf.keras.initializers.glorot_uniform()
         self.weight = tf.Variable(initial_value=xinit(
             shape=(in_feats, out_feats), dtype='float32'), trainable=True)
-        
+
         if bias:
             zeroinit = tf.keras.initializers.zeros()
             self.bias = tf.Variable(initial_value=zeroinit(
@@ -104,7 +107,7 @@ class GraphConv(layers.Layer):
         graph = graph.local_var()
         if self._norm:
             in_degree = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1,
-                                clip_value_max=np.inf) 
+                                         clip_value_max=np.inf)
             norm = tf.pow(in_degree, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = tf.reshape(norm, shp)

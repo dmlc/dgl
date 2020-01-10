@@ -86,7 +86,8 @@ class RelGraphConv(layers.Layer):
         if regularizer == "basis":
             # add basis weights
             self.weight = tf.Variable(initial_value=xinit(
-                shape=(self.num_bases, self.in_feat, self.out_feat), dtype='float32'), trainable=True)
+                shape=(self.num_bases, self.in_feat, self.out_feat),
+                dtype='float32'), trainable=True)
             if self.num_bases < self.num_rels:
                 # linear combination coefficients
                 self.w_comp = tf.Variable(initial_value=xinit(
@@ -103,7 +104,9 @@ class RelGraphConv(layers.Layer):
 
             # assuming in_feat and out_feat are both divisible by num_bases
             self.weight = tf.Variable(initial_value=xinit(
-                shape=(self.num_rels, self.num_bases * self.submat_in * self.submat_out), dtype='float32'), trainable=True)
+                shape=(self.num_rels, self.num_bases *
+                       self.submat_in * self.submat_out),
+                dtype='float32'), trainable=True)
             # message func
             self.message_func = self.bdd_message_func
         else:
@@ -140,10 +143,12 @@ class RelGraphConv(layers.Layer):
 
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
-        if edges.src['h'].dtype == tf.int64 and len(edges.src['h'].shape) == 1:
+        if (edges.src['h'].dtype == tf.int64) and
+        len(edges.src['h'].shape) == 1:
             raise TypeError(
                 'Block decomposition does not allow integer ID feature.')
-        weight = tf.reshape(tf.gather(self.weight, edges.data['type']), (-1, self.submat_in, self.submat_out))
+        weight = tf.reshape(tf.gather(
+            self.weight, edges.data['type']), (-1, self.submat_in, self.submat_out))
         node = tf.reshape(edges.src['h'], (-1, 1, self.submat_in))
         msg = tf.reshape(tf.matmul(node, weight), (-1, self.out_feat))
         if 'norm' in edges.data:

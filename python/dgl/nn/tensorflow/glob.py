@@ -3,14 +3,15 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
-import numpy as np
 
 from ... import BatchedDGLGraph
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+from ...batched_graph import sum_nodes, mean_nodes, max_nodes, \
     softmax_nodes, topk_nodes
 
 
-__all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling', 'WeightAndSum']
+__all__ = ['SumPooling', 'AvgPooling',
+           'MaxPooling', 'SortPooling', 'WeightAndSum']
+
 
 class SumPooling(layers.Layer):
     r"""Apply sum pooling over the nodes in the graph.
@@ -18,6 +19,7 @@ class SumPooling(layers.Layer):
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
     """
+
     def __init__(self):
         super(SumPooling, self).__init__()
 
@@ -52,6 +54,7 @@ class AvgPooling(layers.Layer):
     .. math::
         r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
     """
+
     def __init__(self):
         super(AvgPooling, self).__init__()
 
@@ -85,6 +88,7 @@ class MaxPooling(layers.Layer):
     .. math::
         r^{(i)} = \max_{k=1}^{N_i}\left( x^{(i)}_k \right)
     """
+
     def __init__(self):
         super(MaxPooling, self).__init__()
 
@@ -121,6 +125,7 @@ class SortPooling(layers.Layer):
     k : int
         The number of nodes to hold for each graph.
     """
+
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
@@ -172,6 +177,7 @@ class GlobalAttentionPooling(layers.Layer):
         A neural network applied to each feature before combining them
         with attention scores.
     """
+
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
         self.gate_nn = gate_nn
@@ -211,7 +217,6 @@ class GlobalAttentionPooling(layers.Layer):
             return readout
 
 
-
 class WeightAndSum(layers.Layer):
     """Compute importance weights for atoms and perform a weighted sum.
 
@@ -220,6 +225,7 @@ class WeightAndSum(layers.Layer):
     in_feats : int
         Input atom feature size
     """
+
     def __init__(self, in_feats):
         super(WeightAndSum, self).__init__()
         self.in_feats = in_feats
