@@ -240,7 +240,6 @@ class EvalDataset(object):
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                     pickle.dump(g, graph_file)
         self.g = g
-
         self.num_train = len(dataset.train[0])
         self.num_valid = len(dataset.valid[0])
         self.num_test = len(dataset.test[0])
