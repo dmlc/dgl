@@ -670,7 +670,7 @@ def check_positive_edge_sampler():
     num_edges = g.number_of_edges()
     edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
 
-    edge_weight[num_edges-1] = num_edges ** 2
+    edge_weight[num_edges-1] = num_edges ** 3
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
 
     # Correctness check
