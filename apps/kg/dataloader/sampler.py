@@ -70,8 +70,7 @@ def ConstructGraph(edges, n_entities, args):
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
         g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-        g.ndata['id'] = F.arange(0, g.number_of_nodes())
-        g.edata['id'] = F.tensor(etype_id, F.int64)
+        g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                 pickle.dump(g, graph_file)
@@ -189,7 +188,7 @@ class EvalSampler(object):
                                    num_workers=num_workers,
                                    shuffle=False,
                                    exclude_positive=False,
-                                   relations=g.edata['id'],
+                                   relations=g.edata['tid'],
                                    return_false_neg=filter_false_neg)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
@@ -211,8 +210,9 @@ class EvalSampler(object):
             if neg_g is not None:
                 break
 
-        pos_g.copy_from_parent()
-        neg_g.copy_from_parent()
+        pos_g.ndata['id'] = pos_g.parent_nid
+        neg_g.ndata['id'] = neg_g.parent_nid
+        pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
         if self.filter_false_neg:
             neg_g.edata['bias'] = F.astype(-neg_positive, F.float32)
         return pos_g, neg_g
@@ -235,8 +235,7 @@ class EvalDataset(object):
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
             g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-            g.ndata['id'] = F.arange(0, g.number_of_nodes())
-            g.edata['id'] = F.tensor(etype_id, F.int64)
+            g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                     pickle.dump(g, graph_file)
@@ -329,6 +328,7 @@ class NewBidirectionalOneShotIterator:
                 if neg_g is None:
                     continue
 
-                pos_g.copy_from_parent()
-                neg_g.copy_from_parent()
+                pos_g.ndata['id'] = pos_g.parent_nid
+                neg_g.ndata['id'] = neg_g.parent_nid
+                pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
                 yield pos_g, neg_g
