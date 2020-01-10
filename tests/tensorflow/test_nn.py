@@ -312,6 +312,13 @@ def test_sgc_conv():
     assert F.allclose(h_0, h_1)
     assert h_0.shape[-1] == 10
 
+def test_appnp_conv():
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    appnp = nn.APPNPConv(10, 0.1)
+    feat = F.randn((100, 5))
+
+    h = appnp(g, feat)
+    assert h.shape[-1] == 5
 
 def test_gin_conv():
     for aggregator_type in ['mean', 'max', 'sum']:
@@ -339,7 +346,7 @@ if __name__ == '__main__':
     test_gat_conv()
     test_sage_conv()
     test_sgc_conv()
-    # test_appnp_conv()
+    test_appnp_conv()
     test_gin_conv()
     # test_agnn_conv()
     # test_gated_graph_conv()
