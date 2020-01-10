@@ -143,8 +143,8 @@ class RelGraphConv(layers.Layer):
 
     def bdd_message_func(self, edges):
         """Message function for block-diagonal-decomposition regularizer"""
-        if (edges.src['h'].dtype == tf.int64) and
-        len(edges.src['h'].shape) == 1:
+        if ((edges.src['h'].dtype == tf.int64) and
+                len(edges.src['h'].shape) == 1):
             raise TypeError(
                 'Block decomposition does not allow integer ID feature.')
         weight = tf.reshape(tf.gather(

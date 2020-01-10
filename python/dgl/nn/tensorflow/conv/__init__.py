@@ -1,3 +1,4 @@
+"""TF NN conv module"""
 from .gatconv import GATConv
 from .relgraphconv import RelGraphConv
 from .graphconv import GraphConv

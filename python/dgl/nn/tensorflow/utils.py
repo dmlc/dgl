@@ -1,7 +1,8 @@
 """Utilities for tf NN package"""
-#pylint: disable=no-member, invalid-name
-from tensorflow.keras import layers# pylint: disable=W0235
+# pylint: disable=no-member, invalid-name
+from tensorflow.keras import layers  # pylint: disable=W0235
 import tensorflow as tf
+
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -43,6 +44,7 @@ def matmul_maybe_select(A, B):
         return tf.gather(B, A)
     else:
         return tf.matmul(A, B)
+
 
 def bmm_maybe_select(A, B, index):
     """Slice submatrices of A by the given index and perform bmm.
@@ -87,10 +89,11 @@ def bmm_maybe_select(A, B, index):
         BB = tf.gather(B, index)
         return tf.squeeze(tf.matmul(tf.expand_dims(A, 1), BB))
 
+
 class Identity(layers.Layer):
     """A placeholder identity operator that is argument-insensitive.
     """
-    
+
     def call(self, x):
         """Return input"""
         return x

@@ -27,6 +27,7 @@ class APPNPConv(layers.Layer):
         Dropout rate on edges that controls the
         messages received by each node. Default: ``0``.
     """
+
     def __init__(self,
                  k,
                  alpha,
@@ -54,7 +55,8 @@ class APPNPConv(layers.Layer):
             should be the same as input shape.
         """
         graph = graph.local_var()
-        degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32), clip_value_min=1, clip_value_max=np.inf)
+        degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
+                                clip_value_min=1, clip_value_max=np.inf)
         norm = tf.pow(degs, -0.5)
         shp = norm.shape + (1,) * (feat.ndim - 1)
         norm = tf.reshape(norm, shp)
