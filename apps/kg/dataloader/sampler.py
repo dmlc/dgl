@@ -16,20 +16,6 @@ def StrictRelationPartition(edges, n):
     idx = np.flip(np.argsort(cnts))
     cnts = cnts[idx]
     uniq = uniq[idx]
-    for i in range(10):
-        print("ID-{}/{}:{}".format(uniq[i], len(cnts), cnts[i]))
-
-    threashold = 10000000
-    num = 0
-    for i in range(len(uniq)):
-        cnt = cnts[i]
-        if cnt >= threashold:
-            num += 1
-        else:
-            print(">{}:{}".format(threashold, num))
-            threashold //= 10
-            num = 0
-    print(">{}:{}".format(threashold, num))
 
     assert cnts[0] > cnts[-1]
     edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
@@ -151,17 +137,18 @@ def ConstructGraph(edges, n_entities, args):
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
         g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-        g.ndata['id'] = F.arange(0, g.number_of_nodes())
-        g.edata['id'] = F.tensor(etype_id, F.int64)
+        #g.ndata['id'] = F.arange(0, g.number_of_nodes())
+        #g.edata['id'] = F.tensor(etype_id, F.int64)
+        etype_id = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                 pickle.dump(g, graph_file)
-    return g
+    return g, etype_id
 
 class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
-        self.g = ConstructGraph(triples, dataset.n_entities, args)
+        self.g, self.etype_id = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
 
@@ -196,7 +183,32 @@ class TrainDataset(object):
                 count[(tail, -rel - 1)] += 1
         return count
 
-    def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=5,
+    def create_chunk_sampler(self, batch_size, neg_sample_size, neg_chunk_size, num_nodes,
+                             exclude_positive=False, num_worker=4, rank=0):
+        train_sampler_head = self.create_sampler(batch_size,
+                                                 neg_sample_size,
+                                                 neg_chunk_size,
+                                                 mode='chunk-head',
+                                                 num_workers=num_worker,
+                                                 shuffle=True,
+                                                 exclude_positive=exclude_positive,
+                                                 rank=rank)
+        train_sampler_tail = self.create_sampler(batch_size,
+                                                 neg_sample_size,
+                                                 neg_chunk_size,
+                                                 mode='chunk-tail',
+                                                 num_workers=num_worker,
+                                                 shuffle=True,
+                                                 exclude_positive=exclude_positive,
+                                                 rank=rank)
+        return NewBidirectionalOneShotIterator(train_sampler_head,
+                                               train_sampler_tail,
+                                               neg_chunk_size,
+                                               True,
+                                               num_nodes,
+                                               self.etype_id)
+
+    def create_sampler(self, batch_size, neg_sample_size, neg_chunk_size=None, mode='head', num_workers=4,
                        shuffle=True, exclude_positive=False, rank=0):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         return EdgeSampler(self.g,
@@ -262,7 +274,7 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_node
 
 class EvalSampler(object):
     def __init__(self, g, edges, batch_size, neg_sample_size, neg_chunk_size, mode, num_workers,
-                 filter_false_neg):
+                 filter_false_neg, etype_map):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         self.sampler = EdgeSampler(g,
                                    batch_size=batch_size,
@@ -273,7 +285,7 @@ class EvalSampler(object):
                                    num_workers=num_workers,
                                    shuffle=False,
                                    exclude_positive=False,
-                                   relations=g.edata['id'],
+                                   relations=etype_map,
                                    return_false_neg=filter_false_neg)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
@@ -281,6 +293,7 @@ class EvalSampler(object):
         self.g = g
         self.filter_false_neg = filter_false_neg
         self.neg_chunk_size = neg_chunk_size
+        self.etype_map = etype_map
 
     def __iter__(self):
         return self
@@ -295,8 +308,11 @@ class EvalSampler(object):
             if neg_g is not None:
                 break
 
-        pos_g.copy_from_parent()
-        neg_g.copy_from_parent()
+        #pos_g.copy_from_parent()
+        #neg_g.copy_from_parent()
+        pos_g.ndata['id'] = pos_g.parent_nid
+        neg_g.ndata['id'] = neg_g.parent_nid
+        pos_g.edata['id'] = self.etype_map[pos_g.parent_eid]
         if self.filter_false_neg:
             neg_g.edata['bias'] = F.astype(-neg_positive, F.float32)
         return pos_g, neg_g
@@ -319,8 +335,9 @@ class EvalDataset(object):
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
             g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-            g.ndata['id'] = F.arange(0, g.number_of_nodes())
-            g.edata['id'] = F.tensor(etype_id, F.int64)
+            #g.ndata['id'] = F.arange(0, g.number_of_nodes())
+            #g.edata['id'] = F.tensor(etype_id, F.int64)
+            self.etype_id = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                     pickle.dump(g, graph_file)
@@ -384,16 +401,17 @@ class EvalDataset(object):
         end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
         edges = edges[beg: end]
         return EvalSampler(self.g, edges, batch_size, neg_sample_size, neg_chunk_size,
-                           mode, num_workers, filter_false_neg)
+                           mode, num_workers, filter_false_neg, self.etype_id)
 
 class NewBidirectionalOneShotIterator:
-    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, is_chunked, num_nodes):
+    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, 
+                 is_chunked, num_nodes, etype_map):
         self.sampler_head = dataloader_head
         self.sampler_tail = dataloader_tail
         self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size, is_chunked,
-                                                    True, num_nodes)
+                                                    True, num_nodes, etype_map)
         self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, is_chunked,
-                                                    False, num_nodes)
+                                                    False, num_nodes, etype_map)
         self.step = 0
 
     def __next__(self):
@@ -405,7 +423,7 @@ class NewBidirectionalOneShotIterator:
         return pos_g, neg_g
 
     @staticmethod
-    def one_shot_iterator(dataloader, neg_chunk_size, is_chunked, neg_head, num_nodes):
+    def one_shot_iterator(dataloader, neg_chunk_size, is_chunked, neg_head, num_nodes, etype_map):
         while True:
             for pos_g, neg_g in dataloader:
                 neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, is_chunked,
@@ -413,7 +431,10 @@ class NewBidirectionalOneShotIterator:
                 if neg_g is None:
                     continue
 
-                pos_g.copy_from_parent()
-                neg_g.copy_from_parent()
+                #pos_g.copy_from_parent()
+                #neg_g.copy_from_parent()
+                pos_g.ndata['id'] = pos_g.parent_nid
+                neg_g.ndata['id'] = neg_g.parent_nid
+                pos_g.edata['id'] = etype_map[pos_g.parent_eid]
                 yield pos_g, neg_g
 
