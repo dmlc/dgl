@@ -3,7 +3,10 @@
 import mxnet as mx
 
 from ... import function as fn
+from ...function import TargetCode
 from ...base import ALL, is_all
+from ... import backend as F
+from ... import utils
 
 __all__ = ['edge_softmax']
 
@@ -31,12 +34,11 @@ class EdgeSoftmax(mx.autograd.Function):
             g = g.edge_subgraph(eids.astype('int64'))
         n_nodes = g.number_of_nodes()
         n_edges = g.number_of_edges()
-        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(score.device))
 
         #self.g = g
         self.n_nodes = n_nodes
         self.n_edges = n_edges
-        self.gi = gi
+        self.g = g
 
     def forward(self, score):
         """Forward function.
@@ -54,7 +56,8 @@ class EdgeSoftmax(mx.autograd.Function):
         """
         n_nodes = self.n_nodes
         n_edges = self.n_edges
-        gi = self.gi
+        g = self.g
+        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(score.context))
 
         #g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
         smax = F.copy_reduce('max', gi, TargetCode.EDGE, score, n_nodes)
@@ -86,8 +89,9 @@ class EdgeSoftmax(mx.autograd.Function):
         """
         n_nodes = self.n_nodes
         n_edges = self.n_edges
-        gi = self.gi
+        g = self.g
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
+        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(out.context))
 
         #g.edata['grad_s'] = out * grad_out
         grad_s = out * grad_out

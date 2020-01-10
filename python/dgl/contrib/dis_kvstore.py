@@ -4,13 +4,18 @@ from ..network import _finalize_sender, _finalize_receiver
 from ..network import _network_wait, _add_receiver_addr
 from ..network import _receiver_wait, _sender_connect
 from ..network import _send_kv_msg, _recv_kv_msg
+from ..network import _clear_kv_msg
 from ..network import KVMsgType, KVStoreMsg
 
+from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
+import os
 import numpy as np
-import dgl.backend as F
 import socket
+if os.name != 'nt':
+    import fcntl
+    import struct
 
 def read_ip_config(filename):
     """Read networking configuration from file.
@@ -76,7 +81,7 @@ def start_server(server_id, ip_config, num_client, ndata, edata, ndata_g2l=None,
     edata_g2l : dict of tensor (mx.ndarray or torch.tensor)
         global2local mapping of edge data
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
     """
     assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
     assert len(ip_config) > 0, 'ip_config cannot be empty.'
@@ -123,7 +128,7 @@ def start_client(ip_config, ndata_partition_book, edata_partition_book, close_sh
     close_shared_mem : bool
         Close local shared-memory tensor access.
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
 
     Returns
     -------
@@ -171,7 +176,7 @@ class KVServer(object):
     num_client : int
         Total number of clients connecting to server.
     msg_queue_size : int
-        Size of message queue
+        Size of message queue (2GB by default)
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
@@ -196,6 +201,8 @@ class KVServer(object):
         # Create C communicator of sender and receiver
         self._sender = _create_sender(net_type, msg_queue_size)
         self._receiver = _create_receiver(net_type, msg_queue_size)
+        # A naive garbage collocetion for kvstore
+        self._garbage_msg = []
 
 
     def __del__(self):
@@ -306,7 +313,8 @@ class KVServer(object):
                     rank=self._server_id,
                     name=str(client_id),
                     id=None,
-                    data=None)
+                    data=None,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, client_id)
 
             # send serilaized shared-memory tensor information to clients
@@ -324,7 +332,8 @@ class KVServer(object):
                 rank=self._server_id,
                 name=shared_tensor,
                 id=None,
-                data=None)
+                data=None,
+                c_ptr=None)
 
             for client_id in range(len(self._client_namebook)):
                 _send_kv_msg(self._sender, msg, client_id)
@@ -351,7 +360,8 @@ class KVServer(object):
                     rank=self._server_id,
                     name=msg.name,
                     id=msg.id,
-                    data=res_tensor)
+                    data=res_tensor,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, back_msg, msg.rank)
             # Barrier message
             elif msg.type == KVMsgType.BARRIER:
@@ -362,7 +372,8 @@ class KVServer(object):
                         rank=self._server_id,
                         name=None,
                         id=None,
-                        data=None)
+                        data=None,
+                        c_ptr=None)
                     for i in range(self._client_count):
                         _send_kv_msg(self._sender, back_msg, i)
                     self._barrier_count = 0
@@ -372,6 +383,11 @@ class KVServer(object):
                 break # exit loop
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
+
+            self._garbage_msg.append(msg)
+            if len(self._garbage_msg) > 1000:
+                _clear_kv_msg(self._garbage_msg)
+                self._garbage_msg = []
 
 
     def _push_handler(self, name, ID, data, target):
@@ -413,6 +429,7 @@ class KVServer(object):
             a tensor with the same row size of ID.
         """
         return target[name][ID]
+
 
     def _serialize_shared_tensor(self, name, shape, dtype):
         """Serialize shared tensor
@@ -478,7 +495,7 @@ class KVClient(object):
     close_shared_mem : bool
         DO NOT use shared-memory access on local machine.
     msg_queue_size : int
-        Size of message queue.
+        Size of message queue (2GB by default).
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
@@ -504,6 +521,9 @@ class KVClient(object):
         # create C communicator of sender and receiver
         self._sender = _create_sender(net_type, msg_queue_size)
         self._receiver = _create_receiver(net_type, msg_queue_size)
+        # A naive garbage collocetion for kvstore
+        self._garbage_msg = []
+
 
 
     def __del__(self):
@@ -551,7 +571,7 @@ class KVClient(object):
         # find local server nodes
         for ID, addr in self._server_namebook.items():
             server_ip, server_port = addr.split(':')
-            if client_ip == server_ip or server_ip == '127.0.0.1':
+            if server_ip in self._ip4_addr_list():
                 self._local_server_id.add(ID)
 
         # send addr to server nodes
@@ -560,7 +580,8 @@ class KVClient(object):
             rank=0,
             name=self._addr,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=None)
 
         for server_id in range(self._server_count):
             _send_kv_msg(self._sender, msg, server_id)
@@ -583,8 +604,8 @@ class KVClient(object):
                 for server_id in self._local_server_id:
                     shared_data = empty_shared_mem(tensor_name+str(server_id), False, shape, dtype)
                     dlpack = shared_data.to_dlpack()
-                    self._data_store[tensor_name] = F.zerocopy_from_dlpack(dlpack)
-                    self._has_data.add(tensor_name)
+                    self._data_store[tensor_name+str(server_id)] = F.zerocopy_from_dlpack(dlpack)
+                    self._has_data.add(tensor_name+str(server_id))
 
 
     def push(self, name, id_tensor, data_tensor):
@@ -622,18 +643,19 @@ class KVClient(object):
             partial_data = data_tensor[start:end]
 
             if server[idx] in self._local_server_id and self._close_shared_mem == False:
-                if (name+'-g2l-' in self._has_data) == True:
-                    local_id = self._data_store[name+'-g2l-'][partial_id]
+                if (name+'-g2l-'+str(server[idx]) in self._has_data) == True:
+                    local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                self._push_handler(name+'-data-', local_id, data_tensor, self._data_store)
+                self._push_handler(name+'-data-'+str(server[idx]), local_id, data_tensor, self._data_store)
             else:
                 msg = KVStoreMsg(
                     type=KVMsgType.PUSH, 
                     rank=self._client_id, 
                     name=name,
                     id=partial_id, 
-                    data=partial_data)
+                    data=partial_data,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, server[idx])
 
             start += count[idx]
@@ -642,7 +664,7 @@ class KVClient(object):
     def pull(self, name, id_tensor):
         """Pull message from KVServer.
 
-        Parameters
+        Parameters 
         ----------
         name : str
             data name
@@ -656,6 +678,10 @@ class KVClient(object):
         """
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
+
+        if len(self._garbage_msg) > 1000:
+            _clear_kv_msg(self._garbage_msg)
+            self._garbage_msg = []
 
         # partition data (we can move this part of code into C-api if needed)
         server_id = self._data_store[name+'-part-'][id_tensor]
@@ -676,18 +702,19 @@ class KVClient(object):
             partial_id = id_tensor[start:end]
 
             if server[idx] in self._local_server_id and self._close_shared_mem == False:
-                if (name+'-g2l-' in self._has_data) == True:
-                    local_id = self._data_store[name+'-g2l-'][partial_id]
+                if (name+'-g2l-'+str(server[idx]) in self._has_data) == True:
+                    local_id = self._data_store[name+'-g2l-'+str(server[idx])][partial_id]
                 else:
                     local_id = partial_id
-                local_data[server[idx]] = self._pull_handler(name+'-data-', local_id, self._data_store)
+                local_data[server[idx]] = self._pull_handler(name+'-data-'+str(server[idx]), local_id, self._data_store)
             else:
                 msg = KVStoreMsg(
                     type=KVMsgType.PULL, 
                     rank=self._client_id, 
                     name=name, 
                     id=partial_id, 
-                    data=None)
+                    data=None,
+                    c_ptr=None)
                 _send_kv_msg(self._sender, msg, server[idx])
                 pull_count += 1
 
@@ -700,12 +727,16 @@ class KVClient(object):
                 rank=server_id, 
                 name=name, 
                 id=None,
-                data=data)
+                data=data,
+                c_ptr=None)
             msg_list.append(local_msg)
+            self._garbage_msg.append(local_msg)
 
         # wait message from server nodes
         for idx in range(pull_count):
-            msg_list.append(_recv_kv_msg(self._receiver))
+            remote_msg = _recv_kv_msg(self._receiver)
+            msg_list.append(remote_msg)
+            self._garbage_msg.append(remote_msg)
 
         # sort msg by server id
         msg_list.sort(key=self._takeId)
@@ -724,7 +755,8 @@ class KVClient(object):
             rank=self._client_id,
             name=None,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=None)
 
         for server_id in range(self._server_count):
             _send_kv_msg(self._sender, msg, server_id)
@@ -745,7 +777,8 @@ class KVClient(object):
                 rank=self._client_id,
                 name=None,
                 id=None,
-                data=None)
+                data=None,
+                c_ptr=None)
             _send_kv_msg(self._sender, msg, server_id)
 
 
@@ -796,6 +829,31 @@ class KVClient(object):
         s.close()
 
         return IP + ':' + str(port)
+
+
+    def _get_ip_address(self, NICname):
+        """Return IP by given a NIC name
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return socket.inet_ntoa(fcntl.ioctl(
+            s.fileno(),
+            0x8915,  # SIOCGIFADDR
+            struct.pack('256s', NICname[:15].encode("UTF-8"))
+        )[20:24])
+
+
+    def _ip4_addr_list(self):
+        """Return a set of IPv4 address
+        """
+        nic = set()
+
+        for ix in socket.if_nameindex():
+            name = ix[1]
+            ip = self._get_ip_address(name)
+
+            nic.add(ip)
+
+        return nic
 
 
     def _takeId(self, elem):
@@ -871,3 +929,4 @@ class KVClient(object):
         tensor_shape = tuple(tensor_shape)
 
         return tensor_name, tensor_shape, data_type
+

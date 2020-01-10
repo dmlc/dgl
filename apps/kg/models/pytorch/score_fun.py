@@ -47,7 +47,7 @@ class TransEScore(nn.Module):
     def forward(self, g):
         g.apply_edges(lambda edges: self.edge_func(edges))
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -138,8 +138,8 @@ class TransRScore(nn.Module):
     def reset_parameters(self):
         self.projection_emb.init(1.0)
 
-    def update(self):
-        self.projection_emb.update()
+    def update(self, gpu_id=-1):
+        self.projection_emb.update(gpu_id)
 
     def save(self, path, name):
         self.projection_emb.save(path, name+'projection')
@@ -186,7 +186,7 @@ class DistMultScore(nn.Module):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -243,7 +243,7 @@ class ComplExScore(nn.Module):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -314,7 +314,7 @@ class RESCALScore(nn.Module):
             return head, tail
         return fn
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):
@@ -373,7 +373,7 @@ class RotatEScore(nn.Module):
         score = score.norm(dim=0)
         return {'score': self.gamma - score.sum(-1)}
 
-    def update(self):
+    def update(self, gpu_id=-1):
         pass
 
     def reset_parameters(self):

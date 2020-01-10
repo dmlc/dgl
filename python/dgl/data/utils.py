@@ -35,7 +35,7 @@ def loadtxt(path, delimiter, dtype=None):
 
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
-    dgl_repo_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/'
+    dgl_repo_url = 'https://data.dgl.ai/'
     repo_url = os.environ.get('DGL_REPO', dgl_repo_url)
     if repo_url[-1] != '/':
         repo_url = repo_url + '/'
