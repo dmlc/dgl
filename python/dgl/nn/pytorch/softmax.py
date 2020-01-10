@@ -3,7 +3,10 @@
 import torch as th
 
 from ... import function as fn
+from ...function import TargetCode
 from ...base import ALL, is_all
+from ... import backend as F
+from ... import utils
 
 __all__ = ['edge_softmax']
 
@@ -44,15 +47,24 @@ class EdgeSoftmax(th.autograd.Function):
         # a local variable
         if not is_all(eids):
             g = g.edge_subgraph(eids.long())
-        ctx.backward_cache = g
-        g = g.local_var()
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = th.exp(g.edata['out'])
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
+
+        n_nodes = g.number_of_nodes()
+        n_edges = g.number_of_edges()
+        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(score.device))
+        ctx.backward_cache = n_nodes, n_edges, gi
+
+        #g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        smax = F.copy_reduce('max', gi, TargetCode.EDGE, score, n_nodes)
+        #g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        out = F.binary_reduce(
+            'none', 'sub', gi, TargetCode.EDGE, TargetCode.DST, score, smax, n_edges)
+        #g.edata['out'] = th.exp(g.edata['out'])
+        out = th.exp(out)
+        #g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        out_sum = F.copy_reduce('sum', gi, TargetCode.EDGE, out, n_nodes)
+        #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = F.binary_reduce('none', 'div', gi, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
+
         ctx.save_for_backward(out)
         return out
 
@@ -72,16 +84,19 @@ class EdgeSoftmax(th.autograd.Function):
             grad_score = sds - sds * sds_sum  # multiple expressions
             return grad_score.data
         """
-        g = ctx.backward_cache
-        g = g.local_var()
+        n_nodes, n_edges, gi = ctx.backward_cache
         out, = ctx.saved_tensors
-        # clear backward cache explicitly
-        ctx.backward_cache = None
-        g.edata['out'] = out
-        g.edata['grad_s'] = out * grad_out
-        g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        grad_score = g.edata['grad_s'] - g.edata['out']
+
+        #g.edata['grad_s'] = out * grad_out
+        grad_s = out * grad_out
+        #g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+        accum = F.copy_reduce('sum', gi, TargetCode.EDGE, grad_s, n_nodes)
+        #g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        out = F.binary_reduce(
+            'none', 'mul', gi, TargetCode.EDGE, TargetCode.DST, out, accum, n_edges)
+        #grad_score = g.edata['grad_s'] - g.edata['out']
+        grad_score = grad_s - out
+
         return None, grad_score, None
 
 

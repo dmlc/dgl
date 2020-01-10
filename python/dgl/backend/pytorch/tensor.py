@@ -361,7 +361,7 @@ class BinaryReduce(th.autograd.Function):
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
     lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
     rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
     feat_shape = K.infer_binary_feature_shape(binary_op, lhs_data_nd, rhs_data_nd)
@@ -423,7 +423,8 @@ class CopyReduce(th.autograd.Function):
         return None, None, None, grad_in, None, None, None, None
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
     out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
     return CopyReduce.apply(reducer, graph, target, in_data, out_data, out_size, in_map, out_map)
 

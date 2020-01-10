@@ -29,7 +29,14 @@ class EdgeSoftmax(mx.autograd.Function):
         super(EdgeSoftmax, self).__init__()
         if not is_all(eids):
             g = g.edge_subgraph(eids.astype('int64'))
-        self.g = g
+        n_nodes = g.number_of_nodes()
+        n_edges = g.number_of_edges()
+        gi = g._graph.get_immutable_gidx(utils.to_dgl_context(score.device))
+
+        #self.g = g
+        self.n_nodes = n_nodes
+        self.n_edges = n_edges
+        self.gi = gi
 
     def forward(self, score):
         """Forward function.
@@ -45,14 +52,21 @@ class EdgeSoftmax(mx.autograd.Function):
             out = score / score_sum    # edge_div_dst, ret dgl.EData
             return out.data
         """
-        g = self.g.local_var()
-        g.edata['s'] = score
-        g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
-        g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
-        g.edata['out'] = g.edata['out'].exp()
-        g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
-        g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-        out = g.edata['out']
+        n_nodes = self.n_nodes
+        n_edges = self.n_edges
+        gi = self.gi
+
+        #g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
+        smax = F.copy_reduce('max', gi, TargetCode.EDGE, score, n_nodes)
+        #g.apply_edges(fn.e_sub_v('s', 'smax', 'out'))
+        out = F.binary_reduce(
+            'none', 'sub', gi, TargetCode.EDGE, TargetCode.DST, score, smax, n_edges)
+        #g.edata['out'] = th.exp(g.edata['out'])
+        out = out.exp()
+        #g.update_all(fn.copy_e('out', 'm'), fn.sum('m', 'out_sum'))
+        out_sum = F.copy_reduce('sum', gi, TargetCode.EDGE, out, n_nodes)
+        #g.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+        out = F.binary_reduce('none', 'div', gi, TargetCode.EDGE, TargetCode.DST, out, out_sum, n_edges)
         self.save_for_backward(out)
         return out
 
@@ -70,15 +84,21 @@ class EdgeSoftmax(mx.autograd.Function):
             sds_sum = sds.dst_sum()  # type dgl.NData
             grad_score = sds - sds * sds_sum  # multiple expressions
         """
-        g = self.g.local_var()
+        n_nodes = self.n_nodes
+        n_edges = self.n_edges
+        gi = self.gi
         out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
-        # clear saved tensors explicitly
-        self.saved_tensors = None
-        g.edata['out'] = out
-        g.edata['grad_score'] = out * grad_out
-        g.update_all(fn.copy_e('grad_score', 'm'), fn.sum('m', 'accum'))
-        g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
-        grad_score = g.edata['grad_score'] - g.edata['out']
+
+        #g.edata['grad_s'] = out * grad_out
+        grad_s = out * grad_out
+        #g.update_all(fn.copy_e('grad_s', 'm'), fn.sum('m', 'accum'))
+        accum = F.copy_reduce('sum', gi, TargetCode.EDGE, grad_s, n_nodes)
+        #g.apply_edges(fn.e_mul_v('out', 'accum', 'out'))
+        out = F.binary_reduce(
+            'none', 'mul', gi, TargetCode.EDGE, TargetCode.DST, out, accum, n_edges)
+        #grad_score = g.edata['grad_s'] - g.edata['out']
+        grad_score = grad_s - out
+
         return grad_score
 
 def edge_softmax(graph, logits, eids=ALL):
