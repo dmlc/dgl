@@ -16,20 +16,6 @@ def StrictRelationPartition(edges, n):
     idx = np.flip(np.argsort(cnts))
     cnts = cnts[idx]
     uniq = uniq[idx]
-    for i in range(10):
-        print("ID-{}/{}:{}".format(uniq[i], len(cnts), cnts[i]))
-
-    threashold = 10000000
-    num = 0
-    for i in range(len(uniq)):
-        cnt = cnts[i]
-        if cnt >= threashold:
-            num += 1
-        else:
-            print(">{}:{}".format(threashold, num))
-            threashold //= 10
-            num = 0
-    print(">{}:{}".format(threashold, num))
 
     assert cnts[0] > cnts[-1]
     edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
