@@ -102,8 +102,14 @@ BoolArray LT(IdArray lhs, dgl_id_t rhs);
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 /*! \brief Return the data under the index. In numpy notation, A[I] */
-int64_t IndexSelect(IdArray array, int64_t index);
-IdArray IndexSelect(IdArray array, IdArray index);
+// TODO: change IndexSelect implementation
+template<typename DType>
+DType IndexSelect(NDArray array, int64_t index);
+NDArray IndexSelect(NDArray array, IdArray index);
+
+/*! \brief Writes the data to the index: A[I] = b */
+template<typename DType>
+void IndexWrite(NDArray array, int64_t index, DType value);
 
 /*!
  * \brief Relabel the given ids to consecutive ids.

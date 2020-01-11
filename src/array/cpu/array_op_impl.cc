@@ -176,14 +176,16 @@ IdArray IndexSelect(IdArray array, IdArray index) {
 template IdArray IndexSelect<kDLCPU, int32_t>(IdArray, IdArray);
 template IdArray IndexSelect<kDLCPU, int64_t>(IdArray, IdArray);
 
-template <DLDeviceType XPU, typename IdType>
-int64_t IndexSelect(IdArray array, int64_t index) {
-  const IdType* data = static_cast<IdType*>(array->data);
+template <DLDeviceType XPU, typename DType>
+DType IndexSelect(NDArray array, int64_t index) {
+  const DType* data = static_cast<DType*>(array->data);
   return data[index];
 }
 
-template int64_t IndexSelect<kDLCPU, int32_t>(IdArray array, int64_t index);
-template int64_t IndexSelect<kDLCPU, int64_t>(IdArray array, int64_t index);
+template int32_t IndexSelect<kDLCPU, int32_t>(NDArray array, int64_t index);
+template int64_t IndexSelect<kDLCPU, int64_t>(NDArray array, int64_t index);
+template float IndexSelect<kDLCPU, float>(NDArray array, int64_t index);
+template double IndexSelect<kDLCPU, double>(NDArray array, int64_t index);
 
 ///////////////////////////// Relabel_ /////////////////////////////
 
