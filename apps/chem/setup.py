@@ -23,10 +23,11 @@ setup(
     ],
     zip_safe=False,
     maintainer='DGL Team',
-    packages=find_packages(),
+    packages=[package for package in find_packages()
+              if package.startswith('dglchem')],
     install_requires=[
         'dgl>=0.4',
-        'torch>=1.2.0',
+        'torch>=1'
         'scikit-learn>=0.21.2',
         'pandas>=0.25.1',
         'requests>=2.22.0'

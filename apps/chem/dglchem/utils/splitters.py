@@ -25,7 +25,6 @@ __all__ = ['ConsecutiveSplitter',
            'ScaffoldSplitter',
            'SingleTaskStratifiedSplitter']
 
-
 def base_k_fold_split(split_method, dataset, k, log):
     """Split dataset for k-fold cross validation.
 
@@ -60,10 +59,10 @@ def base_k_fold_split(split_method, dataset, k, log):
                                                        frac_test=1. - (i + 1) * frac_per_part)
         # For cross validation, each fold consists of only a train subset and
         # a validation subset.
-        train_set = Subset(dataset, train_set1.indices + train_set2.indices)
+        train_set = Subset(dataset, np.concatenate(
+            [train_set1.indices, train_set2.indices]).astype(np.int64))
         all_folds.append((train_set, val_set))
     return all_folds
-
 
 def train_val_test_sanity_check(frac_train, frac_val, frac_test):
     """Sanity check for train-val-test split
@@ -84,7 +83,6 @@ def train_val_test_sanity_check(frac_train, frac_val, frac_test):
     assert np.allclose(total_fraction, 1.), \
         'Expect the sum of fractions for training, validation and ' \
         'test to be 1, got {:.4f}'.format(total_fraction)
-
 
 def indices_split(dataset, frac_train, frac_val, frac_test, indices):
     """Reorder datapoints based on the specified indices and then take consecutive
@@ -119,7 +117,6 @@ def indices_split(dataset, frac_train, frac_val, frac_test, indices):
     return [Subset(dataset, list(indices[offset - length:offset]))
             for offset, length in zip(accumulate(lengths), lengths)]
 
-
 def count_and_log(message, i, total, log_every_n):
     """Print a message to reflect the progress of processing once a while.
 
@@ -139,7 +136,6 @@ def count_and_log(message, i, total, log_every_n):
     """
     if (log_every_n is not None) and ((i + 1) % log_every_n == 0):
         print('{} {:d}/{:d}'.format(message, i + 1, total))
-
 
 def prepare_mols(dataset, mols, sanitize, log_every_n=1000):
     """Prepare RDKit molecule instances.
@@ -185,7 +181,6 @@ def prepare_mols(dataset, mols, sanitize, log_every_n=1000):
             mols.append(Chem.MolFromSmiles(s, sanitize=sanitize))
 
     return mols
-
 
 class ConsecutiveSplitter(object):
     """Split datasets with the input order.
@@ -239,7 +234,6 @@ class ConsecutiveSplitter(object):
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
         return base_k_fold_split(ConsecutiveSplitter.train_val_test_split, dataset, k, log)
-
 
 class RandomSplitter(object):
     """Randomly reorder datasets and then split them.
@@ -313,7 +307,6 @@ class RandomSplitter(object):
         indices = np.random.RandomState(seed=random_state).permutation(len(dataset))
 
         return base_k_fold_split(partial(indices_split, indices=indices), dataset, k, log)
-
 
 class MolecularWeightSplitter(object):
     """Sort molecules based on their weights and then split them."""
@@ -437,7 +430,6 @@ class MolecularWeightSplitter(object):
 
         return base_k_fold_split(partial(indices_split, indices=sorted_indices), dataset, k,
                                  log=(log_every_n is not None))
-
 
 class ScaffoldSplitter(object):
     """Group molecules based on their Bemis-Murcko scaffolds and then split the groups.
@@ -640,7 +632,6 @@ class ScaffoldSplitter(object):
             all_folds.append((Subset(dataset, train_indices), Subset(dataset, val_indices)))
 
         return all_folds
-
 
 class SingleTaskStratifiedSplitter(object):
     """Splits the dataset by stratification on a single task.

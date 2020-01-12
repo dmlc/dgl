@@ -7,7 +7,6 @@ from dglchem.utils.rdkit_utils import get_mol_3D_coordinates, load_molecule
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-
 def test_get_mol_3D_coordinates():
     mol = Chem.MolFromSmiles('CCO')
     # Test the case when conformation does not exist
