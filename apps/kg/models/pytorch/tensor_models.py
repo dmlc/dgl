@@ -18,6 +18,11 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.nn.init as INIT
 
+import torch.multiprocessing as mp
+from torch.multiprocessing import Queue
+from _thread import start_new_thread
+from functools import wraps
+
 from .. import *
 
 logsigmoid = functional.logsigmoid
@@ -33,6 +38,56 @@ reshape = lambda arr, x, y: arr.view(x, y)
 
 cuda = lambda arr, gpu: arr.cuda(gpu)
 
+def thread_wrapped_func(func):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function
+
+@thread_wrapped_func
+def async_update(args, emb, queue):
+    th.set_num_threads(4)
+    while True:
+        (grad_indices, grad_values, gpu_id) = queue.get()
+        clr = emb.args.lr
+        if grad_indices is None:
+            return
+                
+        grad_sum = (grad_values * grad_values).mean(1)
+        device = emb.state_sum.device
+        if device != grad_indices.device:
+             grad_indices = grad_indices.to(device)
+        if device != grad_sum.device:
+            grad_sum = grad_sum.to(device)
+
+        emb.state_sum.index_add_(0, grad_indices, grad_sum)
+        std = emb.state_sum[grad_indices]  # _sparse_mask
+        if gpu_id >= 0:
+            std = std.cuda(gpu_id)
+        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+        tmp = (-clr * grad_values / std_values)
+        if tmp.device != device:
+            tmp = tmp.to(device)
+        # TODO(zhengda) the overhead is here.
+        emb.emb.index_add_(0, grad_indices, tmp)
+        
+
 class ExternalEmbedding:
     def __init__(self, args, num, dim, device):
         self.gpu = args.gpu
@@ -42,6 +97,8 @@ class ExternalEmbedding:
         self.emb = th.empty(num, dim, dtype=th.float32, device=device)
         self.state_sum = self.emb.new().resize_(self.emb.size(0)).zero_()
         self.state_step = 0
+        self.async_q = [None] * len(args.gpu)
+        self.async_p = [None] * len(args.gpu)
 
     def init(self, emb_init):
         INIT.uniform_(self.emb, -emb_init, emb_init)
@@ -69,13 +126,18 @@ class ExternalEmbedding:
         with th.no_grad():
             for idx, data in self.trace:
                 grad = data.grad.data
-
                 clr = self.args.lr
                 #clr = self.args.lr / (1 + (self.state_step - 1) * group['lr_decay'])
 
                 # the update is non-linear so indices must be unique
                 grad_indices = idx
                 grad_values = grad
+
+                if gpu_id >= 0 and self.async_q[gpu_id] is not None:
+                    grad_indices.share_memory_()
+                    grad_values.share_memory_()
+                    self.async_q[gpu_id].put((grad_indices, grad_values, gpu_id))
+                    continue
 
                 grad_sum = (grad_values * grad_values).mean(1)
                 device = self.state_sum.device
@@ -94,6 +156,16 @@ class ExternalEmbedding:
                 # TODO(zhengda) the overhead is here.
                 self.emb.index_add_(0, grad_indices, tmp)
         self.trace = []
+
+    def create_async_update(self, gpu_id=-1):
+        self.async_q[gpu_id] = Queue(1)
+        self.async_p[gpu_id] = mp.Process(target=async_update, args=(None, self, self.async_q[gpu_id]))
+        self.async_p[gpu_id].start()
+
+    def finish_async_update(self, gpu_id=-1):
+        self.async_q[gpu_id].put((None, None, None))
+        print('shoud end put')
+        self.async_p[gpu_id].join()
 
     def curr_emb(self):
         data = [data for _, data in self.trace]

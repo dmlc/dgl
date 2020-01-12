@@ -278,3 +278,9 @@ class KEModel(object):
     def load_relation(self, device=None):
         self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
         self.relation_emb.emb = F.copy_to(self.global_relation_emb.emb, device)
+
+    def create_async_update(self, gpu_id=-1):
+        self.entity_emb.create_async_update(gpu_id)
+
+    def finish_async_update(self, gpu_id=-1):
+        self.entity_emb.finish_async_update(gpu_id)
