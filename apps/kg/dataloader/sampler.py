@@ -113,17 +113,75 @@ class TrainDataset(object):
 
     def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
-        EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
-        return EdgeSampler(self.g,
+        return TrainSampler(self.g,
                            seed_edges=F.tensor(self.edge_parts[rank]),
                            batch_size=batch_size,
-                           neg_sample_size=int(neg_sample_size/neg_chunk_size),
+                           neg_sample_size=neg_sample_size,
                            chunk_size=neg_chunk_size,
                            negative_mode=mode,
-                           num_workers=num_workers,
-                           shuffle=shuffle,
-                           exclude_positive=exclude_positive,
-                           return_false_neg=False)
+                           num_workers=num_workers)
+
+
+class TrainSampler(object):
+    def __init__(self, g, seed_edges, batch_size, neg_sample_size, chunk_size, negative_mode, num_workers):
+        self.mode = negative_mode
+        self.neg_head = 'head' in negative_mode
+        self.g = g
+        self.edges = seed_edges
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.neg_chunk_size = chunk_size
+        self.neg_sample_size = neg_sample_size
+        self.sampler = None
+        self.copy_time = 0
+        self.c_sample_time = 0
+        self.shuffle_time = 0
+
+    def __iter__(self):
+        if self.sampler is not None:
+            self.c_sample_time += self.sampler.sample_time
+        start = time.time()
+        self.edges = F.rand_shuffle(self.edges)
+        self.etypes = self.g.edata['tid'][self.edges]
+        self.shuffle_time += time.time() - start
+        EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+        self.sampler = EdgeSampler(self.g,
+                                   batch_size=self.batch_size,
+                                   seed_edges=self.edges,
+                                   neg_sample_size=int(self.neg_sample_size/self.neg_chunk_size),
+                                   chunk_size=self.neg_chunk_size,
+                                   negative_mode=self.mode,
+                                   num_workers=self.num_workers,
+                                   shuffle=False,
+                                   exclude_positive=False,
+                                   return_false_neg=False)
+        self.sampler_iter = iter(self.sampler)
+        self.edge_off = 0
+        return self
+
+    @property
+    def sample_time(self):
+        if self.sampler is not None:
+            return self.c_sample_time + self.sampler.sample_time
+        else:
+            return self.c_sample_time
+
+    def __next__(self):
+        pos_g, neg_g = next(self.sampler_iter)
+        neg_g = create_neg_subgraph(pos_g, neg_g, self.neg_chunk_size, self.neg_sample_size, True,
+                                    self.neg_head, self.g.number_of_nodes())
+        if neg_g is None:
+            return pos_g, None
+
+        copy_start = time.time()
+        pos_g.ndata['id'] = pos_g.parent_nid
+        neg_g.ndata['id'] = neg_g.parent_nid
+        start = self.edge_off
+        end = self.edge_off + len(pos_g.parent_eid)
+        pos_g.edata['id'] = self.etypes[start:end]
+        self.edge_off = end
+        self.copy_time += time.time() - copy_start
+        return pos_g, neg_g
 
 
 class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
@@ -309,24 +367,24 @@ class NewBidirectionalOneShotIterator:
                                                     is_chunked, False, num_nodes)
         self.step = 0
         self.tot_sample_time = 0
-        self.tot_copy_time = 0
 
     def __next__(self):
         self.step += 1
         start = time.time()
         if self.step % 2 == 0:
-            pos_g, neg_g, copy_time = next(self.iterator_head)
+            pos_g, neg_g = next(self.iterator_head)
         else:
-            pos_g, neg_g, copy_time = next(self.iterator_tail)
+            pos_g, neg_g = next(self.iterator_tail)
         self.tot_sample_time += time.time() - start
-        self.tot_copy_time += copy_time
 
         if self.step % 1000 == 0:
             c_sample_time = self.sampler_head.sample_time + self.sampler_tail.sample_time
+            copy_time = self.sampler_head.copy_time + self.sampler_tail.copy_time
+            shuffle_time = self.sampler_head.shuffle_time + self.sampler_tail.shuffle_time
             #self.sampler_head.sample_time = 0
             #self.sampler_tail.sample_time = 0
-            print('sample {}: {:.3f} seconds, copy: {:.3f} seconds: c_sampler: {:.3f} seconds'.format(self.step, self.tot_sample_time,
-                self.tot_copy_time, c_sample_time))
+            print('sample {}: {:.3f} seconds, copy: {:.3f} seconds, c_sampler: {:.3f} seconds, shuffle: {:.3f} seconds'.format(
+                self.step, self.tot_sample_time, copy_time, c_sample_time, shuffle_time))
             #self.tot_sample_time = 0
             #self.tot_copy_time = 0
         return pos_g, neg_g
@@ -335,13 +393,7 @@ class NewBidirectionalOneShotIterator:
     def one_shot_iterator(dataloader, neg_chunk_size, neg_sample_size, is_chunked, neg_head, num_nodes):
         while True:
             for pos_g, neg_g in dataloader:
-                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, neg_sample_size, is_chunked,
-                                            neg_head, num_nodes)
                 if neg_g is None:
                     continue
 
-                start = time.time()
-                pos_g.ndata['id'] = pos_g.parent_nid
-                neg_g.ndata['id'] = neg_g.parent_nid
-                pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
-                yield pos_g, neg_g, time.time() - start
+                yield pos_g, neg_g
