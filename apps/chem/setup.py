@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'dgl>=0.4',
-        'torch>=1.2.0'
+        'torch>=1.2.0',
         'scikit-learn>=0.21.2',
         'pandas>=0.25.1',
         'requests>=2.22.0'
