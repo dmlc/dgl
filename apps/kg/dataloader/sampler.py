@@ -125,6 +125,14 @@ class TrainDataset(object):
                            negative_mode=mode,
                            num_workers=num_workers)
 
+def block_shuffle(edges, block_size):
+    num_blocks = int(len(edges) / block_size)
+    edges1 = edges[:(num_blocks*block_size)]
+    edges1 = edges1.reshape(num_blocks, block_size)
+    idx = np.random.permutation(num_blocks)
+    edges1[:] = edges1[idx]
+    return edges
+
 
 class TrainSampler(object):
     def __init__(self, g, seed_edges, batch_size, neg_sample_size, chunk_size, negative_mode, num_workers):
@@ -145,7 +153,7 @@ class TrainSampler(object):
         if self.sampler is not None:
             self.c_sample_time += self.sampler.sample_time
         start = time.time()
-        self.edges = F.rand_shuffle(self.edges)
+        self.edges = block_shuffle(self.edges, 4)
         self.etypes = self.g.edata['tid'][self.edges]
         self.shuffle_time += time.time() - start
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
