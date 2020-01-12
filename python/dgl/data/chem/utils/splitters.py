@@ -4,6 +4,7 @@ We mostly adapt them from deepchem
 (https://github.com/deepchem/deepchem/blob/master/deepchem/splits/splitters.py).
 """
 import numpy as np
+import warnings
 
 from collections import defaultdict
 from functools import partial
@@ -25,6 +26,17 @@ __all__ = ['ConsecutiveSplitter',
            'MolecularWeightSplitter',
            'ScaffoldSplitter',
            'SingleTaskStratifiedSplitter']
+
+def _deprecate(method):
+    """Print deprecation message.
+
+    Parameters
+    ----------
+    method : str
+        Name for splitting method.
+    """
+    warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5. '
+                  'Import it from dglchem.utils.splitters instead.'.format(method))
 
 def base_k_fold_split(split_method, dataset, k, log):
     """Split dataset for k-fold cross validation.
@@ -187,6 +199,7 @@ class ConsecutiveSplitter(object):
 
     The dataset is split without permutation, so the splitting is deterministic.
     """
+
     @staticmethod
     def train_val_test_split(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1):
         """Split the dataset into three consecutive chunks for training, validation and test.
@@ -211,6 +224,7 @@ class ConsecutiveSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
+        _deprecate('ConsecutiveSplitter')
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test], shuffle=False)
 
     @staticmethod
@@ -232,6 +246,7 @@ class ConsecutiveSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
+        _deprecate('ConsecutiveSplitter')
         return base_k_fold_split(ConsecutiveSplitter.train_val_test_split, dataset, k, log)
 
 class RandomSplitter(object):
@@ -271,6 +286,8 @@ class RandomSplitter(object):
         list of length 3
             Subsets for training, validation and test.
         """
+        _deprecate('RandomSplitter')
+
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test],
                              shuffle=True, random_state=random_state)
 
@@ -300,6 +317,8 @@ class RandomSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
+        _deprecate('RandomSplitter')
+
         # Permute the dataset only once so that each datapoint
         # will appear once in exactly one fold.
         indices = np.random.RandomState(seed=random_state).permutation(len(dataset))
@@ -330,6 +349,8 @@ class MolecularWeightSplitter(object):
             Indices specifying the order of datapoints, which are basically
             argsort of the molecular weights.
         """
+        _deprecate('MolecularWeightSplitter')
+
         if log_every_n is not None:
             print('Start computing molecular weights.')
         mws = []
@@ -381,6 +402,8 @@ class MolecularWeightSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
+        _deprecate('MolecularWeightSplitter')
+
         # Perform sanity check first as molecule instance initialization and descriptor
         # computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
@@ -422,6 +445,8 @@ class MolecularWeightSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
+        _deprecate('MolecularWeightSplitter')
+
         molecules = prepare_mols(dataset, mols, sanitize, log_every_n)
         sorted_indices = MolecularWeightSplitter.molecular_weight_indices(molecules, log_every_n)
 
@@ -439,6 +464,7 @@ class ScaffoldSplitter(object):
     Bemis, G. W.; Murcko, M. A. “The Properties of Known Drugs.
         1. Molecular Frameworks.” J. Med. Chem. 39:2887-93 (1996).
     """
+
     @staticmethod
     def get_ordered_scaffold_sets(molecules, include_chirality, log_every_n):
         """Group molecules based on their Bemis-Murcko scaffolds and
@@ -467,6 +493,8 @@ class ScaffoldSplitter(object):
             Each element of the list is a list of int,
             representing the indices of compounds with a same scaffold.
         """
+        _deprecate('ScaffoldSplitter')
+
         if log_every_n is not None:
             print('Start computing Bemis-Murcko scaffolds.')
         scaffolds = defaultdict(list)
@@ -541,6 +569,8 @@ class ScaffoldSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
+        _deprecate('ScaffoldSplitter')
+
         # Perform sanity check first as molecule related computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
         molecules = prepare_mols(dataset, mols, sanitize)
@@ -607,6 +637,8 @@ class ScaffoldSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
+        _deprecate('ScaffoldSplitter')
+
         assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
 
         molecules = prepare_mols(dataset, mols, sanitize)
@@ -674,6 +706,8 @@ class SingleTaskStratifiedSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
+        _deprecate('SingleTaskStratifiedSplitter')
+
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
 
         if random_state is not None:
@@ -732,6 +766,8 @@ class SingleTaskStratifiedSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
+        _deprecate('SingleTaskStratifiedSplitter')
+
         if not isinstance(labels, np.ndarray):
             labels = F.asnumpy(labels)
         task_labels = labels[:, task_id]
