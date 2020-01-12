@@ -21,6 +21,7 @@ import torch.nn.init as INIT
 import torch.multiprocessing as mp
 from torch.multiprocessing import Queue
 from _thread import start_new_thread
+import traceback
 from functools import wraps
 
 from .. import *
@@ -62,7 +63,7 @@ def thread_wrapped_func(func):
 
 @thread_wrapped_func
 def async_update(args, emb, queue):
-    th.set_num_threads(4)
+    th.set_num_threads(8)
     while True:
         (grad_indices, grad_values, gpu_id) = queue.get()
         clr = emb.args.lr
@@ -86,7 +87,6 @@ def async_update(args, emb, queue):
             tmp = tmp.to(device)
         # TODO(zhengda) the overhead is here.
         emb.emb.index_add_(0, grad_indices, tmp)
-        
 
 class ExternalEmbedding:
     def __init__(self, args, num, dim, device):
@@ -132,7 +132,6 @@ class ExternalEmbedding:
                 # the update is non-linear so indices must be unique
                 grad_indices = idx
                 grad_values = grad
-
                 if gpu_id >= 0 and self.async_q[gpu_id] is not None:
                     grad_indices.share_memory_()
                     grad_values.share_memory_()

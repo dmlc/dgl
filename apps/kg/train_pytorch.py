@@ -66,9 +66,9 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     else:
         gpu_id = -1
 
+    model.create_async_update(gpu_id)
     if args.strict_rel_part:
         model.prepare_relation(th.device('cuda:' + str(gpu_id)))
-    model.create_async_update(gpu_id)
 
     start = time.time()
     sample_time = 0
