@@ -10,14 +10,10 @@ from dgl.data.utils import split_dataset, Subset
 from collections import defaultdict
 from functools import partial
 from itertools import accumulate, chain
-
-try:
-    from rdkit import Chem
-    from rdkit.Chem import rdMolDescriptors
-    from rdkit.Chem.rdmolops import FastFindRings
-    from rdkit.Chem.Scaffolds import MurckoScaffold
-except ImportError:
-    pass
+from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.rdmolops import FastFindRings
+from rdkit.Chem.Scaffolds import MurckoScaffold
 
 __all__ = ['ConsecutiveSplitter',
            'RandomSplitter',

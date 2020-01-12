@@ -4,10 +4,10 @@ import warnings
 
 from functools import partial
 from multiprocessing import Pool
+from rdkit import Chem
+from rdkit.Chem import AllChem
 
 try:
-    from rdkit import Chem
-    from rdkit.Chem import AllChem
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
