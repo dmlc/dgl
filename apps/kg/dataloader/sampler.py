@@ -51,12 +51,16 @@ def RandomPartition(edges, n):
     heads, rels, tails = edges
     print('random partition {} edges into {} parts'.format(len(heads), n))
     idx = np.random.permutation(len(heads))
+    heads[:] = heads[idx]
+    rels[:] = rels[idx]
+    tails[:] = tails[idx]
+
     part_size = int(math.ceil(len(idx) / n))
     parts = []
     for i in range(n):
         start = part_size * i
         end = min(part_size * (i + 1), len(idx))
-        parts.append(idx[start:end])
+        parts.append(np.arange(start, end))
         print('part {} has {} edges'.format(i, len(parts[-1])))
     return parts
 
@@ -79,7 +83,6 @@ def ConstructGraph(edges, n_entities, args):
 class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
-        self.g = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
         if ranks > 1 and args.rel_part:
@@ -88,6 +91,7 @@ class TrainDataset(object):
             self.edge_parts = RandomPartition(triples, ranks)
         else:
             self.edge_parts = [np.arange(num_train)]
+        self.g = ConstructGraph(triples, dataset.n_entities, args)
         if weighting:
             # TODO: weight to be added
             count = self.count_freq(triples)
