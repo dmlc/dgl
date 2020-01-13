@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.keras import layers
 import networkx as nx
 import dgl
 import dgl.nn.tensorflow as nn
@@ -215,25 +216,44 @@ def test_partial_edge_softmax():
             g.add_edge(i, j)
 
     score = F.randn((300, 1))
-    score.requires_grad_()
     grad = F.randn((300, 1))
     import numpy as np
     eids = np.random.choice(900, 300, replace=False).astype('int64')
     eids = F.zerocopy_from_numpy(eids)
     # compute partial edge softmax
-    y_1 = nn.edge_softmax(g, score, eids)
-    y_1.backward(grad)
-    grad_1 = score.grad
-    score.grad.zero_()
+    with tf.GradientTape() as tape:
+        tape.watch(score)
+        y_1 = nn.edge_softmax(g, score, eids)
+        grads = tape.gradient(y_1, [score])
+    grad_1 = grads[0]
     # compute edge softmax on edge subgraph
     subg = g.edge_subgraph(eids)
-    y_2 = nn.edge_softmax(subg, score)
-    y_2.backward(grad)
-    grad_2 = score.grad
-    score.grad.zero_()
+    with tf.GradientTape() as tape:
+        tape.watch(score)
+        y_2 = nn.edge_softmax(subg, score)
+        grads = tape.gradient(y_2, [score])
+    grad_2 = grads[0]
 
     assert F.allclose(y_1, y_2)
     assert F.allclose(grad_1, grad_2)
+
+def test_glob_att_pool():
+    g = dgl.DGLGraph(nx.path_graph(10))
+
+    gap = nn.GlobalAttentionPooling(layers.Dense(1), layers.Dense(10))
+    print(gap)
+
+    # test#1: basic
+    h0 = F.randn((g.number_of_nodes(), 5))
+    h1 = gap(g, h0)
+    assert h1.shape[0] == 10 and h1.ndim == 1
+
+    # test#2: batched graph
+    bg = dgl.batch([g, g, g, g])
+    h0 = F.randn((bg.number_of_nodes(), 5))
+    h1 = gap(bg, h0)
+    assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
+
 
 def test_rgcn():
     etype = []
@@ -336,9 +356,9 @@ def test_gin_conv():
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
-    # test_partial_edge_softmax()
+    test_partial_edge_softmax()
     # test_set2set()
-    # test_glob_att_pool()
+    test_glob_att_pool()
     test_simple_pool()
     # test_set_trans()
     test_rgcn()

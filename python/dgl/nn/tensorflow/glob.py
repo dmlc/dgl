@@ -10,7 +10,7 @@ from ...batched_graph import sum_nodes, mean_nodes, max_nodes, \
 
 
 __all__ = ['SumPooling', 'AvgPooling',
-           'MaxPooling', 'SortPooling', 'WeightAndSum']
+           'MaxPooling', 'SortPooling', 'WeightAndSum', 'GlobalAttentionPooling']
 
 
 class SumPooling(layers.Layer):
@@ -252,7 +252,7 @@ class WeightAndSum(layers.Layer):
         """
         with bg.local_scope():
             bg.ndata['h'] = feats
-            bg.ndata['w'] = tself.atom_weighting(bg.ndata['h'])
+            bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
             h_g_sum = sum_nodes(bg, 'h', 'w')
 
         return h_g_sum

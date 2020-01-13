@@ -11,7 +11,7 @@ __all__ = ['edge_softmax']
 def edge_softmax_real(graph, score, eids=ALL):
     """Edge Softmax function"""
     if not is_all(eids):
-        graph = graph.edge_subgraph(eids.long())
+        graph = graph.edge_subgraph(tf.cast(eids, tf.int64))
     g = graph.local_var()
     g.edata['s'] = score
     g.update_all(fn.copy_e('s', 'm'), fn.max('m', 'smax'))
