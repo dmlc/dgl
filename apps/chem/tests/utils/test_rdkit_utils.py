@@ -27,13 +27,16 @@ def remove_dir(dir):
             pass
 
 def test_load_molecule():
+    remove_dir('tmp1')
+    remove_dir('tmp2')
+
     url = _get_dgl_url('dglchem/example_mols.tar.gz')
     local_path = 'tmp1/example_mols.tar.gz'
     download(url, path=local_path)
     extract_archive(local_path, 'tmp2')
 
-    load_molecule('tmp2/example_mols/example.mol2', use_conformation=False)
-    load_molecule('tmp2/example_mols/example.sdf', sanitize=True)
+    load_molecule('tmp2/example_mols/example.sdf')
+    load_molecule('tmp2/example_mols/example.mol2', use_conformation=False, sanitize=True)
     load_molecule('tmp2/example_mols/example.pdbqt', calc_charges=True)
     mol, _ = load_molecule('tmp2/example_mols/example.pdb', remove_hs=True)
     assert mol.GetNumAtoms() == mol.GetNumHeavyAtoms()

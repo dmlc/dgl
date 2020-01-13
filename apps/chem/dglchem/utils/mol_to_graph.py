@@ -1,15 +1,13 @@
 """Convert molecules into DGLGraphs."""
 import numpy as np
-import warnings
 
+from dgl import DGLGraph
 from functools import partial
-
-from .... import DGLGraph
+from rdkit import Chem
+from rdkit.Chem import rdmolfiles, rdmolops
 
 try:
     import mdtraj
-    from rdkit import Chem
-    from rdkit.Chem import rdmolfiles, rdmolops
 except ImportError:
     pass
 
@@ -19,17 +17,6 @@ __all__ = ['mol_to_graph',
            'smiles_to_complete_graph',
            'mol_to_complete_graph',
            'k_nearest_neighbors']
-
-def _deprecate(func):
-    """Print deprecation message.
-
-    Parameters
-    ----------
-    func : str
-        Name for deprecated function.
-    """
-    warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5.  \
-                  Import it from dglchem.utils.mol_to_graph instead.'.format(func))
 
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
@@ -52,8 +39,6 @@ def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     g : DGLGraph
         Converted DGLGraph for the molecule
     """
-    _deprecate('mol_to_graph')
-
     new_order = rdmolfiles.CanonicalRankAtoms(mol)
     mol = rdmolops.RenumberAtoms(mol, new_order)
     g = graph_constructor(mol)
@@ -139,8 +124,6 @@ def mol_to_bigraph(mol, add_self_loop=False,
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
     """
-    _deprecate('mol_to_bigraph')
-
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer)
 
@@ -167,8 +150,6 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
     """
-    _deprecate('smiles_to_bigraph')
-
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_bigraph(mol, add_self_loop, node_featurizer, edge_featurizer)
 
@@ -233,8 +214,6 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     g : DGLGraph
         Complete DGLGraph for the molecule
     """
-    _deprecate('mol_to_complete_graph')
-
     return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer)
 
@@ -261,13 +240,15 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
     g : DGLGraph
         Complete DGLGraph for the molecule
     """
-    _deprecate('smiles_to_complete_graph')
-
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_complete_graph(mol, add_self_loop, node_featurizer, edge_featurizer)
 
 def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
-    """Find k nearest neighbors for each atom based on the 3D coordinates.
+    """Find k nearest neighbors for each atom based on the 3D coordinates and
+    return the resulted edges.
+
+    For each atom, find its k nearest neighbors and return edges
+    from these neighbors to it.
 
     Parameters
     ----------
@@ -281,8 +262,6 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
 
     Returns
     -------
-    Returns
-    -------
     srcs : list of int
         Source nodes.
     dsts : list of int
@@ -290,8 +269,6 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
     distances : list of float
         Distances between the end nodes.
     """
-    _deprecate('k_nearest_neighbors')
-
     num_atoms = coordinates.shape[0]
     traj = mdtraj.Trajectory(coordinates.reshape((1, num_atoms, 3)), None)
     neighbors = mdtraj.geometry.compute_neighborlist(traj, neighbor_cutoff)
@@ -312,3 +289,5 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
             distances.extend(dist.tolist())
 
     return srcs, dsts, distances
+
+# Todo(Mufei): smiles_to_knn_graph, mol_to_knn_graph
