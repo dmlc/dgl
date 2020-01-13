@@ -26,16 +26,9 @@ std::pair<IdArray, TypeArray> RandomWalk(
   CHECK_IDARRAY(etypes, 1);
   CHECK_FLOATARRAY(prob, 1);
 
-  int64_t num_seeds = seeds->shape[0];
-  int64_t trace_length = etypes->shape[0] + 1;
-
   std::pair<IdArray, TypeArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(seeds->dtype, Idx, {
-      ATEN_ID_TYPE_SWITCH(etypes->dtype, Type, {
-        result = impl::RandomWalk<XPU, Idx, Type>(hg, seeds, etypes, prob);
-      });
-    });
+    result = impl::RandomWalkImpl<XPU>(hg, seeds, etypes, prob);
   });
 
   return result;
