@@ -114,6 +114,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='enable relation partitioning')
         self.add_argument('--strict_rel_part', action='store_true',
                           help='enable strict relation partitioning')
+        self.add_argument('--async_update', action='store_true',
+                          help='allow async_update on node embedding')
 
 
 def get_logger(args):

@@ -32,11 +32,8 @@ def get_device(args):
     return th.device('cpu') if args.gpu[0] < 0 else th.device('cuda:' + str(args.gpu[0]))
 
 norm = lambda x, p: x.norm(p=p)**p
-
 get_scalar = lambda x: x.detach().item()
-
 reshape = lambda arr, x, y: arr.view(x, y)
-
 cuda = lambda arr, gpu: arr.cuda(gpu)
 
 def thread_wrapped_func(func):
@@ -69,24 +66,23 @@ def async_update(args, emb, queue):
         clr = emb.args.lr
         if grad_indices is None:
             return
-                
-        grad_sum = (grad_values * grad_values).mean(1)
-        device = emb.state_sum.device
-        if device != grad_indices.device:
-             grad_indices = grad_indices.to(device)
-        if device != grad_sum.device:
-            grad_sum = grad_sum.to(device)
+        with th.no_grad():
+            grad_sum = (grad_values * grad_values).mean(1)
+            device = emb.state_sum.device
+            if device != grad_indices.device:
+                grad_indices = grad_indices.to(device)
+            if device != grad_sum.device:
+                grad_sum = grad_sum.to(device)
 
-        emb.state_sum.index_add_(0, grad_indices, grad_sum)
-        std = emb.state_sum[grad_indices]  # _sparse_mask
-        if gpu_id >= 0:
-            std = std.cuda(gpu_id)
-        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-        tmp = (-clr * grad_values / std_values)
-        if tmp.device != device:
-            tmp = tmp.to(device)
-        # TODO(zhengda) the overhead is here.
-        emb.emb.index_add_(0, grad_indices, tmp)
+            emb.state_sum.index_add_(0, grad_indices, grad_sum)
+            std = emb.state_sum[grad_indices]  # _sparse_mask
+            if gpu_id >= 0:
+                std = std.cuda(gpu_id)
+            std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+            tmp = (-clr * grad_values / std_values)
+            if tmp.device != device:
+                tmp = tmp.to(device)
+            emb.emb.index_add_(0, grad_indices, tmp)
 
 class ExternalEmbedding:
     def __init__(self, args, num, dim, device):
@@ -97,8 +93,8 @@ class ExternalEmbedding:
         self.emb = th.empty(num, dim, dtype=th.float32, device=device)
         self.state_sum = self.emb.new().resize_(self.emb.size(0)).zero_()
         self.state_step = 0
-        self.async_q = [None] * len(args.gpu)
-        self.async_p = [None] * len(args.gpu)
+        self.async_q = None
+        self.async_p = None
 
     def init(self, emb_init):
         INIT.uniform_(self.emb, -emb_init, emb_init)
@@ -132,39 +128,37 @@ class ExternalEmbedding:
                 # the update is non-linear so indices must be unique
                 grad_indices = idx
                 grad_values = grad
-                if gpu_id >= 0 and self.async_q[gpu_id] is not None:
+                if self.async_q is not None:
                     grad_indices.share_memory_()
                     grad_values.share_memory_()
-                    self.async_q[gpu_id].put((grad_indices, grad_values, gpu_id))
-                    continue
-
-                grad_sum = (grad_values * grad_values).mean(1)
-                device = self.state_sum.device
-                if device != grad_indices.device:
-                    grad_indices = grad_indices.to(device)
-                if device != grad_sum.device:
-                    grad_sum = grad_sum.to(device)
-                self.state_sum.index_add_(0, grad_indices, grad_sum)
-                std = self.state_sum[grad_indices]  # _sparse_mask
-                if gpu_id >= 0:
-                    std = std.cuda(gpu_id)
-                std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-                tmp = (-clr * grad_values / std_values)
-                if tmp.device != device:
-                    tmp = tmp.to(device)
-                # TODO(zhengda) the overhead is here.
-                self.emb.index_add_(0, grad_indices, tmp)
+                    self.async_q.put((grad_indices, grad_values, gpu_id))
+                else:
+                    grad_sum = (grad_values * grad_values).mean(1)
+                    device = self.state_sum.device
+                    if device != grad_indices.device:
+                        grad_indices = grad_indices.to(device)
+                    if device != grad_sum.device:
+                        grad_sum = grad_sum.to(device)
+                    self.state_sum.index_add_(0, grad_indices, grad_sum)
+                    std = self.state_sum[grad_indices]  # _sparse_mask
+                    if gpu_id >= 0:
+                        std = std.cuda(gpu_id)
+                    std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+                    tmp = (-clr * grad_values / std_values)
+                    if tmp.device != device:
+                        tmp = tmp.to(device)
+                    # TODO(zhengda) the overhead is here.
+                    self.emb.index_add_(0, grad_indices, tmp)
         self.trace = []
 
     def create_async_update(self, gpu_id=-1):
-        self.async_q[gpu_id] = Queue(1)
-        self.async_p[gpu_id] = mp.Process(target=async_update, args=(None, self, self.async_q[gpu_id]))
-        self.async_p[gpu_id].start()
+        self.async_q = Queue(1)
+        self.async_p = mp.Process(target=async_update, args=(None, self, self.async_q))
+        self.async_p.start()
 
     def finish_async_update(self, gpu_id=-1):
-        self.async_q[gpu_id].put((None, None, None))
-        print('shoud end put')
-        self.async_p[gpu_id].join()
+        self.async_q.put((None, None, None))
+        self.async_p.join()
 
     def curr_emb(self):
         data = [data for _, data in self.trace]

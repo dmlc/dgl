@@ -102,6 +102,7 @@ def main(args):
     args.test = True
     args.rel_part = False
     args.strict_rel_part = False
+    args.async_update = False
     args.batch_size_eval = args.batch_size
 
     logger = get_logger(args)
