@@ -276,7 +276,7 @@ def load_cora_data():
     data = citegrh.load_cora()
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
-    mask = torch.ByteTensor(data.train_mask)
+    mask = torch.BoolTensor(data.train_mask)
     g = data.graph
     # add self loop
     g.remove_edges_from(nx.selfloop_edges(g))
