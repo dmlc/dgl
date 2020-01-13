@@ -45,6 +45,16 @@ def RelationPartition(edges, n):
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+
     return parts, rel_parts
 
 def RandomPartition(edges, n):
