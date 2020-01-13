@@ -108,8 +108,8 @@ def load_cora_data():
     data = citegrh.load_cora()
     features = th.FloatTensor(data.features)
     labels = th.LongTensor(data.labels)
-    train_mask = th.ByteTensor(data.train_mask)
-    test_mask = th.ByteTensor(data.test_mask)
+    train_mask = th.BoolTensor(data.train_mask)
+    test_mask = th.BoolTensor(data.test_mask)
     g = data.graph
     # add self loop
     g.remove_edges_from(nx.selfloop_edges(g))
