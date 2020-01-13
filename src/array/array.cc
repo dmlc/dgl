@@ -201,24 +201,37 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
-IdArray IndexSelect(IdArray array, IdArray index) {
-  IdArray ret;
+NDArray IndexSelect(NDArray array, IdArray index) {
+  NDArray ret;
+  // TODO: check if array and index match in context
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::IndexSelect<XPU, IdType>(array, index);
+    ATEN_DTYPE_SWITCH(array->dtype, DType, {
+      ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+        ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
+      });
     });
   });
   return ret;
 }
 
-int64_t IndexSelect(IdArray array, int64_t index) {
-  int64_t ret = 0;
+template<typename ValueType>
+ValueType IndexSelect(NDArray array, int64_t index) {
+  ValueType ret = 0;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::IndexSelect<XPU, IdType>(array, index);
+    ATEN_DTYPE_SWITCH(array->dtype, DType, {
+      ret = impl::IndexSelect<XPU, DType>(array, index);
     });
   });
   return ret;
+}
+
+template<typename ValueType>
+void Assign(NDArray array, int64_t index, ValueType value) {
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, {
+      impl::Assign<XPU, DType>(array, index, static_cast<DType>(value));
+    });
+  });
 }
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {

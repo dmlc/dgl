@@ -34,11 +34,14 @@ IdArray BinaryElewise(IdType lhs, IdArray rhs);
 template <DLDeviceType XPU, typename IdType>
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-template <DLDeviceType XPU, typename IdType>
-IdArray IndexSelect(IdArray array, IdArray index);
+template <DLDeviceType XPU, typename DType, typename IdType>
+NDArray IndexSelect(NDArray array, IdArray index);
 
-template <DLDeviceType XPU, typename IdType>
-int64_t IndexSelect(IdArray array, int64_t index);
+template <DLDeviceType XPU, typename DType>
+int64_t IndexSelect(NDArray array, int64_t index);
+
+template <DLDeviceType XPU, typename DType>
+void Assign(NDArray array, int64_t index, DType value);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);

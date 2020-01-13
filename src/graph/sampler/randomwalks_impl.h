@@ -36,8 +36,8 @@ int64_t RandomWalkOneSeed(
   dgl_id_t curr_id = seed;
   int64_t i = 0;
 
-  IndexWrite(vtypes, 0, curr_type);
-  IndexWrite(vids, 0, curr_id);
+  Assign(vtypes, 0, curr_type);
+  Assign(vids, 0, curr_id);
 
   // Perform random walk
   for (; i < num_etypes; ++i) {
@@ -69,8 +69,8 @@ int64_t RandomWalkOneSeed(
     curr_id = IndexSelect(succs, RandomEngine::ThreadLocal()->RandInt(size));
     curr_type = dsttype;
 
-    IndexWrite(vtypes, i + 1, curr_type);
-    IndexWrite(vids, i + 1, curr_id);
+    Assign(vtypes, i + 1, curr_type);
+    Assign(vids, i + 1, curr_id);
 
     double p = RandomEngine::ThreadLocal()->Uniform();
     if (p < restart_prob):
@@ -80,8 +80,8 @@ int64_t RandomWalkOneSeed(
   int64_t len = i;  // record and return number of hops jumped
   // pad
   for (; i < num_etypes; ++i) {
-    IndexWrite(vtypes, i + 1, -1);
-    IndexWrite(vids, i + 1, -1);
+    Assign(vtypes, i + 1, -1);
+    Assign(vids, i + 1, -1);
   }
 
   return len;

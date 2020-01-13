@@ -45,6 +45,24 @@ namespace aten {
   }                                                           \
 } while (0)
 
+#define ATEN_DTYPE_SWITCH(val, DType, ...) do {            \
+  if ((val).code == kDLInt && (val).bits == 32) {             \
+    typedef int32_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLInt && (val).bits == 64) {      \
+    typedef int64_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 32) {    \
+    typedef float DType;                                      \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 64) {    \
+    typedef double DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << "ID can only be int32, int64, float32 or float64"; \
+  }                                                           \
+} while (0)
+
 #define ATEN_CSR_DTYPE_SWITCH(val, DType, ...) do {         \
   if ((val).code == kDLInt && (val).bits == 32) {           \
     typedef int32_t DType;                                  \
