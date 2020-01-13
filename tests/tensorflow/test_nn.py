@@ -24,13 +24,13 @@ def test_graph_conv():
     # conv = conv
     print(conv)
     # test#1: basic
-    h0 = F.ones((3, 5))
+    h0 = tf.ones((3, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert F.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
     # test#2: more-dim
-    h0 = F.ones((3, 5, 5))
+    h0 = tf.ones((3, 5, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
@@ -39,12 +39,12 @@ def test_graph_conv():
     conv = nn.GraphConv(5, 2)
     # conv = conv
     # test#3: basic
-    h0 = F.ones((3, 5))
+    h0 = tf.ones((3, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
-    h0 = F.ones((3, 5, 5))
+    h0 = tf.ones((3, 5, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
@@ -52,12 +52,12 @@ def test_graph_conv():
     conv = nn.GraphConv(5, 2)
     # conv = conv
     # test#3: basic
-    h0 = F.ones((3, 5))
+    h0 = tf.ones((3, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     # test#4: basic
-    h0 = F.ones((3, 5, 5))
+    h0 = tf.ones((3, 5, 5))
     h1 = conv(g, h0)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
@@ -140,14 +140,14 @@ def uniform_attention(g, shape):
 def test_edge_softmax():
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
-    edata = F.ones((g.number_of_edges(), 1))
+    edata = tf.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
     assert F.allclose(a, uniform_attention(g, a.shape))
 
     # Test higher dimension case
-    edata = F.ones((g.number_of_edges(), 3, 1))
+    edata = tf.ones((g.number_of_edges(), 3, 1))
     a = nn.edge_softmax(g, edata)
     assert len(g.ndata) == 0
     assert len(g.edata) == 0
