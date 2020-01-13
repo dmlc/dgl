@@ -58,7 +58,6 @@ class ExternalEmbedding:
         # During the training, we need to trace the computation.
         # In this case, we need to record the computation path and compute the gradients.
         if trace:
-            # TODO is this the right thing to do?
             data = s.clone().detach().requires_grad_(True)
             self.trace.append((idx, data))
         else:
