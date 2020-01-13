@@ -43,7 +43,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         gpu_id = -1
 
     if args.async_update:
-        model.create_async_update(gpu_id)
+        model.create_async_update()
     if args.strict_rel_part:
         model.prepare_relation(th.device('cuda:' + str(gpu_id)))
 
@@ -92,7 +92,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             print('test:', time.time() - start)
 
     if args.async_update:
-        model.finish_async_update(gpu_id)
+        model.finish_async_update()
     if args.strict_rel_part:
         model.writeback_relation(gpu_id, rel_parts)
 

@@ -151,12 +151,12 @@ class ExternalEmbedding:
                     self.emb.index_add_(0, grad_indices, tmp)
         self.trace = []
 
-    def create_async_update(self, gpu_id=-1):
+    def create_async_update(self):
         self.async_q = Queue(1)
         self.async_p = mp.Process(target=async_update, args=(None, self, self.async_q))
         self.async_p.start()
 
-    def finish_async_update(self, gpu_id=-1):
+    def finish_async_update(self):
         self.async_q.put((None, None, None))
         self.async_p.join()
 
