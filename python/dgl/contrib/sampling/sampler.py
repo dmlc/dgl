@@ -1,6 +1,5 @@
 """This file contains NodeFlow samplers."""
 
-import time
 import sys
 import numpy as np
 import threading
@@ -709,8 +708,6 @@ class EdgeSampler(object):
                 self._return_false_neg,
                 self._relations,
                 self._chunk_size)
-        self.sample_time = 0
-        self.sample_num = 0
 
     def fetch(self, current_index):
         '''
@@ -732,16 +729,10 @@ class EdgeSampler(object):
             If return_false_neg is specified as True, the true negative edges and 
             false negative edges in neg_subg is identified in neg_subg.edata['false_neg'].
         '''
-        start = time.time()
         if self._is_uniform:
             subgs = _CAPI_FetchUniformEdgeSample(self._sampler)
         else:
             subgs = _CAPI_FetchWeightedEdgeSample(self._sampler)
-        self.sample_time += time.time() - start
-        self.sample_num += 1
-        #if (self.sample_num + 1) % 100 == 0:
-        #    print('sample takes {:.3f} seconds, {} samples'.format(self.sample_time, self.sample_num))
-        #    self.sample_time = 0
 
         if len(subgs) == 0:
             return []
