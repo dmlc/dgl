@@ -31,24 +31,10 @@ RelGraphConv
     :members: forward
     :show-inheritance:
     
-TAGConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.TAGConv
-    :members: forward
-    :show-inheritance:
-    
 GATConv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: dgl.nn.tensorflow.conv.GATConv
-    :members: forward
-    :show-inheritance:
-    
-EdgeConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.EdgeConv
     :members: forward
     :show-inheritance:
     
@@ -80,72 +66,7 @@ GINConv
     :members: forward
     :show-inheritance:
     
-GatedGraphConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: dgl.nn.tensorflow.conv.GatedGraphConv
-    :members: forward
-    :show-inheritance:
-    
-GMMConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.GMMConv
-    :members: forward
-    :show-inheritance:
-    
-ChebConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.ChebConv
-    :members: forward
-    :show-inheritance:
-    
-AGNNConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.AGNNConv
-    :members: forward
-    :show-inheritance:
-    
-NNConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.NNConv
-    :members: forward
-    :show-inheritance:
-
-AtomicConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.AtomicConv
-    :members: forward
-    :show-inheritance:
-    
-Dense Conv Layers
-----------------------------------------
-
-DenseGraphConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.DenseGraphConv
-    :members: forward
-    :show-inheritance:
-    
-DenseSAGEConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.DenseSAGEConv
-    :members: forward
-    :show-inheritance:
-    
-DenseChebConv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.conv.DenseChebConv
-    :members: forward
-    :show-inheritance:
-    
 Global Pooling Layers 
 ----------------------------------------
 
@@ -185,51 +106,10 @@ GlobalAttentionPooling
 .. autoclass:: dgl.nn.tensorflow.glob.GlobalAttentionPooling
     :members:
     :show-inheritance:
-    
-Set2Set
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: dgl.nn.tensorflow.glob.Set2Set
-    :members: forward
-    :show-inheritance:
-    
-SetTransformerEncoder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.glob.SetTransformerEncoder
-    :members:
-    :show-inheritance:
-    
-SetTransformerDecoder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.glob.SetTransformerDecoder
-    :members:
-    :show-inheritance:
     
 Utility Modules
 ----------------------------------------
-
-Sequential
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.utils.Sequential
-    :members:
-    :show-inheritance:
-
-KNNGraph
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.factory.KNNGraph
-    :members:
-    :show-inheritance:
-    
-SegmentedKNNGraph
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: dgl.nn.tensorflow.factory.SegmentedKNNGraph
-    :members:
-    :show-inheritance:
     
 Edge Softmax
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
