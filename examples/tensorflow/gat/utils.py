@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 class EarlyStopping:
     def __init__(self, patience=10):
