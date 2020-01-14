@@ -112,6 +112,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--strict_rel_part', action='store_true',
+                          help='enable strict relation partitioning')
+        self.add_argument('--async_update', action='store_true',
+                          help='allow async_update on node embedding')
 
 
 def get_logger(args):
@@ -298,7 +302,7 @@ def run(args, logger):
     if args.num_proc > 1:
         procs = []
         for i in range(args.num_proc):
-            rel_parts = train_data.rel_parts if args.rel_part else None
+            rel_parts = train_data.rel_parts if args.rel_part or args.strict_rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
             proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers))
             procs.append(proc)

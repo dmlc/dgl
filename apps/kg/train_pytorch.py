@@ -3,9 +3,7 @@ from models import KEModel
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
-import torch.multiprocessing as mp
-from torch.multiprocessing import Queue
-from _thread import start_new_thread
+from models.pytorch.tensor_models import thread_wrapped_func
 
 from distutils.version import LooseVersion
 TH_VERSION = LooseVersion(th.__version__)
@@ -16,28 +14,6 @@ import os
 import logging
 import time
 from functools import wraps
-
-def thread_wrapped_func(func):
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        queue = Queue()
-        def _queue_result():
-            exception, trace, res = None, None, None
-            try:
-                res = func(*args, **kwargs)
-            except Exception as e:
-                exception = e
-                trace = traceback.format_exc()
-            queue.put((res, exception, trace))
-
-        start_new_thread(_queue_result, ())
-        result, exception, trace = queue.get()
-        if exception is None:
-            return result
-        else:
-            assert isinstance(exception, Exception)
-            raise exception.__class__(trace)
-    return decorated_function
 
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
     model = KEModel(args, args.model_name, n_entities, n_relations,
@@ -65,6 +41,11 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
+
+    if args.async_update:
+        model.create_async_update()
+    if args.strict_rel_part:
+        model.prepare_relation(th.device('cuda:' + str(gpu_id)))
 
     train_start = start = time.time()
     sample_time = 0
@@ -112,6 +93,11 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             print('test:', time.time() - start)
     print('train {} takes {:.3f} seconds'.format(rank, time.time() - train_start))
 
+    if args.async_update:
+        model.finish_async_update()
+    if args.strict_rel_part:
+        model.writeback_relation(gpu_id, rel_parts)
+
 @thread_wrapped_func
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     if args.num_proc > 1:
@@ -121,6 +107,9 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
+
+    if args.strict_rel_part:
+        model.load_relation(th.device('cuda:' + str(gpu_id)))
 
     with th.no_grad():
         logs = []

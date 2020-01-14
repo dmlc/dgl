@@ -47,7 +47,11 @@ class KEModel(object):
             rel_dim = relation_dim
 
         self.rel_dim = rel_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
+        self.strict_rel_part = args.strict_rel_part
+        if not self.strict_rel_part:
+            self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
+        else:
+            self.global_relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -76,11 +80,17 @@ class KEModel(object):
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
         self.entity_emb.share_memory()
-        self.relation_emb.share_memory()
+        if not self.strict_rel_part:
+            self.relation_emb.share_memory()
+        else:
+            self.global_relation_emb.share_memory()
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
-        self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        if not self.strict_rel_part:
+            self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        else:
+            self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
         self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):
@@ -91,7 +101,8 @@ class KEModel(object):
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
         self.score_func.reset_parameters()
-        self.relation_emb.init(self.emb_init)
+        if not self.strict_rel_part:
+            self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
         self.score_func(g)
@@ -252,3 +263,24 @@ class KEModel(object):
         self.relation_emb.update(gpu_id)
         self.score_func.update(gpu_id)
 
+    def prepare_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
+        self.relation_emb.init(self.emb_init)
+
+    def writeback_relation(self, rank=0, rel_parts=None):
+        # rel_parts is None: All in one partition
+        if rel_parts is None:
+            self.global_relation_emb.emb = F.copy_to(self.relation_emb.emb, F.cpu())
+        else:
+            idx = rel_parts[rank]
+            self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
+
+    def load_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
+        self.relation_emb.emb = F.copy_to(self.global_relation_emb.emb, device)
+
+    def create_async_update(self):
+        self.entity_emb.create_async_update()
+
+    def finish_async_update(self):
+        self.entity_emb.finish_async_update()
