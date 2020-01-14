@@ -26,10 +26,10 @@ inline uint32_t GetThreadId() {
 
   auto result = set.find(hash);
   if (result != set.end())
-    return result.second;
+    return result->second;
 
   std::lock_guard<std::mutex> guard(mutex);
-  uint32_t id = set.size() - 1;
+  uint32_t id = set.size();
   set[hash] = id;
   return id;
 }
