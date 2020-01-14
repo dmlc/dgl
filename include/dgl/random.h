@@ -7,6 +7,7 @@
 #ifndef DGL_RANDOM_H_
 #define DGL_RANDOM_H_
 
+#include <dgl/array.h>
 #include <dmlc/thread_local.h>
 #include <dmlc/logging.h>
 #include <random>

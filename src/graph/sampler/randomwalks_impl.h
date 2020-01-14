@@ -4,6 +4,10 @@
  * \brief DGL sampler templated implementation of random walks
  */
 
+#include <dgl/base_heterograph.h>
+#include <dgl/array.h>
+#include <dgl/random.h>
+
 namespace dgl {
 
 namespace sampling {

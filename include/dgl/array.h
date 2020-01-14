@@ -18,12 +18,15 @@ namespace dgl {
 
 typedef uint64_t dgl_id_t;
 typedef uint64_t dgl_type_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-typedef dgl::runtime::NDArray FloatArray;
-typedef dgl::runtime::NDArray TypeArray;
+
+using dgl::runtime::NDArray;
+
+typedef NDArray IdArray;
+typedef NDArray DegreeArray;
+typedef NDArray BoolArray;
+typedef NDArray IntArray;
+typedef NDArray FloatArray;
+typedef NDArray TypeArray;
 
 namespace aten {
 
@@ -300,6 +303,25 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }
   return ret.CopyTo(ctx);
 }
+
+template<typename T>
+NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx) {
+  int64_t size = static_cast<int64_t>(vec.size());
+  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
+  std::copy(vec.begin(), vec.end(), static_cast<T *>(ret->data));
+  return ret.CopyTo(ctx);
+}
+
+#define GEN_VEC_TO_NDARRAY_FOR(T, DTypeCode, DTypeBits) \
+  template<> \
+  NDArray VecToNDArray<T>(const std::vector<T> &vec, DLContext ctx) { \
+    return VecToNDArray(vec, DLDataType{DTypeCode, DTypeBits, 1}, ctx); \
+  }
+
+GEN_VEC_TO_NDARRAY_FOR(int32_t, kDLInt, 32);
+GEN_VEC_TO_NDARRAY_FOR(int64_t, kDLInt, 64);
+GEN_VEC_TO_NDARRAY_FOR(float, kDLFloat, 32);
+GEN_VEC_TO_NDARRAY_FOR(double, kDLFloat, 64);
 
 }  // namespace aten
 }  // namespace dgl
