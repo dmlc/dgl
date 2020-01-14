@@ -11,6 +11,7 @@
 #include <dmlc/logging.h>
 #include <random>
 #include <thread>
+#include <mutex>
 
 namespace dgl {
 
@@ -18,7 +19,19 @@ namespace {
 
 inline uint32_t GetThreadId() {
   static std::hash<std::thread::id> kThreadIdHasher;
-  return kThreadIdHasher(std::this_thread::get_id());
+  static std::vector<uint32_t> set;
+  static std::mutex mutex;
+
+  uint32_t hash = kThreadIdHasher(std::this_thread::get_id());
+
+  for (int i = 0; i < set.size(); ++i) {
+    if (set[i] == hash)
+      return i;
+  }
+
+  std::lock_guard<std::mutex> guard(mutex);
+  set.push_back(hash);
+  return set.size() - 1;
 }
 
 };  // namespace
