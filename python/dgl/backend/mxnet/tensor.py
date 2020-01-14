@@ -445,7 +445,7 @@ class BinaryReduce(mx.autograd.Function):
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
     func = BinaryReduce(reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
                         rhs_map, out_map)
     return func(lhs_data, rhs_data)
@@ -508,7 +508,8 @@ class CopyReduce(mx.autograd.Function):
         return grad_in
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
     func = CopyReduce(reducer, graph, target, out_size, in_map, out_map)
     return func(in_data)
 
