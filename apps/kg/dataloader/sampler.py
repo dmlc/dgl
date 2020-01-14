@@ -122,6 +122,8 @@ def BalancedRelationPartition(edges, n):
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
         print(parts[i].shape)
+        
+    # TODO(zhengda) we should also reshuffle here to speed up
     return parts, rel_parts
 
 def RandomPartition(edges, n):
