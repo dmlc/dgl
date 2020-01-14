@@ -730,11 +730,9 @@ class EdgeSampler(object):
             false negative edges in neg_subg is identified in neg_subg.edata['false_neg'].
         '''
         if self._is_uniform:
-            subgs = _CAPI_FetchUniformEdgeSample(
-                self._sampler)
+            subgs = _CAPI_FetchUniformEdgeSample(self._sampler)
         else:
-            subgs = _CAPI_FetchWeightedEdgeSample(
-                self._sampler)
+            subgs = _CAPI_FetchWeightedEdgeSample(self._sampler)
 
         if len(subgs) == 0:
             return []
