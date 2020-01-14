@@ -38,7 +38,8 @@ for _, item in train_data.items():
 eps = 1e-3
 bg_matrix += 1
 fg_matrix[:, :, 0] = bg_matrix
-pred_dist = np.log(fg_matrix / (fg_matrix.sum(2)[:, :, None] + 1e-08) + eps)
+pred_dist = np.log(fg_matrix / (fg_matrix.sum(2)[:, :, None] + eps) + eps)
+
 
 with open('freq_prior.pkl', 'wb') as f:
     pickle.dump(pred_dist, f)

@@ -232,7 +232,7 @@ def validate(net, val_data, ctx, eval_metric, args):
     if not args.disable_hybridization:
         # input format is differnet than training, thus rehybridization is needed.
         net.hybridize(static_alloc=args.static_alloc)
-    for batch in val_data:
+    for i, batch in enumerate(val_data):
         batch = split_and_load(batch, ctx_list=ctx)
         det_bboxes = []
         det_ids = []

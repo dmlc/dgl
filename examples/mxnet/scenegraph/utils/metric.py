@@ -35,10 +35,10 @@ def object_iou_thresh(gt_object, pred_object, iou_thresh=0.5):
         return True
     return False
 
-def triplet_iou_thresh(gt_triplet, pred_triplet, iou_thresh=0.5):
-    sub_iou = iou(gt_triplet[5:9], pred_triplet[5:9])
+def triplet_iou_thresh(pred_triplet, gt_triplet, iou_thresh=0.5):
+    sub_iou = iou(gt_triplet[6:10], pred_triplet[5:9])
     if sub_iou >= iou_thresh:
-        ob_iou = iou(gt_triplet[9:13], pred_triplet[9:13])
+        ob_iou = iou(gt_triplet[10:14], pred_triplet[9:13])
         if ob_iou >= iou_thresh:
             return True
     return False
@@ -94,7 +94,7 @@ class PredCls(mx.metric.EvalMetric):
         m = min(self.topk, preds.shape[0])
         count = 0
         gt_edge_num = labels.shape[0]
-        label_matched = [False for i in range(gt_edge_num)]
+        label_matched = [False for label in labels]
         for i in range(m):
             pred = preds[i]
             for j in range(gt_edge_num):
@@ -103,10 +103,11 @@ class PredCls(mx.metric.EvalMetric):
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += 1
+                    count += label[3]
                     label_matched[j] = True
 
-        self.sum_metric += count / len(labels)
+        total = labels[:,3].sum()
+        self.sum_metric += count / total
         self.num_inst += 1
 
 @mx.metric.register
@@ -133,12 +134,13 @@ class PhrCls(mx.metric.EvalMetric):
                     continue
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
-                   int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
+                   int(label[5]) == int(pred[5]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += 1
+                    count += label[3]
                     label_matched[j] = True
-        self.sum_metric += count / len(labels)
+        total = labels[:,3].sum()
+        self.sum_metric += count / total
         self.num_inst += 1
 
 @mx.metric.register
@@ -165,12 +167,13 @@ class SGDet(mx.metric.EvalMetric):
                     continue
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
-                   int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
+                   int(label[5]) == int(pred[5]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += 1
-                    label_matched[j] = True
-        self.sum_metric += count / len(labels)
+                    count += label[3]
+                    label_matched[j] =True
+        total = labels[:,3].sum()
+        self.sum_metric += count / total
         self.num_inst += 1
 
 @mx.metric.register
@@ -215,18 +218,19 @@ class SGDetPlus(mx.metric.EvalMetric):
                 label = label_triplets[j]
                 if not predicate_matched:
                     if int(label[2]) == int(pred[2]) and \
-                       triplet_iou_thresh(pred, label, 0.5):
-                        count += 1
+                       triplet_iou_thresh(pred, label, self.iou_thresh):
+                        count += label[3]
                         predicate_matched[j] = True
                 if not triplet_matched[j]:
                     if int(label[2]) == int(pred[2]) and \
-                       int(label[3]) == int(pred[3]) and \
                        int(label[4]) == int(pred[4]) and \
-                       triplet_iou_thresh(pred, label, 0.5):
-                        count += 1
+                       int(label[5]) == int(pred[5]) and \
+                       triplet_iou_thresh(pred, label, self.iou_thresh):
+                        count += label[3]
                         triplet_matched[j] = True
         # compute sum
-        N = gt_obj_num + 2 * gt_triplet_num
+        total = labels[:,3].sum()
+        N = gt_obj_num + 2 * total
         self.sum_metric += count / N
         self.num_inst += 1
 
@@ -308,6 +312,7 @@ def extract_gt(g, img_size):
     gt_node_sub = gt_node_ids[0].asnumpy()
     gt_node_ob = gt_node_ids[1].asnumpy()
     gt_rel_class = g.edata['rel_class'][gt_eids,0].asnumpy() - 1
+    gt_rel_count = g.edata['rel_count'][gt_eids,0].asnumpy()
     gt_sub_class = gt_class[gt_node_sub]
     gt_ob_class = gt_class[gt_node_ob]
 
@@ -316,7 +321,7 @@ def extract_gt(g, img_size):
 
     n = len(gt_eids)
     gt_triplets = np.vstack([np.ones(n), np.ones(n),
-                             gt_rel_class, gt_sub_class, gt_ob_class,
+                             gt_rel_class, gt_rel_count, gt_sub_class, gt_ob_class,
                              gt_sub_bbox.transpose(1, 0),
                              gt_ob_bbox.transpose(1, 0)]).transpose(1, 0)
     return gt_objects, gt_triplets

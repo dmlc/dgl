@@ -11,7 +11,6 @@ import mxnet as mx
 from gluoncv.data import COCODetection
 from collections import Counter
 
-
 class VGObject(COCODetection):
     CLASSES = ["airplane", "animal", "arm", "bag", "banana", "basket", "beach",
                "bear", "bed", "bench", "bike", "bird", "board", "boat", "book",

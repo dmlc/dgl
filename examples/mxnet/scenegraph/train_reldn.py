@@ -35,32 +35,30 @@ batch_verbose_freq = 1000
 
 net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl')
 # net.initialize(ctx=ctx)
-net.semantic.initialize(ctx=ctx)
 net.spatial.initialize(ctx=ctx)
 net.visual.initialize(ctx=ctx)
 net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
                             {'learning_rate': 0.01, 'wd': 0.00001})
 
 # dataset and dataloader
-vg_train = VGRelation(top_frequent_rel=N_relations, top_frequent_obj=N_objects,
-                      balancing='weight', split='train')
+vg_train = VGRelation(split='train')
 logger.info('data loaded!')
 train_data = gluon.data.DataLoader(vg_train, batch_size=batch_size, shuffle=True, num_workers=8*num_gpus,
                                    batchify_fn=dgl_mp_batchify_fn)
 n_batches = len(train_data)
 
-detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train._obj_classes,
+detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)
-params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
+params_path = 'faster_rcnn_resnet101_v1d_custom_0019_15.2000.params'
 detector.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 for k, v in detector.collect_params().items():
     v.grad_req = 'null'
 
-detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_train._obj_classes,
+detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)
-params_path = 'faster_rcnn_resnet101_v1d_custom_best.params'
+params_path = 'faster_rcnn_resnet101_v1d_custom_0019_15.2000.params'
 detector_feat.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 for k, v in detector_feat.collect_params().items():
     v.grad_req = 'null'
@@ -83,11 +81,9 @@ def get_data_batch(g_list, img_list, ctx_list):
     for G_slice, ctx in zip(G_list, ctx_list):
         for G in G_slice:
             G.ndata['bbox'] = G.ndata['bbox'].as_in_context(ctx)
-            G.ndata['node_class_ids'] = G.ndata['node_class_ids'].as_in_context(ctx)
+            G.ndata['node_class'] = G.ndata['node_class'].as_in_context(ctx)
             G.ndata['node_class_vec'] = G.ndata['node_class_vec'].as_in_context(ctx)
-            G.edata['classes'] = G.edata['classes'].as_in_context(ctx)
-            G.edata['link'] = G.edata['link'].as_in_context(ctx)
-            G.edata['weights'] = G.edata['weights'].expand_dims(1).as_in_context(ctx)
+            G.edata['rel_class'] = G.edata['rel_class'].as_in_context(ctx)
     img_list = [img.as_in_context(ctx) for img in img_list]
     return G_list, img_list
 
@@ -97,14 +93,16 @@ L_rel = gluon.loss.SoftmaxCELoss()
 train_metric = mx.metric.Accuracy(name='rel')
 train_metric_top5 = mx.metric.TopKAccuracy(5, name='rel_top')
 train_metric_r100 = PredCls(100, iou_thresh=0.9)
+train_metric_phr100 = PhrCls(100, iou_thresh=0.9)
+
+metric_list = [train_metric, train_metric_top5, train_metric_r100, train_metric_phr100]
 
 for epoch in range(nepoch):
     loss_val = 0
     tic = time.time()
     btic = time.time()
-    train_metric.reset()
-    train_metric_top5.reset()
-    train_metric_r100.reset()
+    for metric in metric_list:
+        metric.reset()
     if epoch == 8:
         net_trainer.set_learning_rate(net_trainer.learning_rate*0.1)
         det_trainer.set_learning_rate(det_trainer.learning_rate*0.1)
@@ -115,8 +113,6 @@ for epoch in range(nepoch):
                 print_txt = 'Epoch[%d] Batch[%d/%d], time: %d, loss_rel=%.4f '%\
                     (epoch, i, n_batches, int(time.time() - btic),
                     loss_rel_val / (i+1), )#, loss_cls_val / (i+1))
-                metric_list = [train_metric, train_metric_top5,
-                            train_metric_r100]
                 for metric in metric_list:
                     metric_name, metric_val = metric.get()
                     print_txt +=  '%s=%.4f '%(metric_name, metric_val)
@@ -162,10 +158,10 @@ for epoch in range(nepoch):
 
             G_batch = [net(G) for G in G_batch]
 
-            for G_slice, G_pred, img in zip(G_list, G_batch, img_list):
+            for G_pred, img in zip(G_batch, img_list):
                 if G_pred is None or G_pred.number_of_nodes() == 0:
                     continue
-                loss_rel = L_rel(G_pred.edata['preds'], G_pred.edata['classes'] + G_pred.edata['link'],
+                loss_rel = L_rel(G_pred.edata['preds'], G_pred.edata['rel_class'],
                                  G_pred.edata['sample_weights'])
                 loss.append(loss_rel.sum())
                 loss_rel_val += loss_rel.sum().asscalar() / num_gpus
@@ -174,24 +170,24 @@ for epoch in range(nepoch):
             l.backward()
         net_trainer.step(batch_size)
         det_trainer.step(batch_size)
-        for G_slice, G_pred, img_slice in zip(G_list, G_batch, img_list):
-            for G_gt, G_pred_one in zip(G_slice, [G_pred]):
-                if G_pred_one is None or G_pred_one.number_of_nodes() == 0:
-                    continue
-                link_ind = np.where(G_pred.edata['link'].asnumpy() == 1)[0]
-                if len(link_ind) == 0:
-                    continue
-                train_metric.update([G_pred.edata['classes'][link_ind]], [G_pred_one.edata['preds'][:,1:][link_ind]])
-                train_metric_top5.update([G_pred.edata['classes'][link_ind]], [G_pred_one.edata['preds'][:,1:][link_ind]])
-                gt_objects, gt_triplet = extract_gt(G_pred, img_slice.shape[2:4])
-                pred_objects, pred_triplet = extract_pred(G_pred, joint_preds=True)
-                train_metric_r100.update(gt_triplet, pred_triplet)
+        for G_pred, img_slice in zip(G_batch, img_list):
+            if G_pred is None or G_pred.number_of_nodes() == 0:
+                continue
+            link_ind = np.where(G_pred.edata['rel_class'].asnumpy() > 0)[0]
+            if len(link_ind) == 0:
+                continue
+            train_metric.update([G_pred.edata['rel_class'][link_ind]],
+                                [G_pred.edata['preds'][link_ind]])
+            train_metric_top5.update([G_pred.edata['rel_class'][link_ind]], 
+                                        [G_pred.edata['preds'][link_ind]])
+            gt_objects, gt_triplet = extract_gt(G_pred, img_slice.shape[2:4])
+            pred_objects, pred_triplet = extract_pred(G_pred, joint_preds=True)
+            train_metric_r100.update(gt_triplet, pred_triplet)
+            train_metric_phr100.update(gt_triplet, pred_triplet)
         if (i+1) % batch_verbose_freq == 0:
             print_txt = 'Epoch[%d] Batch[%d/%d], time: %d, loss_rel=%.4f '%\
                 (epoch, i, n_batches, int(time.time() - btic),
                 loss_rel_val / (i+1), )#, loss_cls_val / (i+1))
-            metric_list = [train_metric, train_metric_top5,
-                           train_metric_r100]
             for metric in metric_list:
                 metric_name, metric_val = metric.get()
                 print_txt +=  '%s=%.4f '%(metric_name, metric_val)
@@ -200,8 +196,6 @@ for epoch in range(nepoch):
     print_txt = 'Epoch[%d], time: %d, loss_rel=%.4f,'%\
         (epoch, int(time.time() - btic),
         loss_rel_val / (i+1))#, loss_cls_val / (i+1))
-    metric_list = [train_metric, train_metric_top5, 
-                   train_metric_r100]
     for metric in metric_list:
         metric_name, metric_val = metric.get()
         print_txt +=  '%s=%.4f '%(metric_name, metric_val)

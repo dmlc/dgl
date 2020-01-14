@@ -13,11 +13,11 @@ from gluoncv.data.base import VisionDataset
 from collections import Counter
 from gluoncv.data.transforms.presets.rcnn import FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform
 
-class VGRelationCOCO(VisionDataset):
+class VGRelation(VisionDataset):
     def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'), split='train'):
-        super(VGRelationCOCO, self).__init__(root)
+        super(VGRelation, self).__init__(root)
         self._root = os.path.expanduser(root)
-        self._img_path = os.path.join(self._root, 'images', '{}')
+        self._img_path = os.path.join(self._root, 'VG_100K', '{}')
 
         if split == 'train':
             self._dict_path = os.path.join(self._root, 'rel_annotations_train.json')
@@ -88,10 +88,11 @@ class VGRelationCOCO(VisionDataset):
                 ind = sub_id[i]
                 sub = it['subject']
                 node_class_ids[ind] = sub['category']
-                bbox[ind,0] = sub['bbox'][0]
-                bbox[ind,1] = sub['bbox'][1]
-                bbox[ind,2] = sub['bbox'][0] + sub['bbox'][2]
-                bbox[ind,3] = sub['bbox'][1] + sub['bbox'][3]
+                # y1y2x1x2 to x1y1x2y2
+                bbox[ind,0] = sub['bbox'][2]
+                bbox[ind,1] = sub['bbox'][0]
+                bbox[ind,2] = sub['bbox'][3]
+                bbox[ind,3] = sub['bbox'][1]
 
                 node_visited[ind] = True
 
@@ -99,10 +100,11 @@ class VGRelationCOCO(VisionDataset):
                 ind = ob_id[i]
                 ob = it['object']
                 node_class_ids[ind] = ob['category']
-                bbox[ind,0] = ob['bbox'][0]
-                bbox[ind,1] = ob['bbox'][1]
-                bbox[ind,2] = ob['bbox'][0] + ob['bbox'][2]
-                bbox[ind,3] = ob['bbox'][1] + ob['bbox'][3]
+                # y1y2x1x2 to x1y1x2y2
+                bbox[ind,0] = ob['bbox'][2]
+                bbox[ind,1] = ob['bbox'][0]
+                bbox[ind,2] = ob['bbox'][3]
+                bbox[ind,3] = ob['bbox'][1]
 
                 node_visited[ind] = True
 
@@ -132,15 +134,18 @@ class VGRelationCOCO(VisionDataset):
 
         # edge features
         rel_class = mx.nd.zeros((g.number_of_edges(), 1))
+        rel_count = mx.nd.zeros((g.number_of_edges(), 1))
         edge_inds = g.edge_ids(sub_id, ob_id)
         for i, it in enumerate(item):
             ind = edge_inds[i]
             rel_class[ind, 0] = it['predicate'] + 1
-        
+            rel_count[ind, 0] += 1
+
         # assign features
         g.ndata['bbox'] = bbox
         g.ndata['node_class'] = node_class_ids
         g.ndata['node_class_vec'] = node_class_vec
         g.edata['rel_class'] = rel_class
+        g.edata['rel_count'] = rel_count
 
         return g, img

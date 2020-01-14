@@ -16,10 +16,10 @@ class EdgeConfMLP(nn.Block):
         super(EdgeConfMLP, self).__init__()
 
     def forward(self, edges):
-        score_pred = nd.softmax(edges.data['preds'])[:,1:].max(axis=1)
-        score_phr = score_pred * \
-                    edges.src['node_class_prob'].max(axis=1) * \
-                    edges.dst['node_class_prob'].max(axis=1)
+        score_pred = nd.log_softmax(edges.data['preds'])[:,1:].max(axis=1)
+        score_phr = score_pred + \
+                    nd.log_softmax(edges.src['node_class_pred']).max(axis=1) + \
+                    nd.log_softmax(edges.dst['node_class_pred']).max(axis=1)
         return {'score_pred': score_pred,
                 'score_phr': score_phr}
 
@@ -32,8 +32,8 @@ class EdgeBBoxExtend(nn.Block):
         result = nd.zeros((n, 4), ctx=bbox_a.context)
         result[:,0] = bbox_a[:,0] - bbox_b[:,0]
         result[:,1] = bbox_a[:,1] - bbox_b[:,1]
-        result[:,2] = nd.log((bbox_a[:,2] - bbox_a[:,0]) / (bbox_b[:,2] - bbox_b[:,0]))
-        result[:,3] = nd.log((bbox_a[:,3] - bbox_a[:,1]) / (bbox_b[:,3] - bbox_b[:,1]))
+        result[:,2] = nd.log((bbox_a[:,2] - bbox_a[:,0]) / (bbox_b[:,2] - bbox_b[:,0] + 1e-8))
+        result[:,3] = nd.log((bbox_a[:,3] - bbox_a[:,1]) / (bbox_b[:,3] - bbox_b[:,1] + 1e-8))
         return result
 
     def forward(self, edges):
@@ -43,37 +43,16 @@ class EdgeBBoxExtend(nn.Block):
         delta_src_rel = self.bbox_delta(edges.src['pred_bbox'], edges.data['rel_bbox'])
         delta_rel_obj = self.bbox_delta(edges.data['rel_bbox'], edges.dst['pred_bbox'])
         result = nd.zeros((n, 12), ctx=ctx)
-        # result[:,0:5] = edge_bbox
         result[:,0:4] = delta_src_obj
         result[:,4:8] = delta_src_rel
         result[:,8:12] = delta_rel_obj
         return {'pred_bbox_additional': result}
-
-class EdgeSemantic(nn.Block):
-    def __init__(self, n_classes, use_prior=False):
-        super(EdgeSemantic, self).__init__()
-        '''
-        self.mlp = nn.Dense(n_classes)
-        self.use_prior = use_prior
-        '''
-
-    def forward(self, edges):
-        '''
-        if self.use_prior:
-            feat = nd.concat(edges.src['node_class_prob'], edges.dst['node_class_prob'], edges.data['freq_prior'])
-        else:
-            feat = nd.concat(edges.src['node_class_prob'], edges.dst['node_class_prob'])
-        out = self.mlp(feat)
-        '''
-        out = edges.data['freq_prior']
-        return {'semantic': out}
 
 class EdgeFreqPrior(nn.Block):
     def __init__(self, prior_pkl):
         super(EdgeFreqPrior, self).__init__()
         with open(prior_pkl, 'rb') as f:
             freq_prior = pickle.load(f)
-        freq_prior[:,:,0] = 1 - freq_prior.sum(axis=2)
         self.freq_prior = freq_prior
 
     def forward(self, edges):
@@ -116,19 +95,14 @@ class EdgeVisual(nn.Block):
         return {'visual': out}
 
 class RelDN(nn.Block):
-    def __init__(self, n_classes, prior_pkl=None, semantic_only=False):
+    def __init__(self, n_classes, prior_pkl, semantic_only=False):
         super(RelDN, self).__init__()
         # output layers
         self.edge_bbox_extend = EdgeBBoxExtend()
         # semantic through mlp encoding
         if prior_pkl is not None:
             self.freq_prior = EdgeFreqPrior(prior_pkl)
-            use_prior = True
-        else:
-            use_prior = False
 
-        self.semantic = EdgeSemantic(n_classes + 1, use_prior)
-        self.use_prior = use_prior
         # with predicate class and a link class
         self.spatial = EdgeSpatial(n_classes + 1)
         # with visual features
@@ -144,15 +118,13 @@ class RelDN(nn.Block):
         # bbox extension
         g.apply_edges(self.edge_bbox_extend)
         # predictions
-        if self.use_prior:
-            g.apply_edges(self.freq_prior)
-        g.apply_edges(self.semantic)
+        g.apply_edges(self.freq_prior)
         g.apply_edges(self.spatial)
         g.apply_edges(self.visual)
         if self.semantic_only:
             g.edata['preds'] = g.edata['freq_prior']
         else:
-            g.edata['preds'] = g.edata['semantic'] + g.edata['spatial'] + g.edata['visual']
+            g.edata['preds'] = g.edata['freq_prior'] + g.edata['spatial'] + g.edata['visual']
         # subgraph for gconv
         g.apply_edges(self.edge_conf_mlp)
         return g
