@@ -7,6 +7,8 @@
 
 using namespace dgl;
 
+// TODO: adapt this to Random::Choice
+
 template <typename Idx, typename DType>
 void _TestWithReplacement(RandomEngine *re) {
   Idx n_categories = 100;
@@ -31,12 +33,24 @@ void _TestWithReplacement(RandomEngine *re) {
       ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
   };
 
+  auto _check_random_choice = [n_categories, n_rolls, &prob]() {
+    std::vector<Idx> counter(n_categories, 0);
+    FloatArray p = VecToFloatArray(prob);
+    for (Idx i = 0; i < n_rolls; ++i) {
+      Idx dice = RandomEngine::ThreadLocal()->Choice(p);
+      counter[dice]++;
+    }
+    for (Idx i = 0; i < n_categories; ++i)
+      ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
+  };
+
   utils::AliasSampler<Idx, DType, true> as(re, prob);
   utils::CDFSampler<Idx, DType, true> cs(re, prob);
   utils::TreeSampler<Idx, DType, true> ts(re, prob);
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);
+  _check_random_choice();
 }
 
 TEST(SampleUtilsTest, TestWithReplacement) {

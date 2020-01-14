@@ -95,8 +95,21 @@ class RandomEngine {
     return dist(rng_);
   }
 
+  /*!
+   * \brief Pick a random integer between 0 to N-1 according to given probabilities
+   */
+  template<typename IdxType>
+  IdxType Choice(FloatArray prob) {
+    ATEN_XPU_SWITCH(prob->ctx.device_type, XPU, {
+      return ChoiceImpl<XPU, IdxType>(prob);
+    });
+  }
+
  private:
-  std::mt19937 rng_;
+  std::default_random_engine rng_;
+
+  template<kDLDeviceType XPU, typename IdxType>
+  IdxType RandomEngine::ChoiceImpl(FloatArray prob);
 };
 
 };  // namespace dgl

@@ -55,6 +55,16 @@ IdArray VecToIdArray(const std::vector<T>& vec,
                      DLContext ctx = DLContext{kDLCPU, 0});
 
 /*!
+ * \brief Create a new NDArray using the given vector data
+ * \param vec The vector data
+ * \param ctx The array context
+ * \return the NDArray
+ */
+template <typename T>
+NDArray VecToNDArray(const std::vector<T>& vec,
+                     DLContext ctx = DLContext{kDLCPU, 0});
+
+/*!
  * \brief Return an array representing a 1D range.
  * \param low Lower bound (inclusive).
  * \param high Higher bound (exclusive).
