@@ -172,36 +172,36 @@ def run(args, logger):
         for i in range(args.num_proc):
             train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                            args.neg_chunk_size,
-                                                           mode='chunk-head',
+                                                           mode='head',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
-                                                           exclude_positive=True,
+                                                           exclude_positive=False,
                                                            rank=i)
             train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                            args.neg_chunk_size,
-                                                           mode='chunk-tail',
+                                                           mode='tail',
                                                            num_workers=args.num_worker,
                                                            shuffle=True,
-                                                           exclude_positive=True,
+                                                           exclude_positive=False,
                                                            rank=i)
             train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                                  args.neg_chunk_size,
+                                                                  args.neg_chunk_size, args.neg_sample_size,
                                                                   True, n_entities))
     else:
         train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                        args.neg_chunk_size,
-                                                       mode='chunk-head',
+                                                       mode='head',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
-                                                       exclude_positive=True)
+                                                       exclude_positive=False)
         train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
                                                        args.neg_chunk_size,
-                                                       mode='chunk-tail',
+                                                       mode='tail',
                                                        num_workers=args.num_worker,
                                                        shuffle=True,
-                                                       exclude_positive=True)
+                                                       exclude_positive=False)
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                        args.neg_chunk_size,
+                                                        args.neg_chunk_size, args.neg_sample_size,
                                                         True, n_entities)
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time

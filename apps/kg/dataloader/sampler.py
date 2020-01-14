@@ -45,6 +45,16 @@ def StrictRelationPartition(edges, n):
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+
     return parts, rel_parts
 
 # This partitions a list of edges based on relations to make sure
@@ -118,12 +128,16 @@ def RandomPartition(edges, n):
     heads, rels, tails = edges
     print('random partition {} edges into {} parts'.format(len(heads), n))
     idx = np.random.permutation(len(heads))
+    heads[:] = heads[idx]
+    rels[:] = rels[idx]
+    tails[:] = tails[idx]
+
     part_size = int(math.ceil(len(idx) / n))
     parts = []
     for i in range(n):
         start = part_size * i
         end = min(part_size * (i + 1), len(idx))
-        parts.append(idx[start:end])
+        parts.append(np.arange(start, end))
         print('part {} has {} edges'.format(i, len(parts[-1])))
     return parts
 
@@ -146,7 +160,6 @@ def ConstructGraph(edges, n_entities, args):
 class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
-        self.g = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
 
@@ -158,6 +171,7 @@ class TrainDataset(object):
             self.edge_parts = RandomPartition(triples, ranks)
         else:
             self.edge_parts = [np.arange(num_train)]
+        self.g = ConstructGraph(triples, dataset.n_entities, args)
         if weighting:
             # TODO: weight to be added
             count = self.count_freq(triples)
@@ -187,7 +201,7 @@ class TrainDataset(object):
         return EdgeSampler(self.g,
                            seed_edges=F.tensor(self.edge_parts[rank]),
                            batch_size=batch_size,
-                           neg_sample_size=neg_sample_size,
+                           neg_sample_size=int(neg_sample_size/neg_chunk_size),
                            chunk_size=neg_chunk_size,
                            negative_mode=mode,
                            num_workers=num_workers,
@@ -219,9 +233,8 @@ class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
 # of a negative subgraph to perform the computation more efficiently.
 # This function tries to infer all of these information of the negative subgraph
 # and create a wrapper class that contains all of the information.
-def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_nodes):
+def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked, neg_head, num_nodes):
     assert neg_g.number_of_edges() % pos_g.number_of_edges() == 0
-    neg_sample_size = int(neg_g.number_of_edges() / pos_g.number_of_edges())
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
     # we can always view the subgraph with one chunk.
     if (neg_head and len(neg_g.head_nid) == num_nodes) \
@@ -230,15 +243,13 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_node
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
         if pos_g.number_of_edges() < chunk_size:
-            num_chunks = 1
-            chunk_size = pos_g.number_of_edges()
+            return None
         else:
             # This is probably the last batch. Let's ignore it.
             if pos_g.number_of_edges() % chunk_size > 0:
                 return None
             num_chunks = int(pos_g.number_of_edges()/ chunk_size)
         assert num_chunks * chunk_size == pos_g.number_of_edges()
-        assert num_chunks * neg_sample_size * chunk_size == neg_g.number_of_edges()
     else:
         num_chunks = pos_g.number_of_edges()
         chunk_size = 1
@@ -266,6 +277,7 @@ class EvalSampler(object):
         self.g = g
         self.filter_false_neg = filter_false_neg
         self.neg_chunk_size = neg_chunk_size
+        self.neg_sample_size = neg_sample_size
 
     def __iter__(self):
         return self
@@ -275,7 +287,7 @@ class EvalSampler(object):
             pos_g, neg_g = next(self.sampler_iter)
             if self.filter_false_neg:
                 neg_positive = neg_g.edata['false_neg']
-            neg_g = create_neg_subgraph(pos_g, neg_g, self.neg_chunk_size, 'chunk' in self.mode,
+            neg_g = create_neg_subgraph(pos_g, neg_g, self.neg_chunk_size, self.neg_sample_size, 'chunk' in self.mode,
                                         self.neg_head, self.g.number_of_nodes())
             if neg_g is not None:
                 break
@@ -371,17 +383,19 @@ class EvalDataset(object):
                            mode, num_workers, filter_false_neg)
 
 class NewBidirectionalOneShotIterator:
-    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, is_chunked, num_nodes):
+    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, neg_sample_size,
+                 is_chunked, num_nodes):
         self.sampler_head = dataloader_head
         self.sampler_tail = dataloader_tail
-        self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size, is_chunked,
-                                                    True, num_nodes)
-        self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, is_chunked,
-                                                    False, num_nodes)
+        self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size, neg_sample_size,
+                                                    is_chunked, True, num_nodes)
+        self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, neg_sample_size,
+                                                    is_chunked, False, num_nodes)
         self.step = 0
 
     def __next__(self):
         self.step += 1
+        start = time.time()
         if self.step % 2 == 0:
             pos_g, neg_g = next(self.iterator_head)
         else:
@@ -389,10 +403,10 @@ class NewBidirectionalOneShotIterator:
         return pos_g, neg_g
 
     @staticmethod
-    def one_shot_iterator(dataloader, neg_chunk_size, is_chunked, neg_head, num_nodes):
+    def one_shot_iterator(dataloader, neg_chunk_size, neg_sample_size, is_chunked, neg_head, num_nodes):
         while True:
             for pos_g, neg_g in dataloader:
-                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, is_chunked,
+                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, neg_sample_size, is_chunked,
                                             neg_head, num_nodes)
                 if neg_g is None:
                     continue
