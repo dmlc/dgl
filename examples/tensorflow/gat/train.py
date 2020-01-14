@@ -46,7 +46,7 @@ def main(args):
     with tf.device(device):
 
         features = tf.convert_to_tensor(data.features, dtype=tf.float32)
-        labels =tf.convert_to_tensor(data.labels, dtype=tf.int64)
+        labels = tf.convert_to_tensor(data.labels, dtype=tf.int64)
         train_mask = tf.convert_to_tensor(data.train_mask, dtype=tf.bool)
         val_mask = tf.convert_to_tensor(data.val_mask, dtype=tf.bool)
         test_mask = tf.convert_to_tensor(data.test_mask, dtype=tf.bool)
@@ -59,10 +59,10 @@ def main(args):
         #Train samples %d
         #Val samples %d
         #Test samples %d""" %
-            (n_edges, n_classes,
-            train_mask.numpy().sum(),
-            val_mask.numpy().sum(),
-            test_mask.numpy().sum()))
+              (n_edges, n_classes,
+               train_mask.numpy().sum(),
+               val_mask.numpy().sum(),
+               test_mask.numpy().sum()))
 
         g = data.graph
         # add self loop
@@ -84,15 +84,17 @@ def main(args):
                     args.negative_slope,
                     args.residual)
         print(model)
-        stopper = EarlyStopping(patience=100)
+        if args.early_stop:
+            stopper = EarlyStopping(patience=100)
 
-        loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True)
+        # loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
+        #     from_logits=False)
+        loss_fcn = tf.nn.sparse_softmax_cross_entropy_with_logits
 
         # use optimizer
         optimizer = tf.keras.optimizers.Adam(
             learning_rate=args.lr, decay=args.weight_decay)
-    
+
         # initialize graph
         dur = []
         for epoch in range(args.epochs):
@@ -101,8 +103,9 @@ def main(args):
             # forward
             with tf.GradientTape() as tape:
                 tape.watch(model.trainable_weights)
-                logits = model(features)
-                loss_value = loss_fcn(labels[train_mask], logits[train_mask])
+                logits = model(features, training=True)
+                loss_value = tf.reduce_mean(loss_fcn(
+                    labels=labels[train_mask], logits=logits[train_mask]))
 
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))
@@ -116,16 +119,18 @@ def main(args):
                 val_acc = accuracy(logits[val_mask], labels[val_mask])
             else:
                 val_acc = evaluate(model, features, labels, val_mask)
-                if stopper.step(val_acc, model):   
-                    break
+                if args.early_stop:
+                    if stopper.step(val_acc, model):
+                        break
 
             print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | TrainAcc {:.4f} |"
-                " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".
-                format(epoch, np.mean(dur), loss_value.numpy().item(), train_acc,
-                        val_acc, n_edges / np.mean(dur) / 1000))
+                  " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".
+                  format(epoch, np.mean(dur), loss_value.numpy().item(), train_acc,
+                         val_acc, n_edges / np.mean(dur) / 1000))
 
         print()
-        model.load_weights('es_checkpoint.pb')
+        if args.early_stop:
+            model.load_weights('es_checkpoint.pb')
         acc = evaluate(model, features, labels, test_mask)
         print("Test Accuracy {:.4f}".format(acc))
 
@@ -136,7 +141,7 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
                         help="which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=200,
+    parser.add_argument("--epochs", type=int, default=600,
                         help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=8,
                         help="number of hidden attention heads")
@@ -152,12 +157,14 @@ if __name__ == '__main__':
                         help="input feature dropout")
     parser.add_argument("--attn-drop", type=float, default=.6,
                         help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.005,
+    parser.add_argument("--lr", type=float, default=0.002,
                         help="learning rate")
-    parser.add_argument('--weight-decay', type=float, default=5e-4,
+    parser.add_argument('--weight-decay', type=float, default=2e-4,
                         help="weight decay")
     parser.add_argument('--negative-slope', type=float, default=0.2,
                         help="the negative slope of leaky relu")
+    parser.add_argument('--early-stop', action='store_true', default=False,
+                        help="indicates whether to use early stop or not")
     parser.add_argument('--fastmode', action="store_true", default=False,
                         help="skip re-evaluate the validation set")
     args = parser.parse_args()

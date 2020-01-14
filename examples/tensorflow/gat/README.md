@@ -9,12 +9,11 @@ Graph Attention Networks (GAT)
 
 Dependencies
 ------------
-- torch v1.0: the autograd support for sparse mm is only available in v1.0.
+- tensorflow 2.1.0+
 - requests
-- sklearn
 
 ```bash
-pip install torch==1.0.0 requests
+pip install tensorflow requests
 ```
 
 How to run
@@ -34,21 +33,16 @@ python3 train.py --dataset=citeseer --gpu=0 --early-stop
 python3 train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001 --early-stop
 ```
 
-```bash
-python3 train_ppi.py --gpu=0
-```
 
 Results
 -------
 
-| Dataset  | Test Accuracy | Time(s) | Baseline#1 times(s) | Baseline#2 times(s) |
-| -------- | ------------- | ------- | ------------------- | ------------------- |
-| Cora     | 84.02(0.40)   | 0.0113  | 0.0982 (**8.7x**)   | 0.0424 (**3.8x**)   |
-| Citeseer | 70.91(0.79)   | 0.0111  | n/a                 | n/a                 |
-| Pubmed   | 78.57(0.75)   | 0.0115  | n/a                 | n/a                 |
+| Dataset  | Test Accuracy |
+| -------- | ------------- |
+| Cora     | 83.4          |
+| Citeseer | 70.3          |
+| Pubmed   | 77.8   |
 
 * All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.
 * All time is measured on EC2 p3.2xlarge instance w/ V100 GPU.
-* Baseline#1: [https://github.com/PetarV-/GAT](https://github.com/PetarV-/GAT).
-* Baseline#2: [https://github.com/Diego999/pyGAT](https://github.com/Diego999/pyGAT).
