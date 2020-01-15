@@ -2,7 +2,7 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
-
+import numpy as np
 
 from .... import function as fn
 from ..softmax import edge_softmax
@@ -60,8 +60,9 @@ class GATConv(layers.Layer):
         self._num_heads = num_heads
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.fc = layers.Dense(out_feats * num_heads, use_bias=False)
-        xinit = tf.keras.initializers.glorot_uniform()
+        xinit = tf.keras.initializers.VarianceScaling(scale=np.sqrt(2), mode="fan_avg", distribution="untruncated_normal")
+        self.fc = layers.Dense(
+            out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
         self.attn_l = tf.Variable(initial_value=xinit(
             shape=(1, num_heads, out_feats), dtype='float32'), trainable=True)
 
@@ -72,14 +73,14 @@ class GATConv(layers.Layer):
         self.leaky_relu = layers.LeakyReLU(alpha=negative_slope)
         if residual:
             if in_feats != out_feats:
-                self.res_fc = layers.Dense(num_heads * out_feats, use_bias=False)
+                self.res_fc = layers.Dense(
+                    num_heads * out_feats, use_bias=False, kernel_initializer=xinit)
             else:
                 self.res_fc = Identity()
         else:
             self.res_fc = None
             # self.register_buffer('res_fc', None)
         self.activation = activation
-
 
     def call(self, graph, feat):
         r"""Compute graph attention network layer.
@@ -115,7 +116,8 @@ class GATConv(layers.Layer):
         rst = graph.ndata['ft']
         # residual
         if self.res_fc is not None:
-            resval = tf.reshape(self.res_fc(h), (h.shape[0], -1, self._out_feats))
+            resval = tf.reshape(self.res_fc(
+                h), (h.shape[0], -1, self._out_feats))
             rst = rst + resval
         # activation
         if self.activation:
