@@ -22,15 +22,15 @@ How to run
 Run with following:
 
 ```bash
-python3 train.py --dataset=cora --gpu=0
+python3 train.py --dataset=cora --gpu=0 --num-hidden 16 --num-heads 16 --epochs 200 --weight-decay 5e-4 --num-out-heads 4
 ```
 
 ```bash
-python3 train.py --dataset=citeseer --gpu=0 --early-stop
+python3 train.py --dataset=citeseer --gpu=0 --early-stop --num-hidden 16 --num-out-heads 8 --num-heads 8
 ```
 
 ```bash
-python3 train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001 --early-stop
+python3 train.py --dataset=pubmed --gpu=0 --num-hidden 8 --num-heads 8 --num-out-heads 4 --weight-decay 1e-4 --early-stop
 ```
 
 
@@ -39,9 +39,9 @@ Results
 
 | Dataset  | Test Accuracy |
 | -------- | ------------- |
-| Cora     | 83.4          |
-| Citeseer | 70.3          |
-| Pubmed   | 77.8   |
+| Cora     | 83.8          |
+| Citeseer | 70.8          |
+| Pubmed   | 77.8          |
 
 * All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.
