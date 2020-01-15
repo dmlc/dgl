@@ -30,7 +30,7 @@ python3 train.py --dataset=citeseer --gpu=0 --early-stop --num-hidden 16 --num-o
 ```
 
 ```bash
-python3 train.py --dataset=pubmed --gpu=0 --num-hidden 8 --num-heads 8 --num-out-heads 4 --weight-decay 1e-4 --early-stop
+python3 train.py --dataset=pubmed --gpu=0 --early-stop --num-hidden 16 --num-out-heads 8 --num-heads 16
 ```
 
 
@@ -41,7 +41,7 @@ Results
 | -------- | ------------- |
 | Cora     | 83.8          |
 | Citeseer | 70.8          |
-| Pubmed   | 77.8          |
+| Pubmed   | 77.9          |
 
 * All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.
