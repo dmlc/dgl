@@ -294,7 +294,7 @@ def run(args, logger):
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
-    if args.num_proc > 1:
+    if args.num_proc >= 1:
         model.share_memory()
 
     # train
