@@ -4,11 +4,12 @@
  * \brief Dispatcher of different DGL random walks by device and data type
  */
 
+#include <dgl/runtime/container.h>
 #include <dgl/runtime/object.h>
 #include <dgl/array.h>
 #include <utility>
 #include "../../c_api_common.h"
-#include "randomwalk.h"
+#include "randomwalks_impl.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -21,10 +22,17 @@ std::pair<IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray etypes,
-    const FloatArray prob) {
-  CHECK_IDARRAY(seeds);
-  CHECK_IDARRAY(etypes, 1);
-  CHECK_FLOATARRAY(prob, 1);
+    const List<FloatArray> &prob) {
+  EXPECT_INT(seeds, "seeds");
+  EXPECT_INT(etypes, "etypes");
+  EXPECT_NDIM(seeds, 1, "seeds");
+  EXPECT_NDIM(etypes, 1, "etypes");
+  for (FloatArray p : prob) {
+    EXPECT_FLOAT(p, "probability");
+    if (p->ndim != 0) {
+      EXPECT_NDIM(p, 1, "probability");
+    }
+  }
 
   std::pair<IdArray, TypeArray> result;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {

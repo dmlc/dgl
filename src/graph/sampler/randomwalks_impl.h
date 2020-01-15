@@ -5,10 +5,14 @@
  */
 
 #include <dgl/base_heterograph.h>
+#include <dgl/runtime/container.h>
 #include <dgl/array.h>
 #include <dgl/random.h>
 
 namespace dgl {
+
+using namespace dgl::runtime;
+using namespace dgl::aten;
 
 namespace sampling {
 
@@ -19,18 +23,16 @@ std::pair<IdArray, TypeArray> RandomWalkImpl(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray etypes,
-    const FloatArray prob);
+    const List<FloatArray> &prob);
 
 int64_t RandomWalkOneSeed(
     const HeteroGraphPtr hg,
     dgl_id_t seed,
     const TypeArray etypes,
-    const FloatArray transition_prob,
+    const List<FloatArray> &transition_prob,
     IdArray vids,
     IdArray vtypes,
     double restart_prob) {
-  bool uniform = (transition_prob->shape[0] == 0);
-
   int64_t num_seeds = seeds->shape[0];
   int64_t num_etypes = etypes->shape[0];
 
@@ -45,6 +47,7 @@ int64_t RandomWalkOneSeed(
 
   // Perform random walk
   for (; i < num_etypes; ++i) {
+    // get edge type and endpoint node types
     etype = IndexSelect(etypes, i);
     auto src_dst_type = hg->GetEndpointTypes(etype);
     dgl_type_t srctype = src_dst_type.first;
@@ -55,6 +58,7 @@ int64_t RandomWalkOneSeed(
       return 0;
     }
 
+    // find all successors
     EdgeArray edges = hg->OutEdges(etype, seed);
     IdArray succs = edges->dst;
     IdArray eids = edges->id;
@@ -63,11 +67,13 @@ int64_t RandomWalkOneSeed(
       // no successors; halt and pad
       break;
 
+    // pick one successor
     int64_t sel;
-    if (uniform) {
+    FloatArray p_etype = transition_prob[etype];
+    if (p_etype->ndim == 0) {     // uniform if empty prob array is given
       sel = RandomEngine::ThreadLocal()->RandInt(size);
     } else {
-      FloatArray selected_probs = IndexSelect(prob, eids);
+      FloatArray selected_probs = IndexSelect(p_etype, eids);
       sel = RandomEngine::ThreadLocal()->Choice(selected_probs);
     }
     curr_id = IndexSelect(succs, RandomEngine::ThreadLocal()->RandInt(size));
@@ -76,6 +82,7 @@ int64_t RandomWalkOneSeed(
     Assign(vtypes, i + 1, curr_type);
     Assign(vids, i + 1, curr_id);
 
+    // determine if terminate the trace
     double p = RandomEngine::ThreadLocal()->Uniform();
     if (p < restart_prob):
       break;

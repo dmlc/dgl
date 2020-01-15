@@ -49,7 +49,8 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   DType accum, taken;             // accumulated likelihood
   std::vector<Idx> K;             // alias table
   std::vector<DType> U;           // probability table
-  std::vector<DType> _prob;       // category distribution
+  DType *_prob;                   // category distribution
+  int64_t _num_categories;        // size of prob
   std::vector<bool> used;         // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;    // index mapping, activated when replace=false;
 
@@ -60,13 +61,13 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
       return id_mapping[x];
   }
 
-  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct alias table
+  void Reconstruct(const DType *prob, int64_t num_categories) { // Reconstruct alias table
     N = 0;
     accum = 0.;
     taken = 0.;
     if (!replace)
       id_mapping.clear();
-    for (Idx i = 0; i < prob.size(); ++i)
+    for (Idx i = 0; i < num_categories; ++i)
       if (!used[i]) {
         N++;
         accum += prob[i];
@@ -103,16 +104,21 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   }
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
-    used.resize(prob.size());
-    if (!replace)
+  void ResetState(const DType *prob, int64_t num_categories) {
+    used.resize(num_categories);
+    if (!replace) {
       _prob = prob;
+      _num_categories = num_categories;
+    }
     std::fill(used.begin(), used.end(), false);
-    Reconstruct(prob);
+    Reconstruct(prob, num_categories);
   }
 
-  explicit AliasSampler(RandomEngine* re, const std::vector<DType>& prob): re(re) {
-    ResetState(prob);
+  explicit AliasSampler(
+      RandomEngine* re,
+      const DType *prob,
+      int64_t num_categories): re(re) {
+    ResetState(prob, num_categories);
   }
 
   ~AliasSampler() {}
@@ -121,7 +127,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
     DType avg = accum / N;
     if (!replace) {
       if (2 * taken >= accum)
-        Reconstruct(_prob);
+        Reconstruct(_prob, _num_categories);
       while (true) {
         DType dice = re->Uniform<DType>(0, N);
         Idx i = static_cast<Idx>(dice), rst;
@@ -166,7 +172,8 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   RandomEngine *re;
   Idx N;
   DType accum, taken;
-  std::vector<DType> _prob;     // categorical distribution
+  DType *_prob;                 // category distribution
+  int64_t _num_categories;      // size of prob
   std::vector<DType> cdf;       // cumulative distribution function
   std::vector<bool> used;       // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;  // indicate index mapping, activated when replace=false;
@@ -178,7 +185,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
       return id_mapping[x];
   }
 
-  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct CDF
+  void Reconstruct(const DType *prob, int64_t num_categories) {  // Reconstruct CDF
     N = 0;
     accum = 0.;
     taken = 0.;
@@ -186,7 +193,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
       id_mapping.clear();
     cdf.clear();
     cdf.push_back(0);
-    for (Idx i = 0; i < prob.size(); ++i)
+    for (Idx i = 0; i < num_categories; ++i)
       if (!used[i]) {
         N++;
         accum += prob[i];
@@ -198,16 +205,21 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   }
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
+  void ResetState(const DType *prob, int64_t num_categories) {
     used.resize(prob.size());
-    if (!replace)
+    if (!replace) {
       _prob = prob;
+      _num_categories = num_categories;
+    }
     std::fill(used.begin(), used.end(), false);
-    Reconstruct(prob);
+    Reconstruct(prob, num_categories);
   }
 
-  explicit CDFSampler(RandomEngine *re, const std::vector<DType>& prob): re(re) {
-    ResetState(prob);
+  explicit CDFSampler(
+      RandomEngine *re,
+      const DType *prob,
+      int64_t num_categories): re(re) {
+    ResetState(prob, num_categories);
   }
 
   ~CDFSampler() {}
@@ -216,7 +228,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
     DType eps = std::numeric_limits<DType>::min();
     if (!replace) {
       if (2 * taken >= accum)
-        Reconstruct(_prob);
+        Reconstruct(_prob, _num_categories);
       while (true) {
         DType p = std::max(re->Uniform<DType>(0., accum), eps);
         Idx rst = Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
@@ -252,21 +264,21 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
   int64_t N, num_leafs;
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
+  void ResetState(const DType *prob, int64_t num_categories) {
     std::fill(weight.begin(), weight.end(), 0);
-    for (int i = 0; i < prob.size(); ++i)
+    for (int i = 0; i < num_categories; ++i)
       weight[num_leafs + i] = prob[i];
     for (int i = num_leafs - 1; i >= 1; --i)
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
   }
 
-  explicit TreeSampler(RandomEngine *re, const std::vector<DType>& prob): re(re) {
+  explicit TreeSampler(RandomEngine *re, const DType *prob, int64_t num_categories): re(re) {
     num_leafs = 1;
-    while (num_leafs < prob.size())
+    while (num_leafs < num_categories)
       num_leafs *= 2;
     N = num_leafs * 2;
     weight.resize(N);
-    ResetState(prob);
+    ResetState(prob, num_categories);
   }
 
   Idx Draw() {

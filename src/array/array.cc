@@ -7,7 +7,6 @@
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
-#include "./common.h"
 
 namespace dgl {
 
@@ -205,7 +204,7 @@ NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
   // TODO: check if array and index match in context
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_DTYPE_SWITCH(array->dtype, DType, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
         ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
       });
@@ -215,11 +214,11 @@ NDArray IndexSelect(NDArray array, IdArray index) {
 }
 
 template<typename ValueType>
-ValueType IndexSelect(NDArray array, int64_t index) {
+ValueType IndexSelect(NDArray array, uint64_t index) {
   ValueType ret = 0;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_DTYPE_SWITCH(array->dtype, DType, {
-      ret = impl::IndexSelect<XPU, DType>(array, index);
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ret = static_cast<ValueType>(impl::IndexSelect<XPU, DType>(array, index));
     });
   });
   return ret;
@@ -228,7 +227,7 @@ ValueType IndexSelect(NDArray array, int64_t index) {
 template<typename ValueType>
 void Assign(NDArray array, int64_t index, ValueType value) {
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_DTYPE_SWITCH(array->dtype, DType, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       impl::Assign<XPU, DType>(array, index, static_cast<DType>(value));
     });
   });

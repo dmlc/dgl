@@ -117,7 +117,7 @@ IdArray HStack(IdArray arr1, IdArray arr2);
 /*! \brief Return the data under the index. In numpy notation, A[I] */
 // TODO: change IndexSelect implementation
 template<typename ValueType>
-ValueType IndexSelect(NDArray array, int64_t index);
+ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
 
 /*! \brief Writes the data to the index: A[I] = b */
@@ -322,6 +322,142 @@ GEN_VEC_TO_NDARRAY_FOR(int32_t, kDLInt, 32);
 GEN_VEC_TO_NDARRAY_FOR(int64_t, kDLInt, 64);
 GEN_VEC_TO_NDARRAY_FOR(float, kDLFloat, 32);
 GEN_VEC_TO_NDARRAY_FOR(double, kDLFloat, 64);
+
+///////////////////////// Dispatchers //////////////////////////
+
+#define ATEN_XPU_SWITCH(val, XPU, ...) do {                     \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+  }                                                             \
+} while (0)
+
+#define ATEN_ID_TYPE_SWITCH(val, IdType, ...) do {            \
+  CHECK_EQ((val).code, kDLInt) << "ID must be integer type";  \
+  if ((val).bits == 32) {                                     \
+    typedef int32_t IdType;                                   \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 64) {                              \
+    typedef int64_t IdType;                                   \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << "ID can only be int32 or int64";            \
+  }                                                           \
+} while (0)
+
+#define ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, ...) do {  \
+  CHECK_EQ((val).code, kDLFloat)                              \
+    << (val_name) << " must be float type";                   \
+  if ((val).bits == 32) {                                     \
+    typedef float FloatType;                                  \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 64) {                              \
+    typedef double FloatType;                                 \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be float32 or float64";  \
+  }                                                           \
+} while (0)
+
+#define ATEN_DTYPE_SWITCH(val, DType, val_name, ...) do {     \
+  if ((val).code == kDLInt && (val).bits == 32) {             \
+    typedef int32_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLInt && (val).bits == 64) {      \
+    typedef int64_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 32) {    \
+    typedef float DType;                                      \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 64) {    \
+    typedef double DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be int32, int64, float32 or float64"; \
+  }                                                           \
+} while (0)
+
+#define ATEN_CSR_DTYPE_SWITCH(val, DType, ...) do {         \
+  if ((val).code == kDLInt && (val).bits == 32) {           \
+    typedef int32_t DType;                                  \
+    {__VA_ARGS__}                                           \
+  } else if ((val).code == kDLInt && (val).bits == 64) {    \
+    typedef int64_t DType;                                  \
+    {__VA_ARGS__}                                           \
+  } else {                                                  \
+    LOG(FATAL) << "CSR matrix data can only be int32 or int64";  \
+  }                                                         \
+} while (0)
+
+// Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context and index type
+#define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
+#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context and index type
+#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+///////////////////////// Array checks //////////////////////////
+
+#define IS_INT32(a)  \
+  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 32)
+#define IS_INT64(a)  \
+  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 64)
+#define IS_FLOAT32(a)  \
+  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 32)
+#define IS_FLOAT64(a)  \
+  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 64)
+
+#define EXPECT(cond, prop, value_name, dtype_name) \
+  CHECK(cond) << "Expecting" << (prop) << " of " << (value_name) << " to be " << (dtype_name)
+
+#define EXPECT_INT32(value, value_name) \
+  EXPECT(IS_INT32(value), "dtype", value_name, "int32")
+#define EXPECT_INT64(value, value_name) \
+  EXPECT(IS_INT64(value), "dtype", value_name, "int64")
+#define EXPECT_INT(value, value_name) \
+  EXPECT(IS_INT32(value) || IS_INT64(value), "dtype", value_name, "int32 or int64")
+#define EXPECT_FLOAT32(value, value_name) \
+  EXPECT(IS_FLOAT32(value), "dtype", value_name, "float32")
+#define EXPECT_FLOAT64(value, value_name) \
+  EXPECT(IS_FLOAT64(value), "dtype", value_name, "float64")
+#define EXPECT_FLOAT(value, value_name) \
+  EXPECT(IS_FLOAT32(value) || IS_FLOAT64(value), "dtype", value_name, "float32 or float64")
+
+#define EXPECT_NDIM(value, _ndim, value_name) \
+  EXPECT((value)->ndim == (_ndim), "ndim", value_name, _ndim)
 
 }  // namespace aten
 }  // namespace dgl

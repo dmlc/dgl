@@ -109,8 +109,8 @@ class RandomEngine {
  private:
   std::default_random_engine rng_;
 
-  template<kDLDeviceType XPU, typename IdxType>
-  IdxType RandomEngine::ChoiceImpl(FloatArray prob);
+  template<DLDeviceType XPU, typename IdxType>
+  IdxType ChoiceImpl(FloatArray prob);
 };
 
 };  // namespace dgl
