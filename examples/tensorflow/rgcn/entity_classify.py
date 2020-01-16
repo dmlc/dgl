@@ -100,18 +100,25 @@ def main(args):
 
         # optimizer
         optimizer = tf.keras.optimizers.Adam(
-                    learning_rate=args.lr, decay=args.l2norm)
+                    learning_rate=args.lr)
         # training loop
         print("start training...")
         forward_time = []
         backward_time = []
         loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True)
+            from_logits=False)
         for epoch in range(args.n_epochs):
             t0 = time.time()
             with tf.GradientTape() as tape:
                 logits = model(g, feats, edge_type, edge_norm)
                 loss = loss_fcn(tf.gather(labels, train_idx), tf.gather(logits, train_idx))
+                # Manually Weight Decay
+                # We found Tensorflow has a different implementation on weight decay 
+                # of Adam(W) optimizer with PyTorch. And this results in worse results.
+                # Manually adding weights to the loss to do weight decay solves this problem.
+                for weight in model.trainable_weights:
+                    loss = loss + \
+                        args.l2norm * tf.nn.l2_loss(weight)
                 t1 = time.time()
                 grads = tape.gradient(loss, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))

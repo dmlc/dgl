@@ -53,7 +53,7 @@ def main(args):
                   args.dropout)
 
         dgi_optimizer = tf.keras.optimizers.Adam(
-            learning_rate=args.dgi_lr, decay=args.weight_decay)
+            learning_rate=args.dgi_lr)
 
         # train deep graph infomax
         cnt_wait = 0
@@ -66,6 +66,13 @@ def main(args):
 
             with tf.GradientTape() as tape:
                 loss = dgi(features)
+                # Manually Weight Decay
+                # We found Tensorflow has a different implementation on weight decay 
+                # of Adam(W) optimizer with PyTorch. And this results in worse results.
+                # Manually adding weights to the loss to do weight decay solves this problem.
+                for weight in dgi.trainable_weights:
+                    loss = loss + \
+                        args.weight_decay * tf.nn.l2_loss(weight)
                 grads = tape.gradient(loss, dgi.trainable_weights)
                 dgi_optimizer.apply_gradients(zip(grads, dgi.trainable_weights))
 
@@ -91,8 +98,7 @@ def main(args):
         # create classifier model
         classifier = Classifier(args.n_hidden, n_classes)
 
-        classifier_optimizer = tf.keras.optimizers.Adam(learning_rate=args.classifier_lr,
-                                                        decay=args.weight_decay)
+        classifier_optimizer = tf.keras.optimizers.Adam(learning_rate=args.classifier_lr)
 
         # train classifier
         print('Loading {}th epoch'.format(best_t))
@@ -108,6 +114,15 @@ def main(args):
             with tf.GradientTape() as tape:
                 preds = classifier(embeds)
                 loss = loss_fcn(labels[train_mask], preds[train_mask])
+                # Manually Weight Decay
+                # We found Tensorflow has a different implementation on weight decay 
+                # of Adam(W) optimizer with PyTorch. And this results in worse results.
+                # Manually adding weights to the loss to do weight decay solves this problem.
+                # In original code, there's no weight decay applied in this part 
+                # link: https://github.com/PetarV-/DGI/blob/master/execute.py#L121
+                # for weight in classifier.trainable_weights:
+                #     loss = loss + \
+                #         args.weight_decay * tf.nn.l2_loss(weight)
                 grads = tape.gradient(loss, classifier.trainable_weights)
                 classifier_optimizer.apply_gradients(zip(grads, classifier.trainable_weights))
             if epoch >= 3:

@@ -153,7 +153,7 @@ def test_edge_softmax():
     assert len(g.edata) == 0
     assert F.allclose(a, uniform_attention(g, a.shape))
 
-    # Test both forward and backward with PyTorch built-in softmax.
+    # Test both forward and backward with Tensorflow built-in softmax.
     g = dgl.DGLGraph()
     g.add_nodes(30)
     # build a complete graph

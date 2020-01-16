@@ -20,7 +20,6 @@ from dgl.data import register_data_args, load_data
 from gat import GAT
 from utils import EarlyStopping
 
-
 def accuracy(logits, labels):
     indices = tf.math.argmax(logits, axis=1)
     acc = tf.reduce_mean(tf.cast(indices == labels, dtype=tf.float32))
@@ -93,7 +92,7 @@ def main(args):
 
         # use optimizer
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=args.lr, decay=args.weight_decay)
+            learning_rate=args.lr, epsilon=1e-8)
 
         # initialize graph
         dur = []
@@ -106,6 +105,13 @@ def main(args):
                 logits = model(features, training=True)
                 loss_value = tf.reduce_mean(loss_fcn(
                     labels=labels[train_mask], logits=logits[train_mask]))
+                # Manually Weight Decay
+                # We found Tensorflow has a different implementation on weight decay 
+                # of Adam(W) optimizer with PyTorch. And this results in worse results.
+                # Manually adding weights to the loss to do weight decay solves this problem.
+                for weight in model.trainable_weights:
+                    loss_value = loss_value + \
+                        args.weight_decay*tf.nn.l2_loss(weight)
 
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))
@@ -141,7 +147,7 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
                         help="which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=600,
+    parser.add_argument("--epochs", type=int, default=200,
                         help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=8,
                         help="number of hidden attention heads")
@@ -157,9 +163,9 @@ if __name__ == '__main__':
                         help="input feature dropout")
     parser.add_argument("--attn-drop", type=float, default=.6,
                         help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.002,
+    parser.add_argument("--lr", type=float, default=0.005,
                         help="learning rate")
-    parser.add_argument('--weight-decay', type=float, default=2e-4,
+    parser.add_argument('--weight-decay', type=float, default=5e-4,
                         help="weight decay")
     parser.add_argument('--negative-slope', type=float, default=0.2,
                         help="the negative slope of leaky relu")
@@ -169,5 +175,5 @@ if __name__ == '__main__':
                         help="skip re-evaluate the validation set")
     args = parser.parse_args()
     print(args)
-
+    
     main(args)

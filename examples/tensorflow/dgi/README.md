@@ -33,6 +33,6 @@ python3 train.py --dataset=pubmed --gpu=0
 
 Results
 -------
-* cora: ~81.6 (80.5-82.9) (paper: 82.3)
+* cora: ~81.6 (80.9-82.9) (paper: 82.3)
 * citeseer: ~70.2 (paper: 71.8)
 * pubmed: ~77.2 (paper: 76.8)

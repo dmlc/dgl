@@ -1,86 +1,11 @@
 import argparse
 import time
-import math
 import numpy as np
 import networkx as nx
 import tensorflow as tf
 from dgl import DGLGraph
-import dgl.function as fn
 from dgl.data import register_data_args, load_data
-from tensorflow.keras import layers
-
-
-class GCNLayer(layers.Layer):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 out_feats,
-                 activation,
-                 dropout,
-                 bias=True):
-        super(GCNLayer, self).__init__()
-        self.g = g
-
-        w_init = tf.keras.initializers.VarianceScaling(
-            scale=1.0, mode="fan_out", distribution="uniform")
-        self.weight = tf.Variable(initial_value=w_init(shape=(in_feats, out_feats),
-                                                       dtype='float32'),
-                                  trainable=True)
-        if dropout:
-            self.dropout = layers.Dropout(rate=dropout)
-        else:
-            self.dropout = 0.
-        if bias:
-            b_init = tf.zeros_initializer()
-            self.bias = tf.Variable(initial_value=b_init(shape=(out_feats,),
-                                                         dtype='float32'),
-                                    trainable=True)
-        else:
-            self.bias = None
-        self.activation = activation
-
-    def call(self, h):
-        if self.dropout:
-            h = self.dropout(h)
-        self.g.ndata['h'] = tf.matmul(h, self.weight)
-        self.g.ndata['norm_h'] = self.g.ndata['h'] * self.g.ndata['norm']
-        self.g.update_all(fn.copy_src('norm_h', 'm'),
-                          fn.sum('m', 'h'))
-        h = self.g.ndata['h']
-        if self.bias is not None:
-            h = h + self.bias
-        if self.activation:
-            h = self.activation(h)
-        return h
-
-
-class GCN(layers.Layer):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
-        super(GCN, self).__init__()
-        self.layers = []
-
-        # input layer
-        self.layers.append(
-            GCNLayer(g, in_feats, n_hidden, activation, dropout))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(
-                GCNLayer(g, n_hidden, n_hidden, activation, dropout))
-        # output layer
-        self.layers.append(GCNLayer(g, n_hidden, n_classes, None, dropout))
-
-    def call(self, features):
-        h = features
-        for layer in self.layers:
-            h = layer(h)
-        return h
+from gcn import GCN
 
 
 def evaluate(model, features, labels, mask):
@@ -123,12 +48,12 @@ def main(args):
 
         # graph preprocess and calculate normalization factor
         g = data.graph
-        g.remove_edges_from(nx.selfloop_edges(g))
+        if args.self_loop:
+            g.remove_edges_from(nx.selfloop_edges(g))
+            g.add_edges_from(zip(g.nodes(), g.nodes()))
         g = DGLGraph(g)
-        # # add self loop
-        g.add_edges(g.nodes(), g.nodes())
         n_edges = g.number_of_edges()
-        # # normalization
+        # normalization
         degs = tf.cast(tf.identity(g.in_degrees()), dtype=tf.float32)
         norm = tf.math.pow(degs, -0.5)
         norm = tf.where(tf.math.is_inf(norm), tf.zeros_like(norm), norm)
@@ -144,11 +69,12 @@ def main(args):
                     tf.nn.relu,
                     args.dropout)
 
-        optimizer = tf.keras.optimizers.Adam(
-            learning_rate=args.lr)
-
         loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True)
+        # use optimizer
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=args.lr, epsilon=1e-8)
+
         # initialize graph
         dur = []
         for epoch in range(args.n_epochs):
@@ -168,7 +94,6 @@ def main(args):
 
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))
-
             if epoch >= 3:
                 dur.append(time.time() - t0)
 
@@ -198,6 +123,9 @@ if __name__ == '__main__':
                         help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
                         help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true',
+                        help="graph self-loop (default=False)")
+    parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
 

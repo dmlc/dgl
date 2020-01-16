@@ -1,4 +1,4 @@
-"""Torch Module for APPNPConv"""
+"""TF Module for APPNPConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -45,13 +45,13 @@ class APPNPConv(layers.Layer):
         ----------
         graph : DGLGraph
             The graph.
-        feat : torch.Tensor
+        feat : tf.Tensor
             The input feature of shape :math:`(N, *)` :math:`N` is the
             number of nodes, and :math:`*` could be of any shape.
 
         Returns
         -------
-        torch.Tensor
+        tf.Tensor
             The output feature of shape :math:`(N, *)` where :math:`*`
             should be the same as input shape.
         """
