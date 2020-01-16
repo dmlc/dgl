@@ -11,26 +11,21 @@
 #include <dmlc/logging.h>
 #include <random>
 #include <thread>
-#include <unordered_map>
 
 namespace dgl {
 
 namespace {
 
 inline uint32_t GetThreadId() {
-  static std::hash<std::thread::id> kThreadIdHasher;
-  static std::unordered_map<uint32_t, uint32_t> set;
+  static int num_threads = 0;
   static std::mutex mutex;
+  static thread_local int id = -1;
 
-  uint32_t hash = kThreadIdHasher(std::this_thread::get_id());
-
-  auto result = set.find(hash);
-  if (result != set.end())
-    return result->second;
-
-  std::lock_guard<std::mutex> guard(mutex);
-  uint32_t id = set.size();
-  set[hash] = id;
+  if (id == -1) {
+    std::lock_guard<std::mutex> guard(mutex);
+    id = num_threads;
+    num_threads++;
+  }
   return id;
 }
 
