@@ -60,7 +60,8 @@ class GATConv(layers.Layer):
         self._num_heads = num_heads
         self._in_feats = in_feats
         self._out_feats = out_feats
-        xinit = tf.keras.initializers.VarianceScaling(scale=np.sqrt(2), mode="fan_avg", distribution="untruncated_normal")
+        xinit = tf.keras.initializers.VarianceScaling(scale=np.sqrt(
+            2), mode="fan_avg", distribution="untruncated_normal")
         self.fc = layers.Dense(
             out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
         self.attn_l = tf.Variable(initial_value=xinit(
