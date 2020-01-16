@@ -168,6 +168,13 @@ class IterAdapter {
  * operator[] only provide const access, use Set to mutate the content.
  *
  * \tparam T The content ObjectRef type.
+ *
+ * \note If one sees the following weird compiler error message:
+ * <code>
+ *      error: no type named 'type' in 'struct std::enable_if<false, void>'
+ * </code>
+ * Then it means you used types like int or NDArray as template arguments; use
+ * Value and convert them to int or NDArray instead.
  */
 template<typename T,
          typename = typename std::enable_if<std::is_base_of<ObjectRef, T>::value>::type >
@@ -366,6 +373,13 @@ class List : public ObjectRef {
  *
  * \tparam K The key ObjectRef type.
  * \tparam V The value ObjectRef type.
+ *
+ * \note If one sees the following weird compiler error message:
+ * <code>
+ *      error: no type named 'type' in 'struct std::enable_if<false, void>'
+ * </code>
+ * Then it means you used types like int or NDArray as template arguments; use
+ * Value and convert them to int or NDArray instead.
  */
 template<typename K,
          typename V,

@@ -38,7 +38,7 @@ template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
 template <DLDeviceType XPU, typename DType>
-int64_t IndexSelect(NDArray array, int64_t index);
+DType IndexSelect(NDArray array, int64_t index);
 
 template <DLDeviceType XPU, typename DType>
 void Assign(NDArray array, int64_t index, DType value);

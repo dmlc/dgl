@@ -101,9 +101,11 @@ class RandomEngine {
    */
   template<typename IdxType>
   IdxType Choice(FloatArray prob) {
+    IdxType result = 0;
     ATEN_XPU_SWITCH(prob->ctx.device_type, XPU, {
-      return ChoiceImpl<XPU, IdxType>(prob);
+      result = ChoiceImpl<XPU, IdxType>(prob);
     });
+    return result;
   }
 
  private:

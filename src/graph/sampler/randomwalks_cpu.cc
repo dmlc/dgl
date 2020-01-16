@@ -1,15 +1,27 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/sampler/randomwalks_cpu.cc
+ * \brief DGL sampler - CPU implementation of random walks with OpenMP
+ */
+
+#include <dgl/runtime/container.h>
+#include <dgl/array.h>
+#include <dgl/base_heterograph.h>
+#include <utility>
+#include "randomwalks_impl.h"
+
 namespace dgl {
 
 namespace sampling {
 
 namespace impl {
 
-template
-std::pair<IdArray, TypeArray> RandomWalkImpl<kDLCPU>(
+template<DLDeviceType XPU>
+std::pair<IdArray, TypeArray> RandomWalkImpl(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray etypes,
-    const FloatArray prob) {
+    const List<Value> &prob) {
   int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = etypes->shape[0] + 1;
 
@@ -25,11 +37,19 @@ std::pair<IdArray, TypeArray> RandomWalkImpl<kDLCPU>(
     TypeArray vtypes_i = vtypes.CreateView(
       {trace_length}, vtypes->dtype, i * trace_length * vtypes->dtype.bits / 8);
 
-    RandomWalkOneSeed(hg, IndexSelect(seeds, i), etypes, prob, vids_i, vtypes_i, 0.);
+    RandomWalkOneSeed(
+        hg, IndexSelect<int64_t>(seeds, i), etypes, prob, vids_i, vtypes_i, 0.);
   }
 
   return std::make_pair(vids, vtypes);
 }
+
+template
+std::pair<IdArray, TypeArray> RandomWalkImpl<kDLCPU>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray etypes,
+    const List<Value> &prob);
 
 };  // namespace impl
 
