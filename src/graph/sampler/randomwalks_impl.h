@@ -35,7 +35,7 @@ int64_t RandomWalkOneSeed(
   dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
   dgl_type_t curr_type = srctype;
   dgl_id_t curr_id = seed;
-  int64_t i = 0;
+  uint64_t i = 0;
 
   Assign(vtypes, 0, curr_type);
   Assign(vids, 0, curr_id);

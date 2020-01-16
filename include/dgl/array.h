@@ -122,7 +122,7 @@ NDArray IndexSelect(NDArray array, IdArray index);
 
 /*! \brief Writes the data to the index: A[I] = b */
 template<typename ValueType>
-void Assign(NDArray array, int64_t index, ValueType value);
+void Assign(NDArray array, uint64_t index, ValueType value);
 
 /*!
  * \brief Relabel the given ids to consecutive ids.

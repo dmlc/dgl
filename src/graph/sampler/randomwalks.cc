@@ -5,6 +5,7 @@
  */
 
 #include <dgl/runtime/container.h>
+#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <utility>
 #include "../../c_api_common.h"
@@ -44,7 +45,7 @@ std::pair<IdArray, TypeArray> RandomWalk(
 
 };  // namespace sampling
 
-DGL_REGISTER_GLOBAL("sampler.randomwalks._CAPI_DGLRandomWalk")
+DGL_REGISTER_GLOBAL("sampler.randomwalks._CAPI_DGLSamplingRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     IdArray seeds = args[1];

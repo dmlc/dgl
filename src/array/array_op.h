@@ -38,10 +38,10 @@ template <DLDeviceType XPU, typename DType, typename IdType>
 NDArray IndexSelect(NDArray array, IdArray index);
 
 template <DLDeviceType XPU, typename DType>
-DType IndexSelect(NDArray array, int64_t index);
+DType IndexSelect(NDArray array, uint64_t index);
 
 template <DLDeviceType XPU, typename DType>
-void Assign(NDArray array, int64_t index, DType value);
+void Assign(NDArray array, uint64_t index, DType value);
 
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);

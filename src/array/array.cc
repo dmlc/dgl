@@ -223,15 +223,27 @@ ValueType IndexSelect(NDArray array, uint64_t index) {
   });
   return ret;
 }
+template int32_t IndexSelect<int32_t>(NDArray array, uint64_t index);
+template int64_t IndexSelect<int64_t>(NDArray array, uint64_t index);
+template uint32_t IndexSelect<uint32_t>(NDArray array, uint64_t index);
+template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
+template float IndexSelect<float>(NDArray array, uint64_t index);
+template double IndexSelect<double>(NDArray array, uint64_t index);
 
 template<typename ValueType>
-void Assign(NDArray array, int64_t index, ValueType value) {
+void Assign(NDArray array, uint64_t index, ValueType value) {
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       impl::Assign<XPU, DType>(array, index, static_cast<DType>(value));
     });
   });
 }
+template void Assign<int32_t>(NDArray array, uint64_t index, int32_t value);
+template void Assign<int64_t>(NDArray array, uint64_t index, int64_t value);
+template void Assign<uint32_t>(NDArray array, uint64_t index, uint32_t value);
+template void Assign<uint64_t>(NDArray array, uint64_t index, uint64_t value);
+template void Assign<float>(NDArray array, uint64_t index, float value);
+template void Assign<double>(NDArray array, uint64_t index, double value);
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
