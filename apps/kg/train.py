@@ -294,7 +294,7 @@ def run(args, logger):
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
-    if args.num_proc >= 1:
+    if args.num_proc > 1 or args.async_update:
         model.share_memory()
 
     # train
@@ -332,13 +332,21 @@ def run(args, logger):
                 proc.start()
 
             total_metrics = {}
+            metrics = {}
+            logs = []
             for i in range(args.num_proc):
+                log = queue.get()
+                logs = logs + log
+                '''
                 metrics = queue.get()
                 for k, v in metrics.items():
                     if i == 0:
                         total_metrics[k] = v / args.num_proc
                     else:
                         total_metrics[k] += v / args.num_proc
+                '''
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             for k, v in metrics.items():
                 print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 

@@ -121,12 +121,13 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
 
         metrics = {}
         if len(logs) > 0:
-            for metric in logs[0].keys():
-                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-        if queue is not None:
-            queue.put(metrics)
-        else:
-            for k, v in metrics.items():
-                print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
+            if queue is not None:
+                queue.put(logs)
+            else:
+                for metric in logs[0].keys():
+                    metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+
+                for k, v in metrics.items():
+                    print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
