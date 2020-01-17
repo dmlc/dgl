@@ -27,4 +27,7 @@ MUTAG: accuracy 75% (DGL), 73.23% (paper)
 python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0
 ```
 
-BGS: OOM
+BGS: accuracy 79.3% (DGL n-base=25), 83.10% (paper n-base=40)
+```
+python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 25 --testing --gpu 0 --relabel
+```
