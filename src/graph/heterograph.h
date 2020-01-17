@@ -102,16 +102,16 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->FindEdges(0, eids);
   }
 
-  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    return GetRelationGraph(etype)->InEdges(0, vid);
+  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst = true) const override {
+    return GetRelationGraph(etype)->InEdges(0, vid, need_dst);
   }
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override {
     return GetRelationGraph(etype)->InEdges(0, vids);
   }
 
-  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    return GetRelationGraph(etype)->OutEdges(0, vid);
+  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src = true) const override {
+    return GetRelationGraph(etype)->OutEdges(0, vid, need_src);
   }
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override {

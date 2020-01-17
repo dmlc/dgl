@@ -199,7 +199,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
                      eids};
   }
 
-  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
+  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst) const override {
     LOG(INFO) << "Not enabled for COO graph.";
     return {};
   }
@@ -209,7 +209,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return {};
   }
 
-  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
+  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src) const override {
     LOG(INFO) << "Not enabled for COO graph.";
     return {};
   }
@@ -509,7 +509,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
+  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst) const override {
     LOG(INFO) << "Not enabled for CSR graph.";
     return {};
   }
@@ -519,11 +519,15 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
+  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src) const override {
     CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
     IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
     IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
-    IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+    IdArray ret_src;
+    if (need_src)
+      ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+    else
+      ret_src = aten::NewIdArray(0, ret_dst->ctx, NumBits());
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
@@ -736,8 +740,8 @@ EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
   return GetCOO()->FindEdges(etype, eids);
 }
 
-EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
-  const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid);
+EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst) const {
+  const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid, need_dst);
   return {ret.dst, ret.src, ret.id};
 }
 
@@ -746,8 +750,8 @@ EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
   return {ret.dst, ret.src, ret.id};
 }
 
-EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
-  return GetOutCSR()->OutEdges(etype, vid);
+EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src) const {
+  return GetOutCSR()->OutEdges(etype, vid, need_src);
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {

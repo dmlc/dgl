@@ -10,6 +10,7 @@
 #include <utility>
 #include "../../c_api_common.h"
 #include "randomwalks.h"
+#include <dgl/profile.h>
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -51,26 +52,36 @@ std::pair<IdArray, TypeArray> RandomWalk(
     const IdArray seeds,
     const TypeArray metapath,
     const List<Value> &prob) {
-  EXPECT_INT(seeds, "seeds");
-  EXPECT_INT(metapath, "metapath");
-  EXPECT_NDIM(seeds, 1, "seeds");
-  EXPECT_NDIM(metapath, 1, "metapath");
-  for (uint64_t i = 0; i < prob.size(); ++i) {
-    FloatArray p = prob[i]->data;
-    EXPECT_FLOAT(p, "probability");
-    if (!IsEmpty(p)) {
-      EXPECT_NDIM(p, 1, "probability");
-    }
-  }
+  TIMEIT_ALLOC(T, iter, 10);
 
-  auto inconsistent_idx = IsInconsistent(hg, metapath);
-  CHECK(inconsistent_idx == -1) << "metapath inconsistent between position " <<
-    (inconsistent_idx - 1) << " and " << inconsistent_idx;
+  TIMEIT(T, 0, {
+    EXPECT_INT(seeds, "seeds");
+    EXPECT_INT(metapath, "metapath");
+    EXPECT_NDIM(seeds, 1, "seeds");
+    EXPECT_NDIM(metapath, 1, "metapath");
+    for (uint64_t i = 0; i < prob.size(); ++i) {
+      FloatArray p = prob[i]->data;
+      EXPECT_FLOAT(p, "probability");
+      if (!IsEmpty(p)) {
+        EXPECT_NDIM(p, 1, "probability");
+      }
+    }
+  });
+
+  TIMEIT(T, 1, {
+    auto inconsistent_idx = IsInconsistent(hg, metapath);
+    CHECK(inconsistent_idx == -1) << "metapath inconsistent between position " <<
+      (inconsistent_idx - 1) << " and " << inconsistent_idx;
+  });
 
   std::pair<IdArray, TypeArray> result;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    result = impl::RandomWalkImpl<XPU>(hg, seeds, metapath, prob);
+  TIMEIT(T, 2, {
+    ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+      result = impl::RandomWalkImpl<XPU>(hg, seeds, metapath, prob);
+    });
   });
+
+  TIMEIT_CHECK(T, iter, 3, 10, "");
 
   return result;
 }

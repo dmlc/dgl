@@ -49,7 +49,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   DType accum, taken;             // accumulated likelihood
   std::vector<Idx> K;             // alias table
   std::vector<DType> U;           // probability table
-  DType *_prob;                   // category distribution
+  const DType *_prob;             // category distribution
   int64_t _num_categories;        // size of prob
   std::vector<bool> used;         // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;    // index mapping, activated when replace=false;
@@ -172,7 +172,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   RandomEngine *re;
   Idx N;
   DType accum, taken;
-  DType *_prob;                 // category distribution
+  const DType *_prob;           // category distribution
   int64_t _num_categories;      // size of prob
   std::vector<DType> cdf;       // cumulative distribution function
   std::vector<bool> used;       // indicate availability, activated when replace=false;
@@ -206,7 +206,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
 
  public:
   void ResetState(const DType *prob, int64_t num_categories) {
-    used.resize(prob.size());
+    used.resize(num_categories);
     if (!replace) {
       _prob = prob;
       _num_categories = num_categories;

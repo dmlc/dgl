@@ -35,18 +35,18 @@ void _TestWithReplacement(RandomEngine *re) {
 
   auto _check_random_choice = [n_categories, n_rolls, &prob]() {
     std::vector<Idx> counter(n_categories, 0);
-    FloatArray p = VecToFloatArray(prob);
+    FloatArray p = aten::VecToNDArray(prob);
     for (Idx i = 0; i < n_rolls; ++i) {
-      Idx dice = RandomEngine::ThreadLocal()->Choice(p);
+      Idx dice = RandomEngine::ThreadLocal()->Choice<Idx>(p);
       counter[dice]++;
     }
     for (Idx i = 0; i < n_categories; ++i)
       ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
   };
 
-  utils::AliasSampler<Idx, DType, true> as(re, prob);
-  utils::CDFSampler<Idx, DType, true> cs(re, prob);
-  utils::TreeSampler<Idx, DType, true> ts(re, prob);
+  utils::AliasSampler<Idx, DType, true> as(re, prob.data(), prob.size());
+  utils::CDFSampler<Idx, DType, true> cs(re, prob.data(), prob.size());
+  utils::TreeSampler<Idx, DType, true> ts(re, prob.data(), prob.size());
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);
@@ -78,9 +78,9 @@ void _TestWithoutReplacementOrder(RandomEngine *re) {
     }
   };
 
-  utils::AliasSampler<Idx, DType, false> as(re, prob);
-  utils::CDFSampler<Idx, DType, false> cs(re, prob);
-  utils::TreeSampler<Idx, DType, false> ts(re, prob);
+  utils::AliasSampler<Idx, DType, false> as(re, prob.data(), prob.size());
+  utils::CDFSampler<Idx, DType, false> cs(re, prob.data(), prob.size());
+  utils::TreeSampler<Idx, DType, false> ts(re, prob.data(), prob.size());
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);
@@ -116,9 +116,9 @@ void _TestWithoutReplacementUnique(RandomEngine *re) {
       ASSERT_EQ(cnt[i], 1);
   };
 
-  utils::AliasSampler<Idx, DType, false> as(re, likelihood);
-  utils::CDFSampler<Idx, DType, false> cs(re, likelihood);
-  utils::TreeSampler<Idx, DType, false> ts(re, likelihood);
+  utils::AliasSampler<Idx, DType, false> as(re, likelihood.data(), likelihood.size());
+  utils::CDFSampler<Idx, DType, false> cs(re, likelihood.data(), likelihood.size());
+  utils::TreeSampler<Idx, DType, false> ts(re, likelihood.data(), likelihood.size());
   _check_given_sampler(&as);
   _check_given_sampler(&cs);
   _check_given_sampler(&ts);

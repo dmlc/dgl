@@ -105,11 +105,11 @@ class UnitGraph : public BaseHeteroGraph {
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override;
 
-  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override;
+  EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst = true) const override;
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override;
 
-  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override;
+  EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src = true) const override;
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override;
 
