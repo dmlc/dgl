@@ -433,7 +433,8 @@ def heterograph(data_dict, num_nodes_dict=None):
         if isinstance(data, DGLHeteroGraph):
             rel_graphs.append(data)
         elif srctype == dsttype:
-            rel_graphs.append(graph(data, srctype, etype, 
+            rel_graphs.append(graph(
+                data, srctype, etype,
                 card=num_nodes_dict[srctype], validate=False))
         else:
             rel_graphs.append(bipartite(
@@ -736,10 +737,12 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     v = utils.toindex(v)
 
     if validate:
-        if urange is not None and len(u) > 0 and urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
+        if urange is not None and len(u) > 0 and
+            urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
-        if vrange is not None and len(v) > 0 and vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
+        if vrange is not None and len(v) > 0 and
+            vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
     urange = urange or (
@@ -1008,7 +1011,8 @@ def create_from_networkx_bipartite(nx_graph,
                 dst.append(bottom_map[e[1]])
     src = utils.toindex(src)
     dst = utils.toindex(dst)
-    g = create_from_edges(src, dst, utype, etype, vtype, len(top_nodes), len(bottom_nodes), validate=False)
+    g = create_from_edges(src, dst, utype, etype, vtype,
+        len(top_nodes), len(bottom_nodes), validate=False)
 
     # TODO attributes
     assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'
