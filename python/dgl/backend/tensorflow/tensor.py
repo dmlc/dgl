@@ -385,7 +385,7 @@ def zerocopy_from_dgl_ndarray(input):
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
 
     @tf.custom_gradient
     def _lambda(lhs_data, rhs_data):
@@ -467,13 +467,13 @@ def binary_reduce_real(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     return out_data, grad
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map,
-                out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
     @tf.custom_gradient
-    def _labmda(in_data):
+    def _lambda(in_data):
         return copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
                                 out_map)
-    return _labmda(in_data)
+    return _lambda(in_data)
 
 
 def copy_reduce_real(reducer, graph, target, in_data, out_size, in_map,
