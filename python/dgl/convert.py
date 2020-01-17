@@ -1011,7 +1011,8 @@ def create_from_networkx_bipartite(nx_graph,
                 dst.append(bottom_map[e[1]])
     src = utils.toindex(src)
     dst = utils.toindex(dst)
-    g = create_from_edges(src, dst, utype, etype, vtype,
+    g = create_from_edges(
+        src, dst, utype, etype, vtype,
         len(top_nodes), len(bottom_nodes), validate=False)
 
     # TODO attributes
