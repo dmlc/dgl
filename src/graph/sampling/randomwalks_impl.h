@@ -4,8 +4,8 @@
  * \brief DGL sampler - templated implementation of random walks
  */
 
-#ifndef SAMPLER_RANDOMWALKS_IMPL_H_
-#define SAMPLER_RANDOMWALKS_IMPL_H_
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/runtime/container.h>
@@ -93,4 +93,4 @@ int64_t RandomWalkOneSeed(
 
 };  // namespace dgl
 
-#endif  // SAMPLER_RANDOMWALKS_IMPL_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
