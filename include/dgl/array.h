@@ -115,7 +115,6 @@ BoolArray LT(IdArray lhs, dgl_id_t rhs);
 IdArray HStack(IdArray arr1, IdArray arr2);
 
 /*! \brief Return the data under the index. In numpy notation, A[I] */
-// TODO: change IndexSelect implementation
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);

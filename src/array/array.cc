@@ -202,7 +202,7 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
 
 NDArray IndexSelect(NDArray array, IdArray index) {
   NDArray ret;
-  // TODO (BarclayII): check if array and index match in context
+  // TODO(BarclayII): check if array and index match in context
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
     ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
       ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {

@@ -61,7 +61,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
       return id_mapping[x];
   }
 
-  void Reconstruct(const DType *prob, int64_t num_categories) { // Reconstruct alias table
+  void Reconstruct(const DType *prob, int64_t num_categories) {   // Reconstruct alias table
     N = 0;
     accum = 0.;
     taken = 0.;
