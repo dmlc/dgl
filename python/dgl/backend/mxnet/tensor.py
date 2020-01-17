@@ -18,10 +18,7 @@ if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
-dgl_mx_np_shape = os.environ.get('DGL_MXNET_NP_SHAPE', '1')
-if dgl_mx_np_shape.isdigit():
-    if int(dgl_mx_np_shape) == 1:
-        mx.set_np_shape(True)
+mx.set_np_shape(bool(os.environ.get('DGL_MXNET_SET_NP_SHAPE', True)))
 
 def data_type_dict():
     return {'float16' : np.float16,
