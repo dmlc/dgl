@@ -442,7 +442,7 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
   ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 64)
 
 #define EXPECT(cond, prop, value_name, dtype_name) \
-  CHECK(cond) << "Expecting" << (prop) << " of " << (value_name) << " to be " << (dtype_name)
+  CHECK(cond) << "Expecting " << (prop) << " of " << (value_name) << " to be " << (dtype_name)
 
 #define EXPECT_INT32(value, value_name) \
   EXPECT(IS_INT32(value), "dtype", value_name, "int32")

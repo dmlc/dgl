@@ -5,6 +5,7 @@ from .._ffi.function import _init_api
 from .. import backend as F
 from ..base import DGLError
 from .. import ndarray as nd
+from .. import utils
 
 __all__ = [
     'random_walk']
@@ -65,8 +66,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gi = g._graph
-    nodes = F.zerocopy_to_dgl_ndarray(nodes)
-    metapath = nd.array(metapath, ctx=nodes.ctx)
+    nodes = utils.toindex(nodes).todgltensor()
+    metapath = utils.toindex(metapath).todgltensor().copyto(nodes.ctx)
 
     if p is None:
         p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
