@@ -737,11 +737,11 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     v = utils.toindex(v)
 
     if validate:
-        if urange is not None and len(u) > 0 and
+        if urange is not None and len(u) > 0 and \
             urange <= int(F.asnumpy(F.max(u.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 urange, int(F.asnumpy(F.max(u.tousertensor(), dim=0)))))
-        if vrange is not None and len(v) > 0 and
+        if vrange is not None and len(v) > 0 and \
             vrange <= int(F.asnumpy(F.max(v.tousertensor(), dim=0))):
             raise DGLError('Invalid node id {} (should be less than cardinality {}).'.format(
                 vrange, int(F.asnumpy(F.max(v.tousertensor(), dim=0)))))
