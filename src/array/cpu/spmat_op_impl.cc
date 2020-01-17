@@ -68,16 +68,6 @@ struct PairHash {
   }
 };
 
-template <typename DType>
-inline runtime::NDArray VecToNDArray(const std::vector<DType>& vec,
-    DLDataType dtype, DLContext ctx) {
-  const int64_t len = vec.size();
-  NDArray ret_arr = NDArray::Empty({len}, dtype, ctx);
-  DType* ptr = static_cast<DType*>(ret_arr->data);
-  std::copy(vec.begin(), vec.end(), ptr);
-  return ret_arr;
-}
-
 inline bool CSRHasData(CSRMatrix csr) {
   return csr.data.defined();
 }

@@ -124,6 +124,18 @@ NDArray IndexSelect(NDArray array, IdArray index);
 template<typename ValueType>
 void Assign(NDArray array, uint64_t index, ValueType value);
 
+/*! \brief Check if an array is empty (i.e. have 0 elements) */
+inline bool IsEmpty(NDArray array) {
+  if (array->ndim == 0)
+    return false;     // scalar
+
+  for (int i = 0; i < array->ndim; ++i)
+    if (array->shape[i] == 0)
+      return true;
+
+  return false;
+}
+
 /*!
  * \brief Relabel the given ids to consecutive ids.
  *

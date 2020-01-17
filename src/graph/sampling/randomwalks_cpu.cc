@@ -20,15 +20,15 @@ template<DLDeviceType XPU>
 std::pair<IdArray, TypeArray> RandomWalkImpl(
     const HeteroGraphPtr hg,
     const IdArray seeds,
-    const TypeArray etypes,
+    const TypeArray metapath,
     const List<Value> &prob) {
   int64_t num_seeds = seeds->shape[0];
-  int64_t trace_length = etypes->shape[0] + 1;
+  int64_t trace_length = metapath->shape[0] + 1;
 
   IdArray vids = IdArray::Empty(
     {num_seeds, trace_length}, seeds->dtype, seeds->ctx);
   TypeArray vtypes = TypeArray::Empty(
-    {num_seeds, trace_length}, etypes->dtype, etypes->ctx);
+    {num_seeds, trace_length}, metapath->dtype, metapath->ctx);
 
 #pragma omp parallel for
   for (int64_t i = 0; i < num_seeds; ++i) {
@@ -38,7 +38,7 @@ std::pair<IdArray, TypeArray> RandomWalkImpl(
       {trace_length}, vtypes->dtype, i * trace_length * vtypes->dtype.bits / 8);
 
     RandomWalkOneSeed(
-        hg, IndexSelect<int64_t>(seeds, i), etypes, prob, vids_i, vtypes_i, 0.);
+        hg, IndexSelect<int64_t>(seeds, i), metapath, prob, vids_i, vtypes_i, 0.);
   }
 
   return std::make_pair(vids, vtypes);
@@ -48,7 +48,7 @@ template
 std::pair<IdArray, TypeArray> RandomWalkImpl<kDLCPU>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
-    const TypeArray etypes,
+    const TypeArray metapath,
     const List<Value> &prob);
 
 };  // namespace impl

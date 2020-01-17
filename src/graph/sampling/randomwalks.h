@@ -25,7 +25,7 @@ template<DLDeviceType XPU>
 std::pair<IdArray, TypeArray> RandomWalkImpl(
     const HeteroGraphPtr hg,
     const IdArray seeds,
-    const TypeArray etypes,
+    const TypeArray metapath,
     const List<Value> &prob);
 
 };  // namespace impl

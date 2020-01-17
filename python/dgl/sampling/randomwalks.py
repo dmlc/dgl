@@ -12,19 +12,19 @@ __all__ = [
 def random_walk(g, nodes, *, metapath=None, length=None, p=None):
     """Generate random walk traces from an array of seed nodes (or starting nodes),
     based on the given metapath.
-   
+
     For a single seed node, ``num_traces`` traces would be generated.  A trace would
-   
+
     1. Start from the given seed and set ``t`` to 0.
     2. Pick and traverse along edge type ``metapath[t]`` from the current node.
     3. If no edge can be found, halt.  Otherwise, increment ``t`` and go to step 2.
-   
+
     The returned traces all have length ``len(metapath) + 1``, where the first node
     is the seed node itself.
-   
+
     If a random walk stops in advance, the trace is padded with -1 to have the same
     length.
-   
+
     Parameters
     ----------
     g : DGLGraph
@@ -43,7 +43,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
         probabilities associated with each edge for choosing the next node.
         The feature tensor must be non-negative.
         If omitted, we assume the neighbors are picked uniformly.
- 
+
     Returns
     -------
     traces : Tensor
@@ -62,7 +62,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
             raise ValueError("Please specify either the metapath or the random walk length.")
         metapath = [0] * length
     else:
-        metapath = np.array([g.get_etype_id(etype) for etype in metapath])
+        metapath = [g.get_etype_id(etype) for etype in metapath]
 
     gi = g._graph
     nodes = F.zerocopy_to_dgl_ndarray(nodes)
@@ -72,7 +72,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
         p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
     else:
         p_nd = []
-        for etype in canonical_etypes:
+        for etype in g.canonical_etypes:
             if p in g.edges[etype].data:
                 prob_nd = F.zerocopy_to_dgl_ndarray(g.edges[etype].data[p])
                 if prob_nd.ctx != nodes.ctx:
@@ -84,8 +84,8 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
             p_nd.append(prob_nd)
 
     traces, types = _CAPI_DGLSamplingRandomWalk(gi, nodes, metapath, p_nd)
-    traces = F.zerocopy_from_dgl_ndarray(traces)
-    types = F.zerocopy_from_dgl_ndarray(types)
+    traces = F.zerocopy_from_dgl_ndarray(traces.data)
+    types = F.zerocopy_from_dgl_ndarray(types.data)
     return traces, types
 
 _init_api('dgl.sampling.randomwalks', __name__)
