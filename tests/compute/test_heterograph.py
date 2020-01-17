@@ -634,14 +634,14 @@ def test_convert_bound():
     def _test_bipartite_bound(data, card):
         try:
             dgl.bipartite(data, card=card)
-        except AssertionError:
+        except dgl.DGLError:
             return
         assert False, 'bipartite bound test with wrong uid failed'
 
     def _test_graph_bound(data, card):
         try:
             dgl.graph(data, card=card)
-        except AssertionError:
+        except dgl.DGLError:
             return
         assert False, 'graph bound test with wrong uid failed'
 
