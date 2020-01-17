@@ -1,4 +1,3 @@
-
 """Tensorflow Module for Relational graph convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
