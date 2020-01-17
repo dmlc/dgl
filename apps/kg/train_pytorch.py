@@ -76,9 +76,9 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         if (step + 1) % args.log_interval == 0:
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
-                print('[Train]({}/{}) average {}: {}'.format(step, args.max_step, k, v))
+                print('[Train {}]({}/{}) average {}: {}'.format(rank, step, args.max_step, k, v))
             logs = []
-            print('[Train] {} steps take {:.3f} seconds'.format(args.log_interval,
+            print('[Train {}] {} steps take {:.3f} seconds'.format(rank, args.log_interval,
                                                             time.time() - start))
             print('sample: {:.3f}, forward: {:.3f}, backward: {:.3f}, update: {:.3f}'.format(
                 sample_time, forward_time, backward_time, update_time))
@@ -89,7 +89,9 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             start = time.time()
 
         if args.valid and (step + 1) % args.eval_interval == 0 and valid_samplers is not None:
-            metrics = test(args, model, valid_samplers, mode='Valid')
+            if args.strict_rel_part:
+                model.writeback_relation(gpu_id, rel_parts)
+            metrics = test(args, model, valid_samplers, rank=rank, mode='Valid')
             if queue is not None:
                 queue.put(metrics)
     print('train {} takes {:.3f} seconds'.format(rank, time.time() - train_start))

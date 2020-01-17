@@ -311,18 +311,19 @@ def run(args, logger):
             procs.append(proc)
             proc.start()
 
-        print('#eval:', int(args.max_step / args.eval_interval))
-        for epoch in range(int(args.max_step / args.eval_interval)):
-            total_metrics = {}
-            for i in range(args.num_proc):
-                metrics = queue.get()
-                for k, v in metrics.items():
-                    if i == 0:
-                        total_metrics[k] = v / args.num_proc
-                    else:
-                        total_metrics[k] += v / args.num_proc
-            for k, v in total_metrics.items():
-                print('Epoch {}: {}: {}'.format(epoch, k, v))
+        if args.valid:
+            print('#eval:', int(args.max_step / args.eval_interval))
+            for epoch in range(int(args.max_step / args.eval_interval)):
+                total_metrics = {}
+                for i in range(args.num_proc):
+                    metrics = queue.get()
+                    for k, v in metrics.items():
+                        if i == 0:
+                            total_metrics[k] = v / args.num_proc
+                        else:
+                            total_metrics[k] += v / args.num_proc
+                for k, v in total_metrics.items():
+                    print('Epoch {}: {}: {}'.format(epoch, k, v))
 
         for proc in procs:
             proc.join()
