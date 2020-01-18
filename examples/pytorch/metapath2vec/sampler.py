@@ -92,10 +92,11 @@ def generate_metapath():
         traces, _ = dgl.sampling.random_walk(
                 hg, [conf_idx] * num_walks_per_node, metapath=['cp', 'pa', 'ap', 'pc'] * walk_length)
         for tr in traces:
-            outline = ' '.join(
-                    (conf_names if i % 4 == 0 else author_names)[tr[i]]
-                    for i in range(0, len(tr), 2))  # skip paper
-            print(outline, file=output_path)
+            pass
+            #outline = ' '.join(
+            #        (conf_names if i % 4 == 0 else author_names)[tr[i]]
+            #        for i in range(0, len(tr), 2))  # skip paper
+            #print(outline, file=output_path)
     output_path.close()
 
 

@@ -10,7 +10,6 @@
 #include <utility>
 #include "../../c_api_common.h"
 #include "randomwalks.h"
-#include <dgl/profile.h>
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -51,37 +50,27 @@ std::pair<IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const List<Value> &prob) {
-  TIMEIT_ALLOC(T, iter, 10);
-
-  TIMEIT(T, 0, {
-    EXPECT_INT(seeds, "seeds");
-    EXPECT_INT(metapath, "metapath");
-    EXPECT_NDIM(seeds, 1, "seeds");
-    EXPECT_NDIM(metapath, 1, "metapath");
-    for (uint64_t i = 0; i < prob.size(); ++i) {
-      FloatArray p = prob[i]->data;
-      EXPECT_FLOAT(p, "probability");
-      if (!IsEmpty(p)) {
-        EXPECT_NDIM(p, 1, "probability");
-      }
+    const std::vector<FloatArray> &prob) {
+  EXPECT_INT(seeds, "seeds");
+  EXPECT_INT(metapath, "metapath");
+  EXPECT_NDIM(seeds, 1, "seeds");
+  EXPECT_NDIM(metapath, 1, "metapath");
+  for (uint64_t i = 0; i < prob.size(); ++i) {
+    FloatArray p = prob[i];
+    EXPECT_FLOAT(p, "probability");
+    if (!IsEmpty(p)) {
+      EXPECT_NDIM(p, 1, "probability");
     }
-  });
+  }
 
-  TIMEIT(T, 1, {
-    auto inconsistent_idx = IsInconsistent(hg, metapath);
-    CHECK(inconsistent_idx == -1) << "metapath inconsistent between position " <<
-      (inconsistent_idx - 1) << " and " << inconsistent_idx;
-  });
+  auto inconsistent_idx = IsInconsistent(hg, metapath);
+  CHECK(inconsistent_idx == -1) << "metapath inconsistent between position " <<
+    (inconsistent_idx - 1) << " and " << inconsistent_idx;
 
   std::pair<IdArray, TypeArray> result;
-  TIMEIT(T, 2, {
-    ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-      result = impl::RandomWalkImpl<XPU>(hg, seeds, metapath, prob);
-    });
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+    result = impl::RandomWalkImpl<XPU>(hg, seeds, metapath, prob);
   });
-
-  TIMEIT_CHECK(T, iter, 3, 10, "");
 
   return result;
 }
@@ -95,7 +84,12 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalk")
     TypeArray metapath = args[2];
     List<Value> prob = args[3];
 
-    auto result = sampling::RandomWalk(hg.sptr(), seeds, metapath, prob);
+    std::vector<FloatArray> prob_vec;
+    prob_vec.reserve(prob.size());
+    for (Value val : prob)
+      prob_vec.push_back(val->data);
+
+    auto result = sampling::RandomWalk(hg.sptr(), seeds, metapath, prob_vec);
     List<Value> ret;
     ret.push_back(Value(MakeValue(result.first)));
     ret.push_back(Value(MakeValue(result.second)));

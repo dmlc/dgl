@@ -26,7 +26,7 @@ std::pair<IdArray, TypeArray> RandomWalkImpl(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const List<Value> &prob);
+    const std::vector<FloatArray> &prob);
 
 };  // namespace impl
 
