@@ -8,6 +8,117 @@ import sys
 import pickle
 import time
 
+# Given a list of relations and the number of edges that belong to the relation,
+# we greedily assign relations and edges to a set of partitions to ensure that
+# each partition has the same number of edges and roughly the same number of
+# relations.
+def greedy_assign(uniq, cnts, edge_cnts, rel_cnts, rel_dict, rel_parts):
+    for i in range(len(cnts)):
+        cnt = cnts[i]
+        r = uniq[i]
+        idx = np.argmin(edge_cnts)
+        rel_dict[r] = idx
+        rel_parts[idx].append(r)
+        edge_cnts[idx] += cnt
+        rel_cnts[idx] += 1
+
+def BucketRelationPartition(edges, n):
+    heads, rels, tails = edges
+    uniq, cnts = np.unique(rels, return_counts=True)
+    idx = np.flip(np.argsort(cnts))
+    cnts = cnts[idx]
+    uniq = uniq[idx]
+    num_edges = len(rels)
+
+    part_size = int(num_edges / n)
+    # If a relation has edges more than half of a partition size, we consider this relation
+    # a giant relation.
+    idx = cnts > (part_size / 10)
+    giant_rels = uniq[idx]
+
+    # Get the remaining relations.
+    idx = np.logical_not(idx)
+    cnts = cnts[idx]
+    uniq = uniq[idx]
+
+    # split the relations into buckets.
+    buckets = []
+    size = 16
+    while len(cnts) > 0:
+        cnts1 = cnts[:size]
+        uniq1 = uniq[:size]
+        cnts = cnts[size:]
+        uniq = uniq[size:]
+        buckets.append((cnts1, uniq1))
+        size *= 2
+
+    edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_dict = {}
+    rel_parts = []
+    for _ in range(n):
+        rel_parts.append([])
+
+    for cnts1, uniq1 in buckets:
+        # random permute relations.
+        rand_idx = np.random.permutation(len(cnts1))
+        cnts1 = cnts1[rand_idx]
+        uniq1 = uniq1[rand_idx]
+        greedy_assign(uniq1, cnts1, edge_cnts, rel_cnts, rel_dict, rel_parts)
+
+    parts = []
+    for i in range(n):
+        parts.append([])
+    # We partition giant relations and evenly split them into all partitions.
+    # Here we assume we don't have many giant relations.
+    selected_idx = np.zeros(len(rels))
+    print('there are {} giant relations'.format(len(giant_rels)))
+    for giant_rel in giant_rels:
+        idx = (rels == giant_rel)
+        selected_idx += idx
+        giant_eids = np.nonzero(idx)[0]
+        giant_eids = np.random.permutation(giant_eids)
+        step_size = int(len(giant_eids)/n + 1)
+        giant_parts = np.split(giant_eids, np.arange(step_size, len(giant_eids), step_size))
+        for i, giant_part in enumerate(giant_parts):
+            parts[i].append(giant_part)
+
+    # Here we store unpopular relations into partitions. Each relation appears
+    # in one of the partition.
+    small_parts = []
+    for i in range(n):
+        small_parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
+    # let's store the edge index to each partition first.
+    for eid in np.nonzero(selected_idx == 0)[0]:
+        r = rels[eid]
+        part_idx = rel_dict[r]
+        small_parts[part_idx].append(eid)
+    for i, part in enumerate(small_parts):
+        small_parts[i] = np.array(part, dtype=np.int64)
+
+    # Put all edges together in each partition.
+    for i, part in enumerate(parts):
+        small_part = small_parts[i]
+        part.append(small_part)
+        part = np.concatenate(part)
+        parts[i] = part
+        print('part {} has {} edges and {} relations'.format(i, len(part), len(rel_parts[i]) + len(giant_rels)))
+
+    # shuffle edges
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+
+    # rel_parts only contains unpopular relations. Popular relations are split into all partitions.
+    return parts, rel_parts
+
+
 # This partitions a list of edges based on relations and make sure
 # each relation only fall into one partition.
 def StrictRelationPartition(edges, n):
@@ -24,14 +135,7 @@ def StrictRelationPartition(edges, n):
     rel_parts = []
     for _ in range(n):
         rel_parts.append([])
-    for i in range(len(cnts)):
-        cnt = cnts[i]
-        r = uniq[i]
-        idx = np.argmin(edge_cnts)
-        rel_dict[r] = idx
-        rel_parts[idx].append(r)
-        edge_cnts[idx] += cnt
-        rel_cnts[idx] += 1
+    greedy_assign(uniq, cnts, edge_cnts, rel_cnts, rel_dict, rel_parts)
     for i, edge_cnt in enumerate(edge_cnts):
         print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
 
@@ -45,6 +149,7 @@ def StrictRelationPartition(edges, n):
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
+
     shuffle_idx = np.concatenate(parts)
     heads[:] = heads[shuffle_idx]
     rels[:] = rels[shuffle_idx]
@@ -168,7 +273,7 @@ class TrainDataset(object):
         if ranks > 1 and args.strict_rel_part:
             self.edge_parts, self.rel_parts = StrictRelationPartition(triples, ranks)
         elif ranks > 1 and args.rel_part:
-            self.edge_parts, self.rel_parts = BalancedRelationPartition(triples, ranks)
+            self.edge_parts, self.rel_parts = BucketRelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
