@@ -45,10 +45,13 @@ int64_t RandomWalkOneSeed(
     dgl_type_t dsttype = src_dst_type.second;
 
     // find all successors
-    EdgeArray edges = hg->OutEdges(etype, curr_id);
-    IdArray succs = edges.dst;
-    IdArray eids = edges.id;
-    int64_t size = succs->shape[0];
+    //EdgeArray edges = hg->OutEdges(etype, curr_id, false);
+    //IdArray succs = edges.dst;
+    //IdArray eids = edges.id;
+    //int64_t size = succs->shape[0];
+    auto succs = hg->SuccVec(etype, curr_id);
+    auto eids = hg->OutEdgeVec(etype, curr_id);
+    int64_t size = succs.size();
     if (size == 0)
       // no successors; halt and pad
       break;
@@ -60,10 +63,14 @@ int64_t RandomWalkOneSeed(
       // uniform if empty prob array is given
       sel = RandomEngine::ThreadLocal()->RandInt(size);
     } else {
-      FloatArray selected_probs = IndexSelect(p_etype, eids);
+      //FloatArray selected_probs = IndexSelect(p_etype, eids);
+      FloatArray selected_probs = FloatArray::Empty({eids.size()}, p_etype->dtype, p_etype->ctx);
+      for (int64_t i = 0; i < eids.size(); ++i)
+        Assign(selected_probs, i, IndexSelect<float>(p_etype, eids[i]));
       sel = RandomEngine::ThreadLocal()->Choice<int64_t>(selected_probs);
     }
-    curr_id = IndexSelect<int64_t>(succs, sel);
+    //curr_id = IndexSelect<int64_t>(succs, sel);
+    curr_id = succs[sel];
     curr_type = dsttype;
 
     Assign(vtypes, i + 1, curr_type);
@@ -99,7 +106,6 @@ std::pair<IdArray, TypeArray> RandomWalkImpl(
   TypeArray vtypes = TypeArray::Empty(
     {num_seeds, trace_length}, metapath->dtype, metapath->ctx);
 
-#pragma omp parallel for
   for (int64_t i = 0; i < num_seeds; ++i) {
     IdArray vids_i = vids.CreateView(
       {trace_length}, vids->dtype, i * trace_length * vids->dtype.bits / 8);
