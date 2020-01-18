@@ -195,7 +195,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \param vid The vertex id.
    * \return the edges
    */
-  virtual EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid, bool need_dst = true) const = 0;
+  virtual EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const = 0;
 
   /*!
    * \brief Get the in edges of the vertices.
@@ -215,7 +215,7 @@ class BaseHeteroGraph : public runtime::Object {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  virtual EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid, bool need_src = true) const = 0;
+  virtual EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const = 0;
 
   /*!
    * \brief Get the out edges of the vertices.

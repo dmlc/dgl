@@ -22,11 +22,17 @@ namespace sampling {
 namespace impl {
 
 template<DLDeviceType XPU>
-std::pair<IdArray, TypeArray> RandomWalkImpl(
+TypeArray GetNodeTypesFromMetapath(
+    const HeteroGraphPtr hg,
+    const TypeArray metapath);
+
+template<DLDeviceType XPU>
+IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob);
+    const std::vector<FloatArray> &prob,
+    double restart_prob = 0);
 
 };  // namespace impl
 

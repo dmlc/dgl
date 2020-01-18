@@ -50,7 +50,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
     traces : Tensor
         A 2-dimensional node ID tensor with shape (num_seeds, len(metapath) + 1).
     types : Tensor
-        A 2-dimensional node type ID tensor with shape (num_seeds, len(metapath) + 1).
+        A 1-dimensional node type ID tensor with shape (len(metapath) + 1).
         The type IDs match the ones in the original graph ``g``.
     """
     n_etypes = len(g.canonical_etypes)

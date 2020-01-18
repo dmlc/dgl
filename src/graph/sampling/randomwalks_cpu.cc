@@ -9,6 +9,7 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/random.h>
 #include <utility>
+#include "randomwalks.h"
 
 namespace dgl {
 
@@ -19,112 +20,104 @@ namespace sampling {
 
 namespace impl {
 
-int64_t RandomWalkOneSeed(
+template<>
+TypeArray GetNodeTypesFromMetapath<kDLCPU>(
     const HeteroGraphPtr hg,
-    dgl_id_t seed,
-    const TypeArray metapath,
-    const std::vector<FloatArray> &transition_prob,
-    IdArray vids,
-    IdArray vtypes,
-    double restart_prob) {
+    const TypeArray metapath) {
   uint64_t num_etypes = metapath->shape[0];
+  TypeArray result = TypeArray::Empty(
+      {metapath->shape[0] + 1}, metapath->dtype, metapath->ctx);
 
-  dgl_type_t etype = IndexSelect<int64_t>(metapath, 0);
-  dgl_type_t curr_type = hg->GetEndpointTypes(etype).first;
-  dgl_id_t curr_id = seed;
-  uint64_t i = 0;
+  const dgl_type_t *metapath_data = static_cast<dgl_type_t *>(metapath->data);
+  dgl_type_t *result_data = static_cast<dgl_type_t *>(result->data);
 
-  Assign(vtypes, 0, curr_type);
-  Assign(vids, 0, curr_id);
+  dgl_type_t etype = metapath_data[0];
+  dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
+  dgl_type_t curr_type = srctype;
+  result_data[0] = curr_type;
 
-  // Perform random walk
-  for (; i < num_etypes; ++i) {
-    // get edge type and endpoint node types
-    etype = IndexSelect<int64_t>(metapath, i);
+  for (uint64_t i = 0; i < num_etypes; ++i) {
+    etype = metapath_data[i];
     auto src_dst_type = hg->GetEndpointTypes(etype);
+    dgl_type_t srctype = src_dst_type.first;
     dgl_type_t dsttype = src_dst_type.second;
 
-    // find all successors
-    //EdgeArray edges = hg->OutEdges(etype, curr_id, false);
-    //IdArray succs = edges.dst;
-    //IdArray eids = edges.id;
-    //int64_t size = succs->shape[0];
-    auto succs = hg->SuccVec(etype, curr_id);
-    auto eids = hg->OutEdgeVec(etype, curr_id);
-    int64_t size = succs.size();
-    if (size == 0)
-      // no successors; halt and pad
-      break;
-
-    // pick one successor
-    int64_t sel;
-    FloatArray p_etype = transition_prob[etype];
-    if (IsEmpty(p_etype)) {
-      // uniform if empty prob array is given
-      sel = RandomEngine::ThreadLocal()->RandInt(size);
-    } else {
-      //FloatArray selected_probs = IndexSelect(p_etype, eids);
-      FloatArray selected_probs = FloatArray::Empty({eids.size()}, p_etype->dtype, p_etype->ctx);
-      for (int64_t i = 0; i < eids.size(); ++i)
-        Assign(selected_probs, i, IndexSelect<float>(p_etype, eids[i]));
-      sel = RandomEngine::ThreadLocal()->Choice<int64_t>(selected_probs);
+    if (srctype != curr_type) {
+      LOG(FATAL) << "source of edge type #" << i <<
+        " does not match destination of edge type #" << i - 1;
+      return result;
     }
-    //curr_id = IndexSelect<int64_t>(succs, sel);
-    curr_id = succs[sel];
     curr_type = dsttype;
-
-    Assign(vtypes, i + 1, curr_type);
-    Assign(vids, i + 1, curr_id);
-
-    // determine if terminate the trace
-    double p = RandomEngine::ThreadLocal()->Uniform<double>();
-    if (p < restart_prob)
-      break;
+    result_data[i + 1] = dsttype;
   }
-
-  int64_t len = i;  // record and return number of hops jumped
-  // pad
-  for (; i < num_etypes; ++i) {
-    Assign(vtypes, i + 1, -1);
-    Assign(vids, i + 1, -1);
-  }
-
-  return len;
+  return result;
 }
 
-template<DLDeviceType XPU>
-std::pair<IdArray, TypeArray> RandomWalkImpl(
+template<>
+IdArray RandomWalk<kDLCPU>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob) {
-  int64_t num_seeds = seeds->shape[0];
+    const std::vector<FloatArray> &prob,
+    double restart_prob) {
   int64_t trace_length = metapath->shape[0] + 1;
+  int64_t num_seeds = seeds->shape[0];
+  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
 
-  IdArray vids = IdArray::Empty(
-    {num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-  TypeArray vtypes = TypeArray::Empty(
-    {num_seeds, trace_length}, metapath->dtype, metapath->ctx);
+  const dgl_type_t *metapath_data = static_cast<dgl_type_t *>(metapath->data);
+  const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
+  dgl_id_t *traces_data = static_cast<dgl_id_t *>(traces->data);
 
-  for (int64_t i = 0; i < num_seeds; ++i) {
-    IdArray vids_i = vids.CreateView(
-      {trace_length}, vids->dtype, i * trace_length * vids->dtype.bits / 8);
-    TypeArray vtypes_i = vtypes.CreateView(
-      {trace_length}, vtypes->dtype, i * trace_length * vtypes->dtype.bits / 8);
+#pragma omp parallel for
+  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
+    int64_t i;
+    dgl_id_t curr = seed_data[seed_id];
+    traces_data[seed_id * trace_length] = curr;
 
-    RandomWalkOneSeed(
-        hg, IndexSelect<int64_t>(seeds, i), metapath, prob, vids_i, vtypes_i, 0.);
+    for (i = 0; i < metapath->shape[0]; ++i) {
+      dgl_type_t etype = metapath_data[i];
+
+      const auto &succ = hg->SuccVec(etype, curr);
+      int64_t size = succ.size();
+      if (size == 0)
+        // no successor, stop
+        break;
+
+      FloatArray prob_etype = prob[etype];
+      if (prob_etype->shape[0] == 0) {
+        // empty probability array; assume uniform
+        curr = succ[RandomEngine::ThreadLocal()->RandInt(size)];
+      } else {
+        // non-uniform random walk
+        const auto eids = hg->OutEdgeVec(etype, curr);
+        FloatArray prob_selected = FloatArray::Empty(
+            {size}, prob_etype->dtype, prob_etype->ctx);
+
+        // do an IndexSelect on OutEdgeVec which is not an NDArray
+        ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
+          const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
+          DType *prob_selected_data = static_cast<DType *>(prob_selected->data);
+          for (int64_t i = 0; i < size; ++i)
+            prob_selected_data[i] = prob_etype_data[eids[i]];
+        });
+
+        curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
+      }
+
+      traces_data[seed_id * trace_length + i + 1] = curr;
+
+      // restart probability
+      if (restart_prob > 0 && RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob)
+        break;
+    }
+
+    // pad
+    for (; i < metapath->shape[0]; ++i)
+      traces_data[seed_id * trace_length + i + 1] = -1;
   }
 
-  return std::make_pair(vids, vtypes);
+  return traces;
 }
-
-template
-std::pair<IdArray, TypeArray> RandomWalkImpl<kDLCPU>(
-    const HeteroGraphPtr hg,
-    const IdArray seeds,
-    const TypeArray metapath,
-    const std::vector<FloatArray> &prob);
 
 };  // namespace impl
 

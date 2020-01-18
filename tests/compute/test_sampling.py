@@ -3,6 +3,10 @@ import backend as F
 import numpy as np
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None):
+    for j in range(traces.shape[1] - 1):
+        assert ntypes[j] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[0])
+        assert ntypes[j + 1] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[2])
+
     for i in range(traces.shape[0]):
         for j in range(traces.shape[1] - 1):
             assert g.has_edge_between(
@@ -11,8 +15,6 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
                 p = F.asnumpy(g.edges[metapath[j]].data['p'])
                 eids = g.edge_id(traces[i, j], traces[i, j+1], etype=metapath[j])
                 assert p[eids] != 0
-            assert ntypes[i, j] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[0])
-            assert ntypes[i, j + 1] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[2])
 
 def test_random_walk():
     g1 = dgl.heterograph({

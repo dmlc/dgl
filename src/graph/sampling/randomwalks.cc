@@ -23,27 +23,9 @@ namespace {
 /*!
  * \brief Check if dsttype of metapath[i-1] == srctype of metapath[i].
  *
- * \return -1 if the metapath is consistent, or the index where the source and destination type
+ * \return 0 if the metapath is consistent, or the index where the source and destination type
  * does not match.
  */
-int64_t IsInconsistent(const HeteroGraphPtr hg, const TypeArray metapath) {
-  uint64_t num_etypes = metapath->shape[0];
-  dgl_type_t etype = IndexSelect<int64_t>(metapath, 0);
-  dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
-  dgl_type_t curr_type = srctype;
-  for (uint64_t i = 0; i < num_etypes; ++i) {
-    etype = IndexSelect<int64_t>(metapath, i);
-    auto src_dst_type = hg->GetEndpointTypes(etype);
-    dgl_type_t srctype = src_dst_type.first;
-    dgl_type_t dsttype = src_dst_type.second;
-
-    if (srctype != curr_type)
-      return i;
-    curr_type = dsttype;
-  }
-  return -1;
-}
-
 };  // namespace
 
 std::pair<IdArray, TypeArray> RandomWalk(
@@ -63,16 +45,14 @@ std::pair<IdArray, TypeArray> RandomWalk(
     }
   }
 
-  auto inconsistent_idx = IsInconsistent(hg, metapath);
-  CHECK(inconsistent_idx == -1) << "metapath inconsistent between position " <<
-    (inconsistent_idx - 1) << " and " << inconsistent_idx;
-
-  std::pair<IdArray, TypeArray> result;
+  TypeArray vtypes;
+  IdArray vids;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    result = impl::RandomWalkImpl<XPU>(hg, seeds, metapath, prob);
+    vtypes = impl::GetNodeTypesFromMetapath<XPU>(hg, metapath);
+    vids = impl::RandomWalk<XPU>(hg, seeds, metapath, prob);
   });
 
-  return result;
+  return std::make_pair(vids, vtypes);
 }
 
 };  // namespace sampling
