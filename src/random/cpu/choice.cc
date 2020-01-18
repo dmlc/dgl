@@ -17,18 +17,15 @@
 
 namespace dgl {
 
-template<DLDeviceType XPU, typename IdxType>
-IdxType RandomEngine::ChoiceImpl(FloatArray prob) {
-  IdxType result = 0;
-  ATEN_FLOAT_TYPE_SWITCH(prob->dtype, DType, "probability", {
-      utils::TreeSampler<IdxType, DType, true> sampler(
-          this, static_cast<DType *>(prob->data), prob->shape[0]);
-    result = sampler.Draw();
-  });
-  return result;
+template<typename IdxType, typename ValueType>
+IdxType RandomEngine::Choice(const std::vector<ValueType> &prob) {
+  utils::TreeSampler<IdxType, ValueType, true> sampler(this, prob);
+  return sampler.Draw();
 }
 
-template int32_t RandomEngine::ChoiceImpl<kDLCPU, int32_t>(FloatArray prob);
-template int64_t RandomEngine::ChoiceImpl<kDLCPU, int64_t>(FloatArray prob);
+template int32_t RandomEngine::Choice<int32_t, float>(const std::vector<float> &);
+template int64_t RandomEngine::Choice<int64_t, float>(const std::vector<float> &);
+template int32_t RandomEngine::Choice<int32_t, double>(const std::vector<double> &);
+template int64_t RandomEngine::Choice<int64_t, double>(const std::vector<double> &);
 
 };  // namespace dgl

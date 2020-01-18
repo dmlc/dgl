@@ -21,12 +21,12 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU>
+template<DLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
 
-template<DLDeviceType XPU>
+template<DLDeviceType XPU, typename IdxType>
 IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,

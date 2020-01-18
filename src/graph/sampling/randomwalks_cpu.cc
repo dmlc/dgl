@@ -20,16 +20,16 @@ namespace sampling {
 
 namespace impl {
 
-template<>
-TypeArray GetNodeTypesFromMetapath<kDLCPU>(
+template<DLDeviceType XPU, typename IdxType>
+TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath) {
   uint64_t num_etypes = metapath->shape[0];
   TypeArray result = TypeArray::Empty(
       {metapath->shape[0] + 1}, metapath->dtype, metapath->ctx);
 
-  const dgl_type_t *metapath_data = static_cast<dgl_type_t *>(metapath->data);
-  dgl_type_t *result_data = static_cast<dgl_type_t *>(result->data);
+  const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
+  IdxType *result_data = static_cast<IdxType *>(result->data);
 
   dgl_type_t etype = metapath_data[0];
   dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
@@ -53,8 +53,17 @@ TypeArray GetNodeTypesFromMetapath<kDLCPU>(
   return result;
 }
 
-template<>
-IdArray RandomWalk<kDLCPU>(
+template
+TypeArray GetNodeTypesFromMetapath<kDLCPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const TypeArray metapath);
+template
+TypeArray GetNodeTypesFromMetapath<kDLCPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const TypeArray metapath);
+
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -64,9 +73,9 @@ IdArray RandomWalk<kDLCPU>(
   int64_t num_seeds = seeds->shape[0];
   IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
 
-  const dgl_type_t *metapath_data = static_cast<dgl_type_t *>(metapath->data);
-  const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
-  dgl_id_t *traces_data = static_cast<dgl_id_t *>(traces->data);
+  const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
+  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
+  IdxType *traces_data = static_cast<IdxType *>(traces->data);
 
 #pragma omp parallel for
   for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
@@ -77,8 +86,19 @@ IdArray RandomWalk<kDLCPU>(
     for (i = 0; i < metapath->shape[0]; ++i) {
       dgl_type_t etype = metapath_data[i];
 
+#ifdef NO_SUCCVEC
+      const auto &etype_csr = hg->GetAdj(etype, true, "csr");
+      const IdxType *offsets = static_cast<IdxType *>(etype_csr[0]->data);
+      const IdxType *all_succ = static_cast<IdxType *>(etype_csr[1]->data);
+      const IdxType *all_eids = static_cast<IdxType *>(etype_csr[2]->data);
+      const IdxType *succ = all_succ + offsets[curr];
+      const IdxType *eids = all_eids + offsets[curr];
+
+      int64_t size = offsets[curr + 1] - offsets[curr];
+#else
       const auto &succ = hg->SuccVec(etype, curr);
       int64_t size = succ.size();
+#endif
       if (size == 0)
         // no successor, stop
         break;
@@ -88,20 +108,18 @@ IdArray RandomWalk<kDLCPU>(
         // empty probability array; assume uniform
         curr = succ[RandomEngine::ThreadLocal()->RandInt(size)];
       } else {
+#ifndef NO_SUCCVEC
+        const auto &eids = hg->OutEdgeVec(etype, curr);
+#endif
         // non-uniform random walk
-        const auto eids = hg->OutEdgeVec(etype, curr);
-        FloatArray prob_selected = FloatArray::Empty(
-            {size}, prob_etype->dtype, prob_etype->ctx);
-
-        // do an IndexSelect on OutEdgeVec which is not an NDArray
         ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
           const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
-          DType *prob_selected_data = static_cast<DType *>(prob_selected->data);
+          std::vector<DType> prob_selected;
           for (int64_t i = 0; i < size; ++i)
-            prob_selected_data[i] = prob_etype_data[eids[i]];
-        });
+            prob_selected.push_back(prob_etype_data[eids[i]]);
 
-        curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
+          curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
+        });
       }
 
       traces_data[seed_id * trace_length + i + 1] = curr;
@@ -118,6 +136,21 @@ IdArray RandomWalk<kDLCPU>(
 
   return traces;
 }
+
+template
+IdArray RandomWalk<kDLCPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob);
+template
+IdArray RandomWalk<kDLCPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob);
 
 };  // namespace impl
 

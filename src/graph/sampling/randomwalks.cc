@@ -18,16 +18,6 @@ namespace dgl {
 
 namespace sampling {
 
-namespace {
-
-/*!
- * \brief Check if dsttype of metapath[i-1] == srctype of metapath[i].
- *
- * \return 0 if the metapath is consistent, or the index where the source and destination type
- * does not match.
- */
-};  // namespace
-
 std::pair<IdArray, TypeArray> RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
@@ -48,8 +38,10 @@ std::pair<IdArray, TypeArray> RandomWalk(
   TypeArray vtypes;
   IdArray vids;
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    vtypes = impl::GetNodeTypesFromMetapath<XPU>(hg, metapath);
-    vids = impl::RandomWalk<XPU>(hg, seeds, metapath, prob);
+    ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
+      vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
+      vids = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
+    });
   });
 
   return std::make_pair(vids, vtypes);
