@@ -147,6 +147,15 @@ class TransRScore(nn.Module):
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
 
+    def share_memory(self, strict_rel_part):
+        self.projection_emb.share_memory()  
+
+    def set_emb(self, emb):
+        self.projection_emb = emb
+
+    def get_emb(self):
+        return self.projection_emb
+
     def create_neg(self, neg_head):
         gamma = self.gamma
         if neg_head:
