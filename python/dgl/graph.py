@@ -3573,9 +3573,12 @@ class DGLGraph(DGLBaseGraph):
         return DGLGraph(graph_data=self._graph,
                         node_frame=local_node_frame,
                         edge_frame=local_edge_frame,
+                        readonly=self.is_readonly,
                         batch_size=self.batch_size,
                         batch_num_nodes=self.batch_num_nodes,
-                        batch_num_edges=self.batch_num_edges)
+                        batch_num_edges=self.batch_num_edges,
+                        parent=self._parent,
+                        sgi=self._subgraph_index)
 
     @contextmanager
     def local_scope(self):

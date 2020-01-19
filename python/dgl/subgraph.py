@@ -40,6 +40,7 @@ class DGLSubGraph(DGLGraph):
     """
     def __init__(self, parent, sgi, shared=False):
         super(DGLSubGraph, self).__init__(graph_data=sgi.graph,
+                                          readonly=True,
                                           parent=parent,
                                           sgi=sgi)
         if shared:
