@@ -205,9 +205,9 @@ class BatchedDGLGraph(DGLGraph):
         batch_num_edges = []
         for grh in graph_list:
             # handle the input is again a batched graph.
-            batch_size += grh._batch_size
-            batch_num_nodes += grh._batch_num_nodes
-            batch_num_edges += grh._batch_num_edges
+            batch_size += grh.batch_size
+            batch_num_nodes += grh.batch_num_nodes
+            batch_num_edges += grh.batch_num_edges
 
         super(BatchedDGLGraph, self).__init__(graph_data=batched_index,
                                               node_frame=batched_node_frame,

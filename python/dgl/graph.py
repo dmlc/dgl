@@ -114,8 +114,7 @@ class DGLBaseGraph(object):
         """Return True if the graph contains node `vid`.
 
         Examples
-        -------fjcchuuclfkgudhedllrfendednivngdukutkrtcjg
-        -
+        --------
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> 0 in G
@@ -905,8 +904,10 @@ class DGLGraph(DGLBaseGraph):
                  readonly=False,
                  sort_csr=False,
                  batch_size=1,
-                 batch_num_nodes=[],
-                 batch_num_edges=[]):
+                 batch_num_nodes=None,
+                 batch_num_edges=None,
+                 parent=None,
+                 sgi=None):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
@@ -940,13 +941,20 @@ class DGLGraph(DGLBaseGraph):
         self._apply_node_func = None
         self._apply_edge_func = None
 
+        # batched graph
         self._batch_size = batch_size
-        if batch_size == 1:
-            self._batch_num_nodes = [self.number_of_nodes()]
-            self._batch_num_edges = [self.number_of_edges()]
+        self._batch_num_nodes = batch_num_nodes
+        self._batch_num_edges = batch_num_edges
+
+        # subgraph
+        self._parent = parent
+        if sgi is not None:
+            self._parent_nid = sgi.induced_nodes
+            self._parent_eid = sgi.induced_edges
         else:
-            self._batch_num_nodes = batch_num_nodes
-            self._batch_num_edges = batch_num_edges
+            self._parent_nid = None
+            self._parent_eid = None
+        self._subgraph_index = sgi
 
     def _get_msg_index(self):
         if self._msg_index is None:
@@ -1264,6 +1272,85 @@ class DGLGraph(DGLBaseGraph):
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
         self._graph = sgi.graph
+
+    @property
+    def parent_nid(self):
+        """Get the parent node ids.
+
+        The returned tensor can be used as a map from the node id
+        in this subgraph to the node id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent node id array.
+        """
+        return self._parent_nid.tousertensor()
+
+    def _get_parent_eid(self):
+        # The parent eid might be lazily evaluated and thus may not
+        # be an index. Instead, it's a lambda function that returns
+        # an index.
+        if isinstance(self._parent_eid, utils.Index):
+            return self._parent_eid
+        else:
+            return self._parent_eid()
+
+    @property
+    def parent_eid(self):
+        """Get the parent edge ids.
+
+        The returned tensor can be used as a map from the edge id
+        in this subgraph to the edge id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent edge id array.
+        """
+        return self._get_parent_eid().tousertensor()
+
+    def copy_to_parent(self, inplace=False):
+        """Write node/edge features to the parent graph.
+
+        Parameters
+        ----------
+        inplace : bool
+            If true, use inplace write (no gradient but faster)
+        """
+        self._parent._node_frame.update_rows(
+            self._parent_nid, self._node_frame, inplace=inplace)
+        if self._parent._edge_frame.num_rows != 0:
+            self._parent._edge_frame.update_rows(
+                self._get_parent_eid(), self._edge_frame, inplace=inplace)
+
+    def copy_from_parent(self):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+        """
+        if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
+            self._node_frame = FrameRef(Frame(
+                self._parent._node_frame[self._parent_nid]))
+        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
+            self._edge_frame = FrameRef(Frame(
+                self._parent._edge_frame[self._get_parent_eid()]))
+
+    def map_to_subgraph_nid(self, parent_vids):
+        """Map the node Ids in the parent graph to the node Ids in the subgraph.
+
+        Parameters
+        ----------
+        parent_vids : list, tensor
+            The node ID array in the parent graph.
+
+        Returns
+        -------
+        tensor
+            The node ID array in the subgraph.
+        """
+        v = graph_index.map_to_subgraph_nid(self._subgraph_index, utils.toindex(parent_vids))
+        return v.tousertensor()
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -1749,7 +1836,10 @@ class DGLGraph(DGLBaseGraph):
         -------
         list
             Number of nodes of each graph in this batch."""
-        return self._batch_num_nodes
+        if self._batch_num_nodes is None:
+            return [self.number_of_nodes()]
+        else:
+            return self._batch_num_nodes
 
     @property
     def batch_num_edges(self):
@@ -1759,8 +1849,10 @@ class DGLGraph(DGLBaseGraph):
         -------
         list
             Number of edges of each graph in this batch."""
-        return self._batch_num_edges
-
+        if self._batch_num_edges is None:
+            return [self.number_of_edges()]
+        else:
+            return self._batch_num_edges
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
@@ -3481,9 +3573,9 @@ class DGLGraph(DGLBaseGraph):
         return DGLGraph(graph_data=self._graph,
                         node_frame=local_node_frame,
                         edge_frame=local_edge_frame,
-                        batch_size=self._batch_size,
-                        batch_num_nodes=self._batch_num_nodes,
-                        batch_num_edges=self._batch_num_edges)
+                        batch_size=self.batch_size,
+                        batch_num_nodes=self.batch_num_nodes,
+                        batch_num_edges=self.batch_num_edges)
 
     @contextmanager
     def local_scope(self):
