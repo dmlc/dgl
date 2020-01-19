@@ -34,7 +34,7 @@ def BucketRelationPartition(edges, n):
     part_size = int(num_edges / n)
     # If a relation has edges more than half of a partition size, we consider this relation
     # a giant relation.
-    idx = cnts > (part_size / 10)
+    idx = cnts > (part_size / 2)
     giant_rels = uniq[idx]
 
     # Get the remaining relations.
