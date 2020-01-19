@@ -1,11 +1,8 @@
 """Class for subgraph data structure."""
 from __future__ import absolute_import
 
-from .frame import Frame, FrameRef
 from .graph import DGLGraph
-from . import utils
 from .base import DGLError
-from .graph_index import map_to_subgraph_nid
 
 class DGLSubGraph(DGLGraph):
     """The subgraph class.

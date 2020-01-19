@@ -948,13 +948,12 @@ class DGLGraph(DGLBaseGraph):
 
         # subgraph
         self._parent = parent
+        self._parent_nid = None
+        self._parent_eid = None
+        self._subgraph_index = sgi
         if sgi is not None:
             self._parent_nid = sgi.induced_nodes
             self._parent_eid = sgi.induced_edges
-        else:
-            self._parent_nid = None
-            self._parent_eid = None
-        self._subgraph_index = sgi
 
     def _get_msg_index(self):
         if self._msg_index is None:
@@ -3713,5 +3712,3 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed()
-
-

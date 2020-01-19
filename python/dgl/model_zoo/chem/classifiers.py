@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
-from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
 from ...nn.pytorch import WeightAndSum

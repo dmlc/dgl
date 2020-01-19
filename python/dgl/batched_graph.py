@@ -736,7 +736,7 @@ def _broadcast_on(graph, typestr, feat_data):
     tensor
         The node/edge features tensor with shape :math:`(N, *)`.
     """
-    _, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
+    _, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
 
     batch_num_objs = getattr(graph, batch_num_objs_attr)
     index = []
@@ -792,7 +792,7 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     with all zero; in the second returned tensor, the behavior of :math:`n+1`
     to :math:`k`th elements is not defined.
     """
-    data_attr, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
     if F.ndim(data[feat]) > 2:
         raise DGLError('The {} feature `{}` should have dimension less than or'

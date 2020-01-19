@@ -4,7 +4,6 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from ... import BatchedDGLGraph
 from ...backend import pytorch as F
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes

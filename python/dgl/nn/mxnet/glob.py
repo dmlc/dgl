@@ -3,7 +3,6 @@
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 
-from ... import BatchedDGLGraph
 from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
