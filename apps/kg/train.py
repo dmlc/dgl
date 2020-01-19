@@ -53,7 +53,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='negative sample proportional to vertex degree in the training')
         self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree in the evaluation')
-        self.add_argument('--neg_sample_size_valid', type=int, default=1000,
+        self.add_argument('--neg_sample_size_valid', type=int, default=-1,
                           help='negative sampling size for validation')
         self.add_argument('--neg_chunk_size_valid', type=int, default=-1,
                           help='chunk size of the negative edges.')
@@ -153,6 +153,8 @@ def run(args, logger):
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = n_entities
+    if args.neg_sample_size_valid < 0:
+        args.neg_sample_size_valid = n_entities
     args.eval_filter = not args.no_eval_filter
     if args.neg_deg_sample_eval:
         assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
@@ -302,13 +304,29 @@ def run(args, logger):
     # train
     start = time.time()
     if args.num_proc > 1:
+        queue = mp.Queue(args.num_proc)
         procs = []
         for i in range(args.num_proc):
             rel_parts = train_data.rel_parts if args.rel_part or args.strict_rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers))
+            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers, queue))
             procs.append(proc)
             proc.start()
+
+        if args.valid:
+            print('#eval:', int(args.max_step / args.eval_interval))
+            for epoch in range(int(args.max_step / args.eval_interval)):
+                total_metrics = {}
+                for i in range(args.num_proc):
+                    metrics = queue.get()
+                    for k, v in metrics.items():
+                        if i == 0:
+                            total_metrics[k] = v / args.num_proc
+                        else:
+                            total_metrics[k] += v / args.num_proc
+                for k, v in total_metrics.items():
+                    print('Epoch {}: {}: {}'.format(epoch, k, v))
+
         for proc in procs:
             proc.join()
     else:
@@ -350,6 +368,7 @@ def run(args, logger):
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             for k, v in metrics.items():
+
                 print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 
             for proc in procs:
