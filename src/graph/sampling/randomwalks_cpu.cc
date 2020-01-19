@@ -82,6 +82,7 @@ IdArray RandomWalk(
   // Prefetch all edges.
   // This forces the heterograph to materialize all OutCSR's before the OpenMP loop;
   // otherwise data races will happen.
+  // TODO(BarclayII): should we later on materialize COO/CSR/CSC anyway unless told otherwise?
   std::vector<std::vector<IdArray> > edges_by_type;
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
@@ -95,13 +96,9 @@ IdArray RandomWalk(
     for (i = 0; i < metapath->shape[0]; ++i) {
       dgl_type_t etype = metapath_data[i];
 
-      // Get CSR of edge type.
-      //
-      // Note that the selection of successors is very lightweight (especially in the uniform
-      // case), we want to reduce the overheads (even from object copies or object construction)
-      // as much as possible.
-      //
-      // Using GetAdj() slows down by 1x due to returning std::vector with copies of NDArrays.
+      // Note that since the selection of successors is very lightweight (especially in the
+      // uniform case), we want to reduce the overheads (even from object copies or object
+      // construction) as much as possible.
       // Using Successors() slows down by 2x.
       // Using OutEdges() slows down by 10x.
       const auto &csr_arrays = edges_by_type[etype];
@@ -120,10 +117,10 @@ IdArray RandomWalk(
         IdxType idx = RandomEngine::ThreadLocal()->RandInt(size);
         curr = succ[idx];
       } else {
+        // non-uniform random walk
         const IdxType *all_eids = static_cast<IdxType *>(csr_arrays[2]->data);
         const IdxType *eids = all_eids + offsets[curr];
 
-        // non-uniform random walk
         ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
           const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
           std::vector<DType> prob_selected;
@@ -141,7 +138,7 @@ IdArray RandomWalk(
         break;
     }
 
-    // pad
+    // pad if the random walk stops early (either due to restart or lack of successors)
     for (; i < metapath->shape[0]; ++i)
       traces_data[seed_id * trace_length + i + 1] = -1;
   }

@@ -119,10 +119,6 @@ template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
 
-/*! \brief Writes the data to the index: A[I] = b */
-template<typename ValueType>
-void Assign(NDArray array, uint64_t index, ValueType value);
-
 /*! \brief Check if an array is empty (i.e. have 0 elements) */
 inline bool IsEmpty(NDArray array) {
   if (array->ndim == 0)
