@@ -353,13 +353,20 @@ def run(args, logger):
             metrics = {}
             logs = []
             for i in range(args.num_proc):
+                log = queue.get()
+                logs = logs + log
+                '''
                 metrics = queue.get()
                 for k, v in metrics.items():
                     if i == 0:
                         total_metrics[k] = v / args.num_proc
                     else:
                         total_metrics[k] += v / args.num_proc
-            for k, v in total_metrics.items():
+                '''
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+            for k, v in metrics.items():
+
                 print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 
             for proc in procs:
