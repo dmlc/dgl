@@ -159,10 +159,6 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetAdj(0, transpose, fmt);
   }
 
-  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override {
-    return GetRelationGraph(etype)->GetCSRAdj(0, transpose);
-  }
-
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(

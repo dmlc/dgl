@@ -10,6 +10,7 @@
 #include <dgl/random.h>
 #include <dmlc/omp.h>
 #include <utility>
+#include <iomanip>
 #include "randomwalks.h"
 
 namespace dgl {
@@ -78,31 +79,13 @@ IdArray RandomWalk(
   const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
   IdxType *traces_data = static_cast<IdxType *>(traces->data);
 
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t t;
-    for (t = 0; t < metapath->shape[0]; ++t) {
-      dgl_type_t etype = metapath_data[t];
-      const CSRMatrix &csr = hg->GetCSRAdj(etype, true);
-      const IdxType *offsets = static_cast<IdxType *>(csr.indptr->data);
-      const IdxType *all_succ = static_cast<IdxType *>(csr.indices->data);
-      const IdxType *all_eids = static_cast<IdxType *>(csr.data->data);
+  // Prefetch all edges.
+  // This forces the heterograph to materialize all OutCSR's before the OpenMP loop;
+  // otherwise data races will happen.
+  std::vector<std::vector<IdArray> > edges_by_type;
+  for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
+    edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
-#pragma omp critical
-      {
-        int i;
-        std::cout << "---" << omp_get_thread_num() << "---" << std::endl;
-        for (i = 0; i < csr.num_rows; ++i)
-          std::cout << offsets[i] << ' ';
-        std::cout << std::endl;
-        for (i = 0; i < csr.indices->shape[0]; ++i)
-          std::cout << all_succ[i] << ':' << all_eids[i] << ' ';
-        std::cout << std::endl;
-      }
-    }
-  }
-
-#if 0
 #pragma omp parallel for
   for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
     int64_t i;
@@ -121,19 +104,12 @@ IdArray RandomWalk(
       // Using GetAdj() slows down by 1x due to returning std::vector with copies of NDArrays.
       // Using Successors() slows down by 2x.
       // Using OutEdges() slows down by 10x.
-      const CSRMatrix &csr = hg->GetCSRAdj(etype, true);
-      const IdxType *offsets = static_cast<IdxType *>(csr.indptr->data);
-      const IdxType *all_succ = static_cast<IdxType *>(csr.indices->data);
+      const auto &csr_arrays = edges_by_type[etype];
+      const IdxType *offsets = static_cast<IdxType *>(csr_arrays[0]->data);
+      const IdxType *all_succ = static_cast<IdxType *>(csr_arrays[1]->data);
       const IdxType *succ = all_succ + offsets[curr];
 
       int64_t size = offsets[curr + 1] - offsets[curr];
-#pragma omp critical
-      {
-        std::cout << omp_get_thread_num() << ' ' << size << std::endl;
-        for (int i = 0; i < csr.num_rows; ++i)
-          std::cout << offsets[i] << ' ';
-        std::cout << std::endl;
-      }
       if (size == 0)
         // no successor, stop
         break;
@@ -142,13 +118,9 @@ IdArray RandomWalk(
       if (prob_etype->shape[0] == 0) {
         // empty probability array; assume uniform
         IdxType idx = RandomEngine::ThreadLocal()->RandInt(size);
-#pragma omp critical
-        {
-          std::cout << "A" << omp_get_thread_num() << ' ' << idx << std::endl;
-        }
         curr = succ[idx];
       } else {
-        const IdxType *all_eids = static_cast<IdxType *>(csr.data->data);
+        const IdxType *all_eids = static_cast<IdxType *>(csr_arrays[2]->data);
         const IdxType *eids = all_eids + offsets[curr];
 
         // non-uniform random walk
@@ -173,7 +145,6 @@ IdArray RandomWalk(
     for (; i < metapath->shape[0]; ++i)
       traces_data[seed_id * trace_length + i + 1] = -1;
   }
-#endif
 
   return traces;
 }

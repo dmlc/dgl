@@ -134,8 +134,6 @@ class UnitGraph : public BaseHeteroGraph {
   std::vector<IdArray> GetAdj(
       dgl_type_t etype, bool transpose, const std::string &fmt) const override;
 
-  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override;
-
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(

@@ -334,11 +334,6 @@ class BaseHeteroGraph : public runtime::Object {
       dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
 
   /*!
-   * \brief Get CSR matrix
-   */
-  virtual const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const = 0;
-
-  /*!
    * \brief Extract the induced subgraph by the given vertices.
    * 
    * The length of the given vector should be equal to the number of vertex types.

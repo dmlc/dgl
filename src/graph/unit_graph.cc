@@ -48,8 +48,6 @@ inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
   return {};
 }
 
-static aten::CSRMatrix _dummy_csr;
-
 };  // namespace
 
 //////////////////////////////////////////////////////////
@@ -277,11 +275,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     } else {
       return {aten::HStack(adj_.row, adj_.col)};
     }
-  }
-
-  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override {
-    LOG(FATAL) << "Not enabled for COO graph.";
-    return _dummy_csr;
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -608,10 +601,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {adj_.indptr, adj_.indices, adj_.data};
   }
 
-  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override {
-    return adj_;
-  }
-
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -837,11 +826,6 @@ std::vector<IdArray> UnitGraph::GetAdj(
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};
   }
-}
-
-const aten::CSRMatrix &UnitGraph::GetCSRAdj(dgl_type_t etype, bool transpose) const {
-  auto csr = transpose ? GetOutCSR() : GetInCSR();
-  return csr->GetCSRAdj(etype, false);
 }
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
