@@ -39,7 +39,7 @@ class EntityClassify(BaseRGCN):
 
     def build_output_layer(self):
         return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
-                self.num_bases, activation=partial(F.softmax, dim=1),
+                self.num_bases, activation=partial(F.log_softmax, dim=1),
                 self_loop=self.use_self_loop)
 
 def main(args):
@@ -107,7 +107,7 @@ def main(args):
         optimizer.zero_grad()
         t0 = time.time()
         logits = model(g, feats, edge_type, edge_norm)
-        loss = F.cross_entropy(logits[train_idx], labels[train_idx])
+        loss = F.nll_loss(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
         optimizer.step()
@@ -117,8 +117,7 @@ def main(args):
         backward_time.append(t2 - t1)
         print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
               format(epoch, forward_time[-1], backward_time[-1]))
-        train_acc = torch.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
-        val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
+        nll_loss(logits[val_idx], labels[val_idx])
         val_acc = torch.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
         print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
               format(train_acc, loss.item(), val_acc, val_loss.item()))
@@ -126,7 +125,7 @@ def main(args):
 
     model.eval()
     logits = model.forward(g, feats, edge_type, edge_norm)
-    test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
+    test_loss = F.nll_loss(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()

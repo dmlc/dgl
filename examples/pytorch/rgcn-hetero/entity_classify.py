@@ -238,7 +238,7 @@ class EntityClassify(nn.Module):
         # h2o
         self.layers.append(RelGraphConvHetero(
             self.h_dim, self.out_dim, self.rel_names, "basis",
-            self.num_bases, activation=partial(F.softmax, dim=1),
+            self.num_bases, activation=partial(F.log_softmax, dim=1),
             self_loop=self.use_self_loop))
 
     def forward(self):
@@ -311,7 +311,7 @@ def main(args):
         if epoch > 5:
             t0 = time.time()
         logits = model()[category_id]
-        loss = F.cross_entropy(logits[train_idx], labels[train_idx])
+        loss = F.nll_loss(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
         t1 = time.time()
@@ -319,7 +319,7 @@ def main(args):
         if epoch > 5:
             dur.append(t1 - t0)
         train_acc = th.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
-        val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
+        val_loss = F.nll_loss(logits[val_idx], labels[val_idx])
         val_acc = th.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
         print("Epoch {:05d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".
               format(epoch, train_acc, loss.item(), val_acc, val_loss.item(), np.average(dur)))
@@ -327,7 +327,7 @@ def main(args):
 
     model.eval()
     logits = model.forward()[category_id]
-    test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
+    test_loss = F.nll_loss(logits[test_idx], labels[test_idx])
     test_acc = th.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Acc: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
     print()
