@@ -31,7 +31,7 @@ class Tox21(MoleculeCSVDataset):
     ----------
     smiles_to_graph: callable, str -> DGLGraph
         A function turning smiles into a DGLGraph.
-        Default to :func:`dgl.data.life_sci.smiles_to_bigraph`.
+        Default to :func:`dgl.data.chem.smiles_to_bigraph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. Default to None.
