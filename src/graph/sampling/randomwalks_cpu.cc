@@ -87,12 +87,9 @@ IdArray RandomWalk(
       dgl_type_t etype = metapath_data[i];
 
 #ifdef NO_SUCCVEC
-      const auto &etype_csr = hg->GetAdj(etype, true, "csr");
-      const IdxType *offsets = static_cast<IdxType *>(etype_csr[0]->data);
-      const IdxType *all_succ = static_cast<IdxType *>(etype_csr[1]->data);
-      const IdxType *all_eids = static_cast<IdxType *>(etype_csr[2]->data);
+      const IdxType *offsets = static_cast<IdxType *>(hg->GetCSRIndptr(etype, true)->data);
+      const IdxType *all_succ = static_cast<IdxType *>(hg->GetCSRIndices(etype, true)->data);
       const IdxType *succ = all_succ + offsets[curr];
-      const IdxType *eids = all_eids + offsets[curr];
 
       int64_t size = offsets[curr + 1] - offsets[curr];
 #else
@@ -108,7 +105,10 @@ IdArray RandomWalk(
         // empty probability array; assume uniform
         curr = succ[RandomEngine::ThreadLocal()->RandInt(size)];
       } else {
-#ifndef NO_SUCCVEC
+#ifdef NO_SUCCVEC
+        const IdxType *all_eids = static_cast<IdxType *>(hg->GetCSRData(etype, true)->data);
+        const IdxType *eids = all_eids + offsets[curr];
+#else
         const auto &eids = hg->OutEdgeVec(etype, curr);
 #endif
         // non-uniform random walk

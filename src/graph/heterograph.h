@@ -159,6 +159,18 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetAdj(0, transpose, fmt);
   }
 
+  const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const override {
+    return GetRelationGraph(etype)->GetCSRIndptr(0, transpose);
+  }
+
+  const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const override {
+    return GetRelationGraph(etype)->GetCSRIndices(0, transpose);
+  }
+
+  const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const override {
+    return GetRelationGraph(etype)->GetCSRData(0, transpose);
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(

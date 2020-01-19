@@ -277,6 +277,21 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
+  const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const override {
+    LOG(FATAL) << "Not enabled for COO graph.";
+    return adj_.col;
+  }
+
+  const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const override {
+    LOG(FATAL) << "Not enabled for COO graph.";
+    return adj_.col;
+  }
+
+  const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const override {
+    LOG(FATAL) << "Not enabled for COO graph.";
+    return adj_.col;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     LOG(INFO) << "Not enabled for COO graph.";
     return {};
@@ -601,6 +616,18 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {adj_.indptr, adj_.indices, adj_.data};
   }
 
+  const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const override {
+    return adj_.indptr;
+  }
+
+  const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const override {
+    return adj_.indices;
+  }
+
+  const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const override {
+    return adj_.data;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -826,6 +853,21 @@ std::vector<IdArray> UnitGraph::GetAdj(
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};
   }
+}
+
+const IdArray &UnitGraph::GetCSRIndptr(dgl_type_t etype, bool transpose) const {
+  auto csr = transpose ? GetOutCSR() : GetInCSR();
+  return csr->GetCSRIndptr(etype, false);
+}
+
+const IdArray &UnitGraph::GetCSRIndices(dgl_type_t etype, bool transpose) const {
+  auto csr = transpose ? GetOutCSR() : GetInCSR();
+  return csr->GetCSRIndices(etype, false);
+}
+
+const IdArray &UnitGraph::GetCSRData(dgl_type_t etype, bool transpose) const {
+  auto csr = transpose ? GetOutCSR() : GetInCSR();
+  return csr->GetCSRData(etype, false);
 }
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
