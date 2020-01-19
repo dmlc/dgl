@@ -48,6 +48,8 @@ inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
   return {};
 }
 
+static aten::CSRMatrix _dummy_csr;
+
 };  // namespace
 
 //////////////////////////////////////////////////////////
@@ -277,19 +279,9 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
-  const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const override {
+  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override {
     LOG(FATAL) << "Not enabled for COO graph.";
-    return adj_.col;
-  }
-
-  const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const override {
-    LOG(FATAL) << "Not enabled for COO graph.";
-    return adj_.col;
-  }
-
-  const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const override {
-    LOG(FATAL) << "Not enabled for COO graph.";
-    return adj_.col;
+    return _dummy_csr;
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -616,16 +608,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {adj_.indptr, adj_.indices, adj_.data};
   }
 
-  const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const override {
-    return adj_.indptr;
-  }
-
-  const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const override {
-    return adj_.indices;
-  }
-
-  const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const override {
-    return adj_.data;
+  const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const override {
+    return adj_;
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -855,19 +839,9 @@ std::vector<IdArray> UnitGraph::GetAdj(
   }
 }
 
-const IdArray &UnitGraph::GetCSRIndptr(dgl_type_t etype, bool transpose) const {
+const aten::CSRMatrix &UnitGraph::GetCSRAdj(dgl_type_t etype, bool transpose) const {
   auto csr = transpose ? GetOutCSR() : GetInCSR();
-  return csr->GetCSRIndptr(etype, false);
-}
-
-const IdArray &UnitGraph::GetCSRIndices(dgl_type_t etype, bool transpose) const {
-  auto csr = transpose ? GetOutCSR() : GetInCSR();
-  return csr->GetCSRIndices(etype, false);
-}
-
-const IdArray &UnitGraph::GetCSRData(dgl_type_t etype, bool transpose) const {
-  auto csr = transpose ? GetOutCSR() : GetInCSR();
-  return csr->GetCSRData(etype, false);
+  return csr->GetCSRAdj(etype, false);
 }
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {

@@ -334,19 +334,9 @@ class BaseHeteroGraph : public runtime::Object {
       dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
 
   /*!
-   * \brief Get indptr of CSR representation
+   * \brief Get CSR matrix
    */
-  virtual const IdArray &GetCSRIndptr(dgl_type_t etype, bool transpose) const = 0;
-
-  /*!
-   * \brief Get indices of CSR representation
-   */
-  virtual const IdArray &GetCSRIndices(dgl_type_t etype, bool transpose) const = 0;
-
-  /*!
-   * \brief Get entries of CSR representation
-   */
-  virtual const IdArray &GetCSRData(dgl_type_t etype, bool transpose) const = 0;
+  virtual const aten::CSRMatrix &GetCSRAdj(dgl_type_t etype, bool transpose) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.

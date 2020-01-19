@@ -34,6 +34,7 @@ def test_random_walk():
 
     g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
     g4.edges['follow'].data['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
+    g4.edges['viewed-by'].data['p'] = F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32)
 
     traces, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes)

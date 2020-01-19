@@ -271,7 +271,7 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
   }
 
   Idx Draw() {
-    int64_t cur = 1;
+    uint64_t cur = 1;
     DType p = re->Uniform<DType>(0, weight[cur]);
     DType accum = 0.;
     while (cur < num_leafs) {
