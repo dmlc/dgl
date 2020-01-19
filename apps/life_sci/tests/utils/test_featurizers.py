@@ -1,6 +1,6 @@
 import torch
 
-from dglchem.utils.featurizers import *
+from dglls.utils.featurizers import *
 from rdkit import Chem
 
 def test_one_hot_encoding():

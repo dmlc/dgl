@@ -29,7 +29,7 @@ def _deprecate(func):
         Name for deprecated function.
     """
     warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5.  \
-                  Import it from dglchem.utils.mol_to_graph instead.'.format(func))
+                  Import it from dglls.utils.mol_to_graph instead.'.format(func))
 
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.

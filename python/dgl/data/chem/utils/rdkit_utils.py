@@ -73,7 +73,7 @@ def get_mol_3D_coordinates(mol):
         the molecule. For failures in getting the conformations, None will be returned.
     """
     warnings.warn('`get_mol_3D_coordinates` has been deprecated from DGL and will be '
-                  'removed in v0.5. Import it from `dglchem.utils.rdkit_utils` instead.')
+                  'removed in v0.5. Import it from `dglls.utils.rdkit_utils` instead.')
     try:
         conf = mol.GetConformer()
         conf_num_atoms = conf.GetNumAtoms()
@@ -121,7 +121,7 @@ def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charg
         we failed to get conformation information.
     """
     warnings.warn('`load_molecule` has been deprecated from DGL and will be '
-                  'removed in v0.5. Import it from `dglchem.utils.rdkit_utils` instead.')
+                  'removed in v0.5. Import it from `dglls.utils.rdkit_utils` instead.')
     if molecule_file.endswith('.mol2'):
         mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=False)
     elif molecule_file.endswith('.sdf'):
@@ -203,7 +203,7 @@ def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=False, calc
         it will be None.
     """
     warnings.warn('`multiprocess_load_molecules` has been deprecated from DGL and will be '
-                  'removed in v0.5. Import it from `dglchem.utils.rdkit_utils` instead.')
+                  'removed in v0.5. Import it from `dglls.utils.rdkit_utils` instead.')
     if num_processes == 1:
         mols_loaded = []
         for i, f in enumerate(files):

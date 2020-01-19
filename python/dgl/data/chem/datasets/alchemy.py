@@ -154,7 +154,7 @@ class TencentAlchemyDataset(object):
         Default to be False.
     mol_to_graph: callable, str -> DGLGraph
         A function turning an RDKit molecule instance into a DGLGraph.
-        Default to :func:`dgl.data.chem.mol_to_complete_graph`.
+        Default to :func:`dgl.data.life_sci.mol_to_complete_graph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
         ndata for a DGLGraph. By default, we construct graphs where nodes represent atoms

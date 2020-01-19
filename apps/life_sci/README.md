@@ -1,8 +1,8 @@
-# dglchem
+# DGL-LifeSci
 
 ## Introduction
 
-dglchem is a DGL-based package for various applications in chemistry and drug discovery with graph neural networks. 
+`dglls` is a DGL-based package for various applications in life science with graph neural networks. 
 
 ## Dependencies
 

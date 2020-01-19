@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 
-from dglchem.utils.featurizers import *
-from dglchem.utils.mol_to_graph import *
+from dglls.utils.featurizers import *
+from dglls.utils.mol_to_graph import *
 from rdkit import Chem
 
 test_smiles1 = 'CCO'

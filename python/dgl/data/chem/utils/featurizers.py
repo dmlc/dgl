@@ -54,7 +54,7 @@ def _deprecate(func):
         Name for deprecated function.
     """
     warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5.  \
-                  Import it from dglchem.utils.featurizers instead.'.format(func))
+                  Import it from dglls.utils.featurizers instead.'.format(func))
 
 def one_hot_encoding(x, allowable_set, encode_unknown=False):
     """One-hot encoding.
@@ -584,7 +584,7 @@ class BaseAtomFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.chem import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
+    >>> from dgl.data.life_sci import BaseAtomFeaturizer, atom_mass, atom_degree_one_hot
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')
@@ -855,7 +855,7 @@ class BaseBondFeaturizer(object):
     Examples
     --------
 
-    >>> from dgl.data.chem import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
+    >>> from dgl.data.life_sci import BaseBondFeaturizer, bond_type_one_hot, bond_is_in_ring
     >>> from rdkit import Chem
 
     >>> mol = Chem.MolFromSmiles('CCO')

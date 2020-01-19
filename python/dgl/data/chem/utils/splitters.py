@@ -36,7 +36,7 @@ def _deprecate(method):
         Name for splitting method.
     """
     warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5. '
-                  'Import it from dglchem.utils.splitters instead.'.format(method))
+                  'Import it from dglls.utils.splitters instead.'.format(method))
 
 def base_k_fold_split(split_method, dataset, k, log):
     """Split dataset for k-fold cross validation.
