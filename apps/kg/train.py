@@ -180,7 +180,7 @@ def run(args, logger):
         for i in range(args.num_proc):
             creator = sample_server.get_creator(args.batch_size, i, args.neg_sample_size,
                                                 args.neg_chunk_size, args.num_worker)
-            train_samplers.append(lambda: NewBidirectionalOneShotIterator(creator, args.neg_chunk_size,
+            train_samplers.append(NewBidirectionalOneShotIterator(creator, args.neg_chunk_size,
                                                                   args.neg_sample_size, True, n_entities, i))
     else:
         sample_server = train_data.get_sampler_server(args.num_proc)

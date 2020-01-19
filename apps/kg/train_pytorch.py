@@ -37,8 +37,6 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
-    train_sampler = train_sampler()
-
     if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
