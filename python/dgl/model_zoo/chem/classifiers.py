@@ -100,9 +100,6 @@ class BaseGNNClassifier(nn.Module):
             bg.ndata['h'] = feats
             h_g_max = dgl.max_nodes(bg, 'h')
 
-        if not isinstance(bg, BatchedDGLGraph):
-            h_g_sum = h_g_sum.unsqueeze(0)
-            h_g_max = h_g_max.unsqueeze(0)
         h_g = torch.cat([h_g_sum, h_g_max], dim=1)
 
         # Multi-task prediction

@@ -114,7 +114,8 @@ class DGLBaseGraph(object):
         """Return True if the graph contains node `vid`.
 
         Examples
-        --------
+        -------fjcchuuclfkgudhedllrfendednivngdukutkrtcjg
+        -
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> 0 in G
@@ -902,7 +903,10 @@ class DGLGraph(DGLBaseGraph):
                  edge_frame=None,
                  multigraph=None,
                  readonly=False,
-                 sort_csr=False):
+                 sort_csr=False,
+                 batch_size=1,
+                 batch_num_nodes=[],
+                 batch_num_edges=[]):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
@@ -935,6 +939,14 @@ class DGLGraph(DGLBaseGraph):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
+
+        self._batch_size = batch_size
+        if batch_size == 1:
+            self._batch_num_nodes = [self.number_of_nodes()]
+            self._batch_num_edges = [self.number_of_edges()]
+        else:
+            self._batch_num_nodes = batch_num_nodes
+            self._batch_num_edges = batch_num_edges
 
     def _get_msg_index(self):
         if self._msg_index is None:
@@ -988,6 +1000,9 @@ class DGLGraph(DGLBaseGraph):
                 [1., 1., 1., 1.],
                 [1., 1., 1., 1.]])
         """
+        if self.is_readonly:
+            raise DGLError("Readonly graph. Mutation is not allowed.")
+
         self._graph.add_nodes(num)
         if data is None:
             # Initialize feature placeholders if there are features existing
@@ -1042,6 +1057,9 @@ class DGLGraph(DGLBaseGraph):
         --------
         add_edges
         """
+        if self.is_readonly:
+            raise DGLError("Readonly graph. Mutation is not allowed.")
+
         self._graph.add_edge(u, v)
         if data is None:
             # Initialize feature placeholders if there are features existing
@@ -1099,6 +1117,9 @@ class DGLGraph(DGLBaseGraph):
         --------
         add_edge
         """
+        if self.is_readonly:
+            raise DGLError("Readonly graph. Mutation is not allowed.")
+
         u = utils.toindex(u)
         v = utils.toindex(v)
         self._graph.add_edges(u, v)
@@ -1709,6 +1730,36 @@ class DGLGraph(DGLBaseGraph):
         dgl.DGLGraph.edges
         """
         return self.edges[:].data
+
+    @property
+    def batch_size(self):
+        """Number of graphs in this batch.
+
+        Returns
+        -------
+        int
+            Number of graphs in this batch."""
+        return self._batch_size
+
+    @property
+    def batch_num_nodes(self):
+        """Number of nodes of each graph in this batch.
+
+        Returns
+        -------
+        list
+            Number of nodes of each graph in this batch."""
+        return self._batch_num_nodes
+
+    @property
+    def batch_num_edges(self):
+        """Number of edges of each graph in this batch.
+
+        Returns
+        -------
+        list
+            Number of edges of each graph in this batch."""
+        return self._batch_num_edges
 
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
@@ -3427,9 +3478,12 @@ class DGLGraph(DGLBaseGraph):
         # otherwise the default initializer will be used.
         sync_frame_initializer(local_node_frame._frame, self._node_frame._frame)
         sync_frame_initializer(local_edge_frame._frame, self._edge_frame._frame)
-        return DGLGraph(self._graph,
-                        local_node_frame,
-                        local_edge_frame)
+        return DGLGraph(graph_data=self._graph,
+                        node_frame=local_node_frame,
+                        edge_frame=local_edge_frame,
+                        batch_size=self._batch_size,
+                        batch_num_nodes=self._batch_num_nodes,
+                        batch_num_edges=self._batch_num_edges)
 
     @contextmanager
     def local_scope(self):
@@ -3564,3 +3618,5 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed()
+
+

@@ -288,7 +288,7 @@ def reverse(g, share_ndata=False, share_edata=False):
             [2.],
             [3.]])
     """
-    assert not isinstance(g, BatchedDGLGraph), \
+    assert g.batch_size == 1, \
         'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
@@ -394,11 +394,7 @@ def laplacian_lambda_max(g):
     >>> dgl.laplacian_lambda_max(g)
     [1.809016994374948]
     """
-    if isinstance(g, BatchedDGLGraph):
-        g_arr = unbatch(g)
-    else:
-        g_arr = [g]
-
+    g_arr = unbatch(g)
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()

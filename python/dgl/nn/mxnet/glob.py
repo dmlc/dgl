@@ -159,10 +159,7 @@ class SortPooling(nn.Block):
             # Sort nodes according to their last features.
             ret = topk_nodes(graph, 'h', self.k)[0].reshape(
                 -1, self.k * feat.shape[-1])
-            if isinstance(graph, BatchedDGLGraph):
-                return ret
-            else:
-                return ret.squeeze(axis=0)
+            return ret
 
     def __repr__(self):
         return 'SortPooling(k={})'.format(self.k)
@@ -277,9 +274,7 @@ class Set2Set(nn.Block):
             would be :math:`(B, D)`.
         """
         with graph.local_scope():
-            batch_size = 1
-            if isinstance(graph, BatchedDGLGraph):
-                batch_size = graph.batch_size
+            batch_size = graph.batch_size
 
             h = (nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context),
                  nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context))
@@ -288,23 +283,14 @@ class Set2Set(nn.Block):
             for _ in range(self.n_iters):
                 q, h = self.lstm(q_star.expand_dims(axis=0), h)
                 q = q.reshape((batch_size, self.input_dim))
-
                 e = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
                 graph.ndata['e'] = e
                 alpha = softmax_nodes(graph, 'e')
-
                 graph.ndata['r'] = feat * alpha
                 readout = sum_nodes(graph, 'r')
-
-                if readout.ndim == 1: # graph is not a BatchedDGLGraph
-                    readout = readout.expand_dims(0)
-
                 q_star = nd.concat(q, readout, dim=-1)
 
-            if isinstance(graph, BatchedDGLGraph):
-                return q_star
-            else:
-                return q_star.squeeze(axis=0)
+            return q_star
 
     def __repr__(self):
         summary = 'Set2Set('

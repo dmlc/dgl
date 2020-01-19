@@ -200,78 +200,22 @@ class BatchedDGLGraph(DGLGraph):
                     for key in edge_attrs}
             batched_edge_frame = FrameRef(Frame(cols))
 
+        batch_size = 0
+        batch_num_nodes = []
+        batch_num_edges = []
+        for grh in graph_list:
+            # handle the input is again a batched graph.
+            batch_size += grh._batch_size
+            batch_num_nodes += grh._batch_num_nodes
+            batch_num_edges += grh._batch_num_edges
+
         super(BatchedDGLGraph, self).__init__(graph_data=batched_index,
                                               node_frame=batched_node_frame,
-                                              edge_frame=batched_edge_frame)
+                                              edge_frame=batched_edge_frame,
+                                              batch_size=batch_size,
+                                              batch_num_nodes=batch_num_nodes,
+                                              batch_num_edges=batch_num_edges)
 
-        # extra members
-        self._batch_size = 0
-        self._batch_num_nodes = []
-        self._batch_num_edges = []
-        for grh in graph_list:
-            if isinstance(grh, BatchedDGLGraph):
-                # handle the input is again a batched graph.
-                self._batch_size += grh._batch_size
-                self._batch_num_nodes += grh._batch_num_nodes
-                self._batch_num_edges += grh._batch_num_edges
-            else:
-                self._batch_size += 1
-                self._batch_num_nodes.append(grh.number_of_nodes())
-                self._batch_num_edges.append(grh.number_of_edges())
-
-    @property
-    def batch_size(self):
-        """Number of graphs in this batch.
-
-        Returns
-        -------
-        int
-            Number of graphs in this batch."""
-        return self._batch_size
-
-    @property
-    def batch_num_nodes(self):
-        """Number of nodes of each graph in this batch.
-
-        Returns
-        -------
-        list
-            Number of nodes of each graph in this batch."""
-        return self._batch_num_nodes
-
-    @property
-    def batch_num_edges(self):
-        """Number of edges of each graph in this batch.
-
-        Returns
-        -------
-        list
-            Number of edges of each graph in this batch."""
-        return self._batch_num_edges
-
-    # override APIs
-    def add_nodes(self, num, data=None):
-        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    def add_edge(self, u, v, data=None):
-        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    def add_edges(self, u, v, data=None):
-        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    # new APIs
-    def __getitem__(self, idx):
-        """Slice the batch and return the batch of graphs specified by the idx."""
-        # TODO
-        raise NotImplementedError
-
-    def __setitem__(self, idx, val):
-        """Set the value of the slice. The graph size cannot be changed."""
-        # TODO
-        raise NotImplementedError
 
 def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
     """Split the batch."""
@@ -305,7 +249,6 @@ def unbatch(graph):
     --------
     batch
     """
-    assert isinstance(graph, BatchedDGLGraph)
     bsize = graph.batch_size
     bnn = graph.batch_num_nodes
     bne = graph.batch_num_edges
@@ -387,15 +330,12 @@ def _sum_on(graph, typestr, feat, weight):
         weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(feat) - 1))
         feat = weight * feat
 
-    if isinstance(graph, BatchedDGLGraph):
-        n_graphs = graph.batch_size
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
-        seg_id = F.copy_to(seg_id, F.context(feat))
-        y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
-        return y
-    else:
-        return F.sum(feat, 0)
+    n_graphs = graph.batch_size
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
+    seg_id = F.copy_to(seg_id, F.context(feat))
+    y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
+    return y
 
 def sum_nodes(graph, feat, weight=None):
     """Sums all the values of node field :attr:`feat` in :attr:`graph`, optionally
@@ -566,24 +506,17 @@ def _mean_on(graph, typestr, feat, weight):
         weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(feat) - 1))
         feat = weight * feat
 
-    if isinstance(graph, BatchedDGLGraph):
-        n_graphs = graph.batch_size
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
-        seg_id = F.copy_to(seg_id, F.context(feat))
-        if weight is not None:
-            w = F.unsorted_1d_segment_sum(weight, seg_id, n_graphs, 0)
-            y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
-            y = y / w
-        else:
-            y = F.unsorted_1d_segment_mean(feat, seg_id, n_graphs, 0)
-        return y
+    n_graphs = graph.batch_size
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
+    seg_id = F.copy_to(seg_id, F.context(feat))
+    if weight is not None:
+        w = F.unsorted_1d_segment_sum(weight, seg_id, n_graphs, 0)
+        y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
+        y = y / w
     else:
-        if weight is None:
-            return F.mean(feat, 0)
-        else:
-            y = F.sum(feat, 0) / F.sum(weight, 0)
-            return y
+        y = F.unsorted_1d_segment_mean(feat, seg_id, n_graphs, 0)
+    return y
 
 def mean_nodes(graph, feat, weight=None):
     """Averages all the values of node field :attr:`feat` in :attr:`graph`,
@@ -750,12 +683,10 @@ def _max_on(graph, typestr, feat):
     # TODO: the current solution pads the different graph sizes to the same,
     #  a more efficient way is to use segment max, we need to implement it in
     #  the future.
-    if isinstance(graph, BatchedDGLGraph):
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
-        return F.max(feat, 1)
-    else:
-        return F.max(feat, 0)
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
+    return F.max(feat, 1)
+
 
 def _softmax_on(graph, typestr, feat):
     """Internal function of applying batch-wise graph-level softmax
@@ -782,13 +713,10 @@ def _softmax_on(graph, typestr, feat):
     # TODO: the current solution pads the different graph sizes to the same,
     #  a more efficient way is to use segment sum/max, we need to implement
     #  it in the future.
-    if isinstance(graph, BatchedDGLGraph):
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
-        feat = F.softmax(feat, 1)
-        return F.pack_padded_tensor(feat, batch_num_objs)
-    else:
-        return F.softmax(feat, 0)
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    feat = F.pad_packed_tensor(feat, batch_num_objs, -float('inf'))
+    feat = F.softmax(feat, 1)
+    return F.pack_padded_tensor(feat, batch_num_objs)
 
 def _broadcast_on(graph, typestr, feat_data):
     """Internal function of broadcasting features to all nodes/edges.
@@ -810,19 +738,13 @@ def _broadcast_on(graph, typestr, feat_data):
     """
     _, batch_num_objs_attr, num_objs_attr = READOUT_ON_ATTRS[typestr]
 
-    if isinstance(graph, BatchedDGLGraph):
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        index = []
-        for i, num_obj in enumerate(batch_num_objs):
-            index.extend([i] * num_obj)
-        ctx = F.context(feat_data)
-        index = F.copy_to(F.tensor(index), ctx)
-        return F.gather_row(feat_data, index)
-    else:
-        num_objs = getattr(graph, num_objs_attr)()
-        if F.ndim(feat_data) == 1:
-            feat_data = F.unsqueeze(feat_data, 0)
-        return F.cat([feat_data] * num_objs, 0)
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    index = []
+    for i, num_obj in enumerate(batch_num_objs):
+        index.extend([i] * num_obj)
+    ctx = F.context(feat_data)
+    index = F.copy_to(F.tensor(index), ctx)
+    return F.gather_row(feat_data, index)
 
 def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
     """Internal function to take graph-wise top-k node/edge features of
@@ -878,12 +800,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
 
     feat = data[feat]
     hidden_size = F.shape(feat)[-1]
-    if isinstance(graph, BatchedDGLGraph):
-        batch_num_objs = getattr(graph, batch_num_objs_attr)
-        batch_size = len(batch_num_objs)
-    else:
-        batch_num_objs = [getattr(graph, num_objs_attr)()]
-        batch_size = 1
+    batch_num_objs = getattr(graph, batch_num_objs_attr)
+    batch_size = len(batch_num_objs)
 
     length = max(max(batch_num_objs), k)
     fill_val = -float('inf') if descending else float('inf')
@@ -912,12 +830,8 @@ def _topk_on(graph, typestr, feat, k, descending=True, idx=None):
         shift = F.copy_to(shift, F.context(feat))
         topk_indices_ = F.reshape(topk_indices, (-1,)) * hidden_size + shift
 
-    if isinstance(graph, BatchedDGLGraph):
-        return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
-               topk_indices
-    else:
-        return F.reshape(F.gather_row(feat_, topk_indices_), (k, -1)),\
-               topk_indices
+    return F.reshape(F.gather_row(feat_, topk_indices_), (batch_size, k, -1)),\
+           topk_indices
 
 
 def max_nodes(graph, feat):
