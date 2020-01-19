@@ -7,6 +7,7 @@ import os
 import sys
 import pickle
 import time
+import multiprocessing as mp
 
 # Given a list of relations and the number of edges that belong to the relation,
 # we greedily assign relations and edges to a set of partitions to ensure that
@@ -115,8 +116,7 @@ def BucketRelationPartition(edges, n):
         parts[i] = np.arange(off, off + len(part))
         off += len(part)
 
-    # rel_parts only contains unpopular relations. Popular relations are split into all partitions.
-    return parts, rel_parts
+    return parts
 
 
 # This partitions a list of edges based on relations and make sure
@@ -273,9 +273,9 @@ class TrainDataset(object):
         if ranks > 1 and args.strict_rel_part:
             self.edge_parts, self.rel_parts = StrictRelationPartition(triples, ranks)
         elif ranks > 1 and args.rel_part:
-            self.edge_parts, self.rel_parts = BucketRelationPartition(triples, ranks)
+            self.edge_parts = lambda: BucketRelationPartition(triples, ranks)
         elif ranks > 1:
-            self.edge_parts = RandomPartition(triples, ranks)
+            self.edge_parts = lambda: RandomPartition(triples, ranks)
         else:
             self.edge_parts = [np.arange(num_train)]
         self.g = ConstructGraph(triples, dataset.n_entities, args)
@@ -302,6 +302,9 @@ class TrainDataset(object):
                 count[(tail, -rel - 1)] += 1
         return count
 
+    def get_sampler_server(self, num_proc, num_epochs):
+        return SamplerServer(self.g, num_proc, num_epochs, self.edge_parts)
+
     def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
@@ -315,6 +318,58 @@ class TrainDataset(object):
                            shuffle=shuffle,
                            exclude_positive=exclude_positive,
                            return_false_neg=False)
+
+
+class SamplerServer:
+    def __init__(self, g, num_proc, num_epochs, partition_edges):
+        self.g = g
+        self.queues = []
+        for _ in range(num_proc):
+            self.queues.append([])
+
+        for i in range(num_epochs):
+            edge_parts = partition_edges()
+            for i, part in enumerate(edge_parts):
+                self.queues[i].append(part)
+
+    def get_creator(self, batch_size, rank, neg_sample_size=2, neg_chunk_size=None, num_workers=5):
+        return SamplerCreator(self.queues[rank], self.g, batch_size, neg_sample_size, neg_chunk_size, num_workers)
+
+class SamplerCreator:
+    def __init__(self, queue, g, batch_size, neg_sample_size=2, neg_chunk_size=None, num_workers=5):
+        self.queue = queue
+        self.g = g
+        self.batch_size = batch_size
+        self.neg_sample_size = neg_sample_size
+        self.neg_chunk_size = neg_chunk_size
+        self.num_workers = num_workers
+        self.epoch = 0
+
+    def create(self):
+        EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+        edge_part = self.queue[0]
+        self.epoch += 1
+        sampler_head = EdgeSampler(self.g,
+                              seed_edges=edge_part,
+                              batch_size=self.batch_size,
+                              neg_sample_size=int(self.neg_sample_size/self.neg_chunk_size),
+                              chunk_size=self.neg_chunk_size,
+                              negative_mode='head',
+                              num_workers=self.num_workers,
+                              shuffle=True,
+                              exclude_positive=False,
+                              return_false_neg=False)
+        sampler_tail = EdgeSampler(self.g,
+                              seed_edges=edge_part,
+                              batch_size=self.batch_size,
+                              neg_sample_size=int(self.neg_sample_size/self.neg_chunk_size),
+                              chunk_size=self.neg_chunk_size,
+                              negative_mode='tail',
+                              num_workers=self.num_workers,
+                              shuffle=True,
+                              exclude_positive=False,
+                              return_false_neg=False)
+        return sampler_head, sampler_tail
 
 
 class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
@@ -490,36 +545,50 @@ class EvalDataset(object):
                            mode, num_workers, filter_false_neg)
 
 class NewBidirectionalOneShotIterator:
-    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, neg_sample_size,
-                 is_chunked, num_nodes):
-        self.sampler_head = dataloader_head
-        self.sampler_tail = dataloader_tail
-        self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size, neg_sample_size,
-                                                    is_chunked, True, num_nodes)
-        self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, neg_sample_size,
-                                                    is_chunked, False, num_nodes)
+    def __init__(self, sample_creator, neg_chunk_size, neg_sample_size, is_chunked, num_nodes, rank):
         self.step = 0
+        self.neg_chunk_size = neg_chunk_size
+        self.neg_sample_size = neg_sample_size
+        self.is_chunked = is_chunked
+        self.num_nodes = num_nodes
+        self.sample_creator = sample_creator
+        self.rank = rank
+        self.epoch = 0
+        self.reset()
+
+    def reset(self):
+        self.sampler_head, self.sampler_tail = self.sample_creator.create()
+        self.iterator_head = self.one_shot_iterator(self.sampler_head, self.neg_chunk_size, self.neg_sample_size,
+                                                    self.is_chunked, True, self.num_nodes)
+        self.iterator_tail = self.one_shot_iterator(self.sampler_tail, self.neg_chunk_size, self.neg_sample_size,
+                                                    self.is_chunked, False, self.num_nodes)
+        self.epoch += 1
 
     def __next__(self):
         self.step += 1
         start = time.time()
-        if self.step % 2 == 0:
-            pos_g, neg_g = next(self.iterator_head)
-        else:
-            pos_g, neg_g = next(self.iterator_tail)
+        pos_g = None
+        neg_g = None
+        while pos_g is None:
+            try:
+                if self.step % 2 == 0:
+                    pos_g, neg_g = next(self.iterator_head)
+                else:
+                    pos_g, neg_g = next(self.iterator_tail)
+            except:
+                self.reset()
         return pos_g, neg_g
 
     @staticmethod
     def one_shot_iterator(dataloader, neg_chunk_size, neg_sample_size, is_chunked, neg_head, num_nodes):
-        while True:
-            for pos_g, neg_g in dataloader:
-                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, neg_sample_size, is_chunked,
-                                            neg_head, num_nodes)
-                if neg_g is None:
-                    continue
+        for pos_g, neg_g in dataloader:
+            neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, neg_sample_size, is_chunked,
+                                        neg_head, num_nodes)
+            if neg_g is None:
+                return None, None
 
-                pos_g.ndata['id'] = pos_g.parent_nid
-                neg_g.ndata['id'] = neg_g.parent_nid
-                pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
-                yield pos_g, neg_g
+            pos_g.ndata['id'] = pos_g.parent_nid
+            neg_g.ndata['id'] = neg_g.parent_nid
+            pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
+            yield pos_g, neg_g
 

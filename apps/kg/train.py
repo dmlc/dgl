@@ -5,6 +5,7 @@ import argparse
 import os
 import logging
 import time
+import math
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
@@ -169,42 +170,24 @@ def run(args, logger):
         args.neg_chunk_size_test = args.neg_sample_size_test
 
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    num_steps_epoch = int(math.ceil(train_data.g.number_of_edges() / args.num_proc / args.batch_size))
+    num_epochs = int(math.ceil(args.max_step / num_steps_epoch / 2)) + 1
+    print('max step: {}, #stpes/epoch: {}, #epochs: {}'.format(args.max_step, num_steps_epoch, num_epochs))
+
     if args.num_proc > 1:
         train_samplers = []
+        sample_server = train_data.get_sampler_server(args.num_proc, num_epochs)
         for i in range(args.num_proc):
-            train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           args.neg_chunk_size,
-                                                           mode='head',
-                                                           num_workers=args.num_worker,
-                                                           shuffle=True,
-                                                           exclude_positive=False,
-                                                           rank=i)
-            train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                           args.neg_chunk_size,
-                                                           mode='tail',
-                                                           num_workers=args.num_worker,
-                                                           shuffle=True,
-                                                           exclude_positive=False,
-                                                           rank=i)
-            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                                  args.neg_chunk_size, args.neg_sample_size,
-                                                                  True, n_entities))
+            creator = sample_server.get_creator(args.batch_size, i, args.neg_sample_size,
+                                                args.neg_chunk_size, args.num_worker)
+            train_samplers.append(lambda: NewBidirectionalOneShotIterator(creator, args.neg_chunk_size,
+                                                                  args.neg_sample_size, True, n_entities, i))
     else:
-        train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       args.neg_chunk_size,
-                                                       mode='head',
-                                                       num_workers=args.num_worker,
-                                                       shuffle=True,
-                                                       exclude_positive=False)
-        train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
-                                                       args.neg_chunk_size,
-                                                       mode='tail',
-                                                       num_workers=args.num_worker,
-                                                       shuffle=True,
-                                                       exclude_positive=False)
-        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                        args.neg_chunk_size, args.neg_sample_size,
-                                                        True, n_entities)
+        sample_server = train_data.get_sampler_server(args.num_proc)
+        creator = sample_server.get_creator(args.batch_size, 0, args.neg_sample_size,
+                                            args.neg_chunk_size, args.num_worker)
+        train_sampler = lambda: NewBidirectionalOneShotIterator(creator, args.neg_chunk_size,
+                                                        args.neg_sample_size, True, n_entities, 0)
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
@@ -305,7 +288,7 @@ def run(args, logger):
         queue = mp.Queue(args.num_proc)
         procs = []
         for i in range(args.num_proc):
-            rel_parts = train_data.rel_parts if args.rel_part or args.strict_rel_part else None
+            rel_parts = train_data.rel_parts if args.strict_rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
             proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers, queue))
             procs.append(proc)
