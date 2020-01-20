@@ -3,7 +3,6 @@ import dgl.backend as F
 import numpy as np
 import os
 import pandas as pd
-import warnings
 
 from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive
 
@@ -73,8 +72,6 @@ class PDBBind(object):
                  remove_hs=False, use_conformation=True,
                  construct_graph_and_featurize=ACNN_graph_construction_and_featurization,
                  zero_padding=True, num_processes=64):
-        warnings.warn('`PDBBind` has been deprecated and will be removed in v0.5. Import it '
-                      'from `dglls.data.pdbbind` instead.')
         self.task_names = ['-logKd/Ki']
         self.n_tasks = len(self.task_names)
 

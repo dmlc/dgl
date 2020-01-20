@@ -4,7 +4,7 @@ import torch.nn as nn
 from dglls.utils.eval import Meter
 from torch.utils.data import DataLoader
 
-from utils import set_random_seed, load_dataset, collate, load_model
+from utils import set_random_seed, load_dataset, collate, load_model, compute_metric
 
 def update_msg_from_scores(msg, scores):
     for metric, score in scores.items():
@@ -27,7 +27,7 @@ def run_a_train_epoch(args, epoch, model, data_loader,
         optimizer.step()
         train_meter.update(prediction, labels)
     avg_loss = epoch_loss / len(data_loader.dataset)
-    total_scores = {metric: train_meter.compute_metric(metric) for metric in args['metrics']}
+    total_scores = {metric: compute_metric(metric) for metric in args['metrics']}
     msg = 'epoch {:d}/{:d}, training | loss {:.4f}'.format(
         epoch + 1, args['num_epochs'], avg_loss)
     msg = update_msg_from_scores(msg, total_scores)
@@ -42,7 +42,7 @@ def run_an_eval_epoch(args, model, data_loader):
             labels, bg = labels.to(args['device']), bg.to(args['device'])
             prediction = model(bg)
             eval_meter.update(prediction, labels)
-    total_scores = {metric: eval_meter.compute_metric(metric) for metric in args['metrics']}
+    total_scores = {metric: compute_metric(metric) for metric in args['metrics']}
     return total_scores
 
 def main(args):
