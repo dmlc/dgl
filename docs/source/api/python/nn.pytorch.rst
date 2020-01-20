@@ -210,6 +210,13 @@ SetTransformerDecoder
 Utility Modules
 ----------------------------------------
 
+Sequential
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.Sequential
+    :members:
+    :show-inheritance:
+
 KNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

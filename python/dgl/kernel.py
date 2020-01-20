@@ -46,9 +46,9 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
          node ID, destination node ID, or edge ID, according to ``A_target``
          and ``B_target`` which could take either
 
-         - "source" (0),
-         - "destination" (1), or
-         - "edge" (2).
+         - "source" (dgl.function.TargetCode.SRC),
+         - "destination" (dgl.function.TargetCode.DST), or
+         - "edge" (dgl.function.TargetCode.EDGE).
 
        * ``A`` and ``B`` are data tensors.  If ``A_target`` is "edge", then
          ``A.shape[0]`` should equal the number of edges of ``G``. Otherwise
@@ -298,9 +298,9 @@ def copy_reduce(reducer, G, target,
        * ``select_target`` would return the source node ID, destination node,
          ID, or edge ID, according to ``target`` which could take either
 
-         - "source" (0),
-         - "destination" (1), or
-         - "edge" (2)
+         - "source" (dgl.function.TargetCode.SRC),
+         - "destination" (dgl.function.TargetCode.DST), or
+         - "edge" (dgl.function.TargetCode.EDGE).
 
        * ``X`` is a data tensor.  If ``target`` is "edge", then ``X.shape[0]``
          should equal the number of edges of ``G``.  Otherwise that should
