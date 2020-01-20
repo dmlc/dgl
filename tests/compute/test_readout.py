@@ -195,7 +195,7 @@ def test_softmax_edges():
 def test_broadcast_nodes():
     # test#1: basic
     g0 = dgl.DGLGraph(nx.path_graph(10))
-    feat0 = F.randn((40,))
+    feat0 = F.randn((1, 40))
     ground_truth = F.stack([feat0] * g0.number_of_nodes(), 0)
     assert F.allclose(dgl.broadcast_nodes(g0, feat0), ground_truth)
 
@@ -220,7 +220,7 @@ def test_broadcast_nodes():
 def test_broadcast_edges():
     # test#1: basic
     g0 = dgl.DGLGraph(nx.path_graph(10))
-    feat0 = F.randn((40,))
+    feat0 = F.randn((1, 40))
     ground_truth = F.stack([feat0] * g0.number_of_edges(), 0)
     assert F.allclose(dgl.broadcast_edges(g0, feat0), ground_truth)
 
