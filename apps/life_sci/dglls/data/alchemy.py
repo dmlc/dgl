@@ -1,27 +1,23 @@
 # -*- coding:utf-8 -*-
-"""Example dataloader of Tencent Alchemy Dataset
-https://alchemy.tencent.com/
-"""
+"""Tencent Alchemy Dataset https://alchemy.tencent.com/"""
 import numpy as np
 import os
 import os.path as osp
+import pandas as pd
 import pathlib
-import warnings
 import zipfile
+
 from collections import defaultdict
+from dgl import backend as F
+from dgl.data.utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
+from rdkit import Chem
+from rdkit.Chem import ChemicalFeatures
+from rdkit import RDConfig
 
-from ..utils import mol_to_complete_graph, atom_type_one_hot, \
-    atom_hybridization_one_hot, atom_is_aromatic
-from ...utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
-from .... import backend as F
+from ..utils.mol_to_graph import mol_to_complete_graph
+from ..utils.featurizers import atom_type_one_hot, atom_hybridization_one_hot, atom_is_aromatic
 
-try:
-    import pandas as pd
-    from rdkit import Chem
-    from rdkit.Chem import ChemicalFeatures
-    from rdkit import RDConfig
-except ImportError:
-    pass
+__all__ = ['TencentAlchemyDataset']
 
 def alchemy_nodes(mol):
     """Featurization for all atoms in a molecule. The atom indices
@@ -180,8 +176,6 @@ class TencentAlchemyDataset(object):
                  node_featurizer=alchemy_nodes,
                  edge_featurizer=alchemy_edges,
                  load=True):
-        warnings.warn('`TencentAlchemyDataset` has been deprecated and will be removed from '
-                      'DGL in v0.5. Import it from `dglls.data.alchemy` instead.')
         if mode == 'test':
             raise ValueError('The test mode is not supported before '
                              'the Alchemy contest finishes.')
@@ -199,7 +193,6 @@ class TencentAlchemyDataset(object):
             file_name = "%s_processed_dgl" % (mode)
         else:
             file_name = "%s_single_sdf" % (mode)
-
         self.file_dir = pathlib.Path(file_dir, file_name)
 
         self._url = 'dataset/alchemy/'

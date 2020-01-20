@@ -1,12 +1,15 @@
 """PDBBind dataset processed by MoleculeNet."""
+import dgl.backend as F
 import numpy as np
 import os
 import pandas as pd
 import warnings
 
+from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive
+
 from ..utils import multiprocess_load_molecules, ACNN_graph_construction_and_featurization
-from ...utils import get_download_dir, download, _get_dgl_url, extract_archive
-from .... import backend as F
+
+__all__ = ['PDBBind']
 
 class PDBBind(object):
     """PDBbind dataset processed by MoleculeNet.
@@ -41,15 +44,13 @@ class PDBBind(object):
         of the ``'core'`` set is 195 and the size of the ``'refined'`` set is 3706.
     load_binding_pocket : bool
         Whether to load binding pockets or full proteins. Default to True.
-    add_hydrogens : bool
-        Whether to add hydrogens via pdbfixer. Default to False.
     sanitize : bool
         Whether sanitization is performed in initializing RDKit molecule instances. See
         https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
         Default to False.
     calc_charges : bool
         Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
-        ``add_hydrogens`` and ``sanitize`` to be True. Default to False.
+        ``sanitize`` to be True. Default to False.
     remove_hs : bool
         Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
         slow for large molecules. Default to False.
@@ -68,8 +69,8 @@ class PDBBind(object):
         Number of worker processes to use. If None,
         then we will use the number of CPUs in the system. Default to 64.
     """
-    def __init__(self, subset, load_binding_pocket=True, add_hydrogens=False,
-                 sanitize=False, calc_charges=False, remove_hs=False, use_conformation=True,
+    def __init__(self, subset, load_binding_pocket=True, sanitize=False, calc_charges=False,
+                 remove_hs=False, use_conformation=True,
                  construct_graph_and_featurize=ACNN_graph_construction_and_featurization,
                  zero_padding=True, num_processes=64):
         warnings.warn('`PDBBind` has been deprecated and will be removed in v0.5. Import it '
@@ -94,7 +95,7 @@ class PDBBind(object):
                 'core or refined, got {}'.format(subset))
 
         self._preprocess(extracted_data_path, index_label_file, load_binding_pocket,
-                         add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
+                         sanitize, calc_charges, remove_hs, use_conformation,
                          construct_graph_and_featurize, zero_padding, num_processes)
 
     def _filter_out_invalid(self, ligands_loaded, proteins_loaded, use_conformation):
@@ -137,7 +138,7 @@ class PDBBind(object):
                 self.protein_coordinates.append(protein_coordinates)
 
     def _preprocess(self, root_path, index_label_file, load_binding_pocket,
-                    add_hydrogens, sanitize, calc_charges, remove_hs, use_conformation,
+                    sanitize, calc_charges, remove_hs, use_conformation,
                     construct_graph_and_featurize, zero_padding, num_processes):
         """Preprocess the dataset.
 
@@ -156,14 +157,12 @@ class PDBBind(object):
             Path to the index file for the dataset.
         load_binding_pocket : bool
             Whether to load binding pockets or full proteins.
-        add_hydrogens : bool
-            Whether to add hydrogens via pdbfixer.
         sanitize : bool
             Whether sanitization is performed in initializing RDKit molecule instances. See
             https://www.rdkit.org/docs/RDKit_Book.html for details of the sanitization.
         calc_charges : bool
             Whether to add Gasteiger charges via RDKit. Setting this to be True will enforce
-            ``add_hydrogens`` and ``sanitize`` to be True.
+            ``sanitize`` to be True.
         remove_hs : bool
             Whether to remove hydrogens via RDKit. Note that removing hydrogens can be quite
             slow for large molecules.
@@ -210,7 +209,6 @@ class PDBBind(object):
 
         print('Loading ligands...')
         ligands_loaded = multiprocess_load_molecules(self.ligand_files,
-                                                     add_hydrogens=add_hydrogens,
                                                      sanitize=sanitize,
                                                      calc_charges=calc_charges,
                                                      remove_hs=remove_hs,
@@ -219,7 +217,6 @@ class PDBBind(object):
 
         print('Loading proteins...')
         proteins_loaded = multiprocess_load_molecules(self.protein_files,
-                                                      add_hydrogens=add_hydrogens,
                                                       sanitize=sanitize,
                                                       calc_charges=calc_charges,
                                                       remove_hs=remove_hs,

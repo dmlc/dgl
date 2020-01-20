@@ -1,11 +1,11 @@
-from __future__ import absolute_import
-
+"""Creating datasets from .csv files for molecular property prediction."""
+import dgl.backend as F
 import numpy as np
 import os
-import sys
 
-from ...utils import save_graphs, load_graphs
-from .... import backend as F
+from dgl.data.utils import save_graphs, load_graphs
+
+__all__ = ['MoleculeCSVDataset']
 
 class MoleculeCSVDataset(object):
     """MoleculeCSVDataset
@@ -46,13 +46,6 @@ class MoleculeCSVDataset(object):
     """
     def __init__(self, df, smiles_to_graph, node_featurizer, edge_featurizer,
                  smiles_column, cache_file_path, task_names=None, load=True):
-        if 'rdkit' not in sys.modules:
-            from ....base import dgl_warning
-            dgl_warning(
-                "Please install RDKit (Recommended Version is 2018.09.3)")
-            dgl_warning(
-                '`MoleculeCSVDataset` has been deprecated from DGL and will be removed in v0.5.'
-                'Import it from `dglls.data.csv_dataset` instead.')
         self.df = df
         self.smiles = self.df[smiles_column].tolist()
         if task_names is None:

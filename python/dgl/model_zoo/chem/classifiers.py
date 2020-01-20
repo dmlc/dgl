@@ -1,8 +1,9 @@
 # pylint: disable=C0111, C0103, C0200
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
+import warnings
 from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
@@ -129,6 +130,9 @@ class GCNClassifier(BaseGNNClassifier):
     """
     def __init__(self, in_feats, gcn_hidden_feats, n_tasks,
                  classifier_hidden_feats=128, dropout=0.):
+        warnings.warn('`GCNClassifier` has been deprecated and will be removed from DGL in v0.5.'
+                      'Import `GCNPredictor` from `dglls.model.model_zoo` instead.')
+
         super(GCNClassifier, self).__init__(gnn_out_feats=gcn_hidden_feats[-1],
                                             n_tasks=n_tasks,
                                             classifier_hidden_feats=classifier_hidden_feats,
@@ -150,6 +154,9 @@ class GATClassifier(BaseGNNClassifier):
     """
     def __init__(self, in_feats, gat_hidden_feats, num_heads,
                  n_tasks, classifier_hidden_feats=128, dropout=0):
+        warnings.warn('`GATClassifier` has been deprecated and will be removed from DGL in v0.5.'
+                      'Import `GATPredictor` from `dglls.model.model_zoo` instead.')
+
         super(GATClassifier, self).__init__(gnn_out_feats=gat_hidden_feats[-1],
                                             n_tasks=n_tasks,
                                             classifier_hidden_feats=classifier_hidden_feats,

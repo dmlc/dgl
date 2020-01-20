@@ -1,10 +1,12 @@
+"""Dataset for aromaticity prediction"""
 import pandas as pd
-import sys
+
+from dgl.data.utils import get_download_dir, download, _get_dgl_url
 
 from .csv_dataset import MoleculeCSVDataset
-from ..utils import smiles_to_bigraph
-from ...utils import get_download_dir, download, _get_dgl_url
-from ....base import dgl_warning
+from ..utils.mol_to_graph import smiles_to_bigraph
+
+__all__ = ['PubChemBioAssayAromaticity']
 
 class PubChemBioAssayAromaticity(MoleculeCSVDataset):
     """Subset of PubChem BioAssay Dataset for aromaticity prediction.
@@ -35,11 +37,6 @@ class PubChemBioAssayAromaticity(MoleculeCSVDataset):
     """
     def __init__(self, smiles_to_graph=smiles_to_bigraph,
                  node_featurizer=None, edge_featurizer=None, load=True):
-        if 'pandas' not in sys.modules:
-            dgl_warning("Please install pandas")
-        dgl_warning("`PubChemBioAssayAromaticity` has been deprecated and will be removed "
-                    "in v0.5. Import it from `dglls.data.pubchem_aromaticity` instead.")
-
         self._url = 'dataset/pubchem_bioassay_aromaticity.csv'
         data_path = get_download_dir() + '/pubchem_bioassay_aromaticity.csv'
         download(_get_dgl_url(self._url), path=data_path)

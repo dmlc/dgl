@@ -1,15 +1,13 @@
-import sys
+"""The Toxicology in the 21st Century initiative."""
+import dgl.backend as F
+import pandas as pd
+
+from dgl.data.utils import get_download_dir, download, _get_dgl_url
 
 from .csv_dataset import MoleculeCSVDataset
-from ..utils import smiles_to_bigraph
-from ...utils import get_download_dir, download, _get_dgl_url
-from .... import backend as F
-from ....base import dgl_warning
+from ..utils.mol_to_graph import smiles_to_bigraph
 
-try:
-    import pandas as pd
-except ImportError:
-    pass
+__all__ = ['Tox21']
 
 class Tox21(MoleculeCSVDataset):
     """Tox21 dataset.
@@ -48,11 +46,6 @@ class Tox21(MoleculeCSVDataset):
                  node_featurizer=None,
                  edge_featurizer=None,
                  load=True):
-        if 'pandas' not in sys.modules:
-            dgl_warning("Please install pandas")
-        dgl_warning("`Tox21` has been deprecated and will be removed from DGL in v0.5. "
-                    "Import it from `dglls.data.tox21` instead.")
-
         self._url = 'dataset/tox21.csv.gz'
         data_path = get_download_dir() + '/tox21.csv.gz'
         download(_get_dgl_url(self._url), path=data_path)

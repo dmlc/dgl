@@ -2,7 +2,13 @@
 
 ## Introduction
 
-`dglls` is a DGL-based package for various applications in life science with graph neural networks. 
+Deep learning on graphs has been an arising trend in the past few years. There are a lot of graphs in 
+life science such as molecular graphs and biological networks, making it an import area for applying 
+deep learning on graphs. `dglls` is a DGL-based package for various applications in life science 
+with graph neural networks. 
+
+We provide various functionalities, including but not limited to methods for graph construction, 
+featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
 ## Dependencies
 
@@ -16,3 +22,8 @@ Depending on the features you want to use, you may need to manually install the 
 - MDTraj
     - We recommend installation with `conda install -c conda-forge mdtraj`. For alternative ways of installation, 
     see the [official documentation](http://mdtraj.org/1.9.3/installation.html).
+
+## Example Usage
+
+Currently we provide examples for molecular property prediction, generative models and protein-ligand binding 
+affinity prediction. See the examples folder for details.

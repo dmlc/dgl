@@ -1,6 +1,5 @@
 """Utilities for using pretrained models."""
 import os
-import numpy as np
 import torch
 from rdkit import Chem
 
@@ -11,7 +10,6 @@ from .mgcn import MGCNModel
 from .mpnn import MPNNModel
 from .schnet import SchNet
 from .attentive_fp import AttentiveFP
-from .acnn import ACNN
 from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 
 URL = {
@@ -82,14 +80,6 @@ def load_pretrained(model_name, log=True):
         * ``'DGMG_ZINC_canonical'``
         * ``'DGMG_ZINC_random'``
         * ``'JTNN_ZINC'``
-        * ``'ACNN_PDBBind_core_pocket_random'``
-        * ``'ACNN_PDBBind_core_pocket_scaffold'``
-        * ``'ACNN_PDBBind_core_pocket_stratified'``
-        * ``'ACNN_PDBBind_core_pocket_temporal'``
-        * ``'ACNN_PDBBind_refined_pocket_random'``
-        * ``'ACNN_PDBBind_refined_pocket_scaffold'``
-        * ``'ACNN_PDBBind_refined_pocket_stratified'``
-        * ``'ACNN_PDBBind_refined_pocket_temporal'``
 
     log : bool
         Whether to print progress for model loading
@@ -159,14 +149,5 @@ def load_pretrained(model_name, log=True):
                            depth=3,
                            hidden_size=450,
                            latent_size=56)
-
-    elif model_name.startswith('ACNN_PDBBind_core_pocket'):
-        model = ACNN(hidden_sizes=[32, 32, 16],
-                     weight_init_stddevs=[1. / float(np.sqrt(32)), 1. / float(np.sqrt(32)),
-                                          1. / float(np.sqrt(16)), 0.01],
-                     dropouts=[0., 0., 0.],
-                     features_to_use=torch.tensor([
-                         1., 6., 7., 8., 9., 11., 12., 15., 16., 17., 20., 25., 30., 35., 53.]),
-                     radial=[[12.0], [0.0, 4.0, 8.0], [4.0]])
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

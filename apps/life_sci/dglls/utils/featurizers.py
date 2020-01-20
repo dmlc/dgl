@@ -1,3 +1,4 @@
+"""Node and edge featurization for molecular graphs."""
 import dgl.backend as F
 import itertools
 import numpy as np

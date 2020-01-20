@@ -119,7 +119,7 @@ We provide a jupyter notebook for performing the visualization and you can downl
 
 Generally we follow the practice of PyTorch.
 
-A Dataset class should implement `__getitem__(self, index)` and `__len__(self)` method
+A dataset class should implement `__getitem__(self, index)` and `__len__(self)` method
 
 ```python
 class CustomDataset(object):
@@ -148,9 +148,9 @@ class CustomDataset(object):
         return len(self.smiles)
 ```
 
-We provide various methods for graph construction in `dgl.data.chem.utils.mol_to_graph`. If your dataset can 
+We provide various methods for graph construction in `dglls.utils.mol_to_graph`. If your dataset can 
 be converted to a pandas dataframe, e.g. a .csv file, you may use `MoleculeCSVDataset` in 
-`dgl.data.chem.datasets.csv_dataset`.
+`dglls.data.csv_dataset`.
 
 ## References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.
