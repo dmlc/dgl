@@ -1,8 +1,11 @@
 import dgl
 import backend as F
 import numpy as np
+import unittest
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None):
+    traces = F.asnumpy(traces)
+    ntypes = F.asnumpy(ntypes)
     for j in range(traces.shape[1] - 1):
         assert ntypes[j] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[0])
         assert ntypes[j + 1] == g.get_ntype_id(g.to_canonical_etype(metapath[j])[2])
@@ -16,6 +19,7 @@ def check_random_walk(g, metapath, traces, ntypes, prob=None):
                 eids = g.edge_id(traces[i, j], traces[i, j+1], etype=metapath[j])
                 assert p[eids] != 0
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random walk not implemented")
 def test_random_walk():
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): [(0, 1), (1, 2), (2, 0)]
