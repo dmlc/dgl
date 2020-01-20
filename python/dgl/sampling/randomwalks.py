@@ -79,7 +79,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
                 if prob_nd.ctx != nodes.ctx:
                     raise ValueError(
                         'context of seed node array and edges[%s].data[%s] are different' %
-                    (etype, prob))
+                        (etype, prob))
             else:
                 prob_nd = nd.array([], ctx=nodes.ctx)
             p_nd.append(prob_nd)
