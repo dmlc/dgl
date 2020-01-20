@@ -10,7 +10,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
-#include <utility>
+#include <vector>
 
 namespace dgl {
 

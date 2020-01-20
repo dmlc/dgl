@@ -8,6 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <utility>
+#include <vector>
 #include "../../c_api_common.h"
 #include "randomwalks.h"
 

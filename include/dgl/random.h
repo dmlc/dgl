@@ -12,6 +12,7 @@
 #include <dmlc/logging.h>
 #include <random>
 #include <thread>
+#include <vector>
 
 namespace dgl {
 
