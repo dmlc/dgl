@@ -10,7 +10,7 @@ from .. import utils
 __all__ = [
     'random_walk']
 
-def random_walk(g, nodes, *, metapath=None, length=None, p=None):
+def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
     """Generate random walk traces from an array of seed nodes (or starting nodes),
     based on the given metapath.
 
@@ -39,7 +39,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
     length : int, optional
         Length of random walks.
         Affects only when ``metapath`` is omitted.
-    p : str, optional
+    prob : str, optional
         The name of the edge feature tensor on the graph storing the (unnormalized)
         probabilities associated with each edge for choosing the next node.
         The feature tensor must be non-negative.
@@ -65,26 +65,26 @@ def random_walk(g, nodes, *, metapath=None, length=None, p=None):
     else:
         metapath = [g.get_etype_id(etype) for etype in metapath]
 
-    gi = g._graph
+    gidx = g._graph
     nodes = utils.toindex(nodes).todgltensor()
     metapath = utils.toindex(metapath).todgltensor().copyto(nodes.ctx)
 
-    if p is None:
+    if prob is None:
         p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
     else:
         p_nd = []
         for etype in g.canonical_etypes:
-            if p in g.edges[etype].data:
-                prob_nd = F.zerocopy_to_dgl_ndarray(g.edges[etype].data[p])
+            if prob in g.edges[etype].data:
+                prob_nd = F.zerocopy_to_dgl_ndarray(g.edges[etype].data[prob])
                 if prob_nd.ctx != nodes.ctx:
                     raise ValueError(
                         'context of seed node array and edges[%s].data[%s] are different' %
-                        (etype, p))
-            else:
-                prob_nd = nd.array([], ctx=nodes.ctx)
-            p_nd.append(prob_nd)
+                    (etype, prob))
+        else:
+            prob_nd = nd.array([], ctx=nodes.ctx)
+        p_nd.append(prob_nd)
 
-    traces, types = _CAPI_DGLSamplingRandomWalk(gi, nodes, metapath, p_nd)
+traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
     traces = F.zerocopy_from_dgl_ndarray(traces.data)
     types = F.zerocopy_from_dgl_ndarray(types.data)
     return traces, types
