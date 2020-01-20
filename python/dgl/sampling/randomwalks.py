@@ -80,11 +80,11 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
                     raise ValueError(
                         'context of seed node array and edges[%s].data[%s] are different' %
                     (etype, prob))
-        else:
-            prob_nd = nd.array([], ctx=nodes.ctx)
-        p_nd.append(prob_nd)
+            else:
+                prob_nd = nd.array([], ctx=nodes.ctx)
+            p_nd.append(prob_nd)
 
-traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
+    traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
     traces = F.zerocopy_from_dgl_ndarray(traces.data)
     types = F.zerocopy_from_dgl_ndarray(types.data)
     return traces, types

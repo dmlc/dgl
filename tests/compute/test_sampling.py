@@ -44,7 +44,7 @@ def test_random_walk():
     check_random_walk(g2, ['follow'] * 4, traces, ntypes)
 
     traces, ntypes = dgl.sampling.random_walk(
-        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, p='p')
+        g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p')
     check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p')
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
@@ -59,7 +59,7 @@ def test_random_walk():
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
     traces, ntypes = dgl.sampling.random_walk(
-        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, p='p')
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p')
     check_random_walk(g4, metapath, traces, ntypes, 'p')
 
 
