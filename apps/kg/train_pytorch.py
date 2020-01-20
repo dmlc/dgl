@@ -132,7 +132,6 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
 
                 for k, v in metrics.items():
                     print('{} average {} at [{}/{}]: {}'.format(mode, k, args.step, args.max_step, v))
-
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
     return metrics

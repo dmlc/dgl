@@ -126,6 +126,86 @@ def BalancedRelationPartition(edges, n):
     # TODO(zhengda) we should also reshuffle here to speed up
     return parts, rel_parts
 
+# This partitions a list of edges based on relations to give a 
+# balanced relation and edge parttion
+def SoftRelationPartition(edges, n):
+    heads, rels, tails = edges
+    print('relation partition {} edges into {} parts'.format(len(heads), n))
+    uniq, cnts = np.unique(rels, return_counts=True)
+    idx = np.flip(np.argsort(cnts))
+    cnts = cnts[idx]
+    uniq = uniq[idx]
+    assert cnts[0] > cnts[-1]
+    edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_dict = {}
+    rel_parts = []
+    for _ in range(n):
+        rel_parts.append([])
+
+    max_edges = (len(rels) // n) + 1
+    num_div = 0
+    for i in range(len(cnts)):
+        cnt = cnts[i]
+        r = uniq[i]
+        r_parts = []
+
+        idx = np.argmin(edge_cnts)
+        # edge cannot fit in one slot
+        if edge_cnts[idx] + cnt > max_edges:
+            avg_part_cnt = (cnt // n) + 1
+            num_div += 1
+            for j in range(n):
+                part_cnt = avg_part_cnt if cnt > avg_part_cnt else cnt
+                r_parts.append([j, part_cnt])
+                rel_parts[j].append(r)
+                edge_cnts[j] += part_cnt
+                rel_cnts[j] += 1
+                cnt -= part_cnt
+        else:
+            r_parts.append([idx, cnt])
+            rel_parts[idx].append(r)
+            edge_cnts[idx] += cnt
+            rel_cnts[idx] += 1
+
+        rel_dict[r] = r_parts
+
+    for i, edge_cnt in enumerate(edge_cnts):
+        print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
+    print('{}/{} duplicated relation across partitions'.format(num_div, len(cnts)))
+
+    parts = []
+    for i in range(n):
+        parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
+
+    for i, r in enumerate(rels):
+        r_part = rel_dict[r][0]
+        part_idx = r_part[0]
+        cnt = r_part[1]
+        parts[part_idx].append(i)
+        cnt -= 1
+        if cnt == 0:
+            rel_dict[r].pop(0)
+        else:
+            rel_dict[r][0][1] = cnt
+
+    for i, part in enumerate(parts):
+        parts[i] = np.array(part, dtype=np.int64)
+        print(parts[i].shape)
+
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+
+    return parts, rel_parts
+
 def RandomPartition(edges, n):
     heads, rels, tails = edges
     print('random partition {} edges into {} parts'.format(len(heads), n))
@@ -169,6 +249,8 @@ class TrainDataset(object):
             self.edge_parts, self.rel_parts = StrictRelationPartition(triples, ranks)
         elif ranks > 1 and args.rel_part:
             self.edge_parts, self.rel_parts = BalancedRelationPartition(triples, ranks)
+        elif ranks > 1 and args.soft_rel_part:
+            self.edge_parts, self.rel_parts = SoftRelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
