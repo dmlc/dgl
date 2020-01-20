@@ -1,8 +1,8 @@
 import os
+import numpy as np
 
 def _download_and_extract(url, path, filename):
     import shutil, zipfile
-    from tqdm import tqdm
     import requests
 
     fn = os.path.join(path, filename)
@@ -19,7 +19,7 @@ def _download_and_extract(url, path, filename):
             sz = f_remote.headers.get('content-length')
             assert f_remote.status_code == 200, 'fail to open {}'.format(url)
             with open(fn, 'wb') as writer:
-                for chunk in tqdm(f_remote.iter_content(chunk_size=1024*1024)):
+                for chunk in f_remote.iter_content(chunk_size=1024*1024):
                     writer.write(chunk)
             print('Download finished. Unzipping the file...')
 
@@ -72,13 +72,20 @@ class KGDataset1:
 
     def read_triple(self, path, mode):
         # mode: train/valid/test
-        triples = []
+        heads = []
+        tails = []
+        rels = []
         with open(os.path.join(path, '{}.txt'.format(mode))) as f:
             for line in f:
                 h, r, t = line.strip().split('\t')
-                triples.append((self.entity2id[h], self.relation2id[r], self.entity2id[t]))
+                heads.append(self.entity2id[h])
+                rels.append(self.relation2id[r])
+                tails.append(self.entity2id[t])
+        heads = np.array(heads, dtype=np.int64)
+        tails = np.array(tails, dtype=np.int64)
+        rels = np.array(rels, dtype=np.int64)
 
-        return triples
+        return (heads, rels, tails)
 
 
 class KGDataset2:
@@ -116,16 +123,23 @@ class KGDataset2:
         self.test = self.read_triple(self.path, 'test')
 
     def read_triple(self, path, mode, skip_first_line=False):
-        triples = []
+        heads = []
+        tails = []
+        rels = []
         print('Reading {} triples....'.format(mode))
         with open(os.path.join(path, '{}.txt'.format(mode))) as f:
             if skip_first_line:
                 _ = f.readline()
             for line in f:
                 h, t, r = line.strip().split('\t')
-                triples.append((int(h), int(r), int(t)))
-        print('Finished. Read {} {} triples.'.format(len(triples), mode))
-        return triples
+                heads.append(int(h))
+                tails.append(int(t))
+                rels.append(int(r))
+        heads = np.array(heads, dtype=np.int64)
+        tails = np.array(tails, dtype=np.int64)
+        rels = np.array(rels, dtype=np.int64)
+        print('Finished. Read {} {} triples.'.format(len(heads), mode))
+        return (heads, rels, tails)
 
 
 def get_dataset(data_path, data_name, format_str):

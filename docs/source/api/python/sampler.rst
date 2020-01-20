@@ -5,6 +5,7 @@ Graph samplers
 
 .. autofunction:: dgl.contrib.sampling.sampler.NeighborSampler
 .. autofunction:: dgl.contrib.sampling.sampler.LayerSampler
+.. autofunction:: dgl.contrib.sampling.sampler.EdgeSampler
 
 Distributed sampler
 ------------------------

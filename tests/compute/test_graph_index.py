@@ -43,7 +43,7 @@ def sort_edges(edges):
     edges = [e.tousertensor() for e in edges]
     if np.prod(edges[2].shape) > 0:
         val, idx = F.sort_1d(edges[2])
-        return (edges[0][idx], edges[1][idx], edges[2][idx])
+        return (F.gather_row(edges[0], idx), F.gather_row(edges[1], idx), F.gather_row(edges[2], idx))
     else:
         return (edges[0], edges[1], edges[2])
 
@@ -124,8 +124,8 @@ def test_node_subgraph():
     subig = ig.node_subgraph(utils.toindex(randv))
     check_basics(subg.graph, subig.graph)
     check_graph_equal(subg.graph, subig.graph)
-    assert F.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
-            == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor(), 0) == 10
+    assert F.asnumpy(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
+            == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor()).sum(0).item() == 10
 
     # node_subgraphs
     randvs = []

@@ -1,6 +1,7 @@
 """Module for heterogeneous graph index class definition."""
 from __future__ import absolute_import
 
+import itertools
 import numpy as np
 import scipy
 
@@ -24,12 +25,27 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        # TODO
-        return
+        metagraph = self.metagraph
+        number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
+        edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
+        # multigraph and readonly are not used.
+        return metagraph, number_of_nodes, edges
 
     def __setstate__(self, state):
-        # TODO
-        pass
+        metagraph, number_of_nodes, edges = state
+
+        self._cache = {}
+        # loop over etypes and recover unit graphs
+        rel_graphs = []
+        for i, edges_per_type in enumerate(edges):
+            src_ntype, dst_ntype = metagraph.find_edge(i)
+            num_src = number_of_nodes[src_ntype]
+            num_dst = number_of_nodes[dst_ntype]
+            src_id, dst_id, _ = edges_per_type
+            rel_graphs.append(create_unitgraph_from_coo(
+                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id))
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
     @property
     def metagraph(self):
@@ -1005,6 +1021,45 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+
+def disjoint_union(metagraph, graphs):
+    """Return a disjoint union of the input heterographs.
+
+    Parameters
+    ----------
+    metagraph : GraphIndex
+        Meta-graph.
+    graphs : list of HeteroGraphIndex
+        Heterographs to be batched.
+
+    Returns
+    -------
+    HeteroGraphIndex
+        Batched Heterograph.
+    """
+    return _CAPI_DGLHeteroDisjointUnion(metagraph, graphs)
+
+def disjoint_partition(graph, bnn_all_types, bne_all_types):
+    """Partition the graph disjointly.
+
+    Parameters
+    ----------
+    graph : HeteroGraphIndex
+        The graph to be partitioned.
+    bnn_all_types : list of list of int
+        bnn_all_types[t] gives the number of nodes with t-th type in the batch.
+    bne_all_types : list of list of int
+        bne_all_types[t] gives the number of edges with t-th type in the batch.
+
+    Returns
+    --------
+    list of HeteroGraphIndex
+        Heterographs unbatched.
+    """
+    bnn_all_types = utils.toindex(list(itertools.chain.from_iterable(bnn_all_types)))
+    bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
+    return _CAPI_DGLHeteroDisjointPartitionBySizes(
+        graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):

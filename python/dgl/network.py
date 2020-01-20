@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 import time
-import signal
 from enum import Enum
 from collections import namedtuple
 
@@ -18,40 +17,37 @@ _init_api("dgl.network")
 
 _WAIT_TIME_SEC = 3  # 3 seconds
 
-def keyboard_interrupt_handler(my_signal):
-    """Users can use [Ctl + C] to exit loop service
-    """
-    print("KeyboardInterrupt (ID: {}) has been caught. Cleaning up DGL ...".format(my_signal))
-    exit(0)
-
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 def _network_wait():
     """Sleep for a few seconds
     """
     time.sleep(_WAIT_TIME_SEC)
 
-def _create_sender(net_type):
+def _create_sender(net_type, msg_queue_size=2*1024*1024*1024):
     """Create a Sender communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size (2GB by default)
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLSenderCreate(net_type)
+    return _CAPI_DGLSenderCreate(net_type, msg_queue_size)
 
-def _create_receiver(net_type):
+def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
     """Create a Receiver communicator via C api
 
     Parameters
     ----------
     net_type : str
         'socket' or 'mpi'
+    msg_queue_size : int
+        message queue size (2GB by default)
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
-    return _CAPI_DGLReceiverCreate(net_type)
+    return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
 def _finalize_sender(sender):
     """Finalize Sender communicator
@@ -188,8 +184,9 @@ class KVMsgType(Enum):
     PULL = 4
     PULL_BACK = 5
     BARRIER = 6
+    IP_ID = 7
 
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data")
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data, c_ptr")
 """Message of DGL kvstore
 
 Data Field
@@ -227,6 +224,13 @@ def _send_kv_msg(sender, msg, recv_id):
             msg.rank,
             msg.name,
             tensor_id)
+    elif msg.type == KVMsgType.IP_ID:
+        _CAPI_SenderSendKVMsg(
+            sender,
+            int(recv_id),
+            msg.type.value,
+            msg.rank,
+            msg.name)
     elif msg.type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         _CAPI_SenderSendKVMsg(
             sender,
@@ -269,7 +273,18 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=None)
+            data=None,
+            c_ptr=msg_ptr)
+        return msg
+    elif msg_type == KVMsgType.IP_ID:
+        name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
+        msg = KVStoreMsg(
+            type=msg_type,
+            rank=rank,
+            name=name,
+            id=None,
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     elif msg_type in (KVMsgType.FINAL, KVMsgType.BARRIER):
         msg = KVStoreMsg(
@@ -277,7 +292,8 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=None,
             id=None,
-            data=None)
+            data=None,
+            c_ptr=msg_ptr)
         return msg
     else:
         name = _CAPI_ReceiverGetKVMsgName(msg_ptr)
@@ -288,7 +304,19 @@ def _recv_kv_msg(receiver):
             rank=rank,
             name=name,
             id=tensor_id,
-            data=data)
+            data=data,
+            c_ptr=msg_ptr)
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
+
+
+def _clear_kv_msg(garbage_msg):
+    """Clear data of kvstore message
+    """
+    F.sync()
+    for msg in garbage_msg:
+        if msg.c_ptr is not None:
+            _CAPI_DeleteKVMsg(msg.c_ptr)
+    garbage_msg = []
+        

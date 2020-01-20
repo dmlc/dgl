@@ -11,6 +11,11 @@ Dependencies
 Results
 =======
 
-Node classification on citation networks:
+## Citation networks
+Run with following (available dataset: "cora", "citeseer", "pubmed")
+```bash
+python3 citation.py --dataset cora --gpu 0
+```
+
 - Cora: ~0.814
 - Pubmed: ~0.748

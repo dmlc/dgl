@@ -4,10 +4,14 @@ import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
 from .graph import DGLGraph
+from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
+from .graph_index import _get_halo_subgraph_inner_node
+from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
 from .convert import graph, bipartite
+from . import utils
 
 
 __all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
@@ -288,7 +292,7 @@ def reverse(g, share_ndata=False, share_edata=False):
         'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
-    g_edges = g.edges()
+    g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
     if share_ndata:
         g_reversed._node_frame = g._node_frame
@@ -519,5 +523,43 @@ def remove_self_loop(g):
     non_self_edges_idx = src != dst
     new_g.add_edges(src[non_self_edges_idx], dst[non_self_edges_idx])
     return new_g
+
+def partition_graph_with_halo(g, node_part, num_hops):
+    '''
+    This is to partition a graph. Each partition contains HALO nodes
+    so that we can generate NodeFlow in each partition correctly.
+
+    Parameters
+    ------------
+    g: DGLGraph
+        The graph to be partitioned
+
+    node_part: 1D tensor
+        Specify which partition a node is assigned to. The length of this tensor
+        needs to be the same as the number of nodes of the graph. Each element
+        indicates the partition Id of a node.
+
+    num_hops: int
+        The number of hops a HALO node can be accessed.
+
+    Returns
+    --------
+    a dict of DGLGraphs
+        The key is the partition Id and the value is the DGLGraph of the partition.
+    '''
+    assert len(node_part) == g.number_of_nodes()
+    node_part = utils.toindex(node_part)
+    subgs = _CAPI_DGLPartitionWithHalo(g._graph, node_part.todgltensor(), num_hops)
+    subg_dict = {}
+    for i, subg in enumerate(subgs):
+        inner_node = _get_halo_subgraph_inner_node(subg)
+        inner_edge = _get_halo_subgraph_inner_edge(subg)
+        subg = DGLSubGraph(g, subg)
+        inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
+        subg.ndata['inner_node'] = inner_node
+        inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
+        subg.edata['inner_edge'] = inner_edge
+        subg_dict[i] = subg
+    return subg_dict
 
 _init_api("dgl.transform")

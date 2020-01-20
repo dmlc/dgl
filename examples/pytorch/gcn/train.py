@@ -44,9 +44,9 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-              train_mask.sum().item(),
-              val_mask.sum().item(),
-              test_mask.sum().item()))
+              train_mask.int().sum().item(),
+              val_mask.int().sum().item(),
+              test_mask.int().sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -117,7 +117,7 @@ def main(args):
 
     print()
     acc = evaluate(model, features, labels, test_mask)
-    print("Test Accuracy {:.4f}".format(acc))
+    print("Test accuracy {:.2%}".format(acc))
 
 
 if __name__ == '__main__':

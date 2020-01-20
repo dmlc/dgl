@@ -5,7 +5,7 @@ import numpy as np
 import dgl.backend as F
 import dgl
 
-backend = os.environ.get('DGLBACKEND')
+backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
     import mxnet as mx
     mx.random.seed(42)
@@ -34,13 +34,14 @@ def generate_rand_graph(n, func_name):
     g = dgl.DGLGraph(arr, readonly=True)
     num_rels = 10
     entity_emb = F.uniform((g.number_of_nodes(), 10), F.float32, F.cpu(), 0, 1)
-    rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), 0, 1)
+    if func_name == 'RotatE':
+        entity_emb = F.uniform((g.number_of_nodes(), 20), F.float32, F.cpu(), 0, 1)
+    rel_emb = F.uniform((num_rels, 10), F.float32, F.cpu(), -1, 1)
     if func_name == 'RESCAL':
         rel_emb = F.uniform((num_rels, 10*10), F.float32, F.cpu(), 0, 1)
     g.ndata['id'] = F.arange(0, g.number_of_nodes())
     rel_ids = np.random.randint(0, num_rels, g.number_of_edges(), dtype=np.int64)
     g.edata['id'] = F.tensor(rel_ids, F.int64)
-
     # TransR have additional projection_emb
     if (func_name == 'TransR'):
         args = {'gpu':-1, 'lr':0.1}
@@ -49,16 +50,25 @@ def generate_rand_graph(n, func_name):
         return g, entity_emb, rel_emb, (12.0, projection_emb, 10, 10)
     elif (func_name == 'TransE'):
         return g, entity_emb, rel_emb, (12.0)
+    elif (func_name == 'TransE_l1'):
+        return g, entity_emb, rel_emb, (12.0, 'l1')
+    elif (func_name == 'TransE_l2'):
+        return g, entity_emb, rel_emb, (12.0, 'l2')
     elif (func_name == 'RESCAL'):
         return g, entity_emb, rel_emb, (10, 10)
+    elif (func_name == 'RotatE'):
+        return g, entity_emb, rel_emb, (12.0, 1.0)
     else:
         return g, entity_emb, rel_emb, None
 
 ke_score_funcs = {'TransE': TransEScore,
+                  'TransE_l1': TransEScore,
+                  'TransE_l2': TransEScore,
                   'DistMult': DistMultScore,
                   'ComplEx': ComplExScore,
                   'RESCAL': RESCALScore,
-                  'TransR': TransRScore}
+                  'TransR': TransRScore,
+                  'RotatE': RotatEScore}
 
 class BaseKEModel:
     def __init__(self, score_func, entity_emb, rel_emb):
@@ -127,14 +137,14 @@ def check_score_func(func_name):
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
     sampler = EdgeSampler(g, batch_size=batch_size,
                           neg_sample_size=neg_sample_size,
-                          negative_mode='PBG-head',
+                          negative_mode='chunk-head',
                           num_workers=1,
                           shuffle=False,
                           exclude_positive=False,
                           return_false_neg=False)
 
     for pos_g, neg_g in sampler:
-        neg_g = create_neg_subgraph(pos_g, neg_g, True, True, g.number_of_nodes())
+        neg_g = create_neg_subgraph(pos_g, neg_g, neg_sample_size, True, True, g.number_of_nodes())
         pos_g.copy_from_parent()
         neg_g.copy_from_parent()
         score1 = F.reshape(model.predict_score(neg_g), (batch_size, -1))
@@ -145,6 +155,8 @@ def check_score_func(func_name):
 
 def test_score_func_transe():
     check_score_func('TransE')
+    check_score_func('TransE_l1')
+    check_score_func('TransE_l2')
 
 def test_score_func_distmult():
     check_score_func('DistMult')
@@ -158,9 +170,13 @@ def test_score_func_rescal():
 def test_score_func_transr():
     check_score_func('TransR')
 
+def test_score_func_rotate():
+    check_score_func('RotatE')
+        
 if __name__ == '__main__':
     test_score_func_transe()
     test_score_func_distmult()
     test_score_func_complex()
     test_score_func_rescal()
     test_score_func_transr()
+    test_score_func_rotate()

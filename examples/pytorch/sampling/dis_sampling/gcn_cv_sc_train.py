@@ -36,9 +36,9 @@ def main(args):
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
-    n_train_samples = train_mask.sum().item()
-    n_val_samples = val_mask.sum().item()
-    n_test_samples = test_mask.sum().item()
+    n_train_samples = train_mask.int().sum().item()
+    n_val_samples = val_mask.int().sum().item()
+    n_test_samples = test_mask.int().sum().item()
 
     print("""----Data statistics------'
       #Edges %d

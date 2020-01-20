@@ -87,13 +87,13 @@ def save_graphs(filename, g_list, labels=None):
     >>> g2 = dgl.DGLGraph()
     >>> g2.add_nodes(3)
     >>> g2.add_edges([0, 1, 2], [1, 2, 1])
-    >>> g1.edata["e"] = th.ones(3, 4)
+    >>> g2.edata["e"] = th.ones(3, 4)
 
     Save Graphs into file
 
     >>> from dgl.data.utils import save_graphs
     >>> graph_labels = {"glabel": th.tensor([0, 1])}
-    >>> save_graphs([g1, g2], "./data.bin", graph_labels)
+    >>> save_graphs("./data.bin", [g1, g2], graph_labels)
 
     """
     if isinstance(g_list, DGLGraph):
@@ -130,7 +130,7 @@ def load_graphs(filename, idx_list=None):
     ----------
     Following the example in save_graphs.
 
-    >>> from dgl.utils.data import load_graphs
+    >>> from dgl.data.utils import load_graphs
     >>> glist, label_dict = load_graphs("./data.bin") # glist will be [g1, g2]
     >>> glist, label_dict = load_graphs("./data.bin", [0]) # glist will be [g1]
 

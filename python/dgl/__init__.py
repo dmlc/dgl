@@ -3,6 +3,10 @@
 # This initializes Winsock and performs cleanup at termination as required
 import socket
 
+# Need to ensure that the backend framework is imported before load dgl libs,
+# otherwise weird cuda problem happens
+from .backend import load_backend
+
 from . import function
 from . import nn
 from . import contrib
@@ -14,8 +18,8 @@ from ._ffi.function import register_func, get_global_func, list_global_func_name
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
-from .backend import load_backend
 from .batched_graph import *
+from .batched_heterograph import *
 from .convert import *
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
