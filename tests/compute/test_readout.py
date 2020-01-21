@@ -214,7 +214,7 @@ def test_broadcast_nodes():
         [feat3] * g3.number_of_nodes(), 0
     )
     assert F.allclose(dgl.broadcast_nodes(
-        bg, F.stack([feat0, feat1, feat2, feat3], 0)
+        bg, F.cat([feat0, feat1, feat2, feat3], 0)
     ), ground_truth)
 
 def test_broadcast_edges():
@@ -239,7 +239,7 @@ def test_broadcast_edges():
         [feat3] * g3.number_of_edges(), 0
     )
     assert F.allclose(dgl.broadcast_edges(
-        bg, F.stack([feat0, feat1, feat2, feat3], 0)
+        bg, F.cat([feat0, feat1, feat2, feat3], 0)
     ), ground_truth)
 
 if __name__ == '__main__':
