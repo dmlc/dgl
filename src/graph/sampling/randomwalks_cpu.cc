@@ -4,13 +4,11 @@
  * \brief DGL sampler - CPU implementation of random walks with OpenMP
  */
 
-#include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/random.h>
-#include <dmlc/omp.h>
 #include <utility>
-#include <iomanip>
+#include <vector>
 #include "randomwalks.h"
 #include "randomwalks_cpu.h"
 
