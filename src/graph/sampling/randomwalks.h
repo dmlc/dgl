@@ -11,6 +11,7 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
 #include <vector>
+#include <utility>
 
 namespace dgl {
 
@@ -22,6 +23,17 @@ namespace sampling {
 namespace impl {
 
 /*!
+ * \brief Random walk step function
+ */
+using StepFunc = std::function<
+  //        ID        terminate?
+  std::pair<dgl_id_t, bool>(
+      void *,       // node IDs generated so far
+      dgl_id_t,     // last node ID
+      int64_t       // # of steps
+      )>;
+
+/*!
  * \brief Get the node types traversed by the metapath.
  * \return A 1D array of shape (len(metapath) + 1,) with node type IDs.
  */
@@ -29,6 +41,22 @@ template<DLDeviceType XPU, typename IdxType>
 TypeArray GetNodeTypesFromMetapath(
     const HeteroGraphPtr hg,
     const TypeArray metapath);
+
+/*!
+ * \brief Generic Random Walk.
+ * \param hg The heterograph.
+ * \param seeds A 1D array of seed nodes, with the type the source type of the first
+ *        edge type in the metapath.
+ * \param max_num_steps The maximum number of steps of a random walk path.
+ * \param step The random walk step function with type \c StepFunc.
+ * \return A 2D array of shape (len(seeds), max_num_steps + 1) with node IDs.
+ */
+template<DLDeviceType XPU, typename IdxType>
+IdArray GenericRandomWalk(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    int64_t max_num_steps,
+    StepFunc step);
 
 /*!
  * \brief Metapath-based random walk with constant restart probability.

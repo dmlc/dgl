@@ -65,19 +65,98 @@ TypeArray GetNodeTypesFromMetapath<kDLCPU, int64_t>(
     const TypeArray metapath);
 
 template<DLDeviceType XPU, typename IdxType>
+IdArray GenericRandomWalk(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    int64_t max_num_steps,
+    StepFunc step) {
+  int64_t num_seeds = seeds->shape[0];
+  int64_t trace_length = max_num_steps + 1;
+  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
+
+  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
+  IdxType *traces_data = static_cast<IdxType *>(traces->data);
+
+#pragma omp parallel for
+  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
+    int64_t i;
+    dgl_id_t curr = seed_data[seed_id];
+    traces_data[seed_id * trace_length] = curr;
+
+    for (i = 0; i < max_num_steps; ++i) {
+      const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
+      traces_data[seed_id * trace_length + i + 1] = curr = succ.first;
+      if (succ.second)
+        break;
+    }
+
+    for (; i < max_num_steps; ++i)
+      traces_data[seed_id * max_num_steps + i + 1] = -1;
+  }
+
+  return traces;
+}
+
+template<DLDeviceType XPU, typename IdxType>
+std::pair<dgl_id_t, bool> _MetapathRandomWalkStep(
+    void *data,
+    dgl_id_t curr,
+    int64_t len,
+    const std::vector<std::vector<IdArray> > &edges_by_type,
+    const IdxType *metapath_data,
+    const std::vector<FloatArray> &prob,
+    double restart_prob) {
+  dgl_type_t etype = metapath_data[len];
+
+  // Note that since the selection of successors is very lightweight (especially in the
+  // uniform case), we want to reduce the overheads (even from object copies or object
+  // construction) as much as possible.
+  // Using Successors() slows down by 2x.
+  // Using OutEdges() slows down by 10x.
+  const auto &csr_arrays = edges_by_type[etype];
+  const IdxType *offsets = static_cast<IdxType *>(csr_arrays[0]->data);
+  const IdxType *all_succ = static_cast<IdxType *>(csr_arrays[1]->data);
+  const IdxType *succ = all_succ + offsets[curr];
+
+  int64_t size = offsets[curr + 1] - offsets[curr];
+  if (size == 0)
+    return std::make_pair(-1, true);
+
+  FloatArray prob_etype = prob[etype];
+  if (prob_etype->shape[0] == 0) {
+    // empty probability array; assume uniform
+    IdxType idx = RandomEngine::ThreadLocal()->RandInt(size);
+    curr = succ[idx];
+  } else {
+    // non-uniform random walk
+    const IdxType *all_eids = static_cast<IdxType *>(csr_arrays[2]->data);
+    const IdxType *eids = all_eids + offsets[curr];
+
+    ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
+      const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
+      std::vector<DType> prob_selected;
+      for (int64_t j = 0; j < size; ++j)
+        prob_selected.push_back(prob_etype_data[eids[j]]);
+
+      curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
+    });
+  }
+
+  bool restart = (
+      restart_prob > 0 &&
+      RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob);
+  return std::make_pair(curr, restart);
+}
+
+template<DLDeviceType XPU, typename IdxType>
 IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob) {
-  int64_t trace_length = metapath->shape[0] + 1;
-  int64_t num_seeds = seeds->shape[0];
-  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-
+  int64_t max_num_steps = metapath->shape[0];
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
-  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
-  IdxType *traces_data = static_cast<IdxType *>(traces->data);
 
   // Prefetch all edges.
   // This forces the heterograph to materialize all OutCSR's before the OpenMP loop;
@@ -87,65 +166,14 @@ IdArray RandomWalk(
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t i;
-    dgl_id_t curr = seed_data[seed_id];
-    traces_data[seed_id * trace_length] = curr;
+  StepFunc step =
+    [&edges_by_type, metapath_data, &prob, restart_prob]
+    (void *data, dgl_id_t curr, int64_t len) {
+      return _MetapathRandomWalkStep<XPU, IdxType>(
+          data, curr, len, edges_by_type, metapath_data, prob, restart_prob);
+    };
 
-    for (i = 0; i < metapath->shape[0]; ++i) {
-      dgl_type_t etype = metapath_data[i];
-
-      // Note that since the selection of successors is very lightweight (especially in the
-      // uniform case), we want to reduce the overheads (even from object copies or object
-      // construction) as much as possible.
-      // Using Successors() slows down by 2x.
-      // Using OutEdges() slows down by 10x.
-      const auto &csr_arrays = edges_by_type[etype];
-      const IdxType *offsets = static_cast<IdxType *>(csr_arrays[0]->data);
-      const IdxType *all_succ = static_cast<IdxType *>(csr_arrays[1]->data);
-      const IdxType *succ = all_succ + offsets[curr];
-
-      int64_t size = offsets[curr + 1] - offsets[curr];
-      if (size == 0) {
-        // no successor, stop
-        traces_data[seed_id * trace_length + i + 1] = -1;
-        break;
-      }
-
-      FloatArray prob_etype = prob[etype];
-      if (prob_etype->shape[0] == 0) {
-        // empty probability array; assume uniform
-        IdxType idx = RandomEngine::ThreadLocal()->RandInt(size);
-        curr = succ[idx];
-      } else {
-        // non-uniform random walk
-        const IdxType *all_eids = static_cast<IdxType *>(csr_arrays[2]->data);
-        const IdxType *eids = all_eids + offsets[curr];
-
-        ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
-          const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
-          std::vector<DType> prob_selected;
-          for (int64_t j = 0; j < size; ++j)
-            prob_selected.push_back(prob_etype_data[eids[j]]);
-
-          curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
-        });
-      }
-
-      traces_data[seed_id * trace_length + i + 1] = curr;
-
-      // restart probability
-      if (restart_prob > 0 && RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob)
-        break;
-    }
-
-    // pad if the random walk stops early (either due to restart or lack of successors)
-    for (; i < metapath->shape[0]; ++i)
-      traces_data[seed_id * trace_length + i + 1] = -1;
-  }
-
-  return traces;
+  return GenericRandomWalk<XPU, IdxType>(hg, seeds, max_num_steps, step);
 }
 
 template
