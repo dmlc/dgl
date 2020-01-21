@@ -14,11 +14,13 @@ def test():
     model = load_pretrained('DGMG_ChEMBL_random')
     model = load_pretrained('DGMG_ZINC_canonical')
     model = load_pretrained('DGMG_ZINC_random')
+    model = load_pretrained('JTNN_ZINC')
 
     remove_file('DGMG_ChEMBL_canonical_pre_trained.pth')
     remove_file('DGMG_ChEMBL_random_pre_trained.pth')
     remove_file('DGMG_ZINC_canonical_pre_trained.pth')
     remove_file('DGMG_ZINC_random_pre_trained.pth')
+    remove_file('JTNN_ZINC_pre_trained.pth')
 
 if __name__ == '__main__':
     test()

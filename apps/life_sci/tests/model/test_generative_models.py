@@ -1,6 +1,6 @@
 from rdkit import Chem
 
-from dglls.model import DGMG
+from dglls.model import DGMG, DGLJTNNVAE
 
 def test_dgmg():
     model = DGMG(atom_types=['O', 'Cl', 'C', 'S', 'F', 'Br', 'N'],
@@ -16,5 +16,11 @@ def test_dgmg():
     model.eval()
     model(rdkit_mol=True)
 
+def test_jtnn():
+    model = DGLJTNNVAE(hidden_size=1,
+                       latent_size=2,
+                       depth=1)
+
 if __name__ == '__main__':
     test_dgmg()
+    test_jtnn()

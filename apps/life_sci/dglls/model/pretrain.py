@@ -5,7 +5,7 @@ import torch
 from dgl.data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 from rdkit import Chem
 
-from ..model import DGMG
+from ..model import DGMG, DGLJTNNVAE
 
 __all__ = ['load_pretrained']
 
@@ -14,6 +14,7 @@ URL = {
     'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
     'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
+    'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -61,9 +62,6 @@ def load_pretrained(model_name, log=True):
 
         * ``'GCN_Tox21'``
         * ``'GAT_Tox21'``
-        * ``'MGCN_Alchemy'``
-        * ``'SCHNET_Alchemy'``
-        * ``'MPNN_Alchemy'``
         * ``'AttentiveFP_Aromaticity'``
         * ``'DGMG_ChEMBL_canonical'``
         * ``'DGMG_ChEMBL_random'``
@@ -95,5 +93,18 @@ def load_pretrained(model_name, log=True):
                      node_hidden_size=128,
                      num_prop_rounds=2,
                      dropout=0.2)
+
+    elif model_name == "JTNN_ZINC":
+        default_dir = get_download_dir()
+        vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
+        if not os.path.exists(vocab_file):
+            zip_file_path = '{}/jtnn.zip'.format(default_dir)
+            download('https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip',
+                     path=zip_file_path)
+            extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
+        model = DGLJTNNVAE(vocab_file=vocab_file,
+                           depth=3,
+                           hidden_size=450,
+                           latent_size=56)
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)
