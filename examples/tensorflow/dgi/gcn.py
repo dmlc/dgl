@@ -1,11 +1,12 @@
 """
 This code was copied from the GCN implementation in DGL examples.
 """
-import torch
-import torch.nn as nn
-from dgl.nn.pytorch import GraphConv
+import tensorflow as tf
+from tensorflow.keras import layers
 
-class GCN(nn.Module):
+from dgl.nn.tensorflow import GraphConv
+
+class GCN(layers.Layer):
     def __init__(self,
                  g,
                  in_feats,
@@ -16,7 +17,7 @@ class GCN(nn.Module):
                  dropout):
         super(GCN, self).__init__()
         self.g = g
-        self.layers = nn.ModuleList()
+        self.layers =[]
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
@@ -24,9 +25,9 @@ class GCN(nn.Module):
             self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = layers.Dropout(dropout)
 
-    def forward(self, features):
+    def call(self, features):
         h = features
         for i, layer in enumerate(self.layers):
             if i != 0:

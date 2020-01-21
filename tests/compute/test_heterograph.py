@@ -630,6 +630,27 @@ def test_to_device():
         hg = hg.to(F.cuda())
         assert hg is not None
 
+def test_convert_bound():
+    def _test_bipartite_bound(data, card):
+        try:
+            dgl.bipartite(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'bipartite bound test with wrong uid failed'
+
+    def _test_graph_bound(data, card):
+        try:
+            dgl.graph(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'graph bound test with wrong uid failed'
+
+    _test_bipartite_bound(([1,2],[1,2]),(2,3))
+    _test_bipartite_bound(([0,1],[1,4]),(2,3))
+    _test_graph_bound(([1,3],[1,2]), 3)
+    _test_graph_bound(([0,1],[1,3]),3)
+
+
 def test_convert():
     hg = create_test_heterograph()
     hs = []
@@ -1265,6 +1286,7 @@ if __name__ == '__main__':
     test_view()
     test_view1()
     test_flatten()
+    test_convert_bound()
     test_convert()
     test_to_device()
     test_transform()
