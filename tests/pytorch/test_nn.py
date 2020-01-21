@@ -170,11 +170,11 @@ def test_simple_pool():
     max_pool = max_pool.to(ctx)
     sort_pool = sort_pool.to(ctx)
     h1 = sum_pool(g, h0)
-    assert F.allclose(h1, F.sum(h0, 0, keepdims=True))
+    assert F.allclose(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
-    assert F.allclose(h1, F.mean(h0, 0, keepdims=True))
+    assert F.allclose(F.squeeze(h1, 0), F.mean(h0, 0))
     h1 = max_pool(g, h0)
-    assert F.allclose(h1, F.max(h0, 0, keepdims=True))
+    assert F.allclose(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
     assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 22
 
