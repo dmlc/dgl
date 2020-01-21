@@ -12,6 +12,7 @@
 #include <utility>
 #include <iomanip>
 #include "randomwalks.h"
+#include "randomwalks_cpu.h"
 
 namespace dgl {
 
@@ -23,89 +24,13 @@ namespace sampling {
 namespace impl {
 
 template<DLDeviceType XPU, typename IdxType>
-TypeArray GetNodeTypesFromMetapath(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath) {
-  uint64_t num_etypes = metapath->shape[0];
-  TypeArray result = TypeArray::Empty(
-      {metapath->shape[0] + 1}, metapath->dtype, metapath->ctx);
-
-  const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
-  IdxType *result_data = static_cast<IdxType *>(result->data);
-
-  dgl_type_t etype = metapath_data[0];
-  dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
-  dgl_type_t curr_type = srctype;
-  result_data[0] = curr_type;
-
-  for (uint64_t i = 0; i < num_etypes; ++i) {
-    etype = metapath_data[i];
-    auto src_dst_type = hg->GetEndpointTypes(etype);
-    dgl_type_t srctype = src_dst_type.first;
-    dgl_type_t dsttype = src_dst_type.second;
-
-    if (srctype != curr_type) {
-      LOG(FATAL) << "source of edge type #" << i <<
-        " does not match destination of edge type #" << i - 1;
-      return result;
-    }
-    curr_type = dsttype;
-    result_data[i + 1] = dsttype;
-  }
-  return result;
-}
-
-template
-TypeArray GetNodeTypesFromMetapath<kDLCPU, int32_t>(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath);
-template
-TypeArray GetNodeTypesFromMetapath<kDLCPU, int64_t>(
-    const HeteroGraphPtr hg,
-    const TypeArray metapath);
-
-template<DLDeviceType XPU, typename IdxType>
-IdArray GenericRandomWalk(
-    const HeteroGraphPtr hg,
-    const IdArray seeds,
-    int64_t max_num_steps,
-    StepFunc step) {
-  int64_t num_seeds = seeds->shape[0];
-  int64_t trace_length = max_num_steps + 1;
-  IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);
-
-  const IdxType *seed_data = static_cast<IdxType *>(seeds->data);
-  IdxType *traces_data = static_cast<IdxType *>(traces->data);
-
-#pragma omp parallel for
-  for (int64_t seed_id = 0; seed_id < num_seeds; ++seed_id) {
-    int64_t i;
-    dgl_id_t curr = seed_data[seed_id];
-    traces_data[seed_id * trace_length] = curr;
-
-    for (i = 0; i < max_num_steps; ++i) {
-      const auto &succ = step(traces_data + seed_id * max_num_steps, curr, i);
-      traces_data[seed_id * trace_length + i + 1] = curr = succ.first;
-      if (succ.second)
-        break;
-    }
-
-    for (; i < max_num_steps; ++i)
-      traces_data[seed_id * max_num_steps + i + 1] = -1;
-  }
-
-  return traces;
-}
-
-template<DLDeviceType XPU, typename IdxType>
 std::pair<dgl_id_t, bool> _MetapathRandomWalkStep(
     void *data,
     dgl_id_t curr,
     int64_t len,
     const std::vector<std::vector<IdArray> > &edges_by_type,
     const IdxType *metapath_data,
-    const std::vector<FloatArray> &prob,
-    double restart_prob) {
+    const std::vector<FloatArray> &prob) {
   dgl_type_t etype = metapath_data[len];
 
   // Note that since the selection of successors is very lightweight (especially in the
@@ -142,10 +67,7 @@ std::pair<dgl_id_t, bool> _MetapathRandomWalkStep(
     });
   }
 
-  bool restart = (
-      restart_prob > 0 &&
-      RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob);
-  return std::make_pair(curr, restart);
+  return std::make_pair(curr, false);
 }
 
 template<DLDeviceType XPU, typename IdxType>
@@ -153,8 +75,7 @@ IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob,
-    double restart_prob) {
+    const std::vector<FloatArray> &prob) {
   int64_t max_num_steps = metapath->shape[0];
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
 
@@ -167,10 +88,10 @@ IdArray RandomWalk(
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
   StepFunc step =
-    [&edges_by_type, metapath_data, &prob, restart_prob]
+    [&edges_by_type, metapath_data, &prob]
     (void *data, dgl_id_t curr, int64_t len) {
       return _MetapathRandomWalkStep<XPU, IdxType>(
-          data, curr, len, edges_by_type, metapath_data, prob, restart_prob);
+          data, curr, len, edges_by_type, metapath_data, prob);
     };
 
   return GenericRandomWalk<XPU, IdxType>(hg, seeds, max_num_steps, step);
@@ -181,15 +102,13 @@ IdArray RandomWalk<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob,
-    double restart_prob);
+    const std::vector<FloatArray> &prob);
 template
 IdArray RandomWalk<kDLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob,
-    double restart_prob);
+    const std::vector<FloatArray> &prob);
 
 };  // namespace impl
 

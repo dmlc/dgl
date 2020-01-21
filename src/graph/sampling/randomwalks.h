@@ -1,17 +1,17 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler/randomwalks.h
+ * \file graph/sampling/randomwalks.h
  * \brief DGL sampler - templated implementation definition of random walks
  */
 
 #ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_H_
 #define DGL_GRAPH_SAMPLING_RANDOMWALKS_H_
 
-#include <dgl/runtime/container.h>
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
 #include <vector>
 #include <utility>
+#include <functional>
 
 namespace dgl {
 
@@ -66,7 +66,6 @@ IdArray GenericRandomWalk(
  * \param metapath A 1D array of edge types representing the metapath.
  * \param prob A vector of 1D float arrays, indicating the transition probability of
  *        each edge by edge type.  An empty float array assumes uniform transition.
- * \param restart_prob The restart probability
  * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
@@ -76,8 +75,7 @@ IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
-    const std::vector<FloatArray> &prob,
-    double restart_prob = 0);
+    const std::vector<FloatArray> &prob);
 
 };  // namespace impl
 
