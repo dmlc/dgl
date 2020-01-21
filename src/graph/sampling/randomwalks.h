@@ -30,8 +30,7 @@ using StepFunc = std::function<
   std::pair<dgl_id_t, bool>(
       void *,       // node IDs generated so far
       dgl_id_t,     // last node ID
-      int64_t       // # of steps
-      )>;
+      int64_t)>;    // # of steps
 
 /*!
  * \brief Get the node types traversed by the metapath.
