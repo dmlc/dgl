@@ -30,7 +30,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     return model
 
 @thread_wrapped_func
-def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None, queue=None):
+def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None, queue=None, barrier=None):
     if args.num_proc > 1:
         th.set_num_threads(4)
     logs = []
@@ -74,6 +74,7 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         logs.append(log)
 
         if (step + 1) % args.log_interval == 0:
+            barrier.wait()
             for k in logs[0].keys():
                 v = sum(l[k] for l in logs) / len(logs)
                 print('[Train {}]({}/{}) average {}: {}'.format(rank, step, args.max_step, k, v))

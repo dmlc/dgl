@@ -306,10 +306,11 @@ def run(args, logger):
     if args.num_proc > 1:
         queue = mp.Queue(args.num_proc)
         procs = []
+        barrier = mp.Barrier(args.num_proc)
         for i in range(args.num_proc):
             rel_parts = train_data.rel_parts if args.rel_part or args.strict_rel_part else None
             valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers, queue))
+            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers, queue, barrier))
             procs.append(proc)
             proc.start()
 
