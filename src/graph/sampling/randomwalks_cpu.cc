@@ -107,9 +107,11 @@ IdArray RandomWalk(
       const IdxType *succ = all_succ + offsets[curr];
 
       int64_t size = offsets[curr + 1] - offsets[curr];
-      if (size == 0)
+      if (size == 0) {
         // no successor, stop
+        traces_data[seed_id * trace_length + i + 1] = -1;
         break;
+      }
 
       FloatArray prob_etype = prob[etype];
       if (prob_etype->shape[0] == 0) {
