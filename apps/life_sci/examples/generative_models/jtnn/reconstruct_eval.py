@@ -2,7 +2,7 @@ import argparse
 import rdkit
 import torch
 
-from dgl import model_zoo
+from dglls.model import DGLJTNNVAE, load_pretrained
 from dglls.model.model_zoo.jtnn.nnutils import cuda
 from torch.utils.data import DataLoader
 
@@ -41,15 +41,15 @@ hidden_size = int(args.hidden_size)
 latent_size = int(args.latent_size)
 depth = int(args.depth)
 
-model = model_zoo.chem.DGLJTNNVAE(vocab_file=vocab_file,
-                                  hidden_size=hidden_size,
-                                  latent_size=latent_size,
-                                  depth=depth)
+model = DGLJTNNVAE(vocab_file=vocab_file,
+                   hidden_size=hidden_size,
+                   latent_size=latent_size,
+                   depth=depth)
 
 if args.model_path is not None:
     model.load_state_dict(torch.load(args.model_path))
 else:
-    model = model_zoo.chem.load_pretrained("JTNN_ZINC")
+    model = load_pretrained("JTNN_ZINC")
 
 model = cuda(model)
 model.eval()

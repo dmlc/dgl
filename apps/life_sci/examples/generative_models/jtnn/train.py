@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
-from dgl import model_zoo
+from dglls.model import DGLJTNNVAE
 from dglls.model.model_zoo.jtnn.nnutils import cuda
 from torch.utils.data import DataLoader
 
@@ -52,10 +52,10 @@ depth = int(args.depth)
 beta = float(args.beta)
 lr = float(args.lr)
 
-model = model_zoo.chem.DGLJTNNVAE(vocab_file=vocab_file,
-                                  hidden_size=hidden_size,
-                                  latent_size=latent_size,
-                                  depth=depth)
+model = DGLJTNNVAE(vocab_file=vocab_file,
+                   hidden_size=hidden_size,
+                   latent_size=latent_size,
+                   depth=depth)
 
 if args.model_path is not None:
     model.load_state_dict(torch.load(args.model_path))
@@ -71,11 +71,9 @@ print("Model #Params: %dK" % (sum([x.nelement() for x in model.parameters()]) / 
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = lr_scheduler.ExponentialLR(optimizer, 0.9)
-scheduler.step()
 
 MAX_EPOCH = 100
 PRINT_ITER = 20
-
 
 def train():
     dataset.training = True

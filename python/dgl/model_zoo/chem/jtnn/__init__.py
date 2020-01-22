@@ -1,5 +1,4 @@
-"""JTNN Module
-"""
+"""JTNN Module"""
 from .chemutils import decode_stereo
 from .jtnn_vae import DGLJTNNVAE
 from .mol_tree import Vocab

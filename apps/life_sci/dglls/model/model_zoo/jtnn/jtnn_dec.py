@@ -126,7 +126,7 @@ class DGLJTNNDecoder(nn.Module):
             'x': self.embedding(mol_tree_batch.ndata['wid']),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
             # whether it's newly generated node
-            'new': cuda(torch.ones(n_nodes).byte()),
+            'new': cuda(torch.ones(n_nodes).bool()),
         })
 
         mol_tree_batch.edata.update({
@@ -174,7 +174,7 @@ class DGLJTNNDecoder(nn.Module):
             p_target_list = torch.zeros_like(root_out_degrees)
             p_target_list[root_out_degrees > 0] = 1 - p
             p_target_list = p_target_list[root_out_degrees >= 0]
-            p_targets.append(torch.tensor(p_target_list))
+            p_targets.append(p_target_list.clone().detach())
 
             root_out_degrees -= (root_out_degrees == 0).long()
             root_out_degrees -= torch.tensor(np.isin(root_ids,
@@ -220,9 +220,9 @@ class DGLJTNNDecoder(nn.Module):
         p = self.U_s(torch.relu(self.U(p_inputs)))[:, 0]
 
         p_loss = F.binary_cross_entropy_with_logits(
-            p, p_targets.float(), size_average=False
+            p, p_targets.float(), reduction='sum'
         ) / n_trees
-        q_loss = F.cross_entropy(q, q_targets, size_average=False) / n_trees
+        q_loss = F.cross_entropy(q, q_targets, reduction='sum') / n_trees
         p_acc = ((p > 0).long() == p_targets).sum().float() / \
             p_targets.shape[0]
         q_acc = (q.max(1)[1] == q_targets).float().sum() / q_targets.shape[0]
