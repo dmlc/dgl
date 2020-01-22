@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler/randomwalks_cpu.cc
- * \brief DGL sampler - CPU implementation of random walks with OpenMP
+ * \file graph/sampling/randomwalk_cpu.cc
+ * \brief DGL sampler - CPU implementation of metapath-based random walk with OpenMP
  */
 
 #include <dgl/array.h>
