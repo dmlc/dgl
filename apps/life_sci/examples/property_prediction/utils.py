@@ -3,6 +3,7 @@ import numpy as np
 import random
 import torch
 
+from dglls.model import GCNPredictor, GATPredictor
 from dglls.utils.mol_to_graph import smiles_to_bigraph
 from dglls.utils.splitters import RandomSplitter
 
@@ -38,7 +39,7 @@ def load_dataset_for_classification(args):
     """
     assert args['dataset'] in ['Tox21']
     if args['dataset'] == 'Tox21':
-        from dgl.data.chem import Tox21
+        from dglls.data import Tox21
         dataset = Tox21(smiles_to_bigraph, args['atom_featurizer'])
         train_set, val_set, test_set = RandomSplitter.train_val_test_split(
             dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
@@ -86,3 +87,21 @@ def collate_molgraphs(data):
     else:
         masks = torch.stack(masks, dim=0)
     return smiles, bg, labels, masks
+
+def load_model(args):
+    if args['model'] == 'GCN':
+        model = GCNPredictor(in_feats=args['in_feats'],
+                             hidden_feats=args['gcn_hidden_feats'],
+                             classifier_hidden_feats=args['classifier_hidden_feats'],
+                             n_tasks=args['n_tasks'])
+
+    if args['model'] == 'GAT':
+        model = GATPredictor(in_feats=args['in_feats'],
+                             hidden_feats=args['gat_hidden_feats'],
+                             num_heads=args['num_heads'],
+                             agg_modes=args['agg_modes'],
+                             activations=args['activations'],
+                             classifier_hidden_feats=args['classifier_hidden_feats'],
+                             n_tasks=args['n_tasks'])
+
+    return model

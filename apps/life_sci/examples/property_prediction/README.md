@@ -38,7 +38,7 @@ We use GPU whenever it is available.
 | ---------------- | --------------------------- |
 | MoleculeNet [1]  | 0.829                       |
 | [DeepChem example](https://github.com/deepchem/deepchem/blob/master/examples/tox21/tox21_tensorgraph_graph_conv.py) | 0.813                  |
-| Pretrained model | 0.826                       |
+| Pretrained model | 0.833                       |
 
 Note that the dataset is randomly split so these numbers are only for reference and they do not necessarily suggest
 a real difference.
@@ -47,7 +47,7 @@ a real difference.
 
 | Source           | Averaged Test ROC-AUC Score |
 | ---------------- | --------------------------- |
-| Pretrained model | 0.827                       |
+| Pretrained model | 0.853                       |
 
 ## Regression   
 

@@ -1,15 +1,18 @@
 """Utilities for using pretrained models."""
 import os
 import torch
+import torch.nn.functional as F
 
 from dgl.data.utils import _get_dgl_url, download, get_download_dir, extract_archive
 from rdkit import Chem
 
-from ..model import DGMG, DGLJTNNVAE
+from ..model import GCNPredictor, GATPredictor, DGMG, DGLJTNNVAE
 
 __all__ = ['load_pretrained']
 
 URL = {
+    'GCN_Tox21': 'dglls/pre_trained/gcn_tox21.pth',
+    'GAT_Tox21': 'dglls/pre_trained/gat_tox21.pth',
     'DGMG_ChEMBL_canonical': 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
@@ -79,7 +82,22 @@ def load_pretrained(model_name, log=True):
     if model_name not in URL:
         raise RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
-    if model_name.startswith('DGMG'):
+    if model_name == 'GCN_Tox21':
+        model = GCNPredictor(in_feats=74,
+                             hidden_feats=[64, 64],
+                             classifier_hidden_feats=64,
+                             n_tasks=12)
+
+    elif model_name == 'GAT_Tox21':
+        model = GATPredictor(in_feats=74,
+                             hidden_feats=[32, 32],
+                             num_heads=[4, 4],
+                             agg_modes=['flatten', 'mean'],
+                             activations=[F.elu, None],
+                             classifier_hidden_feats=64,
+                             n_tasks=12)
+
+    elif model_name.startswith('DGMG'):
         if model_name.startswith('DGMG_ChEMBL'):
             atom_types = ['O', 'Cl', 'C', 'S', 'F', 'Br', 'N']
         elif model_name.startswith('DGMG_ZINC'):

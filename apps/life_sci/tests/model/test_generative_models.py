@@ -1,7 +1,3 @@
-import os
-import pickle
-
-from dgl.data.utils import download, _get_dgl_url
 from rdkit import Chem
 
 from dglls.model import DGMG, DGLJTNNVAE
@@ -18,7 +14,7 @@ def test_dgmg():
         actions=[(0, 2), (1, 3), (0, 0), (1, 0), (2, 0), (1, 3), (0, 7)], rdkit_mol=True) == 'CO'
     assert model(rdkit_mol=False) is None
     model.eval()
-    model(rdkit_mol=True)
+    assert model(rdkit_mol=True) is not None
 
 def test_jtnn():
     model = DGLJTNNVAE(hidden_size=1,

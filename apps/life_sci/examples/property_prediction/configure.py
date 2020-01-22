@@ -1,7 +1,9 @@
+import torch.nn.functional as F
+
 from dglls.utils.featurizers import CanonicalAtomFeaturizer
 
 GCN_Tox21 = {
-    'random_seed': 0,
+    'random_seed': 2,
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
@@ -14,11 +16,11 @@ GCN_Tox21 = {
     'classifier_hidden_feats': 64,
     'patience': 10,
     'atom_featurizer': CanonicalAtomFeaturizer(),
-    'metric_name': 'roc_auc'
+    'metric_name': 'roc_auc_score'
 }
 
 GAT_Tox21 = {
-    'random_seed': 0,
+    'random_seed': 2,
     'batch_size': 128,
     'lr': 1e-3,
     'num_epochs': 100,
@@ -30,9 +32,11 @@ GAT_Tox21 = {
     'gat_hidden_feats': [32, 32],
     'classifier_hidden_feats': 64,
     'num_heads': [4, 4],
+    'agg_modes': ['flatten', 'mean'],
+    'activations': [F.elu, None],
     'patience': 10,
     'atom_featurizer': CanonicalAtomFeaturizer(),
-    'metric_name': 'roc_auc'
+    'metric_name': 'roc_auc_score'
 }
 
 experiment_configures = {

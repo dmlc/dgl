@@ -1,5 +1,6 @@
 """Graph Convolutional Networks."""
 import torch.nn as nn
+import torch.nn.functional as F
 
 from dgl.nn.pytorch import GraphConv
 
@@ -84,7 +85,7 @@ class GCN(nn.Module):
     activation : list of activation functions or None
         If None, no activation will be applied. If not None, ``activation[i]`` gives the
         activation function to be used for the i-th GCN layer. ``len(activation)`` equals
-        the number of GCN layers. By default, no activation function is applied.
+        the number of GCN layers. By default, ReLU is applied for all GCN layers.
     residual : list of bool
         ``residual[i]`` decides if residual connection is to be used for the i-th GCN layer.
         ``len(residual)`` equals the number of GCN layers. By default, residual connection
@@ -104,7 +105,7 @@ class GCN(nn.Module):
 
         n_layers = len(hidden_feats)
         if activation is None:
-            activation = [None for _ in range(n_layers)]
+            activation = [F.relu for _ in range(n_layers)]
         if residual is None:
             residual = [True for _ in range(n_layers)]
         if batchnorm is None:

@@ -22,6 +22,9 @@ def test_Meter():
     assert meter.pearson_r2() == true_scores
     assert meter.pearson_r2('mean') == np.mean(true_scores)
     assert meter.pearson_r2('sum') == np.sum(true_scores)
+    assert meter.compute_metric('r2') == true_scores
+    assert meter.compute_metric('r2', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('r2', 'sum') == np.sum(true_scores)
 
     meter = Meter(label_mean, label_std)
     meter.update(label, pred, mask)
@@ -29,6 +32,9 @@ def test_Meter():
     assert meter.pearson_r2() == true_scores
     assert meter.pearson_r2('mean') == np.mean(true_scores)
     assert meter.pearson_r2('sum') == np.sum(true_scores)
+    assert meter.compute_metric('r2') == true_scores
+    assert meter.compute_metric('r2', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('r2', 'sum') == np.sum(true_scores)
 
     # mae
     meter = Meter()
@@ -37,6 +43,9 @@ def test_Meter():
     assert meter.mae() == true_scores
     assert meter.mae('mean') == np.mean(true_scores)
     assert meter.mae('sum') == np.sum(true_scores)
+    assert meter.compute_metric('mae') == true_scores
+    assert meter.compute_metric('mae', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('mae', 'sum') == np.sum(true_scores)
 
     meter = Meter()
     meter.update(label, pred, mask)
@@ -44,6 +53,9 @@ def test_Meter():
     assert meter.mae() == true_scores
     assert meter.mae('mean') == np.mean(true_scores)
     assert meter.mae('sum') == np.sum(true_scores)
+    assert meter.compute_metric('mae') == true_scores
+    assert meter.compute_metric('mae', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('mae', 'sum') == np.sum(true_scores)
 
     # rmse
     meter = Meter(label_mean, label_std)
@@ -52,6 +64,9 @@ def test_Meter():
     assert meter.rmse() == true_scores
     assert meter.rmse('mean') == np.mean(true_scores)
     assert meter.rmse('sum') == np.sum(true_scores)
+    assert meter.compute_metric('rmse') == true_scores
+    assert meter.compute_metric('rmse', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('rmse', 'sum') == np.sum(true_scores)
 
     meter = Meter(label_mean, label_std)
     meter.update(label, pred, mask)
@@ -59,6 +74,9 @@ def test_Meter():
     assert meter.rmse() == true_scores
     assert meter.rmse('mean') == np.mean(true_scores)
     assert meter.rmse('sum') == np.sum(true_scores)
+    assert meter.compute_metric('rmse') == true_scores
+    assert meter.compute_metric('rmse', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('rmse', 'sum') == np.sum(true_scores)
 
     # roc auc score
     meter = Meter()
@@ -67,6 +85,9 @@ def test_Meter():
     assert meter.roc_auc_score() == true_scores
     assert meter.roc_auc_score('mean') == np.mean(true_scores)
     assert meter.roc_auc_score('sum') == np.sum(true_scores)
+    assert meter.compute_metric('roc_auc_score') == true_scores
+    assert meter.compute_metric('roc_auc_score', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('roc_auc_score', 'sum') == np.sum(true_scores)
 
     meter = Meter()
     meter.update(label, pred, mask)
@@ -74,6 +95,9 @@ def test_Meter():
     assert meter.roc_auc_score() == true_scores
     assert meter.roc_auc_score('mean') == np.mean(true_scores)
     assert meter.roc_auc_score('sum') == np.sum(true_scores)
+    assert meter.compute_metric('roc_auc_score') == true_scores
+    assert meter.compute_metric('roc_auc_score', 'mean') == np.mean(true_scores)
+    assert meter.compute_metric('roc_auc_score', 'sum') == np.sum(true_scores)
 
 if __name__ == '__main__':
     test_Meter()

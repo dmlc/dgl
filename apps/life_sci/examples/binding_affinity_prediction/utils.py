@@ -113,11 +113,3 @@ def load_model(args):
                      radial=args['radial'])
 
     return model
-
-def compute_metric(meter, metric):
-    if metric == 'pearson_r2':
-        return meter.pearson_r2('mean')
-    elif metric == 'mae':
-        return meter.mae('mean')
-    else:
-        raise ValueError('Expect metric to be "pearson_r2" or "mae", got {}'.format(metric))

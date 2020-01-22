@@ -227,3 +227,37 @@ class Meter(object):
         def score(y_true, y_pred):
             return roc_auc_score(y_true.long().numpy(), torch.sigmoid(y_pred).numpy())
         return self.multilabel_score(score, reduction)
+
+    def compute_metric(self, metric_name, reduction='none'):
+        """Compute metric based on metric name.
+
+        Parameters
+        ----------
+        metric_name : str
+
+            * 'r2': compute squared Pearson correlation coefficient
+            * 'mae': compute mean absolute error
+            * 'rmse': compute root mean square error
+            * 'roc_auc_score': compute roc-auc score
+
+        reduction : 'none' or 'mean' or 'sum'
+            Controls the form of scores for all tasks
+
+        Returns
+        -------
+        float or list of float
+            * If ``reduction == 'none'``, return the list of scores for all tasks.
+            * If ``reduction == 'mean'``, return the mean of scores for all tasks.
+            * If ``reduction == 'sum'``, return the sum of scores for all tasks.
+        """
+        if metric_name == 'r2':
+            return self.pearson_r2(reduction)
+
+        if metric_name == 'mae':
+            return self.mae(reduction)
+
+        if metric_name == 'rmse':
+            return self.rmse(reduction)
+
+        if metric_name == 'roc_auc_score':
+            return self.roc_auc_score(reduction)
