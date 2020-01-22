@@ -20,6 +20,15 @@ namespace sampling {
 
 namespace impl {
 
+/*!
+ * \brief Generic Random Walk.
+ * \param hg The heterograph.
+ * \param seeds A 1D array of seed nodes, with the type the source type of the first
+ *        edge type in the metapath.
+ * \param max_num_steps The maximum number of steps of a random walk path.
+ * \param step The random walk step function with type \c StepFunc.
+ * \return A 2D array of shape (len(seeds), max_num_steps + 1) with node IDs.
+ */
 template<DLDeviceType XPU, typename IdxType>
 IdArray GenericRandomWalk(
     const HeteroGraphPtr hg,
