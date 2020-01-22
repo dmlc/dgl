@@ -154,7 +154,7 @@ class DGLJTNNVAE(nn.Module):
 
                 label = cuda(torch.LongTensor([label]))
                 all_loss.append(
-                    F.cross_entropy(cur_score.view(1, -1), label, size_average=False))
+                    F.cross_entropy(cur_score.view(1, -1), label, reduction='sum'))
 
         all_loss = sum(all_loss) / len(mol_batch['mol_trees'])
         return all_loss, acc / cnt
@@ -183,7 +183,7 @@ class DGLJTNNVAE(nn.Module):
                 acc += 1
             label = cuda(torch.LongTensor([label]))
             all_loss.append(
-                F.cross_entropy(cur_scores.view(1, -1), label, size_average=False))
+                F.cross_entropy(cur_scores.view(1, -1), label, reduction='sum'))
             st += le
 
         all_loss = sum(all_loss) / len(labels)
