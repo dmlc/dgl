@@ -20,27 +20,10 @@ def test_dgmg():
     model.eval()
     model(rdkit_mol=True)
 
-def remove_file(fname):
-    if os.path.isfile(fname):
-        try:
-            os.remove(fname)
-        except OSError:
-            pass
-
 def test_jtnn():
-    url = _get_dgl_url('dglls/jtnn_test_batch.pkl')
-    local_path = 'jtnn_test_batch.pkl'
-    download(url, path=local_path)
-    with open(local_path, 'rb') as f:
-        batch = pickle.load(f)
-
-    beta = 1.0
     model = DGLJTNNVAE(hidden_size=1,
                        latent_size=2,
                        depth=1)
-    model(batch, beta)
-
-    remove_file(local_path)
 
 if __name__ == '__main__':
     test_dgmg()

@@ -99,8 +99,7 @@ def load_pretrained(model_name, log=True):
         vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
         if not os.path.exists(vocab_file):
             zip_file_path = '{}/jtnn.zip'.format(default_dir)
-            download('https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip',
-                     path=zip_file_path)
+            download(_get_dgl_url('dglls/jtnn.zip'), path=zip_file_path)
             extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
         model = DGLJTNNVAE(vocab_file=vocab_file,
                            depth=3,
