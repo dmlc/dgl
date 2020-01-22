@@ -21,8 +21,10 @@ namespace sampling {
 
 namespace impl {
 
+namespace {
+
 template<DLDeviceType XPU, typename IdxType>
-std::pair<dgl_id_t, bool> _MetapathRandomWalkStep(
+std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
     void *data,
     dgl_id_t curr,
     int64_t len,
@@ -68,6 +70,8 @@ std::pair<dgl_id_t, bool> _MetapathRandomWalkStep(
   return std::make_pair(curr, false);
 }
 
+};  // namespace
+
 template<DLDeviceType XPU, typename IdxType>
 IdArray RandomWalk(
     const HeteroGraphPtr hg,
@@ -88,7 +92,7 @@ IdArray RandomWalk(
   StepFunc step =
     [&edges_by_type, metapath_data, &prob]
     (void *data, dgl_id_t curr, int64_t len) {
-      return _MetapathRandomWalkStep<XPU, IdxType>(
+      return MetapathRandomWalkStep<XPU, IdxType>(
           data, curr, len, edges_by_type, metapath_data, prob);
     };
 
