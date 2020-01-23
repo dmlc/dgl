@@ -105,15 +105,20 @@ on the training and validation set for reference.
 
 | Model           | Test RMSE |
 | --------------- | --------- |
-| AttentiveFP [8] | 0.6998    |
+| AttentiveFP [8] | 0.7508    |
+
+Note that the dataset is randomly split so this number is only for reference.
 
 ## Interpretation
 
 [8] visualizes the weights of atoms in readout for possible interpretations like the figure below. 
 We provide a jupyter notebook for performing the visualization and you can download it with 
-`wget https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/atom_weight_visualization.ipynb`.
+`wget https://s3.us-west-2.amazonaws.com/dgl-data/dglls/attentive_fp/atom_weight_visualization.ipynb` 
+from the s3 bucket in U.S. or 
+`wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dglls/attentive_fp/atom_weight_visualization.ipynb` 
+from the s3 bucket in China.
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/AttentiveFP/vis_example.png)
+![](https://s3.us-west-2.amazonaws.com/dgl-data/dglls/attentive_fp_vis_example.png)
 
 ## Dataset Customization
 
