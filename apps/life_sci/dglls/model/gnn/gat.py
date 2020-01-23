@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from dgl.nn.pytorch import GATConv
 
-__all__ = ['GATLayer', 'GAT']
+__all__ = ['GAT']
 
 class GATLayer(nn.Module):
     r"""Single GAT layer from `Graph Attention Networks <https://arxiv.org/abs/1710.10903>`__
@@ -127,9 +127,11 @@ class GAT(nn.Module):
         if residuals is None:
             residuals = [True for _ in range(n_layers)]
         if agg_modes is None:
-            agg_modes = ['flatten' for _ in range(n_layers)]
+            agg_modes = ['flatten' for _ in range(n_layers - 1)]
+            agg_modes.append('mean')
         if activations is None:
-            activations = [None for _ in range(n_layers)]
+            activations = [F.elu for _ in range(n_layers - 1)]
+            activations.append(None)
         lengths = [len(hidden_feats), len(num_heads), len(feat_drops), len(attn_drops),
                    len(alphas), len(residuals), len(agg_modes), len(activations)]
         assert len(set(lengths)) == 1, 'Expect the lengths of hidden_feats, num_heads, ' \

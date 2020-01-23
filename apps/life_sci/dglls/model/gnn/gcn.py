@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from dgl.nn.pytorch import GraphConv
 
-__all__ = ['GCNLayer', 'GCN']
+__all__ = ['GCN']
 
 class GCNLayer(nn.Module):
     r"""Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks

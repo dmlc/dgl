@@ -1,5 +1,6 @@
 """GAT-based model for regression and classification on graphs."""
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .mlp_predictor import MLPPredictor
 from ..gnn.gat import GAT
@@ -49,11 +50,13 @@ class GATPredictor(nn.Module):
         'flatten' for concatenating all-head results or 'mean' for averaging all-head results.
         ``agg_modes[i]`` gives the way to aggregate multi-head attention results for the i-th
         GAT layer. ``len(agg_modes)`` equals the number of GAT layers. By default, we flatten
-        all-head results for each GAT layer.
+        multi-head results for intermediate GAT layers and compute mean of multi-head results
+        for the last GAT layer.
     activations : list of activation function or None
         ``activations[i]`` gives the activation function applied to the aggregated multi-head
         results for the i-th GAT layer. ``len(activations)`` equals the number of GAT layers.
-        By default, no activation is applied for each GAT layer.
+        By default, ELU is applied for intermediate GAT layers and no activation is applied
+        for the last GAT layer.
     classifier_hidden_feats : int
         Size of hidden graph representations in the classifier. Default to 128.
     classifier_dropout : float
@@ -65,6 +68,14 @@ class GATPredictor(nn.Module):
                  alphas=None, residuals=None, agg_modes=None, activations=None,
                  classifier_hidden_feats=128, classifier_dropout=0., n_tasks=1):
         super(GATPredictor, self).__init__()
+
+        n_layers = len(hidden_feats)
+        if agg_modes is None:
+            agg_modes = ['flatten' for _ in range(n_layers - 1)]
+            agg_modes.append('mean')
+        if activations is None:
+            activations = [F.elu for _ in range(n_layers - 1)]
+            activations.append(None)
 
         self.gnn = GAT(in_feats=in_feats,
                        hidden_feats=hidden_feats,
