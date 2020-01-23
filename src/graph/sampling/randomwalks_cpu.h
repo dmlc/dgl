@@ -20,6 +20,8 @@ namespace sampling {
 
 namespace impl {
 
+namespace {
+
 /*!
  * \brief Generic Random Walk.
  * \param hg The heterograph.
@@ -61,6 +63,8 @@ IdArray GenericRandomWalk(
 
   return traces;
 }
+
+};  // namespace
 
 };  // namespace impl
 

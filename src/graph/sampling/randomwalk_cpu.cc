@@ -6,8 +6,6 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
-#include <dgl/random.h>
-#include <utility>
 #include <vector>
 #include "randomwalks.h"
 #include "randomwalks_cpu.h"
@@ -22,8 +20,8 @@ namespace sampling {
 
 namespace impl {
 
-template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalk(
+template
+IdArray RandomWalk<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
