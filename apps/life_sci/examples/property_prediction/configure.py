@@ -86,7 +86,7 @@ AttentiveFP_Aromaticity = {
     'num_timesteps': 2,
     'node_feat_size': 39,
     'edge_feat_size': 10,
-    'output_size': 1,
+    'n_tasks': 1,
     'dropout': 0.2,
     'weight_decay': 10 ** (-5.0),
     'lr': 10 ** (-2.5),
