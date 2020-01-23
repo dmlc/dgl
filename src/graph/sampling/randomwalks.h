@@ -42,7 +42,7 @@ TypeArray GetNodeTypesFromMetapath(
     const TypeArray metapath);
 
 /*!
- * \brief Metapath-based random walk with constant restart probability.
+ * \brief Metapath-based random walk.
  * \param hg The heterograph.
  * \param seeds A 1D array of seed nodes, with the type the source type of the first
  *        edge type in the metapath.
