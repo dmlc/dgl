@@ -20,8 +20,8 @@ namespace sampling {
 
 namespace impl {
 
-template
-IdArray RandomWalk<kDLCPU, int32_t>(
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalk(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

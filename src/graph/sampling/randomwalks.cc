@@ -19,7 +19,9 @@ namespace dgl {
 
 namespace sampling {
 
-std::pair<IdArray, TypeArray> RandomWalk(
+namespace {
+
+void CheckRandomWalkInputs(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -31,10 +33,19 @@ std::pair<IdArray, TypeArray> RandomWalk(
   for (uint64_t i = 0; i < prob.size(); ++i) {
     FloatArray p = prob[i];
     EXPECT_FLOAT(p, "probability");
-    if (!IsEmpty(p)) {
+    if (!IsEmpty(p))
       EXPECT_NDIM(p, 1, "probability");
-    }
   }
+}
+
+};  // namespace
+
+std::pair<IdArray, TypeArray> RandomWalk(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob) {
+  CheckRandomWalkInputs(hg, seeds, metapath, prob);
 
   TypeArray vtypes;
   IdArray vids;
@@ -42,6 +53,48 @@ std::pair<IdArray, TypeArray> RandomWalk(
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
       vids = impl::RandomWalk<XPU, IdxType>(hg, seeds, metapath, prob);
+    });
+  });
+
+  return std::make_pair(vids, vtypes);
+}
+
+std::pair<IdArray, TypeArray> RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob) {
+  CheckRandomWalkInputs(hg, seeds, metapath, prob);
+  CHECK(restart_prob >= 0 && restart_prob < 1) << "restart probability must belong to [0, 1)";
+
+  TypeArray vtypes;
+  IdArray vids;
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
+      vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
+      vids = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
+    });
+  });
+
+  return std::make_pair(vids, vtypes);
+}
+
+std::pair<IdArray, TypeArray> RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob) {
+  CheckRandomWalkInputs(hg, seeds, metapath, prob);
+  // TODO(BarclayII): check the elements of restart probability
+
+  TypeArray vtypes;
+  IdArray vids;
+  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
+    ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
+      vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
+      vids = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
     });
   });
 

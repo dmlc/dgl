@@ -22,8 +22,8 @@ namespace sampling {
 
 namespace impl {
 
-template
-IdArray RandomWalkWithRestart<kDLCPU, int32_t>(
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalkWithRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -33,7 +33,7 @@ IdArray RandomWalkWithRestart<kDLCPU, int32_t>(
     [prob] (void *data, dgl_id_t curr, int64_t len) {
       return RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob;
     }
-  return RandomWalk(hg, seeds, metapath, prob, terminate);
+  return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
 }
 
 template
@@ -50,6 +50,40 @@ IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob);
+
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob) {
+  IdArray result;
+
+  ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, DType, "restart probability", {
+    DType restart_prob_data = static_cast<DType *>(restart_prob->data);
+    TerminatePredicate terminate =
+      [restart_prob_data] (void *data, dgl_id_t curr, int64_t len) {
+        return RandomEngine::ThreadLocal()->Uniform<DType>() < restart_prob_data[len];
+      }
+    return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
+  });
+}
+
+template
+IdArray RandomWalkWithRestart<kDLCPU, int32_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob);
+template
+IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob);
 
 };  // namespace impl
 
