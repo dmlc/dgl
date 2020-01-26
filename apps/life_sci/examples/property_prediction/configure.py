@@ -51,7 +51,7 @@ MPNN_Alchemy = {
     'output_dim': 12,
     'lr': 0.0001,
     'patience': 50,
-    'metric_name': 'l1',
+    'metric_name': 'mae',
     'weight_decay': 0
 }
 
@@ -65,7 +65,7 @@ SchNet_Alchemy = {
     'n_tasks': 12,
     'lr': 0.0001,
     'patience': 50,
-    'metric_name': 'l1',
+    'metric_name': 'mae',
     'weight_decay': 0
 }
 
@@ -77,7 +77,7 @@ MGCN_Alchemy = {
     'output_dim': 12,
     'lr': 0.0001,
     'patience': 50,
-    'metric_name': 'l1',
+    'metric_name': 'mae',
     'weight_decay': 0
 }
 
