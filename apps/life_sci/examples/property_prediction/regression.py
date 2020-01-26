@@ -15,7 +15,7 @@ def regress(args, model, bg):
         e = bg.edata.pop('e_feat')
         h, e = h.to(args['device']), e.to(args['device'])
         return model(bg, h, e)
-    elif args['model'] in ['SCHNET', 'MGCN']:
+    elif args['model'] in ['SchNet', 'MGCN']:
         node_types = bg.ndata.pop('node_type')
         edge_distances = bg.edata.pop('distance')
         node_types, edge_distances = node_types.to(args['device']), \

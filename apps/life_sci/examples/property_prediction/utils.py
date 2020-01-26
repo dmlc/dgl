@@ -148,7 +148,7 @@ def load_model(args):
                                      n_tasks=args['n_tasks'],
                                      dropout=args['dropout'])
 
-    if args['model'] == 'SCHNET':
+    if args['model'] == 'SchNet':
         from dglls.model import SchNetPredictor
         model = SchNetPredictor(node_feats=args['node_feats'],
                                 hidden_feats=args['hidden_feats'],
