@@ -55,7 +55,7 @@ MPNN_Alchemy = {
     'weight_decay': 0
 }
 
-SCHNET_Alchemy = {
+SchNet_Alchemy = {
     'random_seed': 0,
     'batch_size': 16,
     'num_epochs': 250,
@@ -122,7 +122,7 @@ experiment_configures = {
     'GCN_Tox21': GCN_Tox21,
     'GAT_Tox21': GAT_Tox21,
     'MPNN_Alchemy': MPNN_Alchemy,
-    'SCHNET_Alchemy': SCHNET_Alchemy,
+    'SchNet_Alchemy': SchNet_Alchemy,
     'MGCN_Alchemy': MGCN_Alchemy,
     'AttentiveFP_Aromaticity': AttentiveFP_Aromaticity
 }

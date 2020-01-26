@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Molecule Regression')
     parser.add_argument('-m', '--model', type=str,
-                        choices=['MPNN', 'SCHNET', 'MGCN', 'AttentiveFP'],
+                        choices=['MPNN', 'SchNet', 'MGCN', 'AttentiveFP'],
                         help='Model to use')
     parser.add_argument('-d', '--dataset', type=str, choices=['Alchemy', 'Aromaticity'],
                         help='Dataset to use')

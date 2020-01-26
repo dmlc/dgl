@@ -81,7 +81,7 @@ performance across datasetts.
 
 Use `regression.py` with arguments
 ```
--m {MPNN, SCHNET, MGCN, AttentiveFP}, Model to use
+-m {MPNN, SchNet, MGCN, AttentiveFP}, Model to use
 -d {Alchemy, Aromaticity}, Dataset to use
 ```
 
