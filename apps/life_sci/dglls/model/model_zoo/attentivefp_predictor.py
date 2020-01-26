@@ -7,8 +7,11 @@ from ..readout import AttentiveFPReadout
 __all__ = ['AttentiveFPPredictor']
 
 class AttentiveFPPredictor(nn.Module):
-    """`Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph
-    Attention Mechanism <https://www.ncbi.nlm.nih.gov/pubmed/31408336>`__
+    """AttentiveFP for regression and classification on graphs.
+
+    AttentiveFP is introduced in `Pushing the Boundaries of Molecular Representation for Drug
+    Discovery with the Graph Attention Mechanism.
+     <https://www.ncbi.nlm.nih.gov/pubmed/31408336>`__
 
     Parameters
     ----------

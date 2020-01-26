@@ -1,43 +1,67 @@
+import dgl
+import torch
+
 from dgl import DGLGraph
 from dglls.model.readout import *
 
 def test_graph1():
+    """Graph with node features"""
     g = DGLGraph([(0, 1), (0, 2), (1, 2)])
     return g, torch.arange(g.number_of_nodes()).float().reshape(-1, 1)
 
 def test_graph2():
+    "Batched graph with node features"
     g1 = DGLGraph([(0, 1), (0, 2), (1, 2)])
     g2 = DGLGraph([(0, 1), (1, 2), (1, 3), (1, 4)])
     bg = dgl.batch([g1, g2])
     return bg, torch.arange(bg.number_of_nodes()).float().reshape(-1, 1)
 
-def test_graph3():
-    g = DGLGraph([(0, 1), (0, 2), (1, 2)])
-    return g, torch.arange(g.number_of_nodes()).float().reshape(-1, 1), \
-           torch.arange(2 * g.number_of_edges()).float().reshape(-1, 2)
-
-def test_graph4():
-    g1 = DGLGraph([(0, 1), (0, 2), (1, 2)])
-    g2 = DGLGraph([(0, 1), (1, 2), (1, 3), (1, 4)])
-    bg = dgl.batch([g1, g2])
-    return bg, torch.arange(bg.number_of_nodes()).float().reshape(-1, 1), \
-           torch.arange(2 * bg.number_of_edges()).float().reshape(-1, 2)
-
 def test_weighted_sum_and_max():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
     g, node_feats = test_graph1()
+    g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
-    model = WeightedSumAndMax(in_feats=1)
+    bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
+    model = WeightedSumAndMax(in_feats=1).to(device)
     assert model(g, node_feats).shape == torch.Size([1, 2])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 2])
 
 def test_attentive_fp_readout():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
     g, node_feats = test_graph1()
+    g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
+    bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
     model = AttentiveFPReadout(num_timesteps=1,
-                               feat_size=1)
+                               feat_size=1).to(device)
     assert model(g, node_feats).shape == torch.Size([1, 1])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 1])
+
+def test_schnet_readout():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    g, node_feats = test_graph1()
+    g, node_feats = g.to(device), node_feats.to(device)
+    bg, batch_node_feats = test_graph2()
+    bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
+    model = SchNetReadout(node_feats=1,
+                          hidden_feats=2,
+                          graph_feats=3)
+    assert model(g, node_feats).shape == torch.Size([1, 3])
+    assert model(bg, batch_node_feats).shape == torch.Size([2, 3])
 
 if __name__ == '__main__':
     test_weighted_sum_and_max()
     test_attentive_fp_readout()
+    test_schnet_readout()

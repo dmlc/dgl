@@ -3,7 +3,6 @@ import numpy as np
 import random
 import torch
 
-from dglls.model import GCNPredictor, GATPredictor, AttentiveFPPredictor
 from dglls.utils.featurizers import one_hot_encoding
 from dglls.utils.mol_to_graph import smiles_to_bigraph
 from dglls.utils.splitters import RandomSplitter
@@ -125,12 +124,14 @@ def collate_molgraphs(data):
 
 def load_model(args):
     if args['model'] == 'GCN':
+        from dglls.model import GCNPredictor
         model = GCNPredictor(in_feats=args['in_feats'],
                              hidden_feats=args['gcn_hidden_feats'],
                              classifier_hidden_feats=args['classifier_hidden_feats'],
                              n_tasks=args['n_tasks'])
 
     if args['model'] == 'GAT':
+        from dglls.model import GATPredictor
         model = GATPredictor(in_feats=args['in_feats'],
                              hidden_feats=args['gat_hidden_feats'],
                              num_heads=args['num_heads'],
@@ -138,6 +139,7 @@ def load_model(args):
                              n_tasks=args['n_tasks'])
 
     if args['model'] == 'AttentiveFP':
+        from dglls.model import AttentiveFPPredictor
         model = AttentiveFPPredictor(node_feat_size=args['node_feat_size'],
                                      edge_feat_size=args['edge_feat_size'],
                                      num_layers=args['num_layers'],
@@ -145,6 +147,13 @@ def load_model(args):
                                      graph_feat_size=args['graph_feat_size'],
                                      n_tasks=args['n_tasks'],
                                      dropout=args['dropout'])
+
+    if args['model'] == 'SCHNET':
+        from dglls.model import SchNetPredictor
+        model = SchNetPredictor(node_feats=args['node_feats'],
+                                hidden_feats=args['hidden_feats'],
+                                classifier_hidden_feats=args['classifier_hidden_feats'],
+                                n_tasks=args['n_tasks'])
 
     return model
 

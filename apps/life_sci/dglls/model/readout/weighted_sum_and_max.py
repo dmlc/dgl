@@ -6,6 +6,8 @@ import torch.nn as nn
 from dgl import BatchedDGLGraph
 from dgl.nn.pytorch import WeightAndSum
 
+__all__ = ['WeightedSumAndMax']
+
 class WeightedSumAndMax(nn.Module):
     r"""Apply weighted sum and max pooling to the node
     representations and concatenate the results.

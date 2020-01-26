@@ -97,7 +97,7 @@ class AttentiveFPReadout(nn.Module):
             self.readouts.append(GlobalPool(feat_size, dropout))
 
     def forward(self, g, node_feats, get_node_weight=False):
-        """Compute graph representations out of node features.
+        """Computes graph representations out of node features.
 
         Parameters
         ----------
@@ -111,7 +111,7 @@ class AttentiveFPReadout(nn.Module):
         Returns
         -------
         g_feats : float32 tensor of shape (G, graph_feat_size)
-            Graph representations computed.
+            Graph representations computed. G for the number of graphs.
         node_weights : list of float32 tensor of shape (V, 1), optional
             This is returned when ``get_node_weight`` is ``True``.
             The list has a length ``num_timesteps`` and ``node_weights[i]``

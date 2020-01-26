@@ -55,7 +55,6 @@ def run_an_eval_epoch(args, model, data_loader):
         total_score = np.mean(eval_meter.compute_metric(args['metric_name']))
     return total_score
 
-
 def main(args):
     args['device'] = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     set_random_seed(args['random_seed'])
@@ -79,8 +78,6 @@ def main(args):
         model = load_pretrained(args['exp'])
     else:
         model = load_model(args)
-        if args['model'] in ['SCHNET', 'MGCN']:
-            model.set_mean_std(train_set.mean, train_set.std, args['device'])
         loss_fn = nn.MSELoss(reduction='none')
         optimizer = torch.optim.Adam(model.parameters(), lr=args['lr'],
                                      weight_decay=args['weight_decay'])

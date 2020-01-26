@@ -33,6 +33,11 @@ def test_acnn():
     remove_dir('tmp1')
     remove_dir('tmp2')
 
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
     g1 = ACNN_graph_construction_and_featurization(ligand_mol,
                                                    pocket_mol,
                                                    ligand_coords,
@@ -43,10 +48,13 @@ def test_acnn():
                  dropouts=[0.1, 0.],
                  features_to_use=torch.tensor([6., 8.]),
                  radial=[[12.0], [0.0, 2.0], [4.0]])
+    model.to(device)
+    g1.to(device)
     assert model(g1).shape == torch.Size([1, 1])
 
 
     bg = dgl.batch_hetero([g1, g1])
+    bg.to(device)
     assert model(bg).shape == torch.Size([2, 1])
 
 if __name__ == '__main__':

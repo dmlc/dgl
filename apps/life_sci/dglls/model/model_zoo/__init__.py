@@ -5,4 +5,5 @@ from .attentivefp_predictor import *
 from .gat_predictor import *
 from .gcn_predictor import *
 from .mlp_predictor import *
+from .schnet_predictor import *
 from .acnn import *

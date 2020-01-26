@@ -1,3 +1,5 @@
+import torch
+
 from rdkit import Chem
 
 from dglls.model import DGMG, DGLJTNNVAE
@@ -17,9 +19,14 @@ def test_dgmg():
     assert model(rdkit_mol=True) is not None
 
 def test_jtnn():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
     model = DGLJTNNVAE(hidden_size=1,
                        latent_size=2,
-                       depth=1)
+                       depth=1).to(device)
 
 if __name__ == '__main__':
     test_dgmg()
