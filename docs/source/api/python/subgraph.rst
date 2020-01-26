@@ -1,6 +1,6 @@
 .. _apisubgraph:
 
-DGLSubGraph -- Class for subgraph data structure
+dgl.subgraph
 ================================================
 
 .. currentmodule:: dgl.subgraph

@@ -1,9 +1,11 @@
 .. _api-transform:
 
-Transform -- Graph Transformation
+dgl.transform
 =================================
 
 .. automodule:: dgl.transform
+
+Common algorithms applied on graphs.
 
 .. autosummary::
     :toctree: ../../generated/

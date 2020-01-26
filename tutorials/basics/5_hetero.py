@@ -1,8 +1,8 @@
 """
 .. currentmodule:: dgl
 
-Working with Heterogeneous Graphs in DGL
-========================================
+Working with Heterogeneous Graphs
+=================================
 
 **Author**: Quan Gan, `Minjie Wang <https://jermainewang.github.io/>`_, Mufei Li,
 George Karypis, Zheng Zhang

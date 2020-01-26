@@ -1,8 +1,8 @@
 """
 .. currentmodule:: dgl
 
-PageRank with DGL message passing
-=================================
+Message Passing Tutorial
+========================
 
 **Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, Yu Gai,
 Zheng Zhang
