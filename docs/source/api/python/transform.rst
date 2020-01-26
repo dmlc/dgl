@@ -5,7 +5,7 @@ dgl.transform
 
 .. automodule:: dgl.transform
 
-Common algorithms applied on graphs.
+Common algorithms on graphs.
 
 .. autosummary::
     :toctree: ../../generated/
