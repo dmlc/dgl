@@ -62,7 +62,7 @@ SchNet_Alchemy = {
     'node_feats': 64,
     'hidden_feats': [64, 64, 64],
     'classifier_hidden_feats': 64,
-    'output_dim': 12,
+    'n_tasks': 12,
     'lr': 0.0001,
     'patience': 50,
     'metric_name': 'l1',
