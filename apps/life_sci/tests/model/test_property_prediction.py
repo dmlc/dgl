@@ -165,6 +165,29 @@ def test_mgcn_predictor():
     assert mgcn_predictor(bg, batch_node_types, batch_edge_dists).shape == \
            torch.Size([2, 3])
 
+def test_mpnn_predictor():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    g, node_feats, edge_feats = test_graph3()
+    g, node_feats, edge_feats = g.to(device), node_feats.to(device), edge_feats.to(device)
+    bg, batch_node_feats, batch_edge_feats = test_graph4()
+    bg, batch_node_feats, batch_edge_feats = bg.to(device), batch_node_feats.to(device), \
+                                             batch_edge_feats.to(device)
+    mpnn_predictor = MPNNPredictor(node_in_feats=1,
+                                   node_out_feats=2,
+                                   edge_in_feats=2,
+                                   edge_hidden_feats=2,
+                                   n_tasks=2,
+                                   num_step_message_passing=2,
+                                   num_step_set2set=2,
+                                   num_layer_set2set=2)
+    assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 2])
+    assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
+           torch.Size([2, 2])
+
 if __name__ == '__main__':
     test_mlp_predictor()
     test_gcn_predictor()
@@ -172,3 +195,4 @@ if __name__ == '__main__':
     test_attentivefp_predictor()
     test_schnet_predictor()
     test_mgcn_predictor()
+    test_mpnn_predictor()

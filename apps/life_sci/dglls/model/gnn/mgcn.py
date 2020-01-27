@@ -206,6 +206,8 @@ class MGCNGNN(nn.Module):
     MGCN is introduced in `Molecular Property Prediction: A Multilevel Quantum Interactions
     Modeling Perspective <https://arxiv.org/abs/1906.11081>`__.
 
+    This class performs message passing in MGCN and returns the updated node representations.
+
     Parameters
     ----------
     feats : int

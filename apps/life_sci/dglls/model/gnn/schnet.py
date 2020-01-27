@@ -108,6 +108,8 @@ class SchNetGNN(nn.Module):
     SchNet is introduced in `SchNet: A continuous-filter convolutional neural network for
     modeling quantum interactions <https://arxiv.org/abs/1706.08566>`__.
 
+    This class performs message passing in SchNet and returns the updated node representations.
+
     Parameters
     ----------
     node_feats : int
