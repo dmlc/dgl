@@ -302,7 +302,7 @@ class AttentiveFPGNN(nn.Module):
             self.gnn_layers.append(GNNLayer(graph_feat_size, graph_feat_size, dropout))
 
     def forward(self, g, node_feats, edge_feats):
-        """Perform message passing and update node representations.
+        """Performs message passing and updates node representations.
 
         Parameters
         ----------

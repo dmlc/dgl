@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 from dgl import DGLGraph
-from dglls.model.gnn import GCN, GAT, AttentiveFPGNN, SchNetGNN
+from dglls.model.gnn import *
 
 def test_graph1():
     """Graph with node features."""
@@ -141,8 +141,30 @@ def test_schnet_gnn():
     assert gnn(g, node_types, edge_dists).shape == torch.Size([3, 2])
     assert gnn(bg, batch_node_types, batch_edge_dists).shape == torch.Size([8, 2])
 
+def test_mgcn_gnn():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    g, node_types, edge_dists = test_graph5()
+    g, node_types, edge_dists = g.to(device), node_types.to(device), edge_dists.to(device)
+    bg, batch_node_types, batch_edge_dists = test_graph6()
+    bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
+                                             batch_edge_dists.to(device)
+
+    # Test MGCNGNN
+    gnn = MGCNGNN(feats=2,
+                  n_layers=2,
+                  num_node_types=5,
+                  num_edge_types=150,
+                  cutoff=0.3).to(device)
+    assert gnn(g, node_types, edge_dists).shape == torch.Size([3, 6])
+    assert gnn(bg, batch_node_types, batch_edge_dists).shape == torch.Size([8, 6])
+
 if __name__ == '__main__':
     test_gcn()
     test_gat()
     test_attentive_fp_gnn()
     test_schnet_gnn()
+    test_mgcn_gnn()

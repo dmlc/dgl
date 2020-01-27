@@ -155,6 +155,13 @@ def load_model(args):
                                 classifier_hidden_feats=args['classifier_hidden_feats'],
                                 n_tasks=args['n_tasks'])
 
+    if args['model'] == 'MGCN':
+        from dglls.model import MGCNPredictor
+        model = MGCNPredictor(feats=args['feats'],
+                              n_layers=args['n_layers'],
+                              classifier_hidden_feats=args['classifier_hidden_feats'],
+                              n_tasks=args['n_tasks'])
+
     return model
 
 def chirality(atom):

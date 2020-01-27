@@ -143,9 +143,32 @@ def test_schnet_predictor():
     assert schnet_predictor(bg, batch_node_types, batch_edge_dists).shape == \
            torch.Size([2, 3])
 
+def test_mgcn_predictor():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    g, node_types, edge_dists = test_graph5()
+    g, node_types, edge_dists = g.to(device), node_types.to(device), edge_dists.to(device)
+    bg, batch_node_types, batch_edge_dists = test_graph6()
+    bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
+                                             batch_edge_dists.to(device)
+    mgcn_predictor = MGCNPredictor(feats=2,
+                                   n_layers=2,
+                                   classifier_hidden_feats=3,
+                                   n_tasks=3,
+                                   num_node_types=5,
+                                   num_edge_types=150,
+                                   cutoff=0.3).to(device)
+    assert mgcn_predictor(g, node_types, edge_dists).shape == torch.Size([1, 3])
+    assert mgcn_predictor(bg, batch_node_types, batch_edge_dists).shape == \
+           torch.Size([2, 3])
+
 if __name__ == '__main__':
     test_mlp_predictor()
     test_gcn_predictor()
     test_gat_predictor()
     test_attentivefp_predictor()
     test_schnet_predictor()
+    test_mgcn_predictor()

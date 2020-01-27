@@ -1,8 +1,10 @@
 """SchNet"""
 import torch.nn as nn
 
+from dgl.nn.pytorch.conv.cfconv import ShiftedSoftplus
+
 from ..gnn import SchNetGNN
-from ..readout import SchNetReadout
+from ..readout import MLPNodeReadout
 
 __all__ = ['SchNetPredictor']
 
@@ -34,8 +36,9 @@ class SchNetPredictor(nn.Module):
                  num_node_types=100, cutoff=30., gap=0.1):
         super(SchNetPredictor, self).__init__()
 
-        self.gnn = SchNetGNN(num_node_types, node_feats, hidden_feats, cutoff, gap)
-        self.readout = SchNetReadout(node_feats, classifier_hidden_feats, n_tasks)
+        self.gnn = SchNetGNN(node_feats, hidden_feats, num_node_types, cutoff, gap)
+        self.readout = MLPNodeReadout(node_feats, classifier_hidden_feats, n_tasks,
+                                      activation=ShiftedSoftplus())
 
     def forward(self, g, node_types, edge_dists):
         """Graph-level regression/soft classification.

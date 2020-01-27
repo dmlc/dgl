@@ -1,5 +1,6 @@
 import dgl
 import torch
+import torch.nn.functional as F
 
 from dgl import DGLGraph
 from dglls.model.readout import *
@@ -45,7 +46,7 @@ def test_attentive_fp_readout():
     assert model(g, node_feats).shape == torch.Size([1, 1])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 1])
 
-def test_schnet_readout():
+def test_mlp_readout():
     if torch.cuda.is_available():
         device = torch.device('cuda:0')
     else:
@@ -55,13 +56,30 @@ def test_schnet_readout():
     g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
-    model = SchNetReadout(node_feats=1,
-                          hidden_feats=2,
-                          graph_feats=3)
+
+    model = MLPNodeReadout(node_feats=1,
+                            hidden_feats=2,
+                            graph_feats=3,
+                            activation=F.relu,
+                            mode='sum').to(device)
+    assert model(g, node_feats).shape == torch.Size([1, 3])
+    assert model(bg, batch_node_feats).shape == torch.Size([2, 3])
+
+    model = MLPNodeReadout(node_feats=1,
+                            hidden_feats=2,
+                            graph_feats=3,
+                            mode='max').to(device)
+    assert model(g, node_feats).shape == torch.Size([1, 3])
+    assert model(bg, batch_node_feats).shape == torch.Size([2, 3])
+
+    model = MLPNodeReadout(node_feats=1,
+                            hidden_feats=2,
+                            graph_feats=3,
+                            mode='mean').to(device)
     assert model(g, node_feats).shape == torch.Size([1, 3])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 3])
 
 if __name__ == '__main__':
     test_weighted_sum_and_max()
     test_attentive_fp_readout()
-    test_schnet_readout()
+    test_mlp_readout()

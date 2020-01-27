@@ -110,20 +110,19 @@ class SchNetGNN(nn.Module):
 
     Parameters
     ----------
-    num_node_types : int
-        Number of node types to embed.
     node_feats : int
         Size for node representations to learn.
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the size of hidden representations for the i-th interaction
         layer. ``len(hidden_feats)`` equals the number of interaction layers.
+    num_node_types : int
+        Number of node types to embed. Default to 100.
     cutoff : float
         Largest center in RBF expansion. Default to 30.
     gap : float
         Difference between two adjacent centers in RBF expansion. Default to 0.1.
     """
-    def __init__(self, num_node_types, node_feats,
-                 hidden_feats, cutoff=30., gap=0.1):
+    def __init__(self, node_feats, hidden_feats, num_node_types=100, cutoff=30., gap=0.1):
         super(SchNetGNN, self).__init__()
 
         self.embed = nn.Embedding(num_node_types, node_feats)
@@ -153,7 +152,7 @@ class SchNetGNN(nn.Module):
             Updated node representations.
         """
         node_feats = self.embed(node_types)
-        expanded_distances = self.rbf(edge_dists)
+        expanded_dists = self.rbf(edge_dists)
         for gnn in self.gnn_layers:
-            node_feats = gnn(g, node_feats, expanded_distances)
+            node_feats = gnn(g, node_feats, expanded_dists)
         return node_feats
