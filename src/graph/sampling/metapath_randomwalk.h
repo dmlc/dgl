@@ -26,6 +26,10 @@ namespace impl {
 
 namespace {
 
+// bool WhetherToTerminate(
+//     void *node_ids_generated_so_far,
+//     dgl_id_t last_node_id_generated,
+//     int64_t number_of_nodes_generated_so_far)
 using TerminatePredicate = std::function<bool(void *, dgl_id_t, int64_t)>;
 
 /*!

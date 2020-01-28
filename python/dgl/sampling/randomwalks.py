@@ -56,6 +56,61 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     types : Tensor
         A 1-dimensional node type ID tensor with shape (len(metapath) + 1).
         The type IDs match the ones in the original graph ``g``.
+
+    Examples
+    --------
+    The following creates a homogeneous graph:
+    >>> g1 = dgl.heterograph({
+    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)]
+    ...     })
+
+    Normal random walk:
+    >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4)
+    (tensor([[0, 1, 2, 0, 1],
+             [1, 3, 0, 1, 3],
+             [2, 0, 1, 3, 0],
+             [0, 1, 2, 0, 1]]), tensor([0, 0, 0, 0, 0]))
+
+    The first tensor indicates the random walk path for each seed node.
+    The j-th element in the second tensor indicates the node type ID of the j-th node
+    in every path.  In this case, it is returning all 0 (``user``).
+
+    Random walk with restart:
+    >>> dgl.sampling.random_walk_with_restart(g1, [0, 1, 2, 0], length=4, restart_prob=0.5)
+    (tensor([[ 0, -1, -1, -1, -1],
+             [ 1,  3,  0, -1, -1],
+             [ 2, -1, -1, -1, -1],
+             [ 0, -1, -1, -1, -1]]), tensor([0, 0, 0, 0, 0]))
+
+    Non-uniform random walk:
+    >>> g1.edata['p'] = torch.FloatTensor([1, 0, 1, 1, 1])     # disallow going from 1 to 2
+    >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4, prob='p')
+    (tensor([[0, 1, 3, 0, 1],
+             [1, 3, 0, 1, 3],
+             [2, 0, 1, 3, 0],
+             [0, 1, 3, 0, 1]]), tensor([0, 0, 0, 0, 0]))
+
+    Metapath-based random walk:
+    >>> g2 = dgl.heterograph({
+    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
+    ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
+    ...     ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
+    >>> dgl.sampling.random_walk( 
+    ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2)
+    (tensor([[0, 1, 1, 1, 2, 2, 3],
+             [1, 3, 1, 1, 2, 2, 2],
+             [2, 0, 1, 1, 3, 1, 1],
+             [0, 1, 1, 0, 1, 1, 3]]), tensor([0, 0, 1, 0, 0, 1, 0]))
+
+    Metapath-based random walk, with restarts only on items (i.e. after traversing a "view" 
+    relationship):
+    >>> dgl.sampling.random_walk(
+    ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2,
+    ...     restart_prob=torch.FloatTensor([0, 0.5, 0, 0, 0.5, 0]))
+    (tensor([[ 0,  1, -1, -1, -1, -1, -1],
+             [ 1,  3,  1,  0,  1,  1,  0],
+             [ 2,  0,  1,  1,  3,  2,  2],
+             [ 0,  1,  1,  3,  0,  0,  0]]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
     n_etypes = len(g.canonical_etypes)
     n_ntypes = len(g.ntypes)
@@ -127,6 +182,41 @@ def pack_traces(traces, types):
         Length of each trace in the original traces tensor.
     offsets : Tensor
         Offset of each trace in the originial traces tensor in the new concatenated tensor.
+
+    Examples
+    --------
+    >>> g2 = dgl.heterograph({
+    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
+    ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
+    ...     ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
+    >>> traces, types = dgl.sampling.random_walk(
+    ...     g2, [0, 0], metapath=['follow', 'view', 'viewed-by'] * 2,
+    ...     restart_prob=torch.FloatTensor([0, 0.5, 0, 0, 0.5, 0]))
+    >>> traces, types
+    (tensor([[ 0,  1, -1, -1, -1, -1, -1],
+             [ 0,  1,  1,  3,  0,  0,  0]]), tensor([0, 0, 1, 0, 0, 1, 0]))
+    >>> concat_vids, concat_types, lengths, offsets = dgl.sampling.pack_traces(traces, types)
+    >>> concat_vids
+    tensor([0, 1, 0, 1, 1, 3, 0, 0, 0])
+    >>> concat_types
+    tensor([0, 0, 0, 0, 1, 0, 0, 1, 0])
+    >>> lengths
+    tensor([2, 7])
+    >>> offsets
+    tensor([0, 2]))
+
+    The first tensor ``concat_vids`` is the concatenation of all paths, i.e. flattened array
+    of ``traces``, excluding all padding values (-1).
+
+    The second tensor ``concat_types`` stands for the node type IDs of all corresponding nodes
+    in the first tensor.
+
+    The third and fourth tensor indicates the length and the offset of each path.  With these
+    tensors it is easy to obtain the i-th random walk path with:
+    >>> vids = concat_vids.split(lengths.tolist())
+    >>> vtypes = concat_vtypes.split(lengths.tolist())
+    >>> vids[1], vtypes[1]
+    (tensor([0, 1, 1, 3, 0, 0, 0]), tensor([0, 0, 1, 0, 0, 1, 0]))
     """
     traces = F.zerocopy_to_dgl_ndarray(traces)
     types = F.zerocopy_to_dgl_ndarray(types)

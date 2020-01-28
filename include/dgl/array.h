@@ -59,17 +59,6 @@ IdArray VecToIdArray(const std::vector<T>& vec,
                      DLContext ctx = DLContext{kDLCPU, 0});
 
 /*!
- * \brief Create a new NDArray using the given vector data
- * \tparam T Type of vector.  The dtype of the returned array is selected accordingly.
- * \param vec The vector data
- * \param ctx The array context
- * \return the NDArray
- */
-template <typename T>
-NDArray VecToNDArray(const std::vector<T>& vec,
-                     DLContext ctx = DLContext{kDLCPU, 0});
-
-/*!
  * \brief Return an array representing a 1D range.
  * \param low Lower bound (inclusive).
  * \param high Higher bound (exclusive).
@@ -141,15 +130,64 @@ inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
 }
 
 /*!
- * \brief Pack a padded tensor to a triplet of concatenated tensor, their lengths,
- * and offsets.
+ * \brief Packs a tensor containing padded sequences of variable length.
+ *
+ * Similar to \c pack_padded_sequence in PyTorch, except that
+ *
+ * 1. The length for each sequence (before padding) is inferred as the number
+ *    of elements before the first occurrence of \c pad_value.
+ * 2. It does not sort the sequences by length.
+ * 3. Along with the tensor containing the packed sequence, it returns both the
+ *    length, as well as the offsets to the packed tensor, of each sequence.
+ *
+ * \param array The tensor containing sequences padded to the same length
+ * \param pad_value The padding value
+ * \return A triplet of packed tensor, the length tensor, and the offset tensor
+ *
+ * \note Example: consider the following array with padding value -1:
+ *
+ * <code>
+ *     [[1, 2, -1, -1],
+ *      [3, 4,  5, -1]]
+ * </code>
+ *
+ * The packed tensor would be [1, 2, 3, 4, 5].
+ *
+ * The length tensor would be [2, 3], i.e. the length of each sequence before padding.
+ *
+ * The offset tensor would be [0, 2], i.e. the offset to the packed tensor for each
+ * sequence (before padding)
  */
 template<typename ValueType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
 
 /*!
- * \brief Concat array[i, 0:lengths[i]] for every i.  Returns the concatenated array
- * and offsets in the concatenated array for each original slice.
+ * \brief Batch-slice a 1D or 2D array, and then pack the list of sliced arrays
+ * by concatenation.
+ *
+ * If a 2D array is given, then the function is equivalent to:
+ *
+ * <code>
+ *     def ConcatSlices(array, lengths):
+ *         slices = [array[i, :l] for i, l in enumerate(lengths)]
+ *         packed = np.concatenate(slices)
+ *         offsets = np.cumsum([0] + lengths[:-1])
+ *         return packed, offsets
+ * </code>
+ *
+ * If a 1D array is given, then the function is equivalent to
+ *
+ * <code>
+ *     def ConcatSlices(array, lengths):
+ *         slices = [array[:l] for l in lengths]
+ *         packed = np.concatenate(slices)
+ *         offsets = np.cumsum([0] + lengths[:-1])
+ *         return packed, offsets
+ * </code>
+ *
+ * \param array A 1D or 2D tensor for slicing
+ * \param lengths A 1D tensor indicating the number of elements to slice
+ * \return The tensor with packed slices along with the offsets.
  */
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
@@ -314,14 +352,6 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   } else {
     LOG(FATAL) << "Only int32 or int64 is supported.";
   }
-  return ret.CopyTo(ctx);
-}
-
-template<typename T>
-NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx) {
-  int64_t size = static_cast<int64_t>(vec.size());
-  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
-  std::copy(vec.begin(), vec.end(), static_cast<T *>(ret->data));
   return ret.CopyTo(ctx);
 }
 

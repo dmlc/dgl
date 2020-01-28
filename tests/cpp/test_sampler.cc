@@ -22,7 +22,7 @@ void _TestWithReplacement(RandomEngine *re) {
   }
   for (Idx i = 0; i < n_categories; ++i)
     _prob[i] /= accum;
-  FloatArray prob = VecToNDArray(_prob);
+  FloatArray prob = NDArray::FromVector(_prob);
 
   auto _check_given_sampler = [n_categories, n_rolls, &_prob](
       utils::BaseSampler<Idx, DType, true> *s) {
@@ -70,7 +70,7 @@ template <typename Idx, typename DType>
 void _TestWithoutReplacementOrder(RandomEngine *re) {
   // TODO(BarclayII): is there a reliable way to do this test?
   std::vector<DType> _prob = {1e6, 1e-6, 1e-2, 1e2};
-  FloatArray prob = VecToNDArray(_prob);
+  FloatArray prob = NDArray::FromVector(_prob);
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
   auto _check_given_sampler = [&ground_truth](
@@ -107,7 +107,7 @@ void _TestWithoutReplacementUnique(RandomEngine *re) {
   std::vector<DType> _likelihood;
   for (Idx i = 0; i < N; ++i)
     _likelihood.push_back(re->Uniform<DType>());
-  FloatArray likelihood = VecToNDArray(_likelihood);
+  FloatArray likelihood = NDArray::FromVector(_likelihood);
 
   auto _check_given_sampler = [N](
       utils::BaseSampler<Idx, DType, false> *s) {

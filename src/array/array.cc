@@ -427,18 +427,5 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   return ret;
 }
 
-///////////////////////// VecToNDArray specializations //////////////////////////
-
-#define GEN_VEC_TO_NDARRAY_FOR(T, DTypeCode, DTypeBits) \
-  template<> \
-  NDArray VecToNDArray<T>(const std::vector<T> &vec, DLContext ctx) { \
-    return VecToNDArray(vec, DLDataType{DTypeCode, DTypeBits, 1}, ctx); \
-  }
-
-GEN_VEC_TO_NDARRAY_FOR(int32_t, kDLInt, 32);
-GEN_VEC_TO_NDARRAY_FOR(int64_t, kDLInt, 64);
-GEN_VEC_TO_NDARRAY_FOR(float, kDLFloat, 32);
-GEN_VEC_TO_NDARRAY_FOR(double, kDLFloat, 64);
-
 }  // namespace aten
 }  // namespace dgl

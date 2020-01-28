@@ -14,13 +14,14 @@ namespace impl {
 
 template<DLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
-  int64_t rows = array->shape[0];
-  int64_t cols = (array->ndim == 1 ? 0 : array->shape[1]);
+  int64_t rows = lengths->shape[0];
+  int64_t cols = (array->ndim == 1 ? array->shape[0] : array->shape[1]);
+  int64_t stride = (array->ndim == 1 ? 0 : cols);
   const DType *array_data = static_cast<DType *>(array->data);
   const IdType *length_data = static_cast<IdType *>(lengths->data);
 
-  IdArray offsets = NewIdArray(rows, array->ctx);
-  int64_t *offsets_data = static_cast<int64_t *>(offsets->data);
+  IdArray offsets = NewIdArray(rows, array->ctx, sizeof(IdType) * 8);
+  IdType *offsets_data = static_cast<IdType *>(offsets->data);
   for (int64_t i = 0; i < rows; ++i)
     offsets_data[i] = (i == 0 ? 0 : length_data[i - 1] + offsets_data[i - 1]);
   int64_t total_length = offsets_data[rows - 1] + length_data[rows - 1];
@@ -31,7 +32,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
 #pragma omp parallel for
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < length_data[i]; ++j)
-      concat_data[offsets_data[i] + j] = array_data[i * cols + j];
+      concat_data[offsets_data[i] + j] = array_data[i * stride + j];
   }
 
   return std::make_pair(concat, offsets);

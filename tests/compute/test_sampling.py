@@ -88,12 +88,21 @@ def test_random_walk():
         restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32))
     check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p')
     assert (F.asnumpy(traces[:, 7]) == -1).all()
-    vids, vtypes, lengths, offsets = dgl.sampling.pack_traces(traces, ntypes)
 
-    assert np.array_equal(F.asnumpy(vids), F.asnumpy(traces)[:, :7].flatten())
-    assert np.array_equal(F.asnumpy(vtypes), np.tile(F.asnumpy(ntypes)[:7], len(lengths)))
-    assert (F.asnumpy(lengths) == 7).all()
-    assert np.array_equal(F.asnumpy(offsets), np.insert(F.asnumpy(lengths), 0, 0).cumsum()[:-1])
+def test_pack_traces():
+    traces, types = (np.array(
+        [[ 0,  1, -1, -1, -1, -1, -1],
+         [ 0,  1,  1,  3,  0,  0,  0]], dtype='int64'),
+        np.array([0, 0, 1, 0, 0, 1, 0], dtype='int64'))
+    traces = F.zerocopy_from_numpy(traces)
+    types = F.zerocopy_from_numpy(types)
+    result = dgl.sampling.pack_traces(traces, types)
+    assert F.array_equal(result[0], F.tensor([0, 1, 0, 1, 1, 3, 0, 0, 0], dtype=F.int64))
+    assert F.array_equal(result[1], F.tensor([0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=F.int64))
+    assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
+    assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
+
 
 if __name__ == '__main__':
     test_random_walk()
+    test_pack_traces()

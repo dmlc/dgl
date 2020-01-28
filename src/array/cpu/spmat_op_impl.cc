@@ -247,7 +247,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
       }
     }
   }
-  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
@@ -291,7 +291,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     }
   }
 
-  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -373,7 +373,7 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
 
   return {VecToIdArray(ret_rows, csr.indptr->dtype.bits, csr.indptr->ctx),
           VecToIdArray(ret_cols, csr.indptr->dtype.bits, csr.indptr->ctx),
-          VecToNDArray(ret_data, csr.data->dtype, csr.data->ctx)};
+          NDArray::FromVector(ret_data, csr.data->dtype, csr.data->ctx)};
 }
 
 template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int32_t, int32_t>(

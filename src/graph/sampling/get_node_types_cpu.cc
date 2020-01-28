@@ -29,14 +29,11 @@ TypeArray GetNodeTypesFromMetapath(
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
   IdxType *result_data = static_cast<IdxType *>(result->data);
 
-  dgl_type_t etype = metapath_data[0];
-  dgl_type_t srctype = hg->GetEndpointTypes(etype).first;
-  dgl_type_t curr_type = srctype;
+  dgl_type_t curr_type = hg->GetEndpointTypes(metapath_data[0]).first;
   result_data[0] = curr_type;
 
   for (uint64_t i = 0; i < num_etypes; ++i) {
-    etype = metapath_data[i];
-    auto src_dst_type = hg->GetEndpointTypes(etype);
+    auto src_dst_type = hg->GetEndpointTypes(metapath_data[i]);
     dgl_type_t srctype = src_dst_type.first;
     dgl_type_t dsttype = src_dst_type.second;
 
