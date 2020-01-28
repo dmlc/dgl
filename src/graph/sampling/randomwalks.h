@@ -49,7 +49,8 @@ TypeArray GetNodeTypesFromMetapath(
  * \param metapath A 1D array of edge types representing the metapath.
  * \param prob A vector of 1D float arrays, indicating the transition probability of
  *        each edge by edge type.  An empty float array assumes uniform transition.
- * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.
+ * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
+ *         paths that terminated early are padded with -1.
  * \note This function should be called together with GetNodeTypesFromMetapath to
  *       determine the node type of each node in the random walk traces.
  */
@@ -59,6 +60,52 @@ IdArray RandomWalk(
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob);
+
+/*!
+ * \brief Metapath-based random walk with restart probability.
+ * \param hg The heterograph.
+ * \param seeds A 1D array of seed nodes, with the type the source type of the first
+ *        edge type in the metapath.
+ * \param metapath A 1D array of edge types representing the metapath.
+ * \param prob A vector of 1D float arrays, indicating the transition probability of
+ *        each edge by edge type.  An empty float array assumes uniform transition.
+ * \param restart_prob Restart probability
+ * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
+ *         paths that terminated early are padded with -1.
+ * \note This function should be called together with GetNodeTypesFromMetapath to
+ *       determine the node type of each node in the random walk traces.
+ */
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    double restart_prob);
+
+/*!
+ * \brief Metapath-based random walk with restart probability by position.  Useful
+ *        for PinSAGE-like models.
+ * \param hg The heterograph.
+ * \param seeds A 1D array of seed nodes, with the type the source type of the first
+ *        edge type in the metapath.
+ * \param metapath A 1D array of edge types representing the metapath.
+ * \param prob A vector of 1D float arrays, indicating the transition probability of
+ *        each edge by edge type.  An empty float array assumes uniform transition.
+ * \param restart_prob Restart probability array which has the same number of elements
+ *        as \c metapath, indicating the probability to terminate after transition.
+ * \return A 2D array of shape (len(seeds), len(metapath) + 1) with node IDs.  The
+ *         paths that terminated early are padded with -1.
+ * \note This function should be called together with GetNodeTypesFromMetapath to
+ *       determine the node type of each node in the random walk traces.
+ */
+template<DLDeviceType XPU, typename IdxType>
+IdArray RandomWalkWithRestart(
+    const HeteroGraphPtr hg,
+    const IdArray seeds,
+    const TypeArray metapath,
+    const std::vector<FloatArray> &prob,
+    FloatArray restart_prob);
 
 };  // namespace impl
 

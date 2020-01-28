@@ -6,8 +6,6 @@
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
-#include <dgl/random.h>
-#include <utility>
 #include <vector>
 #include "randomwalks.h"
 #include "randomwalks_cpu.h"

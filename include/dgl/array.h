@@ -12,6 +12,7 @@
 #include <dgl/runtime/ndarray.h>
 #include <algorithm>
 #include <vector>
+#include <tuple>
 #include <utility>
 
 namespace dgl {
@@ -146,6 +147,19 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ndim == 1 && arr->dtype.code == kDLInt;
 }
+
+/*!
+ * \brief Pack a padded tensor to a triplet of concatenated tensor, their lengths,
+ * and offsets.
+ */
+template<typename ValueType>
+std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
+
+/*!
+ * \brief Concat array[i, 0:lengths[i]] for every i.  Returns the concatenated array
+ * and offsets in the concatenated array for each original slice.
+ */
+std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
 //////////////////////////////////////////////////////////////////////
 // Sparse matrix

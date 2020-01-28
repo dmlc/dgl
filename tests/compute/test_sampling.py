@@ -42,6 +42,17 @@ def test_random_walk():
 
     traces, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4)
     check_random_walk(g1, ['follow'] * 4, traces, ntypes)
+    traces, ntypes = dgl.sampling.random_walk(g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=0.)
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
+    traces, ntypes = dgl.sampling.random_walk(
+        g1, [0, 1, 2, 0, 1, 2], length=4, restart_prob=F.zeros((4,), F.float32, F.cpu()))
+    check_random_walk(g1, ['follow'] * 4, traces, ntypes)
+    traces, ntypes = dgl.sampling.random_walk(
+        g1, [0, 1, 2, 0, 1, 2], length=5,
+        restart_prob=F.tensor([0, 0, 0, 0, 1], dtype=F.float32))
+    check_random_walk(
+        g1, ['follow'] * 4, F.slice_axis(traces, 1, 0, 5), F.slice_axis(ntypes, 0, 0, 5))
+    assert (F.asnumpy(traces)[:, 5] == -1).all()
 
     traces, ntypes = dgl.sampling.random_walk(
         g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4)
@@ -65,7 +76,24 @@ def test_random_walk():
     traces, ntypes = dgl.sampling.random_walk(
         g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p')
     check_random_walk(g4, metapath, traces, ntypes, 'p')
+    traces, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p', restart_prob=0.)
+    check_random_walk(g4, metapath, traces, ntypes, 'p')
+    traces, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath, prob='p',
+        restart_prob=F.zeros((6,), F.float32, F.cpu()))
+    check_random_walk(g4, metapath, traces, ntypes, 'p')
+    traces, ntypes = dgl.sampling.random_walk(
+        g4, [0, 1, 2, 3, 0, 1, 2, 3], metapath=metapath + ['follow'], prob='p',
+        restart_prob=F.tensor([0, 0, 0, 0, 0, 0, 1], F.float32))
+    check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p')
+    assert (F.asnumpy(traces[:, 7]) == -1).all()
+    vids, vtypes, lengths, offsets = dgl.sampling.pack_traces(traces, ntypes)
 
+    assert np.array_equal(F.asnumpy(vids), F.asnumpy(traces)[:, :7].flatten())
+    assert np.array_equal(F.asnumpy(vtypes), np.tile(F.asnumpy(ntypes)[:7], len(lengths)))
+    assert (F.asnumpy(lengths) == 7).all()
+    assert np.array_equal(F.asnumpy(offsets), np.insert(F.asnumpy(lengths), 0, 0).cumsum()[:-1])
 
 if __name__ == '__main__':
     test_random_walk()

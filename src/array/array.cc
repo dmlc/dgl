@@ -240,6 +240,36 @@ IdArray Relabel_(const std::vector<IdArray>& arrays) {
   return ret;
 }
 
+template<typename ValueType>
+std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
+  std::tuple<NDArray, IdArray, IdArray> ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
+      ret = impl::Pack<XPU, DType>(array, static_cast<DType>(pad_value));
+    });
+  });
+  return ret;
+}
+
+template std::tuple<NDArray, IdArray, IdArray> Pack<int32_t>(NDArray, int32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<int64_t>(NDArray, int64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<uint32_t>(NDArray, uint32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<uint64_t>(NDArray, uint64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<float>(NDArray, float);
+template std::tuple<NDArray, IdArray, IdArray> Pack<double>(NDArray, double);
+
+std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
+  std::pair<NDArray, IdArray> ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
+      ATEN_ID_TYPE_SWITCH(lengths->dtype, IdType, {
+        ret = impl::ConcatSlices<XPU, DType, IdType>(array, lengths);
+      });
+    });
+  });
+  return ret;
+}
+
 ///////////////////////// CSR routines //////////////////////////
 
 bool CSRIsNonZero(CSRMatrix csr, int64_t row, int64_t col) {

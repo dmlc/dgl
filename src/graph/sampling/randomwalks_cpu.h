@@ -20,6 +20,8 @@ namespace sampling {
 
 namespace impl {
 
+namespace {
+
 /*!
  * \brief Generic Random Walk.
  * \param hg The heterograph.
@@ -56,11 +58,13 @@ IdArray GenericRandomWalk(
     }
 
     for (; i < max_num_steps; ++i)
-      traces_data[seed_id * max_num_steps + i + 1] = -1;
+      traces_data[seed_id * trace_length + i + 1] = -1;
   }
 
   return traces;
 }
+
+};  // namespace
 
 };  // namespace impl
 
