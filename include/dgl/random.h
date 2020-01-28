@@ -101,8 +101,8 @@ class RandomEngine {
    * \brief Pick a random integer between 0 to N-1 according to given probabilities
    * \param prob Array of unnormalized probability of each element.  Must be non-negative.
    */
-  template<typename IdxType, typename ValueType>
-  IdxType Choice(const std::vector<ValueType> &prob);
+  template<typename IdxType>
+  IdxType Choice(FloatArray prob);
 
  private:
   std::default_random_engine rng_;

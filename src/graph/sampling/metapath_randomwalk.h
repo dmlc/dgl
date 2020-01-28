@@ -70,24 +70,25 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
     return std::make_pair(-1, true);
 
   FloatArray prob_etype = prob[etype];
+  IdxType idx;
   if (prob_etype->shape[0] == 0) {
     // empty probability array; assume uniform
-    IdxType idx = RandomEngine::ThreadLocal()->RandInt(size);
-    curr = succ[idx];
+    idx = RandomEngine::ThreadLocal()->RandInt(size);
   } else {
     // non-uniform random walk
     const IdxType *all_eids = static_cast<IdxType *>(csr_arrays[2]->data);
     const IdxType *eids = all_eids + offsets[curr];
 
     ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
+      FloatArray prob_selected = FloatArray::Empty({size}, prob_etype->dtype, prob_etype->ctx);
+      DType *prob_selected_data = static_cast<DType *>(prob_selected->data);
       const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
-      std::vector<DType> prob_selected(size);
       for (int64_t j = 0; j < size; ++j)
-        prob_selected[j] = prob_etype_data[eids[j]];
-
-      curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
+        prob_selected_data[j] = prob_etype_data[eids[j]];
+      idx = RandomEngine::ThreadLocal()->Choice<IdxType>(prob_selected);
     });
   }
+  curr = succ[idx];
 
   return std::make_pair(curr, terminate(data, curr, len));
 }

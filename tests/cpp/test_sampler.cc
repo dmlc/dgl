@@ -6,6 +6,7 @@
 #include "../../src/random/cpu/sample_utils.h"
 
 using namespace dgl;
+using namespace dgl::aten;
 
 // TODO: adapt this to Random::Choice
 
@@ -13,16 +14,17 @@ template <typename Idx, typename DType>
 void _TestWithReplacement(RandomEngine *re) {
   Idx n_categories = 100;
   Idx n_rolls = 1000000;
-  std::vector<DType> prob;
+  std::vector<DType> _prob;
   DType accum = 0.;
   for (Idx i = 0; i < n_categories; ++i) {
-    prob.push_back(re->Uniform<DType>());
-    accum += prob.back();
+    _prob.push_back(re->Uniform<DType>());
+    accum += _prob.back();
   }
   for (Idx i = 0; i < n_categories; ++i)
-    prob[i] /= accum;
+    _prob[i] /= accum;
+  FloatArray prob = VecToNDArray(_prob);
 
-  auto _check_given_sampler = [n_categories, n_rolls, &prob](
+  auto _check_given_sampler = [n_categories, n_rolls, &_prob](
       utils::BaseSampler<Idx, DType, true> *s) {
     std::vector<Idx> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
@@ -30,17 +32,17 @@ void _TestWithReplacement(RandomEngine *re) {
       counter[dice]++;
     }
     for (Idx i = 0; i < n_categories; ++i)
-      ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
+      ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, _prob[i], 1e-2);
   };
 
-  auto _check_random_choice = [n_categories, n_rolls, &prob]() {
+  auto _check_random_choice = [n_categories, n_rolls, &_prob, prob]() {
     std::vector<int64_t> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = RandomEngine::ThreadLocal()->Choice<int64_t>(prob);
       counter[dice]++;
     }
     for (Idx i = 0; i < n_categories; ++i)
-      ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, prob[i], 1e-2);
+      ASSERT_NEAR(static_cast<DType>(counter[i]) / n_rolls, _prob[i], 1e-2);
   };
 
   utils::AliasSampler<Idx, DType, true> as(re, prob);
@@ -66,7 +68,9 @@ TEST(SampleUtilsTest, TestWithReplacement) {
 
 template <typename Idx, typename DType>
 void _TestWithoutReplacementOrder(RandomEngine *re) {
-  std::vector<DType> prob = {1e6, 1e-6, 1e-2, 1e2};
+  // TODO(BarclayII): is there a reliable way to do this test?
+  std::vector<DType> _prob = {1e6, 1e-6, 1e-2, 1e2};
+  FloatArray prob = VecToNDArray(_prob);
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
   auto _check_given_sampler = [&ground_truth](
@@ -100,9 +104,10 @@ TEST(SampleUtilsTest, TestWithoutReplacementOrder) {
 template <typename Idx, typename DType>
 void _TestWithoutReplacementUnique(RandomEngine *re) {
   Idx N = 1000000;
-  std::vector<DType> likelihood;
+  std::vector<DType> _likelihood;
   for (Idx i = 0; i < N; ++i)
-    likelihood.push_back(re->Uniform<DType>());
+    _likelihood.push_back(re->Uniform<DType>());
+  FloatArray likelihood = VecToNDArray(_likelihood);
 
   auto _check_given_sampler = [N](
       utils::BaseSampler<Idx, DType, false> *s) {

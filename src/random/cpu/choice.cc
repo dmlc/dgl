@@ -17,15 +17,17 @@
 
 namespace dgl {
 
-template<typename IdxType, typename ValueType>
-IdxType RandomEngine::Choice(const std::vector<ValueType> &prob) {
-  utils::TreeSampler<IdxType, ValueType, true> sampler(this, prob);
-  return sampler.Draw();
+template<typename IdxType>
+IdxType RandomEngine::Choice(FloatArray prob) {
+  IdxType ret;
+  ATEN_FLOAT_TYPE_SWITCH(prob->dtype, ValueType, "probability", {
+    utils::TreeSampler<IdxType, ValueType, true> sampler(this, prob);
+    ret = sampler.Draw();
+  });
+  return ret;
 }
 
-template int32_t RandomEngine::Choice<int32_t, float>(const std::vector<float> &);
-template int64_t RandomEngine::Choice<int64_t, float>(const std::vector<float> &);
-template int32_t RandomEngine::Choice<int32_t, double>(const std::vector<double> &);
-template int64_t RandomEngine::Choice<int64_t, double>(const std::vector<double> &);
+template int32_t RandomEngine::Choice<int32_t>(FloatArray);
+template int64_t RandomEngine::Choice<int64_t>(FloatArray);
 
 };  // namespace dgl
