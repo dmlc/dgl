@@ -7,6 +7,7 @@
 #include <dgl/lazy.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/base_heterograph.h>
+#include <atomic>
 
 #include "./unit_graph.h"
 #include "../c_api_common.h"
@@ -907,52 +908,56 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
+/*
+ * Lazy initialization of CSR, CSC, and COO matrices.
+ *
+ * Implementation taken from
+ * https://www.justsoftwaresolutions.co.uk/threading/multithreading-in-c++0x-part-6-double-checked-locking.html
+ */
+
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
-  if (!in_csr_) {
-    if (out_csr_) {
-      const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
-    } else {
-      CHECK(coo_) << "None of CSR, COO exist";
-      const auto& adj = coo_->adj();
-      const auto& newadj = aten::COOToCSR(
-          aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
-    }
-  }
-  return in_csr_;
+  return LazyInit(&(const_cast<UnitGraph*>(this)->in_csr_), &lazy_mutex_, [this] () {
+      if (out_csr_) {
+        const auto& newadj = aten::CSRTranspose(out_csr_->adj());
+        return CSR(meta_graph(), newadj);
+      } else {
+        CHECK(coo_) << "None of CSR, COO exist";
+        const auto& adj = coo_->adj();
+        const auto& newadj = aten::COOToCSR(
+            aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
+        return CSR(meta_graph(), newadj);
+      }
+    });
 }
 
 /* !\brief Return out csr. If not exist, transpose the other one.*/
 UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
-  if (!out_csr_) {
-    if (in_csr_) {
-      const auto& newadj = aten::CSRTranspose(in_csr_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
-    } else {
-      CHECK(coo_) << "None of CSR, COO exist";
-      const auto& newadj = aten::COOToCSR(coo_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
-    }
-  }
-  return out_csr_;
+  return LazyInit(&(const_cast<UnitGraph*>(this)->out_csr_), &lazy_mutex_, [this] () {
+      if (in_csr_) {
+        const auto& newadj = aten::CSRTranspose(in_csr_->adj());
+        return CSR(meta_graph(), newadj);
+      } else {
+        CHECK(coo_) << "None of CSR, COO exist";
+        const auto& newadj = aten::COOToCSR(coo_->adj());
+        return CSR(meta_graph(), newadj);
+      }
+    });
 }
 
 /* !\brief Return coo. If not exist, create from csr.*/
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
-  if (!coo_) {
-    if (in_csr_) {
-      const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(
-          meta_graph(),
-          aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
-    } else {
-      CHECK(out_csr_) << "Both CSR are missing.";
-      const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
-    }
-  }
-  return coo_;
+  return LazyInit(&(const_cast<UnitGraph*>(this)->coo_), &lazy_mutex_, [this] () {
+      if (in_csr_) {
+        const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
+        return COO(
+            meta_graph(),
+            aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
+      } else {
+        CHECK(out_csr_) << "Both CSR are missing.";
+        const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
+        return COO(meta_graph(), newadj);
+      }
+    });
 }
 
 aten::CSRMatrix UnitGraph::GetInCSRMatrix() const {

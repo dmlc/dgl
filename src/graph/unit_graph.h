@@ -13,6 +13,7 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include "../c_api_common.h"
 
@@ -195,6 +196,9 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr out_csr_;
   /*! \brief COO representation */
   COOPtr coo_;
+
+  /*! \brief Mutex for lazy initialization */
+  mutable std::mutex lazy_mutex_;
 };
 
 };  // namespace dgl
