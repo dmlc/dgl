@@ -95,14 +95,14 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)],
     ...     ('user', 'view', 'item'): [(0, 0), (0, 1), (1, 1), (2, 2), (3, 2), (3, 1)],
     ...     ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
-    >>> dgl.sampling.random_walk( 
+    >>> dgl.sampling.random_walk(
     ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2)
     (tensor([[0, 1, 1, 1, 2, 2, 3],
              [1, 3, 1, 1, 2, 2, 2],
              [2, 0, 1, 1, 3, 1, 1],
              [0, 1, 1, 0, 1, 1, 3]]), tensor([0, 0, 1, 0, 0, 1, 0]))
 
-    Metapath-based random walk, with restarts only on items (i.e. after traversing a "view" 
+    Metapath-based random walk, with restarts only on items (i.e. after traversing a "view"
     relationship):
     >>> dgl.sampling.random_walk(
     ...     g2, [0, 1, 2, 0], metapath=['follow', 'view', 'viewed-by'] * 2,
