@@ -3,8 +3,8 @@
  * \file dgl/sample_utils.h
  * \brief Sampling utilities
  */
-#ifndef DGL_SAMPLE_UTILS_H_
-#define DGL_SAMPLE_UTILS_H_
+#ifndef DGL_RANDOM_CPU_SAMPLE_UTILS_H_
+#define DGL_RANDOM_CPU_SAMPLE_UTILS_H_
 
 #include <dgl/random.h>
 #include <dgl/array.h>
@@ -309,4 +309,4 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
 };  // namespace utils
 };  // namespace dgl
 
-#endif  // DGL_SAMPLE_UTILS_H_
+#endif  // DGL_RANDOM_CPU_SAMPLE_UTILS_H_
