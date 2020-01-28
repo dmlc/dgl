@@ -9,8 +9,7 @@ from mxnet.gluon import nn
 class DenseSAGEConv(nn.Block):
     """GraphSAGE layer where the graph structure is given by an
     adjacency matrix.
-    We recommend to use this module when inducing GraphSAGE operations
-    on dense graphs / k-hop graphs.
+    We recommend to use this module when applying GraphSAGE on dense graphs.
 
     Note that we only support gcn aggregator in DenseSAGEConv.
 

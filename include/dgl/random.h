@@ -17,8 +17,16 @@ namespace dgl {
 namespace {
 
 inline uint32_t GetThreadId() {
-  static std::hash<std::thread::id> kThreadIdHasher;
-  return kThreadIdHasher(std::this_thread::get_id());
+  static int num_threads = 0;
+  static std::mutex mutex;
+  static thread_local int id = -1;
+
+  if (id == -1) {
+    std::lock_guard<std::mutex> guard(mutex);
+    id = num_threads;
+    num_threads++;
+  }
+  return id;
 }
 
 };  // namespace

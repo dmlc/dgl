@@ -1,7 +1,7 @@
 .. _apimodelzoo:
 
-Model Zoo
-=========
+dgl.model_zoo
+==============
 
 .. currentmodule:: dgl.model_zoo
 
