@@ -1,9 +1,9 @@
 """Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity"""
 # pylint: disable=C0103, C0123
+import warnings
 import itertools
 import torch
 import torch.nn as nn
-import warnings
 
 from ...nn.pytorch import AtomicConv
 

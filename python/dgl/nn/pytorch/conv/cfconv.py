@@ -1,11 +1,12 @@
 """Torch modules for interaction blocks in SchNet"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch.nn as nn
 
 from .... import function as fn
 
 class ShiftedSoftplus(nn.Module):
-    """Applies the element-wise function:
+    r"""Applies the element-wise function:
 
     .. math::
         \text{SSP}(x) = \frac{1}{\beta} * \log(1 + \exp(\beta * x)) - \log(\text{shift})
@@ -23,12 +24,12 @@ class ShiftedSoftplus(nn.Module):
         self.shift = shift
         self.softplus = nn.Softplus(beta=beta, threshold=threshold)
 
-    def forward(self, input):
+    def forward(self, inputs):
         """Applies the activation function.
 
         Parameters
         ----------
-        input : float32 tensor of shape (N, *)
+        inputs : float32 tensor of shape (N, *)
             * denotes any number of additional dimensions.
 
         Returns
@@ -36,10 +37,10 @@ class ShiftedSoftplus(nn.Module):
         float32 tensor of shape (N, *)
             Result of applying the activation function to the input.
         """
-        return self.softplus(input) - np.log(float(self.shift))
+        return self.softplus(inputs) - np.log(float(self.shift))
 
 class CFConv(nn.Module):
-    """CFConv in SchNet.
+    r"""CFConv in SchNet.
 
     SchNet is introduced in `SchNet: A continuous-filter convolutional neural network for
     modeling quantum interactions <https://arxiv.org/abs/1706.08566>`__.

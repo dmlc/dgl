@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation of SchNet model."""
+import warnings
 import torch
 import torch.nn as nn
-import warnings
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
 from ...nn.pytorch import SumPooling

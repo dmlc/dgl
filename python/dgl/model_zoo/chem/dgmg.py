@@ -5,11 +5,11 @@ https://arxiv.org/pdf/1803.03324.pdf
 """
 from functools import partial
 
+import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-import warnings
 from torch.distributions import Categorical
 
 import dgl

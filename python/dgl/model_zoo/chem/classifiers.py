@@ -1,12 +1,11 @@
 # pylint: disable=C0111, C0103, C0200
-import dgl
+import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import warnings
-from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
+from ...batched_graph import BatchedDGLGraph, max_nodes
 from ...nn.pytorch import WeightAndSum
 
 class MLPBinaryClassifier(nn.Module):
@@ -99,7 +98,7 @@ class BaseGNNClassifier(nn.Module):
 
         with bg.local_scope():
             bg.ndata['h'] = feats
-            h_g_max = dgl.max_nodes(bg, 'h')
+            h_g_max = max_nodes(bg, 'h')
 
         if not isinstance(bg, BatchedDGLGraph):
             h_g_sum = h_g_sum.unsqueeze(0)

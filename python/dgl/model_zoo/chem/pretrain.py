@@ -1,7 +1,7 @@
 """Utilities for using pretrained models."""
 import os
-import torch
 import warnings
+import torch
 from rdkit import Chem
 
 from . import DGLJTNNVAE

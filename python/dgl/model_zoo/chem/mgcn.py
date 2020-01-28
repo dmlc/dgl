@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation  of MGCN model"""
+import warnings
 import torch
 import torch.nn as nn
-import warnings
 
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
