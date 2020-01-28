@@ -98,8 +98,8 @@ on the training and validation set for reference.
 | Model      | Training MAE | Validation MAE |  
 | ---------- | ------------ | -------------- |
 | SchNet [4] | 0.0651       | 0.0925         |
-| MGCN [5]   | 0.2395       | 0.6463         |
-| MPNN [6]   | 0.2452       | 0.6259         |
+| MGCN [5]   | 0.0582       | 0.0942         |
+| MPNN [6]   | 0.1004       | 0.1587         |
 
 #### PubChem BioAssay Aromaticity
 

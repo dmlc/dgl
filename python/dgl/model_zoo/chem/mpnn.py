@@ -4,6 +4,7 @@
 """Implementation of MPNN model."""
 import torch.nn as nn
 import torch.nn.functional as F
+import warnings
 
 from ...nn.pytorch import Set2Set, NNConv
 
@@ -41,6 +42,9 @@ class MPNNModel(nn.Module):
                  num_step_set2set=6,
                  num_layer_set2set=3):
         super(MPNNModel, self).__init__()
+
+        warnings.warn('`MPNNModel` has been deprecated from DGL and will be removed in v0.5.'
+                      'Import `MPNNPredictor` from `dglls.model` instead.')
 
         self.num_step_message_passing = num_step_message_passing
         self.lin0 = nn.Linear(node_input_dim, node_hidden_dim)

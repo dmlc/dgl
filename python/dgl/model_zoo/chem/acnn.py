@@ -3,6 +3,7 @@
 import itertools
 import torch
 import torch.nn as nn
+import warnings
 
 from ...nn.pytorch import AtomicConv
 
@@ -149,6 +150,9 @@ class ACNN(nn.Module):
     def __init__(self, hidden_sizes, weight_init_stddevs, dropouts,
                  features_to_use=None, radial=None, num_tasks=1):
         super(ACNN, self).__init__()
+
+        warnings.warn('`ACNN` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import it from `dglls.model` instead.')
 
         if radial is None:
             radial = [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]]

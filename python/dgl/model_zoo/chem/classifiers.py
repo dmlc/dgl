@@ -131,7 +131,7 @@ class GCNClassifier(BaseGNNClassifier):
     def __init__(self, in_feats, gcn_hidden_feats, n_tasks,
                  classifier_hidden_feats=128, dropout=0.):
         warnings.warn('`GCNClassifier` has been deprecated and will be removed from DGL in v0.5.'
-                      'Import `GCNPredictor` from `dglls.model.model_zoo` instead.')
+                      'Import `GCNPredictor` from `dglls.model` instead.')
 
         super(GCNClassifier, self).__init__(gnn_out_feats=gcn_hidden_feats[-1],
                                             n_tasks=n_tasks,
@@ -155,7 +155,7 @@ class GATClassifier(BaseGNNClassifier):
     def __init__(self, in_feats, gat_hidden_feats, num_heads,
                  n_tasks, classifier_hidden_feats=128, dropout=0):
         warnings.warn('`GATClassifier` has been deprecated and will be removed from DGL in v0.5.'
-                      'Import `GATPredictor` from `dglls.model.model_zoo` instead.')
+                      'Import `GATPredictor` from `dglls.model` instead.')
 
         super(GATClassifier, self).__init__(gnn_out_feats=gat_hidden_feats[-1],
                                             n_tasks=n_tasks,

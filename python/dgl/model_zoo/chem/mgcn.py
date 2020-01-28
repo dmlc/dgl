@@ -3,6 +3,7 @@
 """Implementation  of MGCN model"""
 import torch
 import torch.nn as nn
+import warnings
 
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
@@ -48,6 +49,9 @@ class MGCNModel(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super(MGCNModel, self).__init__()
+
+        warnings.warn('`MGCNModel` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import `MGCNPredictor` from `dglls.model` instead.')
 
         self._dim = dim
         self.output_dim = output_dim

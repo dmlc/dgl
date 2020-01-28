@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
+import warnings
 from torch.distributions import Categorical
 
 import dgl
@@ -649,6 +650,9 @@ class DGMG(nn.Module):
     """
     def __init__(self, atom_types, bond_types, node_hidden_size, num_prop_rounds, dropout):
         super(DGMG, self).__init__()
+
+        warnings.warn('`DGMG` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import it from `dglls.model` instead.')
 
         self.env = MoleculeEnv(atom_types, bond_types)
 

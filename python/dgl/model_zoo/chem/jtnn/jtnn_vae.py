@@ -1,5 +1,6 @@
 # pylint: disable=C0111, C0103, E1101, W0611, W0612, C0200
 import copy
+import warnings
 
 import torch
 import torch.nn as nn
@@ -29,6 +30,10 @@ class DGLJTNNVAE(nn.Module):
     """
     def __init__(self, hidden_size, latent_size, depth, vocab=None, vocab_file=None):
         super(DGLJTNNVAE, self).__init__()
+
+        warnings.warn('`DGLJTNNVAE` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import it from dglls.model instead.')
+
         if vocab is None:
             if vocab_file is None:
                 vocab_file = '{}/jtnn/{}.txt'.format(

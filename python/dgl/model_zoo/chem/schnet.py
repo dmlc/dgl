@@ -3,6 +3,7 @@
 """Implementation of SchNet model."""
 import torch
 import torch.nn as nn
+import warnings
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
 from ...nn.pytorch import SumPooling
@@ -44,6 +45,9 @@ class SchNet(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super(SchNet, self).__init__()
+
+        warnings.warn('`SchNet` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import `SchNetPredictor` from `dglls.model` instead.')
 
         self._dim = dim
         self.cutoff = cutoff

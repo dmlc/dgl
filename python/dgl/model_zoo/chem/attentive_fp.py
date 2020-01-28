@@ -5,6 +5,7 @@ import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import warnings
 
 from ... import function as fn
 from ...nn.pytorch.softmax import edge_softmax
@@ -305,6 +306,9 @@ class AttentiveFP(nn.Module):
                  output_size,
                  dropout):
         super(AttentiveFP, self).__init__()
+
+        warnings.warn('`AttentiveFP` has been deprecated from DGL and will be removed in v0.5. '
+                      'Import `AttentiveFPPredictor` from `dglls.model` instead.')
 
         self.init_context = GetContext(node_feat_size, edge_feat_size, graph_feat_size, dropout)
         self.gnn_layers = nn.ModuleList()

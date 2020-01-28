@@ -1,6 +1,7 @@
 """Utilities for using pretrained models."""
 import os
 import torch
+import warnings
 from rdkit import Chem
 
 from . import DGLJTNNVAE
@@ -88,6 +89,9 @@ def load_pretrained(model_name, log=True):
     -------
     model
     """
+    warnings.warn('`load_pretrained` has been deprecated from DGL and will be removed in v0.5. '
+                  'Import it from `dglls.model` instead.')
+
     if model_name not in URL:
         raise RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
