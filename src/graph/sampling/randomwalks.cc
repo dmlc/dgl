@@ -8,6 +8,7 @@
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
 #include <utility>
+#include <tuple>
 #include <vector>
 #include "../../c_api_common.h"
 #include "randomwalks.h"
@@ -119,6 +120,65 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalk")
     List<Value> ret;
     ret.push_back(Value(MakeValue(result.first)));
     ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestart")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    IdArray seeds = args[1];
+    TypeArray metapath = args[2];
+    List<Value> prob = args[3];
+    double restart_prob = args[4];
+
+    std::vector<FloatArray> prob_vec;
+    prob_vec.reserve(prob.size());
+    for (Value val : prob)
+      prob_vec.push_back(val->data);
+
+    auto result = sampling::RandomWalkWithRestart(
+        hg.sptr(), seeds, metapath, prob_vec, restart_prob);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestartA")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    IdArray seeds = args[1];
+    TypeArray metapath = args[2];
+    List<Value> prob = args[3];
+    FloatArray restart_prob = args[4];
+
+    std::vector<FloatArray> prob_vec;
+    prob_vec.reserve(prob.size());
+    for (Value val : prob)
+      prob_vec.push_back(val->data);
+
+    auto result = sampling::RandomWalkWithRestart(
+        hg.sptr(), seeds, metapath, prob_vec, restart_prob);
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(result.first)));
+    ret.push_back(Value(MakeValue(result.second)));
+    *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingPackTraces")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    IdArray vids = args[0];
+    TypeArray vtypes = args[1];
+
+    IdArray concat_vids, concat_vtypes, lengths, offsets;
+    std::tie(concat_vids, lengths, offsets) = Pack(vids, -1);
+    std::tie(concat_vtypes, std::ignore) = ConcatSlices(vtypes, lengths);
+
+    List<Value> ret;
+    ret.push_back(Value(MakeValue(concat_vids)));
+    ret.push_back(Value(MakeValue(concat_vtypes)));
+    ret.push_back(Value(MakeValue(lengths)));
+    ret.push_back(Value(MakeValue(offsets)));
     *rv = ret;
   });
 

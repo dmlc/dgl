@@ -4,8 +4,6 @@
  * \brief Array index select CPU implementation
  */
 #include <dgl/array.h>
-#include <numeric>
-#include "../arith.h"
 
 namespace dgl {
 using runtime::NDArray;

@@ -8,9 +8,10 @@ from .. import ndarray as nd
 from .. import utils
 
 __all__ = [
-    'random_walk']
+    'random_walk',
+    'pack_traces']
 
-def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
+def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob=None):
     """Generate random walk traces from an array of seed nodes (or starting nodes),
     based on the given metapath.
 
@@ -44,6 +45,9 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
         probabilities associated with each edge for choosing the next node.
         The feature tensor must be non-negative.
         If omitted, we assume the neighbors are picked uniformly.
+    restart_prob : float or Tensor, optional
+        Probability to stop after each step.
+        If a tensor is given, ``restart_prob`` should have the same length as ``metapath``.
 
     Returns
     -------
@@ -69,6 +73,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
     nodes = utils.toindex(nodes).todgltensor()
     metapath = utils.toindex(metapath).todgltensor().copyto(nodes.ctx)
 
+    # Load the probability tensor from the edge frames
     if prob is None:
         p_nd = [nd.array([], ctx=nodes.ctx) for _ in g.canonical_etypes]
     else:
@@ -84,9 +89,55 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None):
                 prob_nd = nd.array([], ctx=nodes.ctx)
             p_nd.append(prob_nd)
 
-    traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
+    # Actual random walk
+    if restart_prob is None:
+        traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
+    elif F.is_tensor(restart_prob):
+        restart_prob = F.zerocopy_to_dgl_ndarray(restart_prob)
+        traces, types = _CAPI_DGLSamplingRandomWalkWithRestartA(
+            gidx, nodes, metapath, p_nd, restart_prob)
+    else:
+        traces, types = _CAPI_DGLSamplingRandomWalkWithRestart(
+            gidx, nodes, metapath, p_nd, restart_prob)
+
     traces = F.zerocopy_from_dgl_ndarray(traces.data)
     types = F.zerocopy_from_dgl_ndarray(types.data)
     return traces, types
+
+def pack_traces(traces, types):
+    """Pack the padded traces returned by ``random_walk()`` into a concatenated array.
+    The padding values (-1) are removed, and the length and offset of each trace is
+    returned along with the concatenated node ID and node type arrays.
+
+    Parameters
+    ----------
+    traces : Tensor
+        A 2-dimensional node ID tensor.
+    types : Tensor
+        A 1-dimensional node type ID tensor.
+
+    Returns
+    -------
+    concat_vids : Tensor
+        An array of all node IDs concatenated and padding values removed.
+    concat_types : Tensor
+        An array of node types corresponding for each node in ``concat_vids``.
+        Has the same length as ``concat_vids``.
+    lengths : Tensor
+        Length of each trace in the original traces tensor.
+    offsets : Tensor
+        Offset of each trace in the originial traces tensor in the new concatenated tensor.
+    """
+    traces = F.zerocopy_to_dgl_ndarray(traces)
+    types = F.zerocopy_to_dgl_ndarray(types)
+
+    concat_vids, concat_types, lengths, offsets = _CAPI_DGLSamplingPackTraces(traces, types)
+
+    concat_vids = F.zerocopy_from_dgl_ndarray(concat_vids.data)
+    concat_types = F.zerocopy_from_dgl_ndarray(concat_types.data)
+    lengths = F.zerocopy_from_dgl_ndarray(lengths.data)
+    offsets = F.zerocopy_from_dgl_ndarray(offsets.data)
+
+    return concat_vids, concat_types, lengths, offsets
 
 _init_api('dgl.sampling.randomwalks', __name__)
