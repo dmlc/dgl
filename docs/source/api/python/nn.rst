@@ -1,6 +1,6 @@
 .. _apinn:
 
-NN Modules
+dgl.nn
 ==========
 
 .. automodule:: dgl.nn

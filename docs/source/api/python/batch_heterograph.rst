@@ -1,6 +1,6 @@
 .. _apibatch_heterograph:
 
-BatchedDGLHeteroGraph -- Enable batched graph operations for heterographs
+dgl.batched_heterograph
 =========================================================================
 
 .. currentmodule:: dgl

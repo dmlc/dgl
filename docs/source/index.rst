@@ -34,11 +34,48 @@ Relationship of DGL to other frameworks
 ---------------------------------------
 DGL is designed to be compatible and agnostic to the existing tensor
 frameworks. It provides a backend adapter interface that allows easy porting
-to other tensor-based, autograd-enabled frameworks. Currently, our prototype
-works with MXNet/Gluon and PyTorch.
+to other tensor-based, autograd-enabled frameworks.
 
-Get Started
------------
+Getting Started
+---------------
+
+Follow the :doc:`instructions<install/index>` to install DGL.  
+:doc:`DGL at a glance<tutorials/basics/1_first>` is the most common place to get started with.
+It offers a broad experience of using DGL for deep learning on graph data.
+You can learn other basic concepts of DGL through the dedicated tutorials.
+
+* Learn constructing graphs and set/get node and edge features :doc:`here<tutorials/basics/2_basics>`.
+* Learn performing computation on graph using message passing :doc:`here<tutorials/basics/3_pagerank>`.
+* Learn processing multiple graph samples in a batch :doc:`here<tutorials/basics/4_batch>`.
+* Learn working with heterogeneous graph data :doc:`here<tutorials/basics/5_hetero>`.
+
+End-to-end model tutorials are other good starting points for learning DGL and popular
+models on graphs. The model tutorials are categorized based on the way they utilize DGL APIs.
+
+* :ref:`Graph Neural Network and its variant <tutorials1-index>`: Learn how to use DGL to train
+  popular **GNN models** on one input graph.
+* :ref:`Dealing with many small graphs <tutorials2-index>`: Learn how to train models for
+  many graph samples such as sentence parse trees.
+* :ref:`Generative models <tutorials3-index>`: Learn how to deal with **dynamically-changing graphs**.
+* :ref:`Old (new) wines in new bottle <tutorials4-index>`: Learn how to combine DGL with tensor-based
+  DGL framework in a flexible way. Explore new perspective on traditional models by graphs.
+* :ref:`Training on giant graphs <tutorials5-index>`: Learn how to train graph neural networks
+  on giant graphs.
+
+Each tutorial is accompanied with a runnable python script and jupyter notebook that
+can be downloaded. If you would like the tutorials improved, please raise a github issue.
+
+API reference document lists more endetailed specifications of each API and GNN modules,
+a useful manual for in-depth developers.
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Installation
+   :hidden:
+   :glob:
+
+   install/index
+   install/backend
 
 .. toctree::
    :maxdepth: 1
@@ -46,156 +83,11 @@ Get Started
    :hidden:
    :glob:
 
-   install/index
-   install/backend
-
-Follow the :doc:`instructions<install/index>` to install DGL. The :doc:`DGL at a glance<tutorials/basics/1_first>`
-is the most common place to get started with. Each tutorial is accompanied with a runnable
-python script and jupyter notebook that can be downloaded.
-
-.. ================================================================================================
-   (start) MANUALLY INCLUDE THE GENERATED TUTORIALS/BASIC/INDEX.RST HERE TO EMBED THE EXAMPLES
-   ================================================================================================
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer">
-
-.. only:: html
-
-    .. figure:: /tutorials/basics/images/thumb/sphx_glr_1_first_thumb.png
-
-        :ref:`sphx_glr_tutorials_basics_1_first.py`
-
-.. raw:: html
-
-    </div>
-
-
-.. toctree::
-   :hidden:
-
-   /tutorials/basics/1_first
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer">
-
-.. only:: html
-
-    .. figure:: /tutorials/basics/images/thumb/sphx_glr_2_basics_thumb.png
-
-        :ref:`sphx_glr_tutorials_basics_2_basics.py`
-
-.. raw:: html
-
-    </div>
-
-
-.. toctree::
-   :hidden:
-
-   /tutorials/basics/2_basics
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer">
-
-.. only:: html
-
-    .. figure:: /tutorials/basics/images/thumb/sphx_glr_3_pagerank_thumb.png
-
-        :ref:`sphx_glr_tutorials_basics_3_pagerank.py`
-
-.. raw:: html
-
-    </div>
-
-.. toctree::
-   :hidden:
-
-   /tutorials/basics/3_pagerank
-
-.. raw:: html
-
-    </div>
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer">
-
-.. only:: html
-
-    .. figure:: /tutorials/basics/images/thumb/sphx_glr_4_batch_thumb.png
-
-        :ref:`sphx_glr_tutorials_basics_4_batch.py`
-
-.. raw:: html
-
-    </div>
-
-.. toctree::
-   :hidden:
-
-   /tutorials/basics/4_batch
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer">
-
-.. only:: html
-
-    .. figure:: /tutorials/hetero/images/thumb/sphx_glr_1_basics_thumb.png
-
-        :ref:`sphx_glr_tutorials_hetero_1_basics.py`
-
-.. raw:: html
-
-    </div>
-
-.. toctree::
-   :hidden:
-
-   /tutorials/hetero/1_basics
-
-.. raw:: html
-
-    <div style='clear:both'></div>
-
-
-.. ================================================================================================
-   (end) MANUALLY INCLUDE THE GENERATED TUTORIALS/BASIC/INDEX.RST HERE TO EMBED THE EXAMPLES
-   ================================================================================================
-
-Learning DGL through examples
------------------------------
-
-The model tutorials are categorized based on the way they utilize DGL APIs.
-
-* :ref:`Graph Neural Network and its variant <tutorials1-index>`: Learn how to use DGL to train
-  popular **GNN models** on one input graph.
-* :ref:`Dealing with many small graphs <tutorials2-index>`: Learn how to **batch** many
-  graph samples for max efficiency.
-* :ref:`Generative models <tutorials3-index>`: Learn how to deal with **dynamically-changing graphs**.
-* :ref:`Old (new) wines in new bottle <tutorials4-index>`: Learn how to combine DGL with tensor-based
-  DGL framework in a flexible way. Explore new perspective on traditional models by graphs.
-* :ref:`Training on giant graphs <tutorials5-index>`: Learn how to train graph neural networks
-  on giant graphs.
-
-Or go through all of them :doc:`here <tutorials/models/index>`.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Features
-   :hidden:
-   :glob:
-
-   features/builtin
-   features/nn
+   tutorials/basics/index
 
 .. toctree::
    :maxdepth: 3
-   :caption: Model Tutorials
+   :caption: Tutorials
    :hidden:
    :glob:
 
@@ -204,9 +96,25 @@ Or go through all of them :doc:`here <tutorials/models/index>`.
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
+   :hidden:
    :glob:
 
-   api/python/index
+   api/python/graph
+   api/python/heterograph
+   api/python/batch
+   api/python/batch_heterograph
+   api/python/nn
+   api/python/function
+   api/python/udf
+   api/python/subgraph
+   api/python/traversal
+   api/python/propagate
+   api/python/transform
+   api/python/sampler
+   api/python/data
+   api/python/nodeflow
+   api/python/random
+   api/python/model_zoo
 
 .. toctree::
    :maxdepth: 1
