@@ -60,6 +60,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 /*!
  * \brief Create a new NDArray using the given vector data
+ * \tparam T Type of vector.  The dtype of the returned array is selected accordingly.
  * \param vec The vector data
  * \param ctx The array context
  * \return the NDArray
@@ -115,22 +116,13 @@ BoolArray LT(IdArray lhs, dgl_id_t rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! \brief Return the data under the index. In numpy notation, A[I] */
+/*!
+ * \brief Return the data under the index. In numpy notation, A[I]
+ * \tparam ValueType The type of return value.
+ */
 template<typename ValueType>
 ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
-
-/*! \brief Check if an array is empty (i.e. have 0 elements) */
-inline bool IsEmpty(NDArray array) {
-  if (array->ndim == 0)
-    return false;     // scalar
-
-  for (int i = 0; i < array->ndim; ++i)
-    if (array->shape[i] == 0)
-      return true;
-
-  return false;
-}
 
 /*!
  * \brief Relabel the given ids to consecutive ids.
@@ -335,6 +327,14 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
 
 ///////////////////////// Dispatchers //////////////////////////
 
+/*
+ * Dispatch according to device:
+ *
+ * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+ *   // Now XPU is a placeholder for array->ctx.device_type
+ *   DeviceSpecificImplementation<XPU>(...);
+ * });
+ */
 #define ATEN_XPU_SWITCH(val, XPU, ...) do {                     \
   if ((val) == kDLCPU) {                                        \
     constexpr auto XPU = kDLCPU;                                \
@@ -344,6 +344,15 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
   }                                                             \
 } while (0)
 
+/*
+ * Dispatch according to integral type (either int32 or int64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+ *   // Now IdType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
 #define ATEN_ID_TYPE_SWITCH(val, IdType, ...) do {            \
   CHECK_EQ((val).code, kDLInt) << "ID must be integer type";  \
   if ((val).bits == 32) {                                     \
@@ -357,6 +366,15 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
   }                                                           \
 } while (0)
 
+/*
+ * Dispatch according to float type (either float32 or float64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, FloatType, {
+ *   // Now FloatType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   FloatType *data = static_cast<FloatType *>(array->data);
+ * });
+ */
 #define ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, ...) do {  \
   CHECK_EQ((val).code, kDLFloat)                              \
     << (val_name) << " must be float type";                   \
@@ -371,6 +389,15 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
   }                                                           \
 } while (0)
 
+/*
+ * Dispatch according to data type (int32, int64, float32 or float64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+ *   // Now DType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
 #define ATEN_DTYPE_SWITCH(val, DType, val_name, ...) do {     \
   if ((val).code == kDLInt && (val).bits == 32) {             \
     typedef int32_t DType;                                    \
@@ -389,6 +416,10 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
   }                                                           \
 } while (0)
 
+/*
+ * Dispatch according to integral type of CSR graphs.
+ * Identical to ATEN_ID_TYPE_SWITCH except for a different error message.
+ */
 #define ATEN_CSR_DTYPE_SWITCH(val, DType, ...) do {         \
   if ((val).code == kDLInt && (val).bits == 32) {           \
     typedef int32_t DType;                                  \
@@ -450,24 +481,24 @@ NDArray VecToNDArray(const std::vector<T> &vec, DLDataType dtype, DLContext ctx)
 #define IS_FLOAT64(a)  \
   ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 64)
 
-#define EXPECT(cond, prop, value_name, dtype_name) \
+#define CHECK_IF(cond, prop, value_name, dtype_name) \
   CHECK(cond) << "Expecting " << (prop) << " of " << (value_name) << " to be " << (dtype_name)
 
-#define EXPECT_INT32(value, value_name) \
-  EXPECT(IS_INT32(value), "dtype", value_name, "int32")
-#define EXPECT_INT64(value, value_name) \
-  EXPECT(IS_INT64(value), "dtype", value_name, "int64")
-#define EXPECT_INT(value, value_name) \
-  EXPECT(IS_INT32(value) || IS_INT64(value), "dtype", value_name, "int32 or int64")
-#define EXPECT_FLOAT32(value, value_name) \
-  EXPECT(IS_FLOAT32(value), "dtype", value_name, "float32")
-#define EXPECT_FLOAT64(value, value_name) \
-  EXPECT(IS_FLOAT64(value), "dtype", value_name, "float64")
-#define EXPECT_FLOAT(value, value_name) \
-  EXPECT(IS_FLOAT32(value) || IS_FLOAT64(value), "dtype", value_name, "float32 or float64")
+#define CHECK_INT32(value, value_name) \
+  CHECK_IF(IS_INT32(value), "dtype", value_name, "int32")
+#define CHECK_INT64(value, value_name) \
+  CHECK_IF(IS_INT64(value), "dtype", value_name, "int64")
+#define CHECK_INT(value, value_name) \
+  CHECK_IF(IS_INT32(value) || IS_INT64(value), "dtype", value_name, "int32 or int64")
+#define CHECK_FLOAT32(value, value_name) \
+  CHECK_IF(IS_FLOAT32(value), "dtype", value_name, "float32")
+#define CHECK_FLOAT64(value, value_name) \
+  CHECK_IF(IS_FLOAT64(value), "dtype", value_name, "float64")
+#define CHECK_FLOAT(value, value_name) \
+  CHECK_IF(IS_FLOAT32(value) || IS_FLOAT64(value), "dtype", value_name, "float32 or float64")
 
-#define EXPECT_NDIM(value, _ndim, value_name) \
-  EXPECT((value)->ndim == (_ndim), "ndim", value_name, _ndim)
+#define CHECK_NDIM(value, _ndim, value_name) \
+  CHECK_IF((value)->ndim == (_ndim), "ndim", value_name, _ndim)
 
 }  // namespace aten
 }  // namespace dgl

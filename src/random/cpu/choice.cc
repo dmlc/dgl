@@ -4,7 +4,6 @@
  * \brief Non-uniform discrete sampling implementation
  */
 
-#include <dgl/sample_utils.h>
 #include <dgl/random.h>
 #include <algorithm>
 #include <utility>
@@ -14,6 +13,7 @@
 #include <numeric>
 #include <limits>
 #include <vector>
+#include "sample_utils.h"
 
 namespace dgl {
 

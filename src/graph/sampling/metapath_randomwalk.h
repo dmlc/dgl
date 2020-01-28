@@ -81,9 +81,9 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
 
     ATEN_FLOAT_TYPE_SWITCH(prob_etype->dtype, DType, "probability", {
       const DType *prob_etype_data = static_cast<DType *>(prob_etype->data);
-      std::vector<DType> prob_selected;
+      std::vector<DType> prob_selected(size);
       for (int64_t j = 0; j < size; ++j)
-        prob_selected.push_back(prob_etype_data[eids[j]]);
+        prob_selected[j] = prob_etype_data[eids[j]];
 
       curr = succ[RandomEngine::ThreadLocal()->Choice<int64_t>(prob_selected)];
     });

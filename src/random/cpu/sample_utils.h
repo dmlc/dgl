@@ -6,6 +6,7 @@
 #ifndef DGL_SAMPLE_UTILS_H_
 #define DGL_SAMPLE_UTILS_H_
 
+#include <dgl/random.h>
 #include <algorithm>
 #include <utility>
 #include <queue>
@@ -14,7 +15,6 @@
 #include <numeric>
 #include <limits>
 #include <vector>
-#include "random.h"
 
 namespace dgl {
 namespace utils {

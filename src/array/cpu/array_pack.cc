@@ -48,7 +48,7 @@ template std::pair<NDArray, IdArray> ConcatSlices<kDLCPU, double, int64_t>(NDArr
 
 template<DLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
-  EXPECT_NDIM(array, 2, "array");
+  CHECK_NDIM(array, 2, "array");
   const DType *array_data = static_cast<DType *>(array->data);
   int64_t rows = array->shape[0];
   int64_t cols = array->shape[1];

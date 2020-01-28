@@ -27,15 +27,15 @@ void CheckRandomWalkInputs(
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob) {
-  EXPECT_INT(seeds, "seeds");
-  EXPECT_INT(metapath, "metapath");
-  EXPECT_NDIM(seeds, 1, "seeds");
-  EXPECT_NDIM(metapath, 1, "metapath");
+  CHECK_INT(seeds, "seeds");
+  CHECK_INT(metapath, "metapath");
+  CHECK_NDIM(seeds, 1, "seeds");
+  CHECK_NDIM(metapath, 1, "metapath");
   for (uint64_t i = 0; i < prob.size(); ++i) {
     FloatArray p = prob[i];
-    EXPECT_FLOAT(p, "probability");
-    if (!IsEmpty(p))
-      EXPECT_NDIM(p, 1, "probability");
+    CHECK_FLOAT(p, "probability");
+    if (p.GetSize() == 0)
+      CHECK_NDIM(p, 1, "probability");
   }
 }
 

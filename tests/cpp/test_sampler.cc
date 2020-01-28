@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include <dgl/sample_utils.h>
 #include <vector>
 #include <algorithm>
 #include <iostream>
 #include "./common.h"
+#include "../../src/random/cpu/sample_utils.h"
 
 using namespace dgl;
 
