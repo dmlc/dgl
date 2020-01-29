@@ -256,20 +256,90 @@ void CSRSort(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
 
-/*! \return True if the matrix has duplicate entries */
-bool COOHasDuplicate(COOMatrix coo);
+/*! \brief Return true if the value (row, col) is non-zero */
+bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of COOIsNonZero.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
+
+/*! \brief Return the nnz of the given row */
+int64_t COOGetRowNNZ(COOMatrix , int64_t row);
+runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row);
+
+/*! \brief Return the column index array of the given row */
+runtime::NDArray COOGetRowColumnIndices(COOMatrix , int64_t row);
+
+/*! \brief Return the data array of the given row */
+runtime::NDArray COOGetRowData(COOMatrix , int64_t row);
+
+/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of COOGetData.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+
+runtime::NDArray COOGetData(COOMatrix, runtime::NDArray rows, runtime::NDArray cols);
+
+/*!
+ * \brief Get the data and the row,col indices for each returned entries.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+std::vector<runtime::NDArray> COOGetDataAndIndices(
+    COOMatrix , runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \brief Return a transposed COO matrix */
+COOMatrix COOTranspose(COOMatrix coo);
 
 /*!
  * \brief Convert COO matrix to CSR matrix.
- *
- * If the input COO matrix does not have data array, the data array of
- * the result CSR matrix stores a shuffle index for how the entries
- * will be reordered in CSR. The i^th entry in the result CSR corresponds
- * to the CSR.data[i] th entry in the input COO.
+ * \param coo Input coo matrix
+ * \param sorted Whether to sort column indices per row.
+ * \return a coo matrix
  */
-CSRMatrix COOToCSR(COOMatrix coo);
+COOMatrix COOToCSR(COOMatrix coo, bool sorted);
 
-// inline implementations
+/*!
+ * \brief Slice rows of the given matrix and return.
+ * \param coo COO matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ *
+ * Examples:
+ * num_rows = 4
+ * num_cols = 4
+ * rows = [0, 0, 1, 3, 3]
+ * cols = [1, 0, 2, 3, 1]
+ *
+ *  After COOSliceRows(coo, 1, 3)
+ *
+ * num_rows = 2
+ * num_cols = 4
+ * rows = [0]
+ * cols = [2]
+ */
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
+
+/*!
+ * \brief Get the submatrix specified by the row and col ids.
+ *
+ * In numpy notation, given matrix M, row index array I, col index array J
+ * This function returns the submatrix M[I, J].
+ *
+ * \param coo The input coo matrix
+ * \param rows The row index to select
+ * \param cols The col index to select
+ * \return submatrix
+ */
+COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \return True if the matrix has duplicate entries */
+bool COOHasDuplicate(COOMatrix coo);
+
+///////////////// inline implementations ///////////////////////
 template <typename T>
 IdArray VecToIdArray(const std::vector<T>& vec,
                      uint8_t nbits,
