@@ -89,6 +89,7 @@ def test_random_walk():
     check_random_walk(g4, metapath, traces[:, :7], ntypes[:7], 'p')
     assert (F.asnumpy(traces[:, 7]) == -1).all()
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU pack traces not implemented")
 def test_pack_traces():
     traces, types = (np.array(
         [[ 0,  1, -1, -1, -1, -1, -1],
