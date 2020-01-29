@@ -240,6 +240,14 @@ NDArray NDArray::FromVector(const std::vector<T>& vec, DLDataType dtype, DLConte
   return ret;
 }
 
+// export specializations
+template NDArray NDArray::FromVector(const std::vector<int32_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<int64_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<uint32_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<uint64_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<float>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<double>&, DLDataType, DLContext);
+
 // specializations of FromVector
 #define GEN_FROMVECTOR_FOR(T, DTypeCode, DTypeBits) \
   template<> \
