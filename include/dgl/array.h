@@ -296,10 +296,9 @@ COOMatrix COOTranspose(COOMatrix coo);
 /*!
  * \brief Convert COO matrix to CSR matrix.
  * \param coo Input coo matrix
- * \param sorted Whether to sort column indices per row.
  * \return a coo matrix
  */
-COOMatrix COOToCSR(COOMatrix coo, bool sorted);
+CSRMatrix COOToCSR(COOMatrix coo);
 
 /*!
  * \brief Slice rows of the given matrix and return.
