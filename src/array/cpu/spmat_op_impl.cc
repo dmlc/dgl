@@ -603,8 +603,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   DType* ptr = static_cast<DType*>(sub_data_arr->data);
   std::copy(sub_data.begin(), sub_data.end(), ptr);
   return CSRMatrix{new_nrows, new_ncols,
-    VecToIdArray(sub_indptr, csr.indptr->dtype.bits, csr.indptr->ctx),
-    VecToIdArray(sub_indices, csr.indptr->dtype.bits, csr.indptr->ctx),
+    NDArray::FromVector(sub_indptr, csr.indptr->dtype, csr.indptr->ctx),
+    NDArray::FromVector(sub_indices, csr.indptr->dtype, csr.indptr->ctx),
     sub_data_arr};
 }
 
