@@ -1227,13 +1227,7 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(const Subgraph &pos_subg,
   neg_subg.graph = GraphPtr(new ImmutableGraph(neg_coo));
   neg_subg.induced_vertices = induced_neg_vid;
   neg_subg.induced_edges = induced_neg_eid;
-  // If we didn't sample all nodes to form negative edges, some of the nodes
-  // in the vector might be redundant.
-  if (neg_sample_size < num_tot_nodes) {
-    std::sort(neg_vids.begin(), neg_vids.end());
-    auto it = std::unique(neg_vids.begin(), neg_vids.end());
-    neg_vids.resize(it - neg_vids.begin());
-  }
+
   if (IsNegativeHeadMode(neg_mode)) {
     neg_subg.head_nid = aten::VecToIdArray(Global2Local(neg_vids, neg_map));
     neg_subg.tail_nid = aten::VecToIdArray(local_pos_vids);

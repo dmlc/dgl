@@ -10,7 +10,15 @@ import time
 
 # This partitions a list of edges based on relations to make sure
 # each partition has roughly the same number of edges and relations.
-def RelationPartition(edges, n):
+# Algo:
+#     For r in relations:
+#       Find partition with maximum empty slot
+#       if r.size() > num_of empty_slot
+#         put edges of r into this partition to fill the partition,
+#         find next partition with maximum empty slot to put r in.
+#       else
+#         put edges of r into this partition.
+def BalancedRelationPartition(edges, n):
     heads, rels, tails = edges
     print('relation partition {} edges into {} parts'.format(len(heads), n))
     uniq, cnts = np.unique(rels, return_counts=True)
@@ -24,33 +32,74 @@ def RelationPartition(edges, n):
     rel_parts = []
     for _ in range(n):
         rel_parts.append([])
+
+    max_edges = (len(rels) // n) + 1
+    num_cross_part = 0
     for i in range(len(cnts)):
         cnt = cnts[i]
         r = uniq[i]
-        idx = np.argmin(edge_cnts)
-        rel_dict[r] = idx
-        rel_parts[idx].append(r)
-        edge_cnts[idx] += cnt
-        rel_cnts[idx] += 1
+        r_parts = []
+
+        while cnt > 0:
+            idx = np.argmin(edge_cnts)
+            if edge_cnts[idx] + cnt <= max_edges:
+                r_parts.append([idx, cnt])
+                rel_parts[idx].append(r)
+                edge_cnts[idx] += cnt
+                rel_cnts[idx] += 1
+                cnt = 0
+            else:
+                cur_cnt = max_edges - edge_cnts[idx]
+                r_parts.append([idx, cur_cnt])
+                rel_parts[idx].append(r)
+                edge_cnts[idx] += cur_cnt
+                rel_cnts[idx] += 1
+                num_cross_part += 1
+                cnt -= cur_cnt
+        rel_dict[r] = r_parts
+
     for i, edge_cnt in enumerate(edge_cnts):
         print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
+    print('{}/{} duplicated relation across partitions'.format(num_cross_part, len(cnts)))
 
     parts = []
     for i in range(n):
         parts.append([])
         rel_parts[i] = np.array(rel_parts[i])
-    # let's store the edge index to each partition first.
+
     for i, r in enumerate(rels):
-        part_idx = rel_dict[r]
+        r_part = rel_dict[r][0]
+        part_idx = r_part[0]
+        cnt = r_part[1]
         parts[part_idx].append(i)
+        cnt -= 1
+        if cnt == 0:
+            rel_dict[r].pop(0)
+        else:
+            rel_dict[r][0][1] = cnt
+
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
-    return parts, rel_parts
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+
+    return parts, rel_parts, num_cross_part > 0
 
 def RandomPartition(edges, n):
     heads, rels, tails = edges
     print('random partition {} edges into {} parts'.format(len(heads), n))
     idx = np.random.permutation(len(heads))
+    heads[:] = heads[idx]
+    rels[:] = rels[idx]
+    tails[:] = tails[idx]
+
     part_size = int(math.ceil(len(idx) / n))
     parts = []
     for i in range(n):
@@ -79,15 +128,18 @@ def ConstructGraph(edges, n_entities, args):
 class TrainDataset(object):
     def __init__(self, dataset, args, weighting=False, ranks=64):
         triples = dataset.train
-        self.g = ConstructGraph(triples, dataset.n_entities, args)
         num_train = len(triples[0])
         print('|Train|:', num_train)
+
         if ranks > 1 and args.rel_part:
-            self.edge_parts, self.rel_parts = RelationPartition(triples, ranks)
+            self.edge_parts, self.rel_parts, self.cross_part = \
+                BalancedRelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
             self.edge_parts = [np.arange(num_train)]
+
+        self.g = ConstructGraph(triples, dataset.n_entities, args)
         if weighting:
             # TODO: weight to be added
             count = self.count_freq(triples)
@@ -114,10 +166,11 @@ class TrainDataset(object):
     def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=5,
                        shuffle=True, exclude_positive=False, rank=0):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
+        assert batch_size % neg_sample_size == 0, 'batch_size should be divisible by B'
         return EdgeSampler(self.g,
                            seed_edges=F.tensor(self.edge_parts[rank]),
                            batch_size=batch_size,
-                           neg_sample_size=neg_sample_size,
+                           neg_sample_size=int(neg_sample_size/neg_chunk_size),
                            chunk_size=neg_chunk_size,
                            negative_mode=mode,
                            num_workers=num_workers,
@@ -149,9 +202,9 @@ class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
 # of a negative subgraph to perform the computation more efficiently.
 # This function tries to infer all of these information of the negative subgraph
 # and create a wrapper class that contains all of the information.
-def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_nodes):
+def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked,
+                        neg_head, num_nodes):
     assert neg_g.number_of_edges() % pos_g.number_of_edges() == 0
-    neg_sample_size = int(neg_g.number_of_edges() / pos_g.number_of_edges())
     # We use all nodes to create negative edges. Regardless of the sampling algorithm,
     # we can always view the subgraph with one chunk.
     if (neg_head and len(neg_g.head_nid) == num_nodes) \
@@ -166,9 +219,8 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, is_chunked, neg_head, num_node
             # This is probably the last batch. Let's ignore it.
             if pos_g.number_of_edges() % chunk_size > 0:
                 return None
-            num_chunks = int(pos_g.number_of_edges()/ chunk_size)
+            num_chunks = int(pos_g.number_of_edges() / chunk_size)
         assert num_chunks * chunk_size == pos_g.number_of_edges()
-        assert num_chunks * neg_sample_size * chunk_size == neg_g.number_of_edges()
     else:
         num_chunks = pos_g.number_of_edges()
         chunk_size = 1
@@ -196,6 +248,7 @@ class EvalSampler(object):
         self.g = g
         self.filter_false_neg = filter_false_neg
         self.neg_chunk_size = neg_chunk_size
+        self.neg_sample_size = neg_sample_size
 
     def __iter__(self):
         return self
@@ -205,8 +258,12 @@ class EvalSampler(object):
             pos_g, neg_g = next(self.sampler_iter)
             if self.filter_false_neg:
                 neg_positive = neg_g.edata['false_neg']
-            neg_g = create_neg_subgraph(pos_g, neg_g, self.neg_chunk_size, 'chunk' in self.mode,
-                                        self.neg_head, self.g.number_of_nodes())
+            neg_g = create_neg_subgraph(pos_g, neg_g, 
+                                        self.neg_chunk_size, 
+                                        self.neg_sample_size, 
+                                        'chunk' in self.mode, 
+                                        self.neg_head, 
+                                        self.g.number_of_nodes())
             if neg_g is not None:
                 break
 
@@ -259,9 +316,6 @@ class EvalDataset(object):
             self.test = np.arange(self.num_train + self.num_valid, self.g.number_of_edges())
         print('|test|:', len(self.test))
 
-        self.num_valid = len(self.valid)
-        self.num_test = len(self.test)
-
     def get_edges(self, eval_type):
         if eval_type == 'valid':
             return self.valid
@@ -270,29 +324,8 @@ class EvalDataset(object):
         else:
             raise Exception('get invalid type: ' + eval_type)
 
-    def check(self, eval_type):
-        edges = self.get_edges(eval_type)
-        subg = self.g.edge_subgraph(edges)
-        if eval_type == 'valid':
-            data = self.valid
-        elif eval_type == 'test':
-            data = self.test
-
-        subg.copy_from_parent()
-        src, dst, eid = subg.all_edges('all', order='eid')
-        src_id = subg.ndata['id'][src]
-        dst_id = subg.ndata['id'][dst]
-        etype = subg.edata['id'][eid]
-
-        orig_src = np.array([t[0] for t in data])
-        orig_etype = np.array([t[1] for t in data])
-        orig_dst = np.array([t[2] for t in data])
-        np.testing.assert_equal(F.asnumpy(src_id), orig_src)
-        np.testing.assert_equal(F.asnumpy(dst_id), orig_dst)
-        np.testing.assert_equal(F.asnumpy(etype), orig_etype)
-
     def create_sampler(self, eval_type, batch_size, neg_sample_size, neg_chunk_size,
-                       filter_false_neg, mode='head', num_workers=5, rank=0, ranks=1):
+                       filter_false_neg, mode='head', num_workers=1, rank=0, ranks=1):
         edges = self.get_edges(eval_type)
         beg = edges.shape[0] * rank // ranks
         end = min(edges.shape[0] * (rank + 1) // ranks, edges.shape[0])
@@ -301,12 +334,15 @@ class EvalDataset(object):
                            mode, num_workers, filter_false_neg)
 
 class NewBidirectionalOneShotIterator:
-    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, is_chunked, num_nodes):
+    def __init__(self, dataloader_head, dataloader_tail, neg_chunk_size, neg_sample_size,
+                 is_chunked, num_nodes):
         self.sampler_head = dataloader_head
         self.sampler_tail = dataloader_tail
-        self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size, is_chunked,
+        self.iterator_head = self.one_shot_iterator(dataloader_head, neg_chunk_size,
+                                                    neg_sample_size, is_chunked,
                                                     True, num_nodes)
-        self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size, is_chunked,
+        self.iterator_tail = self.one_shot_iterator(dataloader_tail, neg_chunk_size,
+                                                    neg_sample_size, is_chunked,
                                                     False, num_nodes)
         self.step = 0
 
@@ -319,11 +355,12 @@ class NewBidirectionalOneShotIterator:
         return pos_g, neg_g
 
     @staticmethod
-    def one_shot_iterator(dataloader, neg_chunk_size, is_chunked, neg_head, num_nodes):
+    def one_shot_iterator(dataloader, neg_chunk_size, neg_sample_size, is_chunked,
+                          neg_head, num_nodes):
         while True:
             for pos_g, neg_g in dataloader:
-                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, is_chunked,
-                                            neg_head, num_nodes)
+                neg_g = create_neg_subgraph(pos_g, neg_g, neg_chunk_size, neg_sample_size,
+                                            is_chunked, neg_head, num_nodes)
                 if neg_g is None:
                     continue
 

@@ -47,7 +47,13 @@ class KEModel(object):
             rel_dim = relation_dim
 
         self.rel_dim = rel_dim
-        self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu() if args.mix_cpu_gpu else device)
+        self.entity_dim = entity_dim
+        self.strict_rel_part = args.strict_rel_part
+        if not self.strict_rel_part:
+            self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim,
+                                                  F.cpu() if args.mix_cpu_gpu else device)
+        else:
+            self.global_relation_emb = ExternalEmbedding(args, n_relations, rel_dim, F.cpu())
 
         if model_name == 'TransE' or model_name == 'TransE_l2':
             self.score_func = TransEScore(gamma, 'l2')
@@ -56,6 +62,9 @@ class KEModel(object):
         elif model_name == 'TransR':
             projection_emb = ExternalEmbedding(args, n_relations, entity_dim * relation_dim,
                                                F.cpu() if args.mix_cpu_gpu else device)
+            if self.strict_rel_part:
+                self.global_projection_emb = ExternalEmbedding(args, n_relations,
+                                                               entity_dim * relation_dim, F.cpu())
             self.score_func = TransRScore(gamma, projection_emb, relation_dim, entity_dim)
         elif model_name == 'DistMult':
             self.score_func = DistMultScore()
@@ -66,6 +75,7 @@ class KEModel(object):
         elif model_name == 'RotatE':
             self.score_func = RotatEScore(gamma, self.emb_init)
         
+        self.model_name = model_name
         self.head_neg_score = self.score_func.create_neg(True)
         self.tail_neg_score = self.score_func.create_neg(False)
         self.head_neg_prepare = self.score_func.create_neg_prepare(True)
@@ -76,11 +86,22 @@ class KEModel(object):
     def share_memory(self):
         # TODO(zhengda) we should make it work for parameters in score func
         self.entity_emb.share_memory()
-        self.relation_emb.share_memory()
+        if self.strict_rel_part:
+            self.global_relation_emb.share_memory()
+        else:
+            self.relation_emb.share_memory()
+
+        if self.model_name == 'TransR':
+            if self.strict_rel_part:
+                self.global_projection_emb.share_memory()
+            self.score_func.share_memory(self.strict_rel_part)
 
     def save_emb(self, path, dataset):
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
-        self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        if self.strict_rel_part:
+            self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
+        else:
+            self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')   
         self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):
@@ -91,7 +112,8 @@ class KEModel(object):
     def reset_parameters(self):
         self.entity_emb.init(self.emb_init)
         self.score_func.reset_parameters()
-        self.relation_emb.init(self.emb_init)
+        if not self.strict_rel_part:
+            self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
         self.score_func(g)
@@ -183,7 +205,7 @@ class KEModel(object):
         # To compute the rank of a positive edge among all negative edges,
         # we need to know how many negative edges have higher scores than
         # the positive edge.
-        rankings = F.sum(neg_scores > pos_scores, dim=1) + 1
+        rankings = F.sum(neg_scores >= pos_scores, dim=1) + 1
         rankings = F.asnumpy(rankings)
         for i in range(batch_size):
             ranking = rankings[i]
@@ -252,3 +274,33 @@ class KEModel(object):
         self.relation_emb.update(gpu_id)
         self.score_func.update(gpu_id)
 
+    def prepare_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
+        self.relation_emb.init(self.emb_init)
+        if self.model_name == 'TransR':
+            projection_emb = ExternalEmbedding(self.args, self.n_relations,
+                                               self.entity_dim * self.rel_dim, device)
+            self.score_func.set_emb(projection_emb)
+            self.score_func.reset_parameters()
+
+    def writeback_relation(self, rank=0, rel_parts=None):
+        idx = rel_parts[rank]
+        self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
+        if self.model_name == 'TransR':
+            projection_emb = self.score_func.get_emb()
+            self.global_projection_emb.emb[idx] = F.copy_to(projection_emb.emb, F.cpu())[idx]
+
+    def load_relation(self, device=None):
+        self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
+        self.relation_emb.emb = F.copy_to(self.global_relation_emb.emb, device)
+        if self.model_name == 'TransR':
+            projection_emb = ExternalEmbedding(self.args, self.n_relations,
+                                               self.entity_dim * self.rel_dim, device)
+            projection_emb.emb = F.copy_to(self.global_projection_emb.emb, device)
+            self.score_func.set_emb(projection_emb)
+
+    def create_async_update(self):
+        self.entity_emb.create_async_update()
+
+    def finish_async_update(self):
+        self.entity_emb.finish_async_update()
