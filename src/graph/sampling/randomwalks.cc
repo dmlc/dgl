@@ -7,6 +7,7 @@
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/array.h>
+#include <dgl/sampling/randomwalks.h>
 #include <utility>
 #include <tuple>
 #include <vector>
