@@ -1,11 +1,11 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampling/randomwalks.h
+ * \file graph/sampling/randomwalks_impl.h
  * \brief DGL sampler - templated implementation definition of random walks
  */
 
-#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_H_
-#define DGL_GRAPH_SAMPLING_RANDOMWALKS_H_
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
@@ -84,7 +84,7 @@ IdArray RandomWalkWithRestart(
     double restart_prob);
 
 /*!
- * \brief Metapath-based random walk with restart probability by position.  Useful
+ * \brief Metapath-based random walk with stepwise restart probability.  Useful
  *        for PinSAGE-like models.
  * \param hg The heterograph.
  * \param seeds A 1D array of seed nodes, with the type the source type of the first
@@ -100,7 +100,7 @@ IdArray RandomWalkWithRestart(
  *       determine the node type of each node in the random walk traces.
  */
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithRestart(
+IdArray RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -113,4 +113,4 @@ IdArray RandomWalkWithRestart(
 
 };  // namespace dgl
 
-#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_

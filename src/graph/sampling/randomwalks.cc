@@ -11,7 +11,7 @@
 #include <tuple>
 #include <vector>
 #include "../../c_api_common.h"
-#include "randomwalks.h"
+#include "randomwalks_impl.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -81,7 +81,7 @@ std::pair<IdArray, TypeArray> RandomWalkWithRestart(
   return std::make_pair(vids, vtypes);
 }
 
-std::pair<IdArray, TypeArray> RandomWalkWithRestart(
+std::pair<IdArray, TypeArray> RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -95,7 +95,8 @@ std::pair<IdArray, TypeArray> RandomWalkWithRestart(
   ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(seeds->dtype, IdxType, {
       vtypes = impl::GetNodeTypesFromMetapath<XPU, IdxType>(hg, metapath);
-      vids = impl::RandomWalkWithRestart<XPU, IdxType>(hg, seeds, metapath, prob, restart_prob);
+      vids = impl::RandomWalkWithStepwiseRestart<XPU, IdxType>(
+          hg, seeds, metapath, prob, restart_prob);
     });
   });
 
@@ -144,7 +145,7 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestart
     *rv = ret;
   });
 
-DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestartA")
+DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithStepwiseRestart")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     IdArray seeds = args[1];
@@ -157,7 +158,7 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestart
     for (Value val : prob)
       prob_vec.push_back(val->data);
 
-    auto result = sampling::RandomWalkWithRestart(
+    auto result = sampling::RandomWalkWithStepwiseRestart(
         hg.sptr(), seeds, metapath, prob_vec, restart_prob);
     List<Value> ret;
     ret.push_back(Value(MakeValue(result.first)));

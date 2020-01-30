@@ -12,7 +12,7 @@
 #include <dgl/random.h>
 #include <utility>
 #include <vector>
-#include "randomwalks.h"
+#include "randomwalks_impl.h"
 #include "randomwalks_cpu.h"
 
 namespace dgl {
@@ -50,7 +50,7 @@ using TerminatePredicate = std::function<bool(void *, dgl_id_t, int64_t)>;
  */
 template<DLDeviceType XPU, typename IdxType>
 std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
-    void *data,     // void * because std::function does not accept template typenames.
+    void *data,
     dgl_id_t curr,
     int64_t len,
     const std::vector<std::vector<IdArray> > &edges_by_type,
@@ -64,12 +64,12 @@ std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
   // construction) as much as possible.
   // Using Successors() slows down by 2x.
   // Using OutEdges() slows down by 10x.
-  const auto &csr_arrays = edges_by_type[etype];
+  const std::vector<NDArray> &csr_arrays = edges_by_type[etype];
   const IdxType *offsets = static_cast<IdxType *>(csr_arrays[0]->data);
   const IdxType *all_succ = static_cast<IdxType *>(csr_arrays[1]->data);
   const IdxType *succ = all_succ + offsets[curr];
 
-  int64_t size = offsets[curr + 1] - offsets[curr];
+  const int64_t size = offsets[curr + 1] - offsets[curr];
   if (size == 0)
     return std::make_pair(-1, true);
 
@@ -133,7 +133,7 @@ IdArray MetapathBasedRandomWalk(
           data, curr, len, edges_by_type, metapath_data, prob, terminate);
     };
 
-  return GenericRandomWalk<XPU, IdxType>(hg, seeds, max_num_steps, step);
+  return GenericRandomWalk<XPU, IdxType>(seeds, max_num_steps, step);
 }
 
 };  // namespace

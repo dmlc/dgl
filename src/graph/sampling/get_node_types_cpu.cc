@@ -7,7 +7,7 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <utility>
-#include "randomwalks.h"
+#include "randomwalks_impl.h"
 
 namespace dgl {
 

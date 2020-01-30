@@ -9,7 +9,7 @@
 #include <dgl/random.h>
 #include <utility>
 #include <vector>
-#include "randomwalks.h"
+#include "randomwalks_impl.h"
 #include "randomwalks_cpu.h"
 #include "metapath_randomwalk.h"
 
@@ -52,7 +52,7 @@ IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
     double restart_prob);
 
 template<DLDeviceType XPU, typename IdxType>
-IdArray RandomWalkWithRestart(
+IdArray RandomWalkWithStepwiseRestart(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
@@ -73,14 +73,14 @@ IdArray RandomWalkWithRestart(
 }
 
 template
-IdArray RandomWalkWithRestart<kDLCPU, int32_t>(
+IdArray RandomWalkWithStepwiseRestart<kDLCPU, int32_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     FloatArray restart_prob);
 template
-IdArray RandomWalkWithRestart<kDLCPU, int64_t>(
+IdArray RandomWalkWithStepwiseRestart<kDLCPU, int64_t>(
     const HeteroGraphPtr hg,
     const IdArray seeds,
     const TypeArray metapath,

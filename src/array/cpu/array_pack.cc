@@ -14,9 +14,9 @@ namespace impl {
 
 template<DLDeviceType XPU, typename DType, typename IdType>
 std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
-  int64_t rows = lengths->shape[0];
-  int64_t cols = (array->ndim == 1 ? array->shape[0] : array->shape[1]);
-  int64_t stride = (array->ndim == 1 ? 0 : cols);
+  const int64_t rows = lengths->shape[0];
+  const int64_t cols = (array->ndim == 1 ? array->shape[0] : array->shape[1]);
+  const int64_t stride = (array->ndim == 1 ? 0 : cols);
   const DType *array_data = static_cast<DType *>(array->data);
   const IdType *length_data = static_cast<IdType *>(lengths->data);
 
@@ -24,7 +24,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
   IdType *offsets_data = static_cast<IdType *>(offsets->data);
   for (int64_t i = 0; i < rows; ++i)
     offsets_data[i] = (i == 0 ? 0 : length_data[i - 1] + offsets_data[i - 1]);
-  int64_t total_length = offsets_data[rows - 1] + length_data[rows - 1];
+  const int64_t total_length = offsets_data[rows - 1] + length_data[rows - 1];
 
   NDArray concat = NDArray::Empty({total_length}, array->dtype, array->ctx);
   DType *concat_data = static_cast<DType *>(concat->data);
@@ -51,8 +51,8 @@ template<DLDeviceType XPU, typename DType>
 std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   CHECK_NDIM(array, 2, "array");
   const DType *array_data = static_cast<DType *>(array->data);
-  int64_t rows = array->shape[0];
-  int64_t cols = array->shape[1];
+  const int64_t rows = array->shape[0];
+  const int64_t cols = array->shape[1];
 
   IdArray length = NewIdArray(rows, array->ctx);
   int64_t *length_data = static_cast<int64_t *>(length->data);
@@ -60,7 +60,7 @@ std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, DType pad_value) {
   for (int64_t i = 0; i < rows; ++i) {
     int64_t j;
     for (j = 0; j < cols; ++j) {
-      DType val = array_data[i * cols + j];
+      const DType val = array_data[i * cols + j];
       if (val == pad_value)
         break;
     }

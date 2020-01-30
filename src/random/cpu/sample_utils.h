@@ -62,7 +62,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   }
 
   void Reconstruct(FloatArray prob) {  // Reconstruct alias table
-    int64_t prob_size = prob->shape[0];
+    const int64_t prob_size = prob->shape[0];
     const DType *prob_data = static_cast<DType *>(prob->data);
     N = 0;
     accum = 0.;

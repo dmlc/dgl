@@ -60,9 +60,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
     Examples
     --------
     The following creates a homogeneous graph:
-    >>> g1 = dgl.heterograph({
-    ...     ('user', 'follow', 'user'): [(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)]
-    ...     })
+    >>> g1 = dgl.graph([(0, 1), (1, 2), (1, 3), (2, 0), (3, 0)], 'user', 'follow')
 
     Normal random walk:
     >>> dgl.sampling.random_walk(g1, [0, 1, 2, 0], length=4)
@@ -149,7 +147,7 @@ def random_walk(g, nodes, *, metapath=None, length=None, prob=None, restart_prob
         traces, types = _CAPI_DGLSamplingRandomWalk(gidx, nodes, metapath, p_nd)
     elif F.is_tensor(restart_prob):
         restart_prob = F.zerocopy_to_dgl_ndarray(restart_prob)
-        traces, types = _CAPI_DGLSamplingRandomWalkWithRestartA(
+        traces, types = _CAPI_DGLSamplingRandomWalkWithStepwiseRestart(
             gidx, nodes, metapath, p_nd, restart_prob)
     else:
         traces, types = _CAPI_DGLSamplingRandomWalkWithRestart(

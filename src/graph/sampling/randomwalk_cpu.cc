@@ -7,7 +7,7 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 #include <vector>
-#include "randomwalks.h"
+#include "randomwalks_impl.h"
 #include "randomwalks_cpu.h"
 #include "metapath_randomwalk.h"
 

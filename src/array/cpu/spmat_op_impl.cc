@@ -371,8 +371,8 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     }
   }
 
-  return {VecToIdArray(ret_rows, csr.indptr->dtype.bits, csr.indptr->ctx),
-          VecToIdArray(ret_cols, csr.indptr->dtype.bits, csr.indptr->ctx),
+  return {NDArray::FromVector(ret_rows, csr.indptr->dtype, csr.indptr->ctx),
+          NDArray::FromVector(ret_cols, csr.indptr->dtype, csr.indptr->ctx),
           NDArray::FromVector(ret_data, csr.data->dtype, csr.data->ctx)};
 }
 
