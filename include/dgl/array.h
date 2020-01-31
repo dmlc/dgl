@@ -211,7 +211,7 @@ struct CSRMatrix {
   runtime::NDArray indptr, indices;
   /*! \brief data array, could be empty. */
   runtime::NDArray data;
-  /*! \brief indicate that the edges are stored in the sorted order. */
+  /*! \brief whether the column indices per row are sorted */
   bool sorted;
 };
 
@@ -326,8 +326,34 @@ void CSRSort(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
 
-/*! \return True if the matrix has duplicate entries */
-bool COOHasDuplicate(COOMatrix coo);
+/*! \brief Return true if the value (row, col) is non-zero */
+bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of COOIsNonZero.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
+
+/*! \brief Return the nnz of the given row */
+int64_t COOGetRowNNZ(COOMatrix , int64_t row, bool transpose);
+runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row, bool transpose);
+
+/*! \brief Return the data array of the given row */
+std::pair<runtime::NDArray, runtime::NDArray>
+COOGetRowDataAndIndices(COOMatrix , int64_t row, bool transpose);
+
+/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
+
+/*!
+ * \brief Get the data and the row,col indices for each returned entries.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+std::vector<runtime::NDArray> COOGetDataAndIndices(
+    COOMatrix , runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \brief Return a transposed COO matrix */
+COOMatrix COOTranspose(COOMatrix coo);
 
 /*!
  * \brief Convert COO matrix to CSR matrix.
@@ -338,6 +364,32 @@ bool COOHasDuplicate(COOMatrix coo);
  * to the CSR.data[i] th entry in the input COO.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
+
+/*!
+ * \brief Slice rows of the given matrix and return.
+ * \param coo COO matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ */
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose);
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows, bool transpose);
+
+/*!
+ * \brief Get the submatrix specified by the row and col ids.
+ *
+ * In numpy notation, given matrix M, row index array I, col index array J
+ * This function returns the submatrix M[I, J].
+ *
+ * \param coo The input coo matrix
+ * \param rows The row index to select
+ * \param cols The col index to select
+ * \return submatrix
+ */
+COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \return True if the matrix has duplicate entries */
+bool COOHasDuplicate(COOMatrix coo);
+
 
 // inline implementations
 template <typename T>

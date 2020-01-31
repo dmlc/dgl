@@ -411,6 +411,22 @@ void CSRSort(CSRMatrix csr) {
 
 ///////////////////////// COO routines //////////////////////////
 
+bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
+  bool ret = false;
+  ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOIsNonZero<XPU, IdType>(coo, row, col);
+  });
+  return ret;
+}
+
+NDArray COOIsNonZero(COOMatrix coo, NDArray row, NDArray col) {
+  NDArray ret;
+  ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOIsNonZero<XPU, IdType>(coo, row, col);
+  });
+  return ret;
+}
+
 bool COOHasDuplicate(COOMatrix coo) {
   bool ret = false;
   ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
@@ -419,10 +435,83 @@ bool COOHasDuplicate(COOMatrix coo) {
   return ret;
 }
 
+int64_t COOGetRowNNZ(COOMatrix coo, int64_t row, bool transpose) {
+  int64_t ret = 0;
+  ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row, transpose);
+  });
+  return ret;
+}
+
+NDArray COOGetRowNNZ(COOMatrix coo, NDArray row, bool transpose) {
+  NDArray ret;
+  ATEN_COO_IDX_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOGetRowNNZ<XPU, IdType>(coo, row, transpose);
+  });
+  return ret;
+}
+
+std::pair<NDArray, NDArray> COOGetRowDataAndIndices(COOMatrix coo, int64_t row, bool transpose) {
+  std::pair<NDArray, NDArray> ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOGetRowDataAndIndices<XPU, IdType, DType>(coo, row, transpose);
+  });
+  return ret;
+}
+
+NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
+  NDArray ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOGetData<XPU, IdType, DType>(coo, row, col);
+  });
+  return ret;
+}
+
+std::vector<NDArray> COOGetDataAndIndices(
+    COOMatrix coo, NDArray rows, NDArray cols) {
+  std::vector<NDArray> ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOGetDataAndIndices<XPU, IdType, DType>(coo, rows, cols);
+  });
+  return ret;
+}
+
+COOMatrix COOTranspose(COOMatrix coo) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOTranspose<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
 CSRMatrix COOToCSR(COOMatrix coo) {
   CSRMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
     ret = impl::COOToCSR<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOSliceRows<XPU, IdType, DType>(coo, start, end, transpose);
+  });
+  return ret;
+}
+
+COOMatrix COOSliceRows(COOMatrix coo, NDArray rows, bool transpose) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOSliceRows<XPU, IdType, DType>(coo, rows, transpose);
+  });
+  return ret;
+}
+
+COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOSliceMatrix<XPU, IdType, DType>(coo, rows, cols);
   });
   return ret;
 }

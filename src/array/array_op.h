@@ -108,10 +108,46 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 void CSRSort(CSRMatrix csr);
 
 template <DLDeviceType XPU, typename IdType>
+bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
+
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray COOIsNonZero(COOMatrix coo, runtime::NDArray row, runtime::NDArray col);
+
+template <DLDeviceType XPU, typename IdType>
 bool COOHasDuplicate(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType>
+int64_t COOGetRowNNZ(COOMatrix coo, int64_t row, bool transpose);
+
+template <DLDeviceType XPU, typename IdType>
+runtime::NDArray COOGetRowNNZ(COOMatrix coo, runtime::NDArray row, bool transpose);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+std::pair<runtime::NDArray, runtime::NDArray>
+COOGetRowDataAndIndices(COOMatrix coo, int64_t row, bool transpose);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+std::vector<runtime::NDArray> COOGetDataAndIndices(
+    COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOTranspose(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows, bool transpose);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
 
 }  // namespace impl
 }  // namespace aten

@@ -143,7 +143,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col);
+      IdArray row, IdArray col, bool prefer_coo = false);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
@@ -182,7 +182,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param out_csr out edge csr
    * \param coo coo
    */
-  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo);
+  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool prefer_coo = false);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
@@ -195,6 +195,8 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr out_csr_;
   /*! \brief COO representation */
   COOPtr coo_;
+  /*! \brief whether to force using COO */
+  bool prefer_coo_;
 };
 
 };  // namespace dgl

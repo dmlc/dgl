@@ -428,7 +428,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    auto hgptr = UnitGraph::CreateFromCOO(nvtypes, num_src, num_dst, row, col);
+    bool prefer_coo = args[5];
+    auto hgptr = UnitGraph::CreateFromCOO(nvtypes, num_src, num_dst, row, col, prefer_coo);
     *rv = HeteroGraphRef(hgptr);
   });
 

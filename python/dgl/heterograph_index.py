@@ -957,7 +957,7 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo=False):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -972,13 +972,16 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
         Row index.
     col : utils.Index
         Col index.
+    prefer_coo : bool
+        Whether to force the storage to be in COO format.
 
     Returns
     -------
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
-        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor(),
+        prefer_coo)
 
 def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
     """Create a unitgraph graph index from CSR format

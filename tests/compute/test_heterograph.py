@@ -62,6 +62,23 @@ def create_test_heterograph2():
         })
     return g
 
+def create_test_heterograph3():
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    wishes_nx = nx.DiGraph()
+    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
+    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
+
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', _prefer_coo=True)
+    plays_g = dgl.bipartite(
+        [(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game', _prefer_coo=True)
+    wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game', _prefer_coo=True)
+    develops_g = dgl.bipartite(
+        [(0, 0), (1, 1)], 'developer', 'develops', 'game', _prefer_coo=True)
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
+    return g
+
 def get_redfn(name):
     return getattr(F, name)
 
@@ -125,9 +142,7 @@ def test_create():
     _test_validate_bipartite((3, 3))
     _test_validate_bipartite((2, 4))
 
-def test_query():
-    g = create_test_heterograph()
-
+def _test_query(g):
     ntypes = ['user', 'game', 'developer']
     canonical_etypes = [
         ('user', 'follows', 'user'),
@@ -274,6 +289,10 @@ def test_query():
 
     # test repr
     print(g)
+
+def test_query():
+    for g in [create_test_heterograph(), create_test_heterograph3()]:
+        _test_query(g)
 
 def test_adj():
     g = create_test_heterograph()

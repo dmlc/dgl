@@ -156,33 +156,38 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
+    CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
+    return aten::COOIsNonZero(adj_, src, dst);
   }
 
   BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+    return aten::COOIsNonZero(adj_, src_ids, dst_ids);
   }
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
+    return aten::COOGetRowDataAndIndices(adj_, dst, true).second;
   }
 
   IdArray Successors(dgl_type_t etype, dgl_id_t src) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
+    return aten::COOGetRowDataAndIndices(adj_, src, false).second;
   }
 
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
+    CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
+    return aten::COOGetData(adj_, src, dst);
   }
 
   EdgeArray EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(src)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dst)) << "Invalid vertex id array.";
+    const auto& arrs = aten::COOGetDataAndIndices(adj_, src, dst);
+    return EdgeArray{arrs[0], arrs[1], arrs[2]};
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
@@ -200,23 +205,31 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    IdArray ret_src, ret_eid;
+    std::tie(ret_eid, ret_src) = aten::COOGetRowDataAndIndices(adj_, vid, true);
+    IdArray ret_dst = aten::Full(vid, ret_src->shape[0], NumBits(), ret_src->ctx);
+    return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+    auto coosubmat = aten::COOSliceRows(adj_, vids, true);
+    auto row = aten::IndexSelect(vids, coosubmat.row);
+    return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
   EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    IdArray ret_dst, ret_eid;
+    std::tie(ret_eid, ret_dst) = aten::COOGetRowDataAndIndices(adj_, vid, false);
+    IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+    return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+    auto coosubmat = aten::COOSliceRows(adj_, vids, false);
+    auto row = aten::IndexSelect(vids, coosubmat.row);
+    return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
   EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
@@ -228,23 +241,23 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(DstType(), vid)) << "Invalid dst vertex id: " << vid;
+    return aten::COOGetRowNNZ(adj_, vid, true);
   }
 
   DegreeArray InDegrees(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+    return aten::COOGetRowNNZ(adj_, vids, true);
   }
 
   uint64_t OutDegree(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
+    return aten::COOGetRowNNZ(adj_, vid, false);
   }
 
   DegreeArray OutDegrees(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
+    return aten::COOGetRowNNZ(adj_, vids, false);
   }
 
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override {
@@ -278,8 +291,18 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
-    LOG(INFO) << "Not enabled for COO graph.";
-    return {};
+    CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
+    auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
+    CHECK(aten::IsValidIdArray(srcvids)) << "Invalid vertex id array.";
+    CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
+    HeteroSubgraph subg;
+    const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
+    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
+        submat.row, submat.col);
+    subg.induced_vertices = vids;
+    subg.induced_edges.emplace_back(submat.data);
+    return subg;
   }
 
   HeteroSubgraph EdgeSubgraph(
@@ -687,7 +710,9 @@ BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
 }
 
 bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (in_csr_) {
+  if (prefer_coo_) {
+    return GetCOO()->HasEdgeBetween(etype, src, dst);
+  } else if (in_csr_) {
     return in_csr_->HasEdgeBetween(etype, dst, src);
   } else {
     return GetOutCSR()->HasEdgeBetween(etype, src, dst);
@@ -696,7 +721,9 @@ bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) con
 
 BoolArray UnitGraph::HasEdgesBetween(
     dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (in_csr_) {
+  if (prefer_coo_) {
+    return GetCOO()->HasEdgesBetween(etype, src, dst);
+  } else if (in_csr_) {
     return in_csr_->HasEdgesBetween(etype, dst, src);
   } else {
     return GetOutCSR()->HasEdgesBetween(etype, src, dst);
@@ -704,15 +731,23 @@ BoolArray UnitGraph::HasEdgesBetween(
 }
 
 IdArray UnitGraph::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
-  return GetInCSR()->Successors(etype, dst);
+  if (prefer_coo_)
+    return GetCOO()->Predecessors(etype, dst);
+  else
+    return GetInCSR()->Successors(etype, dst);
 }
 
 IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
-  return GetOutCSR()->Successors(etype, src);
+  if (prefer_coo_)
+    return GetCOO()->Successors(etype, src);
+  else
+    return GetOutCSR()->Successors(etype, src);
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (in_csr_) {
+  if (prefer_coo_) {
+    return GetCOO()->EdgeId(etype, src, dst);
+  } else if (in_csr_) {
     return in_csr_->EdgeId(etype, dst, src);
   } else {
     return GetOutCSR()->EdgeId(etype, src, dst);
@@ -720,7 +755,9 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
 }
 
 EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (in_csr_) {
+  if (prefer_coo_) {
+    return GetCOO()->EdgeIds(etype, src, dst);
+  } else if (in_csr_) {
     EdgeArray edges = in_csr_->EdgeIds(etype, dst, src);
     return EdgeArray{edges.dst, edges.src, edges.id};
   } else {
@@ -737,25 +774,41 @@ EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
-  const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid);
-  return {ret.dst, ret.src, ret.id};
+  if (prefer_coo_) {
+    return GetCOO()->InEdges(etype, vid);
+  } else {
+    const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid);
+    return {ret.dst, ret.src, ret.id};
+  }
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
-  const EdgeArray& ret = GetInCSR()->OutEdges(etype, vids);
-  return {ret.dst, ret.src, ret.id};
+  if (prefer_coo_) {
+    return GetCOO()->InEdges(etype, vids);
+  } else {
+    const EdgeArray& ret = GetInCSR()->OutEdges(etype, vids);
+    return {ret.dst, ret.src, ret.id};
+  }
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
-  return GetOutCSR()->OutEdges(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->OutEdges(etype, vid);
+  else
+    return GetOutCSR()->OutEdges(etype, vid);
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
-  return GetOutCSR()->OutEdges(etype, vids);
+  if (prefer_coo_)
+    return GetCOO()->OutEdges(etype, vids);
+  else
+    return GetOutCSR()->OutEdges(etype, vids);
 }
 
 EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
-  if (order.empty()) {
+  if (prefer_coo_ || order == std::string("eid")) {
+    return GetCOO()->Edges(etype, order);
+  } else if (order.empty()) {
     // arbitrary order
     if (in_csr_) {
       // transpose
@@ -768,8 +821,6 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
     // TODO(minjie): CSR only guarantees "src" to be sorted.
     //   Maybe we should relax this requirement?
     return GetOutCSR()->Edges(etype, order);
-  } else if (order == std::string("eid")) {
-    return GetCOO()->Edges(etype, order);
   } else {
     LOG(FATAL) << "Unsupported order request: " << order;
   }
@@ -777,6 +828,7 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 }
 
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
+  // TODO: start here
   return GetInCSR()->OutDegree(etype, vid);
 }
 
@@ -851,13 +903,14 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
+    bool prefer_coo) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo, prefer_coo));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
@@ -868,7 +921,7 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, false));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -902,8 +955,9 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
 }
 
-UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
-  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool prefer_coo)
+  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo),
+    prefer_coo_(prefer_coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 

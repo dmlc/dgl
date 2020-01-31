@@ -21,7 +21,7 @@ __all__ = [
     'to_networkx',
 ]
 
-def graph(data, ntype='_N', etype='_E', card=None, validate=True, **kwargs):
+def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo=False, **kwargs):
     """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
@@ -49,6 +49,9 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, **kwargs):
         If True, check if node ids are within cardinality, the check process may take
         some time. (Default: True)
         If False and card is not None, user would receive a warning.
+    _prefer_coo : bool, optional
+        Internal argument for forcing the storage to be in COO format.  For unit test
+        only.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
         graph. It can consist of:
@@ -122,9 +125,11 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, **kwargs):
         urange, vrange = None, None
     if isinstance(data, tuple):
         u, v = data
-        return create_from_edges(u, v, ntype, etype, ntype, urange, vrange, validate)
+        return create_from_edges(
+            u, v, ntype, etype, ntype, urange, vrange, validate, _prefer_coo)
     elif isinstance(data, list):
-        return create_from_edge_list(data, ntype, etype, ntype, urange, vrange, validate)
+        return create_from_edge_list(
+            data, ntype, etype, ntype, urange, vrange, validate, _prefer_coo)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(data, ntype, etype, ntype)
     elif isinstance(data, nx.Graph):
@@ -132,7 +137,8 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, **kwargs):
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
-def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True, **kwargs):
+def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True,
+              _prefer_coo=False, **kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -253,9 +259,11 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
         urange, vrange = None, None
     if isinstance(data, tuple):
         u, v = data
-        return create_from_edges(u, v, utype, etype, vtype, urange, vrange, validate)
+        return create_from_edges(
+            u, v, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
     elif isinstance(data, list):
-        return create_from_edge_list(data, utype, etype, vtype, urange, vrange, validate)
+        return create_from_edge_list(
+            data, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
     elif isinstance(data, sp.sparse.spmatrix):
         return create_from_scipy(data, utype, etype, vtype)
     elif isinstance(data, nx.Graph):
@@ -703,7 +711,8 @@ def to_homo(G):
 # Internal APIs
 ############################################################
 
-def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, validate=True):
+def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, validate=True,
+                      _prefer_coo=False):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -728,6 +737,9 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
+    _prefer_coo : bool, optional
+        Internal argument for forcing the storage to be in COO format.  For unit test
+        only.
 
     Returns
     -------
@@ -755,13 +767,14 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         num_ntypes = 1
     else:
         num_ntypes = 2
-    hgidx = heterograph_index.create_unitgraph_from_coo(num_ntypes, urange, vrange, u, v)
+    hgidx = heterograph_index.create_unitgraph_from_coo(num_ntypes, urange, vrange, u, v, _prefer_coo)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
-def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None, validate=True):
+def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
+                          validate=True, _prefer_coo=False):
     """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
@@ -784,7 +797,9 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None, 
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-
+    _prefer_coo : bool, optional
+        Internal argument for forcing the storage to be in COO format.  For unit test
+        only.
 
     Returns
     -------
@@ -796,7 +811,7 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None, 
         u, v = zip(*elist)
         u = list(u)
         v = list(v)
-    return create_from_edges(u, v, utype, etype, vtype, urange, vrange, validate)
+    return create_from_edges(u, v, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
 
 def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
     """Internal function to create a heterograph from a scipy sparse matrix with types.
