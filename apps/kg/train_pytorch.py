@@ -30,8 +30,6 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     return model
 
 def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
-    if args.num_proc > 1:
-        th.set_num_threads(4)
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
@@ -138,6 +136,8 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
 
 @thread_wrapped_func
 def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
+    if args.num_proc > 1:
+        th.set_num_threads(4)
     train(args, model, train_sampler, valid_samplers, rank, rel_parts, barrier)
 
 @thread_wrapped_func
