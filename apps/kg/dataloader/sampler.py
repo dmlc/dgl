@@ -21,26 +21,31 @@ def RelationPartition(edges, n):
     edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
     rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
     rel_dict = {}
+    rel_parts = []
+    for _ in range(n):
+        rel_parts.append([])
     for i in range(len(cnts)):
         cnt = cnts[i]
         r = uniq[i]
         idx = np.argmin(edge_cnts)
         rel_dict[r] = idx
+        rel_parts[idx].append(r)
         edge_cnts[idx] += cnt
         rel_cnts[idx] += 1
     for i, edge_cnt in enumerate(edge_cnts):
         print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
 
     parts = []
-    for _ in range(n):
+    for i in range(n):
         parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
     # let's store the edge index to each partition first.
     for i, r in enumerate(rels):
         part_idx = rel_dict[r]
         parts[part_idx].append(i)
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
-    return parts
+    return parts, rel_parts
 
 def RandomPartition(edges, n):
     heads, rels, tails = edges
@@ -65,8 +70,7 @@ def ConstructGraph(edges, n_entities, args):
         src, etype_id, dst = edges
         coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)), shape=[n_entities, n_entities])
         g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-        g.ndata['id'] = F.arange(0, g.number_of_nodes())
-        g.edata['id'] = F.tensor(etype_id, F.int64)
+        g.edata['tid'] = F.tensor(etype_id, F.int64)
         if args.pickle_graph:
             with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                 pickle.dump(g, graph_file)
@@ -79,7 +83,7 @@ class TrainDataset(object):
         num_train = len(triples[0])
         print('|Train|:', num_train)
         if ranks > 1 and args.rel_part:
-            self.edge_parts = RelationPartition(triples, ranks)
+            self.edge_parts, self.rel_parts = RelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
         else:
@@ -184,7 +188,7 @@ class EvalSampler(object):
                                    num_workers=num_workers,
                                    shuffle=False,
                                    exclude_positive=False,
-                                   relations=g.edata['id'],
+                                   relations=g.edata['tid'],
                                    return_false_neg=filter_false_neg)
         self.sampler_iter = iter(self.sampler)
         self.mode = mode
@@ -206,8 +210,9 @@ class EvalSampler(object):
             if neg_g is not None:
                 break
 
-        pos_g.copy_from_parent()
-        neg_g.copy_from_parent()
+        pos_g.ndata['id'] = pos_g.parent_nid
+        neg_g.ndata['id'] = neg_g.parent_nid
+        pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
         if self.filter_false_neg:
             neg_g.edata['bias'] = F.astype(-neg_positive, F.float32)
         return pos_g, neg_g
@@ -230,13 +235,11 @@ class EvalDataset(object):
             coo = sp.sparse.coo_matrix((np.ones(len(src)), (src, dst)),
                                        shape=[dataset.n_entities, dataset.n_entities])
             g = dgl.DGLGraph(coo, readonly=True, sort_csr=True)
-            g.ndata['id'] = F.arange(0, g.number_of_nodes())
-            g.edata['id'] = F.tensor(etype_id, F.int64)
+            g.edata['tid'] = F.tensor(etype_id, F.int64)
             if args.pickle_graph:
                 with open(os.path.join(args.data_path, args.dataset, pickle_name), 'wb') as graph_file:
                     pickle.dump(g, graph_file)
         self.g = g
-
         self.num_train = len(dataset.train[0])
         self.num_valid = len(dataset.valid[0])
         self.num_test = len(dataset.test[0])
@@ -324,6 +327,7 @@ class NewBidirectionalOneShotIterator:
                 if neg_g is None:
                     continue
 
-                pos_g.copy_from_parent()
-                neg_g.copy_from_parent()
+                pos_g.ndata['id'] = pos_g.parent_nid
+                neg_g.ndata['id'] = neg_g.parent_nid
+                pos_g.edata['id'] = pos_g._parent.edata['tid'][pos_g.parent_eid]
                 yield pos_g, neg_g

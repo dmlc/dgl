@@ -668,7 +668,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 def check_positive_edge_sampler():
     g = generate_rand_graph(1000)
     num_edges = g.number_of_edges()
-    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 0.1, dtype=np.float32)), F.cpu())
 
     edge_weight[num_edges-1] = num_edges ** 2
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
