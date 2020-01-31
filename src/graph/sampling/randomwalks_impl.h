@@ -25,10 +25,11 @@ namespace impl {
 /*!
  * \brief Random walk step function
  */
+template<typename IdxType>
 using StepFunc = std::function<
   //        ID        terminate?
   std::pair<dgl_id_t, bool>(
-      void *,       // node IDs generated so far
+      IdxType *,    // node IDs generated so far
       dgl_id_t,     // last node ID
       int64_t)>;    // # of steps
 

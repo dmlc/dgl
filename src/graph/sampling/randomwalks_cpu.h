@@ -35,7 +35,7 @@ template<DLDeviceType XPU, typename IdxType>
 IdArray GenericRandomWalk(
     const IdArray seeds,
     int64_t max_num_steps,
-    StepFunc step) {
+    StepFunc<IdxType> step) {
   int64_t num_seeds = seeds->shape[0];
   int64_t trace_length = max_num_steps + 1;
   IdArray traces = IdArray::Empty({num_seeds, trace_length}, seeds->dtype, seeds->ctx);

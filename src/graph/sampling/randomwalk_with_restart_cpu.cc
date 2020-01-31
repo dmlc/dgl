@@ -29,8 +29,8 @@ IdArray RandomWalkWithRestart(
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
     double restart_prob) {
-  TerminatePredicate terminate =
-    [restart_prob] (void *data, dgl_id_t curr, int64_t len) {
+  TerminatePredicate<IdxType> terminate =
+    [restart_prob] (IdxType *data, dgl_id_t curr, int64_t len) {
       return RandomEngine::ThreadLocal()->Uniform<double>() < restart_prob;
     };
   return MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);
@@ -62,8 +62,8 @@ IdArray RandomWalkWithStepwiseRestart(
 
   ATEN_FLOAT_TYPE_SWITCH(restart_prob->dtype, DType, "restart probability", {
     DType *restart_prob_data = static_cast<DType *>(restart_prob->data);
-    TerminatePredicate terminate =
-      [restart_prob_data] (void *data, dgl_id_t curr, int64_t len) {
+    TerminatePredicate<IdxType> terminate =
+      [restart_prob_data] (IdxType *data, dgl_id_t curr, int64_t len) {
         return RandomEngine::ThreadLocal()->Uniform<DType>() < restart_prob_data[len];
       };
     result = MetapathBasedRandomWalk<XPU, IdxType>(hg, seeds, metapath, prob, terminate);

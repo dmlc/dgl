@@ -26,8 +26,8 @@ IdArray RandomWalk(
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob) {
-  TerminatePredicate terminate =
-    [] (void *data, dgl_id_t curr, int64_t len) {
+  TerminatePredicate<IdxType> terminate =
+    [] (IdxType *data, dgl_id_t curr, int64_t len) {
       return false;
     };
 

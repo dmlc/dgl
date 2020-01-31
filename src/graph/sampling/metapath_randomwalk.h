@@ -27,10 +27,11 @@ namespace impl {
 namespace {
 
 // bool WhetherToTerminate(
-//     void *node_ids_generated_so_far,
+//     IdxType *node_ids_generated_so_far,
 //     dgl_id_t last_node_id_generated,
 //     int64_t number_of_nodes_generated_so_far)
-using TerminatePredicate = std::function<bool(void *, dgl_id_t, int64_t)>;
+template<typename IdxType>
+using TerminatePredicate = std::function<bool(IdxType *, dgl_id_t, int64_t)>;
 
 /*!
  * \brief Select one successor of metapath-based random walk, given the path generated
@@ -50,13 +51,13 @@ using TerminatePredicate = std::function<bool(void *, dgl_id_t, int64_t)>;
  */
 template<DLDeviceType XPU, typename IdxType>
 std::pair<dgl_id_t, bool> MetapathRandomWalkStep(
-    void *data,
+    IdxType *data,
     dgl_id_t curr,
     int64_t len,
     const std::vector<std::vector<IdArray> > &edges_by_type,
     const IdxType *metapath_data,
     const std::vector<FloatArray> &prob,
-    TerminatePredicate terminate) {
+    TerminatePredicate<IdxType> terminate) {
   dgl_type_t etype = metapath_data[len];
 
   // Note that since the selection of successors is very lightweight (especially in the
@@ -114,7 +115,7 @@ IdArray MetapathBasedRandomWalk(
     const IdArray seeds,
     const TypeArray metapath,
     const std::vector<FloatArray> &prob,
-    TerminatePredicate terminate) {
+    TerminatePredicate<IdxType> terminate) {
   int64_t max_num_steps = metapath->shape[0];
   const IdxType *metapath_data = static_cast<IdxType *>(metapath->data);
 
@@ -126,9 +127,9 @@ IdArray MetapathBasedRandomWalk(
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype)
     edges_by_type.push_back(hg->GetAdj(etype, true, "csr"));
 
-  StepFunc step =
+  StepFunc<IdxType> step =
     [&edges_by_type, metapath_data, &prob, terminate]
-    (void *data, dgl_id_t curr, int64_t len) {
+    (IdxType *data, dgl_id_t curr, int64_t len) {
       return MetapathRandomWalkStep<XPU, IdxType>(
           data, curr, len, edges_by_type, metapath_data, prob, terminate);
     };
