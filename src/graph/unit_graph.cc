@@ -187,8 +187,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
     CHECK(eid < NumEdges(etype)) << "Invalid edge id: " << eid;
-    const auto src = aten::IndexSelect(adj_.row, eid);
-    const auto dst = aten::IndexSelect(adj_.col, eid);
+    const dgl_id_t src = aten::IndexSelect<int64_t>(adj_.row, eid);
+    const dgl_id_t dst = aten::IndexSelect<int64_t>(adj_.col, eid);
     return std::pair<dgl_id_t, dgl_id_t>(src, dst);
   }
 

@@ -303,8 +303,8 @@ bool COO::IsMultigraph() const {
 
 std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
   CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
-  const auto src = aten::IndexSelect(adj_.row, eid);
-  const auto dst = aten::IndexSelect(adj_.col, eid);
+  const dgl_id_t src = aten::IndexSelect<dgl_id_t>(adj_.row, eid);
+  const dgl_id_t dst = aten::IndexSelect<dgl_id_t>(adj_.col, eid);
   return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 

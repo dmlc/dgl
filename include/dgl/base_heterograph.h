@@ -57,6 +57,11 @@ class BaseHeteroGraph : public runtime::Object {
     return meta_graph_->NumEdges();
   }
 
+  /*! \return given the edge type, find the source type */
+  virtual std::pair<dgl_type_t, dgl_type_t> GetEndpointTypes(dgl_type_t etype) const {
+    return meta_graph_->FindEdge(etype);
+  }
+
   /*! \return the meta graph */
   virtual GraphPtr meta_graph() const {
     return meta_graph_;
