@@ -25,7 +25,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     return model
 
 def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
-    assert args.num_proc == 0, "MXNet KGE does not support multi-process now"
+    assert args.num_proc <= 1, "MXNet KGE does not support multi-process now"
     assert args.rel_part == False, "No need for relation partition in single process for MXNet KGE"
     logs = []
 
@@ -63,7 +63,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
     logs = []
 
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
-    assert args.num_proc == 0, "MXNet KGE does not support multi-process now"
+    assert args.num_proc <= 1, "MXNet KGE does not support multi-process now"
     logs = []
 
     if len(args.gpu) > 0:

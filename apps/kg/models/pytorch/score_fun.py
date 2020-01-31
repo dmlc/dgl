@@ -141,20 +141,26 @@ class TransRScore(nn.Module):
     def update(self, gpu_id=-1):
         self.projection_emb.update(gpu_id)
 
-    def save(self, path, name):
+    def save(self, path, name):  
         self.projection_emb.save(path, name+'projection')
 
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
 
-    def share_memory(self, strict_rel_part):
+    def prepare_local_emb(self, projection_emb):
+        self.global_projection_emb = self.projection_emb
+        self.projection_emb = projection_emb
+
+    def writeback_local_emb(self, idx):
+        self.global_projection_emb.emb[idx] = self.projection_emb.emb.cpu()[idx]
+
+    def load_local_emb(self, projection_emb):
+        device = projection_emb.emb.device
+        projection_emb.emb = self.projection_emb.emb.to(device)
+        self.projection_emb = projection_emb
+
+    def share_memory(self):
         self.projection_emb.share_memory()  
-
-    def set_emb(self, emb):
-        self.projection_emb = emb
-
-    def get_emb(self):
-        return self.projection_emb
 
     def create_neg(self, neg_head):
         gamma = self.gamma
