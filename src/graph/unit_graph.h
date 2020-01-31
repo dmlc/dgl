@@ -157,6 +157,15 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  /*! \return Return whether the in-edge CSR format is initialized. */
+  bool HasInCSR() const;
+
+  /*! \return Return whether the out-edge CSR format is initialized. */
+  bool HasOutCSR() const;
+
+  /*! \return Return whether the COO format is initialized. */
+  bool HasCOO() const;
+
   /*! \return Return the in-edge CSR format. Create from other format if not exist. */
   CSRPtr GetInCSR() const;
 

@@ -657,10 +657,10 @@ bool UnitGraph::IsMultigraph() const {
 }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
     return in_csr_->NumVertices(vtype);
-  } else if (out_csr_) {
+  } else if (HasOutCSR()) {
     return out_csr_->NumVertices(vtype);
   } else {
     return GetCOO()->NumVertices(vtype);
@@ -672,10 +672,10 @@ uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
 }
 
 bool UnitGraph::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
     return in_csr_->HasVertex(vtype, vid);
-  } else if (out_csr_) {
+  } else if (HasOutCSR()) {
     return out_csr_->HasVertex(vtype, vid);
   } else {
     return GetCOO()->HasVertex(vtype, vid);
@@ -688,7 +688,7 @@ BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
 }
 
 bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     return in_csr_->HasEdgeBetween(etype, dst, src);
   } else {
     return GetOutCSR()->HasEdgeBetween(etype, src, dst);
@@ -697,7 +697,7 @@ bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) con
 
 BoolArray UnitGraph::HasEdgesBetween(
     dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     return in_csr_->HasEdgesBetween(etype, dst, src);
   } else {
     return GetOutCSR()->HasEdgesBetween(etype, src, dst);
@@ -713,7 +713,7 @@ IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     return in_csr_->EdgeId(etype, dst, src);
   } else {
     return GetOutCSR()->EdgeId(etype, src, dst);
@@ -721,7 +721,7 @@ IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
 }
 
 EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     EdgeArray edges = in_csr_->EdgeIds(etype, dst, src);
     return EdgeArray{edges.dst, edges.src, edges.id};
   } else {
@@ -758,7 +758,7 @@ EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
 EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
   if (order.empty()) {
     // arbitrary order
-    if (in_csr_) {
+    if (HasInCSR()) {
       // transpose
       const auto& edges = in_csr_->Edges(etype, order);
       return EdgeArray{edges.dst, edges.src, edges.id};
@@ -915,6 +915,18 @@ UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr c
  * https://www.justsoftwaresolutions.co.uk/threading/multithreading-in-c++0x-part-6-double-checked-locking.html
  */
 
+bool UnitGraph::HasInCSR() const {
+  return !!std::atomic_load_explicit(&in_csr_, std::memory_order_acquire);
+}
+
+bool UnitGraph::HasOutCSR() const {
+  return !!std::atomic_load_explicit(&out_csr_, std::memory_order_acquire);
+}
+
+bool UnitGraph::HasCOO() const {
+  return !!std::atomic_load_explicit(&coo_, std::memory_order_acquire);
+}
+
 UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   return LazyInit(&(const_cast<UnitGraph*>(this)->in_csr_), &lazy_mutex_, [this] () {
       if (out_csr_) {
@@ -973,9 +985,9 @@ aten::COOMatrix UnitGraph::GetCOOMatrix() const {
 }
 
 HeteroGraphPtr UnitGraph::GetAny() const {
-  if (in_csr_) {
+  if (HasInCSR()) {
     return in_csr_;
-  } else if (out_csr_) {
+  } else if (HasOutCSR()) {
     return out_csr_;
   } else {
     return coo_;
