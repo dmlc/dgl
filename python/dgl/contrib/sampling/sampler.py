@@ -242,7 +242,6 @@ class NeighborSampler(NodeFlowSampler):
         The batch size (i.e, the number of nodes in the last layer)
     expand_factor : int
         The number of neighbors sampled from the neighbor list of a vertex.
-        The value of this parameter indicates the number of neighbors sampled from a neighbor list.
 
         Note that no matter how large the expand_factor, the max number of sampled neighbors
         is the neighborhood size.
