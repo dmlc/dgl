@@ -121,6 +121,32 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_.row->dtype.bits;
   }
 
+  COO AsNumBits(uint8_t bits) const {
+    if (NumBits() == bits)
+      return *this;
+
+    COO ret(
+        meta_graph_,
+        adj_.num_rows, adj_.num_cols,
+        aten::AsNumBits(adj_.row, bits),
+        aten::AsNumBits(adj_.col, bits));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+
+  COO CopyTo(const DLContext& ctx) const {
+    if (Context() == ctx)
+      return *this;
+
+    COO ret(
+        meta_graph_,
+        adj_.num_rows, adj_.num_cols,
+        adj_.row.CopyTo(ctx),
+        adj_.col.CopyTo(ctx));
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+
   bool IsMultigraph() const override {
     return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
         return aten::COOHasDuplicate(adj_);
@@ -828,36 +854,59 @@ EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
 }
 
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
-  // TODO: start here
-  return GetInCSR()->OutDegree(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->InDegree(etype, vid);
+  else
+    return GetInCSR()->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
-  return GetInCSR()->OutDegrees(etype, vids);
+  if (prefer_coo_)
+    return GetCOO()->InDegrees(etype, vids);
+  else
+    return GetInCSR()->OutDegrees(etype, vids);
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
-  return GetOutCSR()->OutDegree(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->OutDegree(etype, vid);
+  else
+    return GetOutCSR()->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
-  return GetOutCSR()->OutDegrees(etype, vids);
+  if (prefer_coo_)
+    return GetCOO()->OutDegrees(etype, vids);
+  else
+    return GetOutCSR()->OutDegrees(etype, vids);
 }
 
 DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
-  return GetOutCSR()->SuccVec(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->SuccVec(etype, vid);
+  else
+    return GetOutCSR()->SuccVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  return GetOutCSR()->OutEdgeVec(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->OutEdgeVec(etype, vid);
+  else
+    return GetOutCSR()->OutEdgeVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::PredVec(dgl_type_t etype, dgl_id_t vid) const {
-  return GetInCSR()->SuccVec(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->PredVec(etype, vid);
+  else
+    return GetInCSR()->SuccVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  return GetInCSR()->OutEdgeVec(etype, vid);
+  if (prefer_coo_)
+    return GetCOO()->InEdgeVec(etype, vid);
+  else
+    return GetInCSR()->OutEdgeVec(etype, vid);
 }
 
 std::vector<IdArray> UnitGraph::GetAdj(
@@ -882,7 +931,11 @@ std::vector<IdArray> UnitGraph::GetAdj(
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
   // We prefer to generate a subgraph from out-csr.
-  auto sg = GetOutCSR()->VertexSubgraph(vids);
+  HeteroSubgraph sg;
+  if (prefer_coo_)
+    sg = GetCOO()->VertexSubgraph(vids);
+  else
+    sg = GetOutCSR()->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
   ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
@@ -934,9 +987,17 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     //   be fixed later.
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
-    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
-    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
-    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
+
+    if (!bg->prefer_coo_) {
+      CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
+      CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+      return HeteroGraphPtr(
+          new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, false));
+    } else {
+      COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->AsNumBits(bits)));
+      return HeteroGraphPtr(
+          new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, true));
+    }
   }
 }
 
@@ -950,9 +1011,15 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   //   be fixed later.
   auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
-  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
-  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr));
+
+  if (!bg->prefer_coo_) {
+    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
+    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, false));
+  } else {
+    COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->CopyTo(ctx)));
+    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, true));
+  }
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool prefer_coo)
