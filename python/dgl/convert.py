@@ -713,6 +713,7 @@ def to_homo(G):
 # Internal APIs
 ############################################################
 
+# pylint: disable=unused-argument
 def detect_prefer_coo(urange, vrange, u, v):
     """
     Decides whether to prefer graph queries on COO format for a unit graph, given the
