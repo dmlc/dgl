@@ -253,6 +253,11 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 /*! \brief Return the data array of the given row */
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
+/*! \brief Whether the CSR matrix contains data */
+inline bool CSRHasData(CSRMatrix csr) {
+  return csr.data.defined();
+}
+
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
 /*!
@@ -342,7 +347,12 @@ runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row, bool transpose);
 std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix , int64_t row, bool transpose);
 
-/* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+/*! \brief Whether the COO matrix contains data */
+inline bool COOHasData(COOMatrix csr) {
+  return csr.data.defined();
+}
+
+/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
 
 /*!
