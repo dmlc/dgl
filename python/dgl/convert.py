@@ -21,7 +21,8 @@ __all__ = [
     'to_networkx',
 ]
 
-def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo=False, **kwargs):
+def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo='auto',
+          **kwargs):
     """Create a graph with one type of nodes and edges.
 
     In the sparse matrix perspective, :func:`dgl.graph` creates a graph
@@ -49,9 +50,8 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo=Fa
         If True, check if node ids are within cardinality, the check process may take
         some time. (Default: True)
         If False and card is not None, user would receive a warning.
-    _prefer_coo : bool, optional
-        Internal argument for forcing the storage to be in COO format.  For unit test
-        only.
+    _prefer_coo : bool or 'auto', optional
+        Internal argument for forcing the storage to be in COO format.  Do not use.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
         graph. It can consist of:
@@ -138,7 +138,7 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo=Fa
         raise DGLError('Unsupported graph data type:', type(data))
 
 def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True,
-              _prefer_coo=False, **kwargs):
+              _prefer_coo='auto', **kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -171,6 +171,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
         If True, check if node ids are within cardinality, the check process may take
         some time. (Default: True)
         If False and card is not None, user would receive a warning.
+    _prefer_coo : bool or 'auto', optional
+        Internal argument for forcing the storage to be in COO format.  Do not use.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
         graph. It can consist of:
@@ -711,8 +713,30 @@ def to_homo(G):
 # Internal APIs
 ############################################################
 
+def detect_prefer_coo(urange, vrange, u, v):
+    """
+    Decides whether to prefer graph queries on COO format for a unit graph, given the
+    number of source and destination nodes, as well as the edges.
+
+    If the edges is much less than the number of nodes, storing the graph as CSR is
+    not memory-efficient.
+
+    Parameters
+    ----------
+    urange, vrange : int
+        Number of source and destination nodes, respectively.
+    u, v : iterable of int
+        List of source and destination node IDs.
+
+    Returns
+    -------
+    bool
+        Whether to prefer COO as storage.
+    """
+    return bool(len(u) < urange * 0.2)
+
 def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, validate=True,
-                      _prefer_coo=False):
+                      _prefer_coo="auto"):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -737,9 +761,8 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-    _prefer_coo : bool, optional
-        Internal argument for forcing the storage to be in COO format.  For unit test
-        only.
+    _prefer_coo : bool or 'auto'
+        Internal argument for forcing the storage to be in COO format.  Do not use.
 
     Returns
     -------
@@ -767,14 +790,19 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         num_ntypes = 1
     else:
         num_ntypes = 2
-    hgidx = heterograph_index.create_unitgraph_from_coo(num_ntypes, urange, vrange, u, v, _prefer_coo)
+
+    if _prefer_coo == 'auto':
+        _prefer_coo = detect_prefer_coo(urange, vrange, u, v)
+
+    hgidx = heterograph_index.create_unitgraph_from_coo(
+        num_ntypes, urange, vrange, u, v, _prefer_coo)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
-                          validate=True, _prefer_coo=False):
+                          validate=True, _prefer_coo='auto'):
     """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
@@ -797,9 +825,8 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-    _prefer_coo : bool, optional
-        Internal argument for forcing the storage to be in COO format.  For unit test
-        only.
+    _prefer_coo : bool or 'auto', optional
+        Internal argument for forcing the storage to be in COO format.  Do not use.
 
     Returns
     -------
@@ -813,7 +840,7 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         v = list(v)
     return create_from_edges(u, v, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
 
-def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
+def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False, _prefer_coo='auto'):
     """Internal function to create a heterograph from a scipy sparse matrix with types.
 
     Parameters
@@ -833,7 +860,10 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
         (source, destination) order.
     validate : bool, optional
         If True, checks if node IDs are within range.
-
+    _prefer_coo : bool, optional
+        Internal argument for forcing the storage to be in COO format.  For unit test
+        only.
+        Only takes effect when the Scipy matrix is in COO format.
 
     Returns
     -------
@@ -844,6 +874,8 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False):
     if spmat.getformat() == 'coo':
         row = utils.toindex(spmat.row)
         col = utils.toindex(spmat.col)
+        if _prefer_coo == 'auto':
+            _prefer_coo = detect_prefer_coo(num_src, num_dst, spmat.row, spmat.col)
         hgidx = heterograph_index.create_unitgraph_from_coo(
             num_ntypes, num_src, num_dst, row, col)
     else:
