@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
- * \file dgl/array.h
- * \brief Array types and common array operations required by DGL.
+ * \file dgl/array_utils.h
+ * \brief Utility classes and functions for DGL arrays.
  *
  * Note that this is not meant for a full support of array library such as ATen.
  * Only a limited set of operators required by DGL are implemented.
