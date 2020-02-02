@@ -461,7 +461,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 /*
  * Dispatch according to float type (either float32 or float64):
  *
- * ATEN_ID_TYPE_SWITCH(array->dtype, FloatType, {
+ * ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, {
  *   // Now FloatType is the type corresponding to data type in array.
  *   // For instance, one can do this for a CPU array:
  *   FloatType *data = static_cast<FloatType *>(array->data);
@@ -484,7 +484,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 /*
  * Dispatch according to data type (int32, int64, float32 or float64):
  *
- * ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+ * ATEN_DTYPE_SWITCH(array->dtype, DType, {
  *   // Now DType is the type corresponding to data type in array.
  *   // For instance, one can do this for a CPU array:
  *   DType *data = static_cast<DType *>(array->data);

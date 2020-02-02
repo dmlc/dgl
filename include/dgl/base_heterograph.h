@@ -91,6 +91,11 @@ class BaseHeteroGraph : public runtime::Object {
   virtual void Clear() = 0;
 
   /*!
+   * \brief Get the data type of node and edge IDs of this graph.
+   */
+  virtual DLDataType DataType() const = 0;
+
+  /*!
    * \brief Get the device context of this graph.
    */
   virtual DLContext Context() const = 0;
@@ -98,6 +103,7 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
    */
+  // TODO(BarclayII) replace NumBits() calls to DataType() calls
   virtual uint8_t NumBits() const = 0;
 
   /*!
@@ -464,18 +470,31 @@ DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 // creators
 
-/*! \brief Create a bipartite graph from COO arrays */
-HeteroGraphPtr CreateBipartiteFromCOO(
-    int64_t num_src, int64_t num_dst, IdArray row, IdArray col);
+/*! \brief Create a unit graph from COO arrays */
+HeteroGraphPtr CreateUnitGraphFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col);
 
-/*! \brief Create a bipartite graph from (out) CSR arrays */
-HeteroGraphPtr CreateBipartiteFromCSR(
-    int64_t num_src, int64_t num_dst,
+/*! \brief Create a unit graph from (out) CSR arrays */
+HeteroGraphPtr CreateUnitGraphFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids);
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
+
+/*!
+ * \brief Given a list of graphs, remove the common nodes that do not have inbound and
+ * outbound edges.
+ *
+ * The graphs should have identical node ID space (i.e. should have the same set of nodes,
+ * including types and IDs) and metagraph.
+ *
+ * \return A pair.  The first element is the list of compacted graphs, and the second
+ * element is the mapping from the compacted graphs and the original graph.
+ */
+std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
+CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
 
 };  // namespace dgl
 

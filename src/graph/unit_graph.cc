@@ -113,6 +113,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
+  DLDataType DataType() const override {
+    return adj_.row->dtype;
+  }
+
   DLContext Context() const override {
     return adj_.row->ctx;
   }
@@ -441,6 +445,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
+  DLDataType DataType() const override {
+    return adj_.indices->dtype;
+  }
+
   DLContext Context() const override {
     return adj_.indices->ctx;
   }
@@ -691,6 +699,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 // unit graph implementation
 //
 //////////////////////////////////////////////////////////
+
+DLDataType UnitGraph::DataType() const {
+  return GetAny()->DataType();
+}
 
 DLContext UnitGraph::Context() const {
   return GetAny()->Context();
@@ -975,6 +987,17 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, false));
+}
+
+HeteroGraphPtr CreateUnitGraphFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
+  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col, false);
+}
+
+HeteroGraphPtr CreateUnitGraphFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids) {
+  return UnitGraph::CreateFromCSR(num_vtypes, num_src, num_dst, indptr, indices, edge_ids);
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {

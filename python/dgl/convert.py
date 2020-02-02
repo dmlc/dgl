@@ -19,6 +19,7 @@ __all__ = [
     'to_hetero',
     'to_homo',
     'to_networkx',
+    'compact_graphs',
 ]
 
 def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo='auto',
@@ -708,6 +709,49 @@ def to_homo(G):
         retg.edata.update(comb_ef)
 
     return retg
+
+def compact_graphs(graphs):
+    """Given a list of graphs with the same set of nodes, find and eliminate the common
+    isolated nodes across all graphs.
+
+    This function requires the graphs to have the same set of nodes (i.e. the node types
+    must be the same, and the number of nodes of each node type must be the same).
+
+    It finds all the nodes that have zero in-degree and zero out-degree in all the given
+    graphs, and eliminates them from all the graphs.
+
+    The node and edge features are not preserved.
+
+    Parameters
+    ----------
+    graphs : list[DGLHeteroGraph]
+        List of graphs
+
+    Returns
+    -------
+    list[DGLHeteroGraph]
+        List of compacted graphs
+    dict[str, Tensor]
+        Induced nodes of each type.  Contains the mapping of node IDs for each type
+        from the compacted graph(s) to the original graph(s).
+        Note that the mapping is the same for all the compacted graphs.
+
+    Examples
+    --------
+    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', card=(20, 10))
+    >>> new_g, induced_nodes = dgl.compact_graphs(g)
+    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', card=(20, 10))
+    >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
+    """
+    new_graph_indexes, induced_nodes = heterograph_index.compact_graph_indexes(
+        [g._graph for g in graphs])
+
+    new_graphs = [
+            DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+            for new_graph_index, graph in zip(new_graph_indexes, graphs)]
+
+    return new_graphs, {ntype: induced_nodes[i] for i, ntype in enumerate(graphs[0].ntypes)}
+
 
 ############################################################
 # Internal APIs

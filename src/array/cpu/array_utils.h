@@ -2,9 +2,6 @@
  *  Copyright (c) 2019 by Contributors
  * \file dgl/array_utils.h
  * \brief Utility classes and functions for DGL arrays.
- *
- * Note that this is not meant for a full support of array library such as ATen.
- * Only a limited set of operators required by DGL are implemented.
  */
 #ifndef DGL_ARRAY_CPU_ARRAY_UTILS_H_
 #define DGL_ARRAY_CPU_ARRAY_UTILS_H_
@@ -24,12 +21,21 @@ namespace aten {
 template <typename IdType>
 class IdHashMap {
  public:
-  // Construct the hashmap using the given id arrays.
+  // default ctor
+  IdHashMap(): filter_(kFilterSize, false) {}
+
+  // Construct the hashmap using the given id array.
   // The id array could contain duplicates.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+    Update(ids);
+  }
+
+  // Update the hashmap with given id array.
+  // The id array could contain duplicates.
+  void Update(IdArray ids) {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
-    IdType newid = 0;
+    IdType newid = oldv2newv_.size();
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
       if (!Contains(id)) {
@@ -53,6 +59,23 @@ class IdHashMap {
     } else {
       return default_val;
     }
+  }
+
+  // Return the new id of each id in the given array.
+  IdArray Map(IdArray ids, IdType default_val) const {
+    const int64_t len = ids->shape[0];
+    std::vector<IdType> values(len);
+    for (int64_t i = 0; i < len; ++i)
+      values[i] = Map(IndexSelect<IdType>(ids, i), default_val);
+    return NDArray::FromVector(values, ids->dtype, ids->ctx);
+  }
+
+  // Return all the old ids collected so far, ordered by new id.
+  std::vector<IdType> Values() const {
+    std::vector<IdType> values(oldv2newv_.size());
+    for (auto pair : oldv2newv_)
+      values[pair.second] = pair.first;
+    return values;
   }
 
  private:

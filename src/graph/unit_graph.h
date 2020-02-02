@@ -71,6 +71,8 @@ class UnitGraph : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
+  DLDataType DataType() const override;
+
   DLContext Context() const override;
 
   uint8_t NumBits() const override;
