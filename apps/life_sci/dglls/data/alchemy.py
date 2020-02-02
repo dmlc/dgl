@@ -209,7 +209,7 @@ class TencentAlchemyDataset(object):
         if self.load:
             self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "{}_graphs.bin".format(self.mode)))
             self.labels = label_dict['labels']
-            with open(osp.join(self.file_dir, "{}_smiles.txt".format(self.mode), 'r')) as f:
+            with open(osp.join(self.file_dir, "{}_smiles.txt".format(self.mode)), 'r') as f:
                 smiles_ = f.readlines()
                 self.smiles = [s.strip() for s in smiles_]
         else:
