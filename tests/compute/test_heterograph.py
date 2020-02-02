@@ -1329,7 +1329,7 @@ def test_compact():
             assert (g_src == new_g_src_mapped).all()
             assert (g_dst == new_g_dst_mapped).all()
 
-    (new_g1,), induced_nodes = dgl.compact_graphs([g1])
+    new_g1, induced_nodes = dgl.compact_graphs(g1)
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     _check(g1, new_g1, induced_nodes)
 
