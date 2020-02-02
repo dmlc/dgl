@@ -168,7 +168,7 @@ def run(args, logger):
 
     num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
-    args.strict_rel_part = train_data.cross_part == False if args.rel_part else False
+    args.strict_rel_part = (train_data.cross_part == False)
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
@@ -306,11 +306,11 @@ def run(args, logger):
 
     # train
     start = time.time()
+    rel_parts = train_data.rel_parts if args.strict_rel_part else None
     if args.num_proc > 1:
         procs = []
         barrier = mp.Barrier(args.num_proc)
         for i in range(args.num_proc):
-            rel_parts = train_data.rel_parts if args.rel_part or args.strict_rel_part else None
             valid_sampler = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
             proc = mp.Process(target=train_mp, args=(args,
                                                      model,
@@ -325,7 +325,7 @@ def run(args, logger):
             proc.join()
     else:
         valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-        train(args, model, train_sampler, valid_samplers)
+        train(args, model, train_sampler, valid_samplers, rel_parts=rel_parts)
     print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb is not None:

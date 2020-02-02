@@ -60,7 +60,7 @@ def thread_wrapped_func(func):
 
 @thread_wrapped_func
 def async_update(args, emb, queue):
-    th.set_num_threads(8)
+    th.set_num_threads(4)
     while True:
         (grad_indices, grad_values, gpu_id) = queue.get()
         clr = emb.args.lr

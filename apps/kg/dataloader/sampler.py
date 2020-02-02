@@ -136,8 +136,11 @@ class TrainDataset(object):
                 BalancedRelationPartition(triples, ranks)
         elif ranks > 1:
             self.edge_parts = RandomPartition(triples, ranks)
+            self.cross_part = True
         else:
             self.edge_parts = [np.arange(num_train)]
+            self.rel_parts = [np.arange(dataset.n_relations)]
+            self.cross_part = False
 
         self.g = ConstructGraph(triples, dataset.n_entities, args)
         if weighting:
