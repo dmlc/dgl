@@ -68,16 +68,6 @@ struct PairHash {
   }
 };
 
-template <typename DType>
-inline runtime::NDArray VecToNDArray(const std::vector<DType>& vec,
-    DLDataType dtype, DLContext ctx) {
-  const int64_t len = vec.size();
-  NDArray ret_arr = NDArray::Empty({len}, dtype, ctx);
-  DType* ptr = static_cast<DType*>(ret_arr->data);
-  std::copy(vec.begin(), vec.end(), ptr);
-  return ret_arr;
-}
-
 inline bool CSRHasData(CSRMatrix csr) {
   return csr.data.defined();
 }
@@ -257,7 +247,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
       }
     }
   }
-  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix, int64_t, int64_t);
@@ -301,7 +291,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     }
   }
 
-  return VecToNDArray(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -381,9 +371,9 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     }
   }
 
-  return {VecToIdArray(ret_rows, csr.indptr->dtype.bits, csr.indptr->ctx),
-          VecToIdArray(ret_cols, csr.indptr->dtype.bits, csr.indptr->ctx),
-          VecToNDArray(ret_data, csr.data->dtype, csr.data->ctx)};
+  return {NDArray::FromVector(ret_rows, csr.indptr->dtype, csr.indptr->ctx),
+          NDArray::FromVector(ret_cols, csr.indptr->dtype, csr.indptr->ctx),
+          NDArray::FromVector(ret_data, csr.data->dtype, csr.data->ctx)};
 }
 
 template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int32_t, int32_t>(
@@ -613,8 +603,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   DType* ptr = static_cast<DType*>(sub_data_arr->data);
   std::copy(sub_data.begin(), sub_data.end(), ptr);
   return CSRMatrix{new_nrows, new_ncols,
-    VecToIdArray(sub_indptr, csr.indptr->dtype.bits, csr.indptr->ctx),
-    VecToIdArray(sub_indices, csr.indptr->dtype.bits, csr.indptr->ctx),
+    NDArray::FromVector(sub_indptr, csr.indptr->dtype, csr.indptr->ctx),
+    NDArray::FromVector(sub_indices, csr.indptr->dtype, csr.indptr->ctx),
     sub_data_arr};
 }
 

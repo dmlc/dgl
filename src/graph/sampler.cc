@@ -4,6 +4,7 @@
  * \brief DGL sampler implementation
  */
 #include <dgl/sampler.h>
+#include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/container.h>
 #include <dgl/packed_func_ext.h>
@@ -14,7 +15,6 @@
 #include <cmath>
 #include <numeric>
 #include "../c_api_common.h"
-#include "../array/common.h"  // for ATEN_FLOAT_TYPE_SWITCH
 
 using namespace dgl::runtime;
 

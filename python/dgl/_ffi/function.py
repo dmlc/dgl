@@ -286,14 +286,16 @@ def _init_api_prefix(module_name, prefix):
     for name in list_global_func_names():
         if name.startswith("_"):
             continue
-        if not name.startswith(prefix):
+        name_split = name.rsplit('.', 1)
+        if name_split[0] != prefix:
             continue
-        fname = name[len(prefix)+1:]
+
+        if len(name_split) == 1:
+            print('Warning: invalid API name "%s".' % name)
+            continue
+        fname = name_split[1]
         target_module = module
 
-        if fname.find(".") != -1:
-            print('Warning: invalid API name "%s".' % fname)
-            continue
         f = get_global_func(name)
         ff = _get_api(f)
         ff.__name__ = fname
