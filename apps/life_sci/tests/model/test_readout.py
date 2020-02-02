@@ -41,8 +41,8 @@ def test_attentive_fp_readout():
     g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
-    model = AttentiveFPReadout(num_timesteps=1,
-                               feat_size=1).to(device)
+    model = AttentiveFPReadout(feat_size=1,
+                               num_timesteps=1).to(device)
     assert model(g, node_feats).shape == torch.Size([1, 1])
     assert model(bg, batch_node_feats).shape == torch.Size([2, 1])
 

@@ -282,17 +282,17 @@ class AttentiveFPGNN(nn.Module):
     edge_feat_size : int
         Size for the input edge features.
     num_layers : int
-        Number of GNN layers.
+        Number of GNN layers. Default to 2.
     graph_feat_size : int
-        Size for the graph representations to be computed.
+        Size for the graph representations to be computed. Default to 200.
     dropout : float
         The probability for performing dropout. Default to 0.
     """
     def __init__(self,
                  node_feat_size,
                  edge_feat_size,
-                 num_layers,
-                 graph_feat_size,
+                 num_layers=2,
+                 graph_feat_size=200,
                  dropout=0.):
         super(AttentiveFPGNN, self).__init__()
 

@@ -20,23 +20,23 @@ class AttentiveFPPredictor(nn.Module):
     edge_feat_size : int
         Size for the input edge features.
     num_layers : int
-        Number of GNN layers.
+        Number of GNN layers. Default to 2.
     num_timesteps : int
-        Times of updating the graph representations with GRU.
+        Times of updating the graph representations with GRU. Default to 2.
     graph_feat_size : int
-        Size for the learned graph representations.
+        Size for the learned graph representations. Default to 200.
     n_tasks : int
-        Number of tasks, which is also the output size.
+        Number of tasks, which is also the output size. Default to 1.
     dropout : float
         Probability for performing the dropout. Default to 0.
     """
     def __init__(self,
                  node_feat_size,
                  edge_feat_size,
-                 num_layers,
-                 num_timesteps,
-                 graph_feat_size,
-                 n_tasks,
+                 num_layers=2,
+                 num_timesteps=2,
+                 graph_feat_size=200,
+                 n_tasks=1,
                  dropout=0.):
         super(AttentiveFPPredictor, self).__init__()
 
@@ -45,8 +45,8 @@ class AttentiveFPPredictor(nn.Module):
                                   num_layers=num_layers,
                                   graph_feat_size=graph_feat_size,
                                   dropout=dropout)
-        self.readout = AttentiveFPReadout(num_timesteps=num_timesteps,
-                                          feat_size=graph_feat_size,
+        self.readout = AttentiveFPReadout(feat_size=graph_feat_size,
+                                          num_timesteps=num_timesteps,
                                           dropout=dropout)
         self.predict = nn.Sequential(
             nn.Dropout(dropout),

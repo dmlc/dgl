@@ -2,8 +2,10 @@ import dgl
 import os
 import torch
 
+from functools import partial
+
 from dglls.model import load_pretrained
-from dglls.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
+from dglls.utils import *
 
 def remove_file(fname):
     if os.path.isfile(fname):
@@ -63,6 +65,7 @@ def test_gcn_tox21():
     g1 = smiles_to_bigraph('CO', node_featurizer=node_featurizer)
     g2 = smiles_to_bigraph('CCO', node_featurizer=node_featurizer)
     bg = dgl.batch([g1, g2])
+
     model = load_pretrained('GCN_Tox21').to(device)
     model(bg.to(device), bg.ndata.pop('h').to(device))
     model.eval()
@@ -80,6 +83,7 @@ def test_gat_tox21():
     g1 = smiles_to_bigraph('CO', node_featurizer=node_featurizer)
     g2 = smiles_to_bigraph('CCO', node_featurizer=node_featurizer)
     bg = dgl.batch([g1, g2])
+
     model = load_pretrained('GAT_Tox21').to(device)
     model(bg.to(device), bg.ndata.pop('h').to(device))
     model.eval()
@@ -87,8 +91,51 @@ def test_gat_tox21():
 
     remove_file('GAT_Tox21_pre_trained.pth')
 
+def chirality(atom):
+    try:
+        return one_hot_encoding(atom.GetProp('_CIPCode'), ['R', 'S']) + \
+               [atom.HasProp('_ChiralityPossible')]
+    except:
+        return [False, False] + [atom.HasProp('_ChiralityPossible')]
+
+def test_attentivefp_aromaticity():
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    else:
+        device = torch.device('cpu')
+
+    node_featurizer = BaseAtomFeaturizer(
+        featurizer_funcs={'hv': ConcatFeaturizer([
+            partial(atom_type_one_hot, allowable_set=[
+                'B', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl', 'As', 'Se', 'Br', 'Te', 'I', 'At'],
+                    encode_unknown=True),
+            partial(atom_degree_one_hot, allowable_set=list(range(6))),
+            atom_formal_charge, atom_num_radical_electrons,
+            partial(atom_hybridization_one_hot, encode_unknown=True),
+            lambda atom: [0], # A placeholder for aromatic information,
+            atom_total_num_H_one_hot, chirality
+        ],
+        )}
+    )
+    edge_featurizer = BaseBondFeaturizer({
+        'he': lambda bond: [0 for _ in range(10)]
+    })
+    g1 = smiles_to_bigraph('CO', node_featurizer=node_featurizer,
+                           edge_featurizer=edge_featurizer)
+    g2 = smiles_to_bigraph('CCO', node_featurizer=node_featurizer,
+                           edge_featurizer=edge_featurizer)
+    bg = dgl.batch([g1, g2])
+
+    model = load_pretrained('AttentiveFP_Aromaticity').to(device)
+    model(bg.to(device), bg.ndata.pop('hv').to(device), bg.edata.pop('he').to(device))
+    model.eval()
+    model(g1.to(device), g1.ndata.pop('hv').to(device), g1.edata.pop('he').to(device))
+
+    remove_file('AttentiveFP_Aromaticity_pre_trained.pth')
+
 if __name__ == '__main__':
     test_dgmg()
     test_jtnn()
     test_gcn_tox21()
     test_gat_tox21()
+    test_attentivefp_aromaticity()

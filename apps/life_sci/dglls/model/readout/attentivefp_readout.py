@@ -81,15 +81,15 @@ class AttentiveFPReadout(nn.Module):
 
     Parameters
     ----------
-    num_timesteps : int
-        Times of updating the graph representations with GRU.
     feat_size : int
         Size for the input node features, graph features and output graph
         representations.
+    num_timesteps : int
+        Times of updating the graph representations with GRU. Default to 2.
     dropout : float
         The probability for performing dropout. Default to 0.
     """
-    def __init__(self, num_timesteps, feat_size, dropout=0.):
+    def __init__(self, feat_size, num_timesteps=2, dropout=0.):
         super(AttentiveFPReadout, self).__init__()
 
         self.readouts = nn.ModuleList()

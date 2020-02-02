@@ -43,6 +43,15 @@ def test_acnn():
                                                    ligand_coords,
                                                    pocket_coords)
 
+    model = ACNN()
+    model.to(device)
+    g1.to(device)
+    assert model(g1).shape == torch.Size([1, 1])
+
+    bg = dgl.batch_hetero([g1, g1])
+    bg.to(device)
+    assert model(bg).shape == torch.Size([2, 1])
+
     model = ACNN(hidden_sizes=[1, 2],
                  weight_init_stddevs=[1, 1],
                  dropouts=[0.1, 0.],
@@ -51,7 +60,6 @@ def test_acnn():
     model.to(device)
     g1.to(device)
     assert model(g1).shape == torch.Size([1, 1])
-
 
     bg = dgl.batch_hetero([g1, g1])
     bg.to(device)

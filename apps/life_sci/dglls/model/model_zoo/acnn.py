@@ -1,6 +1,7 @@
 """Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity"""
 # pylint: disable=C0103, C0123
 import itertools
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -129,29 +130,55 @@ class ACNN(nn.Module):
     The model was proposed in `Atomic Convolutional Networks for
     Predicting Protein-Ligand Binding Affinity <https://arxiv.org/abs/1703.10603>`__.
 
+    The prediction proceeds as follows:
+
+    1. Perform message passing to update atom representations for the
+       ligand, protein and protein-ligand complex.
+    2. Predict the energy of atoms from their representations with an MLP.
+    3. Take the sum of predicted energy of atoms within each molecule for
+       predicted energy of the ligand, protein and protein-ligand complex.
+    4. Make the final prediction by subtracting the predicted ligand and protein
+       energy from the predicted complex energy.
+
     Parameters
     ----------
     hidden_sizes : list of int
-        Specifying the hidden sizes for all layers in the predictor.
+        ``hidden_sizes[i]`` gives the size of hidden representations in the i-th
+        hidden layer of the MLP. By Default, ``[32, 32, 16]`` will be used.
     weight_init_stddevs : list of float
-        Specifying the standard deviations to use for truncated normal
-        distributions in initialzing weights for the predictor.
+        ``weight_init_stddevs[i]`` gives the std to initialize parameters in the
+        i-th layer of the MLP. Note that ``len(weight_init_stddevs) == len(hidden_sizes) + 1``
+        due to the output layer. By default, we use ``1 / sqrt(hidden_sizes[i])`` for hidden
+        layers and 0.01 for the output layer.
     dropouts : list of float
-        Specifying the dropouts to use for all layers in the predictor.
+        ``dropouts[i]`` gives the dropout in the i-th hidden layer of the MLP. By default,
+        no dropout is used.
     features_to_use : None or float tensor of shape (T)
         In the original paper, these are atomic numbers to consider, representing the types
-        of atoms. T for the number of types of atomic numbers. Default to None.
-    radial : None or list
-        If not None, the list consists of 3 lists of floats, separately for the
+        of atoms. T for the number of types of atomic numbers. If None, we use same parameters
+        for all atoms regardless of their type. Default to None.
+    radial : list
+        The list consists of 3 sublists of floats, separately for the
         options of interaction cutoff, the options of rbf kernel mean and the
-        options of rbf kernel scaling. If None, a default option of
+        options of rbf kernel scaling. By default,
         ``[[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]]`` will be used.
     num_tasks : int
-        Number of output tasks.
+        Number of output tasks. Default to 1.
     """
-    def __init__(self, hidden_sizes, weight_init_stddevs, dropouts,
+    def __init__(self, hidden_sizes=None, weight_init_stddevs=None, dropouts=None,
                  features_to_use=None, radial=None, num_tasks=1):
         super(ACNN, self).__init__()
+
+        if hidden_sizes is None:
+            hidden_sizes = [32, 32, 16]
+
+        if weight_init_stddevs is None:
+            weight_init_stddevs = [1. / float(np.sqrt(hidden_sizes[i]))
+                                   for i in range(len(hidden_sizes))]
+            weight_init_stddevs.append(0.01)
+
+        if dropouts is None:
+            dropouts = [0. for _ in range(len(hidden_sizes))]
 
         if radial is None:
             radial = [[12.0], [0.0, 2.0, 4.0, 6.0, 8.0], [4.0]]
