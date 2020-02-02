@@ -790,8 +790,8 @@ def compact_graphs(graphs):
         [g._graph for g in graphs])
 
     new_graphs = [
-            DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
-            for new_graph_index, graph in zip(new_graph_indexes, graphs)]
+        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+        for new_graph_index, graph in zip(new_graph_indexes, graphs)]
     if return_single:
         new_graphs = new_graphs[0]
 
