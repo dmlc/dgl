@@ -37,6 +37,9 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
     else:
         gpu_id = -1
 
+    if args.strict_rel_part:
+        model.prepare_relation(mx.gpu(gpu_id))
+
     start = time.time()
     for step in range(args.init_step, args.max_step):
         pos_g, neg_g = next(train_sampler)
@@ -59,6 +62,9 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
             start = time.time()
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
+    if args.strict_rel_part:
+        model.writeback_relation(rank, rel_parts)
+
     # clear cache
     logs = []
 
@@ -70,6 +76,9 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
+
+    if args.strict_rel_part:
+        model.load_relation(mx.gpu(gpu_id))
 
     for sampler in test_samplers:
         #print('Number of tests: ' + len(sampler))

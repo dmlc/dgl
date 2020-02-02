@@ -180,6 +180,18 @@ class TransRScore(nn.Block):
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
 
+    def prepare_local_emb(self, projection_emb):
+        self.global_projection_emb = self.projection_emb
+        self.projection_emb = projection_emb
+
+    def writeback_local_emb(self, idx):
+        self.global_projection_emb.emb[idx] = self.projection_emb.emb.as_in_context(mx.cpu())[idx]
+
+    def load_local_emb(self, projection_emb):
+        context = projection_emb.emb.context
+        projection_emb.emb = self.projection_emb.emb.as_in_context(context)
+        self.projection_emb = projection_emb
+
     def create_neg(self, neg_head):
         gamma = self.gamma
         if neg_head:
