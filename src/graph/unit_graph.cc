@@ -967,15 +967,27 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
   return ret;
 }
 
+inline bool DetectPreferCOO(
+    int64_t num_src, int64_t num_dst, IdArray row, IdArray col, std::string prefer_coo) {
+  if (prefer_coo == "True")
+    return true;
+  else if (prefer_coo == "False")
+    return false;
+  else
+    return row->shape[0] < num_src / 5;
+}
+
 HeteroGraphPtr UnitGraph::CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
-    bool prefer_coo) {
+    std::string prefer_coo) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo, prefer_coo));
+
+  bool prefer_coo_flag = DetectPreferCOO(num_src, num_dst, row, col, prefer_coo);
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo, prefer_coo_flag));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
@@ -991,7 +1003,7 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
 
 HeteroGraphPtr CreateUnitGraphFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
-  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col, false);
+  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
 }
 
 HeteroGraphPtr CreateUnitGraphFromCSR(
@@ -1045,7 +1057,8 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   }
 }
 
-UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool prefer_coo)
+UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
+                     bool prefer_coo)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo),
     prefer_coo_(prefer_coo) {
   CHECK(GetAny()) << "At least one graph structure should exist.";

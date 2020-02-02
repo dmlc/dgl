@@ -957,7 +957,7 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo=False):
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo="auto"):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -972,7 +972,7 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo
         Row index.
     col : utils.Index
         Col index.
-    prefer_coo : bool
+    prefer_coo : bool or "auto"
         Whether to force the storage to be in COO format.
 
     Returns

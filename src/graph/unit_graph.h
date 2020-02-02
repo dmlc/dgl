@@ -145,7 +145,7 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, bool prefer_coo = false);
+      IdArray row, IdArray col, std::string prefer_coo = "auto");
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
@@ -184,7 +184,8 @@ class UnitGraph : public BaseHeteroGraph {
    * \param out_csr out edge csr
    * \param coo coo
    */
-  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool prefer_coo = false);
+  UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
+            bool prefer_coo = false);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
