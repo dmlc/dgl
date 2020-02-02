@@ -168,7 +168,7 @@ def run(args, logger):
 
     num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
-    args.strict_rel_part = (train_data.cross_part == False)
+    args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
