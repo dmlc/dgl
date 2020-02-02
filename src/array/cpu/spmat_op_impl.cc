@@ -4,9 +4,9 @@
  * \brief Sparse matrix operator CPU implementation
  */
 #include <dgl/array.h>
-#include <dgl/array_utils.h>
 #include <vector>
 #include <unordered_set>
+#include "array_utils.h"
 
 namespace dgl {
 

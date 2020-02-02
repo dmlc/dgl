@@ -4,10 +4,10 @@
  * \brief Sparse matrix operator CPU implementation
  */
 #include <dgl/array.h>
-#include <dgl/array_utils.h>
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
+#include "array_utils.h"
 
 namespace dgl {
 

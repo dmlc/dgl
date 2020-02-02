@@ -6,8 +6,8 @@
  * Note that this is not meant for a full support of array library such as ATen.
  * Only a limited set of operators required by DGL are implemented.
  */
-#ifndef DGL_ARRAY_UTILS_H_
-#define DGL_ARRAY_UTILS_H_
+#ifndef DGL_ARRAY_CPU_ARRAY_UTILS_H_
+#define DGL_ARRAY_CPU_ARRAY_UTILS_H_
 
 #include <dgl/array.h>
 #include <vector>
@@ -27,10 +27,11 @@ class IdHashMap {
   // Construct the hashmap using the given id arrays.
   // The id array could contain duplicates.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+    const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
     IdType newid = 0;
     for (int64_t i = 0; i < len; ++i) {
-      const IdType id = IndexSelect<IdType>(ids, i);
+      const IdType id = ids_data[i];
       if (!Contains(id)) {
         oldv2newv_[id] = newid++;
         filter_[id & kFilterMask] = true;
@@ -75,4 +76,4 @@ struct PairHash {
 
 };  // namespace dgl
 
-#endif  // DGL_ARRAY_UTILS_H_
+#endif  // DGL_ARRAY_CPU_ARRAY_UTILS_H_
