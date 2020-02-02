@@ -190,9 +190,9 @@ class TencentAlchemyDataset(object):
         file_dir = osp.join(get_download_dir(), 'Alchemy_data')
 
         if load:
-            file_name = "%s_processed_dgl" % (mode)
+            file_name = "{}_processed_dgl".format(mode)
         else:
-            file_name = "%s_single_sdf" % (mode)
+            file_name = "{}_single_sdf".format(mode)
         self.file_dir = pathlib.Path(file_dir, file_name)
 
         self._url = 'dataset/alchemy/'
@@ -207,19 +207,19 @@ class TencentAlchemyDataset(object):
 
     def _load(self, mol_to_graph, node_featurizer, edge_featurizer):
         if self.load:
-            self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))
+            self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "{}_graphs.bin".format(self.mode)))
             self.labels = label_dict['labels']
-            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'r') as f:
+            with open(osp.join(self.file_dir, "{}_smiles.txt".format(self.mode), 'r')) as f:
                 smiles_ = f.readlines()
                 self.smiles = [s.strip() for s in smiles_]
         else:
             print('Start preprocessing dataset...')
-            target_file = pathlib.Path(self.file_dir, "%s_target.csv" % self.mode)
+            target_file = pathlib.Path(self.file_dir, "{}_target.csv".format(self.mode))
             self.target = pd.read_csv(
                 target_file,
                 index_col=0,
-                usecols=['gdb_idx',] + ['property_%d' % x for x in range(12)])
-            self.target = self.target[['property_%d' % x for x in range(12)]]
+                usecols=['gdb_idx',] + ['property_{:d}'.format(x) for x in range(12)])
+            self.target = self.target[['property_{:d}'.format(x) for x in range(12)]]
             self.graphs, self.labels, self.smiles = [], [], []
 
             supp = Chem.SDMolSupplier(osp.join(self.file_dir, self.mode + ".sdf"))
@@ -236,9 +236,9 @@ class TencentAlchemyDataset(object):
                 label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
                 self.labels.append(label)
 
-            save_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode), self.graphs,
+            save_graphs(osp.join(self.file_dir, "{}_graphs.bin".format(self.mode)), self.graphs,
                         labels={'labels': F.stack(self.labels, dim=0)})
-            with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'w') as f:
+            with open(osp.join(self.file_dir, "{}_smiles.txt".format(self.mode)), 'w') as f:
                 for s in self.smiles:
                     f.write(s + '\n')
 
