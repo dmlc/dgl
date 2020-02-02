@@ -7,7 +7,6 @@
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
-#include "./common.h"
 
 namespace dgl {
 
@@ -201,31 +200,71 @@ IdArray HStack(IdArray lhs, IdArray rhs) {
   return ret;
 }
 
-IdArray IndexSelect(IdArray array, IdArray index) {
-  IdArray ret;
+NDArray IndexSelect(NDArray array, IdArray index) {
+  NDArray ret;
+  // TODO(BarclayII): check if array and index match in context
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::IndexSelect<XPU, IdType>(array, index);
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(index->dtype, IdType, {
+        ret = impl::IndexSelect<XPU, DType, IdType>(array, index);
+      });
     });
   });
   return ret;
 }
 
-int64_t IndexSelect(IdArray array, int64_t index) {
-  int64_t ret = 0;
+template<typename ValueType>
+ValueType IndexSelect(NDArray array, uint64_t index) {
+  ValueType ret = 0;
   ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
-      ret = impl::IndexSelect<XPU, IdType>(array, index);
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ret = impl::IndexSelect<XPU, DType>(array, index);
     });
   });
   return ret;
 }
+template int32_t IndexSelect<int32_t>(NDArray array, uint64_t index);
+template int64_t IndexSelect<int64_t>(NDArray array, uint64_t index);
+template uint32_t IndexSelect<uint32_t>(NDArray array, uint64_t index);
+template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
+template float IndexSelect<float>(NDArray array, uint64_t index);
+template double IndexSelect<double>(NDArray array, uint64_t index);
 
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
   ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, {
     ATEN_ID_TYPE_SWITCH(arrays[0]->dtype, IdType, {
       ret = impl::Relabel_<XPU, IdType>(arrays);
+    });
+  });
+  return ret;
+}
+
+template<typename ValueType>
+std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value) {
+  std::tuple<NDArray, IdArray, IdArray> ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
+      ret = impl::Pack<XPU, DType>(array, static_cast<DType>(pad_value));
+    });
+  });
+  return ret;
+}
+
+template std::tuple<NDArray, IdArray, IdArray> Pack<int32_t>(NDArray, int32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<int64_t>(NDArray, int64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<uint32_t>(NDArray, uint32_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<uint64_t>(NDArray, uint64_t);
+template std::tuple<NDArray, IdArray, IdArray> Pack<float>(NDArray, float);
+template std::tuple<NDArray, IdArray, IdArray> Pack<double>(NDArray, double);
+
+std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths) {
+  std::pair<NDArray, IdArray> ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "array", {
+      ATEN_ID_TYPE_SWITCH(lengths->dtype, IdType, {
+        ret = impl::ConcatSlices<XPU, DType, IdType>(array, lengths);
+      });
     });
   });
   return ret;
