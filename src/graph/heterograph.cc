@@ -5,7 +5,6 @@
  */
 #include "./heterograph.h"
 #include <dgl/array.h>
-#include <dgl/array_utils.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
 #include <vector>
@@ -13,6 +12,9 @@
 #include <utility>
 #include "../c_api_common.h"
 #include "./unit_graph.h"
+// TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation which
+// only works on CPU.  Should fix later to make it device agnostic.
+#include "../array/cpu/array_utils.h"
 
 using namespace dgl::runtime;
 
@@ -135,11 +137,7 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
   // Step 2: Relabel the nodes for each type to a smaller ID space and save the mapping.
   std::vector<IdArray> induced_nodes;
   for (auto &hashmap : hashmaps)
-    induced_nodes.push_back(
-        NDArray::FromVector(
-          hashmap.Values(),
-          DLDataType{kDLInt, graphs[0]->NumBits(), 1},
-          graphs[0]->Context()));
+    induced_nodes.push_back(hashmap.Values());
 
   // Step 3: Remap the edges of each graph.
   std::vector<HeteroGraphPtr> new_graphs;

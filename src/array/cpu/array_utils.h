@@ -63,18 +63,21 @@ class IdHashMap {
 
   // Return the new id of each id in the given array.
   IdArray Map(IdArray ids, IdType default_val) const {
+    const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
-    std::vector<IdType> values(len);
+    IdArray values = NewIdArray(len, ids->ctx, ids->dtype.bits);
+    IdType* values_data = static_cast<IdType*>(values->data);
     for (int64_t i = 0; i < len; ++i)
-      values[i] = Map(IndexSelect<IdType>(ids, i), default_val);
-    return NDArray::FromVector(values, ids->dtype, ids->ctx);
+      values_data[i] = Map(ids_data[i], default_val);
+    return values;
   }
 
   // Return all the old ids collected so far, ordered by new id.
-  std::vector<IdType> Values() const {
-    std::vector<IdType> values(oldv2newv_.size());
+  IdArray Values() const {
+    IdArray values = NewIdArray(oldv2newv_.size(), DLContext{kDLCPU, 0}, sizeof(IdType) * 8);
+    IdType* values_data = static_cast<IdType*>(values->data);
     for (auto pair : oldv2newv_)
-      values[pair.second] = pair.first;
+      values_data[pair.second] = pair.first;
     return values;
   }
 
