@@ -1022,17 +1022,10 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
 
-    SparseFormat fmt = bg->SelectFormat(SparseFormat::ANY);
-    if (fmt != SparseFormat::COO) {
-      CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
-      CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
-      return HeteroGraphPtr(
-          new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
-    } else {
-      COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->AsNumBits(bits)));
-      return HeteroGraphPtr(
-          new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, bg->restrict_format_));
-    }
+    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
+    return HeteroGraphPtr(
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, SparseFormat::ANY));
   }
 }
 
@@ -1047,17 +1040,10 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
 
-  SparseFormat fmt = bg->SelectFormat(SparseFormat::ANY);
-  if (fmt != SparseFormat::COO) {
-    CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
-    CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-    return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
-  } else {
-    COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->CopyTo(ctx)));
-    return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, bg->restrict_format_));
-  }
+  CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
+  return HeteroGraphPtr(
+      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, SparseFormat::ANY));
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
