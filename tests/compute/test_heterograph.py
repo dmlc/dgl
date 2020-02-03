@@ -70,12 +70,12 @@ def create_test_heterograph3():
     wishes_nx.add_edge('u0', 'g1', id=0)
     wishes_nx.add_edge('u2', 'g0', id=1)
 
-    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', _prefer_coo=True)
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', _restrict_format='coo')
     plays_g = dgl.bipartite(
-        [(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game', _prefer_coo=True)
-    wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game', _prefer_coo=True)
+        [(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game', _restrict_format='coo')
+    wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game', _restrict_format='coo')
     develops_g = dgl.bipartite(
-        [(0, 0), (1, 1)], 'developer', 'develops', 'game', _prefer_coo=True)
+        [(0, 0), (1, 1)], 'developer', 'develops', 'game', _restrict_format='coo')
     g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     return g
 
@@ -142,7 +142,9 @@ def test_create():
     _test_validate_bipartite((3, 3))
     _test_validate_bipartite((2, 4))
 
-def _test_query(g):
+def test_query():
+    g = create_test_heterograph()
+
     ntypes = ['user', 'game', 'developer']
     canonical_etypes = [
         ('user', 'follows', 'user'),
@@ -168,25 +170,25 @@ def _test_query(g):
     for i in range(len(etypes)):
         assert g.to_canonical_etype(etypes[i]) == canonical_etypes[i]
 
-    # number of nodes
-    assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
-
-    # number of edges
-    assert [g.number_of_edges(etype) for etype in etypes] == [2, 4, 2, 2]
-
-    assert not g.is_multigraph
-    assert g.is_readonly
-
-    # has_node & has_nodes
-    for ntype in ntypes:
-        n = g.number_of_nodes(ntype)
-        for i in range(n):
-            assert g.has_node(i, ntype)
-        assert not g.has_node(n, ntype)
-        assert np.array_equal(
-            F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
-
     def _test(g):
+        # number of nodes
+        assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
+
+        # number of edges
+        assert [g.number_of_edges(etype) for etype in etypes] == [2, 4, 2, 2]
+
+        # has_node & has_nodes
+        for ntype in ntypes:
+            n = g.number_of_nodes(ntype)
+            for i in range(n):
+                assert g.has_node(i, ntype)
+            assert not g.has_node(n, ntype)
+            assert np.array_equal(
+                F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
+
+        assert not g.is_multigraph
+        assert g.is_readonly
+
         for etype in etypes:
             srcs, dsts = edges[etype]
             for src, dst in zip(srcs, dsts):
@@ -267,6 +269,8 @@ def _test_query(g):
     _test(g)
     g = create_test_heterograph1()
     _test(g)
+    g = create_test_heterograph3()
+    _test(g)
 
     etypes = canonical_etypes
     edges = {
@@ -286,13 +290,11 @@ def _test_query(g):
     _test(g)
     g = create_test_heterograph1()
     _test(g)
+    g = create_test_heterograph3()
+    _test(g)
 
     # test repr
     print(g)
-
-def test_query():
-    for g in [create_test_heterograph(), create_test_heterograph3()]:
-        _test_query(g)
 
 def test_adj():
     g = create_test_heterograph()

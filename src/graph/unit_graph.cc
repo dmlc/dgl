@@ -199,12 +199,12 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   IdArray Predecessors(dgl_type_t etype, dgl_id_t dst) const override {
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
-    return aten::COOGetRowDataAndIndices(adj_, dst, true).second;
+    return aten::COOGetRowDataAndIndices(aten::COOTranspose(adj_), dst).second;
   }
 
   IdArray Successors(dgl_type_t etype, dgl_id_t src) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
-    return aten::COOGetRowDataAndIndices(adj_, src, false).second;
+    return aten::COOGetRowDataAndIndices(adj_, src).second;
   }
 
   IdArray EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
@@ -236,28 +236,29 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
     IdArray ret_src, ret_eid;
-    std::tie(ret_eid, ret_src) = aten::COOGetRowDataAndIndices(adj_, vid, true);
+    std::tie(ret_eid, ret_src) = aten::COOGetRowDataAndIndices(
+        aten::COOTranspose(adj_), vid);
     IdArray ret_dst = aten::Full(vid, ret_src->shape[0], NumBits(), ret_src->ctx);
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override {
     CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
-    auto coosubmat = aten::COOSliceRows(adj_, vids, true);
+    auto coosubmat = aten::COOSliceRows(aten::COOTranspose(adj_), vids);
     auto row = aten::IndexSelect(vids, coosubmat.row);
-    return EdgeArray{row, coosubmat.col, coosubmat.data};
+    return EdgeArray{coosubmat.col, row, coosubmat.data};
   }
 
   EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
     IdArray ret_dst, ret_eid;
-    std::tie(ret_eid, ret_dst) = aten::COOGetRowDataAndIndices(adj_, vid, false);
+    std::tie(ret_eid, ret_dst) = aten::COOGetRowDataAndIndices(adj_, vid);
     IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
   EdgeArray OutEdges(dgl_type_t etype, IdArray vids) const override {
     CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
-    auto coosubmat = aten::COOSliceRows(adj_, vids, false);
+    auto coosubmat = aten::COOSliceRows(adj_, vids);
     auto row = aten::IndexSelect(vids, coosubmat.row);
     return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
@@ -272,22 +273,22 @@ class UnitGraph::COO : public BaseHeteroGraph {
 
   uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const override {
     CHECK(HasVertex(DstType(), vid)) << "Invalid dst vertex id: " << vid;
-    return aten::COOGetRowNNZ(adj_, vid, true);
+    return aten::COOGetRowNNZ(aten::COOTranspose(adj_), vid);
   }
 
   DegreeArray InDegrees(dgl_type_t etype, IdArray vids) const override {
     CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
-    return aten::COOGetRowNNZ(adj_, vids, true);
+    return aten::COOGetRowNNZ(aten::COOTranspose(adj_), vids);
   }
 
   uint64_t OutDegree(dgl_type_t etype, dgl_id_t vid) const override {
     CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
-    return aten::COOGetRowNNZ(adj_, vid, false);
+    return aten::COOGetRowNNZ(adj_, vid);
   }
 
   DegreeArray OutDegrees(dgl_type_t etype, IdArray vids) const override {
     CHECK(aten::IsValidIdArray(vids)) << "Invalid vertex id array.";
-    return aten::COOGetRowNNZ(adj_, vids, false);
+    return aten::COOGetRowNNZ(adj_, vids);
   }
 
   DGLIdIters SuccVec(dgl_type_t etype, dgl_id_t vid) const override {
@@ -717,14 +718,13 @@ bool UnitGraph::IsMultigraph() const {
 }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
-  if (in_csr_) {
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  // TODO(BarclayII): we have a lot of special handling for CSC.
+  // Need to have a UnitGraph::CSC backend instead.
+  if (fmt == SparseFormat::CSC)
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
-    return in_csr_->NumVertices(vtype);
-  } else if (out_csr_) {
-    return out_csr_->NumVertices(vtype);
-  } else {
-    return GetCOO()->NumVertices(vtype);
-  }
+  return ptr->NumVertices(vtype);
 }
 
 uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
@@ -732,14 +732,11 @@ uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {
 }
 
 bool UnitGraph::HasVertex(dgl_type_t vtype, dgl_id_t vid) const {
-  if (in_csr_) {
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
-    return in_csr_->HasVertex(vtype, vid);
-  } else if (out_csr_) {
-    return out_csr_->HasVertex(vtype, vid);
-  } else {
-    return GetCOO()->HasVertex(vtype, vid);
-  }
+  return ptr->HasVertex(vtype, vid);
 }
 
 BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
@@ -748,177 +745,184 @@ BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
 }
 
 bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (prefer_coo_) {
-    return GetCOO()->HasEdgeBetween(etype, src, dst);
-  } else if (in_csr_) {
-    return in_csr_->HasEdgeBetween(etype, dst, src);
-  } else {
-    return GetOutCSR()->HasEdgeBetween(etype, src, dst);
-  }
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->HasEdgeBetween(etype, dst, src);
+  else
+    return ptr->HasEdgeBetween(etype, src, dst);
 }
 
 BoolArray UnitGraph::HasEdgesBetween(
     dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (prefer_coo_) {
-    return GetCOO()->HasEdgesBetween(etype, src, dst);
-  } else if (in_csr_) {
-    return in_csr_->HasEdgesBetween(etype, dst, src);
-  } else {
-    return GetOutCSR()->HasEdgesBetween(etype, src, dst);
-  }
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->HasEdgesBetween(etype, dst, src);
+  else
+    return ptr->HasEdgesBetween(etype, src, dst);
 }
 
 IdArray UnitGraph::Predecessors(dgl_type_t etype, dgl_id_t dst) const {
-  if (prefer_coo_)
-    return GetCOO()->Predecessors(etype, dst);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->Successors(etype, dst);
   else
-    return GetInCSR()->Successors(etype, dst);
+    return ptr->Predecessors(etype, dst);
 }
 
 IdArray UnitGraph::Successors(dgl_type_t etype, dgl_id_t src) const {
-  if (prefer_coo_)
-    return GetCOO()->Successors(etype, src);
-  else
-    return GetOutCSR()->Successors(etype, src);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->Successors(etype, src);
 }
 
 IdArray UnitGraph::EdgeId(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
-  if (prefer_coo_) {
-    return GetCOO()->EdgeId(etype, src, dst);
-  } else if (in_csr_) {
-    return in_csr_->EdgeId(etype, dst, src);
-  } else {
-    return GetOutCSR()->EdgeId(etype, src, dst);
-  }
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->EdgeId(etype, dst, src);
+  else
+    return ptr->EdgeId(etype, src, dst);
 }
 
 EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
-  if (prefer_coo_) {
-    return GetCOO()->EdgeIds(etype, src, dst);
-  } else if (in_csr_) {
-    EdgeArray edges = in_csr_->EdgeIds(etype, dst, src);
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC) {
+    EdgeArray edges = ptr->EdgeIds(etype, dst, src);
     return EdgeArray{edges.dst, edges.src, edges.id};
   } else {
-    return GetOutCSR()->EdgeIds(etype, src, dst);
+    return ptr->EdgeIds(etype, src, dst);
   }
 }
 
 std::pair<dgl_id_t, dgl_id_t> UnitGraph::FindEdge(dgl_type_t etype, dgl_id_t eid) const {
-  return GetCOO()->FindEdge(etype, eid);
+  const SparseFormat fmt = SelectFormat(SparseFormat::COO);
+  const auto ptr = GetFormat(fmt);
+  return ptr->FindEdge(etype, eid);
 }
 
 EdgeArray UnitGraph::FindEdges(dgl_type_t etype, IdArray eids) const {
-  return GetCOO()->FindEdges(etype, eids);
+  const SparseFormat fmt = SelectFormat(SparseFormat::COO);
+  const auto ptr = GetFormat(fmt);
+  return ptr->FindEdges(etype, eids);
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_) {
-    return GetCOO()->InEdges(etype, vid);
-  } else {
-    const EdgeArray& ret = GetInCSR()->OutEdges(etype, vid);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC) {
+    const EdgeArray& ret = ptr->OutEdges(etype, vid);
     return {ret.dst, ret.src, ret.id};
+  } else {
+    return ptr->InEdges(etype, vid);
   }
 }
 
 EdgeArray UnitGraph::InEdges(dgl_type_t etype, IdArray vids) const {
-  if (prefer_coo_) {
-    return GetCOO()->InEdges(etype, vids);
-  } else {
-    const EdgeArray& ret = GetInCSR()->OutEdges(etype, vids);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC) {
+    const EdgeArray& ret = ptr->OutEdges(etype, vids);
     return {ret.dst, ret.src, ret.id};
+  } else {
+    return ptr->InEdges(etype, vids);
   }
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->OutEdges(etype, vid);
-  else
-    return GetOutCSR()->OutEdges(etype, vid);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->OutEdges(etype, vid);
 }
 
 EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
-  if (prefer_coo_)
-    return GetCOO()->OutEdges(etype, vids);
-  else
-    return GetOutCSR()->OutEdges(etype, vids);
+  const SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->OutEdges(etype, vids);
 }
 
 EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
-  if (prefer_coo_ || order == std::string("eid")) {
-    return GetCOO()->Edges(etype, order);
+  SparseFormat fmt;
+  if (order == std::string("eid")) {
+    fmt = SelectFormat(SparseFormat::COO);
   } else if (order.empty()) {
     // arbitrary order
-    if (in_csr_) {
-      // transpose
-      const auto& edges = in_csr_->Edges(etype, order);
-      return EdgeArray{edges.dst, edges.src, edges.id};
-    } else {
-      return GetAny()->Edges(etype, order);
-    }
+    fmt = SelectFormat(SparseFormat::ANY);
   } else if (order == std::string("srcdst")) {
-    // TODO(minjie): CSR only guarantees "src" to be sorted.
-    //   Maybe we should relax this requirement?
-    return GetOutCSR()->Edges(etype, order);
+    fmt = SelectFormat(SparseFormat::CSR);
   } else {
     LOG(FATAL) << "Unsupported order request: " << order;
+    return {};
   }
-  return {};
+
+  const auto& edges = GetFormat(fmt)->Edges(etype, order);
+  if (fmt == SparseFormat::CSC)
+    return EdgeArray{edges.dst, edges.src, edges.id};
+  else
+    return edges;
 }
 
 uint64_t UnitGraph::InDegree(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->InDegree(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->OutDegree(etype, vid);
   else
-    return GetInCSR()->OutDegree(etype, vid);
+    return ptr->InDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::InDegrees(dgl_type_t etype, IdArray vids) const {
-  if (prefer_coo_)
-    return GetCOO()->InDegrees(etype, vids);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->OutDegrees(etype, vids);
   else
-    return GetInCSR()->OutDegrees(etype, vids);
+    return ptr->InDegrees(etype, vids);
 }
 
 uint64_t UnitGraph::OutDegree(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->OutDegree(etype, vid);
-  else
-    return GetOutCSR()->OutDegree(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->OutDegree(etype, vid);
 }
 
 DegreeArray UnitGraph::OutDegrees(dgl_type_t etype, IdArray vids) const {
-  if (prefer_coo_)
-    return GetCOO()->OutDegrees(etype, vids);
-  else
-    return GetOutCSR()->OutDegrees(etype, vids);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->OutDegrees(etype, vids);
 }
 
 DGLIdIters UnitGraph::SuccVec(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->SuccVec(etype, vid);
-  else
-    return GetOutCSR()->SuccVec(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->SuccVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::OutEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->OutEdgeVec(etype, vid);
-  else
-    return GetOutCSR()->OutEdgeVec(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  const auto ptr = GetFormat(fmt);
+  return ptr->OutEdgeVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::PredVec(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->PredVec(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->SuccVec(etype, vid);
   else
-    return GetInCSR()->SuccVec(etype, vid);
+    return ptr->PredVec(etype, vid);
 }
 
 DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
-  if (prefer_coo_)
-    return GetCOO()->InEdgeVec(etype, vid);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSC);
+  const auto ptr = GetFormat(fmt);
+  if (fmt == SparseFormat::CSC)
+    return ptr->OutEdgeVec(etype, vid);
   else
-    return GetInCSR()->OutEdgeVec(etype, vid);
+    return ptr->InEdgeVec(etype, vid);
 }
 
 std::vector<IdArray> UnitGraph::GetAdj(
@@ -943,11 +947,8 @@ std::vector<IdArray> UnitGraph::GetAdj(
 
 HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
   // We prefer to generate a subgraph from out-csr.
-  HeteroSubgraph sg;
-  if (prefer_coo_)
-    sg = GetCOO()->VertexSubgraph(vids);
-  else
-    sg = GetOutCSR()->VertexSubgraph(vids);
+  SparseFormat fmt = SelectFormat(SparseFormat::CSR);
+  HeteroSubgraph sg = GetFormat(fmt)->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
   ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
@@ -958,7 +959,8 @@ HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const
 
 HeteroSubgraph UnitGraph::EdgeSubgraph(
     const std::vector<IdArray>& eids, bool preserve_nodes) const {
-  auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
+  SparseFormat fmt = SelectFormat(SparseFormat::COO);
+  auto sg = GetFormat(fmt)->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   HeteroSubgraph ret;
   ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
@@ -967,49 +969,42 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
   return ret;
 }
 
-inline bool DetectPreferCOO(
-    int64_t num_src, int64_t num_dst, IdArray row, IdArray col, std::string prefer_coo) {
-  if (prefer_coo == "True")
-    return true;
-  else if (prefer_coo == "False")
-    return false;
-  else
-    return row->shape[0] < num_src / 5;
-}
-
 HeteroGraphPtr UnitGraph::CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
-    std::string prefer_coo) {
+    SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
 
-  bool prefer_coo_flag = DetectPreferCOO(num_src, num_dst, row, col, prefer_coo);
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, nullptr, coo, prefer_coo_flag));
+  return HeteroGraphPtr(
+      new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids) {
+    IdArray indptr, IdArray indices, IdArray edge_ids, SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, false));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
 HeteroGraphPtr CreateUnitGraphFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col) {
-  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
+    SparseFormat restrict_format) {
+  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col, restrict_format);
 }
 
 HeteroGraphPtr CreateUnitGraphFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids) {
-  return UnitGraph::CreateFromCSR(num_vtypes, num_src, num_dst, indptr, indices, edge_ids);
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format) {
+  return UnitGraph::CreateFromCSR(
+      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -1023,15 +1018,16 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
     CHECK_NOTNULL(bg);
 
-    if (!bg->prefer_coo_) {
+    SparseFormat fmt = bg->SelectFormat(SparseFormat::ANY);
+    if (fmt != SparseFormat::COO) {
       CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
       CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
       return HeteroGraphPtr(
-          new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, false));
+          new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
     } else {
       COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->AsNumBits(bits)));
       return HeteroGraphPtr(
-          new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, true));
+          new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, bg->restrict_format_));
     }
   }
 }
@@ -1047,20 +1043,23 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   auto bg = std::dynamic_pointer_cast<UnitGraph>(g);
   CHECK_NOTNULL(bg);
 
-  if (!bg->prefer_coo_) {
+  SparseFormat fmt = bg->SelectFormat(SparseFormat::ANY);
+  if (fmt != SparseFormat::COO) {
     CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
     CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, false));
+    return HeteroGraphPtr(
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
   } else {
     COOPtr new_coo = COOPtr(new COO(bg->GetCOO()->CopyTo(ctx)));
-    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, true));
+    return HeteroGraphPtr(
+        new UnitGraph(g->meta_graph(), nullptr, nullptr, new_coo, bg->restrict_format_));
   }
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-                     bool prefer_coo)
+                     SparseFormat restrict_format)
   : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo),
-    prefer_coo_(prefer_coo) {
+    restrict_format_(restrict_format) {
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
@@ -1132,6 +1131,37 @@ HeteroGraphPtr UnitGraph::GetAny() const {
   } else {
     return coo_;
   }
+}
+
+HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
+  if (format == SparseFormat::CSR)
+    return GetOutCSR();
+  else if (format == SparseFormat::CSC)
+    return GetInCSR();
+  else if (format == SparseFormat::COO)
+    return GetCOO();
+  else if (format == SparseFormat::ANY)
+    return GetAny();
+
+  LOG(FATAL) << "Unsupported format code: " << format;
+  return nullptr;
+}
+
+bool UnitGraph::IsHypersparse() const {
+  return NumEdges(0) < NumVertices(SrcType()) / 5;
+}
+
+SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
+  if (restrict_format_ != SparseFormat::ANY)
+    return restrict_format_;
+  else if (preferred_format != SparseFormat::ANY)
+    return preferred_format;
+  else if (in_csr_)
+    return SparseFormat::CSC;
+  else if (out_csr_)
+    return SparseFormat::CSR;
+  else
+    return SparseFormat::COO;
 }
 
 }  // namespace dgl

@@ -23,7 +23,7 @@ __all__ = [
     'compact_graphs',
 ]
 
-def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo='auto',
+def graph(data, ntype='_N', etype='_E', card=None, validate=True, _restrict_format='any',
           **kwargs):
     """Create a graph with one type of nodes and edges.
 
@@ -52,8 +52,8 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo='a
         If True, check if node ids are within cardinality, the check process may take
         some time. (Default: True)
         If False and card is not None, user would receive a warning.
-    _prefer_coo : bool or 'auto', optional
-        Internal argument for forcing the storage to be in COO format.
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
         For unit test only.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
@@ -129,19 +129,19 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, _prefer_coo='a
     if isinstance(data, tuple):
         u, v = data
         return create_from_edges(
-            u, v, ntype, etype, ntype, urange, vrange, validate, _prefer_coo)
+            u, v, ntype, etype, ntype, urange, vrange, validate, _restrict_format)
     elif isinstance(data, list):
         return create_from_edge_list(
-            data, ntype, etype, ntype, urange, vrange, validate, _prefer_coo)
+            data, ntype, etype, ntype, urange, vrange, validate, _restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
-        return create_from_scipy(data, ntype, etype, ntype)
+        return create_from_scipy(data, ntype, etype, ntype, _restrict_format)
     elif isinstance(data, nx.Graph):
-        return create_from_networkx(data, ntype, etype, **kwargs)
+        return create_from_networkx(data, ntype, etype, _restrict_format, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
 def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True,
-              _prefer_coo='auto', **kwargs):
+              _restrict_format='any', **kwargs):
     """Create a bipartite graph.
 
     The result graph is directed and edges must be from ``utype`` nodes
@@ -174,8 +174,8 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
         If True, check if node ids are within cardinality, the check process may take
         some time. (Default: True)
         If False and card is not None, user would receive a warning.
-    _prefer_coo : bool or 'auto', optional
-        Internal argument for forcing the storage to be in COO format.
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
         For unit test only.
     kwargs : key-word arguments, optional
         Other key word arguments. Only comes into effect when we are using a NetworkX
@@ -266,14 +266,15 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
     if isinstance(data, tuple):
         u, v = data
         return create_from_edges(
-            u, v, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
+            u, v, utype, etype, vtype, urange, vrange, validate, _restrict_format)
     elif isinstance(data, list):
         return create_from_edge_list(
-            data, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
+            data, utype, etype, vtype, urange, vrange, validate, _restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
-        return create_from_scipy(data, utype, etype, vtype)
+        return create_from_scipy(data, utype, etype, vtype, _restrict_format)
     elif isinstance(data, nx.Graph):
-        return create_from_networkx_bipartite(data, utype, etype, vtype, **kwargs)
+        return create_from_networkx_bipartite(
+            data, utype, etype, vtype, _restrict_format, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -802,31 +803,8 @@ def compact_graphs(graphs):
 # Internal APIs
 ############################################################
 
-# pylint: disable=unused-argument
-def detect_prefer_coo(urange, vrange, u, v):
-    """
-    Decides whether to prefer graph queries on COO format for a unit graph, given the
-    number of source and destination nodes, as well as the edges.
-
-    If the edges is much less than the number of nodes, storing the graph as CSR is
-    not memory-efficient.
-
-    Parameters
-    ----------
-    urange, vrange : int
-        Number of source and destination nodes, respectively.
-    u, v : iterable of int
-        List of source and destination node IDs.
-
-    Returns
-    -------
-    bool
-        Whether to prefer COO as storage.
-    """
-    return bool(len(u) < urange * 0.2)
-
 def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, validate=True,
-                      _prefer_coo="auto"):
+                      _restrict_format="any"):
     """Internal function to create a graph from incident nodes with types.
 
     utype could be equal to vtype
@@ -851,8 +829,8 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-    _prefer_coo : bool or 'auto'
-        Internal argument for forcing the storage to be in COO format.
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
         For unit test only.
 
     Returns
@@ -882,17 +860,15 @@ def create_from_edges(u, v, utype, etype, vtype, urange=None, vrange=None, valid
     else:
         num_ntypes = 2
 
-    if isinstance(_prefer_coo, bool):
-        _prefer_coo = str(_prefer_coo)
     hgidx = heterograph_index.create_unitgraph_from_coo(
-        num_ntypes, urange, vrange, u, v, _prefer_coo)
+        num_ntypes, urange, vrange, u, v, _restrict_format)
     if utype == vtype:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
         return DGLHeteroGraph(hgidx, [utype, vtype], [etype])
 
 def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
-                          validate=True, _prefer_coo='auto'):
+                          validate=True, _restrict_format='any'):
     """Internal function to create a heterograph from a list of edge tuples with types.
 
     utype could be equal to vtype
@@ -915,8 +891,8 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         maximum of the destination node IDs in the edge list plus 1. (Default: None)
     validate : bool, optional
         If True, checks if node IDs are within range.
-    _prefer_coo : bool or 'auto', optional
-        Internal argument for forcing the storage to be in COO format.
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
         For unit test only.
 
     Returns
@@ -929,9 +905,11 @@ def create_from_edge_list(elist, utype, etype, vtype, urange=None, vrange=None,
         u, v = zip(*elist)
         u = list(u)
         v = list(v)
-    return create_from_edges(u, v, utype, etype, vtype, urange, vrange, validate, _prefer_coo)
+    return create_from_edges(
+        u, v, utype, etype, vtype, urange, vrange, validate, _restrict_format)
 
-def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False, _prefer_coo='auto'):
+def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
+                      _restrict_format='any'):
     """Internal function to create a heterograph from a scipy sparse matrix with types.
 
     Parameters
@@ -951,10 +929,9 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False, _prefer_co
         (source, destination) order.
     validate : bool, optional
         If True, checks if node IDs are within range.
-    _prefer_coo : bool or "auto", optional
-        Internal argument for forcing the storage to be in COO format.  For unit test
-        only.
-        Only takes effect when the Scipy matrix is in COO format.
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
+        For unit test only.
 
     Returns
     -------
@@ -965,10 +942,8 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False, _prefer_co
     if spmat.getformat() == 'coo':
         row = utils.toindex(spmat.row)
         col = utils.toindex(spmat.col)
-        if isinstance(_prefer_coo, bool):
-            _prefer_coo = str(_prefer_coo)
         hgidx = heterograph_index.create_unitgraph_from_coo(
-            num_ntypes, num_src, num_dst, row, col)
+            num_ntypes, num_src, num_dst, row, col, _restrict_format)
     else:
         spmat = spmat.tocsr()
         indptr = utils.toindex(spmat.indptr)
@@ -976,7 +951,7 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False, _prefer_co
         # TODO(minjie): with_edge_id is only reasonable for csr matrix. How to fix?
         data = utils.toindex(spmat.data if with_edge_id else list(range(len(indices))))
         hgidx = heterograph_index.create_unitgraph_from_csr(
-            num_ntypes, num_src, num_dst, indptr, indices, data)
+            num_ntypes, num_src, num_dst, indptr, indices, data, _restrict_format)
     if num_ntypes == 1:
         return DGLHeteroGraph(hgidx, [utype], [etype])
     else:
@@ -986,7 +961,8 @@ def create_from_networkx(nx_graph,
                          ntype, etype,
                          edge_id_attr_name='id',
                          node_attrs=None,
-                         edge_attrs=None):
+                         edge_attrs=None,
+                         _restrict_format=None):
     """Create a heterograph that has only one set of nodes and edges.
 
     Parameters
@@ -1003,6 +979,9 @@ def create_from_networkx(nx_graph,
         Names for node features to retrieve from the NetworkX graph (Default: None)
     edge_attrs : list of str
         Names for edge features to retrieve from the NetworkX graph (Default: None)
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
+        For unit test only.
 
     Returns
     -------
@@ -1037,7 +1016,8 @@ def create_from_networkx(nx_graph,
     src = utils.toindex(src)
     dst = utils.toindex(dst)
     num_nodes = nx_graph.number_of_nodes()
-    g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes, validate=False)
+    g = create_from_edges(src, dst, ntype, etype, ntype, num_nodes, num_nodes,
+                          validate=False, _restrict_format=_restrict_format)
 
     # handle features
     # copy attributes
@@ -1088,7 +1068,8 @@ def create_from_networkx_bipartite(nx_graph,
                                    utype, etype, vtype,
                                    edge_id_attr_name='id',
                                    node_attrs=None,
-                                   edge_attrs=None):
+                                   edge_attrs=None,
+                                   _restrict_format='any'):
     """Create a heterograph that has one set of source nodes, one set of
     destination nodes and one set of edges.
 
@@ -1112,6 +1093,9 @@ def create_from_networkx_bipartite(nx_graph,
         Names for node features to retrieve from the NetworkX graph (Default: None)
     edge_attrs : list of str
         Names for edge features to retrieve from the NetworkX graph (Default: None)
+    _restrict_format : 'any', 'coo', 'csr', 'csc', optional
+        Internal argument for forcing the storage format.
+        For unit test only.
 
     Returns
     -------
@@ -1151,7 +1135,7 @@ def create_from_networkx_bipartite(nx_graph,
     dst = utils.toindex(dst)
     g = create_from_edges(
         src, dst, utype, etype, vtype,
-        len(top_nodes), len(bottom_nodes), validate=False)
+        len(top_nodes), len(bottom_nodes), validate=False, _restrict_format=_restrict_format)
 
     # TODO attributes
     assert node_attrs is None, 'Retrieval of node attributes are not supported yet.'

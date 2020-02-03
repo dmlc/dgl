@@ -229,7 +229,9 @@ struct COOMatrix {
   int64_t num_rows, num_cols;
   /*! \brief COO index arrays */
   runtime::NDArray row, col;
-  /*! \brief data array, could be empty. */
+  /*!
+   * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
+   */
   runtime::NDArray data;
 };
 
@@ -340,12 +342,12 @@ bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
 runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
 
 /*! \brief Return the nnz of the given row */
-int64_t COOGetRowNNZ(COOMatrix , int64_t row, bool transpose);
-runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row, bool transpose);
+int64_t COOGetRowNNZ(COOMatrix , int64_t row);
+runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row);
 
 /*! \brief Return the data array of the given row */
 std::pair<runtime::NDArray, runtime::NDArray>
-COOGetRowDataAndIndices(COOMatrix , int64_t row, bool transpose);
+COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
 /*! \brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
@@ -381,8 +383,8 @@ CSRMatrix COOToCSR(COOMatrix coo);
  * \param start Start row id (inclusive)
  * \param end End row id (exclusive)
  */
-COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose);
-COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows, bool transpose);
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 
 /*!
  * \brief Get the submatrix specified by the row and col ids.

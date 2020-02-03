@@ -83,62 +83,53 @@ template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
 ///////////////////////////// COOGetRowNNZ /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
-int64_t COOGetRowNNZ(COOMatrix coo, int64_t row, bool transpose) {
-  int64_t num_rows = transpose ? coo.num_cols : coo.num_rows;
-  const std::string name = transpose ? "column" : "row";
-  CHECK(row >= 0 && row < num_rows) << "Invalid " << name << " index: " << row;
-
-  NDArray coo_row = transpose ? coo.col : coo.row;
-  const IdType* coo_row_data = static_cast<IdType*>(coo_row->data);
-
+int64_t COOGetRowNNZ(COOMatrix coo, int64_t row) {
+  CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
+  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   int64_t result = 0;
-  for (int64_t i = 0; i < coo_row->shape[0]; ++i) {
+  for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     if (coo_row_data[i] == row)
       ++result;
   }
   return result;
 }
 
-template int64_t COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, int64_t, bool);
-template int64_t COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, int64_t, bool);
+template int64_t COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, int64_t);
+template int64_t COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, int64_t);
 
 template <DLDeviceType XPU, typename IdType>
-NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows, bool transpose) {
+NDArray COOGetRowNNZ(COOMatrix coo, NDArray rows) {
   const auto len = rows->shape[0];
   const IdType* vid_data = static_cast<IdType*>(rows->data);
   NDArray rst = NDArray::Empty({len}, rows->dtype, rows->ctx);
   IdType* rst_data = static_cast<IdType*>(rst->data);
 #pragma omp parallel for
   for (int64_t i = 0; i < len; ++i)
-    rst_data[i] = COOGetRowNNZ<XPU, IdType>(coo, vid_data[i], transpose);
+    rst_data[i] = COOGetRowNNZ<XPU, IdType>(coo, vid_data[i]);
   return rst;
 }
 
-template NDArray COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, NDArray, bool);
-template NDArray COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, NDArray, bool);
+template NDArray COOGetRowNNZ<kDLCPU, int32_t>(COOMatrix, NDArray);
+template NDArray COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, NDArray);
 
 ///////////////////////////// COOGetRowDataAndIndices /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
-    COOMatrix coo, int64_t row, bool transpose) {
-  int64_t num_rows = transpose ? coo.num_cols : coo.num_rows;
-  const std::string name = transpose ? "column" : "row";
-  CHECK(row >= 0 && row < num_rows) << "Invalid " << name << " index: " << row;
+    COOMatrix coo, int64_t row) {
+  CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
 
-  NDArray coo_row = transpose ? coo.col : coo.row;
-  NDArray coo_col = transpose ? coo.row : coo.col;
-  const IdType* coo_row_data = static_cast<IdType*>(coo_row->data);
-  const IdType* coo_col_data = static_cast<IdType*>(coo_col->data);
-  const DType* coo_data = static_cast<DType*>(coo.data->data);
+  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
+  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> indices;
   std::vector<DType> data;
 
-  for (int64_t i = 0; i < coo_row->shape[0]; ++i) {
+  for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     if (coo_row_data[i] == row) {
       indices.push_back(coo_col_data[i]);
-      data.push_back(coo_data[i]);
+      data.push_back(coo_data ? coo_data[i] : i);
     }
   }
 
@@ -146,27 +137,25 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
 }
 
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, bool);
+COOGetRowDataAndIndices<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t);
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, bool);
+COOGetRowDataAndIndices<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t);
 
-///////////////////////////// CSRGetData /////////////////////////////
+///////////////////////////// COOGetData /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
-  CHECK(COOHasData(coo)) << "missing data array";
-  // TODO(minjie): use more efficient binary search when the column indices is sorted
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < coo.num_cols) << "Invalid col index: " << col;
   std::vector<DType> ret_vec;
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* data = static_cast<DType*>(coo.data->data);
+  const DType* data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
   for (IdType i = 0; i < coo.row->shape[0]; ++i) {
     if (coo_row_data[i] == row && coo_col_data[i] == col)
-      ret_vec.push_back(data[i]);
+      ret_vec.push_back(data ? data[i] : i);
   }
-  return NDArray::FromVector(ret_vec, coo.data->dtype, coo.data->ctx);
+  return NDArray::FromVector(ret_vec);
 }
 
 template NDArray COOGetData<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, int64_t);
@@ -177,7 +166,6 @@ template NDArray COOGetData<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
-  CHECK(COOHasData(coo)) << "missing data array";
   // TODO(minjie): more efficient implementation for matrix without duplicate entries
   // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
@@ -193,7 +181,7 @@ std::vector<NDArray> COOGetDataAndIndices(
 
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* data = static_cast<DType*>(coo.data->data);
+  const DType* data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_rows, ret_cols;
   std::vector<DType> ret_data;
@@ -206,7 +194,7 @@ std::vector<NDArray> COOGetDataAndIndices(
       if (coo_row_data[k] == row_id && coo_col_data[k] == col_id) {
         ret_rows.push_back(row_id);
         ret_cols.push_back(col_id);
-        ret_data.push_back(data[k]);
+        ret_data.push_back(data ? data[k] : k);
       }
     }
   }
@@ -297,106 +285,77 @@ template CSRMatrix COOToCSR<kDLCPU, int64_t, int64_t>(COOMatrix coo);
 ///////////////////////////// COOSliceRows /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose) {
-  CHECK(COOHasData(coo)) << "missing data array.";
-  int64_t num_rows = transpose ? coo.num_cols : coo.num_rows;
-  const std::string name = transpose ? "column" : "row";
-  CHECK(start >= 0 && start < num_rows) << "Invalid start " << name << " " << start;
-  CHECK(end > 0 && end <= num_rows) << "Invalid end " << name << " " << end;
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
+  CHECK(start >= 0 && start < coo.num_rows) << "Invalid start row " << start;
+  CHECK(end > 0 && end <= coo.num_rows) << "Invalid end row " << end;
 
-  NDArray coo_row = transpose ? coo.col : coo.row;
-  NDArray coo_col = transpose ? coo.row : coo.col;
-
-  const IdType* coo_row_data = static_cast<IdType*>(coo_row->data);
-  const IdType* coo_col_data = static_cast<IdType*>(coo_col->data);
-  const DType* coo_data = static_cast<DType*>(coo.data->data);
+  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
+  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_row, ret_col;
   std::vector<DType> ret_data;
 
-  for (int64_t i = 0; i < coo_row->shape[0]; ++i) {
+  for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     const IdType row_id = coo_row_data[i];
     const IdType col_id = coo_col_data[i];
     if (row_id < end && row_id >= start) {
       ret_row.push_back(row_id - start);
       ret_col.push_back(col_id);
-      ret_data.push_back(coo_data[i]);
+      ret_data.push_back(coo_data ? coo_data[i] : i);
     }
   }
-  if (!transpose)
-    return COOMatrix{
-      end - start,
-      coo.num_cols,
-      NDArray::FromVector(ret_row, coo_row->dtype, coo_row->ctx),
-      NDArray::FromVector(ret_col, coo_col->dtype, coo_col->ctx),
-      NDArray::FromVector(ret_data, coo.data->dtype, coo.data->ctx)};
-  else
-    return COOMatrix{
-      coo.num_rows,
-      end - start,
-      NDArray::FromVector(ret_col, coo_col->dtype, coo_col->ctx),
-      NDArray::FromVector(ret_row, coo_row->dtype, coo_row->ctx),
-      NDArray::FromVector(ret_data, coo.data->dtype, coo.data->ctx)};
+  return COOMatrix{
+    end - start,
+    coo.num_cols,
+    NDArray::FromVector(ret_row),
+    NDArray::FromVector(ret_col),
+    NDArray::FromVector(ret_data)};
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, int64_t, bool);
-template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_t, bool);
+template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, int64_t);
+template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_t);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOSliceRows(COOMatrix coo, NDArray rows, bool transpose) {
-  CHECK(COOHasData(coo)) << "missing data array.";
-
-  NDArray coo_row = transpose ? coo.col : coo.row;
-  NDArray coo_col = transpose ? coo.row : coo.col;
-
-  const IdType* coo_row_data = static_cast<IdType*>(coo_row->data);
-  const IdType* coo_col_data = static_cast<IdType*>(coo_col->data);
-  const DType* coo_data = static_cast<DType*>(coo.data->data);
+COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
+  const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
+  const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
+  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_row, ret_col;
   std::vector<DType> ret_data;
 
   IdHashMap<IdType> hashmap(rows);
 
-  for (int64_t i = 0; i < coo_row->shape[0]; ++i) {
+  for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     const IdType row_id = coo_row_data[i];
     const IdType col_id = coo_col_data[i];
     const IdType mapped_row_id = hashmap.Map(row_id, -1);
     if (mapped_row_id != -1) {
       ret_row.push_back(mapped_row_id);
       ret_col.push_back(col_id);
-      ret_data.push_back(coo_data[i]);
+      ret_data.push_back(coo_data ? coo_data[i] : i);
     }
   }
 
-  if (!transpose)
-    return COOMatrix{
-      rows->shape[0],
-      coo.num_cols,
-      NDArray::FromVector(ret_row, coo_row->dtype, coo_row->ctx),
-      NDArray::FromVector(ret_col, coo_col->dtype, coo_col->ctx),
-      NDArray::FromVector(ret_data, coo.data->dtype, coo.data->ctx)};
-  else
-    return COOMatrix{
-      coo.num_rows,
-      rows->shape[0],
-      NDArray::FromVector(ret_col, coo_col->dtype, coo_col->ctx),
-      NDArray::FromVector(ret_row, coo_row->dtype, coo_row->ctx),
-      NDArray::FromVector(ret_data, coo.data->dtype, coo.data->ctx)};
+  return COOMatrix{
+    rows->shape[0],
+    coo.num_cols,
+    NDArray::FromVector(ret_row),
+    NDArray::FromVector(ret_col),
+    NDArray::FromVector(ret_data)};
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix , NDArray, bool);
-template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix , NDArray, bool);
+template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix , NDArray);
+template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix , NDArray);
 
-///////////////////////////// CSRSliceMatrix /////////////////////////////
+///////////////////////////// COOSliceMatrix /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols) {
-  CHECK(COOHasData(coo)) << "missing data array.";
-
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* coo_data = static_cast<DType*>(coo.data->data);
+  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
 
   IdHashMap<IdType> row_map(rows), col_map(cols);
 
@@ -412,7 +371,7 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
       if (mapped_col_id != -1) {
         ret_row.push_back(mapped_row_id);
         ret_col.push_back(mapped_col_id);
-        ret_data.push_back(coo_data[i]);
+        ret_data.push_back(coo_data ? coo_data[i] : i);
       }
     }
   }
@@ -420,9 +379,9 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
   return COOMatrix{
     rows->shape[0],
     cols->shape[0],
-    NDArray::FromVector(ret_row, coo.row->dtype, coo.row->ctx),
-    NDArray::FromVector(ret_col, coo.col->dtype, coo.col->ctx),
-    NDArray::FromVector(ret_data, coo.data->dtype, coo.data->ctx)};
+    NDArray::FromVector(ret_row),
+    NDArray::FromVector(ret_col),
+    NDArray::FromVector(ret_data)};
 }
 
 template COOMatrix COOSliceMatrix<kDLCPU, int32_t, int32_t>(

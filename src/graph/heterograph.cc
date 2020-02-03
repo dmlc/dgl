@@ -503,8 +503,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     int64_t num_dst = args[2];
     IdArray row = args[3];
     IdArray col = args[4];
-    std::string prefer_coo = args[5];
-    auto hgptr = UnitGraph::CreateFromCOO(nvtypes, num_src, num_dst, row, col, prefer_coo);
+    SparseFormat restrict_format = ParseSparseFormat(args[5]);
+    auto hgptr = UnitGraph::CreateFromCOO(
+        nvtypes, num_src, num_dst, row, col, restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -516,8 +517,9 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indptr = args[3];
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
+    SparseFormat restrict_format = ParseSparseFormat(args[6]);
     auto hgptr = UnitGraph::CreateFromCSR(
-        nvtypes, num_src, num_dst, indptr, indices, edge_ids);
+        nvtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 

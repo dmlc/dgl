@@ -34,8 +34,10 @@ class UnitGraph : public BaseHeteroGraph {
   // internal data structure
   class COO;
   class CSR;
+  class CSC;
   typedef std::shared_ptr<COO> COOPtr;
   typedef std::shared_ptr<CSR> CSRPtr;
+  typedef std::shared_ptr<CSC> CSCPtr;
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -145,12 +147,13 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, std::string prefer_coo = "auto");
+      IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray indptr, IdArray indices, IdArray edge_ids);
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      SparseFormat restrict_format = SparseFormat::ANY);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -185,10 +188,27 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            bool prefer_coo = false);
+            SparseFormat restrict_format = SparseFormat::ANY);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
+
+  /*! \return Return the given format. */
+  HeteroGraphPtr GetFormat(SparseFormat format) const;
+
+  /*!
+   * \brief Determine which format to use with a preference.
+   *
+   * If the storage of unit graph is "locked", i.e. no conversion is allowed, then
+   * it will return the locked format.
+   *
+   * Otherwise, it will return whatever DGL thinks is the most appropriate given
+   * the arguments.
+   */
+  SparseFormat SelectFormat(SparseFormat preferred_format) const;
+
+  /*! \return Whether the graph is hypersparse */
+  bool IsHypersparse() const;
 
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
@@ -198,8 +218,14 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr out_csr_;
   /*! \brief COO representation */
   COOPtr coo_;
-  /*! \brief whether to force using COO */
-  bool prefer_coo_;
+  /*!
+   * \brief Storage format restriction.
+   * If it is not ANY, then conversion is not allowed for graph queries.
+   *
+   * Note that GetInCSR/GetOutCSR/GetCOO() can still be called and the conversion will
+   * still be done if requested explicitly (e.g. in message passing).
+   */
+  SparseFormat restrict_format_;
 };
 
 };  // namespace dgl

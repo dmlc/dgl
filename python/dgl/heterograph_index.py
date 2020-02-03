@@ -957,7 +957,8 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo="auto"):
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
+                              restrict_format):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -972,8 +973,9 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo
         Row index.
     col : utils.Index
         Col index.
-    prefer_coo : bool or "auto"
-        Whether to force the storage to be in COO format.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
+        Default: 'any' (i.e. no restriction)
 
     Returns
     -------
@@ -981,9 +983,10 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col, prefer_coo
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
         int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor(),
-        prefer_coo)
+        restrict_format)
 
-def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
+def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
+                              restrict_format):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -1000,6 +1003,9 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         CSR indices.
     edge_ids : utils.Index
         Edge shuffle id.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
+        Default: 'any' (i.e. no restriction)
 
     Returns
     -------
@@ -1007,7 +1013,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
-        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
+        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor(),
+        restrict_format)
 
 def create_heterograph_from_relations(metagraph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.

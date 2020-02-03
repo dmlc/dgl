@@ -117,14 +117,14 @@ template <DLDeviceType XPU, typename IdType>
 bool COOHasDuplicate(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
-int64_t COOGetRowNNZ(COOMatrix coo, int64_t row, bool transpose);
+int64_t COOGetRowNNZ(COOMatrix coo, int64_t row);
 
 template <DLDeviceType XPU, typename IdType>
-runtime::NDArray COOGetRowNNZ(COOMatrix coo, runtime::NDArray row, bool transpose);
+runtime::NDArray COOGetRowNNZ(COOMatrix coo, runtime::NDArray row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::pair<runtime::NDArray, runtime::NDArray>
-COOGetRowDataAndIndices(COOMatrix coo, int64_t row, bool transpose);
+COOGetRowDataAndIndices(COOMatrix coo, int64_t row);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
@@ -140,10 +140,10 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix COOToCSR(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end, bool transpose);
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows, bool transpose);
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);

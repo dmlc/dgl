@@ -470,14 +470,56 @@ DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 // creators
 
-/*! \brief Create a unit graph from COO arrays */
-HeteroGraphPtr CreateUnitGraphFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col);
+/*!
+ * \brief Sparse graph format.
+ */
+enum SparseFormat {
+  ANY = 0,
+  COO = 1,
+  CSR = 2,
+  CSC = 3
+};
 
-/*! \brief Create a unit graph from (out) CSR arrays */
+inline SparseFormat ParseSparseFormat(const std::string& name) {
+  if (name == "coo")
+    return SparseFormat::COO;
+  else if (name == "csr")
+    return SparseFormat::CSR;
+  else if (name == "csc")
+    return SparseFormat::CSC;
+  else
+    return SparseFormat::ANY;
+}
+
+/*!
+ * \brief Create a unit graph from COO arrays
+ * \param num_vtypes Number of node types - 1 for homogeneous and 2 for directed bipartite.
+ * \param num_src Number of nodes of source node type.
+ * \param num_dst Number of nodes of destination node type.  Must equal to that of source
+ * type if homogeneous.
+ * \param row Source node IDs
+ * \param col Destination node IDs
+ * \param restrict_format The format to restrict the graph storage on.
+ */
+HeteroGraphPtr CreateUnitGraphFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
+    SparseFormat restrict_format = SparseFormat::ANY);
+
+/*!
+ * \brief Create a unit graph from (out) CSR arrays.
+ * \param num_vtypes Number of node types - 1 for homogeneous and 2 for directed bipartite.
+ * \param num_src Number of nodes of source node type.
+ * \param num_dst Number of nodes of destination node type.  Must equal to that of source
+ * type if homogeneous.
+ * \param indptr Index pointer of the CSR matrix with source nodes as rows.
+ * \param indices Column indices, i.e. destination node IDs, of the CSR matrix.
+ * \param edge_ids Entries, i.e. edge IDs, of the CSR matrix.
+ * \param restrict_format The format to restrict the graph storage on.
+ */
 HeteroGraphPtr CreateUnitGraphFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids);
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format = SparseFormat::ANY);
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
 HeteroGraphPtr CreateHeteroGraph(
