@@ -216,8 +216,7 @@ def create_neg_subgraph(pos_g, neg_g, chunk_size, neg_sample_size, is_chunked,
         chunk_size = pos_g.number_of_edges()
     elif is_chunked:
         if pos_g.number_of_edges() < chunk_size:
-            num_chunks = 1
-            chunk_size = pos_g.number_of_edges()
+            return None
         else:
             # This is probably the last batch. Let's ignore it.
             if pos_g.number_of_edges() % chunk_size > 0:
