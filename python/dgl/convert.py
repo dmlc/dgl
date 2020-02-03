@@ -136,11 +136,11 @@ def graph(data, ntype='_N', etype='_E', card=None, validate=True, _restrict_form
             data, ntype, etype, ntype, urange, vrange, validate,
             _restrict_format=_restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
-        return create_from_scipy(data, ntype, etype, ntype,
-            _restrict_format=_restrict_format)
+        return create_from_scipy(
+            data, ntype, etype, ntype, _restrict_format=_restrict_format)
     elif isinstance(data, nx.Graph):
-        return create_from_networkx(data, ntype, etype,
-            _restrict_format=_restrict_format, **kwargs)
+        return create_from_networkx(
+            data, ntype, etype, _restrict_format=_restrict_format, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
@@ -277,12 +277,11 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
             data, utype, etype, vtype, urange, vrange, validate,
             _restrict_format=_restrict_format)
     elif isinstance(data, sp.sparse.spmatrix):
-        return create_from_scipy(data, utype, etype, vtype,
-            _restrict_format=_restrict_format)
+        return create_from_scipy(
+            data, utype, etype, vtype, _restrict_format=_restrict_format)
     elif isinstance(data, nx.Graph):
         return create_from_networkx_bipartite(
-            data, utype, etype, vtype,
-            _restrict_format=_restrict_format, **kwargs)
+            data, utype, etype, vtype, _restrict_format=_restrict_format, **kwargs)
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
