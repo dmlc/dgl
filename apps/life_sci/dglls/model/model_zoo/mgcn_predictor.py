@@ -15,13 +15,13 @@ class MGCNPredictor(nn.Module):
     Parameters
     ----------
     feats : int
-        Size for the node and edge embeddings to learn.
+        Size for the node and edge embeddings to learn. Default to 128.
     n_layers : int
-        Number of gnn layers to use.
+        Number of gnn layers to use. Default to 3.
     classifier_hidden_feats : int
-        Size for hidden representations in the classifier.
+        Size for hidden representations in the classifier. Default to 64.
     n_tasks : int
-        Number of tasks, which is also the output size.
+        Number of tasks, which is also the output size. Default to 1.
     num_node_types : int
         Number of node types to embed. Default to 100.
     num_edge_types : int
@@ -31,7 +31,7 @@ class MGCNPredictor(nn.Module):
     gap : float
         Difference between two adjacent centers in RBF expansion. Default to 1.0
     """
-    def __init__(self, feats, n_layers, classifier_hidden_feats, n_tasks,
+    def __init__(self, feats=128, n_layers=3, classifier_hidden_feats=64, n_tasks=1,
                  num_node_types=100, num_edge_types=3000, cutoff=5.0, gap=1.0):
         super(MGCNPredictor, self).__init__()
 

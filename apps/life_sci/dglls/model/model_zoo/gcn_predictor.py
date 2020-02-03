@@ -25,7 +25,8 @@ class GCNPredictor(nn.Module):
         Number of input node features.
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the size of node representations after the i-th GCN layer.
-        ``len(hidden_feats)`` equals the number of GCN layers.
+        ``len(hidden_feats)`` equals the number of GCN layers. By default, we use
+        ``[64, 64]``.
     activation : list of activation functions or None
         If None, no activation will be applied. If not None, ``activation[i]`` gives the
         activation function to be used for the i-th GCN layer. ``len(activation)`` equals
@@ -49,7 +50,7 @@ class GCNPredictor(nn.Module):
     n_tasks : int
         Number of tasks, which is also the output size. Default to 1.
     """
-    def __init__(self, in_feats, hidden_feats, activation=None, residual=None, batchnorm=None,
+    def __init__(self, in_feats, hidden_feats=None, activation=None, residual=None, batchnorm=None,
                  dropout=None, classifier_hidden_feats=128, classifier_dropout=0., n_tasks=1):
         super(GCNPredictor, self).__init__()
 
@@ -59,8 +60,9 @@ class GCNPredictor(nn.Module):
                        residual=residual,
                        batchnorm=batchnorm,
                        dropout=dropout)
-        self.readout = WeightedSumAndMax(hidden_feats[-1])
-        self.predict = MLPPredictor(2 * hidden_feats[-1], classifier_hidden_feats,
+        gnn_out_feats = self.gnn.hidden_feats[-1]
+        self.readout = WeightedSumAndMax(gnn_out_feats)
+        self.predict = MLPPredictor(2 * gnn_out_feats, classifier_hidden_feats,
                                     n_tasks, classifier_dropout)
 
     def forward(self, bg, feats):

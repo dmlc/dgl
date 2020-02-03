@@ -19,16 +19,16 @@ class MPNNGNN(nn.Module):
     node_in_feats : int
         Size for the input node features.
     node_out_feats : int
-        Size for the output node representations.
+        Size for the output node representations. Default to 64.
     edge_in_feats : int
-        Size for the input edge features.
+        Size for the input edge features. Default to 128.
     edge_hidden_feats : int
         Size for the hidden edge representations.
     num_step_message_passing : int
         Number of message passing steps. Default to 6.
     """
-    def __init__(self, node_in_feats, node_out_feats, edge_in_feats,
-                 edge_hidden_feats, num_step_message_passing=6):
+    def __init__(self, node_in_feats, edge_in_feats, node_out_feats=64,
+                 edge_hidden_feats=128, num_step_message_passing=6):
         super(MPNNGNN, self).__init__()
 
         self.project_node_feats = nn.Sequential(

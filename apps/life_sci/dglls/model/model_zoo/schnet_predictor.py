@@ -17,14 +17,15 @@ class SchNetPredictor(nn.Module):
     Parameters
     ----------
     node_feats : int
-        Size for node representations to learn.
+        Size for node representations to learn. Default to 64.
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the size of hidden representations for the i-th interaction
         (gnn) layer. ``len(hidden_feats)`` equals the number of interaction (gnn) layers.
+        Default to ``[64, 64, 64]``.
     classifier_hidden_feats : int
-        Size for hidden representations in the classifier.
+        Size for hidden representations in the classifier. Default to 64.
     n_tasks : int
-        Number of tasks, which is also the output size.
+        Number of tasks, which is also the output size. Default to 1.
     num_node_types : int
         Number of node types to embed. Default to 100.
     cutoff : float
@@ -32,7 +33,7 @@ class SchNetPredictor(nn.Module):
     gap : float
         Difference between two adjacent centers in RBF expansion. Default to 0.1.
     """
-    def __init__(self, node_feats, hidden_feats, classifier_hidden_feats, n_tasks,
+    def __init__(self, node_feats=64, hidden_feats=None, classifier_hidden_feats=64, n_tasks=1,
                  num_node_types=100, cutoff=30., gap=0.1):
         super(SchNetPredictor, self).__init__()
 

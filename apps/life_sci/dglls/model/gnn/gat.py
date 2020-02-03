@@ -1,5 +1,6 @@
 """Graph Attention Networks"""
 import torch.nn as nn
+import torch.nn.functional as F
 
 from dgl.nn.pytorch import GATConv
 
@@ -82,10 +83,11 @@ class GAT(nn.Module):
         Number of input node features
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the output size of an attention head in the i-th GAT layer.
-        ``len(hidden_feats)`` equals the number of GAT layers.
+        ``len(hidden_feats)`` equals the number of GAT layers. By default, we use ``[32, 32]``.
     num_heads : list of int
         ``num_heads[i]`` gives the number of attention heads in the i-th GAT layer.
-        ``len(num_heads)`` equals the number of GAT layers.
+        ``len(num_heads)`` equals the number of GAT layers. By default, we use 4 attention heads
+        for each GAT layer.
     feat_drops : list of float
         ``feat_drops[i]`` gives the dropout applied to the input features in the i-th GAT layer.
         ``len(feat_drops)`` equals the number of GAT layers. By default, this will be zero for
@@ -113,11 +115,16 @@ class GAT(nn.Module):
         results for the i-th GAT layer. ``len(activations)`` equals the number of GAT layers.
         By default, no activation is applied for each GAT layer.
     """
-    def __init__(self, in_feats, hidden_feats, num_heads, feat_drops=None, attn_drops=None,
-                 alphas=None, residuals=None, agg_modes=None, activations=None):
+    def __init__(self, in_feats, hidden_feats=None, num_heads=None, feat_drops=None,
+                 attn_drops=None, alphas=None, residuals=None, agg_modes=None, activations=None):
         super(GAT, self).__init__()
 
+        if hidden_feats is None:
+            hidden_feats = [32, 32]
+
         n_layers = len(hidden_feats)
+        if num_heads is None:
+            num_heads = [4 for _ in range(n_layers)]
         if feat_drops is None:
             feat_drops = [0. for _ in range(n_layers)]
         if attn_drops is None:
@@ -138,6 +145,9 @@ class GAT(nn.Module):
                                        'feat_drops, attn_drops, alphas, residuals, ' \
                                        'agg_modes and activations to be the same, ' \
                                        'got {}'.format(lengths)
+        self.hidden_feats = hidden_feats
+        self.num_heads = num_heads
+        self.agg_modes = agg_modes
         self.gnn_layers = nn.ModuleList()
         for i in range(n_layers):
             self.gnn_layers.append(GATLayer(in_feats, hidden_feats[i], num_heads[i],

@@ -211,9 +211,9 @@ class MGCNGNN(nn.Module):
     Parameters
     ----------
     feats : int
-        Size for the node and edge embeddings to learn.
+        Size for the node and edge embeddings to learn. Default to 128.
     n_layers : int
-        Number of gnn layers to use.
+        Number of gnn layers to use. Default to 3.
     num_node_types : int
         Number of node types to embed. Default to 100.
     num_edge_types : int
@@ -223,7 +223,7 @@ class MGCNGNN(nn.Module):
     gap : float
         Difference between two adjacent centers in RBF expansion. Default to 0.1.
     """
-    def __init__(self, feats, n_layers, num_node_types=100,
+    def __init__(self, feats=128, n_layers=3, num_node_types=100,
                  num_edge_types=3000, cutoff=30., gap=0.1):
         super(MGCNGNN, self).__init__()
 

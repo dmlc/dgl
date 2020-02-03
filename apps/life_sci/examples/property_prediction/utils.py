@@ -165,8 +165,8 @@ def load_model(args):
     if args['model'] == 'MPNN':
         from dglls.model import MPNNPredictor
         model = MPNNPredictor(node_in_feats=args['node_in_feats'],
-                              node_out_feats=args['node_out_feats'],
                               edge_in_feats=args['edge_in_feats'],
+                              node_out_feats=args['node_out_feats'],
                               edge_hidden_feats=args['edge_hidden_feats'],
                               n_tasks=args['n_tasks'])
 

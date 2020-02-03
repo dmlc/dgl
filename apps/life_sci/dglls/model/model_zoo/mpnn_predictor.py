@@ -18,14 +18,14 @@ class MPNNPredictor(nn.Module):
     ----------
     node_in_feats : int
         Size for the input node features.
-    node_out_feats : int
-        Size for the output node representations.
     edge_in_feats : int
         Size for the input edge features.
-    n_tasks : int
-        Number of tasks, which is also the output size.
+    node_out_feats : int
+        Size for the output node representations. Default to 64.
     edge_hidden_feats : int
         Size for the hidden edge representations. Default to 128.
+    n_tasks : int
+        Number of tasks, which is also the output size. Default to 1.
     num_step_message_passing : int
         Number of message passing steps. Default to 6.
     num_step_set2set : int
@@ -35,10 +35,10 @@ class MPNNPredictor(nn.Module):
     """
     def __init__(self,
                  node_in_feats,
-                 node_out_feats,
                  edge_in_feats,
-                 edge_hidden_feats,
-                 n_tasks,
+                 node_out_feats=64,
+                 edge_hidden_feats=128,
+                 n_tasks=1,
                  num_step_message_passing=6,
                  num_step_set2set=6,
                  num_layer_set2set=3):

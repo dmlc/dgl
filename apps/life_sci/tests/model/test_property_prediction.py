@@ -63,6 +63,15 @@ def test_gcn_predictor():
     g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
+
+    # Test default setting
+    gcn_predictor = GCNPredictor(in_feats=1)
+    gcn_predictor.eval()
+    assert gcn_predictor(g, node_feats).shape == torch.Size([1, 1])
+    gcn_predictor.train()
+    assert gcn_predictor(bg, batch_node_feats).shape == torch.Size([2, 1])
+
+    # Test configured setting
     gcn_predictor = GCNPredictor(in_feats=1,
                                  hidden_feats=[1],
                                  activation=[F.relu],
@@ -87,6 +96,15 @@ def test_gat_predictor():
     g, node_feats = g.to(device), node_feats.to(device)
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
+
+    # Test default setting
+    gat_predictor = GATPredictor(in_feats=1).to(device)
+    gat_predictor.eval()
+    assert gat_predictor(g, node_feats).shape == torch.Size([1, 1])
+    gat_predictor.train()
+    assert gat_predictor(bg, batch_node_feats).shape == torch.Size([2, 1])
+
+    # Test configured setting
     gat_predictor = GATPredictor(in_feats=1,
                                  hidden_feats=[1, 2],
                                  num_heads=[2, 3],
@@ -133,6 +151,14 @@ def test_schnet_predictor():
     bg, batch_node_types, batch_edge_dists = test_graph6()
     bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
                                              batch_edge_dists.to(device)
+
+    # Test default setting
+    schnet_predictor = SchNetPredictor().to(device)
+    assert schnet_predictor(g, node_types, edge_dists).shape == torch.Size([1, 1])
+    assert schnet_predictor(bg, batch_node_types, batch_edge_dists).shape == \
+           torch.Size([2, 1])
+
+    # Test configured setting
     schnet_predictor = SchNetPredictor(node_feats=2,
                                        hidden_feats=[2, 2],
                                        classifier_hidden_feats=3,
@@ -154,6 +180,14 @@ def test_mgcn_predictor():
     bg, batch_node_types, batch_edge_dists = test_graph6()
     bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
                                              batch_edge_dists.to(device)
+
+    # Test default setting
+    mgcn_predictor = MGCNPredictor().to(device)
+    assert mgcn_predictor(g, node_types, edge_dists).shape == torch.Size([1, 1])
+    assert mgcn_predictor(bg, batch_node_types, batch_edge_dists).shape == \
+           torch.Size([2, 1])
+
+    # Test configured setting
     mgcn_predictor = MGCNPredictor(feats=2,
                                    n_layers=2,
                                    classifier_hidden_feats=3,
@@ -176,9 +210,18 @@ def test_mpnn_predictor():
     bg, batch_node_feats, batch_edge_feats = test_graph4()
     bg, batch_node_feats, batch_edge_feats = bg.to(device), batch_node_feats.to(device), \
                                              batch_edge_feats.to(device)
+
+    # Test default setting
     mpnn_predictor = MPNNPredictor(node_in_feats=1,
-                                   node_out_feats=2,
+                                   edge_in_feats=2)
+    assert mpnn_predictor(g, node_feats, edge_feats).shape == torch.Size([1, 1])
+    assert mpnn_predictor(bg, batch_node_feats, batch_edge_feats).shape == \
+           torch.Size([2, 1])
+
+    # Test configured setting
+    mpnn_predictor = MPNNPredictor(node_in_feats=1,
                                    edge_in_feats=2,
+                                   node_out_feats=2,
                                    edge_hidden_feats=2,
                                    n_tasks=2,
                                    num_step_message_passing=2,

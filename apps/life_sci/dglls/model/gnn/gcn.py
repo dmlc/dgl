@@ -81,7 +81,8 @@ class GCN(nn.Module):
         Number of input node features.
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the size of node representations after the i-th GCN layer.
-        ``len(hidden_feats)`` equals the number of GCN layers.
+        ``len(hidden_feats)`` equals the number of GCN layers.  By default, we use
+        ``[64, 64]``.
     activation : list of activation functions or None
         If None, no activation will be applied. If not None, ``activation[i]`` gives the
         activation function to be used for the i-th GCN layer. ``len(activation)`` equals
@@ -99,9 +100,12 @@ class GCN(nn.Module):
         ``len(dropout)`` equals the number of GCN layers. By default, no dropout is
         performed for all layers.
     """
-    def __init__(self, in_feats, hidden_feats, activation=None, residual=None,
+    def __init__(self, in_feats, hidden_feats=None, activation=None, residual=None,
                  batchnorm=None, dropout=None):
         super(GCN, self).__init__()
+
+        if hidden_feats is None:
+            hidden_feats = [64, 64]
 
         n_layers = len(hidden_feats)
         if activation is None:
@@ -117,6 +121,8 @@ class GCN(nn.Module):
         assert len(set(lengths)) == 1, 'Expect the lengths of hidden_feats, activation, ' \
                                        'residual, batchnorm and dropout to be the same, ' \
                                        'got {}'.format(lengths)
+
+        self.hidden_feats = hidden_feats
         self.gnn_layers = nn.ModuleList()
         for i in range(n_layers):
             self.gnn_layers.append(GCNLayer(in_feats, hidden_feats[i], activation[i],

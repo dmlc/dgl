@@ -25,10 +25,11 @@ class GATPredictor(nn.Module):
         Number of input node features
     hidden_feats : list of int
         ``hidden_feats[i]`` gives the output size of an attention head in the i-th GAT layer.
-        ``len(hidden_feats)`` equals the number of GAT layers.
+        ``len(hidden_feats)`` equals the number of GAT layers. By default, we use ``[32, 32]``.
     num_heads : list of int
         ``num_heads[i]`` gives the number of attention heads in the i-th GAT layer.
-        ``len(num_heads)`` equals the number of GAT layers.
+        ``len(num_heads)`` equals the number of GAT layers. By default, we use 4 attention heads
+        for each GAT layer.
     feat_drops : list of float
         ``feat_drops[i]`` gives the dropout applied to the input features in the i-th GAT layer.
         ``len(feat_drops)`` equals the number of GAT layers. By default, this will be zero for
@@ -64,18 +65,10 @@ class GATPredictor(nn.Module):
     n_tasks : int
         Number of tasks, which is also the output size. Default to 1.
     """
-    def __init__(self, in_feats, hidden_feats, num_heads, feat_drops=None, attn_drops=None,
+    def __init__(self, in_feats, hidden_feats=None, num_heads=None, feat_drops=None, attn_drops=None,
                  alphas=None, residuals=None, agg_modes=None, activations=None,
                  classifier_hidden_feats=128, classifier_dropout=0., n_tasks=1):
         super(GATPredictor, self).__init__()
-
-        n_layers = len(hidden_feats)
-        if agg_modes is None:
-            agg_modes = ['flatten' for _ in range(n_layers - 1)]
-            agg_modes.append('mean')
-        if activations is None:
-            activations = [F.elu for _ in range(n_layers - 1)]
-            activations.append(None)
 
         self.gnn = GAT(in_feats=in_feats,
                        hidden_feats=hidden_feats,
@@ -87,10 +80,10 @@ class GATPredictor(nn.Module):
                        agg_modes=agg_modes,
                        activations=activations)
 
-        if agg_modes[-1] == 'flatten':
-            gnn_out_feats = hidden_feats[-1] * num_heads[-1]
+        if self.gnn.agg_modes[-1] == 'flatten':
+            gnn_out_feats = self.gnn.hidden_feats[-1] * self.gnn.num_heads[-1]
         else:
-            gnn_out_feats = hidden_feats[-1]
+            gnn_out_feats = self.gnn.hidden_feats[-1]
         self.readout = WeightedSumAndMax(gnn_out_feats)
         self.predict = MLPPredictor(2 * gnn_out_feats, classifier_hidden_feats,
                                     n_tasks, classifier_dropout)

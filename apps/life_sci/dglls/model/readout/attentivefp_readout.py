@@ -62,7 +62,7 @@ class GlobalPool(nn.Module):
             if isinstance(g, BatchedDGLGraph):
                 g_repr = dgl.sum_nodes(g, 'hv', 'a')
             else:
-                g_repr = dgl.sum_nodes(g, 'hv', 'a').unsqueeze(-1)
+                g_repr = dgl.sum_nodes(g, 'hv', 'a').unsqueeze(0)
             context = F.elu(g_repr)
 
             if get_node_weight:

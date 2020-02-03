@@ -633,18 +633,19 @@ class DGMG(nn.Module):
     Parameters
     ----------
     atom_types : list
-        E.g. ['C', 'N']
+        E.g. ['C', 'N'].
     bond_types : list
         E.g. [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
-        Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
+        Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC].
     node_hidden_size : int
-        Size of atom representation
+        Size of atom representation. Default to 128.
     num_prop_rounds : int
-        Number of message passing rounds for each time
+        Number of message passing rounds for each time. Default to 2.
     dropout : float
-        Probability for dropout
+        Probability for dropout. Default to 0.2.
     """
-    def __init__(self, atom_types, bond_types, node_hidden_size, num_prop_rounds, dropout):
+    def __init__(self, atom_types, bond_types, node_hidden_size=128,
+                 num_prop_rounds=2, dropout=0.2):
         super(DGMG, self).__init__()
 
         self.env = MoleculeEnv(atom_types, bond_types)

@@ -54,7 +54,12 @@ def test_gcn():
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
-    # Test GCN
+    # Test default setting
+    gnn = GCN(in_feats=1).to(device)
+    assert gnn(g, node_feats).shape == torch.Size([3, 64])
+    assert gnn(bg, batch_node_feats).shape == torch.Size([8, 64])
+
+    # Test configured setting
     gnn = GCN(in_feats=1,
               hidden_feats=[1, 1],
               activation=[F.relu, F.relu],
@@ -75,7 +80,12 @@ def test_gat():
     bg, batch_node_feats = test_graph2()
     bg, batch_node_feats = bg.to(device), batch_node_feats.to(device)
 
-    # Test GAT
+    # Test default setting
+    gnn = GAT(in_feats=1)
+    assert gnn(g, node_feats).shape == torch.Size([3, 32])
+    assert gnn(bg, batch_node_feats).shape == torch.Size([8, 32])
+
+    # Test configured setting
     gnn = GAT(in_feats=1,
               hidden_feats=[1, 1],
               num_heads=[2, 3],
@@ -133,7 +143,12 @@ def test_schnet_gnn():
     bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
                                              batch_edge_dists.to(device)
 
-    # Test SchNetGNN
+    # Test default setting
+    gnn = SchNetGNN().to(device)
+    assert gnn(g, node_types, edge_dists).shape == torch.Size([3, 64])
+    assert gnn(bg, batch_node_types, batch_edge_dists).shape == torch.Size([8, 64])
+
+    # Test configured setting
     gnn = SchNetGNN(num_node_types=5,
                     node_feats=2,
                     hidden_feats=[3],
@@ -153,7 +168,12 @@ def test_mgcn_gnn():
     bg, batch_node_types, batch_edge_dists = bg.to(device), batch_node_types.to(device), \
                                              batch_edge_dists.to(device)
 
-    # Test MGCNGNN
+    # Test default setting
+    gnn = MGCNGNN().to(device)
+    assert gnn(g, node_types, edge_dists).shape == torch.Size([3, 512])
+    assert gnn(bg, batch_node_types, batch_edge_dists).shape == torch.Size([8, 512])
+
+    # Test configured setting
     gnn = MGCNGNN(feats=2,
                   n_layers=2,
                   num_node_types=5,
@@ -174,10 +194,16 @@ def test_mpnn_gnn():
     bg, batch_node_feats, batch_edge_feats = bg.to(device), batch_node_feats.to(device), \
                                              batch_edge_feats.to(device)
 
-    # Test MPNNGNN
+    # Test default setting
     gnn = MPNNGNN(node_in_feats=1,
-                  node_out_feats=2,
+                  edge_in_feats=2)
+    assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 64])
+    assert gnn(bg, batch_node_feats, batch_edge_feats).shape == torch.Size([8, 64])
+
+    # Test configured setting
+    gnn = MPNNGNN(node_in_feats=1,
                   edge_in_feats=2,
+                  node_out_feats=2,
                   edge_hidden_feats=2,
                   num_step_message_passing=2).to(device)
     assert gnn(g, node_feats, edge_feats).shape == torch.Size([3, 2])
