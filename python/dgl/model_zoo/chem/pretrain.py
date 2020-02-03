@@ -1,6 +1,5 @@
 """Utilities for using pretrained models."""
 import os
-import warnings
 import torch
 from rdkit import Chem
 
@@ -12,6 +11,7 @@ from .mpnn import MPNNModel
 from .schnet import SchNet
 from .attentive_fp import AttentiveFP
 from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
+from ...contrib.deprecation import deprecated
 
 URL = {
     'GCN_Tox21': 'pre_trained/gcn_tox21.pth',
@@ -62,6 +62,7 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
 
     return model
 
+@deprecated('Import it from dgllife.model instead.')
 def load_pretrained(model_name, log=True):
     """Load a pretrained model
 
@@ -89,9 +90,6 @@ def load_pretrained(model_name, log=True):
     -------
     model
     """
-    warnings.warn('`load_pretrained` has been deprecated from DGL and will be removed in v0.5. '
-                  'Import it from `dglls.model` instead.')
-
     if model_name not in URL:
         raise RuntimeError("Cannot find a pretrained model with name {}".format(model_name))
 
@@ -146,7 +144,7 @@ def load_pretrained(model_name, log=True):
         vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
         if not os.path.exists(vocab_file):
             zip_file_path = '{}/jtnn.zip'.format(default_dir)
-            download(_get_dgl_url('dglls/jtnn.zip'), path=zip_file_path)
+            download(_get_dgl_url('dgllife/jtnn.zip'), path=zip_file_path)
             extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
         model = DGLJTNNVAE(vocab_file=vocab_file,
                            depth=3,

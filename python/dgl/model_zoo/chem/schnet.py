@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation of SchNet model."""
-import warnings
 import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch import SumPooling
 
 
@@ -35,6 +35,7 @@ class SchNet(nn.Module):
         If None, random representation initialization will be used. Otherwise,
         they will be used to initialize atom representations. Default to be None.
     """
+    @deprecated('Import SchNetPredictor from dgllife.model instead.')
     def __init__(self,
                  dim=64,
                  cutoff=5.0,
@@ -45,9 +46,6 @@ class SchNet(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super(SchNet, self).__init__()
-
-        warnings.warn('`SchNet` has been deprecated from DGL and will be removed in v0.5. '
-                      'Import `SchNetPredictor` from `dglls.model` instead.')
 
         self._dim = dim
         self.cutoff = cutoff

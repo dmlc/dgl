@@ -1,13 +1,13 @@
 # -*- coding:utf-8 -*-
 # pylint: disable=C0103, C0111, W0621
 """Implementation  of MGCN model"""
-import warnings
 import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
 from ...nn.pytorch import SumPooling
+from ...contrib.deprecation import deprecated
 
 
 class MGCNModel(nn.Module):
@@ -38,6 +38,7 @@ class MGCNModel(nn.Module):
         If None, random representation initialization will be used. Otherwise,
         they will be used to initialize atom representations. Default to be None.
     """
+    @deprecated('Import MGCNPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  dim=128,
                  width=1,
@@ -49,9 +50,6 @@ class MGCNModel(nn.Module):
                  atom_ref=None,
                  pre_train=None):
         super(MGCNModel, self).__init__()
-
-        warnings.warn('`MGCNModel` has been deprecated from DGL and will be removed in v0.5. '
-                      'Import `MGCNPredictor` from `dglls.model` instead.')
 
         self._dim = dim
         self.output_dim = output_dim

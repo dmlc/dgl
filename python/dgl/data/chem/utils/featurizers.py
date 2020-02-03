@@ -1,10 +1,10 @@
 import itertools
 import numpy as np
-import warnings
 
 from collections import defaultdict
 
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 try:
     from rdkit import Chem
@@ -45,17 +45,7 @@ __all__ = ['one_hot_encoding',
            'BaseBondFeaturizer',
            'CanonicalBondFeaturizer']
 
-def _deprecate(func):
-    """Print deprecation message.
-
-    Parameters
-    ----------
-    func : str
-        Name for deprecated function.
-    """
-    warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5.  \
-                  Import it from dglls.utils.featurizers instead.'.format(func))
-
+@deprecated('Import it from dgllife.utils instead.')
 def one_hot_encoding(x, allowable_set, encode_unknown=False):
     """One-hot encoding.
 
@@ -77,8 +67,6 @@ def one_hot_encoding(x, allowable_set, encode_unknown=False):
         The list is of length ``len(allowable_set)`` if ``encode_unknown=False``
         and ``len(allowable_set) + 1`` otherwise.
     """
-    _deprecate('one_hot_encoding')
-
     if encode_unknown and (allowable_set[-1] is not None):
         allowable_set.append(None)
 
@@ -91,6 +79,7 @@ def one_hot_encoding(x, allowable_set, encode_unknown=False):
 # Atom featurization
 #################################################################
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_type_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the type of an atom.
 
@@ -113,8 +102,6 @@ def atom_type_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_type_one_hot')
-
     if allowable_set is None:
         allowable_set = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
                          'Fe', 'As', 'Al', 'I', 'B', 'V', 'K', 'Tl', 'Yb', 'Sb', 'Sn',
@@ -122,6 +109,7 @@ def atom_type_one_hot(atom, allowable_set=None, encode_unknown=False):
                          'Ni', 'Cd', 'In', 'Mn', 'Zr', 'Cr', 'Pt', 'Hg', 'Pb']
     return one_hot_encoding(atom.GetSymbol(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atomic_number_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the atomic number of an atom.
 
@@ -140,12 +128,11 @@ def atomic_number_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atomic_number_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(1, 101))
     return one_hot_encoding(atom.GetAtomicNum(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atomic_number(atom):
     """Get the atomic number for an atom.
 
@@ -159,10 +146,9 @@ def atomic_number(atom):
     list
        List containing one int only.
     """
-    _deprecate('atomic_number')
-
     return [atom.GetAtomicNum()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the degree of an atom.
 
@@ -188,12 +174,11 @@ def atom_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     --------
     atom_total_degree_one_hot
     """
-    _deprecate('atom_degree_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(11))
     return one_hot_encoding(atom.GetDegree(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_degree(atom):
     """Get the degree of an atom.
 
@@ -214,10 +199,9 @@ def atom_degree(atom):
     --------
     atom_total_degree
     """
-    _deprecate('atom_degree')
-
     return [atom.GetDegree()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the degree of an atom including Hs.
 
@@ -235,12 +219,11 @@ def atom_total_degree_one_hot(atom, allowable_set=None, encode_unknown=False):
     --------
     atom_degree_one_hot
     """
-    _deprecate('atom_total_degree_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(6))
     return one_hot_encoding(atom.GetTotalDegree(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_total_degree(atom):
     """The degree of an atom including Hs.
 
@@ -253,10 +236,9 @@ def atom_total_degree(atom):
     list
         List containing one int only.
     """
-    _deprecate('atom_total_degree')
-
     return [atom.GetTotalDegree()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the implicit valences of an atom.
 
@@ -275,12 +257,11 @@ def atom_implicit_valence_one_hot(atom, allowable_set=None, encode_unknown=False
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_implicit_valence_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(7))
     return one_hot_encoding(atom.GetImplicitValence(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_implicit_valence(atom):
     """Get the implicit valence of an atom.
 
@@ -294,10 +275,9 @@ def atom_implicit_valence(atom):
     list
         List containing one int only.
     """
-    _deprecate('atom_implicit_valence')
-
     return [atom.GetImplicitValence()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the hybridization of an atom.
 
@@ -318,8 +298,6 @@ def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_hybridization_one_hot')
-
     if allowable_set is None:
         allowable_set = [Chem.rdchem.HybridizationType.SP,
                          Chem.rdchem.HybridizationType.SP2,
@@ -328,6 +306,7 @@ def atom_hybridization_one_hot(atom, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.HybridizationType.SP3D2]
     return one_hot_encoding(atom.GetHybridization(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_total_num_H_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the total number of Hs of an atom.
 
@@ -346,12 +325,11 @@ def atom_total_num_H_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_total_num_H_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(5))
     return one_hot_encoding(atom.GetTotalNumHs(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_total_num_H(atom):
     """Get the total number of Hs of an atom.
 
@@ -365,10 +343,9 @@ def atom_total_num_H(atom):
     list
         List containing one int only.
     """
-    _deprecate('atom_total_num_H')
-
     return [atom.GetTotalNumHs()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_formal_charge_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the formal charge of an atom.
 
@@ -387,12 +364,11 @@ def atom_formal_charge_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_formal_charge_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(-2, 3))
     return one_hot_encoding(atom.GetFormalCharge(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_formal_charge(atom):
     """Get formal charge for an atom.
 
@@ -406,10 +382,9 @@ def atom_formal_charge(atom):
     list
         List containing one int only.
     """
-    _deprecate('atom_formal_charge')
-
     return [atom.GetFormalCharge()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the number of radical electrons of an atom.
 
@@ -428,12 +403,11 @@ def atom_num_radical_electrons_one_hot(atom, allowable_set=None, encode_unknown=
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_num_radical_electrons_one_hot')
-
     if allowable_set is None:
         allowable_set = list(range(5))
     return one_hot_encoding(atom.GetNumRadicalElectrons(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_num_radical_electrons(atom):
     """Get the number of radical electrons for an atom.
 
@@ -447,10 +421,9 @@ def atom_num_radical_electrons(atom):
     list
         List containing one int only.
     """
-    _deprecate('atom_num_radical_electrons')
-
     return [atom.GetNumRadicalElectrons()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_is_aromatic_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the atom is aromatic.
 
@@ -469,12 +442,11 @@ def atom_is_aromatic_one_hot(atom, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('atom_is_aromatic_one_hot')
-
     if allowable_set is None:
         allowable_set = [False, True]
     return one_hot_encoding(atom.GetIsAromatic(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_is_aromatic(atom):
     """Get whether the atom is aromatic.
 
@@ -488,10 +460,9 @@ def atom_is_aromatic(atom):
     list
         List containing one bool only.
     """
-    _deprecate('atom_is_aromatic')
-
     return [atom.GetIsAromatic()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
     """One hot encoding for the chiral tag of an atom.
 
@@ -505,8 +476,6 @@ def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
         ``rdkit.Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW``,
         ``rdkit.Chem.rdchem.ChiralType.CHI_OTHER``.
     """
-    _deprecate('atom_chiral_tag_one_hot')
-
     if allowable_set is None:
         allowable_set = [Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
                          Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
@@ -514,6 +483,7 @@ def atom_chiral_tag_one_hot(atom, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.ChiralType.CHI_OTHER]
     return one_hot_encoding(atom.GetChiralTag(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def atom_mass(atom, coef=0.01):
     """Get the mass of an atom and scale it.
 
@@ -529,8 +499,6 @@ def atom_mass(atom, coef=0.01):
     list
         List containing one float only.
     """
-    _deprecate('atom_mass')
-
     return [atom.GetMass() * coef]
 
 class ConcatFeaturizer(object):
@@ -544,9 +512,8 @@ class ConcatFeaturizer(object):
         ``func(data_type) -> list of float or bool or int``. The resulting order of
         the features will follow that of the functions in the list.
     """
+    @deprecated('Import ConcatFeaturizer from dgllife.utils instead.', 'class')
     def __init__(self, func_list):
-        _deprecate('ConcatFeaturizer')
-
         self.func_list = func_list
 
     def __call__(self, x):
@@ -597,9 +564,8 @@ class BaseAtomFeaturizer(object):
                        [0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.],
                        [0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])}
     """
+    @deprecated('Import BaseAtomFeaturizer from dgllife.utils instead.', 'class')
     def __init__(self, featurizer_funcs, feat_sizes=None):
-        _deprecate('BaseAtomFeaturizer')
-
         self.featurizer_funcs = featurizer_funcs
         if feat_sizes is None:
             feat_sizes = dict()
@@ -685,9 +651,8 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
     atom_data_field : str
         Name for storing atom features in DGLGraphs, default to be 'h'.
     """
+    @deprecated('Import CanonicalAtomFeaturizer from dgllife.utils instead.', 'class')
     def __init__(self, atom_data_field='h'):
-        _deprecate('CanonicalAtomFeaturizer')
-
         super(CanonicalAtomFeaturizer, self).__init__(
             featurizer_funcs={atom_data_field: ConcatFeaturizer(
                 [atom_type_one_hot,
@@ -700,6 +665,7 @@ class CanonicalAtomFeaturizer(BaseAtomFeaturizer):
                  atom_total_num_H_one_hot]
             )})
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the type of a bond.
 
@@ -720,8 +686,6 @@ def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('bond_type_one_hot')
-
     if allowable_set is None:
         allowable_set = [Chem.rdchem.BondType.SINGLE,
                          Chem.rdchem.BondType.DOUBLE,
@@ -729,6 +693,7 @@ def bond_type_one_hot(bond, allowable_set=None, encode_unknown=False):
                          Chem.rdchem.BondType.AROMATIC]
     return one_hot_encoding(bond.GetBondType(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_is_conjugated_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the bond is conjugated.
     Parameters
@@ -745,12 +710,11 @@ def bond_is_conjugated_one_hot(bond, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('bond_is_conjugated_one_hot')
-
     if allowable_set is None:
         allowable_set = [False, True]
     return one_hot_encoding(bond.GetIsConjugated(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_is_conjugated(bond):
     """Get whether the bond is conjugated.
     Parameters
@@ -762,10 +726,9 @@ def bond_is_conjugated(bond):
     list
         List containing one bool only.
     """
-    _deprecate('bond_is_conjugated')
-
     return [bond.GetIsConjugated()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_is_in_ring_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for whether the bond is in a ring of any size.
     Parameters
@@ -782,12 +745,11 @@ def bond_is_in_ring_one_hot(bond, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('bond_is_in_ring_one_hot')
-
     if allowable_set is None:
         allowable_set = [False, True]
     return one_hot_encoding(bond.IsInRing(), allowable_set, encode_unknown)
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_is_in_ring(bond):
     """Get whether the bond is in a ring of any size.
     Parameters
@@ -799,10 +761,9 @@ def bond_is_in_ring(bond):
     list
         List containing one bool only.
     """
-    _deprecate('bond_is_in_ring')
-
     return [bond.IsInRing()]
 
+@deprecated('Import it from dgllife.utils instead.')
 def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
     """One hot encoding for the stereo configuration of a bond.
     Parameters
@@ -822,8 +783,6 @@ def bond_stereo_one_hot(bond, allowable_set=None, encode_unknown=False):
     list
         List of boolean values where at most one value is True.
     """
-    _deprecate('bond_stereo_one_hot')
-
     if allowable_set is None:
         allowable_set = [Chem.rdchem.BondStereo.STEREONONE,
                          Chem.rdchem.BondStereo.STEREOANY,
@@ -867,9 +826,8 @@ class BaseBondFeaturizer(object):
                           [1., 0., 0., 0.]]),
      'in_ring': tensor([[0.], [0.], [0.], [0.]])}
     """
+    @deprecated('Import BaseBondFeaturizer from dgllife.utils instead.', 'class')
     def __init__(self, featurizer_funcs, feat_sizes=None):
-        _deprecate('BaseBondFeaturizer')
-
         self.featurizer_funcs = featurizer_funcs
         if feat_sizes is None:
             feat_sizes = dict()
@@ -941,9 +899,8 @@ class CanonicalBondFeaturizer(BaseBondFeaturizer):
     **We assume the resulting DGLGraph will be created with :func:`smiles_to_bigraph` without
     self loops.**
     """
+    @deprecated('Import CanonicalBondFeaturizer from dgllife.utils instead.', 'class')
     def __init__(self, bond_data_field='e'):
-        _deprecate('CanonicalBondFeaturizer')
-
         super(CanonicalBondFeaturizer, self).__init__(
             featurizer_funcs={bond_data_field: ConcatFeaturizer(
                 [bond_type_one_hot,

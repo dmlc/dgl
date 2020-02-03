@@ -1,10 +1,10 @@
 """Convert complexes into DGLHeteroGraphs"""
 import numpy as np
-import warnings
 
 from ..utils import k_nearest_neighbors
 from .... import graph, bipartite, hetero_from_relations
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 __all__ = ['ACNN_graph_construction_and_featurization']
 
@@ -50,6 +50,7 @@ def get_atomic_numbers(mol, indices):
         atomic_numbers.append(atom.GetAtomicNum())
     return atomic_numbers
 
+@deprecated('Import it from dgllife.utils instead.')
 def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,
                                               ligand_coordinates,
@@ -87,10 +88,6 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     strip_hydrogens : bool
         Whether to exclude hydrogen atoms. Default to False.
     """
-    warnings.warn(
-        '`ACNN_graph_construction_and_featurization` has been deprecated from DGL and '
-        'will be removed in v0.5. Import it from dglls.utils.complex_to_graph instead.')
-
     assert ligand_coordinates is not None, 'Expect ligand_coordinates to be provided.'
     assert protein_coordinates is not None, 'Expect protein_coordinates to be provided.'
     if max_num_ligand_atoms is not None:

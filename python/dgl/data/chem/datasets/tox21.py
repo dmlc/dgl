@@ -5,6 +5,7 @@ from ..utils import smiles_to_bigraph
 from ...utils import get_download_dir, download, _get_dgl_url
 from .... import backend as F
 from ....base import dgl_warning
+from ....contrib.deprecation import deprecated
 
 try:
     import pandas as pd
@@ -44,14 +45,13 @@ class Tox21(MoleculeCSVDataset):
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
     """
+    @deprecated('Import Tox21 from dgllife.data instead.', 'class')
     def __init__(self, smiles_to_graph=smiles_to_bigraph,
                  node_featurizer=None,
                  edge_featurizer=None,
                  load=True):
         if 'pandas' not in sys.modules:
             dgl_warning("Please install pandas")
-        dgl_warning("`Tox21` has been deprecated and will be removed from DGL in v0.5. "
-                    "Import it from `dglls.data.tox21` instead.")
 
         self._url = 'dataset/tox21.csv.gz'
         data_path = get_download_dir() + '/tox21.csv.gz'

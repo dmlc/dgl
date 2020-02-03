@@ -4,7 +4,6 @@ We mostly adapt them from deepchem
 (https://github.com/deepchem/deepchem/blob/master/deepchem/splits/splitters.py).
 """
 import numpy as np
-import warnings
 
 from collections import defaultdict
 from functools import partial
@@ -12,6 +11,7 @@ from itertools import accumulate, chain
 
 from ...utils import split_dataset, Subset
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 try:
     from rdkit import Chem
@@ -26,17 +26,6 @@ __all__ = ['ConsecutiveSplitter',
            'MolecularWeightSplitter',
            'ScaffoldSplitter',
            'SingleTaskStratifiedSplitter']
-
-def _deprecate(method):
-    """Print deprecation message.
-
-    Parameters
-    ----------
-    method : str
-        Name for splitting method.
-    """
-    warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5. '
-                  'Import it from dglls.utils.splitters instead.'.format(method))
 
 def base_k_fold_split(split_method, dataset, k, log):
     """Split dataset for k-fold cross validation.
@@ -201,6 +190,7 @@ class ConsecutiveSplitter(object):
     """
 
     @staticmethod
+    @deprecated('Import ConsecutiveSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1):
         """Split the dataset into three consecutive chunks for training, validation and test.
 
@@ -224,10 +214,10 @@ class ConsecutiveSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
-        _deprecate('ConsecutiveSplitter')
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test], shuffle=False)
 
     @staticmethod
+    @deprecated('Import ConsecutiveSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, k=5, log=True):
         """Split the dataset for k-fold cross validation by taking consecutive chunks.
 
@@ -246,7 +236,6 @@ class ConsecutiveSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
-        _deprecate('ConsecutiveSplitter')
         return base_k_fold_split(ConsecutiveSplitter.train_val_test_split, dataset, k, log)
 
 class RandomSplitter(object):
@@ -255,6 +244,7 @@ class RandomSplitter(object):
     The dataset is split with permutation and the splitting is hence random.
     """
     @staticmethod
+    @deprecated('Import RandomSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, frac_train=0.8, frac_val=0.1,
                              frac_test=0.1, random_state=None):
         """Randomly permute the dataset and then split it into
@@ -286,12 +276,11 @@ class RandomSplitter(object):
         list of length 3
             Subsets for training, validation and test.
         """
-        _deprecate('RandomSplitter')
-
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test],
                              shuffle=True, random_state=random_state)
 
     @staticmethod
+    @deprecated('Import RandomSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, k=5, random_state=None, log=True):
         """Randomly permute the dataset and then split it
         for k-fold cross validation by taking consecutive chunks.
@@ -317,8 +306,6 @@ class RandomSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
-        _deprecate('RandomSplitter')
-
         # Permute the dataset only once so that each datapoint
         # will appear once in exactly one fold.
         indices = np.random.RandomState(seed=random_state).permutation(len(dataset))
@@ -328,6 +315,7 @@ class RandomSplitter(object):
 class MolecularWeightSplitter(object):
     """Sort molecules based on their weights and then split them."""
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def molecular_weight_indices(molecules, log_every_n):
         """Reorder molecules based on molecular weights.
 
@@ -349,8 +337,6 @@ class MolecularWeightSplitter(object):
             Indices specifying the order of datapoints, which are basically
             argsort of the molecular weights.
         """
-        _deprecate('MolecularWeightSplitter')
-
         if log_every_n is not None:
             print('Start computing molecular weights.')
         mws = []
@@ -362,6 +348,7 @@ class MolecularWeightSplitter(object):
         return np.argsort(mws)
 
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, mols=None, sanitize=True, frac_train=0.8,
                              frac_val=0.1, frac_test=0.1, log_every_n=1000):
         """Sort molecules based on their weights and then split them into
@@ -402,8 +389,6 @@ class MolecularWeightSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
-        _deprecate('MolecularWeightSplitter')
-
         # Perform sanity check first as molecule instance initialization and descriptor
         # computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
@@ -413,6 +398,7 @@ class MolecularWeightSplitter(object):
         return indices_split(dataset, frac_train, frac_val, frac_test, sorted_indices)
 
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, mols=None, sanitize=True, k=5, log_every_n=1000):
         """Sort molecules based on their weights and then split them
         for k-fold cross validation by taking consecutive chunks.
@@ -445,8 +431,6 @@ class MolecularWeightSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
-        _deprecate('MolecularWeightSplitter')
-
         molecules = prepare_mols(dataset, mols, sanitize, log_every_n)
         sorted_indices = MolecularWeightSplitter.molecular_weight_indices(molecules, log_every_n)
 
@@ -466,6 +450,7 @@ class ScaffoldSplitter(object):
     """
 
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def get_ordered_scaffold_sets(molecules, include_chirality, log_every_n):
         """Group molecules based on their Bemis-Murcko scaffolds and
         order these groups based on their sizes.
@@ -493,8 +478,6 @@ class ScaffoldSplitter(object):
             Each element of the list is a list of int,
             representing the indices of compounds with a same scaffold.
         """
-        _deprecate('ScaffoldSplitter')
-
         if log_every_n is not None:
             print('Start computing Bemis-Murcko scaffolds.')
         scaffolds = defaultdict(list)
@@ -522,6 +505,7 @@ class ScaffoldSplitter(object):
         return scaffold_sets
 
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, mols=None, sanitize=True, include_chirality=False,
                              frac_train=0.8, frac_val=0.1, frac_test=0.1, log_every_n=1000):
         """Split the dataset into training, validation and test set based on molecular scaffolds.
@@ -569,8 +553,6 @@ class ScaffoldSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
-        _deprecate('ScaffoldSplitter')
-
         # Perform sanity check first as molecule related computation can take a long time.
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
         molecules = prepare_mols(dataset, mols, sanitize)
@@ -594,6 +576,7 @@ class ScaffoldSplitter(object):
                 Subset(dataset, test_indices)]
 
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, mols=None, sanitize=True,
                      include_chirality=False, k=5, log_every_n=1000):
         """Group molecules based on their scaffolds and sort groups based on their sizes.
@@ -637,8 +620,6 @@ class ScaffoldSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
-        _deprecate('ScaffoldSplitter')
-
         assert k >= 2, 'Expect the number of folds to be no smaller than 2, got {:d}'.format(k)
 
         molecules = prepare_mols(dataset, mols, sanitize)
@@ -668,6 +649,8 @@ class SingleTaskStratifiedSplitter(object):
     take buckets of datapoints to augment the training, validation and test subsets.
     """
     @staticmethod
+    @deprecated('Import SingleTaskStratifiedSplitter from '
+                'dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, labels, task_id, frac_train=0.8, frac_val=0.1,
                              frac_test=0.1, bucket_size=10, random_state=None):
         """Split the dataset into training, validation and test subsets as stated above.
@@ -706,8 +689,6 @@ class SingleTaskStratifiedSplitter(object):
         list of length 3
             Subsets for training, validation and test, which are all :class:`Subset` instances.
         """
-        _deprecate('SingleTaskStratifiedSplitter')
-
         train_val_test_sanity_check(frac_train, frac_val, frac_test)
 
         if random_state is not None:
@@ -741,6 +722,8 @@ class SingleTaskStratifiedSplitter(object):
                 Subset(dataset, test_indices)]
 
     @staticmethod
+    @deprecated('Import SingleTaskStratifiedSplitter from '
+                'dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, labels, task_id, k=5, log=True):
         """Sort molecules based on their label values for a task and then split them
         for k-fold cross validation by taking consecutive chunks.
@@ -766,8 +749,6 @@ class SingleTaskStratifiedSplitter(object):
         list of 2-tuples
             Each element of the list represents a fold and is a 2-tuple (train_set, val_set).
         """
-        _deprecate('SingleTaskStratifiedSplitter')
-
         if not isinstance(labels, np.ndarray):
             labels = F.asnumpy(labels)
         task_labels = labels[:, task_id]

@@ -2,10 +2,10 @@
 # coding: utf-8
 # pylint: disable=C0103, C0111, E1101, W0612
 """Implementation of MPNN model."""
-import warnings
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch import Set2Set, NNConv
 
 class MPNNModel(nn.Module):
@@ -32,6 +32,7 @@ class MPNNModel(nn.Module):
     num_layer_set2set : int
         Number of set2set layers
     """
+    @deprecated('Import MPNNPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  node_input_dim=15,
                  edge_input_dim=5,
@@ -42,9 +43,6 @@ class MPNNModel(nn.Module):
                  num_step_set2set=6,
                  num_layer_set2set=3):
         super(MPNNModel, self).__init__()
-
-        warnings.warn('`MPNNModel` has been deprecated from DGL and will be removed in v0.5.'
-                      'Import `MPNNPredictor` from `dglls.model` instead.')
 
         self.num_step_message_passing = num_step_message_passing
         self.lin0 = nn.Linear(node_input_dim, node_hidden_dim)

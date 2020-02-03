@@ -1,10 +1,10 @@
 """Convert molecules into DGLGraphs."""
 import numpy as np
-import warnings
 
 from functools import partial
 
 from .... import DGLGraph
+from ....contrib.deprecation import deprecated
 
 try:
     import mdtraj
@@ -20,17 +20,7 @@ __all__ = ['mol_to_graph',
            'mol_to_complete_graph',
            'k_nearest_neighbors']
 
-def _deprecate(func):
-    """Print deprecation message.
-
-    Parameters
-    ----------
-    func : str
-        Name for deprecated function.
-    """
-    warnings.warn('`{}` has been deprecated from DGL and will be removed in v0.5.  \
-                  Import it from dglls.utils.mol_to_graph instead.'.format(func))
-
+@deprecated('Import it from dgllife.utils instead.')
 def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
 
@@ -52,8 +42,6 @@ def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     g : DGLGraph
         Converted DGLGraph for the molecule
     """
-    _deprecate('mol_to_graph')
-
     new_order = rdmolfiles.CanonicalRankAtoms(mol)
     mol = rdmolops.RenumberAtoms(mol, new_order)
     g = graph_constructor(mol)
@@ -116,6 +104,7 @@ def construct_bigraph_from_mol(mol, add_self_loop=False):
 
     return g
 
+@deprecated('Import it from dgllife.utils instead.')
 def mol_to_bigraph(mol, add_self_loop=False,
                    node_featurizer=None,
                    edge_featurizer=None):
@@ -139,11 +128,10 @@ def mol_to_bigraph(mol, add_self_loop=False,
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
     """
-    _deprecate('mol_to_bigraph')
-
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer)
 
+@deprecated('Import it from dgllife.utils instead.')
 def smiles_to_bigraph(smiles, add_self_loop=False,
                       node_featurizer=None,
                       edge_featurizer=None):
@@ -167,8 +155,6 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
     g : DGLGraph
         Bi-directed DGLGraph for the molecule
     """
-    _deprecate('smiles_to_bigraph')
-
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_bigraph(mol, add_self_loop, node_featurizer, edge_featurizer)
 
@@ -210,6 +196,7 @@ def construct_complete_graph_from_mol(mol, add_self_loop=False):
 
     return g
 
+@deprecated('Import it from dgllife.utils instead.')
 def mol_to_complete_graph(mol, add_self_loop=False,
                           node_featurizer=None,
                           edge_featurizer=None):
@@ -233,11 +220,10 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     g : DGLGraph
         Complete DGLGraph for the molecule
     """
-    _deprecate('mol_to_complete_graph')
-
     return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
                         node_featurizer, edge_featurizer)
 
+@deprecated('Import it from dgllife.utils instead.')
 def smiles_to_complete_graph(smiles, add_self_loop=False,
                              node_featurizer=None,
                              edge_featurizer=None):
@@ -261,11 +247,10 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
     g : DGLGraph
         Complete DGLGraph for the molecule
     """
-    _deprecate('smiles_to_complete_graph')
-
     mol = Chem.MolFromSmiles(smiles)
     return mol_to_complete_graph(mol, add_self_loop, node_featurizer, edge_featurizer)
 
+@deprecated('Import it from dgllife.utils instead.')
 def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
     """Find k nearest neighbors for each atom based on the 3D coordinates.
 
@@ -290,8 +275,6 @@ def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
     distances : list of float
         Distances between the end nodes.
     """
-    _deprecate('k_nearest_neighbors')
-
     num_atoms = coordinates.shape[0]
     traj = mdtraj.Trajectory(coordinates.reshape((1, num_atoms, 3)), None)
     neighbors = mdtraj.geometry.compute_neighborlist(traj, neighbor_cutoff)

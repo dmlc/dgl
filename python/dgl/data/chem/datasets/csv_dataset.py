@@ -6,6 +6,7 @@ import sys
 
 from ...utils import save_graphs, load_graphs
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 class MoleculeCSVDataset(object):
     """MoleculeCSVDataset
@@ -44,15 +45,13 @@ class MoleculeCSVDataset(object):
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
     """
+    @deprecated('Import MoleculeCSVDataset from dgllife.data instead.', 'class')
     def __init__(self, df, smiles_to_graph, node_featurizer, edge_featurizer,
                  smiles_column, cache_file_path, task_names=None, load=True):
         if 'rdkit' not in sys.modules:
             from ....base import dgl_warning
             dgl_warning(
                 "Please install RDKit (Recommended Version is 2018.09.3)")
-            dgl_warning(
-                '`MoleculeCSVDataset` has been deprecated from DGL and will be removed in v0.5.'
-                'Import it from `dglls.data.csv_dataset` instead.')
         self.df = df
         self.smiles = self.df[smiles_column].tolist()
         if task_names is None:

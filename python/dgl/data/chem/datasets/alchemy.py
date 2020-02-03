@@ -6,7 +6,6 @@ import numpy as np
 import os
 import os.path as osp
 import pathlib
-import warnings
 import zipfile
 from collections import defaultdict
 
@@ -14,6 +13,7 @@ from ..utils import mol_to_complete_graph, atom_type_one_hot, \
     atom_hybridization_one_hot, atom_is_aromatic
 from ...utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 try:
     import pandas as pd
@@ -175,13 +175,12 @@ class TencentAlchemyDataset(object):
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch. Default to True.
     """
+    @deprecated('Import TencentAlchemyDataset from dgllife.data.alchemy instead.', 'class')
     def __init__(self, mode='dev',
                  mol_to_graph=mol_to_complete_graph,
                  node_featurizer=alchemy_nodes,
                  edge_featurizer=alchemy_edges,
                  load=True):
-        warnings.warn('`TencentAlchemyDataset` has been deprecated and will be removed from '
-                      'DGL in v0.5. Import it from `dglls.data.alchemy` instead.')
         if mode == 'test':
             raise ValueError('The test mode is not supported before '
                              'the Alchemy contest finishes.')
