@@ -366,6 +366,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_;
   }
 
+  bool IsHypersparse() const {
+    return NumVertices(SrcType()) / 8 > NumEdges(EdgeType());
+  }
+
  private:
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
@@ -1058,8 +1062,17 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
                      SparseFormat restrict_format)
-  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo),
-    restrict_format_(restrict_format) {
+  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+  restrict_format_ = restrict_format;
+
+  // If the graph is hypersparse and in COO format, switch the restricted format to COO.
+  // If the graph is given as CSR, the indptr array is already materialized so we don't
+  // care about restricting conversion anyway (even if it is hypersparse).
+  if (restrict_format == SparseFormat::ANY) {
+    if (coo && coo->IsHypersparse())
+      restrict_format_ = SparseFormat::COO;
+  }
+
   CHECK(GetAny()) << "At least one graph structure should exist.";
 }
 
@@ -1145,10 +1158,6 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 
   LOG(FATAL) << "Unsupported format code: " << format;
   return nullptr;
-}
-
-bool UnitGraph::IsHypersparse() const {
-  return NumEdges(0) < NumVertices(SrcType()) / 5;
 }
 
 SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
