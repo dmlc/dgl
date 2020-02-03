@@ -1,6 +1,6 @@
 .. _apigraph:
 
-DGLGraph -- Untyped graph with node/edge features
+dgl.DGLGraph
 =========================================
 
 .. currentmodule:: dgl

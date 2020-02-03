@@ -1,7 +1,11 @@
 .. apisampler
 
-Graph samplers
-==============
+dgl.contrib.sampling
+======================
+
+Module for sampling algorithms on graph. Each algorithm is implemented as a
+data loader, which produces sampled subgraphs (called Nodeflow) at each
+iteration.
 
 .. autofunction:: dgl.contrib.sampling.sampler.NeighborSampler
 .. autofunction:: dgl.contrib.sampling.sampler.LayerSampler

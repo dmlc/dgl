@@ -1,6 +1,6 @@
 .. _apiheterograph:
 
-DGLHeteroGraph -- Typed graph with node/edge features
+dgl.DGLHeteroGraph
 =====================================================
 
 .. currentmodule:: dgl

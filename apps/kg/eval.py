@@ -22,7 +22,7 @@ class ArgParser(argparse.ArgumentParser):
         super(ArgParser, self).__init__()
 
         self.add_argument('--model_name', default='TransE',
-                          choices=['TransE', 'TransH', 'TransR', 'TransD',
+                          choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransH', 'TransR', 'TransD',
                                    'RESCAL', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE'],
                           help='model to use')
         self.add_argument('--data_path', type=str, default='data',
@@ -38,15 +38,21 @@ class ArgParser(argparse.ArgumentParser):
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=-1,
                           help='negative sampling size for testing')
+        self.add_argument('--neg_deg_sample', action='store_true',
+                          help='negative sampling proportional to vertex degree for testing')
+        self.add_argument('--neg_chunk_size', type=int, default=-1,
+                          help='chunk size of the negative edges.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
         self.add_argument('--eval_percent', type=float, default=1,
                           help='sample some percentage for evaluation.')
+        self.add_argument('--no_eval_filter', action='store_true',
+                          help='do not filter positive edges among negative edges for evaluation')
 
-        self.add_argument('--gpu', type=int, default=-1,
-                          help='use GPU')
+        self.add_argument('--gpu', type=int, default=[-1], nargs='+',
+                          help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
                           help='mix CPU and GPU training')
         self.add_argument('-de', '--double_ent', action='store_true',
@@ -84,47 +90,70 @@ def get_logger(args):
     return logger
 
 def main(args):
+    args.eval_filter = not args.no_eval_filter
+    if args.neg_deg_sample:
+        assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
+
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     args.pickle_graph = False
     args.train = False
     args.valid = False
     args.test = True
+    args.rel_part = False
     args.batch_size_eval = args.batch_size
 
     logger = get_logger(args)
     # Here we want to use the regualr negative sampler because we need to ensure that
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
+
     args.neg_sample_size_test = args.neg_sample_size
+    args.neg_deg_sample_eval = args.neg_deg_sample
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
+    if args.neg_chunk_size < 0:
+        args.neg_chunk_size = args.neg_sample_size
+
+    num_workers = args.num_worker
+    # for multiprocessing evaluation, we don't need to sample multiple batches at a time
+    # in each process.
+    if args.num_proc > 1:
+        num_workers = 1
     if args.num_proc > 1:
         test_sampler_tails = []
         test_sampler_heads = []
         for i in range(args.num_proc):
             test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
-                                                            mode='PBG-head',
-                                                            num_workers=args.num_worker,
+                                                            args.neg_chunk_size,
+                                                            args.eval_filter,
+                                                            mode='chunk-head',
+                                                            num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
-                                                            mode='PBG-tail',
-                                                            num_workers=args.num_worker,
+                                                            args.neg_chunk_size,
+                                                            args.eval_filter,
+                                                            mode='chunk-tail',
+                                                            num_workers=num_workers,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
             test_sampler_tails.append(test_sampler_tail)
     else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
-                                                        mode='PBG-head',
-                                                        num_workers=args.num_worker,
+                                                        args.neg_chunk_size,
+                                                        args.eval_filter,
+                                                        mode='chunk-head',
+                                                        num_workers=num_workers,
                                                         rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                         args.neg_sample_size,
-                                                        mode='PBG-tail',
-                                                        num_workers=args.num_worker,
+                                                        args.neg_chunk_size,
+                                                        args.eval_filter,
+                                                        mode='chunk-tail',
+                                                        num_workers=num_workers,
                                                         rank=0, ranks=1)
 
     # load model
@@ -138,16 +167,31 @@ def main(args):
     # test
     args.step = 0
     args.max_step = 0
+    start = time.time()
     if args.num_proc > 1:
+        queue = mp.Queue(args.num_proc)
         procs = []
         for i in range(args.num_proc):
-            proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]]))
+            proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
+                              i, 'Test', queue))
             procs.append(proc)
             proc.start()
         for proc in procs:
             proc.join()
+
+        total_metrics = {}
+        for i in range(args.num_proc):
+            metrics = queue.get()
+            for k, v in metrics.items():
+                if i == 0:
+                    total_metrics[k] = v / args.num_proc
+                else:
+                    total_metrics[k] += v / args.num_proc
+        for k, v in metrics.items():
+            print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
     else:
         test(args, model, [test_sampler_head, test_sampler_tail])
+    print('Test takes {:.3f} seconds'.format(time.time() - start))
 
 
 if __name__ == '__main__':

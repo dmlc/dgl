@@ -1,8 +1,8 @@
 """
 .. currentmodule:: dgl
 
-DGL Basics
-==========
+DGLGraph and Node/edge Features
+===============================
 
 **Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, Yu Gai,
 Zheng Zhang

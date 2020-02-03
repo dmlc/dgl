@@ -630,6 +630,27 @@ def test_to_device():
         hg = hg.to(F.cuda())
         assert hg is not None
 
+def test_convert_bound():
+    def _test_bipartite_bound(data, card):
+        try:
+            dgl.bipartite(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'bipartite bound test with wrong uid failed'
+
+    def _test_graph_bound(data, card):
+        try:
+            dgl.graph(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'graph bound test with wrong uid failed'
+
+    _test_bipartite_bound(([1,2],[1,2]),(2,3))
+    _test_bipartite_bound(([0,1],[1,4]),(2,3))
+    _test_graph_bound(([1,3],[1,2]), 3)
+    _test_graph_bound(([0,1],[1,3]),3)
+
+
 def test_convert():
     hg = create_test_heterograph()
     hs = []
@@ -1230,6 +1251,33 @@ def test_backward():
                                               [2., 2., 2., 2., 2.],
                                               [2., 2., 2., 2., 2.]]))
 
+def test_empty_heterograph():
+    def assert_empty(g):
+        assert g.number_of_nodes('user') == 0
+        assert g.number_of_edges('plays') == 0
+        assert g.number_of_nodes('game') == 0
+
+    # empty edge list
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): []}))
+    # empty src-dst pair
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ([], [])}))
+    # empty sparse matrix
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ssp.coo_matrix((0, 0))}))
+    # empty networkx graph
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
+
+    g = dgl.heterograph({('user', 'follows', 'user'): []})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('follows') == 0
+
+    # empty relation graph with others
+    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [(0, 0), (1, 1)]})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('plays') == 0
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('develops') == 2
+    assert g.number_of_nodes('developer') == 2
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1238,6 +1286,7 @@ if __name__ == '__main__':
     test_view()
     test_view1()
     test_flatten()
+    test_convert_bound()
     test_convert()
     test_to_device()
     test_transform()
@@ -1247,3 +1296,4 @@ if __name__ == '__main__':
     test_level2()
     test_updates()
     test_backward()
+    test_empty_heterograph()

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from distutils.version import LooseVersion
 
+import os
 import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
@@ -17,7 +18,7 @@ if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] < 5:
 
 # After MXNet 1.5, empty tensors aren't supprted by default.
 # After we turn on the numpy compatible flag, MXNet supports empty NDArray.
-mx.set_np_shape(True)
+mx.set_np_shape(bool(os.environ.get('DGL_MXNET_SET_NP_SHAPE', True)))
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -445,7 +446,7 @@ class BinaryReduce(mx.autograd.Function):
 
 
 def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+                  out_size, lhs_map=(None, None), rhs_map=(None, None), out_map=(None, None)):
     func = BinaryReduce(reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
                         rhs_map, out_map)
     return func(lhs_data, rhs_data)
@@ -508,7 +509,8 @@ class CopyReduce(mx.autograd.Function):
         return grad_in
 
 
-def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map=(None, None),
+                out_map=(None, None)):
     func = CopyReduce(reducer, graph, target, out_size, in_map, out_map)
     return func(in_data)
 

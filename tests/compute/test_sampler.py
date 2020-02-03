@@ -668,7 +668,7 @@ def check_weighted_negative_sampler(mode, exclude_positive, neg_size):
 def check_positive_edge_sampler():
     g = generate_rand_graph(1000)
     num_edges = g.number_of_edges()
-    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 1, dtype=np.float32)), F.cpu())
+    edge_weight = F.copy_to(F.tensor(np.full((num_edges,), 0.1, dtype=np.float32)), F.cpu())
 
     edge_weight[num_edges-1] = num_edges ** 2
     EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
@@ -700,10 +700,10 @@ def check_positive_edge_sampler():
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support item assignment")
 def test_negative_sampler():
-    check_negative_sampler('PBG-head', False, 10)
+    check_negative_sampler('chunk-head', False, 10)
     check_negative_sampler('head', True, 10)
     check_negative_sampler('head', False, 10)
-    check_weighted_negative_sampler('PBG-head', False, 10)
+    check_weighted_negative_sampler('chunk-head', False, 10)
     check_weighted_negative_sampler('head', True, 10)
     check_weighted_negative_sampler('head', False, 10)
     check_positive_edge_sampler()

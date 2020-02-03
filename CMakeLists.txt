@@ -92,6 +92,8 @@ file(GLOB DGL_SRC
   src/*.cc
   src/array/*.cc
   src/array/cpu/*.cc
+  src/random/*.cc
+  src/random/cpu/*.cc
   src/kernel/*.cc
   src/kernel/cpu/*.cc
   src/runtime/*.cc
