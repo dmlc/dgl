@@ -12,18 +12,22 @@
 #include <dgl/runtime/ndarray.h>
 #include <algorithm>
 #include <vector>
+#include <tuple>
 #include <utility>
 
 namespace dgl {
 
 typedef uint64_t dgl_id_t;
 typedef uint64_t dgl_type_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-typedef dgl::runtime::NDArray FloatArray;
-typedef dgl::runtime::NDArray TypeArray;
+
+using dgl::runtime::NDArray;
+
+typedef NDArray IdArray;
+typedef NDArray DegreeArray;
+typedef NDArray BoolArray;
+typedef NDArray IntArray;
+typedef NDArray FloatArray;
+typedef NDArray TypeArray;
 
 namespace aten {
 
@@ -101,9 +105,13 @@ BoolArray LT(IdArray lhs, dgl_id_t rhs);
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
 
-/*! \brief Return the data under the index. In numpy notation, A[I] */
-int64_t IndexSelect(IdArray array, int64_t index);
-IdArray IndexSelect(IdArray array, IdArray index);
+/*!
+ * \brief Return the data under the index. In numpy notation, A[I]
+ * \tparam ValueType The type of return value.
+ */
+template<typename ValueType>
+ValueType IndexSelect(NDArray array, uint64_t index);
+NDArray IndexSelect(NDArray array, IdArray index);
 
 /*!
  * \brief Relabel the given ids to consecutive ids.
@@ -120,6 +128,68 @@ IdArray Relabel_(const std::vector<IdArray>& arrays);
 inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ndim == 1 && arr->dtype.code == kDLInt;
 }
+
+/*!
+ * \brief Packs a tensor containing padded sequences of variable length.
+ *
+ * Similar to \c pack_padded_sequence in PyTorch, except that
+ *
+ * 1. The length for each sequence (before padding) is inferred as the number
+ *    of elements before the first occurrence of \c pad_value.
+ * 2. It does not sort the sequences by length.
+ * 3. Along with the tensor containing the packed sequence, it returns both the
+ *    length, as well as the offsets to the packed tensor, of each sequence.
+ *
+ * \param array The tensor containing sequences padded to the same length
+ * \param pad_value The padding value
+ * \return A triplet of packed tensor, the length tensor, and the offset tensor
+ *
+ * \note Example: consider the following array with padding value -1:
+ *
+ * <code>
+ *     [[1, 2, -1, -1],
+ *      [3, 4,  5, -1]]
+ * </code>
+ *
+ * The packed tensor would be [1, 2, 3, 4, 5].
+ *
+ * The length tensor would be [2, 3], i.e. the length of each sequence before padding.
+ *
+ * The offset tensor would be [0, 2], i.e. the offset to the packed tensor for each
+ * sequence (before padding)
+ */
+template<typename ValueType>
+std::tuple<NDArray, IdArray, IdArray> Pack(NDArray array, ValueType pad_value);
+
+/*!
+ * \brief Batch-slice a 1D or 2D array, and then pack the list of sliced arrays
+ * by concatenation.
+ *
+ * If a 2D array is given, then the function is equivalent to:
+ *
+ * <code>
+ *     def ConcatSlices(array, lengths):
+ *         slices = [array[i, :l] for i, l in enumerate(lengths)]
+ *         packed = np.concatenate(slices)
+ *         offsets = np.cumsum([0] + lengths[:-1])
+ *         return packed, offsets
+ * </code>
+ *
+ * If a 1D array is given, then the function is equivalent to
+ *
+ * <code>
+ *     def ConcatSlices(array, lengths):
+ *         slices = [array[:l] for l in lengths]
+ *         packed = np.concatenate(slices)
+ *         offsets = np.cumsum([0] + lengths[:-1])
+ *         return packed, offsets
+ * </code>
+ *
+ * \param array A 1D or 2D tensor for slicing
+ * \param lengths A 1D tensor indicating the number of elements to slice
+ * \return The tensor with packed slices along with the offsets.
+ */
+std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 
 //////////////////////////////////////////////////////////////////////
 // Sparse matrix
@@ -284,6 +354,181 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }
   return ret.CopyTo(ctx);
 }
+
+///////////////////////// Dispatchers //////////////////////////
+
+/*
+ * Dispatch according to device:
+ *
+ * ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+ *   // Now XPU is a placeholder for array->ctx.device_type
+ *   DeviceSpecificImplementation<XPU>(...);
+ * });
+ */
+#define ATEN_XPU_SWITCH(val, XPU, ...) do {                     \
+  if ((val) == kDLCPU) {                                        \
+    constexpr auto XPU = kDLCPU;                                \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Device type: " << (val) << " is not supported.";  \
+  }                                                             \
+} while (0)
+
+/*
+ * Dispatch according to integral type (either int32 or int64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, IdType, {
+ *   // Now IdType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_ID_TYPE_SWITCH(val, IdType, ...) do {            \
+  CHECK_EQ((val).code, kDLInt) << "ID must be integer type";  \
+  if ((val).bits == 32) {                                     \
+    typedef int32_t IdType;                                   \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 64) {                              \
+    typedef int64_t IdType;                                   \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << "ID can only be int32 or int64";            \
+  }                                                           \
+} while (0)
+
+/*
+ * Dispatch according to float type (either float32 or float64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, FloatType, {
+ *   // Now FloatType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   FloatType *data = static_cast<FloatType *>(array->data);
+ * });
+ */
+#define ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, ...) do {  \
+  CHECK_EQ((val).code, kDLFloat)                              \
+    << (val_name) << " must be float type";                   \
+  if ((val).bits == 32) {                                     \
+    typedef float FloatType;                                  \
+    {__VA_ARGS__}                                             \
+  } else if ((val).bits == 64) {                              \
+    typedef double FloatType;                                 \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be float32 or float64";  \
+  }                                                           \
+} while (0)
+
+/*
+ * Dispatch according to data type (int32, int64, float32 or float64):
+ *
+ * ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+ *   // Now DType is the type corresponding to data type in array.
+ *   // For instance, one can do this for a CPU array:
+ *   DType *data = static_cast<DType *>(array->data);
+ * });
+ */
+#define ATEN_DTYPE_SWITCH(val, DType, val_name, ...) do {     \
+  if ((val).code == kDLInt && (val).bits == 32) {             \
+    typedef int32_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLInt && (val).bits == 64) {      \
+    typedef int64_t DType;                                    \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 32) {    \
+    typedef float DType;                                      \
+    {__VA_ARGS__}                                             \
+  } else if ((val).code == kDLFloat && (val).bits == 64) {    \
+    typedef double DType;                                     \
+    {__VA_ARGS__}                                             \
+  } else {                                                    \
+    LOG(FATAL) << (val_name) << " can only be int32, int64, float32 or float64"; \
+  }                                                           \
+} while (0)
+
+/*
+ * Dispatch according to integral type of CSR graphs.
+ * Identical to ATEN_ID_TYPE_SWITCH except for a different error message.
+ */
+#define ATEN_CSR_DTYPE_SWITCH(val, DType, ...) do {         \
+  if ((val).code == kDLInt && (val).bits == 32) {           \
+    typedef int32_t DType;                                  \
+    {__VA_ARGS__}                                           \
+  } else if ((val).code == kDLInt && (val).bits == 64) {    \
+    typedef int64_t DType;                                  \
+    {__VA_ARGS__}                                           \
+  } else {                                                  \
+    LOG(FATAL) << "CSR matrix data can only be int32 or int64";  \
+  }                                                         \
+} while (0)
+
+// Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context and index type
+#define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
+  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context, index type and data type
+// TODO(minjie): In our current use cases, data type and id type are the
+//   same. For example, data array is used to store edge ids.
+#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      typedef IdType DType;                                 \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+// Macro to dispatch according to device context and index type
+#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
+  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+      {__VA_ARGS__}                                         \
+    });                                                     \
+  });
+
+///////////////////////// Array checks //////////////////////////
+
+#define IS_INT32(a)  \
+  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 32)
+#define IS_INT64(a)  \
+  ((a)->dtype.code == kDLInt && (a)->dtype.bits == 64)
+#define IS_FLOAT32(a)  \
+  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 32)
+#define IS_FLOAT64(a)  \
+  ((a)->dtype.code == kDLFloat && (a)->dtype.bits == 64)
+
+#define CHECK_IF(cond, prop, value_name, dtype_name) \
+  CHECK(cond) << "Expecting " << (prop) << " of " << (value_name) << " to be " << (dtype_name)
+
+#define CHECK_INT32(value, value_name) \
+  CHECK_IF(IS_INT32(value), "dtype", value_name, "int32")
+#define CHECK_INT64(value, value_name) \
+  CHECK_IF(IS_INT64(value), "dtype", value_name, "int64")
+#define CHECK_INT(value, value_name) \
+  CHECK_IF(IS_INT32(value) || IS_INT64(value), "dtype", value_name, "int32 or int64")
+#define CHECK_FLOAT32(value, value_name) \
+  CHECK_IF(IS_FLOAT32(value), "dtype", value_name, "float32")
+#define CHECK_FLOAT64(value, value_name) \
+  CHECK_IF(IS_FLOAT64(value), "dtype", value_name, "float64")
+#define CHECK_FLOAT(value, value_name) \
+  CHECK_IF(IS_FLOAT32(value) || IS_FLOAT64(value), "dtype", value_name, "float32 or float64")
+
+#define CHECK_NDIM(value, _ndim, value_name) \
+  CHECK_IF((value)->ndim == (_ndim), "ndim", value_name, _ndim)
 
 }  // namespace aten
 }  // namespace dgl

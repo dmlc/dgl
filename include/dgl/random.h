@@ -7,10 +7,12 @@
 #ifndef DGL_RANDOM_H_
 #define DGL_RANDOM_H_
 
+#include <dgl/array.h>
 #include <dmlc/thread_local.h>
 #include <dmlc/logging.h>
 #include <random>
 #include <thread>
+#include <vector>
 
 namespace dgl {
 
@@ -95,8 +97,15 @@ class RandomEngine {
     return dist(rng_);
   }
 
+  /*!
+   * \brief Pick a random integer between 0 to N-1 according to given probabilities
+   * \param prob Array of unnormalized probability of each element.  Must be non-negative.
+   */
+  template<typename IdxType>
+  IdxType Choice(FloatArray prob);
+
  private:
-  std::mt19937 rng_;
+  std::default_random_engine rng_;
 };
 
 };  // namespace dgl
