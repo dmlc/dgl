@@ -43,7 +43,7 @@ class HeteroGraphIndex(ObjectBase):
             num_dst = number_of_nodes[dst_ntype]
             src_id, dst_id, _ = edges_per_type
             rel_graphs.append(create_unitgraph_from_coo(
-                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id))
+                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
         self.__init_handle_by_constructor__(
             _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 

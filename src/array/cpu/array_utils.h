@@ -91,6 +91,9 @@ class IdHashMap {
   std::unordered_map<IdType, IdType> oldv2newv_;
 };
 
+/*
+ * \brief Hash type for building maps/sets with pairs as keys.
+ */
 struct PairHash {
   template <class T1, class T2>
   std::size_t operator() (const std::pair<T1, T2>& pair) const {

@@ -962,7 +962,7 @@ def create_from_networkx(nx_graph,
                          edge_id_attr_name='id',
                          node_attrs=None,
                          edge_attrs=None,
-                         _restrict_format=None):
+                         _restrict_format='any'):
     """Create a heterograph that has only one set of nodes and edges.
 
     Parameters
