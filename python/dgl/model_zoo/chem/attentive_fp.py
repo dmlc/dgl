@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ... import function as fn
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch.softmax import edge_softmax
 
 class AttentiveGRU1(nn.Module):
@@ -296,6 +297,7 @@ class AttentiveFP(nn.Module):
     dropout : float
         The probability for performing dropout.
     """
+    @deprecated('Import AttentiveFPPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  node_feat_size,
                  edge_feat_size,
