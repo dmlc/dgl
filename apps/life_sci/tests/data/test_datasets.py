@@ -1,6 +1,6 @@
 import os
 
-from dglls.data import *
+from dgllife.data import *
 
 def remove_file(fname):
     if os.path.isfile(fname):

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from dglls.utils.eval import Meter
+from dgllife.utils.eval import Meter
 from torch.utils.data import DataLoader
 
 from utils import set_random_seed, load_dataset, collate, load_model

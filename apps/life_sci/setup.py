@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import dglls
+import dgllife
 import sys
 
 from setuptools import find_packages
@@ -11,8 +11,8 @@ else:
     from setuptools import setup
 
 setup(
-    name='dglls',
-    version=dglls.__version__,
+    name='dgllife',
+    version=dgllife.__version__,
     description='DGL-based package for Chemistry',
     keywords=[
         'pytorch',
@@ -24,7 +24,7 @@ setup(
     zip_safe=False,
     maintainer='DGL Team',
     packages=[package for package in find_packages()
-              if package.startswith('dglls')],
+              if package.startswith('dgllife')],
     install_requires=[
         'dgl>=0.4',
         'torch>=1'

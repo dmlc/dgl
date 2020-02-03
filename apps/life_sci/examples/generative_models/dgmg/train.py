@@ -6,7 +6,7 @@ import datetime
 import time
 import torch
 import torch.distributed as dist
-from dglls.model import DGMG
+from dgllife.model import DGMG
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 

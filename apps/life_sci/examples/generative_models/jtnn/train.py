@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
-from dglls.model import DGLJTNNVAE
-from dglls.model.model_zoo.jtnn.nnutils import cuda
+from dgllife.model import DGLJTNNVAE
+from dgllife.model.model_zoo.jtnn.nnutils import cuda
 from torch.utils.data import DataLoader
 
 from jtnn import *

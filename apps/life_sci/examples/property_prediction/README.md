@@ -113,12 +113,12 @@ Note that the dataset is randomly split so this number is only for reference.
 
 [8] visualizes the weights of atoms in readout for possible interpretations like the figure below. 
 We provide a jupyter notebook for performing the visualization and you can download it with 
-`wget https://s3.us-west-2.amazonaws.com/dgl-data/dglls/attentive_fp/atom_weight_visualization.ipynb` 
+`wget https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/attentive_fp/atom_weight_visualization.ipynb` 
 from the s3 bucket in U.S. or 
-`wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dglls/attentive_fp/atom_weight_visualization.ipynb` 
+`wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dgllife/attentive_fp/atom_weight_visualization.ipynb` 
 from the s3 bucket in China.
 
-![](https://s3.us-west-2.amazonaws.com/dgl-data/dglls/attentive_fp_vis_example.png)
+![](https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/attentive_fp_vis_example.png)
 
 ## Dataset Customization
 
@@ -153,9 +153,9 @@ class CustomDataset(object):
         return len(self.smiles)
 ```
 
-We provide various methods for graph construction in `dglls.utils.mol_to_graph`. If your dataset can 
+We provide various methods for graph construction in `dgllife.utils.mol_to_graph`. If your dataset can 
 be converted to a pandas dataframe, e.g. a .csv file, you may use `MoleculeCSVDataset` in 
-`dglls.data.csv_dataset`.
+`dgllife.data.csv_dataset`.
 
 ## References
 [1] Wu et al. (2017) MoleculeNet: a benchmark for molecular machine learning. *Chemical Science* 9, 513-530.

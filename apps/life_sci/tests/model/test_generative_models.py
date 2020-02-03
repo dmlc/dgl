@@ -2,7 +2,7 @@ import torch
 
 from rdkit import Chem
 
-from dglls.model import DGMG, DGLJTNNVAE
+from dgllife.model import DGMG, DGLJTNNVAE
 
 def test_dgmg():
     model = DGMG(atom_types=['O', 'Cl', 'C', 'S', 'F', 'Br', 'N'],

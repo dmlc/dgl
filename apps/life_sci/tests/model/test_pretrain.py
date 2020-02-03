@@ -4,8 +4,8 @@ import torch
 
 from functools import partial
 
-from dglls.model import load_pretrained
-from dglls.utils import *
+from dgllife.model import load_pretrained
+from dgllife.utils import *
 
 def remove_file(fname):
     if os.path.isfile(fname):

@@ -4,7 +4,7 @@
 
 Deep learning on graphs has been an arising trend in the past few years. There are a lot of graphs in 
 life science such as molecular graphs and biological networks, making it an import area for applying 
-deep learning on graphs. `dglls` is a DGL-based package for various applications in life science 
+deep learning on graphs. `dgllife` is a DGL-based package for various applications in life science 
 with graph neural networks. 
 
 We provide various functionalities, including but not limited to methods for graph construction, 
@@ -28,7 +28,7 @@ Depending on the features you want to use, you may need to manually install the 
 For a full list of work implemented in DGL-LifeSci, **see implemented.md**.
 
 ```
-dglls
+dgllife
     data
         csv_dataset.py
         ...
@@ -81,9 +81,9 @@ For some examples we also provide pre-trained models, which can be used off-shel
 
 ```python
 """Load a pre-trained model for property prediction."""
-from dglls.data import Tox21
-from dglls.model import load_pretrained
-from dglls.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
+from dgllife.data import Tox21
+from dgllife.model import load_pretrained
+from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
 
 dataset = Tox21(smiles_to_bigraph, CanonicalAtomFeaturizer())
 model = load_pretrained('GCN_Tox21') # Pretrained model loaded
@@ -104,7 +104,7 @@ from IPython.display import SVG
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from dglls.model import load_pretrained
+from dgllife.model import load_pretrained
 
 model = load_pretrained('DGMG_ZINC_canonical')
 model.eval()

@@ -1,9 +1,9 @@
 import os
 import pandas as pd
 
-from dglls.data.csv_dataset import *
-from dglls.utils.featurizers import *
-from dglls.utils.mol_to_graph import *
+from dgllife.data.csv_dataset import *
+from dgllife.utils.featurizers import *
+from dgllife.utils.mol_to_graph import *
 
 def test_data_frame():
     data = [['CCO', 0, 1], ['CO', 2, 3]]

@@ -2,8 +2,8 @@ import argparse
 import rdkit
 import torch
 
-from dglls.model import DGLJTNNVAE, load_pretrained
-from dglls.model.model_zoo.jtnn.nnutils import cuda
+from dgllife.model import DGLJTNNVAE, load_pretrained
+from dgllife.model.model_zoo.jtnn.nnutils import cuda
 from torch.utils.data import DataLoader
 
 from jtnn import *

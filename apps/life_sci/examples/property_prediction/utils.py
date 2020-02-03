@@ -3,9 +3,9 @@ import numpy as np
 import random
 import torch
 
-from dglls.utils.featurizers import one_hot_encoding
-from dglls.utils.mol_to_graph import smiles_to_bigraph
-from dglls.utils.splitters import RandomSplitter
+from dgllife.utils.featurizers import one_hot_encoding
+from dgllife.utils.mol_to_graph import smiles_to_bigraph
+from dgllife.utils.splitters import RandomSplitter
 
 def set_random_seed(seed=0):
     """Set random seed.
@@ -39,7 +39,7 @@ def load_dataset_for_classification(args):
     """
     assert args['dataset'] in ['Tox21']
     if args['dataset'] == 'Tox21':
-        from dglls.data import Tox21
+        from dgllife.data import Tox21
         dataset = Tox21(smiles_to_bigraph, args['atom_featurizer'])
         train_set, val_set, test_set = RandomSplitter.train_val_test_split(
             dataset, frac_train=args['frac_train'], frac_val=args['frac_val'],
@@ -65,13 +65,13 @@ def load_dataset_for_regression(args):
     assert args['dataset'] in ['Alchemy', 'Aromaticity']
 
     if args['dataset'] == 'Alchemy':
-        from dglls.data import TencentAlchemyDataset
+        from dgllife.data import TencentAlchemyDataset
         train_set = TencentAlchemyDataset(mode='dev')
         val_set = TencentAlchemyDataset(mode='valid')
         test_set = None
 
     if args['dataset'] == 'Aromaticity':
-        from dglls.data import PubChemBioAssayAromaticity
+        from dgllife.data import PubChemBioAssayAromaticity
         dataset = PubChemBioAssayAromaticity(smiles_to_bigraph,
                                              args['atom_featurizer'],
                                              args['bond_featurizer'])
@@ -124,14 +124,14 @@ def collate_molgraphs(data):
 
 def load_model(args):
     if args['model'] == 'GCN':
-        from dglls.model import GCNPredictor
+        from dgllife.model import GCNPredictor
         model = GCNPredictor(in_feats=args['in_feats'],
                              hidden_feats=args['gcn_hidden_feats'],
                              classifier_hidden_feats=args['classifier_hidden_feats'],
                              n_tasks=args['n_tasks'])
 
     if args['model'] == 'GAT':
-        from dglls.model import GATPredictor
+        from dgllife.model import GATPredictor
         model = GATPredictor(in_feats=args['in_feats'],
                              hidden_feats=args['gat_hidden_feats'],
                              num_heads=args['num_heads'],
@@ -139,7 +139,7 @@ def load_model(args):
                              n_tasks=args['n_tasks'])
 
     if args['model'] == 'AttentiveFP':
-        from dglls.model import AttentiveFPPredictor
+        from dgllife.model import AttentiveFPPredictor
         model = AttentiveFPPredictor(node_feat_size=args['node_feat_size'],
                                      edge_feat_size=args['edge_feat_size'],
                                      num_layers=args['num_layers'],
@@ -149,21 +149,21 @@ def load_model(args):
                                      dropout=args['dropout'])
 
     if args['model'] == 'SchNet':
-        from dglls.model import SchNetPredictor
+        from dgllife.model import SchNetPredictor
         model = SchNetPredictor(node_feats=args['node_feats'],
                                 hidden_feats=args['hidden_feats'],
                                 classifier_hidden_feats=args['classifier_hidden_feats'],
                                 n_tasks=args['n_tasks'])
 
     if args['model'] == 'MGCN':
-        from dglls.model import MGCNPredictor
+        from dgllife.model import MGCNPredictor
         model = MGCNPredictor(feats=args['feats'],
                               n_layers=args['n_layers'],
                               classifier_hidden_feats=args['classifier_hidden_feats'],
                               n_tasks=args['n_tasks'])
 
     if args['model'] == 'MPNN':
-        from dglls.model import MPNNPredictor
+        from dgllife.model import MPNNPredictor
         model = MPNNPredictor(node_in_feats=args['node_in_feats'],
                               edge_in_feats=args['edge_in_feats'],
                               node_out_feats=args['node_out_feats'],

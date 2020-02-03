@@ -4,8 +4,8 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader
 
-from dglls.model import load_pretrained
-from dglls.utils import EarlyStopping, Meter
+from dgllife.model import load_pretrained
+from dgllife.utils import EarlyStopping, Meter
 
 from utils import set_random_seed, load_dataset_for_regression, collate_molgraphs, load_model
 

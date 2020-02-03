@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dglls.utils.eval import *
+from dgllife.utils.eval import *
 
 def test_Meter():
     label = torch.tensor([[0., 1.],

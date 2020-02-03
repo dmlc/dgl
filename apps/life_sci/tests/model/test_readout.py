@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 from dgl import DGLGraph
-from dglls.model.readout import *
+from dgllife.model.readout import *
 
 def test_graph1():
     """Graph with node features"""

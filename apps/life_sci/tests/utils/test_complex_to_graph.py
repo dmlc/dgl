@@ -3,8 +3,8 @@ import shutil
 import torch
 
 from dgl.data.utils import download, _get_dgl_url, extract_archive
-from dglls.utils.complex_to_graph import *
-from dglls.utils.rdkit_utils import load_molecule
+from dgllife.utils.complex_to_graph import *
+from dgllife.utils.rdkit_utils import load_molecule
 
 def remove_dir(dir):
     if os.path.isdir(dir):
@@ -17,7 +17,7 @@ def test_acnn_graph_construction_and_featurization():
     remove_dir('tmp1')
     remove_dir('tmp2')
 
-    url = _get_dgl_url('dglls/example_mols.tar.gz')
+    url = _get_dgl_url('dgllife/example_mols.tar.gz')
     local_path = 'tmp1/example_mols.tar.gz'
     download(url, path=local_path)
     extract_archive(local_path, 'tmp2')

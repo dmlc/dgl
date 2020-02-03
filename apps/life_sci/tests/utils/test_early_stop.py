@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 
-from dglls.utils import EarlyStopping
+from dgllife.utils import EarlyStopping
 
 def remove_file(fname):
     if os.path.isfile(fname):

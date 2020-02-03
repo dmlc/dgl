@@ -3,7 +3,7 @@ import os
 import shutil
 
 from dgl.data.utils import download, _get_dgl_url, extract_archive
-from dglls.utils.rdkit_utils import get_mol_3D_coordinates, load_molecule
+from dgllife.utils.rdkit_utils import get_mol_3D_coordinates, load_molecule
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
@@ -30,7 +30,7 @@ def test_load_molecule():
     remove_dir('tmp1')
     remove_dir('tmp2')
 
-    url = _get_dgl_url('dglls/example_mols.tar.gz')
+    url = _get_dgl_url('dgllife/example_mols.tar.gz')
     local_path = 'tmp1/example_mols.tar.gz'
     download(url, path=local_path)
     extract_archive(local_path, 'tmp2')

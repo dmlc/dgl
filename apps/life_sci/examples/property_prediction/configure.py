@@ -1,6 +1,6 @@
 from functools import partial
 
-from dglls.utils.featurizers import CanonicalAtomFeaturizer, BaseAtomFeaturizer, \
+from dgllife.utils.featurizers import CanonicalAtomFeaturizer, BaseAtomFeaturizer, \
     BaseBondFeaturizer, ConcatFeaturizer, atom_type_one_hot, atom_degree_one_hot, \
     atom_formal_charge, atom_num_radical_electrons, atom_hybridization_one_hot, \
     atom_total_num_H_one_hot

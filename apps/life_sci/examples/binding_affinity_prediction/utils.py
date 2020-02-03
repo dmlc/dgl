@@ -4,9 +4,9 @@ import random
 import torch
 
 from dgl.data.utils import Subset
-from dglls.data import PDBBind
-from dglls.model import ACNN
-from dglls.utils import RandomSplitter, ScaffoldSplitter, SingleTaskStratifiedSplitter
+from dgllife.data import PDBBind
+from dgllife.model import ACNN
+from dgllife.utils import RandomSplitter, ScaffoldSplitter, SingleTaskStratifiedSplitter
 from itertools import accumulate
 
 def set_random_seed(seed=0):

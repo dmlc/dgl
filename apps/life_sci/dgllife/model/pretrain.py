@@ -11,9 +11,9 @@ from ..model import GCNPredictor, GATPredictor, AttentiveFPPredictor, DGMG, DGLJ
 __all__ = ['load_pretrained']
 
 URL = {
-    'GCN_Tox21': 'dglls/pre_trained/gcn_tox21.pth',
-    'GAT_Tox21': 'dglls/pre_trained/gat_tox21.pth',
-    'AttentiveFP_Aromaticity': 'dglls/pre_trained/attentivefp_aromaticity.pth',
+    'GCN_Tox21': 'dgllife/pre_trained/gcn_tox21.pth',
+    'GAT_Tox21': 'dgllife/pre_trained/gat_tox21.pth',
+    'AttentiveFP_Aromaticity': 'dgllife/pre_trained/attentivefp_aromaticity.pth',
     'DGMG_ChEMBL_canonical': 'pre_trained/dgmg_ChEMBL_canonical.pth',
     'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
     'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
@@ -127,7 +127,7 @@ def load_pretrained(model_name, log=True):
         vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
         if not os.path.exists(vocab_file):
             zip_file_path = '{}/jtnn.zip'.format(default_dir)
-            download(_get_dgl_url('dglls/jtnn.zip'), path=zip_file_path)
+            download(_get_dgl_url('dgllife/jtnn.zip'), path=zip_file_path)
             extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
         model = DGLJTNNVAE(vocab_file=vocab_file,
                            depth=3,

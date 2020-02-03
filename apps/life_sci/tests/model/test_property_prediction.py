@@ -3,7 +3,7 @@ import torch
 
 from dgl import DGLGraph
 
-from dglls.model.model_zoo import *
+from dgllife.model.model_zoo import *
 
 def test_graph1():
     """Graph with node features."""

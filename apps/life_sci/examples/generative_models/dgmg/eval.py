@@ -3,7 +3,7 @@ import pickle
 import shutil
 import torch
 
-from dglls.model import DGMG, load_pretrained
+from dgllife.model import DGMG, load_pretrained
 
 from utils import MoleculeDataset, set_random_seed, download_data,\
     mkdir_p, summarize_molecules, get_unique_smiles, get_novel_smiles

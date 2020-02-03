@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 
-from dglls.model import load_pretrained
-from dglls.utils import EarlyStopping, Meter
+from dgllife.model import load_pretrained
+from dgllife.utils import EarlyStopping, Meter
 from torch.nn import BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader

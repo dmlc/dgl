@@ -1,6 +1,6 @@
 import torch
 
-from dglls.utils.splitters import *
+from dgllife.utils.splitters import *
 from rdkit import Chem
 
 class TestDataset(object):

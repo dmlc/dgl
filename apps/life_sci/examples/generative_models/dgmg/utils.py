@@ -10,7 +10,7 @@ import torch.nn as nn
 from collections import defaultdict
 from datetime import timedelta
 from dgl.data.utils import download, _get_dgl_url
-from dglls.model.model_zoo.dgmg import MoleculeEnv
+from dgllife.model.model_zoo.dgmg import MoleculeEnv
 from multiprocessing import Pool
 from pprint import pprint
 from rdkit import Chem
