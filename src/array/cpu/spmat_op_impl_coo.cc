@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2019 by Contributors
  * \file array/cpu/spmat_op_impl.cc
- * \brief Sparse matrix operator CPU implementation
+ * \brief CPU implementation of COO sparse matrix operators
  */
 #include <dgl/array.h>
 #include <vector>
@@ -15,6 +15,13 @@ using runtime::NDArray;
 
 namespace aten {
 namespace impl {
+
+/*
+ * TODO(BarclayII):
+ * For row-major sorted COOs, we have faster implementation with binary search,
+ * sorted search, etc.  Later we should benchmark how much we can gain with
+ * sorted COOs on hypersparse graphs.
+ */
 
 ///////////////////////////// COOIsNonZero /////////////////////////////
 
@@ -166,8 +173,6 @@ template NDArray COOGetData<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_
 template <DLDeviceType XPU, typename IdType, typename DType>
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
-  // TODO(minjie): more efficient implementation for matrix without duplicate entries
-  // TODO(minjie): more efficient implementation for sorted column index
   const int64_t rowlen = rows->shape[0];
   const int64_t collen = cols->shape[0];
 
