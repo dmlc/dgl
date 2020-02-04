@@ -6,6 +6,7 @@
 #include <dgl/array.h>
 #include <vector>
 #include <unordered_set>
+#include "array_utils.h"
 
 namespace dgl {
 
@@ -13,69 +14,6 @@ using runtime::NDArray;
 
 namespace aten {
 namespace impl {
-namespace {
-/*!
- * \brief A hashmap that maps each ids in the given array to new ids starting from zero.
- */
-template <typename IdType>
-class IdHashMap {
- public:
-  // Construct the hashmap using the given id arrays.
-  // The id array could contain duplicates.
-  explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
-    const IdType* ids_data = static_cast<IdType*>(ids->data);
-    const int64_t len = ids->shape[0];
-    IdType newid = 0;
-    for (int64_t i = 0; i < len; ++i) {
-      const IdType id = ids_data[i];
-      if (!Contains(id)) {
-        oldv2newv_[id] = newid++;
-        filter_[id & kFilterMask] = true;
-      }
-    }
-  }
-
-  // Return true if the given id is contained in this hashmap.
-  bool Contains(IdType id) const {
-    return filter_[id & kFilterMask] && oldv2newv_.count(id);
-  }
-
-  // Return the new id of the given id. If the given id is not contained
-  // in the hash map, returns the default_val instead.
-  IdType Map(IdType id, IdType default_val) const {
-    if (filter_[id & kFilterMask]) {
-      auto it = oldv2newv_.find(id);
-      return (it == oldv2newv_.end()) ? default_val : it->second;
-    } else {
-      return default_val;
-    }
-  }
-
- private:
-  static constexpr int32_t kFilterMask = 0xFFFFFF;
-  static constexpr int32_t kFilterSize = kFilterMask + 1;
-  // This bitmap is used as a bloom filter to remove some lookups.
-  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
-  std::vector<bool> filter_;
-  // The hashmap from old vid to new vid
-  std::unordered_map<IdType, IdType> oldv2newv_;
-};
-
-struct PairHash {
-  template <class T1, class T2>
-  std::size_t operator() (const std::pair<T1, T2>& pair) const {
-    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
-  }
-};
-
-inline bool CSRHasData(CSRMatrix csr) {
-  return csr.data.defined();
-}
-
-inline bool COOHasData(COOMatrix csr) {
-  return csr.data.defined();
-}
-}  // namespace
 
 ///////////////////////////// CSRIsNonZero /////////////////////////////
 
@@ -648,91 +586,6 @@ void CSRSort(CSRMatrix csr) {
 
 template void CSRSort<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
 template void CSRSort<kDLCPU, int32_t, int32_t>(CSRMatrix csr);
-
-///////////////////////////// COOHasDuplicate /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-bool COOHasDuplicate(COOMatrix coo) {
-  std::unordered_set<std::pair<IdType, IdType>, PairHash> hashmap;
-  const IdType* src_data = static_cast<IdType*>(coo.row->data);
-  const IdType* dst_data = static_cast<IdType*>(coo.col->data);
-  const auto nnz = coo.row->shape[0];
-  for (IdType eid = 0; eid < nnz; ++eid) {
-    const auto& p = std::make_pair(src_data[eid], dst_data[eid]);
-    if (hashmap.count(p)) {
-      return true;
-    } else {
-      hashmap.insert(p);
-    }
-  }
-  return false;
-}
-
-template bool COOHasDuplicate<kDLCPU, int32_t>(COOMatrix coo);
-template bool COOHasDuplicate<kDLCPU, int64_t>(COOMatrix coo);
-
-///////////////////////////// COOToCSR /////////////////////////////
-
-// complexity: time O(NNZ), space O(1)
-template <DLDeviceType XPU, typename IdType, typename DType>
-CSRMatrix COOToCSR(COOMatrix coo) {
-  const int64_t N = coo.num_rows;
-  const int64_t NNZ = coo.row->shape[0];
-  const IdType* row_data = static_cast<IdType*>(coo.row->data);
-  const IdType* col_data = static_cast<IdType*>(coo.col->data);
-  NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_data;
-  if (COOHasData(coo)) {
-    ret_data = NDArray::Empty({NNZ}, coo.data->dtype, coo.data->ctx);
-  } else {
-    // if no data array in the input coo, the return data array is a shuffle index.
-    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-  }
-
-  IdType* Bp = static_cast<IdType*>(ret_indptr->data);
-  IdType* Bi = static_cast<IdType*>(ret_indices->data);
-
-  std::fill(Bp, Bp + N, 0);
-
-  for (int64_t i = 0; i < NNZ; ++i) {
-    Bp[row_data[i]]++;
-  }
-
-  // cumsum
-  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const IdType temp = Bp[i];
-    Bp[i] = cumsum;
-    cumsum += temp;
-  }
-  Bp[N] = NNZ;
-
-  for (int64_t i = 0; i < NNZ; ++i) {
-    const IdType r = row_data[i];
-    Bi[Bp[r]] = col_data[i];
-    if (COOHasData(coo)) {
-      const DType* data = static_cast<DType*>(coo.data->data);
-      DType* Bx = static_cast<DType*>(ret_data->data);
-      Bx[Bp[r]] = data[i];
-    } else {
-      IdType* Bx = static_cast<IdType*>(ret_data->data);
-      Bx[Bp[r]] = i;
-    }
-    Bp[r]++;
-  }
-
-  // correct the indptr
-  for (int64_t i = 0, last = 0; i <= N; ++i) {
-    IdType temp = Bp[i];
-    Bp[i] = last;
-    last = temp;
-  }
-
-  return CSRMatrix{coo.num_rows, coo.num_cols, ret_indptr, ret_indices, ret_data};
-}
-
-template CSRMatrix COOToCSR<kDLCPU, int32_t, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLCPU, int64_t, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

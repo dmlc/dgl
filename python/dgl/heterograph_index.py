@@ -43,7 +43,7 @@ class HeteroGraphIndex(ObjectBase):
             num_dst = number_of_nodes[dst_ntype]
             src_id, dst_id, _ = edges_per_type
             rel_graphs.append(create_unitgraph_from_coo(
-                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id))
+                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
         self.__init_handle_by_constructor__(
             _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
@@ -957,7 +957,8 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
+def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
+                              restrict_format):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -972,15 +973,19 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col):
         Row index.
     col : utils.Index
         Col index.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
 
     Returns
     -------
     HeteroGraphIndex
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
-        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor())
+        int(num_ntypes), int(num_src), int(num_dst), row.todgltensor(), col.todgltensor(),
+        restrict_format)
 
-def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids):
+def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
+                              restrict_format):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -997,6 +1002,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         CSR indices.
     edge_ids : utils.Index
         Edge shuffle id.
+    restrict_format : "any", "coo", "csr" or "csc"
+        Restrict the storage format of the unit graph.
 
     Returns
     -------
@@ -1004,7 +1011,8 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     """
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
         int(num_ntypes), int(num_src), int(num_dst),
-        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor())
+        indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor(),
+        restrict_format)
 
 def create_heterograph_from_relations(metagraph, rel_graphs):
     """Create a heterograph from metagraph and graphs of every relation.
@@ -1060,6 +1068,31 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
     return _CAPI_DGLHeteroDisjointPartitionBySizes(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
+
+def compact_graph_indexes(graphs):
+    """Given a list of graphs, remove the common nodes that do not have inbound and
+    outbound edges.
+
+    The graphs should have identical node space (i.e. should have the same set of
+    nodes, including types and IDs) and metagraph.
+
+    Parameters
+    ----------
+    graph : list[HeteroGraphIndex]
+        List of heterographs.
+
+    Returns
+    -------
+    list[HeteroGraphIndex]
+        A list of compacted heterographs.
+        The returned heterographs also have the same metagraph, which is identical
+        to the original heterographs.
+        The returned heterographs also have identical node space.
+    list[Tensor]
+        The induced node IDs of each node type.
+    """
+    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs(graphs)
+    return new_graphs, [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
 
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):

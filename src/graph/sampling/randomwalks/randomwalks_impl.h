@@ -4,8 +4,8 @@
  * \brief DGL sampler - templated implementation definition of random walks
  */
 
-#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
-#define DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_RANDOMWALKS_IMPL_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_RANDOMWALKS_IMPL_H_
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
@@ -114,4 +114,4 @@ IdArray RandomWalkWithStepwiseRestart(
 
 };  // namespace dgl
 
-#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_IMPL_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_RANDOMWALKS_IMPL_H_
