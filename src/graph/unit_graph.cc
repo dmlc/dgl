@@ -1125,15 +1125,15 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   switch (format) {
-   case SparseFormat::CSR:
+  case SparseFormat::CSR:
     return GetOutCSR();
-   case SparseFormat::CSC:
+  case SparseFormat::CSC:
     return GetInCSR();
-   case SparseFormat::COO:
+  case SparseFormat::COO:
     return GetCOO();
-   case SparseFormat::ANY:
+  case SparseFormat::ANY:
     return GetAny();
-   default:
+  default:
     LOG(FATAL) << "unsupported format code";
     return nullptr;
   }
