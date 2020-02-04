@@ -714,7 +714,7 @@ def test_convert():
 
     for _mg in [None, mg]:
         hg2 = dgl.to_hetero(
-                g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
+                g, hg.ntypes, hg.etypes,
                 ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
         assert set(hg.ntypes) == set(hg2.ntypes)
         assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
@@ -790,8 +790,9 @@ def test_subgraph():
     g.edges['follows'].data['h'] = y
 
     def _check_subgraph(g, sg):
-        assert sg.ntypes == ['user', 'game', 'developer']
-        assert sg.etypes == ['follows', 'plays', 'wishes', 'develops']
+        assert sg.ntypes == g.ntypes
+        assert sg.etypes == g.etypes
+        assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
                              F.tensor([1, 2], F.int64))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
@@ -1308,10 +1309,9 @@ def test_compact():
         {'user': 20, 'game': 10})
 
     g2 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(1, 8), (2, 9)],
-        ('user', 'plays', 'game'): [(2, 1)],
         ('game', 'wished-by', 'user'): [(3, 1)],
-        ('game', 'viewed-by', 'user'): [(4, 1)]},
+        ('user', 'plays', 'game'): [],
+        ('user', 'follow', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10})
 
     def _check(g, new_g, induced_nodes):
@@ -1333,10 +1333,14 @@ def test_compact():
 
     new_g1, induced_nodes = dgl.compact_graphs(g1)
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
+    assert set(induced_nodes['game']) == set([4, 5, 6])
     _check(g1, new_g1, induced_nodes)
 
     (new_g1, new_g2), induced_nodes = dgl.compact_graphs([g1, g2])
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
+    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
     _check(g1, new_g1, induced_nodes)
     _check(g2, new_g2, induced_nodes)
 

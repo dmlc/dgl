@@ -353,24 +353,29 @@ def hetero_from_relations(rel_graphs):
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
     # infer meta graph
-    ntype_dict = {}  # ntype -> ntid
+    ntype_set = set()
     meta_edges = []
     ntypes = []
     etypes = []
+    # TODO(BarclayII): I'm keeping the node type names sorted because even if
+    # the metagraph is the same, the same node type name in different graphs may
+    # map to different node type IDs.
+    # In the future, we need to lower the type names into C++.
     for rgrh in rel_graphs:
         assert len(rgrh.etypes) == 1
         stype, etype, dtype = rgrh.canonical_etypes[0]
-        if stype not in ntype_dict:
-            ntype_dict[stype] = len(ntypes)
-            ntypes.append(stype)
+        ntype_set.add(stype)
+        ntype_set.add(dtype)
+    ntypes = list(sorted(ntype_set))
+    ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
+    for rgrh in rel_graphs:
+        stype, etype, dtype = rgrh.canonical_etypes[0]
         stid = ntype_dict[stype]
-        if dtype not in ntype_dict:
-            ntype_dict[dtype] = len(ntypes)
-            ntypes.append(dtype)
         dtid = ntype_dict[dtype]
         meta_edges.append((stid, dtid))
         etypes.append(etype)
     metagraph = graph_index.from_edge_list(meta_edges, True, True)
+
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
         metagraph, [rgrh._graph for rgrh in rel_graphs])
@@ -726,7 +731,8 @@ def compact_graphs(graphs):
     isolated nodes across all graphs.
 
     This function requires the graphs to have the same set of nodes (i.e. the node types
-    must be the same, and the number of nodes of each node type must be the same).
+    must be the same, and the number of nodes of each node type must be the same), as
+    well as the same metagraph.
 
     It finds all the nodes that have zero in-degree and zero out-degree in all the given
     graphs, and eliminates them from all the graphs.

@@ -112,7 +112,7 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
 template<typename IdType>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
-  // TODO(BarclayII): check whether the node and edge space of each graph is the same.
+  // TODO(BarclayII): check whether the node space and metagraph of each graph is the same.
   // Step 1: Collect the nodes that has connections for each type.
   std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
