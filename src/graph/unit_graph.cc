@@ -366,8 +366,13 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return adj_;
   }
 
+  /*!
+   * \brief Determines whether the graph is "hypersparse", i.e. having significantly more
+   * nodes than edges.
+   */
   bool IsHypersparse() const {
-    return NumVertices(SrcType()) / 8 > NumEdges(EdgeType());
+    return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
+           (NumVertices(SrcType()) > 1000000);
   }
 
  private:
@@ -997,20 +1002,6 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
-HeteroGraphPtr CreateUnitGraphFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
-    SparseFormat restrict_format) {
-  return UnitGraph::CreateFromCOO(num_vtypes, num_src, num_dst, row, col, restrict_format);
-}
-
-HeteroGraphPtr CreateUnitGraphFromCSR(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids,
-    SparseFormat restrict_format) {
-  return UnitGraph::CreateFromCSR(
-      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
-}
-
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
   if (g->NumBits() == bits) {
     return g;
@@ -1025,7 +1016,7 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
     CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
     CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
     return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, SparseFormat::ANY));
+        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
   }
 }
 
@@ -1043,7 +1034,7 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
   CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
   return HeteroGraphPtr(
-      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, SparseFormat::ANY));
+      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
 }
 
 UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
@@ -1133,17 +1124,19 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 }
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
-  if (format == SparseFormat::CSR)
+  switch (format) {
+   case SparseFormat::CSR:
     return GetOutCSR();
-  else if (format == SparseFormat::CSC)
+   case SparseFormat::CSC:
     return GetInCSR();
-  else if (format == SparseFormat::COO)
+   case SparseFormat::COO:
     return GetCOO();
-  else if (format == SparseFormat::ANY)
+   case SparseFormat::ANY:
     return GetAny();
-
-  LOG(FATAL) << "Unsupported format code: " << format;
-  return nullptr;
+   default:
+    LOG(FATAL) << "unsupported format code";
+    return nullptr;
+  }
 }
 
 SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {

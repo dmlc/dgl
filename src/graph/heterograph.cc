@@ -155,7 +155,7 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
       const IdArray mapped_rows = hashmaps[srctype].Map(edges.src, -1);
       const IdArray mapped_cols = hashmaps[dsttype].Map(edges.dst, -1);
 
-      rel_graphs.push_back(CreateUnitGraphFromCOO(
+      rel_graphs.push_back(UnitGraph::CreateFromCOO(
           srctype == dsttype ? 1 : 2,
           induced_nodes[srctype]->shape[0],
           induced_nodes[dsttype]->shape[0],

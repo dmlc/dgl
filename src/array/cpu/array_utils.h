@@ -17,6 +17,10 @@ namespace aten {
 
 /*!
  * \brief A hashmap that maps each ids in the given array to new ids starting from zero.
+ *
+ * Useful for relabeling integers and finding unique integers.
+ *
+ * Usually faster than std::unordered_map in existence checking.
  */
 template <typename IdType>
 class IdHashMap {

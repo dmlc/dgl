@@ -296,6 +296,72 @@ def test_query():
     # test repr
     print(g)
 
+def test_hypersparse():
+    N1 = 1 << 50        # should crash if allocated a CSR
+    N2 = 1 << 48
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+    assert g.number_of_nodes('user') == N1
+    assert g.number_of_nodes('game') == N1
+    assert g.number_of_edges('follows') == 1
+    assert g.number_of_edges('plays') == 1
+
+    assert g.has_edge_between(0, 1, 'follows')
+    assert not g.has_edge_between(0, 0, 'follows')
+    mask = F.asnumpy(g.has_edges_between([0, 0], [0, 1], 'follows')).tolist()
+    assert mask == [0, 1]
+
+    assert g.has_edge_between(0, N2, 'plays')
+    assert not g.has_edge_between(0, 0, 'plays')
+    mask = F.asnumpy(g.has_edges_between([0, 0], [0, N2], 'plays')).tolist()
+    assert mask == [0, 1]
+
+    assert F.asnumpy(g.predecessors(0, 'follows')).tolist() == []
+    assert F.asnumpy(g.successors(0, 'follows')).tolist() == [1]
+    assert F.asnumpy(g.predecessors(1, 'follows')).tolist() == [0]
+    assert F.asnumpy(g.successors(1, 'follows')).tolist() == []
+
+    assert F.asnumpy(g.predecessors(0, 'plays')).tolist() == []
+    assert F.asnumpy(g.successors(0, 'plays')).tolist() == [N2]
+    assert F.asnumpy(g.predecessors(N2, 'plays')).tolist() == [0]
+    assert F.asnumpy(g.successors(N2, 'plays')).tolist() == []
+
+    assert g.edge_id(0, 1, etype='follows') == 0
+    assert g.edge_id(0, N2, etype='plays') == 0
+    assert F.asnumpy(g.edge_ids(0, 1, etype='follows')).tolist() == [0]
+    assert F.asnumpy(g.edge_ids(0, N2, etype='plays')).tolist() == [0]
+
+    u, v = g.find_edges([0], 'follows')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [1]
+    u, v = g.find_edges([0], 'plays')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [N2]
+    u, v, e = g.all_edges('all', 'eid', 'follows')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [1]
+    assert F.asnumpy(e).tolist() == [0]
+    u, v, e = g.all_edges('all', 'eid', 'plays')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [N2]
+    assert F.asnumpy(e).tolist() == [0]
+
+    assert g.in_degree(0, 'follows') == 0
+    assert g.in_degree(1, 'follows') == 1
+    assert F.asnumpy(g.in_degrees([0, 1], 'follows')).tolist() == [0, 1]
+    assert g.in_degree(0, 'plays') == 0
+    assert g.in_degree(N2, 'plays') == 1
+    assert F.asnumpy(g.in_degrees([0, N2], 'plays')).tolist() == [0, 1]
+    assert g.out_degree(0, 'follows') == 1
+    assert g.out_degree(1, 'follows') == 0
+    assert F.asnumpy(g.out_degrees([0, 1], 'follows')).tolist() == [1, 0]
+    assert g.out_degree(0, 'plays') == 1
+    assert g.out_degree(N2, 'plays') == 0
+    assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
+
 def test_adj():
     g = create_test_heterograph()
     adj = F.sparse_to_numpy(g.adj(etype='follows'))
@@ -1309,9 +1375,8 @@ def test_compact():
         {'user': 20, 'game': 10})
 
     g2 = dgl.heterograph({
-        ('game', 'wished-by', 'user'): [(3, 1)],
-        ('user', 'plays', 'game'): [],
-        ('user', 'follow', 'user'): [(1, 8), (8, 9)]},
+        ('game', 'clicked-by', 'user'): [(3, 1)],
+        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
         {'user': 20, 'game': 10})
 
     def _check(g, new_g, induced_nodes):
@@ -1348,6 +1413,7 @@ def test_compact():
 if __name__ == '__main__':
     test_create()
     test_query()
+    test_hypersparse()
     test_adj()
     test_inc()
     test_view()

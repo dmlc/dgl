@@ -34,10 +34,8 @@ class UnitGraph : public BaseHeteroGraph {
   // internal data structure
   class COO;
   class CSR;
-  class CSC;
   typedef std::shared_ptr<COO> COOPtr;
   typedef std::shared_ptr<CSR> CSRPtr;
-  typedef std::shared_ptr<CSC> CSCPtr;
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -193,7 +191,10 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;
 
-  /*! \return Return the given format. */
+  /*!
+   * \return Return the given format.  Perform format conversion if requested format does
+   * not exist.
+   */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
 
   /*!

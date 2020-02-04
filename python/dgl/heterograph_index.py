@@ -975,7 +975,6 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
         Col index.
     restrict_format : "any", "coo", "csr" or "csc"
         Restrict the storage format of the unit graph.
-        Default: 'any' (i.e. no restriction)
 
     Returns
     -------
@@ -1005,7 +1004,6 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         Edge shuffle id.
     restrict_format : "any", "coo", "csr" or "csc"
         Restrict the storage format of the unit graph.
-        Default: 'any' (i.e. no restriction)
 
     Returns
     -------
