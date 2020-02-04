@@ -1396,13 +1396,15 @@ def test_compact():
             assert (g_src == new_g_src_mapped).all()
             assert (g_dst == new_g_dst_mapped).all()
 
-    new_g1, induced_nodes = dgl.compact_graphs(g1)
+    new_g1 = dgl.compact_graphs(g1)
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
     assert set(induced_nodes['game']) == set([4, 5, 6])
     _check(g1, new_g1, induced_nodes)
 
-    (new_g1, new_g2), induced_nodes = dgl.compact_graphs([g1, g2])
+    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
     assert set(induced_nodes['game']) == set([3, 4, 5, 6])

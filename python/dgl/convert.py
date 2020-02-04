@@ -748,10 +748,10 @@ def compact_graphs(graphs):
     Returns
     -------
     DGLHeteroGraph or list[DGLHeteroGraph]
-        The compacted graph or list of compacted graphs
-    dict[str, Tensor]
-        Induced nodes of each type.  Contains the mapping of node IDs for each type
-        from the compacted graph(s) to the original graph(s).
+        The compacted graph or list of compacted graphs.
+
+        Each returned graph would have a feature ``dgl.NID`` containing the mapping
+        of node IDs for each type from the compacted graph(s) to the original graph(s).
         Note that the mapping is the same for all the compacted graphs.
 
     Examples
@@ -807,10 +807,13 @@ def compact_graphs(graphs):
     new_graphs = [
         DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
         for new_graph_index, graph in zip(new_graph_indexes, graphs)]
+    for g in new_graphs:
+        for i, ntype in enumerate(graphs[0].ntypes):
+            g.nodes[ntype].data[NID] = induced_nodes[i]
     if return_single:
         new_graphs = new_graphs[0]
 
-    return new_graphs, {ntype: induced_nodes[i] for i, ntype in enumerate(graphs[0].ntypes)}
+    return new_graphs
 
 
 ############################################################
