@@ -224,7 +224,7 @@ struct CSRMatrix {
     fs->Write(indices);
     fs->Write(data);
     fs->Write(sorted);
-  };
+  }
 
   /*! \brief Load CSRMatrix from stream */
   bool Load(dmlc::Stream* fs){
@@ -235,7 +235,7 @@ struct CSRMatrix {
     CHECK(fs->Read(&data)) << "Invalid data";
     CHECK(fs->Read(&sorted)) << "Invalid sorted";
     return true;
-  };
+  }
 };
 
 /*!
