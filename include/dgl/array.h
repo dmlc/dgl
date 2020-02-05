@@ -10,6 +10,8 @@
 #define DGL_ARRAY_H_
 
 #include <dgl/runtime/ndarray.h>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
@@ -203,7 +205,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- */
+ */ 
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows, num_cols;
@@ -213,6 +215,27 @@ struct CSRMatrix {
   runtime::NDArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted;
+
+  /*! \brief Write CSRMatrix into stream */
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(indptr);
+    fs->Write(indices);
+    fs->Write(data);
+    fs->Write(sorted);
+  };
+
+  /*! \brief Load CSRMatrix from stream */
+  bool Load(dmlc::Stream* fs){
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&indices)) << "Invalid indices";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&sorted)) << "Invalid sorted";
+    return true;
+  };
 };
 
 /*!
@@ -596,5 +619,9 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 }  // namespace aten
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
+}  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_

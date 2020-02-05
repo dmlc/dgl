@@ -1152,4 +1152,38 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::COO;
 }
 
+bool UnitGraph::Load(dmlc::Stream* fs) {
+  int64_t num_vtypes, num_src, num_dst;
+  CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
+  CHECK(fs->Read(&num_src)) << "Invalid num_src";
+  CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
+  aten::CSRMatrix csr_matrix;
+  CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
+  SparseFormat restrict_format;
+  CHECK(fs->Read(&restrict_format)) << "Invalid restrict_format";
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr, csr_matrix.indices, csr_matrix.data));
+  in_csr_ = csr;
+  meta_graph_ = mg;
+  restrict_format_ = restrict_format;
+  // HeteroGraphPtr hptr = CreateFromCSR(num_vtypes, num_src, num_dst, csr_matrix.indptr,
+  //                                     csr_matrix.indices, csr_matrix.data);
+  // How can I move hptr to the current `this`?
+  return true;
+};
+
+void UnitGraph::Save(dmlc::Stream* fs) const{
+  // Following CreateFromCSR signature
+  aten::CSRMatrix csr_matrix = GetInCSRMatrix();
+  int64_t num_vtypes = NumVertexTypes();
+  int64_t num_src = NumVertices(SrcType());
+  int64_t num_dst = NumVertices(DstType());
+  SparseFormat restrict_format = restrict_format_;
+  fs->Write(num_vtypes);
+  fs->Write(num_src);
+  fs->Write(num_dst);
+  fs->Write(csr_matrix);
+  fs->Write(restrict_format);
+};
+
 }  // namespace dgl
