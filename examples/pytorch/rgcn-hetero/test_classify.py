@@ -44,13 +44,11 @@ def main(args):
                            num_classes,
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
-                           dropout=args.dropout,
                            use_self_loop=args.use_self_loop)
-
-    if use_cuda:
-        model.cuda()
     # training loop
     model.load_state_dict(th.load(args.model_path))
+    if use_cuda:
+        model.cuda()
 
     print("start testing...")
     model.eval()
@@ -62,8 +60,6 @@ def main(args):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
-    parser.add_argument("--dropout", type=float, default=0,
-            help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden units")
     parser.add_argument("--gpu", type=int, default=-1,
@@ -78,8 +74,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--model_path", type=str,
             help='path of the model to load from')
-    parser.add_argument("--l2norm", type=float, default=0,
-            help="l2 norm coef")
     parser.add_argument("--use-self-loop", default=False, action='store_true',
             help="include self feature as a special relation")
 
