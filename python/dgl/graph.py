@@ -3564,3 +3564,7 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed()
+
+    @property
+    def canonical_etype(self):
+        return (None, None, None)
