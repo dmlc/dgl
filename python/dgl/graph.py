@@ -3567,4 +3567,5 @@ class AdaptedDGLGraph(GraphAdapter):
 
     @property
     def canonical_etype(self):
+        """Canonical edge type (None for homogeneous graph)"""
         return (None, None, None)

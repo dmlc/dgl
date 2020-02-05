@@ -3992,4 +3992,5 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     @property
     def canonical_etype(self):
+        """Canonical edge type."""
         return self.graph.canonical_etypes[self.etid]
