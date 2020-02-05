@@ -1,4 +1,5 @@
 """Torch Module for Atomic Convolution Layer"""
+# pylint: disable= no-member, arguments-differ, invalid-name
 import numpy as np
 import torch as th
 import torch.nn as nn

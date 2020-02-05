@@ -1,8 +1,8 @@
 """
 .. currentmodule:: dgl
 
-Tutorial: Batched graph classification with DGL
-================================================
+Graph Classification Tutorial
+=============================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Minjie Wang <https://jermainewang.github.io/>`_,
