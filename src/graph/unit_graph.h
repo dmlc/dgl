@@ -239,10 +239,8 @@ class UnitGraph : public BaseHeteroGraph {
 
 };  // namespace dgl
 
-namespace dmlc
-{
-  DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
-} // namespace dmlc
-
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_

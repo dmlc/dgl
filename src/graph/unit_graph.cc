@@ -1170,9 +1170,9 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   //                                     csr_matrix.indices, csr_matrix.data);
   // How can I move hptr to the current `this`?
   return true;
-};
+}
 
-void UnitGraph::Save(dmlc::Stream* fs) const{
+void UnitGraph::Save(dmlc::Stream* fs) const {
   // Following CreateFromCSR signature
   aten::CSRMatrix csr_matrix = GetInCSRMatrix();
   int64_t num_vtypes = NumVertexTypes();
@@ -1184,6 +1184,6 @@ void UnitGraph::Save(dmlc::Stream* fs) const{
   fs->Write(num_dst);
   fs->Write(csr_matrix);
   fs->Write(restrict_format);
-};
+}
 
 }  // namespace dgl
