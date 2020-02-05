@@ -20,12 +20,12 @@
 namespace dgl {
 namespace utils {
 
-template <
-  typename Idx,
-  typename DType,
-  bool replace>
+/*! \brief Base sampler class */
+template <typename Idx>
 class BaseSampler {
  public:
+  virtual ~BaseSampler() = default;
+  /*! \brief Draw one integer sample */
   virtual Idx Draw() {
     LOG(INFO) << "Not implemented yet.";
     return 0;
@@ -43,7 +43,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class AliasSampler: public BaseSampler<Idx, DType, replace> {
+class AliasSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
   Idx N;
@@ -165,7 +165,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class CDFSampler: public BaseSampler<Idx, DType, replace> {
+class CDFSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
   Idx N;
@@ -252,7 +252,7 @@ template <
   typename Idx,
   typename DType,
   bool replace>
-class TreeSampler: public BaseSampler<Idx, DType, replace> {
+class TreeSampler: public BaseSampler<Idx> {
  private:
   RandomEngine *re;
   std::vector<DType> weight;    // accumulated likelihood of subtrees.

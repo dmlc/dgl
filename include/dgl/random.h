@@ -99,10 +99,25 @@ class RandomEngine {
 
   /*!
    * \brief Pick a random integer between 0 to N-1 according to given probabilities
-   * \param prob Array of unnormalized probability of each element.  Must be non-negative.
+   * \tparam IdxType Return integer type
+   * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
+   * \return An integer randomly picked from 0 to N-1.
    */
   template<typename IdxType>
   IdxType Choice(FloatArray prob);
+
+  /*!
+   * \brief Pick random integers between 0 to N-1 according to given probabilities
+   * 
+   * If replace is false, the number of picked integers must not larger than N.
+   *
+   * \tparam IdxType Return integer type
+   * \param num Number of integers to choose
+   * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
+   * \return Integer array
+   */
+  template<typename IdxType>
+  IdArray Choice(int64_t num, FloatArray prob, bool replace = true);
 
  private:
   std::default_random_engine rng_;
