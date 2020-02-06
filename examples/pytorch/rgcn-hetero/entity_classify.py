@@ -220,6 +220,7 @@ class EntityClassify(nn.Module):
         self.h_dim = h_dim
         self.out_dim = out_dim
         self.rel_names = list(set(g.etypes))
+        self.rel_names.sort()
         self.num_bases = None if num_bases < 0 else num_bases
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
