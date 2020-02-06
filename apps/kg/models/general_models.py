@@ -1,3 +1,12 @@
+"""
+Graph Embedding Model
+1. TransE
+2. TransR
+3. RESCAL
+4. DistMult
+5. ComplEx
+6. RotatE
+"""
 import os
 import numpy as np
 import dgl.backend as F
@@ -23,6 +32,30 @@ else:
     from .pytorch.score_fun import *
 
 class KEModel(object):
+    """ DGL Knowledge Embedding Model.
+
+    Parameters
+    ----------
+    args:
+        Global configs.
+    model_name : str
+        Which KG model to use, including 'TransE_l1', 'TransE_l2', 'TransR',
+        'RESCAL', 'DistMult', 'ComplEx', 'RotatE'
+    n_entities : int
+        Num of entities.
+    n_relations : int
+        Num of relations.
+    hidden_dim : int
+        Dimetion size of embedding.
+    gamma : float
+        Gamma for score function.
+    double_entity_emb : bool
+        If True, entity embedding size will be 2 * hidden_dim.
+        Default: False
+    double_relation_emb : bool
+        If True, relation embedding size will be 2 * hidden_dim.
+        Default: False
+    """
     def __init__(self, args, model_name, n_entities, n_relations, hidden_dim, gamma,
                  double_entity_emb=False, double_relation_emb=False):
         super(KEModel, self).__init__()
@@ -84,7 +117,8 @@ class KEModel(object):
         self.reset_parameters()
 
     def share_memory(self):
-        # TODO(zhengda) we should make it work for parameters in score func
+        """Use torch.tensor.share_memory_() to allow cross process embeddings access.
+        """
         self.entity_emb.share_memory()
         if self.strict_rel_part:
             self.global_relation_emb.share_memory()
@@ -95,6 +129,15 @@ class KEModel(object):
             self.score_func.share_memory()
 
     def save_emb(self, path, dataset):
+        """Save the model.
+
+        Parameters
+        ----------
+        path : str
+            Directory to save the model.
+        dataset : str
+            Dataset name as prefix to the saved embeddings.
+        """
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
         if self.strict_rel_part:
             self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
@@ -104,22 +147,71 @@ class KEModel(object):
         self.score_func.save(path, dataset+'_'+self.model_name)
 
     def load_emb(self, path, dataset):
+        """Load the model.
+
+        Parameters
+        ----------
+        path : str
+            Directory to load the model.
+        dataset : str
+            Dataset name as prefix to the saved embeddings.
+        """
         self.entity_emb.load(path, dataset+'_'+self.model_name+'_entity')
         self.relation_emb.load(path, dataset+'_'+self.model_name+'_relation')
         self.score_func.load(path, dataset+'_'+self.model_name)
 
     def reset_parameters(self):
+        """Re-initialize the model.
+        """
         self.entity_emb.init(self.emb_init)
         self.score_func.reset_parameters()
         if not self.strict_rel_part:
             self.relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
+        """Predict the positive score.
+
+        Parameters
+        ----------
+        g : DGLGraph
+            Graph holding positive edges.
+
+        Returns
+        -------
+        tensor
+            The positive score
+        """
         self.score_func(g)
         return g.edata['score']
 
     def predict_neg_score(self, pos_g, neg_g, to_device=None, gpu_id=-1, trace=False,
                           neg_deg_sample=False):
+        """Calculate the negative score.
+
+        Parameters
+        ----------
+        pos_g : DGLGraph
+            Graph holding positive edges.
+        neg_g : DGLGraph
+            Graph holding negative edges.
+        to_device : func
+            Function to move data into device.
+        gpu_id : int
+            Which gpu to move data to.
+        trace : bool
+            If True, trace the computation. This is required in training.
+            If False, do not trace the computation.
+            Default: False
+        neg_deg_sample : bool
+            If True, we use the head and tail nodes of the positive edges to
+            construct negative edges.
+            Default: False
+
+        Returns
+        -------
+        tensor
+            The negative score
+        """
         num_chunks = neg_g.num_chunks
         chunk_size = neg_g.chunk_size
         neg_sample_size = neg_g.neg_sample_size
@@ -181,6 +273,19 @@ class KEModel(object):
             return neg_score
 
     def forward_test(self, pos_g, neg_g, logs, gpu_id=-1):
+        """Do the forward and generate ranking results.
+
+        Parameters
+        ----------
+        pos_g : DGLGraph
+            Graph holding positive edges.
+        neg_g : DGLGraph
+            Graph holding negative edges.
+        logs : List
+            Where to put results in.
+        gpu_id : int
+            Which gpu to accelerate the calculation. if -1 is provided, cpu is used.
+        """
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, False)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, False)
 
@@ -218,6 +323,24 @@ class KEModel(object):
 
     # @profile
     def forward(self, pos_g, neg_g, gpu_id=-1):
+        """Do the forward.
+
+        Parameters
+        ----------
+        pos_g : DGLGraph
+            Graph holding positive edges.
+        neg_g : DGLGraph
+            Graph holding negative edges.
+        gpu_id : int
+            Which gpu to accelerate the calculation. if -1 is provided, cpu is used.
+
+        Returns
+        -------
+        tensor
+            loss value
+        dict
+            loss info
+        """
         pos_g.ndata['emb'] = self.entity_emb(pos_g.ndata['id'], gpu_id, True)
         pos_g.edata['emb'] = self.relation_emb(pos_g.edata['id'], gpu_id, True)
 
@@ -269,11 +392,21 @@ class KEModel(object):
         return loss, log
 
     def update(self, gpu_id=-1):
+        """ Update the embeddings in the model
+
+        gpu_id : int
+            Which gpu to accelerate the calculation. if -1 is provided, cpu is used.
+        """
         self.entity_emb.update(gpu_id)
         self.relation_emb.update(gpu_id)
         self.score_func.update(gpu_id)
 
     def prepare_relation(self, device=None):
+        """ Prepare relation embeddings in multi-process multi-gpu training model.
+
+        device : th.device
+            Which device (GPU) to put relation embeddings in.
+        """
         self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
         self.relation_emb.init(self.emb_init)
         if self.model_name == 'TransR':
@@ -283,12 +416,26 @@ class KEModel(object):
             self.score_func.reset_parameters()
 
     def writeback_relation(self, rank=0, rel_parts=None):
+        """ Writeback relation embeddings in a specific process to global relation embedding.
+        Used in multi-process multi-gpu training model.
+
+        rank : int
+            Process id.
+        rel_parts : List of tensor
+            List of tensor stroing edge types of each partition.
+        """
         idx = rel_parts[rank]
         self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
         if self.model_name == 'TransR':
             self.score_func.writeback_local_emb(idx)
 
     def load_relation(self, device=None):
+        """ Sync global relation embeddings into local relation embeddings.
+        Used in multi-process multi-gpu training model.
+
+        device : th.device
+            Which device (GPU) to put relation embeddings in.
+        """
         self.relation_emb = ExternalEmbedding(self.args, self.n_relations, self.rel_dim, device)
         self.relation_emb.emb = F.copy_to(self.global_relation_emb.emb, device)
         if self.model_name == 'TransR':
@@ -297,7 +444,11 @@ class KEModel(object):
             self.score_func.load_local_emb(local_projection_emb)
 
     def create_async_update(self):
+        """Set up the async update for entity embedding.
+        """
         self.entity_emb.create_async_update()
 
     def finish_async_update(self):
+        """Terminate the async update for entity embedding.
+        """
         self.entity_emb.finish_async_update()

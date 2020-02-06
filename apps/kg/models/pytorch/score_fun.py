@@ -19,6 +19,9 @@ def batched_l1_dist(a, b):
     return res
 
 class TransEScore(nn.Module):
+    """TransE score function
+    Paper link: https://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data
+    """
     def __init__(self, gamma, dist_func='l2'):
         super(TransEScore, self).__init__()
         self.gamma = gamma
@@ -79,6 +82,9 @@ class TransEScore(nn.Module):
             return fn
 
 class TransRScore(nn.Module):
+    """TransR score function
+    Paper link: https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/download/9571/9523
+    """
     def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
         super(TransRScore, self).__init__()
         self.gamma = gamma
@@ -182,6 +188,9 @@ class TransRScore(nn.Module):
             return fn
 
 class DistMultScore(nn.Module):
+    """DistMult score function
+    Paper link: https://arxiv.org/abs/1412.6575
+    """
     def __init__(self):
         super(DistMultScore, self).__init__()
 
@@ -235,6 +244,9 @@ class DistMultScore(nn.Module):
             return fn
 
 class ComplExScore(nn.Module):
+    """ComplEx score function
+    Paper link: https://arxiv.org/abs/1606.06357
+    """
     def __init__(self):
         super(ComplExScore, self).__init__()
 
@@ -306,6 +318,9 @@ class ComplExScore(nn.Module):
             return fn
 
 class RESCALScore(nn.Module):
+    """RESCAL score function
+    Paper link: http://www.icml-2011.org/papers/438_icmlpaper.pdf
+    """
     def __init__(self, relation_dim, entity_dim):
         super(RESCALScore, self).__init__()
         self.relation_dim = relation_dim
@@ -369,6 +384,9 @@ class RESCALScore(nn.Module):
             return fn
 
 class RotatEScore(nn.Module):
+    """RotatE score function
+    Paper link: https://arxiv.org/abs/1902.10197
+    """
     def __init__(self, gamma, emb_init):
         super(RotatEScore, self).__init__()
         self.gamma = gamma
