@@ -18,7 +18,7 @@ def batched_l1_dist(a, b):
     a = nd.expand_dims(a, axis=-2)
     b = nd.expand_dims(b, axis=-3)
     res = nd.norm(a - b, ord=1, axis=-1)
-    return resu
+    return res
 
 class TransEScore(nn.Block):
     """ TransE score function
