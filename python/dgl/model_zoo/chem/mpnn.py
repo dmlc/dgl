@@ -5,6 +5,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch import Set2Set, NNConv
 
 class MPNNModel(nn.Module):
@@ -31,6 +32,7 @@ class MPNNModel(nn.Module):
     num_layer_set2set : int
         Number of set2set layers
     """
+    @deprecated('Import MPNNPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  node_input_dim=15,
                  edge_input_dim=5,

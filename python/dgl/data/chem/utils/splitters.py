@@ -11,6 +11,7 @@ from itertools import accumulate, chain
 
 from ...utils import split_dataset, Subset
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 try:
     from rdkit import Chem
@@ -187,7 +188,9 @@ class ConsecutiveSplitter(object):
 
     The dataset is split without permutation, so the splitting is deterministic.
     """
+
     @staticmethod
+    @deprecated('Import ConsecutiveSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, frac_train=0.8, frac_val=0.1, frac_test=0.1):
         """Split the dataset into three consecutive chunks for training, validation and test.
 
@@ -214,6 +217,7 @@ class ConsecutiveSplitter(object):
         return split_dataset(dataset, frac_list=[frac_train, frac_val, frac_test], shuffle=False)
 
     @staticmethod
+    @deprecated('Import ConsecutiveSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, k=5, log=True):
         """Split the dataset for k-fold cross validation by taking consecutive chunks.
 
@@ -240,6 +244,7 @@ class RandomSplitter(object):
     The dataset is split with permutation and the splitting is hence random.
     """
     @staticmethod
+    @deprecated('Import RandomSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, frac_train=0.8, frac_val=0.1,
                              frac_test=0.1, random_state=None):
         """Randomly permute the dataset and then split it into
@@ -275,6 +280,7 @@ class RandomSplitter(object):
                              shuffle=True, random_state=random_state)
 
     @staticmethod
+    @deprecated('Import RandomSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, k=5, random_state=None, log=True):
         """Randomly permute the dataset and then split it
         for k-fold cross validation by taking consecutive chunks.
@@ -309,6 +315,7 @@ class RandomSplitter(object):
 class MolecularWeightSplitter(object):
     """Sort molecules based on their weights and then split them."""
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def molecular_weight_indices(molecules, log_every_n):
         """Reorder molecules based on molecular weights.
 
@@ -341,6 +348,7 @@ class MolecularWeightSplitter(object):
         return np.argsort(mws)
 
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, mols=None, sanitize=True, frac_train=0.8,
                              frac_val=0.1, frac_test=0.1, log_every_n=1000):
         """Sort molecules based on their weights and then split them into
@@ -390,6 +398,7 @@ class MolecularWeightSplitter(object):
         return indices_split(dataset, frac_train, frac_val, frac_test, sorted_indices)
 
     @staticmethod
+    @deprecated('Import MolecularWeightSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, mols=None, sanitize=True, k=5, log_every_n=1000):
         """Sort molecules based on their weights and then split them
         for k-fold cross validation by taking consecutive chunks.
@@ -439,7 +448,9 @@ class ScaffoldSplitter(object):
     Bemis, G. W.; Murcko, M. A. “The Properties of Known Drugs.
         1. Molecular Frameworks.” J. Med. Chem. 39:2887-93 (1996).
     """
+
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def get_ordered_scaffold_sets(molecules, include_chirality, log_every_n):
         """Group molecules based on their Bemis-Murcko scaffolds and
         order these groups based on their sizes.
@@ -494,6 +505,7 @@ class ScaffoldSplitter(object):
         return scaffold_sets
 
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, mols=None, sanitize=True, include_chirality=False,
                              frac_train=0.8, frac_val=0.1, frac_test=0.1, log_every_n=1000):
         """Split the dataset into training, validation and test set based on molecular scaffolds.
@@ -564,6 +576,7 @@ class ScaffoldSplitter(object):
                 Subset(dataset, test_indices)]
 
     @staticmethod
+    @deprecated('Import ScaffoldSplitter from dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, mols=None, sanitize=True,
                      include_chirality=False, k=5, log_every_n=1000):
         """Group molecules based on their scaffolds and sort groups based on their sizes.
@@ -636,6 +649,8 @@ class SingleTaskStratifiedSplitter(object):
     take buckets of datapoints to augment the training, validation and test subsets.
     """
     @staticmethod
+    @deprecated('Import SingleTaskStratifiedSplitter from '
+                'dgllife.utils.splitters instead.', 'class')
     def train_val_test_split(dataset, labels, task_id, frac_train=0.8, frac_val=0.1,
                              frac_test=0.1, bucket_size=10, random_state=None):
         """Split the dataset into training, validation and test subsets as stated above.
@@ -707,6 +722,8 @@ class SingleTaskStratifiedSplitter(object):
                 Subset(dataset, test_indices)]
 
     @staticmethod
+    @deprecated('Import SingleTaskStratifiedSplitter from '
+                'dgllife.utils.splitters instead.', 'class')
     def k_fold_split(dataset, labels, task_id, k=5, log=True):
         """Sort molecules based on their label values for a task and then split them
         for k-fold cross validation by taking consecutive chunks.

@@ -7,8 +7,9 @@ import torch.nn.functional as F
 
 import rdkit.Chem as Chem
 
-from dgl import batch, unbatch
-from dgl.data.utils import get_download_dir
+from ....batched_graph import batch, unbatch
+from ....contrib.deprecation import deprecated
+from ....data.utils import get_download_dir
 
 from .chemutils import (attach_mols_nx, copy_edit_mol, decode_stereo,
                         enum_assemble_nx, set_atommap)
@@ -27,8 +28,10 @@ class DGLJTNNVAE(nn.Module):
     `Junction Tree Variational Autoencoder for Molecular Graph Generation
     <https://arxiv.org/abs/1802.04364>`__
     """
+    @deprecated('Import DGLJTNNVAE from dgllife.model instead.', 'class')
     def __init__(self, hidden_size, latent_size, depth, vocab=None, vocab_file=None):
         super(DGLJTNNVAE, self).__init__()
+
         if vocab is None:
             if vocab_file is None:
                 vocab_file = '{}/jtnn/{}.txt'.format(
