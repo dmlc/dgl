@@ -57,4 +57,32 @@ template IdArray RandomEngine::Choice<int32_t>(
 template IdArray RandomEngine::Choice<int64_t>(
     int64_t num, FloatArray prob, bool replace);
 
+template <typename IdxType>
+IdArray RandomEngine::UniformChoice(int64_t num, int64_t population, bool replace) {
+  if (!replace)
+    CHECK_LE(num, population) << "Cannot take more sample than population when 'replace=false'";
+  const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
+  IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+  IdxType* ret_data = static_cast<IdxType*>(ret->data);
+  if (replace) {
+    for (int64_t i = 0; i < num; ++i)
+      ret_data[i] = RandInt(population);
+  } else {
+    // time: O(population), space: O(num)
+    for (int64_t i = 0; i < num; ++i)
+      ret_data[i] = i;
+    for (uint64_t i = num; i < population; ++i) {
+      const int64_t j = RandInt(i);
+      if (j < num)
+        ret_data[j] = i;
+    }
+  }
+  return ret;
+}
+
+template IdArray RandomEngine::UniformChoice<int32_t>(
+    int64_t num, int64_t population, bool replace);
+template IdArray RandomEngine::UniformChoice<int64_t>(
+    int64_t num, int64_t population, bool replace);
+
 };  // namespace dgl

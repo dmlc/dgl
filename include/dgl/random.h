@@ -18,6 +18,7 @@ namespace dgl {
 
 namespace {
 
+// Get a unique integer ID representing this thread.
 inline uint32_t GetThreadId() {
   static int num_threads = 0;
   static std::mutex mutex;

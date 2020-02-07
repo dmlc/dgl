@@ -495,6 +495,23 @@ HeteroGraphPtr CreateHeteroGraph(
   return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
 }
 
+HeteroGraphPtr CreateFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col, SparseFormat restrict_format) {
+  auto unit_g = UnitGraph::CreateFromCOO(
+      num_vtypes, num_src, num_dst, row, col, restrict_format);
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+}
+
+HeteroGraphPtr CreateFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format) {
+  auto unit_g = UnitGraph::CreateFromCSR(
+      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+}
+
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
   std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> result;
@@ -514,8 +531,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     IdArray row = args[3];
     IdArray col = args[4];
     SparseFormat restrict_format = ParseSparseFormat(args[5]);
-    auto hgptr = UnitGraph::CreateFromCOO(
-        nvtypes, num_src, num_dst, row, col, restrict_format);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -528,8 +544,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
     SparseFormat restrict_format = ParseSparseFormat(args[6]);
-    auto hgptr = UnitGraph::CreateFromCSR(
-        nvtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids,
+                               restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 

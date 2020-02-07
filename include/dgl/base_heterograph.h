@@ -518,6 +518,36 @@ HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
 
 /*!
+ * \brief Create a heterograph from COO input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param num_src Number of nodes in the source type.
+ * \param num_dst Number of nodes in the destination type.
+ * \param row Src node ids of the edges.
+ * \param col Dst node ids of the edges.
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
+
+/*!
+ * \brief Create a heterograph from CSR input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param num_src Number of nodes in the source type.
+ * \param num_dst Number of nodes in the destination type.
+ * \param indptr Indptr array
+ * \param indices Indices array
+ * \param edge_ids Edge ids
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format = SparseFormat::ANY);
+
+/*!
  * \brief Given a list of graphs, remove the common nodes that do not have inbound and
  * outbound edges.
  *
