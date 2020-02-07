@@ -55,3 +55,30 @@ AM: accuracy 91.41% (DGL), 89.29% (paper)
 ```
 python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0
 ```
+
+### Offline Inferencing
+Trained Model can be exported by providing '--model\_path <PATH>' parameter to entity\_classify.py. And then test\_classify.py can load the saved model and do the testing offline.
+
+AIFB:
+```
+python3 entity_classify.py -d aifb --testing --gpu 0 --model_path "aifb.pt"
+python3 test_classify.py -d aifb --gpu 0 --model_path "aifb.pt"
+```
+
+MUTAG:
+```
+python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --model_path "mutag.pt"
+python3 test_classify.py -d mutag --n-bases 30 --gpu 0 --model_path "mutag.pt"
+```
+
+BGS:
+```
+python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --model_path "bgs.pt"
+python3 test_classify.py -d bgs --n-bases 40 --gpu 0 --model_path "bgs.pt"
+```
+
+AM:
+```
+python3 entity_classify.py -d am --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --model_path "am.pt"
+python3 test_classify.py -d am --n-bases 40 --gpu 0 --model_path "am.pt"
+```
