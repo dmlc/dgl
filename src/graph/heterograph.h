@@ -41,6 +41,10 @@ class HeteroGraph : public BaseHeteroGraph {
     LOG(FATAL) << "Bipartite graph is not mutable.";
   }
 
+  DLDataType DataType() const override {
+    return relation_graphs_[0]->DataType();
+  }
+
   DLContext Context() const override {
     return relation_graphs_[0]->Context();
   }

@@ -11,7 +11,7 @@
 #include <utility>
 #include <tuple>
 #include <vector>
-#include "../../c_api_common.h"
+#include "../../../c_api_common.h"
 #include "randomwalks_impl.h"
 
 using namespace dgl::runtime;

@@ -4,8 +4,8 @@
  * \brief DGL sampler - templated implementation definition of random walks on CPU
  */
 
-#ifndef DGL_GRAPH_SAMPLING_METAPATH_RANDOMWALK_H_
-#define DGL_GRAPH_SAMPLING_METAPATH_RANDOMWALK_H_
+#ifndef DGL_GRAPH_SAMPLING_RANDOMWALKS_METAPATH_RANDOMWALK_H_
+#define DGL_GRAPH_SAMPLING_RANDOMWALKS_METAPATH_RANDOMWALK_H_
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -145,4 +145,4 @@ IdArray MetapathBasedRandomWalk(
 
 };  // namespace dgl
 
-#endif  // DGL_GRAPH_SAMPLING_METAPATH_RANDOMWALK_H_
+#endif  // DGL_GRAPH_SAMPLING_RANDOMWALKS_METAPATH_RANDOMWALK_H_

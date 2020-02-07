@@ -211,7 +211,7 @@ struct CSRMatrix {
   runtime::NDArray indptr, indices;
   /*! \brief data array, could be empty. */
   runtime::NDArray data;
-  /*! \brief indicate that the edges are stored in the sorted order. */
+  /*! \brief whether the column indices per row are sorted */
   bool sorted;
 };
 
@@ -229,7 +229,9 @@ struct COOMatrix {
   int64_t num_rows, num_cols;
   /*! \brief COO index arrays */
   runtime::NDArray row, col;
-  /*! \brief data array, could be empty. */
+  /*!
+   * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
+   */
   runtime::NDArray data;
 };
 
@@ -252,6 +254,11 @@ runtime::NDArray CSRGetRowColumnIndices(CSRMatrix , int64_t row);
 
 /*! \brief Return the data array of the given row */
 runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
+
+/*! \brief Whether the CSR matrix contains data */
+inline bool CSRHasData(CSRMatrix csr) {
+  return csr.data.defined();
+}
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
 runtime::NDArray CSRGetData(CSRMatrix , int64_t row, int64_t col);
@@ -326,8 +333,39 @@ void CSRSort(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
 
-/*! \return True if the matrix has duplicate entries */
-bool COOHasDuplicate(COOMatrix coo);
+/*! \brief Return true if the value (row, col) is non-zero */
+bool COOIsNonZero(COOMatrix , int64_t row, int64_t col);
+/*!
+ * \brief Batched implementation of COOIsNonZero.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+runtime::NDArray COOIsNonZero(COOMatrix, runtime::NDArray row, runtime::NDArray col);
+
+/*! \brief Return the nnz of the given row */
+int64_t COOGetRowNNZ(COOMatrix , int64_t row);
+runtime::NDArray COOGetRowNNZ(COOMatrix , runtime::NDArray row);
+
+/*! \brief Return the data array of the given row */
+std::pair<runtime::NDArray, runtime::NDArray>
+COOGetRowDataAndIndices(COOMatrix , int64_t row);
+
+/*! \brief Whether the COO matrix contains data */
+inline bool COOHasData(COOMatrix csr) {
+  return csr.data.defined();
+}
+
+/*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
+runtime::NDArray COOGetData(COOMatrix , int64_t row, int64_t col);
+
+/*!
+ * \brief Get the data and the row,col indices for each returned entries.
+ * \note This operator allows broadcasting (i.e, either row or col can be of length 1).
+ */
+std::vector<runtime::NDArray> COOGetDataAndIndices(
+    COOMatrix , runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \brief Return a transposed COO matrix */
+COOMatrix COOTranspose(COOMatrix coo);
 
 /*!
  * \brief Convert COO matrix to CSR matrix.
@@ -338,6 +376,32 @@ bool COOHasDuplicate(COOMatrix coo);
  * to the CSR.data[i] th entry in the input COO.
  */
 CSRMatrix COOToCSR(COOMatrix coo);
+
+/*!
+ * \brief Slice rows of the given matrix and return.
+ * \param coo COO matrix
+ * \param start Start row id (inclusive)
+ * \param end End row id (exclusive)
+ */
+COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
+COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
+
+/*!
+ * \brief Get the submatrix specified by the row and col ids.
+ *
+ * In numpy notation, given matrix M, row index array I, col index array J
+ * This function returns the submatrix M[I, J].
+ *
+ * \param coo The input coo matrix
+ * \param rows The row index to select
+ * \param cols The col index to select
+ * \return submatrix
+ */
+COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
+
+/*! \return True if the matrix has duplicate entries */
+bool COOHasDuplicate(COOMatrix coo);
+
 
 // inline implementations
 template <typename T>
@@ -399,7 +463,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 /*
  * Dispatch according to float type (either float32 or float64):
  *
- * ATEN_ID_TYPE_SWITCH(array->dtype, FloatType, {
+ * ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, {
  *   // Now FloatType is the type corresponding to data type in array.
  *   // For instance, one can do this for a CPU array:
  *   FloatType *data = static_cast<FloatType *>(array->data);
@@ -422,7 +486,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 /*
  * Dispatch according to data type (int32, int64, float32 or float64):
  *
- * ATEN_ID_TYPE_SWITCH(array->dtype, DType, {
+ * ATEN_DTYPE_SWITCH(array->dtype, DType, {
  *   // Now DType is the type corresponding to data type in array.
  *   // For instance, one can do this for a CPU array:
  *   DType *data = static_cast<DType *>(array->data);
