@@ -1163,12 +1163,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   CHECK(fs->Read(&restrict_format)) << "Invalid restrict_format";
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr, csr_matrix.indices, csr_matrix.data));
-  in_csr_ = csr;
-  meta_graph_ = mg;
-  restrict_format_ = restrict_format;
-  // HeteroGraphPtr hptr = CreateFromCSR(num_vtypes, num_src, num_dst, csr_matrix.indptr,
-  //                                     csr_matrix.indices, csr_matrix.data);
-  // How can I move hptr to the current `this`?
+  *this = UnitGraph(mg, csr, nullptr, nullptr);
   return true;
 }
 
