@@ -360,6 +360,16 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   return FlattenedHeteroGraphPtr(result);
 }
 
+HeteroGraphPtr HeteroGraph::InEdgeGraph(const std::vector<IdArray>& nodes) const {
+  LOG(FATAL) << "Not implemented";
+  return HeteroGraphPtr();
+}
+
+HeteroGraphPtr HeteroGraph::OutEdgeGraph(const std::vector<IdArray>& nodes) const {
+  LOG(FATAL) << "Not implemented";
+  return HeteroGraphPtr();
+}
+
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";

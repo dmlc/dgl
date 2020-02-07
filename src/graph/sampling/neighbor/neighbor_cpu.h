@@ -9,9 +9,9 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
-#include <dgl/random.h>
 #include "../../unit_graph.h"
 #include <vector>
+#include <algorithm>
 
 namespace dgl {
 namespace sampling {
@@ -33,14 +33,26 @@ inline FloatArray LightSlice(FloatArray array, IdArray idx,
 }
 }  // namespace
 
-template<typename IdxType>
+// Customizable functor for choosing from population (0~N-1). The edge weight
+// array could be empty. Otherwise, its length is population.
+template <typename IdxType>
+using ChooseFunc = std::function<
+  // choosed index
+  IdArray(int64_t,  // how many to choose
+          int64_t,  // population
+          const FloatArray)>;   // edge weight
+
+/*
+ */
+template <typename IdxType>
 HeteroGraphPtr CPUSampleNeighbors(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& fanouts,
     EdgeDir dir,
-    const std::vector<FloatArray>& prob,
-    bool replace) {
+    const std::vector<FloatArray>& weight,
+    bool replace,
+    ChooseFunc<IdxType> choose_fn) {
   std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
     auto pair = hg->meta_graph()->FindEdge(etype);
@@ -64,11 +76,38 @@ HeteroGraphPtr CPUSampleNeighbors(
     const IdxType* indptr = static_cast<IdxType*>(adj[0]->data);
     const IdxType* indices = static_cast<IdxType*>(adj[1]->data);
     const int64_t fanout = fanouts[etype];
-    // To leverage OMP parallelization, we first create two vectors to store
-    // sampled src and dst indices. Each vector is of length num_nodes * fanout.
+
+    // To leverage OMP parallelization, we create two arrays to store
+    // sampled src and dst indices. Each array is of length num_nodes * fanout.
     // For nodes whose neighborhood size < fanout, the indices are padded with -1.
-    // We then remove -1 elements in the two vectors to produce the final result.
-    std::vector<IdxType> row(num_nodes * fanout, -1), col(num_nodes * fanout, -1);
+    //
+    // We check whether all the given nodes
+    // have at least fanout number of neighbors when replace is false.
+    //
+    // If the check holds, remove -1 elements by remove_if operation, which simply
+    // moves valid elements to the head of arrays and create a view of the original
+    // array. The implementation consumes a little extra memory than the actual requirement.
+    //
+    // Otherwise, directly use the row and col arrays to construct the result graph.
+    
+    bool all_has_fanout = true;
+    if (replace) {
+      all_has_fanout = true;
+    } else {
+#pragma omp parallel for reduction(&&:all_has_fanout)
+      for (int64_t i = 0; i < num_nodes; ++i) {
+        const IdxType nid = nodes_data[i];
+        const IdxType len = indptr[nid + 1] - indptr[nid];
+        all_has_fanout = all_has_fanout && (len >= fanout);
+      }
+    }
+
+    IdArray row = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
+    IdArray col = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
+
+    IdxType* row_data = static_cast<IdxType*>(row->data);
+    IdxType* col_data = static_cast<IdxType*>(col->data);
+
 #pragma omp parallel for
     for (int64_t i = 0; i < num_nodes; ++i) {
       const IdxType nid = nodes_data[i];
@@ -77,28 +116,44 @@ HeteroGraphPtr CPUSampleNeighbors(
       if (len <= fanout && !replace) {
         // neighborhood size <= fanout and w/o replacement, take all neighbors
         for (int64_t j = 0; j < len; ++j) {
-          row[i * fanout + j] = nid;
-          col[i * fanout + j] = indices[off + j];
+          row_data[i * fanout + j] = nid;
+          col_data[i * fanout + j] = indices[off + j];
         }
       } else {
-        IdArray chosen;
-        if (prob[etype]->shape[0] == 0) {
-          // empty prob array; assume uniform
-          //chosen = RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
-              //fanout, len, replace);
-        } else {
-          FloatArray prob_selected = LightSlice(prob[etype], adj[2], off, len);
-          chosen = RandomEngine::ThreadLocal()->Choice<IdxType>(
-              fanout, prob_selected, replace);
+        FloatArray weight_selected;
+        if (weight[etype]->shape[0] != 0) {
+          weight_selected = LightSlice<IdxType>(weight[etype], adj[2], off, len);
         }
+        IdArray chosen = choose_fn(fanout, len, weight_selected);
         const IdxType* chosen_data = static_cast<IdxType*>(chosen->data);
         for (int64_t j = 0; j < fanout; ++j) {
-          row[i * fanout + j] = nid;
-          col[i * fanout + j] = indices[off + chosen_data[j]];
+          row_data[i * fanout + j] = nid;
+          col_data[i * fanout + j] = indices[off + chosen_data[j]];
         }
       }
     }
+
+    if (!all_has_fanout) {
+      // correct the array by remove_if
+      IdxType* new_row_end = std::remove_if(row_data, row_data + num_nodes * fanout,
+                                            [] (IdxType i) { return i == -1; });
+      IdxType* new_col_end = std::remove_if(col_data, col_data + num_nodes * fanout,
+                                            [] (IdxType i) { return i == -1; });
+      const int64_t new_len = (new_row_end - row_data);
+      CHECK_EQ(new_col_end - col_data, new_len);
+      CHECK_LT(new_len, num_nodes * fanout);
+      row = row.CreateView({new_len}, row->dtype);
+      col = col.CreateView({new_len}, col->dtype);
+    }
+
+    subrels.push_back(UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        row, col));
   }
+
+  return CreateHeteroGraph(hg->meta_graph(), subrels);
 }
 
 }  // namespace impl

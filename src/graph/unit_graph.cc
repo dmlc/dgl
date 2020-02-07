@@ -362,6 +362,16 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return subg;
   }
 
+  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override {
+    LOG(FATAL) << "Not implemented";
+    return HeteroGraphPtr();
+  }
+
+  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override {
+    LOG(FATAL) << "Not implemented";
+    return HeteroGraphPtr();
+  }
+
   aten::COOMatrix adj() const {
     return adj_;
   }
@@ -689,6 +699,16 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
+  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override {
+    LOG(FATAL) << "Not implemented";
+    return HeteroGraphPtr();
+  }
+
+  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override {
+    LOG(FATAL) << "Not implemented";
+    return HeteroGraphPtr();
+  }
+
   aten::CSRMatrix adj() const {
     return adj_;
   }
@@ -976,6 +996,16 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
+}
+
+HeteroGraphPtr UnitGraph::InEdgeGraph(const std::vector<IdArray>& nodes) const {
+  LOG(FATAL) << "Not implemented";
+  return HeteroGraphPtr();
+}
+
+HeteroGraphPtr UnitGraph::OutEdgeGraph(const std::vector<IdArray>& nodes) const {
+  LOG(FATAL) << "Not implemented";
+  return HeteroGraphPtr();
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(

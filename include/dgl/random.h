@@ -116,8 +116,11 @@ class RandomEngine {
    * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
    * \return Integer array
    */
-  template<typename IdxType>
+  template <typename IdxType>
   IdArray Choice(int64_t num, FloatArray prob, bool replace = true);
+
+  template <typename IdxType>
+  IdArray UniformChoice(int64_t num, int64_t population, bool replace = true);
 
  private:
   std::default_random_engine rng_;
