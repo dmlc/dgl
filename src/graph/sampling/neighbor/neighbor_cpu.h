@@ -63,11 +63,11 @@ HeteroGraphPtr CPUSampleNeighbors(
       // No node provided in the type, create a placeholder relation graph
       IdArray row = IdArray::Empty({}, hg->DataType(), hg->Context());
       IdArray col = IdArray::Empty({}, hg->DataType(), hg->Context());
-      subrels.push_back(UnitGraph::CreateFromCOO(
+      subrels[etype] = UnitGraph::CreateFromCOO(
           hg->GetRelationGraph(etype)->NumVertexTypes(),
           hg->NumVertices(src_vtype),
           hg->NumVertices(dst_vtype),
-          row, col));
+          row, col);
       continue;
     }
     // sample from one relation graph
@@ -149,11 +149,11 @@ HeteroGraphPtr CPUSampleNeighbors(
       col = col.CreateView({new_len}, col->dtype);
     }
 
-    subrels.push_back(UnitGraph::CreateFromCOO(
+    subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
-        row, col));
+        row, col);
   }
 
   return CreateHeteroGraph(hg->meta_graph(), subrels);
