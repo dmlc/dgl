@@ -29,7 +29,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
+def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None):
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
@@ -43,6 +43,8 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         model.create_async_update()
     if args.strict_rel_part:
         model.prepare_relation(th.device('cuda:' + str(gpu_id)))
+    if args.soft_rel_part:
+        model.prepare_cross_rels(cross_rels)
 
     start = time.time()
     sample_time = 0

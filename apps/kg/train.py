@@ -112,6 +112,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--soft_rel_part', action='store_true',
+                          help='enable soft relation partition')
         self.add_argument('--async_update', action='store_true',
                           help='allow async_update on node embedding')
         self.add_argument('--force_sync_interval', type=int, default=-1,
@@ -307,6 +309,7 @@ def run(args, logger):
     # train
     start = time.time()
     rel_parts = train_data.rel_parts if args.strict_rel_part else None
+    cross_rels = train_data.cross_rels if args.soft_rel_part else None
     if args.num_proc > 1:
         procs = []
         barrier = mp.Barrier(args.num_proc)
@@ -318,6 +321,7 @@ def run(args, logger):
                                                      valid_sampler,
                                                      i,
                                                      rel_parts,
+                                                     cross_rels,
                                                      barrier))
             procs.append(proc)
             proc.start()

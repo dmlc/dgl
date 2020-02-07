@@ -8,6 +8,112 @@ import sys
 import pickle
 import time
 
+def SoftRelationPartition(edges, n, threshold=0.05):
+    """This partitions a list of edges based in to n partitions that 
+    SMALL relations (which has only small number of edges) will be put 
+    into a single LARGE partition (relations with large number of edges) 
+    will be evenly divided into all partitions.
+    
+    Algo:
+
+    Parameters
+    ----------
+    edges : (heads, rels, tails) triple
+        Edge list to partition
+    n : int
+        Number of partitions
+    threshold : float
+        The threshold of whether a relation is LARGE or SMALL
+        Default: 5%
+
+    Returns
+    -------
+    List of np.array
+        Edges of each partition
+    List of np.array
+        Edge types of each partition
+    bool
+        Whether there exists some relations belongs to multiple partitions
+    """
+    heads, rels, tails = edges
+    print('relation partition {} edges into {} parts'.format(len(heads), n))
+    uniq, cnts = np.unique(rels, return_counts=True)
+    idx = np.flip(np.argsort(cnts))
+    cnts = cnts[idx]
+    uniq = uniq[idx]
+    assert cnts[0] > cnts[-1]
+    edge_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_cnts = np.zeros(shape=(n,), dtype=np.int64)
+    rel_dict = {}
+    rel_parts = []
+    cross_rel_part = []
+    for _ in range(n):
+        rel_parts.append([])
+        strict_rel_part.append([])
+
+    large_threshold = int(len(rels) * threshold)
+    num_cross_part = 0
+    for i in range(len(cnts)):
+        cnt = cnts[i]
+        r = uniq[i]
+        r_parts = []
+
+        if cnt > large_threshold:
+            avg_part_cnt = (cnt // n) + 1
+            num_cross_part += 1
+            for j in range(n):
+                part_cnt = avg_part_cnt if cnt > avg_part_cnt else cnt
+                r_parts.append([j, part_cnt])
+                rel_parts[j].append(r)
+                edge_cnts[j] += part_cnt
+                rel_cnts[j] += 1
+                cnt -= part_cnt
+            cross_rel_part.append(r)
+        else:
+            idx = np.argmin(edge_cnts)
+            r_parts.append([idx, cnt])
+            rel_parts[idx].append(r)
+            edge_cnts[idx] += cnt
+            rel_cnts[idx] += 1
+        rel_dict[r] = r_parts
+
+    for i, edge_cnt in enumerate(edge_cnts):
+        print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
+    print('{}/{} duplicated relation across partitions'.format(num_div, len(cnts)))
+
+    parts = []
+    for i in range(n):
+        parts.append([])
+        rel_parts[i] = np.array(rel_parts[i])
+
+    for i, r in enumerate(rels):
+        r_part = rel_dict[r][0]
+        part_idx = r_part[0]
+        cnt = r_part[1]
+        parts[part_idx].append(i)
+        cnt -= 1
+        if cnt == 0:
+            rel_dict[r].pop(0)
+        else:
+            rel_dict[r][0][1] = cnt
+
+    for i, part in enumerate(parts):
+        parts[i] = np.array(part, dtype=np.int64)
+        print(parts[i].shape)
+
+    shuffle_idx = np.concatenate(parts)
+    heads[:] = heads[shuffle_idx]
+    rels[:] = rels[shuffle_idx]
+    tails[:] = tails[shuffle_idx]
+
+    off = 0
+    for i, part in enumerate(parts):
+        parts[i] = np.arange(off, off + len(part))
+        off += len(part)
+    cross_rel_part = np.array(cross_rel_part)
+
+    return parts, rel_parts, num_cross_part > 0, cross_rel_part
+
 def BalancedRelationPartition(edges, n):
     """This partitions a list of edges based on relations to make sure
     each partition has roughly the same number of edges and relations.
@@ -184,6 +290,9 @@ class TrainDataset(object):
         num_train = len(triples[0])
         print('|Train|:', num_train)
 
+        if ranks > 1 and args.soft_rel_part:
+            self.edge_parts, self.rel_parts, self.cross_part, self.cross_rels = \
+            SoftRelationPartition(triples, ranks)
         if ranks > 1 and args.rel_part:
             self.edge_parts, self.rel_parts, self.cross_part = \
                 BalancedRelationPartition(triples, ranks)

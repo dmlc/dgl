@@ -82,6 +82,7 @@ class KEModel(object):
         self.rel_dim = rel_dim
         self.entity_dim = entity_dim
         self.strict_rel_part = args.strict_rel_part
+        self.soft_rel_part = args.soft_rel_part
         if not self.strict_rel_part:
             self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim,
                                                   F.cpu() if args.mix_cpu_gpu else device)
@@ -167,6 +168,8 @@ class KEModel(object):
         self.score_func.reset_parameters()
         if not self.strict_rel_part:
             self.relation_emb.init(self.emb_init)
+        else:
+            self.global_relation_emb.init(self.emb_init)
 
     def predict_score(self, g):
         """Predict the positive score.
@@ -415,6 +418,10 @@ class KEModel(object):
             self.score_func.prepare_local_emb(local_projection_emb)
             self.score_func.reset_parameters()
 
+    def prepare_cross_rels(self, cross_rels):
+        self.cross_rels = cross_rels
+        self.relation_emb.setup_cross_rels(cross_rels)
+
     def writeback_relation(self, rank=0, rel_parts=None):
         """ Writeback relation embeddings in a specific process to global relation embedding.
         Used in multi-process multi-gpu training model.
@@ -425,6 +432,8 @@ class KEModel(object):
             List of tensor stroing edge types of each partition.
         """
         idx = rel_parts[rank]
+        if self.soft_rel_part:
+            self.relation_emb.prepare_cross_rel(idx)
         self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
         if self.model_name == 'TransR':
             self.score_func.writeback_local_emb(idx)
