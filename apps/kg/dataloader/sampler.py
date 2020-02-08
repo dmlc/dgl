@@ -99,8 +99,6 @@ def SoftRelationPartition(edges, n, threshold=0.03):
 
     for i, part in enumerate(parts):
         parts[i] = np.array(part, dtype=np.int64)
-        print(parts[i].shape)
-
     shuffle_idx = np.concatenate(parts)
     heads[:] = heads[shuffle_idx]
     rels[:] = rels[shuffle_idx]
@@ -293,7 +291,7 @@ class TrainDataset(object):
         if ranks > 1 and args.soft_rel_part:
             self.edge_parts, self.rel_parts, self.cross_part, self.cross_rels = \
             SoftRelationPartition(triples, ranks)
-        if ranks > 1 and args.rel_part:
+        elif ranks > 1 and args.rel_part:
             self.edge_parts, self.rel_parts, self.cross_part = \
                 BalancedRelationPartition(triples, ranks)
         elif ranks > 1:
