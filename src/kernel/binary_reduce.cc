@@ -338,7 +338,7 @@ void BinaryOpReduce(
 
 void csrwrapper_switch(DGLArgValue argval,
                        std::function<void(const CSRWrapper&)> fn) {
-  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);  
+  DGL_CHECK_TYPE_CODE(argval.type_code(), kObjectHandle);
   if (argval.IsObjectType<GraphRef>()) {
     GraphRef g = argval;
     auto igptr = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
