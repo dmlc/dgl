@@ -153,16 +153,19 @@ def test_sample_neighbors():
     g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
     g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
     g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    hg = dgl.hetero_from_relations([g, g1, g2])
+    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
 
     def _test3(p, replace):
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, p=p, replace=replace)
-            assert len(subg.ntypes) == 2
-            assert len(subg.etypes) == 3
+            assert len(subg.ntypes) == 3
+            assert len(subg.etypes) == 4
             assert subg['follow'].number_of_edges() == 4
             assert subg['play'].number_of_edges() == 2 if replace else 1
             assert subg['liked-by'].number_of_edges() == 4 if replace else 3
+            assert subg['flips'].number_of_edges() == 0
 
     _test3(None, True)   # w/ replacement, uniform
     _test3(None, False)  # w/o replacement, uniform

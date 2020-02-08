@@ -66,8 +66,12 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
     if p is None:
         prob = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
     else:
-        prob = [F.zerocopy_to_dgl_ndarray(g.edges[etype].data[p])
-                for etype in g.canonical_etypes]
+        prob = []
+        for etype in g.canonical_etypes:
+            if p in g.edges[etype].data:
+                prob.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[p]))
+            else:
+                prob.append(nd.array([], ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout,
                                        edge_dir, prob, replace)
