@@ -1152,7 +1152,12 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::COO;
 }
 
+constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
+
 bool UnitGraph::Load(dmlc::Stream* fs) {
+  uint64_t magicNum;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
   uint64_t num_vtypes, num_src, num_dst;
   CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
   CHECK(fs->Read(&num_src)) << "Invalid num_src";
@@ -1174,6 +1179,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   uint64_t num_src = NumVertices(SrcType());
   uint64_t num_dst = NumVertices(DstType());
   SparseFormat restrict_format = restrict_format_;
+  fs->Write(kDGLSerialize_UnitGraphMagic);
   fs->Write(num_vtypes);
   fs->Write(num_src);
   fs->Write(num_dst);
