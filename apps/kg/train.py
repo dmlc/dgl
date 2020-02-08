@@ -98,7 +98,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='set value > 0.0 if regularization is used')
         self.add_argument('-rn', '--regularization_norm', type=int, default=3,
                           help='norm used in regularization')
-        self.add_argument('--num_worker', type=int, default=16,
+        self.add_argument('--num_worker', type=int, default=32,
                           help='number of workers used for loading data')
         self.add_argument('--non_uni_weight', action='store_true',
                           help='if use uniform weight when computing loss')
@@ -112,6 +112,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--nomp_thread_per_process', type=int, default=-1,
+                          help='num of omp threads used per process in multi-process training')
         self.add_argument('--async_update', action='store_true',
                           help='allow async_update on node embedding')
         self.add_argument('--force_sync_interval', type=int, default=-1,
@@ -169,6 +171,20 @@ def run(args, logger):
     num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
+
+    # Automatically set number of OMP threads for each process if it is not provided
+    # The value for GPU is evaluated in AWS p3.16xlarge
+    # The value for CPU is evaluated in AWS x1.32xlarge
+    if args.nomp_thread_per_process == -1:
+        if len(args.gpu) > 0:
+            # GPU training
+            args.num_thread = 4
+        else:
+            # CPU training
+            args.num_thread = mp.cpu_count() // args.num_proc + 1
+    else:
+        args.num_thread = args.nomp_thread_per_process
+
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
