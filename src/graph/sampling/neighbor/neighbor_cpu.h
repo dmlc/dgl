@@ -59,7 +59,8 @@ HeteroGraphPtr CPUSampleNeighbors(
     auto pair = hg->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    const int64_t num_nodes = nodes[src_vtype]->shape[0];
+    const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
+    const int64_t num_nodes = nodes_ntype->shape[0];
     if (num_nodes == 0) {
       // No node provided in the type, create a placeholder relation graph
       IdArray row = IdArray::Empty({}, hg->DataType(), hg->Context());
@@ -72,7 +73,7 @@ HeteroGraphPtr CPUSampleNeighbors(
       continue;
     }
     // sample from one relation graph
-    const IdxType* nodes_data = static_cast<IdxType*>(nodes[src_vtype]->data);
+    const IdxType* nodes_data = static_cast<IdxType*>(nodes_ntype->data);
     const std::vector<IdArray>& adj = hg->GetAdj(etype, dir == EdgeDir::kOut, "csr");
     const IdxType* indptr = static_cast<IdxType*>(adj[0]->data);
     const IdxType* indices = static_cast<IdxType*>(adj[1]->data);

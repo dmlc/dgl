@@ -157,9 +157,17 @@ def test_sample_neighbors():
 
     def _test3(p, replace):
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(g, {'user' : [0,1], 'game' : 0}, 2, p=p, replace=replace)
-            assert subg.number_of_ntypes == 2
-            assert subg.number_of_etypes == 3
+            subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, p=p, replace=replace)
+            assert len(subg.ntypes) == 2
+            assert len(subg.etypes) == 3
+            assert subg['follow'].number_of_edges() == 4
+            assert subg['play'].number_of_edges() == 2 if replace else 1
+            assert subg['liked-by'].number_of_edges() == 4 if replace else 3
+
+    _test3(None, True)   # w/ replacement, uniform
+    _test3(None, False)  # w/o replacement, uniform
+    _test3('prob', True)   # w/ replacement
+    _test3('prob', False)  # w/o replacement
 
 if __name__ == '__main__':
     test_random_walk()
