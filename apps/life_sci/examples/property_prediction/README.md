@@ -113,12 +113,9 @@ Note that the dataset is randomly split so this number is only for reference.
 
 [8] visualizes the weights of atoms in readout for possible interpretations like the figure below. 
 We provide a jupyter notebook for performing the visualization and you can download it with 
-`wget https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/attentive_fp/atom_weight_visualization.ipynb` 
-from the s3 bucket in U.S. or 
-`wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dgllife/attentive_fp/atom_weight_visualization.ipynb` 
-from the s3 bucket in China.
+`wget https://data.dgl.ai/dgllife/attentive_fp/atom_weight_visualization.ipynb`.
 
-![](https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/attentive_fp_vis_example.png)
+![](https://data.dgl.ai/dgllife/attentive_fp_vis_example.png)
 
 ## Dataset Customization
 

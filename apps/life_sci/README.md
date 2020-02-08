@@ -117,7 +117,7 @@ for i in range(4):
 SVG(Draw.MolsToGridImage(mols, molsPerRow=4, subImgSize=(180, 150), useSVG=True))
 ```
 
-![](https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/dgmg/dgmg_model_zoo_example2.png)
+![](https://data.dgl.ai/dgllife/dgmg/dgmg_model_zoo_example2.png)
 
 ## Speed Reference
 
