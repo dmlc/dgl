@@ -104,20 +104,17 @@ HeteroGraphPtr CPUSampleNeighbors(
       }
     }
 
-    //LOG(INFO) << "all_has_fanout: " << all_has_fanout;
-
     IdArray row = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
     IdArray col = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
 
     IdxType* row_data = static_cast<IdxType*>(row->data);
     IdxType* col_data = static_cast<IdxType*>(col->data);
 
-//#pragma omp parallel for
+#pragma omp parallel for
     for (int64_t i = 0; i < num_nodes; ++i) {
       const IdxType nid = nodes_data[i];
       const IdxType off = indptr[nid];
       const IdxType len = indptr[nid + 1] - off;
-      //LOG(INFO) << "nid=" << nid << " off=" << off << " len=" << len;
       if (len <= fanout && !replace) {
         // neighborhood size <= fanout and w/o replacement, take all neighbors
         for (int64_t j = 0; j < len; ++j) {
