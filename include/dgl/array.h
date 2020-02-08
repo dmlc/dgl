@@ -11,7 +11,7 @@
 
 #include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
-#include <dmlc/type_traits.h>
+#include <dmlc/serializer.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
@@ -215,27 +215,6 @@ struct CSRMatrix {
   runtime::NDArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted;
-
-  /*! \brief Write CSRMatrix into stream */
-  void Save(dmlc::Stream* fs) const {
-    fs->Write(num_cols);
-    fs->Write(num_rows);
-    fs->Write(indptr);
-    fs->Write(indices);
-    fs->Write(data);
-    fs->Write(sorted);
-  }
-
-  /*! \brief Load CSRMatrix from stream */
-  bool Load(dmlc::Stream* fs){
-    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
-    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
-    CHECK(fs->Read(&indptr)) << "Invalid indptr";
-    CHECK(fs->Read(&indices)) << "Invalid indices";
-    CHECK(fs->Read(&data)) << "Invalid data";
-    CHECK(fs->Read(&sorted)) << "Invalid sorted";
-    return true;
-  }
 };
 
 /*!
@@ -442,6 +421,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
+
+
 ///////////////////////// Dispatchers //////////////////////////
 
 /*
@@ -621,7 +602,38 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 }  // namespace dgl
 
 namespace dmlc {
-DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
+
+namespace serializer {
+  
+using dgl::aten::CSRMatrix;
+
+constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
+
+template<>
+struct Handler<CSRMatrix> {
+  inline static void Write(Stream *fs, const CSRMatrix& csr) {
+    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
+    fs->Write(csr.num_cols);
+    fs->Write(csr.num_rows);
+    fs->Write(csr.indptr);
+    fs->Write(csr.indices);
+    fs->Write(csr.data);
+    fs->Write(csr.sorted);
+  }
+  inline static bool Read(Stream *fs, CSRMatrix* csr) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic) << "Invalid CSRMatrix Data";
+    CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&csr->indices)) << "Invalid indices";
+    CHECK(fs->Read(&csr->data)) << "Invalid data";
+    CHECK(fs->Read(&csr->sorted)) << "Invalid sorted";
+    return true;
+  }
+};
+}  // namespace serializer
 }  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_
