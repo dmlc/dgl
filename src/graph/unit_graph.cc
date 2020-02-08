@@ -1153,7 +1153,7 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
 }
 
 bool UnitGraph::Load(dmlc::Stream* fs) {
-  int64_t num_vtypes, num_src, num_dst;
+  uint64_t num_vtypes, num_src, num_dst;
   CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
   CHECK(fs->Read(&num_src)) << "Invalid num_src";
   CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
@@ -1170,9 +1170,9 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
 void UnitGraph::Save(dmlc::Stream* fs) const {
   // Following CreateFromCSR signature
   aten::CSRMatrix csr_matrix = GetInCSRMatrix();
-  int64_t num_vtypes = NumVertexTypes();
-  int64_t num_src = NumVertices(SrcType());
-  int64_t num_dst = NumVertices(DstType());
+  uint64_t num_vtypes = NumVertexTypes();
+  uint64_t num_src = NumVertices(SrcType());
+  uint64_t num_dst = NumVertices(DstType());
   SparseFormat restrict_format = restrict_format_;
   fs->Write(num_vtypes);
   fs->Write(num_src);
