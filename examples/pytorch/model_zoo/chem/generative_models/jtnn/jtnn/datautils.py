@@ -32,7 +32,7 @@ class JTNNDataset(Dataset):
     def __init__(self, data, vocab, training=True):
         self.dir = get_download_dir()
         self.zip_file_path='{}/jtnn.zip'.format(self.dir)
-        download(_get_dgl_url('dglls/jtnn.zip'), path=self.zip_file_path)
+        download(_get_dgl_url('dgllife/jtnn.zip'), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/jtnn'.format(self.dir))
         print('Loading data...')
         if data in ['train', 'test']:

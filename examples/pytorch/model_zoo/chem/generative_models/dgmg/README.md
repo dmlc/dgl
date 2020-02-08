@@ -130,8 +130,8 @@ and compare their property distributions against the training molecule property 
 
 ![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_dist.png)
 
-Download it with `wget https://s3.us-west-2.amazonaws.com/dgl-data/dglls/dgmg/eval_jupyter.ipynb` from the s3
-bucket in U.S. or `wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dglls/dgmg/eval_jupyter.ipynb` from the 
+Download it with `wget https://s3.us-west-2.amazonaws.com/dgl-data/dgllife/dgmg/eval_jupyter.ipynb` from the s3
+bucket in U.S. or `wget https://s3.cn-north-1.amazonaws.com.cn/dgl-data/dgllife/dgmg/eval_jupyter.ipynb` from the 
 s3 bucket in China.
 
 ### Pre-trained models
