@@ -241,6 +241,10 @@ def reshape(input, shape):
     return tf.reshape(input, shape)
 
 
+def repeat(input, repeats, axis):
+    return tf.repeat(input, repeats, axis)
+
+
 def swapaxes(input, axis1, axis2):
     return tf.transpose(input, perm=[axis1, axis2])
 

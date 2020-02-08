@@ -552,12 +552,15 @@ template CSRMatrix CSRSliceMatrix<kDLCPU, int64_t, int64_t>(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-void CSRSort(CSRMatrix csr) {
+void CSRSort(CSRMatrix* csr) {
+  if (csr->sorted)
+    return;
+
   typedef std::pair<IdType, DType> shuffle_ele;
-  int64_t num_rows = csr.num_rows;
-  const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
-  IdType* indices_data = static_cast<IdType*>(csr.indices->data);
-  DType* eid_data = static_cast<DType*>(csr.data->data);
+  int64_t num_rows = csr->num_rows;
+  const IdType* indptr_data = static_cast<IdType*>(csr->indptr->data);
+  IdType* indices_data = static_cast<IdType*>(csr->indices->data);
+  DType* eid_data = static_cast<DType*>(csr->data->data);
 #pragma omp parallel
   {
     std::vector<shuffle_ele> reorder_vec;
@@ -582,10 +585,11 @@ void CSRSort(CSRMatrix csr) {
       }
     }
   }
+  csr->sorted = true;
 }
 
-template void CSRSort<kDLCPU, int64_t, int64_t>(CSRMatrix csr);
-template void CSRSort<kDLCPU, int32_t, int32_t>(CSRMatrix csr);
+template void CSRSort<kDLCPU, int64_t, int64_t>(CSRMatrix* csr);
+template void CSRSort<kDLCPU, int32_t, int32_t>(CSRMatrix* csr);
 
 }  // namespace impl
 }  // namespace aten

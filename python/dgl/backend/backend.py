@@ -746,6 +746,26 @@ def reshape(input, shape):
     """
     pass
 
+def repeat(input, repeats, axis):
+    """Repeats the input tensor along a given axis multiple times.
+    The axis must have one element only.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    repeats : int
+        Number of times to repeat
+    axis : int
+        The axis.
+
+    Returns
+    -------
+    Tensor
+        The repeated tensor.
+    """
+    pass
+
 def swapaxes(input, axis1, axis2):
     """Interchange the two given axes of a tensor.
 

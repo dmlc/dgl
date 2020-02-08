@@ -176,6 +176,11 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return th.reshape(input ,shape)
 
+def repeat(input, repeats, dim):
+    new_shape = list(input.shape)
+    new_shape[dim] = repeaets
+    return input.expand(*new_shape)
+
 def swapaxes(input, axis1, axis2):
     return th.transpose(input, axis1, axis2)
 

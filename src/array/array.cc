@@ -403,8 +403,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   return ret;
 }
 
-void CSRSort(CSRMatrix csr) {
-  ATEN_CSR_SWITCH(csr, XPU, IdType, DType, {
+void CSRSort(CSRMatrix* csr) {
+  ATEN_CSR_SWITCH(*csr, XPU, IdType, DType, {
     impl::CSRSort<XPU, IdType, DType>(csr);
   });
 }
@@ -512,6 +512,37 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
     ret = impl::COOSliceMatrix<XPU, IdType, DType>(coo, rows, cols);
+  });
+  return ret;
+}
+
+COOMatrix COOSort(COOMatrix coo) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOSort<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
+COOMatrix COOCoalesce(COOMatrix coo) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ret = impl::COOCoalesce<XPU, IdType, DType>(coo);
+  });
+  return ret;
+}
+
+std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
+    COOMatrix coo,
+    int64_t K,
+    NDArray weights,
+    bool smallest) {
+  std::pair<COOMatrix, NDArray> ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
+    ATEN_DTYPE_SWITCH(weights->dtype, WType, "weights", {
+      ret = impl::COORowwiseTopKNonZero<XPU, IdType, DType, WType>(
+          coo, K, weights, smallest);
+    });
   });
   return ret;
 }

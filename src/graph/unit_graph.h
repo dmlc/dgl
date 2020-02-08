@@ -136,6 +136,12 @@ class UnitGraph : public BaseHeteroGraph {
   std::vector<IdArray> GetAdj(
       dgl_type_t etype, bool transpose, const std::string &fmt) const override;
 
+  aten::CSRMatrix GetInCSRMatrix(dgl_type_t etype) const override;
+
+  aten::CSRMatrix GetOutCSRMatrix(dgl_type_t etype) const override;
+
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(
@@ -167,15 +173,6 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \return Return the COO format. Create from other format if not exist. */
   COOPtr GetCOO() const;
-
-  /*! \return Return the in-edge CSR in the matrix form */
-  aten::CSRMatrix GetInCSRMatrix() const;
-
-  /*! \return Return the out-edge CSR in the matrix form */
-  aten::CSRMatrix GetOutCSRMatrix() const;
-
-  /*! \return Return the COO matrix form */
-  aten::COOMatrix GetCOOMatrix() const;
 
  private:
   /*!

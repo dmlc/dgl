@@ -1069,31 +1069,6 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
-def compact_graph_indexes(graphs):
-    """Given a list of graphs, remove the common nodes that do not have inbound and
-    outbound edges.
-
-    The graphs should have identical node space (i.e. should have the same set of
-    nodes, including types and IDs) and metagraph.
-
-    Parameters
-    ----------
-    graph : list[HeteroGraphIndex]
-        List of heterographs.
-
-    Returns
-    -------
-    list[HeteroGraphIndex]
-        A list of compacted heterographs.
-        The returned heterographs also have the same metagraph, which is identical
-        to the original heterographs.
-        The returned heterographs also have identical node space.
-    list[Tensor]
-        The induced node IDs of each node type.
-    """
-    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs(graphs)
-    return new_graphs, [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
-
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
     """FlattenedHeteroGraph object class in C++ backend."""

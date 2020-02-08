@@ -14,9 +14,22 @@ from .convert import graph, bipartite
 from . import utils
 
 
-__all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
-           'remove_self_loop', 'metapath_reachable_graph']
+__all__ = [
+    'line_graph',
+    'khop_adj',
+    'khop_graph',
+    'reverse',
+    'to_simple_graph',
+    'to_bidirected',
+    'laplacian_lambda_max',
+    'knn_graph',
+    'segmented_knn_graph',
+    'add_self_loop',
+    'remove_self_loop',
+    'metapath_reachable_graph',
+    'compact_graphs',
+    'to_simple',
+    'select_topk']
 
 
 def pairwise_squared_distance(x):
@@ -561,5 +574,31 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg.edata['inner_edge'] = inner_edge
         subg_dict[i] = subg
     return subg_dict
+
+def compact_graph_indexes(graphs):
+    """Given a list of graphs, remove the common nodes that do not have inbound and
+    outbound edges.
+
+    The graphs should have identical node space (i.e. should have the same set of
+    nodes, including types and IDs) and metagraph.
+
+    Parameters
+    ----------
+    graph : list[HeteroGraphIndex]
+        List of heterographs.
+
+    Returns
+    -------
+    list[HeteroGraphIndex]
+        A list of compacted heterographs.
+        The returned heterographs also have the same metagraph, which is identical
+        to the original heterographs.
+        The returned heterographs also have identical node space.
+    list[Tensor]
+        The induced node IDs of each node type.
+    """
+    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs(graphs)
+    return new_graphs, [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
+
 
 _init_api("dgl.transform")

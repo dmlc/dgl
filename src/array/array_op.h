@@ -105,7 +105,7 @@ template <DLDeviceType XPU, typename IdType, typename DType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType, typename DType>
-void CSRSort(CSRMatrix csr);
+void CSRSort(CSRMatrix* csr);
 
 template <DLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
@@ -148,6 +148,15 @@ COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOSort(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType, typename DType>
+COOMatrix COOCoalesce(COOMatrix coo);
+
+template <DLDeviceType XPU, typename IdType, typename DType, typename WType>
+std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
+    COOMatrix coo, int64_t K, NDArray weights, bool smallest);
 
 }  // namespace impl
 }  // namespace aten

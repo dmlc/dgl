@@ -340,6 +340,29 @@ class BaseHeteroGraph : public runtime::Object {
       dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
 
   /*!
+   * \brief Get a matrix representation of the edges of given type, in the in-edge
+   * CSR format (where rows indicate destination nodes).
+   * \param etype The edge type.
+   * \return A CSRMatrix structure.
+   */
+  virtual aten::CSRMatrix GetInCSRMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get a matrix representation of the edges of given type, in the out-edge
+   * CSR format (where rows indicate source nodes).
+   * \param etype The edge type.
+   * \return A CSRMatrix structure.
+   */
+  virtual aten::CSRMatrix GetOutCSRMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get a matrix representation of the edges of given type, in the COO format.
+   * \param etype The edge type.
+   * \return A COOMatrix structure.
+   */
+  virtual aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const = 0;
+
+  /*!
    * \brief Extract the induced subgraph by the given vertices.
    * 
    * The length of the given vector should be equal to the number of vertex types.
@@ -494,19 +517,6 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
-
-/*!
- * \brief Given a list of graphs, remove the common nodes that do not have inbound and
- * outbound edges.
- *
- * The graphs should have identical node ID space (i.e. should have the same set of nodes,
- * including types and IDs) and metagraph.
- *
- * \return A pair.  The first element is the list of compacted graphs, and the second
- * element is the mapping from the compacted graphs and the original graph.
- */
-std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
 
 };  // namespace dgl
 

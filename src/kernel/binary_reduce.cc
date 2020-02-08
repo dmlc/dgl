@@ -249,11 +249,11 @@ class UnitGraphCSRWrapper : public CSRWrapper {
     gptr_(graph) { }
 
   aten::CSRMatrix GetInCSRMatrix() const override {
-    return gptr_->GetInCSRMatrix();
+    return gptr_->GetInCSRMatrix(0);
   }
 
   aten::CSRMatrix GetOutCSRMatrix() const override {
-    return gptr_->GetOutCSRMatrix();
+    return gptr_->GetOutCSRMatrix(0);
   }
 
   DGLContext Context() const override {

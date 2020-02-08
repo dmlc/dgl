@@ -221,9 +221,9 @@ struct CSRMatrix {
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- *
- * We call a COO matrix is *coalesced* if its row index is sorted.
  */
+// TODO(BarclayII): Graph queries on COO formats should support the case where
+// data ordered by rows/columns instead of EID.
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows, num_cols;
@@ -233,6 +233,11 @@ struct COOMatrix {
    * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
    */
   runtime::NDArray data;
+  /*!
+   * \brief whether the COO matrix is sorted (first by row, then by column, edge ID
+   * is not necessarily sorted)
+   */
+  bool sorted;
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -329,7 +334,7 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 bool CSRHasDuplicate(CSRMatrix csr);
 
 /*! Sort the columns in each row in the ascending order. */
-void CSRSort(CSRMatrix csr);
+void CSRSort(CSRMatrix* csr);
 
 ///////////////////////// COO routines //////////////////////////
 
@@ -401,6 +406,26 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
+
+/*! \brief Sort the edges first by row, then by column, then by edge ID. */
+COOMatrix COOSort(COOMatrix coo);
+
+/*!
+ * \brief Deduplicate the entries of a sorted COO matrix, replacing the data with the
+ * number of occurrences of the row-col coordinates.
+ */
+COOMatrix COOCoalesce(COOMatrix coo);
+
+/*!
+ * \brief Select K-largest non-zero elements on each row of the sparse matrix.
+ *
+ * \param coo The input COO matrix
+ * \param weights The weight of each entry in the COO matrix
+ * \param smallest If true, return K-smallest elements instead.
+ * \return a pair of the selected entries as well as their correspondin weights.
+ */
+std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
+    COOMatrix coo, int64_t K, NDArray weights, bool smallest = false);
 
 
 // inline implementations
@@ -530,8 +555,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 // TODO(minjie): In our current use cases, data type and id type are the
 //   same. For example, data array is used to store edge ids.
 #define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
       typedef IdType DType;                                 \
       {__VA_ARGS__}                                         \
     });                                                     \
@@ -539,8 +564,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 // Macro to dispatch according to device context and index type
 #define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
@@ -549,7 +574,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 // TODO(minjie): In our current use cases, data type and id type are the
 //   same. For example, data array is used to store edge ids.
 #define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
       typedef IdType DType;                                 \
       {__VA_ARGS__}                                         \
@@ -558,7 +583,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 // Macro to dispatch according to device context and index type
 #define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
       {__VA_ARGS__}                                         \
     });                                                     \

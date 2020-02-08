@@ -375,6 +375,21 @@ class UnitGraph::COO : public BaseHeteroGraph {
            (NumVertices(SrcType()) > 1000000);
   }
 
+  aten::CSRMatrix GetInCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetInCSRMatrix unsupported; use UnitGraph::GetInCSRMatrix() instead";
+    return aten::CSRMatrix{};
+  }
+
+  aten::CSRMatrix GetOutCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetOutCSRMatrix unsupported; use UnitGraph::GetOutCSRMatrix() instead";
+    return aten::CSRMatrix{};
+  }
+
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetCOOMatrix unsupported; use UnitGraph::GetCOOMatrix() instead";
+    return aten::COOMatrix{};
+  }
+
  private:
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
@@ -691,6 +706,21 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   aten::CSRMatrix adj() const {
     return adj_;
+  }
+
+  aten::CSRMatrix GetInCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetInCSRMatrix unsupported; use UnitGraph::GetInCSRMatrix() instead";
+    return aten::CSRMatrix{};
+  }
+
+  aten::CSRMatrix GetOutCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetOutCSRMatrix unsupported; use UnitGraph::GetOutCSRMatrix() instead";
+    return aten::CSRMatrix{};
+  }
+
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "[BUG] GetCOOMatrix unsupported; use UnitGraph::GetCOOMatrix() instead";
+    return aten::COOMatrix{};
   }
 
  private:
@@ -1101,15 +1131,15 @@ UnitGraph::COOPtr UnitGraph::GetCOO() const {
   return coo_;
 }
 
-aten::CSRMatrix UnitGraph::GetInCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetInCSRMatrix(dgl_type_t etype) const {
   return GetInCSR()->adj();
 }
 
-aten::CSRMatrix UnitGraph::GetOutCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetOutCSRMatrix(dgl_type_t etype) const {
   return GetOutCSR()->adj();
 }
 
-aten::COOMatrix UnitGraph::GetCOOMatrix() const {
+aten::COOMatrix UnitGraph::GetCOOMatrix(dgl_type_t etype) const {
   return GetCOO()->adj();
 }
 
