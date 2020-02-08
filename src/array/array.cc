@@ -230,6 +230,30 @@ template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
 template float IndexSelect<float>(NDArray array, uint64_t index);
 template double IndexSelect<double>(NDArray array, uint64_t index);
 
+NDArray Scatter(NDArray array, IdArray indices) {
+  NDArray ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(indices->dtype, IdType, {
+        ret = impl::Scatter<XPU, DType, IdType>(array, indices);
+      });
+    });
+  });
+  return ret;
+}
+
+NDArray Repeat(NDArray array, IdArray repeats) {
+  NDArray ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(repeats->dtype, IdType, {
+        ret = impl::Repeat<XPU, DType, IdType>(array, repeats);
+      });
+    });
+  });
+  return ret;
+}
+
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
   ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, {

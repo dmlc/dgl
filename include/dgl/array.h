@@ -114,6 +114,21 @@ ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
 
 /*!
+ * \brief Permute the elements of an array according to given indices.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     result = np.zeros_like(array)
+ *     result[indices] = array
+ * </code>
+ */
+NDArray Scatter(NDArray array, IdArray indices);
+
+/*! \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats) */
+NDArray Repeat(NDArray array, IdArray repeats);
+
+/*!
  * \brief Relabel the given ids to consecutive ids.
  *
  * Relabeling is done inplace. The mapping is created from the union

@@ -12,6 +12,7 @@ from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
 from .convert import graph, bipartite
 from . import utils
+from .base import EID
 
 
 __all__ = [
@@ -575,30 +576,159 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def compact_graph_indexes(graphs):
-    """Given a list of graphs, remove the common nodes that do not have inbound and
-    outbound edges.
+def compact_graphs(graphs):
+    """Given a list of graphs with the same set of nodes, find and eliminate the common
+    isolated nodes across all graphs.
 
-    The graphs should have identical node space (i.e. should have the same set of
-    nodes, including types and IDs) and metagraph.
+    This function requires the graphs to have the same set of nodes (i.e. the node types
+    must be the same, and the number of nodes of each node type must be the same).  The
+    metagraph does not have to be the same.
+
+    It finds all the nodes that have zero in-degree and zero out-degree in all the given
+    graphs, and eliminates them from all the graphs.
+
+    Useful for graph sampling where we have a giant graph but we only wish to perform
+    message passing on a smaller graph with a (tiny) subset of nodes.
+
+    The node and edge features are not preserved.
 
     Parameters
     ----------
-    graph : list[HeteroGraphIndex]
-        List of heterographs.
+    graphs : DGLHeteroGraph or list[DGLHeteroGraph]
+        The graph, or list of graphs
 
     Returns
     -------
-    list[HeteroGraphIndex]
-        A list of compacted heterographs.
-        The returned heterographs also have the same metagraph, which is identical
-        to the original heterographs.
-        The returned heterographs also have identical node space.
-    list[Tensor]
-        The induced node IDs of each node type.
-    """
-    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs(graphs)
-    return new_graphs, [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
+    DGLHeteroGraph or list[DGLHeteroGraph]
+        The compacted graph or list of compacted graphs.
 
+        Each returned graph would have a feature ``dgl.NID`` containing the mapping
+        of node IDs for each type from the compacted graph(s) to the original graph(s).
+        Note that the mapping is the same for all the compacted graphs.
+
+    Examples
+    --------
+    The following code constructs a bipartite graph with 20 users and 10 games, but
+    only user #1 and #3, as well as game #3 and #5, have connections:
+
+    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', card=(20, 10))
+
+    The following would compact the graph above to another bipartite graph with only
+    two users and two games.
+
+    >>> new_g, induced_nodes = dgl.compact_graphs(g)
+    >>> induced_nodes
+    {'user': tensor([1, 3]), 'game': tensor([3, 5])}
+
+    The mapping tells us that only user #1 and #3 as well as game #3 and #5 are kept.
+    Furthermore, the first user and second user in the compacted graph maps to
+    user #1 and #3 in the original graph.  Games are similar.
+
+    One can verify that the edge connections are kept the same in the compacted graph.
+
+    >>> new_g.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
+
+    When compacting multiple graphs, nodes that do not have any connections in any
+    of the given graphs are removed.  So if we compact ``g`` and the following ``g2``
+    graphs together:
+
+    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', card=(20, 10))
+    >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
+    >>> induced_nodes
+    {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
+
+    Then one can see that user #1 from both graphs, users #3 from the first graph, as
+    well as user #6 from the second graph, are kept.  Games are similar.
+
+    Similarly, one can also verify the connections:
+
+    >>> new_g.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
+    >>> new_g2.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 2]), tensor([2, 3]), tensor([0, 1]))
+    """
+    return_single = False
+    if not isinstance(graphs, Iterable):
+        graphs = [graphs]
+        return_single = True
+
+    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs([g._graph for g in graphs])
+    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
+
+    new_graphs = [
+        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+        for new_graph_index, graph in zip(new_graph_indexes, graphs)]
+    for g in new_graphs:
+        for i, ntype in enumerate(graphs[0].ntypes):
+            g.nodes[ntype].data[NID] = induced_nodes[i]
+    if return_single:
+        new_graphs = new_graphs[0]
+
+    return new_graphs
+
+def to_simple(g, return_weights=None, writeback_mapping=False):
+    """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
+    duplicate edges into one.
+
+    This function does not preserve node and edge features.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The heterogeneous graph
+    return_weights : str, optional
+        If given, the returned graph would have a column with the same name that stores
+        the number of duplicated edges from the original graph.
+    writeback_mapping : bool, default False
+        If True, the mapping from the edge IDs of original graph to those of the returned
+        graph would be written into edge feature ``dgl.EID`` in the original graph for
+        each edge type.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new heterogeneous simple graph.
+
+    Examples
+    --------
+    Consider the following graph
+    >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+    >>> sg = dgl.to_simple(g, return_weights='weights', writeback_mapping=True)
+
+    The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
+    >>> sg.all_edges()
+    (tensor([0, 1, 1, 2]), tensor([1, 3, 4, 2]))
+
+    If ``return_weights`` is set, the returned graph will also return how many edges
+    in the original graph are connecting the endpoints of the edges in the new graph:
+    >>> sg.edata['weights']
+    tensor([1, 2, 2, 1])
+
+    This essentially reads that one edge is connecting (0, 1) in ``g``, whereas 2 edges
+    are connecting (1, 3) in ``g``, etc.
+
+    One can also retrieve the mapping from the edges in the original graph to edges in
+    the new graph by setting ``writeback_mapping`` and running
+    >>> g.edata[dgl.EID]
+    tensor([0, 1, 3, 1, 2, 2])
+
+    This tells us that the first edge in ``g`` is mapped to the first edge in ``sg``, and
+    the second and the fourth edge are mapped to the second edge in ``sg``, etc.
+    """
+    simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
+    simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
+    counts = [F.zerocopy_from_dgl_ndarray(count.data) for count in counts]
+    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map.data) for x in edge_maps]
+
+    if return_weights is not None:
+        for count, canonical_etype in zip(count, g.canonical_etypes):
+            simple_graph.edges[canonical_etype].data[return_weights] = count
+
+    if writeback_mapping:
+        for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
+            g.edges[canonical_etype].data[EID] = edge_map
+
+    return simple_graph
 
 _init_api("dgl.transform")

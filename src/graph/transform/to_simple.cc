@@ -32,11 +32,36 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
     const HeteroGraphPtr rel_graph = graph->GetRelationGraph(etype);
     const COOMatrix adj = rel_graph->GetCOOMatrix(0);
     const COOMatrix sorted_adj = COOSort(adj);
-    const IdArray eids = sorted_adj.data;
+    const IdArray eids_shuffled = sorted_adj.data;
     const COOMatrix coalesced_adj = COOCoalesce(sorted_adj);
+    const IdArray &count = coalesced_adj.data;
 
-    edge_maps[etype] = eids;
-    counts[etype] = coalesced_adj.data;
+    /*
+     * eids_shuffled actually already contains the mapping from old edge space to the
+     * new one:
+     *
+     * * eids_shuffled[0:count[0]] indicates the original edge IDs that coalesced into new
+     *   edge #0.
+     * * eids_shuffled[count[0]:count[0] + count[1]] indicates those that coalesced into
+     *   new edge #1.
+     * * eids_shuffled[count[0] + count[1]:count[0] + count[1] + count[2]] indicates those
+     *   that coalesced into new edge #2.
+     * * etc.
+     *
+     * Here, we need to translate eids_shuffled to an array "eids_remapped" such that
+     * eids_remapped[i] indicates the new edge ID the old edge #i is mapped to.  The
+     * translation can simply be achieved by (in numpy code):
+     *
+     *     new_eid_for_eids_shuffled = np.range(len(count)).repeat(count)
+     *     eids_remapped = np.zeros_like(new_eid_for_eids_shuffled)
+     *     eids_remapped[eids_shuffled] = new_eid_for_eids_shuffled
+     */
+    const IdArray new_eids = Range(
+        0, sorted_adj.data->shape[0], sorted_adj.data->dtype.bits, sorted_adj.data->ctx);
+    const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
+
+    edge_maps[etype] = eids_remapped;
+    counts[etype] = count;
     rel_graphs[etype] = UnitGraph::CreateFromCOO(
         rel_graph->NumVertexTypes(),
         coalesced_adj.num_rows,

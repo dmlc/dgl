@@ -42,6 +42,12 @@ NDArray IndexSelect(NDArray array, IdArray index);
 template <DLDeviceType XPU, typename DType>
 DType IndexSelect(NDArray array, uint64_t index);
 
+template <DLDeviceType XPU, typename DType, typename IdType>
+NDArray Scatter(NDArray array, IdArray indices);
+
+template <DLDeviceType XPU, typename DType, typename IdType>
+NDArray Repeat(NDArray array, IdArray repeats);
+
 template <DLDeviceType XPU, typename IdType>
 IdArray Relabel_(const std::vector<IdArray>& arrays);
 
