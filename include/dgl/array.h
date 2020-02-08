@@ -604,14 +604,14 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 namespace dmlc {
 
 namespace serializer {
-  
+
 using dgl::aten::CSRMatrix;
 
 constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
 
-template<>
+template <>
 struct Handler<CSRMatrix> {
-  inline static void Write(Stream *fs, const CSRMatrix& csr) {
+  inline static void Write(Stream* fs, const CSRMatrix& csr) {
     fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
     fs->Write(csr.num_cols);
     fs->Write(csr.num_rows);
@@ -620,10 +620,11 @@ struct Handler<CSRMatrix> {
     fs->Write(csr.data);
     fs->Write(csr.sorted);
   }
-  inline static bool Read(Stream *fs, CSRMatrix* csr) {
+  inline static bool Read(Stream* fs, CSRMatrix* csr) {
     uint64_t magicNum;
     CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic) << "Invalid CSRMatrix Data";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
+        << "Invalid CSRMatrix Data";
     CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
     CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
     CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
