@@ -8,7 +8,7 @@ import sys
 import pickle
 import time
 
-def SoftRelationPartition(edges, n, threshold=0.05):
+def SoftRelationPartition(edges, n, threshold=0.03):
     """This partitions a list of edges based in to n partitions that 
     SMALL relations (which has only small number of edges) will be put 
     into a single LARGE partition (relations with large number of edges) 
@@ -49,7 +49,6 @@ def SoftRelationPartition(edges, n, threshold=0.05):
     cross_rel_part = []
     for _ in range(n):
         rel_parts.append([])
-        strict_rel_part.append([])
 
     large_threshold = int(len(rels) * threshold)
     num_cross_part = 0
@@ -57,7 +56,8 @@ def SoftRelationPartition(edges, n, threshold=0.05):
         cnt = cnts[i]
         r = uniq[i]
         r_parts = []
-
+        if i < 10:
+            print("{}:{}", cnt, large_threshold)
         if cnt > large_threshold:
             avg_part_cnt = (cnt // n) + 1
             num_cross_part += 1
@@ -79,7 +79,7 @@ def SoftRelationPartition(edges, n, threshold=0.05):
 
     for i, edge_cnt in enumerate(edge_cnts):
         print('part {} has {} edges and {} relations'.format(i, edge_cnt, rel_cnts[i]))
-    print('{}/{} duplicated relation across partitions'.format(num_div, len(cnts)))
+    print('{}/{} duplicated relation across partitions'.format(num_cross_part, len(cnts)))
 
     parts = []
     for i in range(n):

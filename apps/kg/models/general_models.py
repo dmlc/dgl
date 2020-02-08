@@ -83,7 +83,7 @@ class KEModel(object):
         self.entity_dim = entity_dim
         self.strict_rel_part = args.strict_rel_part
         self.soft_rel_part = args.soft_rel_part
-        if not self.strict_rel_part:
+        if not self.strict_rel_part and not self.soft_rel_part:
             self.relation_emb = ExternalEmbedding(args, n_relations, rel_dim,
                                                   F.cpu() if args.mix_cpu_gpu else device)
         else:
@@ -121,7 +121,7 @@ class KEModel(object):
         """Use torch.tensor.share_memory_() to allow cross process embeddings access.
         """
         self.entity_emb.share_memory()
-        if self.strict_rel_part:
+        if self.strict_rel_part or self.soft_rel_part:
             self.global_relation_emb.share_memory()
         else:
             self.relation_emb.share_memory()
@@ -140,7 +140,7 @@ class KEModel(object):
             Dataset name as prefix to the saved embeddings.
         """
         self.entity_emb.save(path, dataset+'_'+self.model_name+'_entity')
-        if self.strict_rel_part:
+        if self.strict_rel_part or self.soft_rel_part:
             self.global_relation_emb.save(path, dataset+'_'+self.model_name+'_relation')
         else:
             self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')   
@@ -166,7 +166,7 @@ class KEModel(object):
         """
         self.entity_emb.init(self.emb_init)
         self.score_func.reset_parameters()
-        if not self.strict_rel_part:
+        if (not self.strict_rel_part) and (not self.soft_rel_part):
             self.relation_emb.init(self.emb_init)
         else:
             self.global_relation_emb.init(self.emb_init)
@@ -419,8 +419,7 @@ class KEModel(object):
             self.score_func.reset_parameters()
 
     def prepare_cross_rels(self, cross_rels):
-        self.cross_rels = cross_rels
-        self.relation_emb.setup_cross_rels(cross_rels)
+        self.relation_emb.setup_cross_rels(cross_rels, self.global_relation_emb)
 
     def writeback_relation(self, rank=0, rel_parts=None):
         """ Writeback relation embeddings in a specific process to global relation embedding.
@@ -433,7 +432,7 @@ class KEModel(object):
         """
         idx = rel_parts[rank]
         if self.soft_rel_part:
-            self.relation_emb.prepare_cross_rel(idx)
+            idx = self.relation_emb.get_noncross_idx(idx)
         self.global_relation_emb.emb[idx] = F.copy_to(self.relation_emb.emb, F.cpu())[idx]
         if self.model_name == 'TransR':
             self.score_func.writeback_local_emb(idx)

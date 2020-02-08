@@ -308,7 +308,7 @@ def run(args, logger):
 
     # train
     start = time.time()
-    rel_parts = train_data.rel_parts if args.strict_rel_part else None
+    rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
     cross_rels = train_data.cross_rels if args.soft_rel_part else None
     if args.num_proc > 1:
         procs = []
