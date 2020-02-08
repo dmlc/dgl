@@ -103,7 +103,65 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU pack traces not implemented")
+def test_sample_neighbors():
+    g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
+            'user', 'follow')
+    g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+
+    def _test1(p, replace):
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, p=p, replace=replace)
+            assert subg.number_of_nodes() == 4
+            assert subg.number_of_edges() == 4
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(v))) == {0, 1}
+            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            if not replace:
+                # check no duplication
+                len(edge_set) == 4
+            if p is not None:
+                assert not (3, 0) in edge_set
+                assert not (3, 1) in edge_set
+    _test1(None, True)   # w/ replacement, uniform
+    _test1(None, False)  # w/o replacement, uniform
+    _test1('prob', True)   # w/ replacement
+    _test1('prob', False)  # w/o replacement
+
+    def _test2(p, replace):  # fanout > #neighbors
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, p=p, replace=replace)
+            assert subg.number_of_nodes() == 4
+            num_edges = 4 if replace else 3
+            assert subg.number_of_edges() == num_edges
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(v))) == {0, 2}
+            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            if not replace:
+                # check no duplication
+                len(edge_set) == num_edges
+            if p is not None:
+                assert not (3, 0) in edge_set
+    _test2(None, True)   # w/ replacement, uniform
+    _test2(None, False)  # w/o replacement, uniform
+    _test2('prob', True)   # w/ replacement
+    _test2('prob', False)  # w/o replacement
+
+    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    hg = dgl.hetero_from_relations([g, g1, g2])
+
+    def _test3(p, replace):
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(g, {'user' : [0,1], 'game' : 0}, 2, p=p, replace=replace)
+            assert subg.number_of_ntypes == 2
+            assert subg.number_of_etypes == 3
 
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
+    test_sample_neighbors()

@@ -26,8 +26,9 @@ inline FloatArray LightSlice(FloatArray array, IdArray idx,
   ATEN_FLOAT_TYPE_SWITCH(array->dtype, DType, "array", {
     const DType* array_data = static_cast<DType*>(array->data);
     DType* ret_data = static_cast<DType*>(ret->data);
-    for (int64_t j = offset; j < offset + len; ++j)
-      ret_data[j] = array_data[idx_data[j]];
+    for (int64_t j = 0; j < len; ++j) {
+      ret_data[j] = array_data[idx_data[offset + j]];
+    }
   });
   return ret;
 }
@@ -64,10 +65,10 @@ HeteroGraphPtr CPUSampleNeighbors(
       IdArray row = IdArray::Empty({}, hg->DataType(), hg->Context());
       IdArray col = IdArray::Empty({}, hg->DataType(), hg->Context());
       subrels[etype] = UnitGraph::CreateFromCOO(
-          hg->GetRelationGraph(etype)->NumVertexTypes(),
-          hg->NumVertices(src_vtype),
-          hg->NumVertices(dst_vtype),
-          row, col);
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        row, col);
       continue;
     }
     // sample from one relation graph
@@ -102,7 +103,7 @@ HeteroGraphPtr CPUSampleNeighbors(
       }
     }
 
-    LOG(INFO) << "all_has_fanout: " << all_has_fanout;
+    //LOG(INFO) << "all_has_fanout: " << all_has_fanout;
 
     IdArray row = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
     IdArray col = aten::Full(-1, num_nodes * fanout, sizeof(IdxType) * 8, hg->Context());
@@ -115,7 +116,7 @@ HeteroGraphPtr CPUSampleNeighbors(
       const IdxType nid = nodes_data[i];
       const IdxType off = indptr[nid];
       const IdxType len = indptr[nid + 1] - off;
-      LOG(INFO) << "nid=" << nid << " off=" << off << " len=" << len;
+      //LOG(INFO) << "nid=" << nid << " off=" << off << " len=" << len;
       if (len <= fanout && !replace) {
         // neighborhood size <= fanout and w/o replacement, take all neighbors
         for (int64_t j = 0; j < len; ++j) {
@@ -149,11 +150,14 @@ HeteroGraphPtr CPUSampleNeighbors(
       col = col.CreateView({new_len}, col->dtype);
     }
 
+    if (dir == EdgeDir::kIn)
+      std::swap(row, col);
+
     subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(),
-        hg->NumVertices(src_vtype),
-        hg->NumVertices(dst_vtype),
-        row, col);
+      hg->GetRelationGraph(etype)->NumVertexTypes(),
+      hg->NumVertices(src_vtype),
+      hg->NumVertices(dst_vtype),
+      row, col);
   }
 
   return CreateHeteroGraph(hg->meta_graph(), subrels);
