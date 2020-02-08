@@ -88,7 +88,9 @@ Below gives the statistics of pre-trained `JTNN_ZINC` model.
 
 ### Visualization
 
-Here we draw some "neighbor" of a given molecule, by adding noises on the intermediate representations. Detailed script can be found [here](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/jtnn/viz_neighbor_mol.ipynb). Please put this script at the current directory (`examples/pytorch/model_zoo/chem/generative_models/jtnn/`).
+Here we draw some "neighbor" of a given molecule, by adding noises on the intermediate representations. 
+You can download the script with `wget https://data.dgl.ai/dgllife/jtnn_viz_neighbor_mol.ipynb`. 
+Please put this script at the current directory (`examples/pytorch/model_zoo/chem/generative_models/jtnn/`).
 
 #### Given Molecule
 ![image](https://user-images.githubusercontent.com/8686776/63773593-0d37da00-c90e-11e9-8933-0abca4b430db.png)
