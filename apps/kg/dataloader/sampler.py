@@ -15,6 +15,12 @@ def SoftRelationPartition(edges, n, threshold=0.03):
     will be evenly divided into all partitions.
     
     Algo:
+    For r in relations:
+        if r.size() > threadold
+            Evenly divide edges of r into n parts and put into each relation.
+        else
+            Find partition with fewest edges, and put edges of r into 
+            this partition.
 
     Parameters
     ----------
