@@ -112,6 +112,7 @@ class PinSAGESampler(object):
         restart_prob[0] = 0     # allow at least one step
         self.restart_prob = F.zerocopy_from_numpy(restart_prob)
 
+    # pylint: disable=no-member
     def __call__(self, seed_nodes):
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(

@@ -1,8 +1,8 @@
 """Module for graph transformation utilities."""
 
+from collections.abc import Iterable
 import numpy as np
 from scipy import sparse
-from collections.abc import Iterable
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph
