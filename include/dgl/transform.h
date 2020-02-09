@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <tuple>
+#include <utility>
 #include "base_heterograph.h"
 #include "array.h"
 
