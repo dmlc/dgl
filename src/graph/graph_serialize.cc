@@ -56,7 +56,6 @@ using dgl::serialize::GraphData;
 using dgl::serialize::GraphDataObject;
 
 namespace dmlc {
-DMLC_DECLARE_TRAITS(has_saveload, NDArray, true);
 DMLC_DECLARE_TRAITS(has_saveload, GraphDataObject, true);
 }
 
