@@ -1,10 +1,12 @@
+"""PinSAGE sampler & related functions and classes"""
+
+import numpy as np
+
 from .. import backend as F
 from .. import convert
 from .. import transform
 from .. import function as fn
 from .randomwalks import random_walk
-
-import numpy as np
 
 class PinSAGESampler(object):
     """PinSAGE neighbor sampler.
@@ -113,7 +115,7 @@ class PinSAGESampler(object):
     def __call__(self, seed_nodes):
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
-                self.G, seed_nodes, metapath=self.metapath, restart_prob=self.restart_prob)
+            self.G, seed_nodes, metapath=self.metapath, restart_prob=self.restart_prob)
         src = F.reshape(paths[:, 2::2], (-1,))
         dst = F.repeat(paths[:, 0], self.random_walk_length, 0)
 
@@ -124,7 +126,8 @@ class PinSAGESampler(object):
         neighbor_graph = convert.graph(
             (src, dst), card=self.G.number_of_nodes(self.ntype), ntype=self.ntype)
         neighbor_graph = transform.to_simple(neighbor_graph, return_counts=self.weight_column)
-        neighbor_graph = transform.select_topk(neighbor_graph, self.weight_column, self.num_neighbors)
+        neighbor_graph = transform.select_topk(
+            neighbor_graph, self.weight_column, self.num_neighbors)
 
         # normalize weights
         with neighbor_graph.local_scope():
