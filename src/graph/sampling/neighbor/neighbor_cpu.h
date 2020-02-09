@@ -9,9 +9,10 @@
 
 #include <dgl/base_heterograph.h>
 #include <dgl/array.h>
-#include "../../unit_graph.h"
 #include <vector>
 #include <algorithm>
+#include <utility>
+#include "../../unit_graph.h"
 
 namespace dgl {
 namespace sampling {
@@ -89,7 +90,7 @@ HeteroGraphPtr CPUSampleNeighbors(
     // array. The implementation consumes a little extra memory than the actual requirement.
     //
     // Otherwise, directly use the row and col arrays to construct the result graph.
-    
+
     bool all_has_fanout = true;
     if (replace) {
       all_has_fanout = true;

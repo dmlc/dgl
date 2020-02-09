@@ -565,7 +565,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
     return subg_dict
 
 def in_subgraph(g, nodes):
-    """Extract the subgraph containing only the in edges of the given nodes.  
+    """Extract the subgraph containing only the in edges of the given nodes.
 
     The subgraph keeps the same type schema and the cardinality of the original one.
     Node/edge features are not preserved.
@@ -578,7 +578,7 @@ def in_subgraph(g, nodes):
         Node ids to sample neighbors from. The allowed types
         are dictionary of node types to node id tensors, or simply node id tensor if
         the given graph g has only one type of nodes.
-  
+
     Returns
     -------
     DGLHeteroGraph
@@ -599,7 +599,7 @@ def in_subgraph(g, nodes):
                           g.ntypes, g.etypes)
 
 def out_subgraph(g, nodes):
-    """Extract the subgraph containing only the out edges of the given nodes.  
+    """Extract the subgraph containing only the out edges of the given nodes.
 
     The subgraph keeps the same type schema and the cardinality of the original one.
     Node/edge features are not preserved.
@@ -612,7 +612,7 @@ def out_subgraph(g, nodes):
         Node ids to sample neighbors from. The allowed types
         are dictionary of node types to node id tensors, or simply node id tensor if
         the given graph g has only one type of nodes.
-  
+
     Returns
     -------
     DGLHeteroGraph

@@ -150,7 +150,7 @@ class UnitGraph : public BaseHeteroGraph {
     IdArray col = IdArray::Empty({0}, dtype, ctx);
     return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
   }
-  
+
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,

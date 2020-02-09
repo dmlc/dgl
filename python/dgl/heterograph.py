@@ -628,7 +628,8 @@ class DGLHeteroGraph(object):
 
         if len(etypes) == 0:
             raise DGLError('Invalid key "{}". Must be one of the edge types.'.format(orig_key))
-        elif len(etypes) == 1:
+
+        if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
             stid = self.get_ntype_id(srctype)
