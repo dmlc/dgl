@@ -751,6 +751,9 @@ def select_topk(g, weights, K, inbound=True, smallest=False):
         The heterogeneous graph.
     weights : str
         The name of the weights column.  Must be a scalar feature.
+
+        Currently only CPU weights are supported; GPU weights must be copied to
+        CPU first.
     K : int
         The value of K
     inbound : bool, default True
@@ -790,7 +793,7 @@ def select_topk(g, weights, K, inbound=True, smallest=False):
     subgraph = DGLHeteroGraph(subgraph_index, g.ntypes, g.etypes)
     for i, etype in enumerate(subgraph.canonical_etypes):
         subgraph.edges[etype].data[EID] = induced_edges[i]
-        subgraph.edges[etype].data[weights] = F.take(w[i], induced_edges[i], 0)
+        subgraph.edges[etype].data[weights] = F.gather_row(w[i], induced_edges[i])
     return subgraph
 
 _init_api("dgl.transform")

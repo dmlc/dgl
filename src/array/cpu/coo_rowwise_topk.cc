@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <vector>
 #include <numeric>
+#include "../../c_api_common.h"
 
 namespace dgl {
 
@@ -67,6 +68,8 @@ std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
     int64_t K,
     NDArray weights,
     bool smallest) {
+  CHECK(weights->ctx == coo.row->ctx) <<
+    "context of weights and graph mismatch; is weights array or graph on GPU?";
   CHECK(coo.sorted) << "[BUG] Rowwise Top-K is only supported on sorted matrix";
 
   const int64_t nnz = coo.row->shape[0];

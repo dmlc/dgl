@@ -1,4 +1,5 @@
 from scipy import sparse as spsp
+import unittest
 import networkx as nx
 import numpy as np
 import dgl
@@ -303,6 +304,7 @@ def test_to_simple():
             assert eid_map[i] == suv.index(e)
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU array ops not implemented")
 def test_select_topk():
     g = dgl.heterograph({
         ('user', 'follow', 'user'): [(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)],
