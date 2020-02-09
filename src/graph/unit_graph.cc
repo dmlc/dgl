@@ -362,16 +362,6 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return subg;
   }
 
-  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override {
-    LOG(FATAL) << "Not implemented";
-    return HeteroGraphPtr();
-  }
-
-  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override {
-    LOG(FATAL) << "Not implemented";
-    return HeteroGraphPtr();
-  }
-
   aten::COOMatrix adj() const {
     return adj_;
   }
@@ -577,22 +567,22 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -623,12 +613,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   DegreeArray InDegrees(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -663,12 +653,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   DGLIdIters PredVec(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   DGLIdIters InEdgeVec(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -695,18 +685,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
-  }
-
-  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override {
-    LOG(FATAL) << "Not implemented";
-    return HeteroGraphPtr();
-  }
-
-  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override {
-    LOG(FATAL) << "Not implemented";
-    return HeteroGraphPtr();
   }
 
   aten::CSRMatrix adj() const {
@@ -996,16 +976,6 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
-}
-
-HeteroGraphPtr UnitGraph::InEdgeGraph(const std::vector<IdArray>& nodes) const {
-  LOG(FATAL) << "Not implemented";
-  return HeteroGraphPtr();
-}
-
-HeteroGraphPtr UnitGraph::OutEdgeGraph(const std::vector<IdArray>& nodes) const {
-  LOG(FATAL) << "Not implemented";
-  return HeteroGraphPtr();
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(

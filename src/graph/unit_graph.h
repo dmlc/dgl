@@ -141,11 +141,16 @@ class UnitGraph : public BaseHeteroGraph {
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
-  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override;
-
-  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override;
-
   // creators
+  /*! \brief Create a graph with no edges */
+  static HeteroGraphPtr Empty(
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+      DLDataType dtype, DLContext ctx) {
+    IdArray row = IdArray::Empty({0}, dtype, ctx);
+    IdArray col = IdArray::Empty({0}, dtype, ctx);
+    return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
+  }
+  
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,

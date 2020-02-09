@@ -212,6 +212,15 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
       CHECK_EQ(num_verts_per_type_[dsttype], nv)
         << "Mismatch number of vertices for vertex type " << dsttype;
   }
+
+  // Make sure that all relation graphs are UnitGraphs to avoid too many indirect pointers.
+  for (size_t i = 0; i < relation_graphs_.size(); ++i) {
+    HeteroGraphPtr relg = relation_graphs_[i];
+    while (std::dynamic_pointer_cast<UnitGraph>(relg) == nullptr) {
+      relg = relg->GetRelationGraph(0);
+    }
+    relation_graphs_[i] = relg;
+  }
 }
 
 bool HeteroGraph::IsMultigraph() const {
@@ -360,14 +369,62 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   return FlattenedHeteroGraphPtr(result);
 }
 
-HeteroGraphPtr HeteroGraph::InEdgeGraph(const std::vector<IdArray>& nodes) const {
-  LOG(FATAL) << "Not implemented";
-  return HeteroGraphPtr();
+HeteroGraphPtr InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  CHECK_EQ(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    auto relgraph = graph->GetRelationGraph(etype);
+    if (vids[dst_vtype]->shape[0] == 0) {
+      // create a placeholder graph
+      subrels[etype] = UnitGraph::Empty(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        graph->DataType(), graph->Context());
+    } else {
+      const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+    }
+  }
+  return CreateHeteroGraph(graph->meta_graph(), subrels);
 }
 
-HeteroGraphPtr HeteroGraph::OutEdgeGraph(const std::vector<IdArray>& nodes) const {
-  LOG(FATAL) << "Not implemented";
-  return HeteroGraphPtr();
+HeteroGraphPtr OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  CHECK_EQ(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    auto relgraph = graph->GetRelationGraph(etype);
+    if (vids[src_vtype]->shape[0] == 0) {
+      // create a placeholder graph
+      subrels[etype] = UnitGraph::Empty(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        graph->DataType(), graph->Context());
+    } else {
+      const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
+      subrels[etype] = UnitGraph::CreateFromCOO(
+          relgraph->NumVertexTypes(),
+          graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype),
+          earr.src,
+          earr.dst);
+    }
+  }
+  return CreateHeteroGraph(graph->meta_graph(), subrels);
 }
 
 HeteroGraphPtr DisjointUnionHeteroGraph(
@@ -909,6 +966,22 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCompactGraphs")
     result.push_back(induced_nodes);
 
     *rv = result;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    HeteroGraphPtr ret = InEdgeGraph(hg.sptr(), nodes);
+    *rv = HeteroGraphRef(ret);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    HeteroGraphPtr ret = OutEdgeGraph(hg.sptr(), nodes);
+    *rv = HeteroGraphRef(ret);
   });
 
 // HeteroSubgraph C APIs

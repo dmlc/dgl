@@ -117,11 +117,23 @@ class RandomEngine {
    * \tparam IdxType Return integer type
    * \param num Number of integers to choose
    * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
+   * \param replace If true, choose with replacement.
    * \return Integer array
    */
   template <typename IdxType>
   IdArray Choice(int64_t num, FloatArray prob, bool replace = true);
 
+  /*!
+   * \brief Pick random integers from population by uniform distribution.
+   *
+   * If replace is false, num must not be larger than population.
+   *
+   * \tparam IdxType Return integer type
+   * \param num Number of integers to choose
+   * \param population Total number of elements to choose from.
+   * \param replace If true, choose with replacement.
+   * \return Integer array
+   */
   template <typename IdxType>
   IdArray UniformChoice(int64_t num, int64_t population, bool replace = true);
 

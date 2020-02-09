@@ -21,9 +21,11 @@ namespace dgl {
 
 // Forward declaration
 class BaseHeteroGraph;
-struct FlattenedHeteroGraph;
 typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
+
+struct FlattenedHeteroGraph;
 typedef std::shared_ptr<FlattenedHeteroGraph> FlattenedHeteroGraphPtr;
+
 struct HeteroSubgraph;
 
 /*! \brief Enum class for edge direction */
@@ -385,22 +387,6 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
-  /*!
-   * \brief Extract the subgraph of the in edges of the given nodes.
-   * \param nodes Node IDs of each type
-   * \return Graph containing only the in edges. The returned graph has the same
-   *         schema as the original one.
-   */
-  virtual HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const = 0;
-
-  /*!
-   * \brief Extract the subgraph of the out edges of the given nodes.
-   * \param nodes Node IDs of each type
-   * \return Graph containing only the out edges. The returned graph has the same
-   *         schema as the original one.
-   */
-  virtual HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const = 0;
-
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
@@ -559,6 +545,24 @@ HeteroGraphPtr CreateFromCSR(
  */
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
+
+/*!
+ * \brief Extract the subgraph of the in edges of the given nodes.
+ * \param graph Graph
+ * \param nodes Node IDs of each type
+ * \return Graph containing only the in edges. The returned graph has the same
+ *         schema as the original one.
+ */
+HeteroGraphPtr InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+
+/*!
+ * \brief Extract the subgraph of the out edges of the given nodes.
+ * \param graph Graph
+ * \param nodes Node IDs of each type
+ * \return Graph containing only the out edges. The returned graph has the same
+ *         schema as the original one.
+ */
+HeteroGraphPtr OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
 };  // namespace dgl
 

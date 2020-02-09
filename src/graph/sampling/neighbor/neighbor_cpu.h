@@ -63,13 +63,11 @@ HeteroGraphPtr CPUSampleNeighbors(
     const int64_t num_nodes = nodes_ntype->shape[0];
     if (num_nodes == 0) {
       // No node provided in the type, create a placeholder relation graph
-      IdArray row = IdArray::Empty({0}, hg->DataType(), hg->Context());
-      IdArray col = IdArray::Empty({0}, hg->DataType(), hg->Context());
-      subrels[etype] = UnitGraph::CreateFromCOO(
+      subrels[etype] = UnitGraph::Empty(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
-        row, col);
+        hg->DataType(), hg->Context());
       continue;
     }
     // sample from one relation graph

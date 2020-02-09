@@ -103,21 +103,5 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
     *rv = HeteroGraphRef(ret);
   });
 
-DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLInSubgraph")
-.set_body([] (DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef hg = args[0];
-    const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    HeteroGraphPtr ret = hg->InEdgeGraph(nodes);
-    *rv = HeteroGraphRef(ret);
-  });
-
-DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLOutSubgraph")
-.set_body([] (DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef hg = args[0];
-    const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    HeteroGraphPtr ret = hg->OutEdgeGraph(nodes);
-    *rv = HeteroGraphRef(ret);
-  });
-
 }  // namespace sampling
 }  // namespace dgl

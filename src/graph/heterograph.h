@@ -170,10 +170,6 @@ class HeteroGraph : public BaseHeteroGraph {
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
-  HeteroGraphPtr InEdgeGraph(const std::vector<IdArray>& nodes) const override;
-
-  HeteroGraphPtr OutEdgeGraph(const std::vector<IdArray>& nodes) const override;
-
  private:
   /*! \brief A map from edge type to unit graph */
   std::vector<HeteroGraphPtr> relation_graphs_;
