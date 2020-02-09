@@ -103,7 +103,7 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU pack traces not implemented")
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors():
     g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
             'user', 'follow')
@@ -120,7 +120,7 @@ def test_sample_neighbors():
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
-                len(edge_set) == 4
+                assert len(edge_set) == 4
             if p is not None:
                 assert not (3, 0) in edge_set
                 assert not (3, 1) in edge_set
@@ -141,7 +141,7 @@ def test_sample_neighbors():
             edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
             if not replace:
                 # check no duplication
-                len(edge_set) == num_edges
+                assert len(edge_set) == num_edges
             if p is not None:
                 assert not (3, 0) in edge_set
     _test2(None, True)   # w/ replacement, uniform
@@ -172,7 +172,57 @@ def test_sample_neighbors():
     _test3('prob', True)   # w/ replacement
     _test3('prob', False)  # w/o replacement
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_topk():
+    g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
+            'user', 'follow')
+    g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+
+    def _test1():
+        subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight')
+        assert subg.number_of_nodes() == 4
+        assert subg.number_of_edges() == 4
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(2,0),(1,0),(2,1),(3,1)}
+    _test1()
+
+    def _test2():  # k > #neighbors
+        subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight')
+        assert subg.number_of_nodes() == 4
+        assert subg.number_of_edges() == 3
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(2,0),(1,0),(0,2)}
+    _test2()
+
+    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+
+    def _test3():
+        subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, 2, 'weight')
+        assert len(subg.ntypes) == 3
+        assert len(subg.etypes) == 4
+        u, v = subg['follow'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(2,0),(1,0),(2,1),(3,1)}
+        u, v = subg['play'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,0)}
+        u, v = subg['liked-by'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(2,0),(2,1),(1,0)}
+        assert subg['flips'].number_of_edges() == 0
+    _test3()
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
     test_sample_neighbors()
+    test_sample_neighbors_topk()

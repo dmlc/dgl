@@ -7,7 +7,7 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
 
-__all__ = ['sample_neighbors',]
+__all__ = ['sample_neighbors', 'sample_neighbors_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
     """Sample from the neighbors of the given nodes and return the induced subgraph.
@@ -75,6 +75,61 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
 
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout,
                                        edge_dir, prob, replace)
+    return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
+
+def sample_neighbors_topk(g, nodes, k, edge_weights, edge_dir='in'):
+    """Sample neighbors by top-k.
+
+    If k > the number of neighbors, all the neighbors are sampled.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph structure.
+    nodes : tensor or dict
+        Node ids to sample neighbors from. The allowed types
+        are dictionary of node types to node id tensors, or simply node id
+        tensor if the given graph g has only one type of nodes.
+    k : int
+        The K value.
+    edge_weights : str
+        Feature name of the weights associated with each edge. Its shape should be
+        compatible with a scalar edge feature tensor.
+    edge_dir : str, optional
+        Edge direction ('in' or 'out'). If is 'in', sample from in edges.
+        Otherwise, sample from out edges.
+
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph by top k criterion.
+    """
+    if not isinstance(nodes, dict):
+        if len(g.ntypes) > 1:
+            raise DGLError("Must specify node type when the graph is not homogeneous.")
+        nodes = {g.ntypes[0] : nodes}
+    nodes_all_types = []
+    for ntype in g.ntypes:
+        if ntype in nodes:
+            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+        else:
+            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+
+    if not isinstance(k, list):
+        k = [int(k)] * len(g.etypes)
+    if len(k) != len(g.etypes):
+        raise DGLError('K value must be specified for each edge type '
+                       'if a list is provided.')
+
+    ew = []
+    for etype in g.canonical_etypes:
+        if edge_weights in g.edges[etype].data:
+            ew.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[edge_weights]))
+        else:
+            raise DGLError('Edge weights "{}" do not exist for relation graph "{}".'.format(
+                edge_weights, etype))
+
+    subgidx = _CAPI_DGLSampleNeighborsTopk(g._graph, nodes_all_types, k, edge_dir, ew)
     return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
 
 _init_api('dgl.sampling.neighbor', __name__)
