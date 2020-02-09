@@ -25,7 +25,7 @@ void _TestWithReplacement(RandomEngine *re) {
   FloatArray prob = NDArray::FromVector(_prob);
 
   auto _check_given_sampler = [n_categories, n_rolls, &_prob](
-      utils::BaseSampler<Idx, DType, true> *s) {
+      utils::BaseSampler<Idx> *s) {
     std::vector<Idx> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = s->Draw();
@@ -74,7 +74,7 @@ void _TestWithoutReplacementOrder(RandomEngine *re) {
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
   auto _check_given_sampler = [&ground_truth](
-      utils::BaseSampler<Idx, DType, false> *s) {
+      utils::BaseSampler<Idx> *s) {
     for (size_t i = 0; i < ground_truth.size(); ++i) {
       Idx dice = s->Draw();
       ASSERT_EQ(dice, ground_truth[i]);
@@ -110,7 +110,7 @@ void _TestWithoutReplacementUnique(RandomEngine *re) {
   FloatArray likelihood = NDArray::FromVector(_likelihood);
 
   auto _check_given_sampler = [N](
-      utils::BaseSampler<Idx, DType, false> *s) {
+      utils::BaseSampler<Idx> *s) {
     std::vector<int> cnt(N, 0);
     for (Idx i = 0; i < N; ++i) {
       Idx dice = s->Draw();
@@ -139,3 +139,91 @@ TEST(SampleUtilsTest, TestWithoutReplacementUnique) {
   re->SetSeed(42);
   _TestWithoutReplacementUnique<int64_t, double>(re);
 };
+
+template <typename Idx, typename DType>
+void _TestChoice(RandomEngine* re) {
+  re->SetSeed(42);
+  std::vector<DType> prob_vec = {1., 0., 0., 0., 2., 2., 0., 0.};
+  FloatArray prob = FloatArray::FromVector(prob_vec);
+  {
+    for (int k = 0; k < 1000; ++k) {
+      Idx x = re->Choice<Idx>(prob);
+      ASSERT_TRUE(x == 0 || x == 4 || x == 5);
+    }
+  }
+  // num = 0
+  {
+    IdArray rst = re->Choice<Idx>(0, prob, true);
+    ASSERT_EQ(rst->shape[0], 0);
+  }
+  // w/ replacement
+  {
+    IdArray rst = re->Choice<Idx>(1000, prob, true);
+    ASSERT_EQ(rst->shape[0], 1000);
+    for (int64_t i = 0; i < 1000; ++i) {
+      Idx x = static_cast<Idx*>(rst->data)[i];
+      ASSERT_TRUE(x == 0 || x == 4 || x == 5);
+    }
+  }
+  // w/o replacement
+  {
+    IdArray rst = re->Choice<Idx>(3, prob, false);
+    ASSERT_EQ(rst->shape[0], 3);
+    std::set<Idx> idxset;
+    for (int64_t i = 0; i < 3; ++i) {
+      Idx x = static_cast<Idx*>(rst->data)[i];
+      idxset.insert(x);
+    }
+    ASSERT_EQ(idxset.size(), 3);
+    ASSERT_EQ(idxset.count(0), 1);
+    ASSERT_EQ(idxset.count(4), 1);
+    ASSERT_EQ(idxset.count(5), 1);
+  }
+}
+
+TEST(RandomTest, TestChoice) {
+  RandomEngine* re = RandomEngine::ThreadLocal();
+  _TestChoice<int32_t, float>(re);
+  _TestChoice<int64_t, float>(re);
+  _TestChoice<int32_t, double>(re);
+  _TestChoice<int64_t, double>(re);
+}
+
+template <typename Idx, typename DType>
+void _TestUniformChoice(RandomEngine* re) {
+  re->SetSeed(42);
+  // num == 0
+  {
+    IdArray rst = re->UniformChoice<Idx>(0, 100, true);
+    ASSERT_EQ(rst->shape[0], 0);
+  }
+  // w/ replacement
+  {
+    IdArray rst = re->UniformChoice<Idx>(1000, 100, true);
+    ASSERT_EQ(rst->shape[0], 1000);
+    for (int64_t i = 0; i < 1000; ++i) {
+      Idx x = static_cast<Idx*>(rst->data)[i];
+      ASSERT_TRUE(x >= 0 && x < 100);
+    }
+  }
+  // w/o replacement
+  {
+    IdArray rst = re->UniformChoice<Idx>(99, 100, false);
+    ASSERT_EQ(rst->shape[0], 99);
+    std::set<Idx> idxset;
+    for (int64_t i = 0; i < 99; ++i) {
+      Idx x = static_cast<Idx*>(rst->data)[i];
+      ASSERT_TRUE(x >= 0 && x < 100);
+      idxset.insert(x);
+    }
+    ASSERT_EQ(idxset.size(), 99);
+  }
+}
+
+TEST(RandomTest, TestUniformChoice) {
+  RandomEngine* re = RandomEngine::ThreadLocal();
+  _TestUniformChoice<int32_t, float>(re);
+  _TestUniformChoice<int64_t, float>(re);
+  _TestUniformChoice<int32_t, double>(re);
+  _TestUniformChoice<int64_t, double>(re);
+}
