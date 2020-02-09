@@ -227,9 +227,6 @@ def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
 
-def repeat(input, repeats, axis):
-    return nd.repeat(input, repeats, axis)
-
 def swapaxes(input, axis1, axis2):
     return nd.swapaxes(input, axis1, axis2)
 

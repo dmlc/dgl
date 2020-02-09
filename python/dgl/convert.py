@@ -1,6 +1,5 @@
 """Module for converting graph from/to other object."""
 from collections import defaultdict
-from collections.abc import Iterable
 import numpy as np
 import scipy as sp
 import networkx as nx
@@ -20,7 +19,6 @@ __all__ = [
     'to_hetero',
     'to_homo',
     'to_networkx',
-    'compact_graphs',
 ]
 
 def graph(data, ntype='_N', etype='_E', card=None, validate=True, restrict_format='any',

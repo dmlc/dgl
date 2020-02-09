@@ -103,7 +103,26 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
+def test_pinsage_sampling():
+    g = dgl.heterograph({
+        ('item', 'bought-by', 'user'): [(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)],
+        ('user', 'bought', 'item'): [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2), (3, 2), (2, 3), (3, 3)]})
+    sampler = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
+    neighbor_g = sampler(F.tensor([0, 2], dtype=F.int64))
+    assert neighbor_g.ntypes == ['item']
+    u, v = neighbor_g.all_edges(form='uv', order='eid')
+    uv = list(zip(F.asnumpy(u).tolist(), F.asnumpy(v).tolist()))
+    assert (1, 0) in uv or (0, 0) in uv
+    assert (2, 2) in uv or (3, 2) in uv
+
+    weights = neighbor_g.edata['weights']
+    e0 = F.asnumpy(neighbor_g.in_edges(0, form='eid'))
+    e1 = F.asnumpy(neighbor_g.in_edges(2, form='eid'))
+    assert np.isclose(F.asnumpy(neighbor_g.edata['weights'])[e0].sum(), 1)
+    assert np.isclose(F.asnumpy(neighbor_g.edata['weights'])[e1].sum(), 1)
+
 
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
+    test_pinsage_sampling()

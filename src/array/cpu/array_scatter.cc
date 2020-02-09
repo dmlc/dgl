@@ -19,7 +19,7 @@ NDArray Scatter(NDArray array, IdArray indices) {
   DType *result_data = static_cast<DType *>(result->data);
 
   for (int64_t i = 0; i < indices->shape[0]; ++i)
-    result_data[i] = array_data[indices_data[i]];
+    result_data[indices_data[i]] = array_data[i];
 
   return result;
 }

@@ -39,9 +39,9 @@ COOMatrix COOSort(COOMatrix coo) {
       shuffle.begin(),
       shuffle.end(),
       [coo_row_data, coo_col_data, coo_data](IdType a, IdType b) {
-        return (
-            (coo_row_data[a] < coo_row_data[b]) &&
-            (coo_col_data[a] < coo_col_data[b]));
+        return (coo_row_data[a] != coo_row_data[b]) ?
+          (coo_row_data[a] < coo_row_data[b]) :
+          (coo_col_data[a] < coo_col_data[b]);
       });
 
   IdArray new_row = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);

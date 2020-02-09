@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy import sparse
+from collections.abc import Iterable
 from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph
@@ -10,9 +11,10 @@ from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
+from .heterograph import DGLHeteroGraph
 from .convert import graph, bipartite
 from . import utils
-from .base import EID
+from .base import EID, NID
 
 
 __all__ = [
@@ -653,7 +655,7 @@ def compact_graphs(graphs):
         graphs = [graphs]
         return_single = True
 
-    new_graphs, induced_nodes = _CAPI_DGLCompactGraphs([g._graph for g in graphs])
+    new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs([g._graph for g in graphs])
     induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
 
     new_graphs = [
@@ -667,7 +669,7 @@ def compact_graphs(graphs):
 
     return new_graphs
 
-def to_simple(g, return_weights=None, writeback_mapping=False):
+def to_simple(g, return_counts=None, writeback_mapping=False):
     """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
     duplicate edges into one.
 
@@ -677,7 +679,7 @@ def to_simple(g, return_weights=None, writeback_mapping=False):
     ----------
     g : DGLHeteroGraph
         The heterogeneous graph
-    return_weights : str, optional
+    return_counts : str, optional
         If given, the returned graph would have a column with the same name that stores
         the number of duplicated edges from the original graph.
     writeback_mapping : bool, default False
@@ -694,13 +696,13 @@ def to_simple(g, return_weights=None, writeback_mapping=False):
     --------
     Consider the following graph
     >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
-    >>> sg = dgl.to_simple(g, return_weights='weights', writeback_mapping=True)
+    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
 
     The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
-    >>> sg.all_edges()
+    >>> sg.all_edges(form='uv', order='eid')
     (tensor([0, 1, 1, 2]), tensor([1, 3, 4, 2]))
 
-    If ``return_weights`` is set, the returned graph will also return how many edges
+    If ``return_counts`` is set, the returned graph will also return how many edges
     in the original graph are connecting the endpoints of the edges in the new graph:
     >>> sg.edata['weights']
     tensor([1, 2, 2, 1])
@@ -719,16 +721,76 @@ def to_simple(g, return_weights=None, writeback_mapping=False):
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
     simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
     counts = [F.zerocopy_from_dgl_ndarray(count.data) for count in counts]
-    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map.data) for x in edge_maps]
+    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map.data) for edge_map in edge_maps]
 
-    if return_weights is not None:
-        for count, canonical_etype in zip(count, g.canonical_etypes):
-            simple_graph.edges[canonical_etype].data[return_weights] = count
+    if return_counts is not None:
+        for count, canonical_etype in zip(counts, g.canonical_etypes):
+            simple_graph.edges[canonical_etype].data[return_counts] = count
 
     if writeback_mapping:
         for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
             g.edges[canonical_etype].data[EID] = edge_map
 
     return simple_graph
+
+# pylint: disable=invalid-name
+def select_topk(g, weights, K, inbound=True, smallest=False):
+    """Induce an edge subgraph from inbound edges with K-largest weights for each node.
+
+    For each edge type, the edges are grouped by destination nodes.  Then for each edge
+    group, the K edges with largest weights are selected.  The selected edges then form
+    a subgraph which is returned.
+
+    All nodes in the original graph are preserved in the subgraph.
+
+    The selected weights are preserved in the subgraph.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The heterogeneous graph.
+    weights : str
+        The name of the weights column.  Must be a scalar feature.
+    K : int
+        The value of K
+    inbound : bool, default True
+        If False, induce from outbound edges (i.e. edges are grouped by source node
+        instead of destination node) instead.
+    smallest : bool, default False
+        If True, select edges with K-smallest weights instead.
+
+    Returns
+    -------
+    sg : DGLHeteroGraph
+        The returned subgraph.
+        The induced edge IDs are stored as an edge feature named dgl.EID.
+        The weights of the induced edges are also stored.
+
+    Examples
+    --------
+    Consider the following graph:
+    >>> g = dgl.graph([(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)])
+    >>> g.edata['weights'] = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])  # can be any type
+
+    For each node on each edge type, we wish to select the inbound edges with 2 largest
+    weights.  That would be selecting (5, 1) and (2, 1) for node #1, and (4, 2) and
+    (6, 2) for node #2:
+    >>> sg = dgl.select_topk(g, 'weights', 2)
+    >>> sg.all_edges(form='uv', order='eid')
+    (tensor([2, 5, 4, 6]), tensor([1, 1, 2, 2]))
+    >>> sg.edata[dgl.EID]
+    tensor([1, 2, 5, 6])
+    >>> sg.edata['weights']
+    tensor([2, 3, 6, 7])
+    """
+    w = [g.edges[etype].data[weights] for etype in g.canonical_etypes]
+    w_nd = [F.zerocopy_to_dgl_ndarray(_w) for _w in w]
+    subgraph_index, induced_edges = _CAPI_DGLSelectTopK(g._graph, w_nd, K, inbound, smallest)
+    induced_edges = [F.zerocopy_from_dgl_ndarray(e.data) for e in induced_edges]
+    subgraph = DGLHeteroGraph(subgraph_index, g.ntypes, g.etypes)
+    for i, etype in enumerate(subgraph.canonical_etypes):
+        subgraph.edges[etype].data[EID] = induced_edges[i]
+        subgraph.edges[etype].data[weights] = F.take(w[i], induced_edges[i], 0)
+    return subgraph
 
 _init_api("dgl.transform")

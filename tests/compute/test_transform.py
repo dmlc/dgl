@@ -232,6 +232,113 @@ def test_partition():
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
 
+def test_compact():
+    g1 = dgl.heterograph({
+        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
+        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
+        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
+        {'user': 20, 'game': 10})
+
+    g2 = dgl.heterograph({
+        ('game', 'clicked-by', 'user'): [(3, 1)],
+        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
+        {'user': 20, 'game': 10})
+
+    def _check(g, new_g, induced_nodes):
+        assert g.ntypes == new_g.ntypes
+        assert g.canonical_etypes == new_g.canonical_etypes
+
+        for ntype in g.ntypes:
+            assert -1 not in induced_nodes[ntype]
+
+        for etype in g.canonical_etypes:
+            g_src, g_dst = g.all_edges(order='eid', etype=etype)
+            g_src = F.asnumpy(g_src)
+            g_dst = F.asnumpy(g_dst)
+            new_g_src, new_g_dst = new_g.all_edges(order='eid', etype=etype)
+            new_g_src_mapped = induced_nodes[etype[0]][F.asnumpy(new_g_src)]
+            new_g_dst_mapped = induced_nodes[etype[2]][F.asnumpy(new_g_dst)]
+            assert (g_src == new_g_src_mapped).all()
+            assert (g_dst == new_g_dst_mapped).all()
+
+    new_g1 = dgl.compact_graphs(g1)
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
+    assert set(induced_nodes['game']) == set([4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+
+    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
+    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+    _check(g2, new_g2, induced_nodes)
+
+
+def test_to_simple():
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)],
+        ('user', 'plays', 'game'): [(3, 5), (2, 3), (1, 4), (1, 4), (3, 5), (2, 3), (2, 3)]})
+    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
+
+    for etype in g.canonical_etypes:
+        u, v = g.all_edges(form='uv', order='eid', etype=etype)
+        u = F.asnumpy(u).tolist()
+        v = F.asnumpy(v).tolist()
+        uv = list(zip(u, v))
+        eid_map = F.asnumpy(g.edges[etype].data[dgl.EID])
+
+        su, sv = sg.all_edges(form='uv', order='eid', etype=etype)
+        su = F.asnumpy(su).tolist()
+        sv = F.asnumpy(sv).tolist()
+        suv = list(zip(su, sv))
+        sw = F.asnumpy(sg.edges[etype].data['weights'])
+
+        assert set(uv) == set(suv)
+        for i, e in enumerate(suv):
+            assert sw[i] == sum(e == _e for _e in uv)
+        for i, e in enumerate(uv):
+            assert eid_map[i] == suv.index(e)
+
+
+def test_select_topk():
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): [(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)],
+        ('user', 'plays', 'game'): [(1, 0), (3, 1)]},
+        {'user': 7, 'game': 3})     # include nodes with zero incoming edges
+    g.edges['follow'].data['weights'] = F.arange(1, 8)
+    g.edges['plays'].data['weights'] = F.arange(1, 3)
+    follow_weights = np.arange(1, 8)
+    plays_weights = np.arange(1, 3)
+    sg = dgl.select_topk(g, 'weights', 2)
+
+    su, sv = sg.all_edges(form='uv', order='eid', etype='follow')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sw = F.asnumpy(sg.edges['follow'].data['weights'])
+    induced_edges = F.asnumpy(sg.edges['follow'].data[dgl.EID])
+
+    assert set(suv) == set([(2, 1), (5, 1), (4, 2), (6, 2)])
+    for i, e in enumerate(suv):
+        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='follow')
+        assert sw[i] == follow_weights[induced_edges[i]]
+
+    su, sv = sg.all_edges(form='uv', order='eid', etype='plays')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sw = F.asnumpy(sg.edges['plays'].data['weights'])
+    induced_edges = F.asnumpy(sg.edges['plays'].data[dgl.EID])
+
+    assert set(suv) == set([(1, 0), (3, 1)])
+    for i, e in enumerate(suv):
+        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='plays')
+        assert sw[i] == follow_weights[induced_edges[i]]
+
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
@@ -245,3 +352,6 @@ if __name__ == '__main__':
     test_remove_self_loop()
     test_add_self_loop()
     test_partition()
+    test_compact()
+    test_to_simple()
+    test_select_topk()

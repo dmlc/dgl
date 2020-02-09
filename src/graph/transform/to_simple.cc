@@ -29,8 +29,8 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
   std::vector<HeteroGraphPtr> rel_graphs(num_etypes);
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
-    const HeteroGraphPtr rel_graph = graph->GetRelationGraph(etype);
-    const COOMatrix adj = rel_graph->GetCOOMatrix(0);
+    const auto vtypes = graph->GetEndpointTypes(etype);
+    const COOMatrix adj = graph->GetCOOMatrix(etype);
     const COOMatrix sorted_adj = COOSort(adj);
     const IdArray eids_shuffled = sorted_adj.data;
     const COOMatrix coalesced_adj = COOCoalesce(sorted_adj);
@@ -57,13 +57,13 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
      *     eids_remapped[eids_shuffled] = new_eid_for_eids_shuffled
      */
     const IdArray new_eids = Range(
-        0, sorted_adj.data->shape[0], sorted_adj.data->dtype.bits, sorted_adj.data->ctx);
+        0, coalesced_adj.row->shape[0], coalesced_adj.row->dtype.bits, coalesced_adj.row->ctx);
     const IdArray eids_remapped = Scatter(Repeat(new_eids, count), eids_shuffled);
 
     edge_maps[etype] = eids_remapped;
     counts[etype] = count;
     rel_graphs[etype] = UnitGraph::CreateFromCOO(
-        rel_graph->NumVertexTypes(),
+        vtypes.first == vtypes.second ? 1 : 2,
         coalesced_adj.num_rows,
         coalesced_adj.num_cols,
         coalesced_adj.row,
