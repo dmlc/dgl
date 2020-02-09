@@ -10,6 +10,8 @@
 #define DGL_ARRAY_H_
 
 #include <dgl/runtime/ndarray.h>
+#include <dmlc/io.h>
+#include <dmlc/serializer.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
@@ -218,7 +220,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- */
+ */ 
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows, num_cols;
@@ -459,6 +461,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   return ret.CopyTo(ctx);
 }
 
+
+
 ///////////////////////// Dispatchers //////////////////////////
 
 /*
@@ -636,5 +640,41 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 }  // namespace aten
 }  // namespace dgl
+
+namespace dmlc {
+
+namespace serializer {
+
+using dgl::aten::CSRMatrix;
+
+constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
+
+template <>
+struct Handler<CSRMatrix> {
+  inline static void Write(Stream* fs, const CSRMatrix& csr) {
+    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
+    fs->Write(csr.num_cols);
+    fs->Write(csr.num_rows);
+    fs->Write(csr.indptr);
+    fs->Write(csr.indices);
+    fs->Write(csr.data);
+    fs->Write(csr.sorted);
+  }
+  inline static bool Read(Stream* fs, CSRMatrix* csr) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
+        << "Invalid CSRMatrix Data";
+    CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&csr->indices)) << "Invalid indices";
+    CHECK(fs->Read(&csr->data)) << "Invalid data";
+    CHECK(fs->Read(&csr->sorted)) << "Invalid sorted";
+    return true;
+  }
+};
+}  // namespace serializer
+}  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_

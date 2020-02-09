@@ -27,7 +27,7 @@ class JTNNDataset(Dataset):
         self.dir = get_download_dir()
         self.zip_file_path='{}/jtnn.zip'.format(self.dir)
 
-        download(_get_dgl_url('dglls/jtnn.zip'), path=self.zip_file_path)
+        download(_get_dgl_url('dgllife/jtnn.zip'), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/jtnn'.format(self.dir))
         print('Loading data...')
         data_file = '{}/jtnn/{}.txt'.format(self.dir, data)

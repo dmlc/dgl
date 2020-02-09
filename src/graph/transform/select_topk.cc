@@ -32,7 +32,7 @@ std::pair<HeteroGraphPtr, std::vector<IdArray>> SelectTopK(
   std::vector<IdArray> induced_edges(num_etypes);
   std::vector<HeteroGraphPtr> rel_graphs(num_etypes);
 
-  for (dgl_type_t etype = 0; etype < num_etypes; ++etype) {
+  for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const COOMatrix adj = graph->GetCOOMatrix(etype);
     const auto vtypes = graph->GetEndpointTypes(etype);
     const COOMatrix sorted_adj = COOSort(inbound ? COOTranspose(adj) : adj);
