@@ -420,6 +420,8 @@ class KEModel(object):
 
     def prepare_cross_rels(self, cross_rels):
         self.relation_emb.setup_cross_rels(cross_rels, self.global_relation_emb)
+        if self.model_name == 'TransR':
+            self.score_func.prepare_cross_rels(cross_rels)
 
     def writeback_relation(self, rank=0, rel_parts=None):
         """ Writeback relation embeddings in a specific process to global relation embedding.
