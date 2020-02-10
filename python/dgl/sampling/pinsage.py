@@ -79,7 +79,6 @@ class GenericPinSAGESampler(object):
         self.num_neighbors = num_neighbors
         self.random_walk_length = random_walk_length
 
-        metagraph = G.metagraph
         self.metapath = metapath * random_walk_length
         restart_prob = np.tile(np.array([random_walk_restart_prob, 0]), random_walk_length)
         restart_prob[0] = 0     # allow at least one step
