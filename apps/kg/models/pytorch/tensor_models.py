@@ -225,7 +225,7 @@ class ExternalEmbedding:
                         grad_indices = grad_indices.to(device)
                     if device != grad_sum.device:
                         grad_sum = grad_sum.to(device)
-                    
+
                     if self.has_cross_rel:
                         cpu_mask = self.cpu_bitmap[grad_indices]
                         cpu_idx = grad_indices[cpu_mask]
@@ -241,7 +241,6 @@ class ExternalEmbedding:
                             tmp = (-clr * cpu_grad / std_values)
                             tmp = tmp.cpu()
                             self.global_emb.emb.index_add_(0, cpu_idx, tmp)
-
                     self.state_sum.index_add_(0, grad_indices, grad_sum)
                     std = self.state_sum[grad_indices]  # _sparse_mask
                     if gpu_id >= 0:

@@ -10,6 +10,8 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
 #include <dgl/array.h>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <utility>
 #include <string>
 #include <vector>
@@ -177,6 +179,12 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return the COO matrix form */
   aten::COOMatrix GetCOOMatrix() const;
 
+  /*! \return Load UnitGraph from stream, using CSRMatrix*/
+  bool Load(dmlc::Stream* fs);
+
+  /*! \return Save UnitGraph to stream, using CSRMatrix */
+  void Save(dmlc::Stream* fs) const;
+
  private:
   /*!
    * \brief constructor
@@ -230,5 +238,9 @@ class UnitGraph : public BaseHeteroGraph {
 };
 
 };  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_
