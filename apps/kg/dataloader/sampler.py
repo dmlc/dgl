@@ -310,7 +310,7 @@ class TrainDataset(object):
 
         self.g = ConstructGraph(triples, dataset.n_entities, args)
 
-    def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=8,
+    def create_sampler(self, batch_size, neg_sample_size=2, neg_chunk_size=None, mode='head', num_workers=32,
                        shuffle=True, exclude_positive=False, rank=0):
         """Create sampler for training
 
@@ -467,7 +467,7 @@ class EvalSampler(object):
         If False, return all sampled negative edges even there are positive edges
         Default: True
     """
-    def __init__(self, g, edges, batch_size, neg_sample_size, neg_chunk_size, mode, num_workers=8,
+    def __init__(self, g, edges, batch_size, neg_sample_size, neg_chunk_size, mode, num_workers=32,
                  filter_false_neg=True):
         EdgeSampler = getattr(dgl.contrib.sampling, 'EdgeSampler')
         self.sampler = EdgeSampler(g,
@@ -596,7 +596,7 @@ class EvalDataset(object):
             raise Exception('get invalid type: ' + eval_type)
 
     def create_sampler(self, eval_type, batch_size, neg_sample_size, neg_chunk_size,
-                       filter_false_neg, mode='head', num_workers=8, rank=0, ranks=1):
+                       filter_false_neg, mode='head', num_workers=32, rank=0, ranks=1):
         """Create sampler for validation or testing
 
         Parameters

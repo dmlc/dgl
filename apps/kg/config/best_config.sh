@@ -4,7 +4,7 @@
 # DistMult 1GPU
 DGLBACKEND=pytorch python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 143.0 --lr 0.08 --batch_size_eval 16 \
-    --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --num_proc 0 --gpu 0 \
+    --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --gpu 0 \
     --num_worker=8  --max_step 40000
 # DistMult 8GPU
 DGLBACKEND=pytorch python3 train.py --model DistMult --dataset FB15k --batch_size 1024 \
@@ -15,7 +15,7 @@ DGLBACKEND=pytorch python3 train.py --model DistMult --dataset FB15k --batch_siz
 # ComplEx 1GPU
 DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --hidden_dim 400 --gamma 143.0 --lr 0.1 --regularization_coef 2.00E-06 \
-    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --num_proc 0 \
+    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 \
     --gpu 0 --num_worker=8 --max_step 32000
 # ComplEx 8GPU
 DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset FB15k --batch_size 1024 \
@@ -25,12 +25,12 @@ DGLBACKEND=pytorch python3 train.py --model ComplEx --dataset FB15k --batch_size
 
 # TransE_l1 1GPU
 DGLBACKEND=pytorch python3 train.py --model TransE_l1 --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 64 --regularization_coef 1e-07 --hidden_dim 400 --gamma 16.0 --lr 0.01 \
-    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --num_proc 0 \
-    --gpu 0 --num_worker=8  --max_step 48000
+    --neg_sample_size 64 --regularization_coef 1e-07 --hidden_dim 400 --gamma 16.0 --lr 0.01 \
+    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 \
+    --gpu 0 --num_worker=8 --max_step 48000
 # TransE_l1 8GPU
 DGLBACKEND=pytorch python3 train.py --model TransE_l1 --dataset FB15k --batch_size 1024 \
-    --neg_sample_size 64 --regularization_coef 1e-07 --hidden_dim 400 --gamma 16.0 --lr 0.01 \
+    --neg_sample_size 64 --regularization_coef 1e-07 --hidden_dim 400 --gamma 16.0 --lr 0.01 \
     --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --num_proc 8 \
     --gpu 0 1 2 3 4 5 6 7 --num_worker=4 --max_step 6000 --rel_part --async_update
 
@@ -47,7 +47,7 @@ DGLBACKEND=pytorch python3 train.py --model RESCAL --dataset FB15k --batch_size 
 # TransR 1GPU
 DGLBACKEND=pytorch python3 train.py --model TransR --dataset FB15k --batch_size 1024 \
     --neg_sample_size 256 --regularization_coef 5e-8 --hidden_dim 200 --gamma 8.0 --lr 0.015 \
-    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 --num_proc 0 \
+    --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 \
     --gpu 0 --num_worker=8 --max_step 32000
 # TransR 8GPU
 DGLBACKEND=pytorch python3 train.py --model TransR --dataset FB15k --batch_size 1024 \
@@ -59,7 +59,7 @@ DGLBACKEND=pytorch python3 train.py --model TransR --dataset FB15k --batch_size 
 DGLBACKEND=pytorch python3 train.py --model RotatE --dataset FB15k --batch_size 2048 \
     --neg_sample_size 256 --regularization_coef 1e-07 --hidden_dim 200 --gamma 12.0 --lr 0.009 \
     --batch_size_eval 16 --valid --test -adv --mix_cpu_gpu --eval_interval 100000 -de \
-    --mix_cpu_gpu --max_step 40000 --num_proc 0 --gpu 0 --num_worker=4
+    --mix_cpu_gpu --max_step 40000 --gpu 0 --num_worker=4
 
 # RotatE 8GPU
 DGLBACKEND=pytorch python3 train.py --model RotatE --dataset FB15k --batch_size 2048 \

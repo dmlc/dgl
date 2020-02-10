@@ -75,7 +75,7 @@ def async_update(args, emb, queue):
     queue:
         The request queue.
     """
-    th.set_num_threads(4)
+    th.set_num_threads(args.num_thread)
     while True:
         (grad_indices, grad_values, gpu_id) = queue.get()
         clr = emb.args.lr
@@ -258,7 +258,7 @@ class ExternalEmbedding:
         """Set up the async update subprocess.
         """
         self.async_q = Queue(1)
-        self.async_p = mp.Process(target=async_update, args=(None, self, self.async_q))
+        self.async_p = mp.Process(target=async_update, args=(self.args, self, self.async_q))
         self.async_p.start()
 
     def finish_async_update(self):

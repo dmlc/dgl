@@ -142,7 +142,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
 @thread_wrapped_func
 def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None):
     if args.num_proc > 1:
-        th.set_num_threads(4)
+        th.set_num_threads(args.num_thread)
     train(args, model, train_sampler, valid_samplers, rank, rel_parts, cross_rels, barrier)
 
 @thread_wrapped_func
