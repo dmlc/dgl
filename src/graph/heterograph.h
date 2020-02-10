@@ -170,7 +170,20 @@ class HeteroGraph : public BaseHeteroGraph {
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
+  /*! \return Load HeteroGraph from stream, using CSRMatrix*/
+  bool Load(dmlc::Stream* fs);
+
+  /*! \return Save HeteroGraph to stream, using CSRMatrix */
+  void Save(dmlc::Stream* fs) const;
+
+
  private:
+  // To create empty class
+  friend class Serializer;
+
+  // Empty Constructor, only for serializer
+  HeteroGraph(): BaseHeteroGraph(static_cast<GraphPtr>(nullptr)){}
+
   /*! \brief A map from edge type to unit graph */
   std::vector<HeteroGraphPtr> relation_graphs_;
 
@@ -182,5 +195,11 @@ class HeteroGraph : public BaseHeteroGraph {
 };
 
 }  // namespace dgl
+
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::HeteroGraph, true);
+}  // namespace dmlc
+
 
 #endif  // DGL_GRAPH_HETEROGRAPH_H_
