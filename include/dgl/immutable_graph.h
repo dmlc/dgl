@@ -1034,11 +1034,8 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges,
 
 }  // namespace dgl
 
-
-namespace dmlc
-{
-  DMLC_DECLARE_TRAITS(has_saveload, dgl::ImmutableGraph, true);
-} // namespace dmlc
-
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::ImmutableGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_

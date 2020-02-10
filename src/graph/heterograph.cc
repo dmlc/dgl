@@ -507,7 +507,6 @@ bool HeteroGraph::Load(dmlc::Stream* fs) {
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_HeteroGraph) << "Invalid HeteroGraph Data";
   auto meta_grptr = new ImmutableGraph(static_cast<COOPtr>(nullptr));
-  ;
   CHECK(fs->Read(meta_grptr)) << "Invalid Immutable Graph Data";
   uint64_t num_relation_graphs;
   CHECK(fs->Read(&num_relation_graphs)) << "Invalid num of relation graphs";
