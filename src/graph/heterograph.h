@@ -182,7 +182,7 @@ class HeteroGraph : public BaseHeteroGraph {
   friend class Serializer;
 
   // Empty Constructor, only for serializer
-  HeteroGraph(): BaseHeteroGraph(static_cast<GraphPtr>(nullptr)){}
+  HeteroGraph() : BaseHeteroGraph(static_cast<GraphPtr>(nullptr)) {}
 
   /*! \brief A map from edge type to unit graph */
   std::vector<HeteroGraphPtr> relation_graphs_;

@@ -1155,7 +1155,7 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::COO;
 }
 
-UnitGraph* UnitGraph::EmptyGraph(){
+UnitGraph* UnitGraph::EmptyGraph() {
   auto src = NewIdArray(0);
   auto dst = NewIdArray(0);
   auto mg = CreateUnitGraphMetaGraph(1);
@@ -1177,7 +1177,8 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   aten::CSRMatrix csr_matrix;
   CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr, csr_matrix.indices, csr_matrix.data));
+  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr,
+                     csr_matrix.indices, csr_matrix.data));
   *this = UnitGraph(mg, nullptr, csr, nullptr);
   return true;
 }

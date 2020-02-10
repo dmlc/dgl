@@ -3,6 +3,9 @@
  * \file graph/graph_serializer.cc
  * \brief DGL serializer APIs
  */
+
+#pragma once
+
 #include <dgl/immutable_graph.h>
 #include "heterograph.h"
 #include "unit_graph.h"

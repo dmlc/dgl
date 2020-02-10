@@ -639,23 +639,24 @@ ImmutableGraphPtr ImmutableGraph::Reverse() const {
 constexpr uint64_t kDGLSerialize_ImGraph = 0xDD3c5FFE20046ABF;
 
 /*! \return Load HeteroGraph from stream, using OutCSR Matrix*/
-bool ImmutableGraph::Load(dmlc::Stream* fs){
+bool ImmutableGraph::Load(dmlc::Stream *fs) {
   uint64_t magicNum;
   aten::CSRMatrix out_csr_matrix;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_ImGraph) << "Invalid ImmutableGraph Data";
   CHECK(fs->Read(&out_csr_matrix)) << "Invalid csr matrix";
-  CSRPtr csr(new CSR(out_csr_matrix.indptr, out_csr_matrix.indices, out_csr_matrix.data));
+  CSRPtr csr(new CSR(out_csr_matrix.indptr, out_csr_matrix.indices,
+                     out_csr_matrix.data));
   auto g = new ImmutableGraph(nullptr, csr);
   *this = *g;
   return true;
-};
+}
 
 /*! \return Save HeteroGraph to stream, using OutCSR Matrix */
-void ImmutableGraph::Save(dmlc::Stream* fs) const{
+void ImmutableGraph::Save(dmlc::Stream *fs) const {
   fs->Write(kDGLSerialize_ImGraph);
   fs->Write(GetOutCSR()->ToCSRMatrix());
-};
+}
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
