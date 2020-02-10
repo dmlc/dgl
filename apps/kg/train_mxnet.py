@@ -24,8 +24,8 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=None):
-    assert args.num_proc == 1, "MXNet KGE does not support multi-process now"
+def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
+    assert args.num_proc <= 1, "MXNet KGE does not support multi-process now"
     assert args.rel_part == False, "No need for relation partition in single process for MXNet KGE"
     logs = []
 
@@ -36,6 +36,9 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
+
+    if args.strict_rel_part:
+        model.prepare_relation(mx.gpu(gpu_id))
 
     start = time.time()
     for step in range(args.init_step, args.max_step):
@@ -59,17 +62,23 @@ def train(args, model, train_sampler, rank=0, rel_parts=None, valid_samplers=Non
             start = time.time()
             test(args, model, valid_samplers, mode='Valid')
             print('test:', time.time() - start)
+    if args.strict_rel_part:
+        model.writeback_relation(rank, rel_parts)
+
     # clear cache
     logs = []
 
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
-    assert args.num_proc == 1, "MXNet KGE does not support multi-process now"
+    assert args.num_proc <= 1, "MXNet KGE does not support multi-process now"
     logs = []
 
     if len(args.gpu) > 0:
         gpu_id = args.gpu[rank % len(args.gpu)] if args.mix_cpu_gpu and args.num_proc > 1 else args.gpu[0]
     else:
         gpu_id = -1
+
+    if args.strict_rel_part:
+        model.load_relation(mx.gpu(gpu_id))
 
     for sampler in test_samplers:
         #print('Number of tests: ' + len(sampler))
