@@ -467,4 +467,9 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
 
 }  // namespace runtime
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::runtime::NDArray, true);
+}  // namespace dmlc
+
 #endif  // DGL_RUNTIME_NDARRAY_H_
