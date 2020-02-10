@@ -8,7 +8,7 @@ import sys
 import pickle
 import time
 
-def SoftRelationPartition(edges, n, threshold=0.03):
+def SoftRelationPartition(edges, n, threshold=0.05):
     """This partitions a list of edges based in to n partitions that 
     SMALL relations (which has only small number of edges) will be put 
     into a single LARGE partition (relations with large number of edges) 
