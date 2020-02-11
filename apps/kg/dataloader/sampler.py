@@ -57,13 +57,15 @@ def SoftRelationPartition(edges, n, threshold=0.05):
         rel_parts.append([])
 
     large_threshold = int(len(rels) * threshold)
+    capacity_per_partition = int(len(rels) / n)
+    # ensure any relation larger than the partition capacity will be split
+    large_threshold = capacity_per_partition if capacity_per_partition < large_threshold \
+                      else large_threshold
     num_cross_part = 0
     for i in range(len(cnts)):
         cnt = cnts[i]
         r = uniq[i]
         r_parts = []
-        if i < 10:
-            print("{}:{}", cnt, large_threshold)
         if cnt > large_threshold:
             avg_part_cnt = (cnt // n) + 1
             num_cross_part += 1
