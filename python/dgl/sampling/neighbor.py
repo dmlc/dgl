@@ -9,16 +9,16 @@ from .. import utils
 
 __all__ = ['sample_neighbors', 'sample_neighbors_topk']
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
     """Sample from the neighbors of the given nodes and return the induced subgraph.
-   
+
     When sampling with replacement, the sampled subgraph could have parallel edges.
-   
+
     For sampling without replace, if fanout > the number of neighbors, all the
     neighbors are sampled.
 
     Node/edge features are not preserved.
-   
+
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -33,12 +33,12 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
     edge_dir : str, optional
         Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
         sample from out edges.
-    p : str, optional
+    prob : str, optional
         Feature name used as the probabilities associated with each neighbor of a node.
         Its shape should be compatible with a scalar edge feature tensor.
     replace : bool, optional
         If True, sample with replacement.
-       
+
     Returns
     -------
     DGLHeteroGraph
@@ -63,21 +63,21 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', p=None, replace=True):
         raise DGLError('Fan-out must be specified for each edge type '
                        'if a list is provided.')
 
-    if p is None:
-        prob = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
+    if prob is None:
+        prob_arrays = [nd.array([], ctx=nd.cpu())] * len(g.etypes)
     else:
-        prob = []
+        prob_arrays = []
         for etype in g.canonical_etypes:
-            if p in g.edges[etype].data:
-                prob.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[p]))
+            if prob in g.edges[etype].data:
+                prob_arrays.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[prob]))
             else:
-                prob.append(nd.array([], ctx=nd.cpu()))
+                prob_arrays.append(nd.array([], ctx=nd.cpu()))
 
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout,
-                                       edge_dir, prob, replace)
+                                       edge_dir, prob_arrays, replace)
     return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
 
-def sample_neighbors_topk(g, nodes, k, edge_weights, edge_dir='in'):
+def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
     """Sample neighbors by top-k.
 
     If k > the number of neighbors, all the neighbors are sampled.
@@ -92,7 +92,7 @@ def sample_neighbors_topk(g, nodes, k, edge_weights, edge_dir='in'):
         tensor if the given graph g has only one type of nodes.
     k : int
         The K value.
-    edge_weights : str
+    weight : str
         Feature name of the weights associated with each edge. Its shape should be
         compatible with a scalar edge feature tensor.
     edge_dir : str, optional
@@ -121,15 +121,16 @@ def sample_neighbors_topk(g, nodes, k, edge_weights, edge_dir='in'):
         raise DGLError('K value must be specified for each edge type '
                        'if a list is provided.')
 
-    ew = []
+    weight_arrays = []
     for etype in g.canonical_etypes:
-        if edge_weights in g.edges[etype].data:
-            ew.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[edge_weights]))
+        if weight in g.edges[etype].data:
+            weight_arrays.append(F.zerocopy_to_dgl_ndarray(g.edges[etype].data[weight]))
         else:
             raise DGLError('Edge weights "{}" do not exist for relation graph "{}".'.format(
-                edge_weights, etype))
+                weight, etype))
 
-    subgidx = _CAPI_DGLSampleNeighborsTopk(g._graph, nodes_all_types, k, edge_dir, ew)
+    subgidx = _CAPI_DGLSampleNeighborsTopk(
+        g._graph, nodes_all_types, k, edge_dir, weight_arrays)
     return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
 
 _init_api('dgl.sampling.neighbor', __name__)

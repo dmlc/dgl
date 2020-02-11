@@ -111,7 +111,7 @@ def test_sample_neighbors():
 
     def _test1(p, replace):
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, p=p, replace=replace)
+            subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace)
             assert subg.number_of_nodes() == 4
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
@@ -131,7 +131,7 @@ def test_sample_neighbors():
 
     def _test2(p, replace):  # fanout > #neighbors
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, p=p, replace=replace)
+            subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, prob=p, replace=replace)
             assert subg.number_of_nodes() == 4
             num_edges = 4 if replace else 3
             assert subg.number_of_edges() == num_edges
@@ -159,7 +159,7 @@ def test_sample_neighbors():
 
     def _test3(p, replace):
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, p=p, replace=replace)
+            subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, prob=p, replace=replace)
             assert len(subg.ntypes) == 3
             assert len(subg.etypes) == 4
             assert subg['follow'].number_of_edges() == 4
