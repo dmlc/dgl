@@ -1,8 +1,11 @@
 #!/bin/bash
-set -e 
+function fail {
+    echo FAIL: $@
+    exit -1
+}
 echo $PWD
 pushd build
 ls -lh
 export LD_LIBRARY_PATH=$PWD:$LD_LIBRARY_PATH
-./runUnitTests
+./runUnitTests || fail "CPP unit test"
 popd
