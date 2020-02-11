@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e 
 . /opt/conda/etc/profile.d/conda.sh
 
 function fail {
@@ -32,9 +32,9 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
-python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index || fail "graph_index"
-python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
+python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute
+python3 -m pytest -v --junitxml=pytest_gindex.xml tests/graph_index
+python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND
 
 export OMP_NUM_THREADS=1
 if [ $2 != "gpu" ] && [ $1 != "tensorflow"]; then

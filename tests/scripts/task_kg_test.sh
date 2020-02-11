@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e 
 . /opt/conda/etc/profile.d/conda.sh
 KG_DIR="./apps/kg/"
 
