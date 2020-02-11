@@ -76,7 +76,7 @@ TEST(Serialize, HeteroGraph) {
   dmlc::MemoryStringStream ofs(&blob);
   HeteroGraph* gptr = dgl::Serializer::EmptyHeteroGraph();
   static_cast<dmlc::Stream*>(&ofs)->Read(gptr);
-
+  CHECK(false) << "LLLL";
   EXPECT_EQ(gptr->NumVertices(0), 9);
   EXPECT_EQ(gptr->NumVertices(1), 8);
 }
