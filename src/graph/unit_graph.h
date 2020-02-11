@@ -195,6 +195,8 @@ class UnitGraph : public BaseHeteroGraph {
   void Save(dmlc::Stream* fs) const;
 
  private:
+  friend class Serializer;
+
   /*!
    * \brief constructor
    * \param metagraph metagraph
@@ -227,6 +229,9 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
+
+  // Empty Graph for Serializer Usgae
+  static UnitGraph* EmptyGraph();
 
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
