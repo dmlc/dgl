@@ -5,6 +5,7 @@
  */
 
 #include <dgl/random.h>
+#include <algorithm>
 #include "./neighbor_cpu.h"
 #include "./neighbor_impl.h"
 

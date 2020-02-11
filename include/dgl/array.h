@@ -208,13 +208,23 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  */ 
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
   runtime::NDArray indptr, indices;
   /*! \brief data array, could be empty. */
   runtime::NDArray data;
   /*! \brief whether the column indices per row are sorted */
-  bool sorted;
+  bool sorted = false;
+  /*! \brief default constructor */
+  CSRMatrix() = default;
+  /*! \brief constructor */
+  CSRMatrix(int64_t nrows, int64_t ncols,
+            runtime::NDArray parr,
+            runtime::NDArray iarr,
+            runtime::NDArray darr = runtime::NDArray(),
+            bool sorted_flag = false)
+    : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
+      data(darr), sorted(sorted_flag) {}
 };
 
 /*!
@@ -228,13 +238,28 @@ struct CSRMatrix {
  */
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief COO index arrays */
   runtime::NDArray row, col;
   /*!
    * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
    */
   runtime::NDArray data;
+  /*! \brief whether the row indices are sorted */
+  bool row_sorted = false;
+  /*! \brief whether the column indices per row are sorted */
+  bool col_sorted = false;
+  /*! \brief default constructor */
+  COOMatrix() = default;
+  /*! \brief constructor */
+  COOMatrix(int64_t nrows, int64_t ncols,
+            runtime::NDArray rarr,
+            runtime::NDArray carr,
+            runtime::NDArray darr = runtime::NDArray(),
+            bool rsorted = false,
+            bool csorted = false)
+    : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
+      row_sorted(rsorted), col_sorted(csorted) {}
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -330,7 +355,20 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
 
-/*! Sort the columns in each row in the ascending order. */
+/*!
+ * \brief Sort the column index at each row in the ascending order.
+ *
+ * Examples:
+ * num_rows = 4
+ * num_cols = 4
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [1, 0, 2, 3, 1]
+ *
+ *  After CSRSort(csr)
+ *
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [0, 1, 1, 2, 3]
+ */
 void CSRSort(CSRMatrix csr);
 
 ///////////////////////// COO routines //////////////////////////
@@ -404,6 +442,8 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
+/*! \return Sort indices of the COO matrix. */
+COOMatrix COOSort(COOMatrix mat, bool sort_column = true);
 
 // inline implementations
 template <typename T>
