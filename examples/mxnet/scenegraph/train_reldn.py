@@ -184,8 +184,8 @@ for epoch in range(nepoch):
                 bbox_stack = bbox_pad(bbox_list).as_in_context(cur_ctx)
                 with mx.autograd.pause():
                     ids, scores, bbox, feat, feat_ind, spatial_feat = detector(img)
-                g_pred_batch = build_graph_pred_sample(G_slice, bbox_stack, img, ids, scores, bbox, feat_ind,
-                                                       spatial_feat, scores_top_k=300, overlap=False)
+                g_pred_batch = build_graph_train(G_slice, bbox_stack, img, ids, scores, bbox, feat_ind,
+                                                 spatial_feat, scores_top_k=300, overlap=False)
                 g_batch = l0_sample(g_pred_batch)
                 if g_batch is None:
                     continue

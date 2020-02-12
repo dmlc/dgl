@@ -1,19 +1,6 @@
 import dgl
 from mxnet import nd
 import numpy as np
-from .sampling import l0_sample
-
-def build_complete_graph(n_nodes):
-    g = dgl.DGLGraph()
-    g.add_nodes(n_nodes)
-    edge_list = []
-    for i in range(n_nodes-1):
-        for j in range(i+1, n_nodes):
-            edge_list.append((i, j))
-    src, dst = tuple(zip(*edge_list))
-    g.add_edges(src, dst)
-    g.add_edges(dst, src)
-    return g
 
 def build_graph_with_reference(g_ref):
     n_nodes = g_ref.number_of_nodes()
@@ -39,122 +26,9 @@ def extract_edge_bbox(g):
     edge_bbox[:,3] = nd.stack(src_bbox[:,3], dst_bbox[:,3]).max(axis=0)
     return edge_bbox
 
-def build_graph_gt(g_slice, img, bbox, spatial_feat, cls_pred, l0_w_slice=None,
-                   training=False,
-                   bbox_improvement=True, batchify=True):
-    img_size = img.shape[2:4]
-    bbox[:, :, 0] /= img_size[1]
-    bbox[:, :, 1] /= img_size[0]
-    bbox[:, :, 2] /= img_size[1]
-    bbox[:, :, 3] /= img_size[0]
-
-    n_graph = len(g_slice)
-    g_batch = []
-    for i in range(n_graph):
-        n_nodes = g_slice[i].number_of_nodes()
-        g = build_graph_with_reference(g_slice[i])
-        if bbox_improvement:
-            bbox_improved = bbox_improve(bbox[i, 0:n_nodes])
-            g.ndata['pred_bbox'] = bbox_improved
-        else:
-            g.ndata['pred_bbox'] = bbox[i, 0:n_nodes]
-        g.ndata['node_feat'] = spatial_feat[i, 0:n_nodes]
-        g.ndata['node_class_pred'] = cls_pred[i, 0:n_nodes, 1:]
-        if training:
-            g.edata['rel_class'] = g_slice[i].edata['rel_class']
-        if l0_w_slice is not None:
-            g.edata['sample'] = l0_w_slice[i]
-        g_batch.append(g)
-    if batchify:
-        return dgl.batch(g_batch)
-    else:
-        return g_batch
-
-def build_graph_gt_rel(g_batch, img, bbox, spatial_feat):
-    img_size = img.shape[2:4]
-    bbox[:, :, 0] /= img_size[1]
-    bbox[:, :, 1] /= img_size[0]
-    bbox[:, :, 2] /= img_size[1]
-    bbox[:, :, 3] /= img_size[0]
-
-    n_graph = len(g_batch)
-    for i in range(n_graph):
-        g = g_batch[i]
-        n_edges = g.number_of_edges()
-        if 'sample' in g.edata:
-            ctx = g.edata['sample'].context
-            sample_inds = np.where(g.edata['sample'] > 0)[0]
-            n_samples = len(sample_inds)
-            g.edata['rel_bbox'] = nd.zeros((n_edges, 5), ctx=ctx)
-            g.edata['rel_bbox'][sample_inds] = bbox_improve(bbox[i, 0:n_samples])
-            g.edata['edge_feat'] = nd.zeros((n_edges, spatial_feat.shape[2]), ctx=ctx)
-            g.edata['edge_feat'][sample_inds] = spatial_feat[i, 0:n_samples]
-        else:
-            g.edata['rel_bbox'] = bbox_improve(bbox[i, 0:n_edges])
-            g.edata['edge_feat'] = spatial_feat[i, 0:n_edges]
-    return dgl.batch(g_batch)
-
-def build_graph_pred(g_slice, img, scores, bbox, feat_ind, spatial_feat, cls_pred, node_topk=300):
-    img_size = img.shape[2:4]
-    bbox[:, :, 0] /= img_size[1]
-    bbox[:, :, 1] /= img_size[0]
-    bbox[:, :, 2] /= img_size[1]
-    bbox[:, :, 3] /= img_size[0]
-
-    n_graph = len(g_slice)
-    g_batch = []
-    for i in range(n_graph):
-        inds = np.where(scores[i, :, 0].asnumpy() > 0)[0]
-        if len(inds) == 0:
-            g = None
-        if len(inds) > node_topk:
-            topk_inds = scores[i, inds, 0].argsort()[::-1][0:node_topk].asnumpy().astype(np.int)
-            inds = inds[topk_inds]
-        n_nodes = len(inds)
-        g = build_graph_with_reference(g_slice[i])
-        g.ndata['pred_bbox'] = bbox[i, inds]
-        roi_ind = feat_ind[i, inds].squeeze(axis=1)
-        g.ndata['node_feat'] = spatial_feat[i, roi_ind]
-        g.ndata['node_class_pred'] = cls_pred[i, roi_ind, 1:]
-        g_batch.append(g)
-    return dgl.batch(g_batch)
-
-def build_graph_gt_sample(g_slice, img, bbox, spatial_feat, cls_pred,
-                          bbox_improvement=True, sample=False):
-    img_size = img.shape[2:4]
-    bbox[:, :, 0] /= img_size[1]
-    bbox[:, :, 1] /= img_size[0]
-    bbox[:, :, 2] /= img_size[1]
-    bbox[:, :, 3] /= img_size[0]
-
-    n_graph = len(g_slice)
-    for i in range(n_graph):
-        g = g_slice[i]
-        n_nodes = g.number_of_nodes()
-        n_edges = g.number_of_edges()
-        if bbox_improvement:
-            bbox_improved = bbox_improve(bbox[i, 0:n_nodes])
-            g.ndata['pred_bbox'] = bbox_improved
-        else:
-            g.ndata['pred_bbox'] = bbox[i, 0:n_nodes]
-        g.ndata['node_feat'] = spatial_feat[i, 0:n_nodes]
-        g.ndata['node_class_pred'] = cls_pred[i, 0:n_nodes, 1:].argmax(1)
-        g.ndata['node_class_logit'] = nd.log(cls_pred[i, 0:n_nodes, 1:].max(1) + 1e-3)
-        g.edata['rel_bbox'] = extract_edge_bbox(g)
-        g.edata['batch_id'] = nd.zeros((n_edges, 1), ctx = g.edata['rel_bbox'].context) + i
-    if n_graph > 1:
-        g_batch = dgl.batch(g_slice)
-    else:
-        g_batch = g_slice[0]
-    if sample:
-        sub_g = l0_sample(g_batch)
-    else:
-        sub_g = g_batch
-    return sub_g
-
-def build_graph_pred_sample(g_slice, gt_bbox, img, ids, scores, bbox, feat_ind,
-                            spatial_feat, iou_thresh=0.5,
-                            bbox_improvement=True, scores_top_k=50, overlap=False):
+def build_graph_train(g_slice, gt_bbox, img, ids, scores, bbox, feat_ind,
+                      spatial_feat, iou_thresh=0.5,
+                      bbox_improvement=True, scores_top_k=50, overlap=False):
     # match and re-factor the graph
     img_size = img.shape[2:4]
     gt_bbox[:, :, 0] /= img_size[1]

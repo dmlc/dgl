@@ -56,7 +56,6 @@ class VGRelation(VisionDataset):
 
     def __getitem__(self, idx):
         img_id = list(self._dict)[idx]
-        # img_id = list(self._dict)[22079]
         img_path = self._img_path.format(img_id)
         img = mx.image.imread(img_path)
 
@@ -139,34 +138,9 @@ class VGRelation(VisionDataset):
             src, dst = tuple(zip(*empty_edge_list))
             g.add_edges(src, dst, {'rel_class': mx.nd.zeros((len(empty_edge_list), 1))})
 
-        '''
-        # complete graph
-        edge_list = []
-        for i in range(n_nodes - 1):
-            for j in range(i + 1, n_nodes):
-                edge_list.append((i, j))
-        src, dst = tuple(zip(*edge_list))
-        g.add_edges(src, dst)
-        g.add_edges(dst, src)
-
-        # edge features
-        rel_class = mx.nd.zeros((g.number_of_edges(), 1))
-        rel_count = mx.nd.zeros((g.number_of_edges(), 1))
-        edge_inds = g.edge_ids(sub_id, ob_id)
-        # it is not a simple graph! so we need to add the edges dynamically
-        for i, it in enumerate(item):
-            ind = edge_inds[i]
-            rel_class[ind, 0] = it['predicate'] + 1
-            rel_count[ind, 0] += 1
-
-        '''
         # assign features
         g.ndata['bbox'] = bbox
         g.ndata['node_class'] = node_class_ids
         g.ndata['node_class_vec'] = node_class_vec
-        '''
-        g.edata['rel_class'] = rel_class
-        g.edata['rel_count'] = rel_count
-        '''
 
         return g, img
