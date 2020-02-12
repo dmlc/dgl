@@ -3,7 +3,6 @@ import mxnet as mx
 import numpy as np
 import logging, time
 from mxnet import nd, gluon
-from gluoncv.model_zoo import get_model
 from gluoncv.data.batchify import Pad
 from gluoncv.utils import makedirs
 
@@ -35,7 +34,7 @@ def parse_args():
                         help="Path to save model parameters.")
     parser.add_argument('--log-dir', type=str, default='reldn_output.log',
                         help="Path to save training logs.")
-    parser.add_argument('--pretrained-faster-rcnn', type=str, default='faster_rcnn_resnet101_v1d_custom_best.params',
+    parser.add_argument('--pretrained-faster-rcnn-params', type=str, require=True,
                         help="Path to saved Faster R-CNN model parameters.")
     parser.add_argument('--freq-prior', type=str, default='freq_prior.pkl',
                         help="Path to saved frequency prior data.")
@@ -92,7 +91,7 @@ net_params = net.collect_params()
 net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
                             {'learning_rate': args.lr_reldn, 'wd': args.wd_reldn})
 
-det_params_path = args.pretrained_faster_rcnn
+det_params_path = args.pretrained_faster_rcnn_params
 detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)

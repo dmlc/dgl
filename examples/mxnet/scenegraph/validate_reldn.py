@@ -2,20 +2,40 @@ import dgl
 import mxnet as mx
 import numpy as np
 import logging, time
-from operator import itemgetter
 from mxnet import nd, gluon
-from mxnet.gluon import nn
-from dgl.utils import toindex
-from dgl.nn.mxnet import GraphConv
-from gluoncv.model_zoo import get_model
 from gluoncv.data.batchify import Pad
-from gluoncv.utils import makedirs, LRSequential, LRScheduler
+from gluoncv.utils import makedirs
 
-from model import faster_rcnn_resnet101_v1d_custom, faster_rcnn_resnet50_v1b_custom, RelDN
+from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from utils import *
 from data import *
 
-filehandler = logging.FileHandler('output.log')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser.add_argument('--gpus', type=str, default='0',
+                        help="Training with GPUs, you can specify 1,3 for example.")
+    parser.add_argument('--batch-size', type=int, default=8,
+                        help="Total batch-size for training.")
+    parser.add_argument('--metric', type=str, default='sgdet',
+                        help="Evaluation metric, could be 'predcls', 'phrcls', 'sgdet' or 'sgdet+'.")
+    parser.add_argument('--pretrained-faster-rcnn-params', type=str, require=True,
+                        help="Path to saved Faster R-CNN model parameters.")
+    parser.add_argument('--reldn-params', type=str, require=True,
+                        help="Path to saved Faster R-CNN model parameters.")
+    parser.add_argument('--faster-rcnn-params', type=str, require=True,
+                        help="Path to saved Faster R-CNN model parameters.")
+    parser.add_argument('--log-dir', type=str, default='reldn_output.log',
+                        help="Path to save training logs.")
+    parser.add_argument('--freq-prior', type=str, default='freq_prior.pkl',
+                        help="Path to saved frequency prior data.")
+    parser.add_argument('--verbose-freq', type=int, default=100,
+                        help="Frequency of log printing in number of iterations.")
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
+
+filehandler = logging.FileHandler(args.log_dir)
 streamhandler = logging.StreamHandler()
 logger = logging.getLogger('')
 logger.setLevel(logging.INFO)
@@ -23,37 +43,41 @@ logger.addHandler(filehandler)
 logger.addHandler(streamhandler)
 
 # Hyperparams
-num_gpus = 1
-batch_size = num_gpus * 1
-ctx = [mx.gpu(i) for i in range(num_gpus)]
+ctx = [mx.gpu(int(i)) for i in args.gpus.split(',') if i.strip()]
+if ctx:
+    num_gpus = len(ctx)
+    assert args.batch_size % num_gpus == 0
+    per_device_batch_size = int(args.batch_size / num_gpus)
+else:
+    ctx = [mx.cpu()]
+    per_device_batch_size = args.batch_size
+batch_size = args.batch_size
 N_relations = 50
 N_objects = 150
-save_dir = 'params'
-makedirs(save_dir)
-batch_verbose_freq = 100
+batch_verbose_freq = args.verbose_freq
 
-mode = ['phrcls']
+mode = args.metric
 metric_list = []
 topk_list = [20, 50, 100]
-if 'predcls' in mode:
+if mode == 'predcls':
     for topk in topk_list:
         metric_list.append(PredCls(topk=topk))
-if 'phrcls' in mode:
+if mode == 'phrcls':
     for topk in topk_list:
         metric_list.append(PhrCls(topk=topk))
-if 'sgdet' in mode:
+if mode == 'sgdet':
     for topk in topk_list:
         metric_list.append(SGDet(topk=topk))
-if 'sgdet+' in mode:
+if mode == 'sgdet+':
     for topk in topk_list:
         metric_list.append(SGDetPlus(topk=topk))
 for metric in metric_list:
     metric.reset()
 
 semantic_only = False
-net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl',
+net = RelDN(n_classes=N_relations, prior_pkl=args.freq_prior,
             semantic_only=semantic_only)
-net.load_parameters('params_resnet101_v1d/model-8.params', ctx=ctx)
+net.load_parameters(args.reldn_params, ctx=ctx)
 
 # dataset and dataloader
 vg_val = VGRelation(split='val')
@@ -65,7 +89,7 @@ n_batches = len(val_data)
 detector = faster_rcnn_resnet101_v1d_custom(classes=vg_val.obj_classes,
                                            pretrained_base=False, pretrained=False,
                                            additional_output=True)
-params_path = 'faster_rcnn_resnet101_v1d_custom/faster_rcnn_resnet101_v1d_custom_best.params'
+params_path = args.pretrained_faster_rcnn_params
 detector.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 
 detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_val.obj_classes,
@@ -73,7 +97,7 @@ detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_val.obj_classes,
                                                 additional_output=True)
 detector_feat.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 
-detector_feat.features.load_parameters('params_resnet101_v1d/detector_feat.features-8.params', ctx=ctx)
+detector_feat.features.load_parameters(args.faster_rcnn_params, ctx=ctx)
 
 def get_data_batch(g_list, img_list, ctx_list):
     if g_list is None or len(g_list) == 0:
@@ -103,7 +127,7 @@ for i, (G_list, img_list) in enumerate(val_data):
                 (i, n_batches)
             for metric in metric_list:
                 metric_name, metric_val = metric.get()
-                print_txt +=  '%s=%.4f '%(metric_name, metric_val)
+                print_txt += '%s=%.4f '%(metric_name, metric_val)
             logger.info(print_txt)
         continue
 
@@ -113,7 +137,7 @@ for i, (G_list, img_list) in enumerate(val_data):
     # loss_cls_val = 0
     for G_slice, img in zip(G_list, img_list):
         cur_ctx = img.context
-        if 'predcls' in mode:
+        if mode == 'predcls':
             bbox_list = [G.ndata['bbox'] for G in G_slice]
             bbox_stack = bbox_pad(bbox_list).as_in_context(cur_ctx)
             ids, scores, bbox, spatial_feat = detector(img, None, None, bbox_stack)
@@ -122,7 +146,7 @@ for i, (G_list, img_list) in enumerate(val_data):
             node_class_stack = bbox_pad(node_class_list).as_in_context(cur_ctx)
             g_pred_batch = build_graph_validate_gt_obj(img, node_class_stack, bbox, spatial_feat,
                                                        bbox_improvement=True, overlap=False)
-        elif 'phrcls' in mode:
+        elif mode == 'phrcls':
             # use ground truth bbox
             bbox_list = [G.ndata['bbox'] for G in G_slice]
             bbox_stack = bbox_pad(bbox_list).as_in_context(cur_ctx)
@@ -177,12 +201,12 @@ for i, (G_list, img_list) in enumerate(val_data):
             (i, n_batches)
         for metric in metric_list:
             metric_name, metric_val = metric.get()
-            print_txt +=  '%s=%.4f '%(metric_name, metric_val)
+            print_txt += '%s=%.4f '%(metric_name, metric_val)
         logger.info(print_txt)
 
 print_txt = 'Batch[%d/%d] '%\
     (n_batches, n_batches)
 for metric in metric_list:
     metric_name, metric_val = metric.get()
-    print_txt +=  '%s=%.4f '%(metric_name, metric_val)
+    print_txt += '%s=%.4f '%(metric_name, metric_val)
 logger.info(print_txt)
