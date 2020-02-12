@@ -156,35 +156,6 @@ IdArray Range(IdType low, IdType high, DLContext ctx) {
 template IdArray Range<kDLCPU, int32_t>(int32_t, int32_t, DLContext);
 template IdArray Range<kDLCPU, int64_t>(int64_t, int64_t, DLContext);
 
-///////////////////////////// IndexSelect /////////////////////////////
-
-template <DLDeviceType XPU, typename IdType>
-IdArray IndexSelect(IdArray array, IdArray index) {
-  const IdType* array_data = static_cast<IdType*>(array->data);
-  const IdType* idx_data = static_cast<IdType*>(index->data);
-  const int64_t arr_len = array->shape[0];
-  const int64_t len = index->shape[0];
-  IdArray ret = NDArray::Empty({len}, array->dtype, array->ctx);
-  IdType* ret_data = static_cast<IdType*>(ret->data);
-  for (int64_t i = 0; i < len; ++i) {
-    CHECK_LT(idx_data[i], arr_len) << "Index out of range.";
-    ret_data[i] = array_data[idx_data[i]];
-  }
-  return ret;
-}
-
-template IdArray IndexSelect<kDLCPU, int32_t>(IdArray, IdArray);
-template IdArray IndexSelect<kDLCPU, int64_t>(IdArray, IdArray);
-
-template <DLDeviceType XPU, typename IdType>
-int64_t IndexSelect(IdArray array, int64_t index) {
-  const IdType* data = static_cast<IdType*>(array->data);
-  return data[index];
-}
-
-template int64_t IndexSelect<kDLCPU, int32_t>(IdArray array, int64_t index);
-template int64_t IndexSelect<kDLCPU, int64_t>(IdArray array, int64_t index);
-
 ///////////////////////////// Relabel_ /////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>

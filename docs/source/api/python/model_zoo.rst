@@ -1,7 +1,7 @@
 .. _apimodelzoo:
 
-Model Zoo
-=========
+dgl.model_zoo
+==============
 
 .. currentmodule:: dgl.model_zoo
 
@@ -58,4 +58,14 @@ Currently supported model architectures:
     :members: forward
 
 .. autoclass:: dgl.model_zoo.chem.DGLJTNNVAE
+    :members: forward
+
+Protein Ligand Binding
+``````````````````````
+
+Currently supported model architectures:
+
+* ACNN
+
+.. autoclass:: dgl.model_zoo.chem.ACNN
     :members: forward

@@ -1,21 +1,38 @@
 # This is a simple MXNet server demo shows how to use DGL distributed kvstore.
-# In this demo, we initialize two embeddings on server and push/pull data to/from it.
 import dgl
-import torch
 import argparse
 import mxnet as mx
 
-server_namebook, client_namebook = dgl.contrib.ReadNetworkConfigure('config.txt')
+ndata_g2l = []
+edata_g2l = []
+
+ndata_g2l.append({'ndata':mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64')})
+ndata_g2l.append({'ndata':mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64')})
+
+edata_g2l.append({'edata':mx.nd.array([0,1,0,0,0,0,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,1,0,0,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,0,0,1,0,0], dtype='int64')})
+edata_g2l.append({'edata':mx.nd.array([0,0,0,0,0,0,0,1], dtype='int64')})
+
+DATA = []
+DATA.append(mx.nd.array([[4.,4.,4.,],[4.,4.,4.,]]))
+DATA.append(mx.nd.array([[3.,3.,3.,],[3.,3.,3.,]]))
+DATA.append(mx.nd.array([[2.,2.,2.,],[2.,2.,2.,]]))
+DATA.append(mx.nd.array([[1.,1.,1.,],[1.,1.,1.,]]))
 
 def start_server(args):
-    server = dgl.contrib.KVServer(
-        server_id=args.id, 
-        client_namebook=client_namebook, 
-        server_addr=server_namebook[args.id])
+    
+    dgl.contrib.start_server(
+        server_id=args.id,
+        ip_config='ip_config.txt',
+        num_client=4,
+        ndata={'ndata':DATA[args.id]},
+        edata={'edata':DATA[args.id]},
+        ndata_g2l=ndata_g2l[args.id],
+        edata_g2l=edata_g2l[args.id])
 
-    server.init_data(name='server_embed', data_tensor=mx.nd.array([0., 0., 0., 0., 0.]))
-
-    server.start()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='kvstore')

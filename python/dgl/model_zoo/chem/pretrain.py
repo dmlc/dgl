@@ -11,19 +11,20 @@ from .mpnn import MPNNModel
 from .schnet import SchNet
 from .attentive_fp import AttentiveFP
 from ...data.utils import _get_dgl_url, download, get_download_dir, extract_archive
+from ...contrib.deprecation import deprecated
 
 URL = {
-    'GCN_Tox21' : 'pre_trained/gcn_tox21.pth',
-    'GAT_Tox21' : 'pre_trained/gat_tox21.pth',
+    'GCN_Tox21': 'pre_trained/gcn_tox21.pth',
+    'GAT_Tox21': 'pre_trained/gat_tox21.pth',
     'MGCN_Alchemy': 'pre_trained/mgcn_alchemy.pth',
     'SCHNET_Alchemy': 'pre_trained/schnet_alchemy.pth',
     'MPNN_Alchemy': 'pre_trained/mpnn_alchemy.pth',
     'AttentiveFP_Aromaticity': 'pre_trained/attentivefp_aromaticity.pth',
-    'DGMG_ChEMBL_canonical' : 'pre_trained/dgmg_ChEMBL_canonical.pth',
-    'DGMG_ChEMBL_random' : 'pre_trained/dgmg_ChEMBL_random.pth',
-    'DGMG_ZINC_canonical' : 'pre_trained/dgmg_ZINC_canonical.pth',
-    'DGMG_ZINC_random' : 'pre_trained/dgmg_ZINC_random.pth',
-    'JTNN_ZINC':'pre_trained/JTNN_ZINC.pth'
+    'DGMG_ChEMBL_canonical': 'pre_trained/dgmg_ChEMBL_canonical.pth',
+    'DGMG_ChEMBL_random': 'pre_trained/dgmg_ChEMBL_random.pth',
+    'DGMG_ZINC_canonical': 'pre_trained/dgmg_ZINC_canonical.pth',
+    'DGMG_ZINC_random': 'pre_trained/dgmg_ZINC_random.pth',
+    'JTNN_ZINC': 'pre_trained/JTNN_ZINC.pth'
 }
 
 def download_and_load_checkpoint(model_name, model, model_postfix,
@@ -56,8 +57,12 @@ def download_and_load_checkpoint(model_name, model, model_postfix,
     checkpoint = torch.load(local_pretrained_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
 
+    if log:
+        print('Pretrained model loaded')
+
     return model
 
+@deprecated('Import it from dgllife.model instead.')
 def load_pretrained(model_name, log=True):
     """Load a pretrained model
 
@@ -139,15 +144,11 @@ def load_pretrained(model_name, log=True):
         vocab_file = '{}/jtnn/{}.txt'.format(default_dir, 'vocab')
         if not os.path.exists(vocab_file):
             zip_file_path = '{}/jtnn.zip'.format(default_dir)
-            download('https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip',
-                     path=zip_file_path)
+            download(_get_dgl_url('dgllife/jtnn.zip'), path=zip_file_path)
             extract_archive(zip_file_path, '{}/jtnn'.format(default_dir))
         model = DGLJTNNVAE(vocab_file=vocab_file,
                            depth=3,
                            hidden_size=450,
                            latent_size=56)
-
-    if log:
-        print('Pretrained model loaded')
 
     return download_and_load_checkpoint(model_name, model, URL[model_name], log=log)

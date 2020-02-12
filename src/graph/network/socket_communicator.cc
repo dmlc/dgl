@@ -65,7 +65,6 @@ bool SocketSender::Connect() {
     int port = r.second.port;
     while (bo == false && try_count < kMaxTryCount) {
       if (client_socket->Connect(ip, port)) {
-        LOG(INFO) << "Connected to Receiver: " << ip << ":" << port;
         bo = true;
       } else {
         LOG(ERROR) << "Cannot connect to Receiver: " << ip << ":" << port
@@ -195,12 +194,10 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   if (server_socket_->Bind(ip.c_str(), port) == false) {
     LOG(FATAL) << "Cannot bind to " << ip << ":" << port;
   }
-  LOG(INFO) << "Bind to " << ip << ":" << port;
   // Listen
   if (server_socket_->Listen(kMaxConnection) == false) {
     LOG(FATAL) << "Cannot listen on " << ip << ":" << port;
   }
-  LOG(INFO) << "Listen on " << ip << ":" << port << ", wait sender connect ...";
   // Accept all sender sockets
   std::string accept_ip;
   int accept_port;
@@ -215,7 +212,6 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
       RecvLoop,
       sockets_[i].get(),
       msg_queue_[i].get());
-    LOG(INFO) << "Accept new sender: " << accept_ip << ":" << accept_port;
   }
 
   return true;

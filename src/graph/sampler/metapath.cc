@@ -83,6 +83,12 @@ DGL_REGISTER_GLOBAL("sampler.randomwalk._CAPI_DGLMetapathRandomWalk")
     const IdArray seeds = args[2];
     int num_traces = args[3];
 
+    CHECK(aten::IsValidIdArray(etypes));
+    CHECK_EQ(etypes->ctx.device_type, kDLCPU)
+      << "MetapathRandomWalk only support CPU sampling";
+    CHECK(aten::IsValidIdArray(seeds));
+    CHECK_EQ(seeds->ctx.device_type, kDLCPU)
+      << "MetapathRandomWalk only support CPU sampling";
     const auto tl = MetapathRandomWalk(hg.sptr(), etypes, seeds, num_traces);
     *rv = RandomWalkTracesRef(tl);
   });

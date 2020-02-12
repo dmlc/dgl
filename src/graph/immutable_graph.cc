@@ -6,6 +6,8 @@
 
 #include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <string.h>
 #include <bitset>
 #include <numeric>
@@ -303,8 +305,8 @@ bool COO::IsMultigraph() const {
 
 std::pair<dgl_id_t, dgl_id_t> COO::FindEdge(dgl_id_t eid) const {
   CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
-  const auto src = aten::IndexSelect(adj_.row, eid);
-  const auto dst = aten::IndexSelect(adj_.col, eid);
+  const dgl_id_t src = aten::IndexSelect<dgl_id_t>(adj_.row, eid);
+  const dgl_id_t dst = aten::IndexSelect<dgl_id_t>(adj_.col, eid);
   return std::pair<dgl_id_t, dgl_id_t>(src, dst);
 }
 
@@ -632,6 +634,28 @@ ImmutableGraphPtr ImmutableGraph::Reverse() const {
   } else {
     return ImmutableGraphPtr(new ImmutableGraph(out_csr_, in_csr_));
   }
+}
+
+constexpr uint64_t kDGLSerialize_ImGraph = 0xDD3c5FFE20046ABF;
+
+/*! \return Load HeteroGraph from stream, using OutCSR Matrix*/
+bool ImmutableGraph::Load(dmlc::Stream *fs) {
+  uint64_t magicNum;
+  aten::CSRMatrix out_csr_matrix;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_ImGraph) << "Invalid ImmutableGraph Data";
+  CHECK(fs->Read(&out_csr_matrix)) << "Invalid csr matrix";
+  CSRPtr csr(new CSR(out_csr_matrix.indptr, out_csr_matrix.indices,
+                     out_csr_matrix.data));
+  auto g = new ImmutableGraph(nullptr, csr);
+  *this = *g;
+  return true;
+}
+
+/*! \return Save HeteroGraph to stream, using OutCSR Matrix */
+void ImmutableGraph::Save(dmlc::Stream *fs) const {
+  fs->Write(kDGLSerialize_ImGraph);
+  fs->Write(GetOutCSR()->ToCSRMatrix());
 }
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")

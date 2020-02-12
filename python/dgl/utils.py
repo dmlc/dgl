@@ -384,7 +384,7 @@ def build_relabel_map(x, is_sorted=False):
         unique_x = x
     map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
-    F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
+    old_to_new = F.scatter_row(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
 def build_relabel_dict(x):
@@ -442,11 +442,14 @@ def cached_member(cache, prefix):
     """
     def _creator(func):
         @wraps(func)
-        def wrapper(self, *args):
+        def wrapper(self, *args, **kwargs):
             dic = getattr(self, cache)
-            key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
+            key = '%s-%s-%s' % (
+                prefix,
+                '-'.join([str(a) for a in args]),
+                '-'.join([str(k) + ':' + str(v) for k, v in kwargs.items()]))
             if key not in dic:
-                dic[key] = func(self, *args)
+                dic[key] = func(self, *args, **kwargs)
             return dic[key]
         return wrapper
     return _creator

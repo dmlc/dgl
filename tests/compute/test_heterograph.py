@@ -6,8 +6,8 @@ import scipy.sparse as ssp
 import itertools
 import backend as F
 import networkx as nx
+import unittest
 from dgl import DGLError
-
 
 def create_test_heterograph():
     # test heterograph from the docstring, plus a user -- wishes -- game relation
@@ -60,6 +60,23 @@ def create_test_heterograph2():
         ('user', 'wishes', 'game'): wishes_nx,
         ('developer', 'develops', 'game'): develops_g,
         })
+    return g
+
+def create_test_heterograph3():
+    plays_spmat = ssp.coo_matrix(([1, 1, 1, 1], ([0, 1, 2, 1], [0, 0, 1, 1])))
+    wishes_nx = nx.DiGraph()
+    wishes_nx.add_nodes_from(['u0', 'u1', 'u2'], bipartite=0)
+    wishes_nx.add_nodes_from(['g0', 'g1'], bipartite=1)
+    wishes_nx.add_edge('u0', 'g1', id=0)
+    wishes_nx.add_edge('u2', 'g0', id=1)
+
+    follows_g = dgl.graph([(0, 1), (1, 2)], 'user', 'follows', _restrict_format='coo')
+    plays_g = dgl.bipartite(
+        [(0, 0), (1, 0), (2, 1), (1, 1)], 'user', 'plays', 'game', _restrict_format='coo')
+    wishes_g = dgl.bipartite([(0, 1), (2, 0)], 'user', 'wishes', 'game', _restrict_format='coo')
+    develops_g = dgl.bipartite(
+        [(0, 0), (1, 1)], 'developer', 'develops', 'game', _restrict_format='coo')
+    g = dgl.hetero_from_relations([follows_g, plays_g, wishes_g, develops_g])
     return g
 
 def get_redfn(name):
@@ -153,25 +170,25 @@ def test_query():
     for i in range(len(etypes)):
         assert g.to_canonical_etype(etypes[i]) == canonical_etypes[i]
 
-    # number of nodes
-    assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
-
-    # number of edges
-    assert [g.number_of_edges(etype) for etype in etypes] == [2, 4, 2, 2]
-
-    assert not g.is_multigraph
-    assert g.is_readonly
-
-    # has_node & has_nodes
-    for ntype in ntypes:
-        n = g.number_of_nodes(ntype)
-        for i in range(n):
-            assert g.has_node(i, ntype)
-        assert not g.has_node(n, ntype)
-        assert np.array_equal(
-            F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
-
     def _test(g):
+        # number of nodes
+        assert [g.number_of_nodes(ntype) for ntype in ntypes] == [3, 2, 2]
+
+        # number of edges
+        assert [g.number_of_edges(etype) for etype in etypes] == [2, 4, 2, 2]
+
+        # has_node & has_nodes
+        for ntype in ntypes:
+            n = g.number_of_nodes(ntype)
+            for i in range(n):
+                assert g.has_node(i, ntype)
+            assert not g.has_node(n, ntype)
+            assert np.array_equal(
+                F.asnumpy(g.has_nodes([0, n], ntype)).astype('int32'), [1, 0])
+
+        assert not g.is_multigraph
+        assert g.is_readonly
+
         for etype in etypes:
             srcs, dsts = edges[etype]
             for src, dst in zip(srcs, dsts):
@@ -252,6 +269,8 @@ def test_query():
     _test(g)
     g = create_test_heterograph1()
     _test(g)
+    g = create_test_heterograph3()
+    _test(g)
 
     etypes = canonical_etypes
     edges = {
@@ -271,9 +290,77 @@ def test_query():
     _test(g)
     g = create_test_heterograph1()
     _test(g)
+    g = create_test_heterograph3()
+    _test(g)
 
     # test repr
     print(g)
+
+def test_hypersparse():
+    N1 = 1 << 50        # should crash if allocated a CSR
+    N2 = 1 << 48
+
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): [(0, 1)],
+        ('user', 'plays', 'game'): [(0, N2)]},
+        {'user': N1, 'game': N1})
+    assert g.number_of_nodes('user') == N1
+    assert g.number_of_nodes('game') == N1
+    assert g.number_of_edges('follows') == 1
+    assert g.number_of_edges('plays') == 1
+
+    assert g.has_edge_between(0, 1, 'follows')
+    assert not g.has_edge_between(0, 0, 'follows')
+    mask = F.asnumpy(g.has_edges_between([0, 0], [0, 1], 'follows')).tolist()
+    assert mask == [0, 1]
+
+    assert g.has_edge_between(0, N2, 'plays')
+    assert not g.has_edge_between(0, 0, 'plays')
+    mask = F.asnumpy(g.has_edges_between([0, 0], [0, N2], 'plays')).tolist()
+    assert mask == [0, 1]
+
+    assert F.asnumpy(g.predecessors(0, 'follows')).tolist() == []
+    assert F.asnumpy(g.successors(0, 'follows')).tolist() == [1]
+    assert F.asnumpy(g.predecessors(1, 'follows')).tolist() == [0]
+    assert F.asnumpy(g.successors(1, 'follows')).tolist() == []
+
+    assert F.asnumpy(g.predecessors(0, 'plays')).tolist() == []
+    assert F.asnumpy(g.successors(0, 'plays')).tolist() == [N2]
+    assert F.asnumpy(g.predecessors(N2, 'plays')).tolist() == [0]
+    assert F.asnumpy(g.successors(N2, 'plays')).tolist() == []
+
+    assert g.edge_id(0, 1, etype='follows') == 0
+    assert g.edge_id(0, N2, etype='plays') == 0
+    assert F.asnumpy(g.edge_ids(0, 1, etype='follows')).tolist() == [0]
+    assert F.asnumpy(g.edge_ids(0, N2, etype='plays')).tolist() == [0]
+
+    u, v = g.find_edges([0], 'follows')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [1]
+    u, v = g.find_edges([0], 'plays')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [N2]
+    u, v, e = g.all_edges('all', 'eid', 'follows')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [1]
+    assert F.asnumpy(e).tolist() == [0]
+    u, v, e = g.all_edges('all', 'eid', 'plays')
+    assert F.asnumpy(u).tolist() == [0]
+    assert F.asnumpy(v).tolist() == [N2]
+    assert F.asnumpy(e).tolist() == [0]
+
+    assert g.in_degree(0, 'follows') == 0
+    assert g.in_degree(1, 'follows') == 1
+    assert F.asnumpy(g.in_degrees([0, 1], 'follows')).tolist() == [0, 1]
+    assert g.in_degree(0, 'plays') == 0
+    assert g.in_degree(N2, 'plays') == 1
+    assert F.asnumpy(g.in_degrees([0, N2], 'plays')).tolist() == [0, 1]
+    assert g.out_degree(0, 'follows') == 1
+    assert g.out_degree(1, 'follows') == 0
+    assert F.asnumpy(g.out_degrees([0, 1], 'follows')).tolist() == [1, 0]
+    assert g.out_degree(0, 'plays') == 1
+    assert g.out_degree(N2, 'plays') == 0
+    assert F.asnumpy(g.out_degrees([0, N2], 'plays')).tolist() == [1, 0]
 
 def test_adj():
     g = create_test_heterograph()
@@ -546,11 +633,11 @@ def test_flatten():
             src_fg, dst_fg = fg.find_edges([i])
             # TODO(gq): I feel this code is quite redundant; can we just add new members (like
             # "induced_srcid") to returned heterograph object and not store them as features?
-            assert src_g == fg.nodes[SRC].data[dgl.NID][src_fg]
-            tid = F.asnumpy(fg.nodes[SRC].data[dgl.NTYPE][src_fg])[0]
+            assert src_g == F.gather_row(fg.nodes[SRC].data[dgl.NID], src_fg)[0]
+            tid = F.asnumpy(F.gather_row(fg.nodes[SRC].data[dgl.NTYPE], src_fg)).item()
             assert g.canonical_etypes[etype][0] == g.ntypes[tid]
-            assert dst_g == fg.nodes[DST].data[dgl.NID][dst_fg]
-            tid = F.asnumpy(fg.nodes[DST].data[dgl.NTYPE][dst_fg])[0]
+            assert dst_g == F.gather_row(fg.nodes[DST].data[dgl.NID], dst_fg)[0]
+            tid = F.asnumpy(F.gather_row(fg.nodes[DST].data[dgl.NTYPE], dst_fg)).item()
             assert g.canonical_etypes[etype][2] == g.ntypes[tid]
 
     # check for wildcard slices
@@ -630,6 +717,27 @@ def test_to_device():
         hg = hg.to(F.cuda())
         assert hg is not None
 
+def test_convert_bound():
+    def _test_bipartite_bound(data, card):
+        try:
+            dgl.bipartite(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'bipartite bound test with wrong uid failed'
+
+    def _test_graph_bound(data, card):
+        try:
+            dgl.graph(data, card=card)
+        except dgl.DGLError:
+            return
+        assert False, 'graph bound test with wrong uid failed'
+
+    _test_bipartite_bound(([1,2],[1,2]),(2,3))
+    _test_bipartite_bound(([0,1],[1,4]),(2,3))
+    _test_graph_bound(([1,3],[1,2]), 3)
+    _test_graph_bound(([0,1],[1,3]),3)
+
+
 def test_convert():
     hg = create_test_heterograph()
     hs = []
@@ -672,7 +780,7 @@ def test_convert():
 
     for _mg in [None, mg]:
         hg2 = dgl.to_hetero(
-                g, ['user', 'game', 'developer'], ['follows', 'plays', 'wishes', 'develops'],
+                g, hg.ntypes, hg.etypes,
                 ntype_field=dgl.NTYPE, etype_field=dgl.ETYPE, metagraph=_mg)
         assert set(hg.ntypes) == set(hg2.ntypes)
         assert set(hg.canonical_etypes) == set(hg2.canonical_etypes)
@@ -748,8 +856,9 @@ def test_subgraph():
     g.edges['follows'].data['h'] = y
 
     def _check_subgraph(g, sg):
-        assert sg.ntypes == ['user', 'game', 'developer']
-        assert sg.etypes == ['follows', 'plays', 'wishes', 'develops']
+        assert sg.ntypes == g.ntypes
+        assert sg.etypes == g.etypes
+        assert sg.canonical_etypes == g.canonical_etypes
         assert F.array_equal(F.tensor(sg.nodes['user'].data[dgl.NID]),
                              F.tensor([1, 2], F.int64))
         assert F.array_equal(F.tensor(sg.nodes['game'].data[dgl.NID]),
@@ -782,8 +891,8 @@ def test_subgraph():
             assert F.array_equal(dst_sg, dst_g)
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
-        g.nodes['user'].data['h'][2] = F.randn((5,))
-        g.edges['follows'].data['h'][1] = F.randn((4,))
+        g.nodes['user'].data['h'] = F.scatter_row(g.nodes['user'].data['h'], F.tensor([2]), F.randn((1, 5)))
+        g.edges['follows'].data['h'] = F.scatter_row(g.edges['follows'].data['h'], F.tensor([1]), F.randn((1, 4)))
         assert F.array_equal(sg.nodes['user'].data['h'], g.nodes['user'].data['h'])
         assert F.array_equal(sg.edges['follows'].data['h'], g.edges['follows'].data['h'])
 
@@ -933,6 +1042,7 @@ def test_level1():
     except dgl.DGLError:
         fail = True
     assert fail
+
 
 def test_level2():
     #edges = {
@@ -1229,14 +1339,89 @@ def test_backward():
                                               [2., 2., 2., 2., 2.],
                                               [2., 2., 2., 2., 2.]]))
 
+def test_empty_heterograph():
+    def assert_empty(g):
+        assert g.number_of_nodes('user') == 0
+        assert g.number_of_edges('plays') == 0
+        assert g.number_of_nodes('game') == 0
+
+    # empty edge list
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): []}))
+    # empty src-dst pair
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ([], [])}))
+    # empty sparse matrix
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): ssp.coo_matrix((0, 0))}))
+    # empty networkx graph
+    assert_empty(dgl.heterograph({('user', 'plays', 'game'): nx.DiGraph()}))
+
+    g = dgl.heterograph({('user', 'follows', 'user'): []})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('follows') == 0
+
+    # empty relation graph with others
+    g = dgl.heterograph({('user', 'plays', 'game'): [], ('developer', 'develops', 'game'): [(0, 0), (1, 1)]})
+    assert g.number_of_nodes('user') == 0
+    assert g.number_of_edges('plays') == 0
+    assert g.number_of_nodes('game') == 2
+    assert g.number_of_edges('develops') == 2
+    assert g.number_of_nodes('developer') == 2
+
+
+def test_compact():
+    g1 = dgl.heterograph({
+        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
+        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
+        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
+        {'user': 20, 'game': 10})
+
+    g2 = dgl.heterograph({
+        ('game', 'clicked-by', 'user'): [(3, 1)],
+        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
+        {'user': 20, 'game': 10})
+
+    def _check(g, new_g, induced_nodes):
+        assert g.ntypes == new_g.ntypes
+        assert g.canonical_etypes == new_g.canonical_etypes
+
+        for ntype in g.ntypes:
+            assert -1 not in induced_nodes[ntype]
+
+        for etype in g.canonical_etypes:
+            g_src, g_dst = g.all_edges(order='eid', etype=etype)
+            g_src = F.asnumpy(g_src)
+            g_dst = F.asnumpy(g_dst)
+            new_g_src, new_g_dst = new_g.all_edges(order='eid', etype=etype)
+            new_g_src_mapped = induced_nodes[etype[0]][F.asnumpy(new_g_src)]
+            new_g_dst_mapped = induced_nodes[etype[2]][F.asnumpy(new_g_dst)]
+            assert (g_src == new_g_src_mapped).all()
+            assert (g_dst == new_g_dst_mapped).all()
+
+    new_g1 = dgl.compact_graphs(g1)
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
+    assert set(induced_nodes['game']) == set([4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+
+    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
+    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+    _check(g2, new_g2, induced_nodes)
+
+
 if __name__ == '__main__':
     test_create()
     test_query()
+    test_hypersparse()
     test_adj()
     test_inc()
     test_view()
     test_view1()
     test_flatten()
+    test_convert_bound()
     test_convert()
     test_to_device()
     test_transform()
@@ -1246,3 +1431,5 @@ if __name__ == '__main__':
     test_level2()
     test_updates()
     test_backward()
+    test_empty_heterograph()
+    test_compact()

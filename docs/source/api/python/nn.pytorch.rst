@@ -114,6 +114,13 @@ NNConv
 .. autoclass:: dgl.nn.pytorch.conv.NNConv
     :members: forward
     :show-inheritance:
+
+AtomicConv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.conv.AtomicConv
+    :members: forward
+    :show-inheritance:
     
 Dense Conv Layers
 ----------------------------------------
@@ -203,6 +210,13 @@ SetTransformerDecoder
 Utility Modules
 ----------------------------------------
 
+Sequential
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: dgl.nn.pytorch.utils.Sequential
+    :members:
+    :show-inheritance:
+
 KNNGraph
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -222,5 +236,3 @@ Edge Softmax
 
 .. automodule:: dgl.nn.pytorch.softmax
     :members: edge_softmax
-    
-

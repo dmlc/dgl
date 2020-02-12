@@ -7,6 +7,7 @@ import torch.nn as nn
 from .layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
     MultiLevelInteraction
 from ...nn.pytorch import SumPooling
+from ...contrib.deprecation import deprecated
 
 
 class MGCNModel(nn.Module):
@@ -37,6 +38,7 @@ class MGCNModel(nn.Module):
         If None, random representation initialization will be used. Otherwise,
         they will be used to initialize atom representations. Default to be None.
     """
+    @deprecated('Import MGCNPredictor from dgllife.model instead.', 'class')
     def __init__(self,
                  dim=128,
                  width=1,

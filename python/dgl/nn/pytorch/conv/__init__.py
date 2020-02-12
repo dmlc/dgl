@@ -18,8 +18,10 @@ from .gatedgraphconv import GatedGraphConv
 from .densechebconv import DenseChebConv
 from .densegraphconv import DenseGraphConv
 from .densesageconv import DenseSAGEConv
+from .atomicconv import AtomicConv
+from .cfconv import CFConv
 
 __all__ = ['GraphConv', 'GATConv', 'TAGConv', 'RelGraphConv', 'SAGEConv',
            'SGConv', 'APPNPConv', 'GINConv', 'GatedGraphConv', 'GMMConv',
            'ChebConv', 'AGNNConv', 'NNConv', 'DenseGraphConv', 'DenseSAGEConv',
-           'DenseChebConv', 'EdgeConv']
+           'DenseChebConv', 'EdgeConv', 'AtomicConv', 'CFConv']
