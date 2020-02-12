@@ -2,20 +2,53 @@ import dgl
 import mxnet as mx
 import numpy as np
 import logging, time
-from operator import itemgetter
 from mxnet import nd, gluon
-from mxnet.gluon import nn
-from dgl.utils import toindex
-from dgl.nn.mxnet import GraphConv
 from gluoncv.model_zoo import get_model
 from gluoncv.data.batchify import Pad
-from gluoncv.utils import makedirs, LRSequential, LRScheduler
+from gluoncv.utils import makedirs
 
-from model import faster_rcnn_resnet101_v1d_custom, faster_rcnn_resnet101_v1d_custom, RelDN
+from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from utils import *
 from data import *
 
-filehandler = logging.FileHandler('output.log')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser.add_argument('--gpus', type=str, default='0',
+                        help="Training with GPUs, you can specify 1,3 for example.")
+    parser.add_argument('--batch-size', type=int, default=8,
+                        help="Total batch-size for training.")
+    parser.add_argument('--epochs', type=int, default=9,
+                        help="Training epochs.")
+    parser.add_argument('--lr-reldn', type=float, default=0.01,
+                        help="Learning rate for RelDN module.")
+    parser.add_argument('--wd-reldn', type=float, default=0.0001,
+                        help="Weight decay for RelDN module.")
+    parser.add_argument('--lr-faster-rcnn', type=float, default=0.01,
+                        help="Learning rate for Faster R-CNN module.")
+    parser.add_argument('--wd-faster-rcnn', type=float, default=0.0001,
+                        help="Weight decay for RelDN module.")
+    parser.add_argument('--lr-decay-epoch', type=str, default='5,8',
+                        help="Learning rate decay points.")
+    parser.add_argument('--lr-warmup-iters', type=int, default=4000,
+                        help="Learning rate warm-up iterations.")
+    parser.add_argument('--save-dir', type=str, default='params_resnet101_v1d_reldn',
+                        help="Path to save model parameters.")
+    parser.add_argument('--log-dir', type=str, default='reldn_output.log',
+                        help="Path to save training logs.")
+    parser.add_argument('--pretrained-faster-rcnn', type=str, default='faster_rcnn_resnet101_v1d_custom_best.params',
+                        help="Path to saved Faster R-CNN model parameters.")
+    parser.add_argument('--freq-prior', type=str, default='freq_prior.pkl',
+                        help="Path to saved frequency prior data.")
+    parser.add_argument('--verbose-freq', type=int, default=100,
+                        help="Frequency of log printing in number of iterations.")
+
+    args = parser.parse_args()
+    return args
+
+
+args = parse_args()
+
+filehandler = logging.FileHandler(args.log_dir)
 streamhandler = logging.StreamHandler()
 logger = logging.getLogger('')
 logger.setLevel(logging.INFO)
@@ -23,37 +56,46 @@ logger.addHandler(filehandler)
 logger.addHandler(streamhandler)
 
 # Hyperparams
-num_gpus = 1
-batch_size = num_gpus * 1
-ctx = [mx.gpu(i) for i in range(num_gpus)]
-nepoch = 9
+ctx = [mx.gpu(int(i)) for i in args.gpus.split(',') if i.strip()]
+if ctx:
+    num_gpus = len(ctx)
+    assert args.batch_size % num_gpus == 0
+    per_device_batch_size = int(args.batch_size / num_gpus)
+else:
+    ctx = [mx.cpu()]
+    per_device_batch_size = args.batch_size
+
+aggregate_grad = per_device_batch_size > 1
+
+nepoch = args.epochs
 N_relations = 50
 N_objects = 150
-save_dir = 'params_resnet101_v1d'
+save_dir = args.save_dir
 makedirs(save_dir)
-batch_verbose_freq = 100
+batch_verbose_freq = args.verbose_freq
+lr_decay_epochs = [int(i) for i in args.lr_decay_epochs.split(',')]
 
-net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl')
-# net.initialize(ctx=ctx)
-net.spatial.initialize(mx.init.Normal(1e-4), ctx=ctx)
-net.visual.initialize(mx.init.Normal(1e-4), ctx=ctx)
-for k, v in net.collect_params().items():
-    v.grad_req = 'add'
-net_params = net.collect_params()
-net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
-                            {'learning_rate': 0.01, 'wd': 0.0001})
-
-# dataset and dataloader
+# Dataset and dataloader
 vg_train = VGRelation(split='train')
 logger.info('data loaded!')
-train_data = gluon.data.DataLoader(vg_train, batch_size=batch_size, shuffle=True, num_workers=8*num_gpus,
+train_data = gluon.data.DataLoader(vg_train, batch_size=args.batch_size, shuffle=True, num_workers=8*num_gpus,
                                    batchify_fn=dgl_mp_batchify_fn)
 n_batches = len(train_data)
 
-det_params_path = 'faster_rcnn_resnet101_v1d_custom/faster_rcnn_resnet101_v1d_custom_best.params'
+# Network definition
+net = RelDN(n_classes=N_relations, prior_pkl=args.freq_prior)
+net.spatial.initialize(mx.init.Normal(1e-4), ctx=ctx)
+net.visual.initialize(mx.init.Normal(1e-4), ctx=ctx)
+for k, v in net.collect_params().items():
+    v.grad_req = 'add' if aggretate_grad else 'write'
+net_params = net.collect_params()
+net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
+                            {'learning_rate': args.lr_reldn, 'wd': args.wd_reldn})
+
+det_params_path = args.pretrained_faster_rcnn
 detector = faster_rcnn_resnet101_v1d_custom(classes=vg_train.obj_classes,
-                                           pretrained_base=False, pretrained=False,
-                                           additional_output=True)
+                                            pretrained_base=False, pretrained=False,
+                                            additional_output=True)
 detector.load_parameters(det_params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 for k, v in detector.collect_params().items():
     v.grad_req = 'null'
@@ -65,10 +107,10 @@ detector_feat.load_parameters(det_params_path, ctx=ctx, ignore_extra=True, allow
 for k, v in detector_feat.collect_params().items():
     v.grad_req = 'null'
 for k, v in detector_feat.features.collect_params().items():
-    v.grad_req = 'add'
+    v.grad_req = 'add' if aggretate_grad else 'write'
 det_params = detector_feat.features.collect_params()
 det_trainer = gluon.Trainer(detector_feat.features.collect_params(), 'adam', 
-                            {'learning_rate': 0.01, 'wd': 0.0001})
+                            {'learning_rate': args.lr_faster_rcnn, 'wd': args.wd_faster_rcnn})
 
 def get_data_batch(g_list, img_list, ctx_list):
     if g_list is None or len(g_list) == 0:
@@ -92,21 +134,18 @@ def get_data_batch(g_list, img_list, ctx_list):
 
 L_rel = gluon.loss.SoftmaxCELoss()
 
-train_metric = mx.metric.Accuracy(name='rel')
-train_metric_top5 = mx.metric.TopKAccuracy(5, name='rel_top')
-train_metric_r100 = PredCls(100, iou_thresh=0.9)
-train_metric_phr100 = PhrCls(100, iou_thresh=0.9)
-
+train_metric = mx.metric.Accuracy(name='rel_acc')
+train_metric_top5 = mx.metric.TopKAccuracy(5, name='rel_acc_top5')
 metric_list = [train_metric, train_metric_top5]
 
 def batch_print(epoch, i, batch_verbose_freq, n_batches, btic, loss_rel_val, metric_list):
     if (i+1) % batch_verbose_freq == 0:
         print_txt = 'Epoch[%d] Batch[%d/%d], time: %d, loss_rel=%.4f '%\
             (epoch, i, n_batches, int(time.time() - btic),
-                loss_rel_val / (i+1), )#, loss_cls_val / (i+1))
+                loss_rel_val / (i+1), )
         for metric in metric_list:
             metric_name, metric_val = metric.get()
-            print_txt +=  '%s=%.4f '%(metric_name, metric_val)
+            print_txt += '%s=%.4f '%(metric_name, metric_val)
         logger.info(print_txt)
         btic = time.time()
         loss_rel_val = 0
@@ -125,8 +164,8 @@ for epoch in range(nepoch):
         net_trainer.set_learning_rate(net_trainer.learning_rate*0.1)
         det_trainer.set_learning_rate(det_trainer.learning_rate*0.1)
     for i, (G_list, img_list) in enumerate(train_data):
-        if epoch == 0 and i < 4000:
-            alpha = i / 4000
+        if epoch == 0 and i < args.lr_warm_iters:
+            alpha = i / args.lr_warm_iters
             warmup_factor = 1/3 * (1 - alpha) + alpha
             net_trainer.set_learning_rate(net_trainer_base_lr*warmup_factor)
             det_trainer.set_learning_rate(det_trainer_base_lr*warmup_factor)
@@ -139,7 +178,6 @@ for epoch in range(nepoch):
         detector_res_list = []
         G_batch = []
         bbox_pad = Pad(axis=(0))
-        # loss_cls_val = 0
         with mx.autograd.record():
             for G_slice, img in zip(G_list, img_list):
                 cur_ctx = img.context
@@ -192,13 +230,14 @@ for epoch in range(nepoch):
             continue
         for l in loss:
             l.backward()
-        if (i+1) % 8 == 0 or i == n_batches - 1:
-            net_trainer.step(8)
-            det_trainer.step(8)
-            for k, v in net_params.items():
-                v.zero_grad()
-            for k, v in det_params.items():
-                v.zero_grad()
+        if (i+1) % per_device_batch_size == 0 or i == n_batches - 1:
+            net_trainer.step(args.batch_size)
+            det_trainer.step(args.batch_size)
+            if aggretate_grad:
+                for k, v in net_params.items():
+                    v.zero_grad()
+                for k, v in det_params.items():
+                    v.zero_grad()
         for G_pred, img_slice in zip(G_batch, img_list):
             if G_pred is None or G_pred.number_of_nodes() == 0:
                 continue
@@ -207,7 +246,7 @@ for epoch in range(nepoch):
                 continue
             train_metric.update([G_pred.edata['rel_class'][link_ind]],
                                 [G_pred.edata['preds'][link_ind]])
-            train_metric_top5.update([G_pred.edata['rel_class'][link_ind]], 
+            train_metric_top5.update([G_pred.edata['rel_class'][link_ind]],
                                         [G_pred.edata['preds'][link_ind]])
         btic, loss_rel_val = batch_print(epoch, i, batch_verbose_freq, n_batches, btic, loss_rel_val, metric_list)
         if (i+1) % batch_verbose_freq == 0:
@@ -215,10 +254,10 @@ for epoch in range(nepoch):
             detector_feat.features.save_parameters('%s/detector_feat.features-%d.params'%(save_dir, epoch))
     print_txt = 'Epoch[%d], time: %d, loss_rel=%.4f,'%\
         (epoch, int(time.time() - tic),
-        loss_rel_val / (i+1))#, loss_cls_val / (i+1))
+        loss_rel_val / (i+1))
     for metric in metric_list:
         metric_name, metric_val = metric.get()
-        print_txt +=  '%s=%.4f '%(metric_name, metric_val)
+        print_txt += '%s=%.4f '%(metric_name, metric_val)
     logger.info(print_txt)
     net.save_parameters('%s/model-%d.params'%(save_dir, epoch))
     detector_feat.features.save_parameters('%s/detector_feat.features-%d.params'%(save_dir, epoch))

@@ -35,12 +35,12 @@ except ImportError:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
-    parser.add_argument('--network', type=str, default='resnet50_v1b',
+    parser.add_argument('--network', type=str, default='resnet101_v1d',
                         help="Base network name which serves as feature extraction base.")
-    parser.add_argument('--dataset', type=str, default='voc',
+    parser.add_argument('--dataset', type=str, default='visualgenome',
                         help='Training dataset. Now support voc and coco.')
     parser.add_argument('--num-workers', '-j', dest='num_workers', type=int,
-                        default=4, help='Number of data workers, you can use larger '
+                        default=8, help='Number of data workers, you can use larger '
                                         'number to accelerate data loading, '
                                         'if your CPU and GPUs are powerful.')
     parser.add_argument('--batch-size', type=int, default=8, help='Training mini-batch size.')
@@ -504,16 +504,6 @@ if __name__ == '__main__':
     # net_name = '_'.join(('faster_rcnn', *module_list, args.network, args.dataset))
     net_name = '_'.join(('faster_rcnn', *module_list, args.network, 'custom'))
     args.save_prefix += net_name
-    '''
-    net = get_model(net_name, pretrained_base=False, transfer='coco',
-                    classes=train_dataset._obj_classes,
-                    per_device_batch_size=args.batch_size // len(ctx), **kwargs)
-    '''
-    '''
-    net = faster_rcnn_resnet50_v1b_custom(classes=train_dataset.classes, transfer='coco',
-                                          pretrained_base=False, additional_output=False,
-                                          per_device_batch_size=args.batch_size // len(ctx), **kwargs)
-    '''
     net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset.classes, transfer='coco',
                                            pretrained_base=False, additional_output=False,
                                            per_device_batch_size=args.batch_size // len(ctx), **kwargs)

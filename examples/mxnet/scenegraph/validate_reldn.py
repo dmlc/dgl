@@ -53,9 +53,6 @@ for metric in metric_list:
 semantic_only = False
 net = RelDN(n_classes=N_relations, prior_pkl='freq_prior.pkl',
             semantic_only=semantic_only)
-'''
-net.initialize(ctx=ctx)
-'''
 net.load_parameters('params_resnet101_v1d/model-8.params', ctx=ctx)
 
 # dataset and dataloader
