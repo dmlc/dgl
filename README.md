@@ -10,9 +10,8 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 <p align="center">
   <img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
+  <b>Figure</b>: DGL Overall Architecture
 </p>
-
-**Figure**: DGL Overall Architecture
 
 
 ## Using DGL
@@ -31,7 +30,7 @@ feats = g.ndata.pop('h')
 label_pred = model(g, feats)
 ```
 
-<b>Further reading</b>: DGL is released as a managed service on AWS SageMaker, see the medium posts for an easy trip to DGL on SageMaker([part1](https://medium.com/@julsimon/a-primer-on-graph-neural-networks-with-amazon-neptune-and-the-deep-graph-library-5ce64984a276) and [part2](https://medium.com/@julsimon/deep-graph-library-part-2-training-on-amazon-sagemaker-54d318dfc814)).
+**Further reading**: DGL is released as a managed service on AWS SageMaker, see the medium posts for an easy trip to DGL on SageMaker([part1](https://medium.com/@julsimon/a-primer-on-graph-neural-networks-with-amazon-neptune-and-the-deep-graph-library-5ce64984a276) and [part2](https://medium.com/@julsimon/deep-graph-library-part-2-training-on-amazon-sagemaker-54d318dfc814)).
 
 **Researchers** can start from the growing list of [models implemented in DGL](https://github.com/dmlc/dgl/tree/master/examples). Developing new models does not mean that you have to start from scratch. Instead, you can reuse many [pre-built modules](https://docs.dgl.ai/api/python/nn.html). Here is how to get a standard two-layer graph convolutional model with a pre-built GraphConv module:
 ```python
@@ -97,21 +96,23 @@ class GATLayer(nn.Module):
 | PubMed   | GCN <br> GAT | 79.00 &plusmn; 0.41 <br> 77.65 &plusmn; 0.32 | <b>0.491</b> &emsp;&emsp; 0.690 <br> 1.946 &emsp;&emsp; <b>1.393</b> | 1.1 &emsp;&emsp; 1.1 <br> 1.6 &emsp;&emsp; <b>1.1</b> |
 | Reddit   |     GCN      |             93.46 &plusmn; 0.06              |                    *OOM*&emsp;&emsp; <b>28.6</b>                     |            *OOM* &emsp;&emsp; <b>11.7</b>             |
 | Reddit-S |     GCN      |                     N/A                      |                    29.12 &emsp;&emsp; <b>9.44</b>                    |             15.7 &emsp;&emsp; <b>3.6</b>              |
+
 Table: Training time(in seconds) for 200 epochs and memory consumption(GB)
+  <img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
 
 High memory utilization allows DGL to push the limit of single-GPU performance, as seen in below images.
-| ![](https://i.imgur.com/CvXc9Uu.png =600x) | ![](https://i.imgur.com/HnCfJyU.png =600x) |
+| <img src="https://i.imgur.com/CvXc9Uu.png" width="400"> | <img src="https://i.imgur.com/HnCfJyU.png" width="400"> |
 | -------- | -------- |
 
 **Scalability**: DGL has fully leveraged multiple GPUs in both one machine and clusters for increasing training speed, and has better performance than alternatives, as seen in below images.
 
-![](https://i.imgur.com/IGERtVX.png =600x)
+<img src="https://i.imgur.com/IGERtVX.png" width="600">
 
-| ![](https://i.imgur.com/BugYro2.png =600x) |  ![](https://i.imgur.com/KQ4nVdX.png =600x) | 
+| <img src="https://i.imgur.com/BugYro2.png"> |  <img src="https://i.imgur.com/KQ4nVdX.png"> | 
 | :---------------------------------------: | -- |
 
 
-<b>Further reading</b>: Detailed comparison of DGL and other Graph alternatives can be found [here](https://arxiv.org/abs/1909.01315).
+**Further reading**: Detailed comparison of DGL and other Graph alternatives can be found [here](https://arxiv.org/abs/1909.01315).
 
 ## DGL Models and Applications
 
