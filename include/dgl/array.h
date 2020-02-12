@@ -371,6 +371,47 @@ bool CSRHasDuplicate(CSRMatrix csr);
  */
 void CSRSort(CSRMatrix csr);
 
+/*!
+ * \brief Sample from the non-zero values of the given rows.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = CSRRowSampling(csr, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [1, 2, 4]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix CSRRowSampling(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
 ///////////////////////// COO routines //////////////////////////
 
 /*! \brief Return true if the value (row, col) is non-zero */
@@ -442,8 +483,59 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
-/*! \return Sort indices of the COO matrix. */
-COOMatrix COOSort(COOMatrix mat, bool sort_column = true);
+/*!
+ * \brief Sort the indices of a COO matrix.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * \param mat The input coo matrix
+ * \param sort_column True if column index should be sorted too.
+ * \return COO matrix with index sorted.
+ */
+COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+
+/*!
+ * \brief Sample from the non-zero values of the given rows.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * CSRMatrix coo = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = COORowSampling(coo, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [1, 2, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowSampling(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
 
 // inline implementations
 template <typename T>
@@ -460,8 +552,6 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }
   return ret.CopyTo(ctx);
 }
-
-
 
 ///////////////////////// Dispatchers //////////////////////////
 
@@ -574,6 +664,10 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 // TODO(minjie): In our current use cases, data type and id type are the
 //   same. For example, data array is used to store edge ids.
 #define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
+  if (CSRHasData(csr)) {                                 \
+    CHECK_EQ(csr.indptr->dtype.code, csr.data->dtype.code); \
+    CHECK_EQ(csr.indptr->dtype.bits, csr.data->dtype.bits); \
+  }                                                         \
   ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
     ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
       typedef IdType DType;                                 \
@@ -593,6 +687,10 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 // TODO(minjie): In our current use cases, data type and id type are the
 //   same. For example, data array is used to store edge ids.
 #define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
+  if (COOHasData(coo)) {                                 \
+    CHECK_EQ(coo.row->dtype.code, coo.data->dtype.code);    \
+    CHECK_EQ(coo.row->dtype.bits, coo.data->dtype.bits);    \
+  }                                                         \
   ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
       typedef IdType DType;                                 \

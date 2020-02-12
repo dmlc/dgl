@@ -107,6 +107,15 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 template <DLDeviceType XPU, typename IdType, typename DType>
 void CSRSort(CSRMatrix csr);
 
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowSampling(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRRowSamplingUniform(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
 template <DLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
 
@@ -148,6 +157,17 @@ COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 template <DLDeviceType XPU, typename IdType, typename DType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOSort(COOMatrix mat, bool sort_column);
+
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowSampling(
+    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORowSamplingUniform(
+    COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
 
 }  // namespace impl
 }  // namespace aten

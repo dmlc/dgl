@@ -409,6 +409,22 @@ void CSRSort(CSRMatrix csr) {
   });
 }
 
+COOMatrix CSRRowSampling(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
+  COOMatrix ret;
+  ATEN_CSR_IDX_SWITCH(mat, XPU, IdType, {
+    if (!prob.defined() || prob->shape[0] == 0) {
+      ret = impl::CSRRowSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::CSRRowSampling<XPU, IdType, FloatType>(
+            mat, rows, num_samples, prob, replace);
+      });
+    }
+  });
+  return ret;
+}
+
 ///////////////////////// COO routines //////////////////////////
 
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col) {
@@ -512,6 +528,30 @@ COOMatrix COOSliceMatrix(COOMatrix coo, NDArray rows, NDArray cols) {
   COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, DType, {
     ret = impl::COOSliceMatrix<XPU, IdType, DType>(coo, rows, cols);
+  });
+  return ret;
+}
+
+COOMatrix COOSort(COOMatrix mat, bool sort_column) {
+  COOMatrix ret;
+  ATEN_COO_IDX_SWITCH(mat, XPU, IdType, {
+    ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+  });
+  return ret;
+}
+
+COOMatrix COORowSampling(
+    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
+  COOMatrix ret;
+  ATEN_COO_IDX_SWITCH(mat, XPU, IdType, {
+    if (!prob.defined() || prob->shape[0] == 0) {
+      ret = impl::COORowSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+    } else {
+      ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
+        ret = impl::COORowSampling<XPU, IdType, FloatType>(
+            mat, rows, num_samples, prob, replace);
+      });
+    }
   });
   return ret;
 }
