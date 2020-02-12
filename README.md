@@ -10,6 +10,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 
 <p align="center">
   <img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
+  <br>
   <b>Figure</b>: DGL Overall Architecture
 </p>
 
@@ -98,7 +99,6 @@ class GATLayer(nn.Module):
 | Reddit-S |     GCN      |                     N/A                      |                    29.12 &emsp;&emsp; <b>9.44</b>                    |             15.7 &emsp;&emsp; <b>3.6</b>              |
 
 Table: Training time(in seconds) for 200 epochs and memory consumption(GB)
-  <img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
 
 High memory utilization allows DGL to push the limit of single-GPU performance, as seen in below images.
 | <img src="https://i.imgur.com/CvXc9Uu.png" width="400"> | <img src="https://i.imgur.com/HnCfJyU.png" width="400"> |
@@ -106,7 +106,9 @@ High memory utilization allows DGL to push the limit of single-GPU performance, 
 
 **Scalability**: DGL has fully leveraged multiple GPUs in both one machine and clusters for increasing training speed, and has better performance than alternatives, as seen in below images.
 
-<img src="https://i.imgur.com/IGERtVX.png" width="600">
+<p align="center">
+  <img src="https://i.imgur.com/IGERtVX.png" width="600">
+</p>
 
 | <img src="https://i.imgur.com/BugYro2.png"> |  <img src="https://i.imgur.com/KQ4nVdX.png"> | 
 | :---------------------------------------: | -- |
