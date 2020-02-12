@@ -318,7 +318,7 @@ class FasterRCNN(RCNN):
         return pooled_roi_feats
 
     # pylint: disable=arguments-differ
-    def hybrid_forward(self, F, x, gt_box=None, gt_label=None):
+    def hybrid_forward(self, F, x, gt_box=None, gt_label=None, m_rpn_box=None):
         """Forward Faster-RCNN network.
 
         The behavior during training and inference is different.
@@ -347,8 +347,7 @@ class FasterRCNN(RCNN):
             else:
                 return [x]
 
-        if isinstance(x, tuple):
-            x, m_rpn_box = x
+        if m_rpn_box is not None:
             manual_rpn_box = True
         else:
             manual_rpn_box = False
@@ -415,7 +414,12 @@ class FasterRCNN(RCNN):
         cls_pred = cls_pred.reshape((batch_size, num_roi, self.num_class + 1))
         if manual_rpn_box:
             spatial_feat = top_feat.mean(axis=1).reshape((-4, rpn_box.shape[0], rpn_box.shape[1], -3))
-            return rpn_box, spatial_feat, cls_pred
+            cls_ids, scores = self.cls_decoder(F.softmax(cls_pred, axis=-1))
+            cls_ids = cls_ids.transpose((0, 2, 1)).reshape((0, 0, 0, 1))
+            scores = scores.transpose((0, 2, 1)).reshape((0, 0, 0, 1))
+            cls_ids = _split(cls_ids, axis=0, num_outputs=batch_size, squeeze_axis=True)
+            scores = _split(scores, axis=0, num_outputs=batch_size, squeeze_axis=True)
+            return cls_ids, scores, rpn_box, spatial_feat
 
         # no need to convert bounding boxes in training, just return
         if autograd.is_training():
@@ -490,7 +494,7 @@ class FasterRCNN(RCNN):
         if self._additional_output:
             feat_ind = F.slice_axis(result, axis=-1, begin=6, end=7)
             spatial_feat = top_feat.mean(axis=1).expand_dims(0).reshape(batch_size, 0, -1)
-            return ids, scores, bboxes, feat, feat_ind, spatial_feat, cls_pred
+            return ids, scores, bboxes, feat, feat_ind, spatial_feat
         return ids, scores, bboxes
 
 def get_faster_rcnn(name, dataset, pretrained=False, ctx=mx.cpu(),
@@ -679,7 +683,7 @@ def faster_rcnn_resnet101_v1d_coco(pretrained=False, pretrained_base=True, **kwa
         name='resnet101_v1d', dataset='coco', pretrained=pretrained,
         features=features, top_features=top_features, classes=classes,
         short=800, max_size=1333, train_patterns=train_patterns,
-        nms_thresh=0.5, nms_topk=-1, post_nms=-1,
+        nms_thresh=0.5, nms_topk=-1, post_nms=100,
         roi_mode='align', roi_size=(14, 14), strides=16, clip=4.14,
         rpn_channel=1024, base_size=16, scales=(2, 4, 8, 16, 32),
         ratios=(0.5, 1, 2), alloc_size=(128, 128), rpn_nms_thresh=0.7,

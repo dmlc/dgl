@@ -36,9 +36,9 @@ def object_iou_thresh(gt_object, pred_object, iou_thresh=0.5):
     return False
 
 def triplet_iou_thresh(pred_triplet, gt_triplet, iou_thresh=0.5):
-    sub_iou = iou(gt_triplet[6:10], pred_triplet[5:9])
+    sub_iou = iou(gt_triplet[5:9], pred_triplet[5:9])
     if sub_iou >= iou_thresh:
-        ob_iou = iou(gt_triplet[10:14], pred_triplet[9:13])
+        ob_iou = iou(gt_triplet[9:13], pred_triplet[9:13])
         if ob_iou >= iou_thresh:
             return True
     return False
@@ -103,10 +103,10 @@ class PredCls(mx.metric.EvalMetric):
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += label[3]
+                    count += 1
                     label_matched[j] = True
 
-        total = labels[:,3].sum()
+        total = labels.shape[0]
         self.sum_metric += count / total
         self.num_inst += 1
 
@@ -134,12 +134,12 @@ class PhrCls(mx.metric.EvalMetric):
                     continue
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
+                   int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
-                   int(label[5]) == int(pred[5]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += label[3]
+                    count += 1
                     label_matched[j] = True
-        total = labels[:,3].sum()
+        total = labels.shape[0]
         self.sum_metric += count / total
         self.num_inst += 1
 
@@ -167,12 +167,12 @@ class SGDet(mx.metric.EvalMetric):
                     continue
                 label = labels[j]
                 if int(label[2]) == int(pred[2]) and \
+                   int(label[3]) == int(pred[3]) and \
                    int(label[4]) == int(pred[4]) and \
-                   int(label[5]) == int(pred[5]) and \
                    triplet_iou_thresh(pred, label, self.iou_thresh):
-                    count += label[3]
+                    count += 1
                     label_matched[j] =True
-        total = labels[:,3].sum()
+        total = labels.shape[0]
         self.sum_metric += count / total
         self.num_inst += 1
 
@@ -223,13 +223,13 @@ class SGDetPlus(mx.metric.EvalMetric):
                         predicate_matched[j] = True
                 if not triplet_matched[j]:
                     if int(label[2]) == int(pred[2]) and \
+                       int(label[3]) == int(pred[3]) and \
                        int(label[4]) == int(pred[4]) and \
-                       int(label[5]) == int(pred[5]) and \
                        triplet_iou_thresh(pred, label, self.iou_thresh):
-                        count += label[3]
+                        count += 1
                         triplet_matched[j] = True
         # compute sum
-        total = labels[:,3].sum()
+        total = labels.shape[0]
         N = gt_obj_num + 2 * total
         self.sum_metric += count / N
         self.num_inst += 1
@@ -312,7 +312,6 @@ def extract_gt(g, img_size):
     gt_node_sub = gt_node_ids[0].asnumpy()
     gt_node_ob = gt_node_ids[1].asnumpy()
     gt_rel_class = g.edata['rel_class'][gt_eids,0].asnumpy() - 1
-    gt_rel_count = g.edata['rel_count'][gt_eids,0].asnumpy()
     gt_sub_class = gt_class[gt_node_sub]
     gt_ob_class = gt_class[gt_node_ob]
 
@@ -321,7 +320,7 @@ def extract_gt(g, img_size):
 
     n = len(gt_eids)
     gt_triplets = np.vstack([np.ones(n), np.ones(n),
-                             gt_rel_class, gt_rel_count, gt_sub_class, gt_ob_class,
+                             gt_rel_class, gt_sub_class, gt_ob_class,
                              gt_sub_bbox.transpose(1, 0),
                              gt_ob_bbox.transpose(1, 0)]).transpose(1, 0)
     return gt_objects, gt_triplets
@@ -330,9 +329,8 @@ def extract_pred(g, topk=100, joint_preds=False):
     if g is None or g.number_of_nodes() == 0:
         return None, None
 
-    pred_prob = g.ndata['node_class_prob'].asnumpy()
-    pred_class = pred_prob.argmax(axis=1)
-    pred_class_prob = pred_prob.max(axis=1)
+    pred_class = g.ndata['node_class_pred'].asnumpy()
+    pred_class_prob = g.ndata['node_class_logit'].asnumpy()
     pred_bbox = g.ndata['pred_bbox'][:,0:4].asnumpy()
 
     pred_objects = np.vstack([pred_class, pred_bbox.transpose(1, 0)]).transpose(1, 0)
@@ -353,12 +351,10 @@ def extract_pred(g, topk=100, joint_preds=False):
     pred_node_sub = pred_node_ids[0].asnumpy()
     pred_node_ob = pred_node_ids[1].asnumpy()
 
-    pred_sub_prob = pred_prob[pred_node_sub]
     pred_sub_class = pred_class[pred_node_sub]
     pred_sub_class_prob = pred_class_prob[pred_node_sub]
     pred_sub_bbox = pred_bbox[pred_node_sub]
 
-    pred_ob_prob = pred_prob[pred_node_ob]
     pred_ob_class = pred_class[pred_node_ob]
     pred_ob_class_prob = pred_class_prob[pred_node_ob]
     pred_ob_bbox = pred_bbox[pred_node_ob]

@@ -8,13 +8,14 @@ with open(path_to_json, 'r') as f:
     tmp = f.read()
     val_data = json.loads(tmp)
 
-with open('freq_prior.pkl', 'rb') as f:
+with open('freq_prior_overlap.pkl', 'rb') as f:
     pred_dist = pickle.load(f)
 
 pred_cls = 0
-for i, (_, item) in enumerate(val_data.items()):
-    if (i+1) % 1000 == 0:
-        print('%d\t%f'%(i, pred_cls/(i+1)))
+for i, (img_id, item) in enumerate(val_data.items()):
+    if img_id != '2315353.jpg':
+        continue
+    import pdb; pdb.set_trace()
     gt_box_to_label = {}
     gt_triplet = []
     node_id = 0
@@ -75,5 +76,7 @@ for i, (_, item) in enumerate(val_data.items()):
 
     denom = len(item)
     pred_cls += count / denom
+    if (i+1) % 1000 == 0:
+        print('%d\t%f'%(i, pred_cls/(i+1)))
 
 print('Recall@100: %f'%(pred_cls/len(val_data)))

@@ -17,9 +17,7 @@ class EdgeConfMLP(nn.Block):
 
     def forward(self, edges):
         score_pred = nd.log_softmax(edges.data['preds'])[:,1:].max(axis=1)
-        score_phr = score_pred + \
-                    nd.log_softmax(edges.src['node_class_pred']).max(axis=1) + \
-                    nd.log_softmax(edges.dst['node_class_pred']).max(axis=1)
+        score_phr = score_pred + edges.src['node_class_logit'] + edges.dst['node_class_logit']
         return {'score_pred': score_pred,
                 'score_phr': score_phr}
 
@@ -32,8 +30,8 @@ class EdgeBBoxExtend(nn.Block):
         result = nd.zeros((n, 4), ctx=bbox_a.context)
         result[:,0] = bbox_a[:,0] - bbox_b[:,0]
         result[:,1] = bbox_a[:,1] - bbox_b[:,1]
-        result[:,2] = nd.log((bbox_a[:,2] - bbox_a[:,0]) / (bbox_b[:,2] - bbox_b[:,0] + 1e-8))
-        result[:,3] = nd.log((bbox_a[:,3] - bbox_a[:,1]) / (bbox_b[:,3] - bbox_b[:,1] + 1e-8))
+        result[:,2] = nd.log((bbox_a[:,2] - bbox_a[:,0] + 1e-8) / (bbox_b[:,2] - bbox_b[:,0] + 1e-8))
+        result[:,3] = nd.log((bbox_a[:,3] - bbox_a[:,1] + 1e-8) / (bbox_b[:,3] - bbox_b[:,1] + 1e-8))
         return result
 
     def forward(self, edges):
@@ -56,9 +54,9 @@ class EdgeFreqPrior(nn.Block):
         self.freq_prior = freq_prior
 
     def forward(self, edges):
-        ctx = edges.src['node_class'].context
-        src_ind = edges.src['node_class'][:,0].asnumpy().astype(int)
-        dst_ind = edges.dst['node_class'][:,0].asnumpy().astype(int)
+        ctx = edges.src['node_class_pred'].context
+        src_ind = edges.src['node_class_pred'].asnumpy().astype(int)
+        dst_ind = edges.dst['node_class_pred'].asnumpy().astype(int)
         prob = self.freq_prior[src_ind, dst_ind]
         out = nd.array(prob, ctx=ctx)
         return {'freq_prior': out}
@@ -68,9 +66,9 @@ class EdgeSpatial(nn.Block):
         super(EdgeSpatial, self).__init__()
         self.mlp = nn.Sequential()
         self.mlp.add(nn.Dense(64))
-        self.mlp.add(nn.Activation('relu'))
+        self.mlp.add(nn.LeakyReLU(0.1))
         self.mlp.add(nn.Dense(64))
-        self.mlp.add(nn.Activation('relu'))
+        self.mlp.add(nn.LeakyReLU(0.1))
         self.mlp.add(nn.Dense(n_classes))
 
     def forward(self, edges):
@@ -80,9 +78,16 @@ class EdgeSpatial(nn.Block):
         return {'spatial': out}
 
 class EdgeVisual(nn.Block):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, vis_feat_dim=7*7*3):
         super(EdgeVisual, self).__init__()
-        self.mlp_joint = nn.Dense(n_classes)
+        self.dim_in = vis_feat_dim
+        self.mlp_joint = nn.Sequential()
+        self.mlp_joint.add(nn.Dense(vis_feat_dim // 2))
+        self.mlp_joint.add(nn.LeakyReLU(0.1))
+        self.mlp_joint.add(nn.Dense(vis_feat_dim // 3))
+        self.mlp_joint.add(nn.LeakyReLU(0.1))
+        self.mlp_joint.add(nn.Dense(n_classes))
+
         self.mlp_sub = nn.Dense(n_classes)
         self.mlp_ob = nn.Dense(n_classes)
 
@@ -113,17 +118,15 @@ class RelDN(nn.Block):
     def forward(self, g): 
         if g is None or g.number_of_nodes() == 0:
             return g
-        cls = g.ndata['node_class_pred']
-        g.ndata['node_class_prob'] = nd.softmax(cls)
-        # bbox extension
-        g.apply_edges(self.edge_bbox_extend)
         # predictions
         g.apply_edges(self.freq_prior)
-        g.apply_edges(self.spatial)
-        g.apply_edges(self.visual)
         if self.semantic_only:
             g.edata['preds'] = g.edata['freq_prior']
         else:
+            # bbox extension
+            g.apply_edges(self.edge_bbox_extend)
+            g.apply_edges(self.spatial)
+            g.apply_edges(self.visual)
             g.edata['preds'] = g.edata['freq_prior'] + g.edata['spatial'] + g.edata['visual']
         # subgraph for gconv
         g.apply_edges(self.edge_conf_mlp)

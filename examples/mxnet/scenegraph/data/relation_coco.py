@@ -56,6 +56,7 @@ class VGRelation(VisionDataset):
 
     def __getitem__(self, idx):
         img_id = list(self._dict)[idx]
+        # img_id = list(self._dict)[22079]
         img_path = self._img_path.format(img_id)
         img = mx.image.imread(img_path)
 
@@ -120,9 +121,25 @@ class VGRelation(VisionDataset):
             img, bbox = self.img_transform(img, bbox)
 
         # build the graph
-        g = dgl.DGLGraph()
+        g = dgl.DGLGraph(multigraph=True)
         g.add_nodes(n_nodes)
+        adjmat = np.zeros((n_nodes, n_nodes))
+        predicate = []
+        for i, it in enumerate(item):
+            adjmat[sub_id[i], ob_id[i]] = 1
+            predicate.append(it['predicate'])
+        predicate = mx.nd.array(predicate).expand_dims(1)
+        g.add_edges(sub_id, ob_id, {'rel_class': mx.nd.array(predicate) + 1})
+        empty_edge_list = []
+        for i in range(n_nodes):
+            for j in range(n_nodes):
+                if i != j and adjmat[i, j] == 0:
+                    empty_edge_list.append((i, j))
+        if len(empty_edge_list) > 0:
+            src, dst = tuple(zip(*empty_edge_list))
+            g.add_edges(src, dst, {'rel_class': mx.nd.zeros((len(empty_edge_list), 1))})
 
+        '''
         # complete graph
         edge_list = []
         for i in range(n_nodes - 1):
@@ -136,16 +153,20 @@ class VGRelation(VisionDataset):
         rel_class = mx.nd.zeros((g.number_of_edges(), 1))
         rel_count = mx.nd.zeros((g.number_of_edges(), 1))
         edge_inds = g.edge_ids(sub_id, ob_id)
+        # it is not a simple graph! so we need to add the edges dynamically
         for i, it in enumerate(item):
             ind = edge_inds[i]
             rel_class[ind, 0] = it['predicate'] + 1
             rel_count[ind, 0] += 1
 
+        '''
         # assign features
         g.ndata['bbox'] = bbox
         g.ndata['node_class'] = node_class_ids
         g.ndata['node_class_vec'] = node_class_vec
+        '''
         g.edata['rel_class'] = rel_class
         g.edata['rel_count'] = rel_count
+        '''
 
         return g, img

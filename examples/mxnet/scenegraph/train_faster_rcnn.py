@@ -25,7 +25,7 @@ from gluoncv.utils.metrics.rcnn import RPNAccMetric, RPNL1LossMetric, RCNNAccMet
     RCNNL1LossMetric
 
 from data import *
-from model import EdgeGCN, faster_rcnn_resnet101_v1d_custom
+from model import EdgeGCN, faster_rcnn_resnet101_v1d_custom, faster_rcnn_resnet50_v1b_custom
 
 try:
     import horovod.mxnet as hvd
@@ -508,6 +508,11 @@ if __name__ == '__main__':
     net = get_model(net_name, pretrained_base=False, transfer='coco',
                     classes=train_dataset._obj_classes,
                     per_device_batch_size=args.batch_size // len(ctx), **kwargs)
+    '''
+    '''
+    net = faster_rcnn_resnet50_v1b_custom(classes=train_dataset.classes, transfer='coco',
+                                          pretrained_base=False, additional_output=False,
+                                          per_device_batch_size=args.batch_size // len(ctx), **kwargs)
     '''
     net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset.classes, transfer='coco',
                                            pretrained_base=False, additional_output=False,
