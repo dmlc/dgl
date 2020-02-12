@@ -8,7 +8,7 @@
 
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
-![DGL v0.4 architecture](https://i.imgur.com/DwA1NbZ.png =600x)
+<img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
 
 **Figure**: DGL Overall Architecture
 
