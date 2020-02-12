@@ -3,16 +3,13 @@
  * \file array/cpu/coo_sort.cc
  * \brief COO sorting
  */
-
 #include <dgl/array.h>
 #include <numeric>
 #include <algorithm>
 #include <vector>
 
 namespace dgl {
-
 namespace aten {
-
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
@@ -27,7 +24,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
   IdArray new_data = IdArray::Empty({nnz}, coo.row->dtype, coo.row->ctx);
   IdType* new_row_data = static_cast<IdType*>(new_row->data);
   IdType* new_col_data = static_cast<IdType*>(new_col->data);
-  IdType *new_data_data = static_cast<IdType*>(new_data->data);
+  IdType* new_data_data = static_cast<IdType*>(new_data->data);
   std::iota(new_data_data, new_data_data + nnz, 0);
   if (sort_column)
     std::sort(

@@ -114,13 +114,14 @@ class RandomEngine {
    * 
    * If replace is false, the number of picked integers must not larger than N.
    *
-   * \tparam IdxType Return integer type
+   * \tparam IdxType Id type
+   * \tparam FloatType Probability value type
    * \param num Number of integers to choose
    * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
    * \param replace If true, choose with replacement.
    * \return Integer array
    */
-  template <typename IdxType>
+  template <typename IdxType, typename FloatType>
   IdArray Choice(int64_t num, FloatArray prob, bool replace = true);
 
   /*!

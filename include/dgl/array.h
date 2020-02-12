@@ -200,7 +200,8 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 /*!
  * \brief Plain CSR matrix
  *
- * The column indices are 0-based and are not necessarily sorted.
+ * The column indices are 0-based and are not necessarily sorted. The data array stores
+ * integer ids for reading edge data.
  *
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
@@ -211,7 +212,7 @@ struct CSRMatrix {
   int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
   runtime::NDArray indptr, indices;
-  /*! \brief data array, could be empty. */
+  /*! \brief data array. */
   runtime::NDArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted = false;
@@ -221,7 +222,7 @@ struct CSRMatrix {
   CSRMatrix(int64_t nrows, int64_t ncols,
             runtime::NDArray parr,
             runtime::NDArray iarr,
-            runtime::NDArray darr = runtime::NDArray(),
+            runtime::NDArray darr,
             bool sorted_flag = false)
     : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
       data(darr), sorted(sorted_flag) {}
@@ -386,9 +387,10 @@ void CSRSort(CSRMatrix csr);
  * // csr.num_cols = 4;
  * // csr.indptr = [0, 2, 3, 3, 5]
  * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = ...;  // arbitrary data
  * CSRMatrix csr = ...;
  * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = CSRRowSampling(csr, rows, 2, FloatArray(), false);
+ * COOMatrix sampled = CSRRowWiseSampling(csr, rows, 2, FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -405,12 +407,56 @@ void CSRSort(CSRMatrix csr);
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
-COOMatrix CSRRowSampling(
+COOMatrix CSRRowWiseSampling(
     CSRMatrix mat,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true);
+
+/*!
+ * \brief Select K non-zero values from the given rows according to some  weights.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = ...;  // arbitrary data
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = CSRRowWiseTopk(csr, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [1, 2, 3]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param asceding If true, elements are sorted by ascending order, equivalent to find
+ *                 the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t k,
+    FloatArray weight,
+    bool ascending = false);
 
 ///////////////////////// COO routines //////////////////////////
 
@@ -511,9 +557,9 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  * // coo.num_cols = 4;
  * // coo.rows = [0, 0, 1, 3, 3]
  * // coo.cols = [0, 1, 1, 2, 3]
- * CSRMatrix coo = ...;
+ * COOMatrix coo = ...;
  * IdArray rows = ... ; // [1, 3]
- * COOMatrix sampled = COORowSampling(coo, rows, 2, FloatArray(), false);
+ * COOMatrix sampled = COORowWiseSampling(coo, rows, 2, FloatArray(), false);
  * // possible sampled coo matrix:
  * // sampled.num_rows = 4
  * // sampled.num_cols = 4
@@ -530,12 +576,56 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */
-COOMatrix COORowSampling(
+COOMatrix COORowWiseSampling(
     COOMatrix mat,
     IdArray rows,
     int64_t num_samples,
     FloatArray prob = FloatArray(),
     bool replace = true);
+
+/*!
+ * \brief Select K non-zero values from the given rows according to some  weights.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = ...;  // arbitrary data
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = COORowWiseTopk(coo, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [1, 2, 3]
+ *
+ * \param mat Input COO matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param asceding If true, elements are sorted by ascending order, equivalent to find
+ *                 the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWiseTopk(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t k,
+    FloatArray weight,
+    bool ascending = false);
 
 // inline implementations
 template <typename T>

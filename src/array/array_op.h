@@ -109,12 +109,19 @@ void CSRSort(CSRMatrix csr);
 
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>
-COOMatrix CSRRowSampling(
+COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix CSRRowSamplingUniform(
+COOMatrix CSRRowWiseSamplingUniform(
     CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+// FloatType is the type of weight data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
+
+///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
@@ -162,12 +169,17 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column);
 
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>
-COOMatrix COORowSampling(
+COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COORowSamplingUniform(
+COOMatrix COORowWiseSamplingUniform(
     COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+// FloatType is the type of weight data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowWiseTopk(
+    COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
 }  // namespace impl
 }  // namespace aten

@@ -26,7 +26,7 @@ template int32_t RandomEngine::Choice<int32_t>(FloatArray);
 template int64_t RandomEngine::Choice<int64_t>(FloatArray);
 
 
-template<typename IdxType>
+template<typename IdxType, typename FloatType>
 IdArray RandomEngine::Choice(int64_t num, FloatArray prob, bool replace) {
   const int64_t N = prob->shape[0];
   if (!replace)
@@ -37,24 +37,25 @@ IdArray RandomEngine::Choice(int64_t num, FloatArray prob, bool replace) {
   const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
   IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
   IdxType* ret_data = static_cast<IdxType*>(ret->data);
-  ATEN_FLOAT_TYPE_SWITCH(prob->dtype, ValueType, "probability", {
-    // TODO(minjie): allow choosing different sampling algorithms
-    utils::BaseSampler<IdxType>* sampler = nullptr;
-    if (replace) {
-      sampler = new utils::TreeSampler<IdxType, ValueType, true>(this, prob);
-    } else {
-      sampler = new utils::TreeSampler<IdxType, ValueType, false>(this, prob);
-    }
-    for (int64_t i = 0; i < num; ++i)
-      ret_data[i] = sampler->Draw();
-    delete sampler;
-  });
+  utils::BaseSampler<IdxType>* sampler = nullptr;
+  if (replace) {
+    sampler = new utils::TreeSampler<IdxType, FloatType, true>(this, prob);
+  } else {
+    sampler = new utils::TreeSampler<IdxType, FloatType, false>(this, prob);
+  }
+  for (int64_t i = 0; i < num; ++i)
+    ret_data[i] = sampler->Draw();
+  delete sampler;
   return ret;
 }
 
-template IdArray RandomEngine::Choice<int32_t>(
+template IdArray RandomEngine::Choice<int32_t, float>(
     int64_t num, FloatArray prob, bool replace);
-template IdArray RandomEngine::Choice<int64_t>(
+template IdArray RandomEngine::Choice<int64_t, float>(
+    int64_t num, FloatArray prob, bool replace);
+template IdArray RandomEngine::Choice<int32_t, double>(
+    int64_t num, FloatArray prob, bool replace);
+template IdArray RandomEngine::Choice<int64_t, double>(
     int64_t num, FloatArray prob, bool replace);
 
 template <typename IdxType>

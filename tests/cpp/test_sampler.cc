@@ -153,12 +153,12 @@ void _TestChoice(RandomEngine* re) {
   }
   // num = 0
   {
-    IdArray rst = re->Choice<Idx>(0, prob, true);
+    IdArray rst = re->Choice<Idx, DType>(0, prob, true);
     ASSERT_EQ(rst->shape[0], 0);
   }
   // w/ replacement
   {
-    IdArray rst = re->Choice<Idx>(1000, prob, true);
+    IdArray rst = re->Choice<Idx, DType>(1000, prob, true);
     ASSERT_EQ(rst->shape[0], 1000);
     for (int64_t i = 0; i < 1000; ++i) {
       Idx x = static_cast<Idx*>(rst->data)[i];
@@ -167,7 +167,7 @@ void _TestChoice(RandomEngine* re) {
   }
   // w/o replacement
   {
-    IdArray rst = re->Choice<Idx>(3, prob, false);
+    IdArray rst = re->Choice<Idx, DType>(3, prob, false);
     ASSERT_EQ(rst->shape[0], 3);
     std::set<Idx> idxset;
     for (int64_t i = 0; i < 3; ++i) {
@@ -189,7 +189,7 @@ TEST(RandomTest, TestChoice) {
   _TestChoice<int64_t, double>(re);
 }
 
-template <typename Idx, typename DType>
+template <typename Idx>
 void _TestUniformChoice(RandomEngine* re) {
   re->SetSeed(42);
   // num == 0
@@ -222,8 +222,8 @@ void _TestUniformChoice(RandomEngine* re) {
 
 TEST(RandomTest, TestUniformChoice) {
   RandomEngine* re = RandomEngine::ThreadLocal();
-  _TestUniformChoice<int32_t, float>(re);
-  _TestUniformChoice<int64_t, float>(re);
-  _TestUniformChoice<int32_t, double>(re);
-  _TestUniformChoice<int64_t, double>(re);
+  _TestUniformChoice<int32_t>(re);
+  _TestUniformChoice<int64_t>(re);
+  _TestUniformChoice<int32_t>(re);
+  _TestUniformChoice<int64_t>(re);
 }

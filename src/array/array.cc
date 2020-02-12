@@ -409,18 +409,30 @@ void CSRSort(CSRMatrix csr) {
   });
 }
 
-COOMatrix CSRRowSampling(
+COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_CSR_IDX_SWITCH(mat, XPU, IdType, {
     if (!prob.defined() || prob->shape[0] == 0) {
-      ret = impl::CSRRowSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+      ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::CSRRowSampling<XPU, IdType, FloatType>(
+        ret = impl::CSRRowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
     }
+  });
+  return ret;
+}
+
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
+  COOMatrix ret;
+  ATEN_CSR_IDX_SWITCH(mat, XPU, IdType, {
+    ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
+      ret = impl::CSRRowWiseTopk<XPU, IdType, FloatType>(
+          mat, rows, k, weight, ascending);
+    });
   });
   return ret;
 }
@@ -540,18 +552,30 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column) {
   return ret;
 }
 
-COOMatrix COORowSampling(
+COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_COO_IDX_SWITCH(mat, XPU, IdType, {
     if (!prob.defined() || prob->shape[0] == 0) {
-      ret = impl::COORowSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
+      ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
-        ret = impl::COORowSampling<XPU, IdType, FloatType>(
+        ret = impl::COORowWiseSampling<XPU, IdType, FloatType>(
             mat, rows, num_samples, prob, replace);
       });
     }
+  });
+  return ret;
+}
+
+COOMatrix COORowWiseTopk(
+    COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
+  COOMatrix ret;
+  ATEN_COO_IDX_SWITCH(mat, XPU, IdType, {
+    ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
+      ret = impl::COORowWiseTopk<XPU, IdType, FloatType>(
+          mat, rows, k, weight, ascending);
+    });
   });
   return ret;
 }
