@@ -13,264 +13,160 @@ from gluoncv.data.base import VisionDataset
 from collections import Counter
 from gluoncv.data.transforms.presets.rcnn import FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform
 
-def get_name(obj):
-    if 'name' in obj:
-        return obj['name']
-    elif 'names' in obj:
-        return obj['names'][0]
-    else:
-        return ''
-
 class VGRelation(VisionDataset):
-    def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'),
-                 top_frequent_rel=50, top_frequent_obj=150,
-                 split='all', balancing='sample', rel_json_path=None):
+    def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'visualgenome'), split='train'):
         super(VGRelation, self).__init__(root)
-        self._im_shapes = {}
         self._root = os.path.expanduser(root)
-        if split == 'all':
-            self._dict_path = os.path.join(self._root, 'relationships.json')
-            self._img_path = os.path.join(self._root, 'VG_100K', '{}.jpg')
-        elif split == 'train':
-            self._dict_path = os.path.join(self._root, 'relationships_train.json')
-            self._img_path = os.path.join(self._root, 'train', '{}.jpg')
+        self._img_path = os.path.join(self._root, 'VG_100K', '{}')
+
+        if split == 'train':
+            self._dict_path = os.path.join(self._root, 'rel_annotations_train.json')
         elif split == 'val':
-            self._dict_path = os.path.join(self._root, 'relationships_val.json')
-            self._img_path = os.path.join(self._root, 'val', '{}.jpg')
-        elif split == 'custom':
-            if rel_json_path is not None:
-                self._dict_path = os.path.join(self._root, rel_json_path)
-                self._img_path = os.path.join(self._root, 'VG_100K', '{}.jpg')
-            else:
-                raise ValueError("Must set value for rel_json_path when split=='custom'.")
+            self._dict_path = os.path.join(self._root, 'rel_annotations_val.json')
         else:
             raise NotImplementedError
         with open(self._dict_path) as f:
             tmp = f.read()
             self._dict = json.loads(tmp)
-        self._classes_pkl = os.path.join(self._root, 'classes.pkl')
-        with open(self._classes_pkl, 'rb') as f:
-            vg_obj_classes, vg_rel_classes = pickle.load(f)
-        self._obj_classes = sorted(vg_obj_classes[0:top_frequent_obj])
-        self._relations = sorted(vg_rel_classes[0:top_frequent_rel])
-        self._relations_dict = {}
-        for i, rel in enumerate(self._relations):
-            self._relations_dict[rel] = i
 
-        self._obj_classes_dict = {}
-        for i, obj in enumerate(self._obj_classes):
-            self._obj_classes_dict[obj] = i
+        self._predicates_path = os.path.join(self._root, 'predicates.json')
+        with open(self._predicates_path, 'r') as f:
+            tmp = f.read()
+            self.rel_classes = json.loads(tmp)
+        self.num_rel_classes = len(self.rel_classes) + 1
 
-        self._balancing = balancing
+        self._objects_path = os.path.join(self._root, 'objects.json')
+        with open(self._objects_path, 'r') as f:
+            tmp = f.read()
+            self.obj_classes = json.loads(tmp)
+        self.num_obj_classes = len(self.obj_classes)
+
         if split == 'val':
             self.img_transform = FasterRCNNDefaultValTransform(short=600, max_size=1000)
         else:
             self.img_transform = FasterRCNNDefaultTrainTransform(short=600, max_size=1000)
         self.split = split
 
-        obj_alias_path = os.path.join(self._root, 'object_alias.txt')
-        rel_alias_path = os.path.join(self._root, 'relationship_alias.txt')
-        with open(obj_alias_path) as f:
-            obj_alias = f.read().split('\n')
-        obj_alias_dict = {}
-        for obj in obj_alias:
-            if len(obj) > 0:
-                tmp = obj.split(',')
-                k = tmp[0]
-                v = tmp[1]
-                obj_alias_dict[k] = v
-        self.obj_alias_dict = obj_alias_dict
-
-        with open(rel_alias_path) as f:
-            rel_alias = f.read().split('\n')
-        rel_alias_dict = {}
-        for rel in rel_alias:
-            if len(rel) > 0:
-                tmp = rel.split(',')
-                k = tmp[0]
-                v = tmp[1]
-                rel_alias_dict[k] = v
-        self.rel_alias_dict = rel_alias_dict
-
     def __len__(self):
         return len(self._dict)
 
-    def _extract_label(self, rel):
-        n = len(rel)
-        # extract global ids first, and map into local ids
-        # object_ids = [0]
-        object_ids = []
-        keep_inds = []
-        for i, rl in enumerate(rel):
-            sub = rl['subject']
-            ob = rl['object']
-            if sub['object_id'] == ob['object_id']:
-                continue
+    def _hash_bbox(self, object):
+        num_list = [object['category']] + object['bbox']
+        return '_'.join([str(num) for num in num_list])
 
-            k = get_name(sub)
-            if len(k) == 0:
-                continue
-            if k in self.obj_alias_dict:
-                k = self.obj_alias_dict[k]
-            if not k in self._obj_classes_dict:
-                continue
+    def __getitem__(self, idx):
+        img_id = list(self._dict)[idx]
+        # img_id = list(self._dict)[22079]
+        img_path = self._img_path.format(img_id)
+        img = mx.image.imread(img_path)
 
-            k = get_name(ob)
-            if len(k) == 0:
-                continue
-            if k in self.obj_alias_dict:
-                k = self.obj_alias_dict[k]
-            if k not in self._obj_classes_dict:
-                continue
+        item = self._dict[img_id]
+        n_edges = len(item)
 
-            if len(rl['predicate']) == 0:
-                continue
-            else:
-                synset = rl['predicate']
-                if synset in self.rel_alias_dict:
-                    synset = self.rel_alias_dict[synset]
-                if synset not in self._relations_dict:
-                    continue
+        # edge to node ids
+        sub_node_hash = []
+        ob_node_hash = []
+        for i, it in enumerate(item):
+            sub_node_hash.append(self._hash_bbox(it['subject']))
+            ob_node_hash.append(self._hash_bbox(it['object']))
+        node_set = sorted(list(set(sub_node_hash + ob_node_hash)))
+        n_nodes = len(node_set)
+        node_to_id = {}
+        for i, node in enumerate(node_set):
+            node_to_id[node] = i
+        sub_id = []
+        ob_id = []
+        for i in range(n_edges):
+            sub_id.append(node_to_id[sub_node_hash[i]])
+            ob_id.append(node_to_id[ob_node_hash[i]])
 
-            object_ids.append(sub['object_id'])
-            object_ids.append(ob['object_id'])
-            keep_inds.append(i)
-        object_ids = list(set(object_ids))
+        # node features
+        bbox = mx.nd.zeros((n_nodes, 4))
+        node_class_ids = mx.nd.zeros((n_nodes, 1))
+        node_visited = [False for i in range(n_nodes)]
+        for i, it in enumerate(item):
+            if not node_visited[sub_id[i]]:
+                ind = sub_id[i]
+                sub = it['subject']
+                node_class_ids[ind] = sub['category']
+                # y1y2x1x2 to x1y1x2y2
+                bbox[ind,0] = sub['bbox'][2]
+                bbox[ind,1] = sub['bbox'][0]
+                bbox[ind,2] = sub['bbox'][3]
+                bbox[ind,3] = sub['bbox'][1]
 
-        ids_dict = {}
-        for i, obj in enumerate(object_ids):
-            ids_dict[str(obj)] = i
-        m = len(object_ids)
-        if m == 0:
-            return None, None, None
-        bbox = mx.nd.zeros((m, 4))
-        node_class = mx.nd.zeros((m))
-        visit_ind = set()
-        edges = {'src': [],
-                 'dst': [],
-                 'rel': [],
-                 'link': []}
-        keep_inds = set(keep_inds)
-        for i, rl in enumerate(rel):
-            if i not in keep_inds:
-                continue
-            # extract xyhw and remap object id
-            sub = rl['subject']
-            ob = rl['object']
-            sub_key = str(sub['object_id'])
-            ob_key = str(ob['object_id'])
-            if sub_key not in ids_dict or ob_key not in ids_dict:
-                continue
-            sub_ind = ids_dict[sub_key]
-            ob_ind = ids_dict[ob_key]
+                node_visited[ind] = True
 
-            if sub_ind not in visit_ind:
-                visit_ind.add(sub_ind)
-                bbox[sub_ind,] = mx.nd.array([sub['x'], sub['y'],
-                                              sub['w'] + sub['x'], sub['h'] + sub['y']])
-                k = get_name(sub)
-                if k in self.obj_alias_dict:
-                    k = self.obj_alias_dict[k]
-                node_class[sub_ind] = self._obj_classes_dict[k]
+            if not node_visited[ob_id[i]]:
+                ind = ob_id[i]
+                ob = it['object']
+                node_class_ids[ind] = ob['category']
+                # y1y2x1x2 to x1y1x2y2
+                bbox[ind,0] = ob['bbox'][2]
+                bbox[ind,1] = ob['bbox'][0]
+                bbox[ind,2] = ob['bbox'][3]
+                bbox[ind,3] = ob['bbox'][1]
 
-            if ob_ind not in visit_ind:
-                visit_ind.add(ob_ind)
-                bbox[ob_ind,] = mx.nd.array([ob['x'], ob['y'],
-                                             ob['w'] + ob['x'], ob['h'] + ob['y']])
-                k = get_name(ob)
-                if k in self.obj_alias_dict:
-                    k = self.obj_alias_dict[k]
-                node_class[ob_ind] = self._obj_classes_dict[k]
+                node_visited[ind] = True
 
-            # relational label id of the edge
-            synset = rl['predicate']
-            if synset in self.rel_alias_dict:
-                synset = self.rel_alias_dict[synset]
-            rel_idx = self._relations_dict[synset]
+        eta = 0.1
+        node_class_vec = node_class_ids[:,0].one_hot(self.num_obj_classes,
+                                                     on_value = 1 - eta + eta / self.num_obj_classes,
+                                                     off_value = eta / self.num_obj_classes)
 
-            edges['src'].append(sub_ind)
-            edges['dst'].append(ob_ind)
-            edges['rel'].append(rel_idx)
-        return edges, bbox, node_class.expand_dims(1)
+        # augmentation
+        if self.split == 'val':
+            img, bbox, _ = self.img_transform(img, bbox)
+        else:
+            img, bbox = self.img_transform(img, bbox)
 
-    def _build_complete_graph(self, edges, bbox, node_class, img, img_id):
-        N = bbox.shape[0]
-        g = dgl.DGLGraph()
-        g.add_nodes(N)
+        # build the graph
+        g = dgl.DGLGraph(multigraph=True)
+        g.add_nodes(n_nodes)
+        adjmat = np.zeros((n_nodes, n_nodes))
+        predicate = []
+        for i, it in enumerate(item):
+            adjmat[sub_id[i], ob_id[i]] = 1
+            predicate.append(it['predicate'])
+        predicate = mx.nd.array(predicate).expand_dims(1)
+        g.add_edges(sub_id, ob_id, {'rel_class': mx.nd.array(predicate) + 1})
+        empty_edge_list = []
+        for i in range(n_nodes):
+            for j in range(n_nodes):
+                if i != j and adjmat[i, j] == 0:
+                    empty_edge_list.append((i, j))
+        if len(empty_edge_list) > 0:
+            src, dst = tuple(zip(*empty_edge_list))
+            g.add_edges(src, dst, {'rel_class': mx.nd.zeros((len(empty_edge_list), 1))})
 
+        '''
         # complete graph
         edge_list = []
-        for i in range(N-1):
-            for j in range(i+1, N):
+        for i in range(n_nodes - 1):
+            for j in range(i + 1, n_nodes):
                 edge_list.append((i, j))
         src, dst = tuple(zip(*edge_list))
         g.add_edges(src, dst)
         g.add_edges(dst, src)
 
-        # node features
+        # edge features
+        rel_class = mx.nd.zeros((g.number_of_edges(), 1))
+        rel_count = mx.nd.zeros((g.number_of_edges(), 1))
+        edge_inds = g.edge_ids(sub_id, ob_id)
+        # it is not a simple graph! so we need to add the edges dynamically
+        for i, it in enumerate(item):
+            ind = edge_inds[i]
+            rel_class[ind, 0] = it['predicate'] + 1
+            rel_count[ind, 0] += 1
+
+        '''
+        # assign features
         g.ndata['bbox'] = bbox
-
-        g.ndata['node_class_ids'] = node_class
-        eta = 0.1
-        n_classes = len(self._obj_classes_dict)
-        g.ndata['node_class_vec'] = node_class[:,0].one_hot(n_classes,
-                                                            on_value = 1 - eta + eta/n_classes,
-                                                            off_value = eta / n_classes)
-
-        # assign class label to edges
-        eids = g.edge_ids(edges['src'], edges['dst'])
-        n = g.number_of_edges()
-        k = eids.shape[0]
-
-        classes = np.zeros((n))
-        classes[eids.asnumpy()] = edges['rel']
-        g.edata['classes'] = mx.nd.array(classes)
-        links = np.zeros((n))
-        links[eids.asnumpy()] = 1
-        if links.sum() == 0:
-            return None
-        g.edata['link'] = mx.nd.array(links)
-
-        if self._balancing == 'weight':
-            if n == k:
-                w0 = 0
-            else:
-                w0 = 1.0 / (2 * (n - k))
-            if k == 0:
-                wn = 0
-            else:
-                wn = 1.0 / (2 * k)
-            weights = np.zeros((n)) + w0
-            weights[eids.asnumpy()] = wn
-        elif self._balancing == 'sample':
-            sample_ind = np.random.randint(0, n, 2*k)
-            weights = np.zeros((n))
-            weights[sample_ind] = 1
-            weights[eids.asnumpy()] = 1
-        else:
-            raise NotImplementedError
-        g.edata['weights'] = mx.nd.array(weights)
-
-        return g
-
-    def __getitem__(self, idx):
-        item = self._dict[idx]
-
-        img_id = item['image_id']
-        rel = item['relationships']
-
-        img_path = self._img_path.format(img_id)
-        img = mx.image.imread(img_path)
-
-        edges, bbox, node_class = self._extract_label(rel)
-        if edges is None:
-            return None, None
-        if self.split == 'val':
-            img, bbox, _ = self.img_transform(img, bbox)
-        else:
-            img, bbox = self.img_transform(img, bbox)
-        if bbox.shape[0] < 2:
-            return None, None
-        g = self._build_complete_graph(edges, bbox, node_class, img, img_id)
+        g.ndata['node_class'] = node_class_ids
+        g.ndata['node_class_vec'] = node_class_vec
+        '''
+        g.edata['rel_class'] = rel_class
+        g.edata['rel_count'] = rel_count
+        '''
 
         return g, img

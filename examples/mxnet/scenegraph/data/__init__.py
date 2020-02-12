@@ -1,3 +1,3 @@
-from .object_coco import *
-from .relation_coco import *
+from .object import *
+from .relation import *
 from .dataloader import *
