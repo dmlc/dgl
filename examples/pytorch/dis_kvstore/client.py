@@ -9,6 +9,18 @@ import torch as th
 
 partition = th.tensor([0,0,1,1,2,2,3,3])
 
+ID = []
+ID.append(th.tensor([0,1]))
+ID.append(th.tensor([2,3]))
+ID.append(th.tensor([4,5]))
+ID.append(th.tensor([6,7]))
+
+DATA = []
+DATA.append(th.tensor([[1.,1.,1.,],[1.,1.,1.,]]))
+DATA.append(th.tensor([[2.,2.,2.,],[2.,2.,2.,]]))
+DATA.append(th.tensor([[3.,3.,3.,],[3.,3.,3.,]]))
+DATA.append(th.tensor([[4.,4.,4.,],[4.,4.,4.,]]))
+
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
         super(ArgParser, self).__init__()
@@ -35,8 +47,14 @@ def start_client(args):
         time.sleep(3)
         my_client.set_partition_book(name='entity_embed', partition_book=None, data_shape=tuple((8,)))
 
-    my_client.print()
-    
+    my_client.push(name='entity_embed', id_tensor=ID[args.machine_id], data_tensor=DATA[args.machine_id])
+
+    my_client.barrier()
+
+    if my_client.get_id() % args.backup_count == 0:
+        res = my_client,pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
+        print(res)
+
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()
