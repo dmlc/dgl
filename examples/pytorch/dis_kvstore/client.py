@@ -53,7 +53,7 @@ def start_client(args):
     my_client.barrier()
 
     if my_client.get_id() % args.backup_count == 0:
-        res = my_client,pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
+        res = my_client.pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
         print(res)
 
 
