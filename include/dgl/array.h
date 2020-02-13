@@ -360,12 +360,12 @@ bool CSRHasDuplicate(CSRMatrix csr);
  * indptr = [0, 2, 3, 3, 5]
  * indices = [1, 0, 2, 3, 1]
  *
- *  After CSRSort(csr)
+ *  After CSRSort_(&csr)
  *
  * indptr = [0, 2, 3, 3, 5]
  * indices = [0, 1, 1, 2, 3]
  */
-void CSRSort(CSRMatrix csr);
+void CSRSort_(CSRMatrix* csr);
 
 /*!
  * \brief Sample from the non-zero values of the given rows.

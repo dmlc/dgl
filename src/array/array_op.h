@@ -105,7 +105,7 @@ template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
-void CSRSort(CSRMatrix csr);
+void CSRSort_(CSRMatrix csr);
 
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>

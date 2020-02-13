@@ -403,9 +403,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
   return ret;
 }
 
-void CSRSort(CSRMatrix csr) {
+void CSRSort_(CSRMatrix csr) {
   ATEN_CSR_SWITCH(csr, XPU, IdType, {
-    impl::CSRSort<XPU, IdType>(csr);
+    impl::CSRSort_<XPU, IdType>(csr);
   });
 }
 
