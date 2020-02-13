@@ -25,6 +25,8 @@ def start_server(args):
     """
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
+    print(server_namebook)
+
     my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
 
     if args.server_id % args.machine_number == 0:
