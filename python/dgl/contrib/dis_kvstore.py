@@ -246,12 +246,6 @@ class KVServer(object):
           5. Service loop for listening requests from client nodes.
 
         """
-        print("------------------------")
-        print("Server ID: %d" % self.get_id())
-        for name, data in self._data_store.items():
-            print("name: " + name)
-            print(data)
-        print("------------------------")
         # Get connected with all client nodes
         server_ip, server_port = self._addr.split(':')
         _receiver_wait(self._receiver, server_ip, int(server_port), self._client_count)
@@ -585,6 +579,14 @@ class KVClient(object):
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
+
+
+    def print(self):
+        print('--------------')
+        print('Client ID %d' % self.get_id())
+        for name, data in self._data_store.items():
+            print('name: ' + name)
+            print(data)
 
 
     def get_id(self):

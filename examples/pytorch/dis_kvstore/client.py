@@ -26,9 +26,15 @@ def start_client(args):
 
     my_client = KVClient(server_namebook)
 
-    my_client.set_partition_book(name='entity_embed', partition_book=partition)
-
     my_client.connect()
+
+    if my_client.get_id() % args.num_client == 0:
+        my_client.set_partition_book(name='entity_embed', partition_book=partition)
+    else:
+        time.sleep(3)
+        my_client.set_partition_book(name='entity_embed', partition_book=None, data_shape=tuple((8,)))
+
+    my_client.print()
     
 
 if __name__ == '__main__':
