@@ -545,7 +545,8 @@ class KVClient(object):
         """
         # Get connected with all server nodes
         for ID, addr in self._server_namebook.items():
-            server_ip, server_port = addr.split(':')
+            machine_id, ip_port = addr.split('|')
+            server_ip, server_port = ip_port.split(':')
             _add_receiver_addr(self._sender, server_ip, int(server_port), ID)
         _sender_connect(self._sender)
 
