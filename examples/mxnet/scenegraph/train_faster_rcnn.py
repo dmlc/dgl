@@ -25,7 +25,7 @@ from gluoncv.utils.metrics.rcnn import RPNAccMetric, RPNL1LossMetric, RCNNAccMet
     RCNNL1LossMetric
 
 from data import *
-from model import EdgeGCN, faster_rcnn_resnet101_v1d_custom, faster_rcnn_resnet50_v1b_custom
+from model import faster_rcnn_resnet101_v1d_custom, faster_rcnn_resnet50_v1b_custom
 
 try:
     import horovod.mxnet as hvd
@@ -500,10 +500,10 @@ if __name__ == '__main__':
         if args.norm_layer == 'bn':
             kwargs['num_devices'] = len(args.gpus.split(','))
 
-    train_dataset, val_dataset, eval_metric = get_dataset(args.dataset, args)
-    # net_name = '_'.join(('faster_rcnn', *module_list, args.network, args.dataset))
     net_name = '_'.join(('faster_rcnn', *module_list, args.network, 'custom'))
     args.save_prefix += net_name
+    gutils.makedirs(args.save_prefix)
+    train_dataset, val_dataset, eval_metric = get_dataset(args.dataset, args)
     net = faster_rcnn_resnet101_v1d_custom(classes=train_dataset.classes, transfer='coco',
                                            pretrained_base=False, additional_output=False,
                                            per_device_batch_size=args.batch_size // len(ctx), **kwargs)

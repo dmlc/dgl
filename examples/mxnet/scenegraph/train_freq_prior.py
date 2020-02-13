@@ -1,10 +1,19 @@
 import numpy as np
-import json, pickle, os
+import json, pickle, os, argparse
 
-PATH_TO_DATASETS = os.path.expanduser('~/.mxnet/datasets/visualgenome')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser.add_argument('--overlap', action='store_true',
+                        help="Only count overlap boxes.")
+    parser.add_argument('--json-path', type=str, default='~/.mxnet/datasets/visualgenome',
+                        help="Only count overlap boxes.")
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
+use_overlap = args.overlap
+PATH_TO_DATASETS = os.path.expanduser(args.json_path)
 path_to_json = os.path.join(PATH_TO_DATASETS, 'rel_annotations_train.json')
-
-use_overlap = True
 
 # format in y1y2x1x2
 def with_overlap(boxA, boxB):
@@ -76,8 +85,6 @@ for _, item in train_data.items():
                     continue
                 bg_matrix[l1, l2] += 1
 
-with open('freq_prior_origin.pkl', 'rb') as f:
-    fg_matrix, bg_matrix = pickle.load(f)
 
 eps = 1e-3
 bg_matrix += 1

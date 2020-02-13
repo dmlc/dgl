@@ -1,7 +1,7 @@
 import dgl
 import mxnet as mx
 import numpy as np
-import logging, time
+import logging, time, argparse
 from mxnet import nd, gluon
 from gluoncv.data.batchify import Pad
 from gluoncv.utils import makedirs
@@ -26,7 +26,7 @@ def parse_args():
                         help="Learning rate for Faster R-CNN module.")
     parser.add_argument('--wd-faster-rcnn', type=float, default=0.0001,
                         help="Weight decay for RelDN module.")
-    parser.add_argument('--lr-decay-epoch', type=str, default='5,8',
+    parser.add_argument('--lr-decay-epochs', type=str, default='5,8',
                         help="Learning rate decay points.")
     parser.add_argument('--lr-warmup-iters', type=int, default=4000,
                         help="Learning rate warm-up iterations.")
@@ -34,7 +34,7 @@ def parse_args():
                         help="Path to save model parameters.")
     parser.add_argument('--log-dir', type=str, default='reldn_output.log',
                         help="Path to save training logs.")
-    parser.add_argument('--pretrained-faster-rcnn-params', type=str, require=True,
+    parser.add_argument('--pretrained-faster-rcnn-params', type=str, required=True,
                         help="Path to saved Faster R-CNN model parameters.")
     parser.add_argument('--freq-prior', type=str, default='freq_prior.pkl',
                         help="Path to saved frequency prior data.")
@@ -43,7 +43,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
 
 args = parse_args()
 
@@ -77,7 +76,7 @@ lr_decay_epochs = [int(i) for i in args.lr_decay_epochs.split(',')]
 # Dataset and dataloader
 vg_train = VGRelation(split='train')
 logger.info('data loaded!')
-train_data = gluon.data.DataLoader(vg_train, batch_size=args.batch_size, shuffle=True, num_workers=8*num_gpus,
+train_data = gluon.data.DataLoader(vg_train, batch_size=len(ctx), shuffle=True, num_workers=8*num_gpus,
                                    batchify_fn=dgl_mp_batchify_fn)
 n_batches = len(train_data)
 
@@ -86,7 +85,7 @@ net = RelDN(n_classes=N_relations, prior_pkl=args.freq_prior)
 net.spatial.initialize(mx.init.Normal(1e-4), ctx=ctx)
 net.visual.initialize(mx.init.Normal(1e-4), ctx=ctx)
 for k, v in net.collect_params().items():
-    v.grad_req = 'add' if aggretate_grad else 'write'
+    v.grad_req = 'add' if aggregate_grad else 'write'
 net_params = net.collect_params()
 net_trainer = gluon.Trainer(net.collect_params(), 'adam', 
                             {'learning_rate': args.lr_reldn, 'wd': args.wd_reldn})
@@ -106,7 +105,7 @@ detector_feat.load_parameters(det_params_path, ctx=ctx, ignore_extra=True, allow
 for k, v in detector_feat.collect_params().items():
     v.grad_req = 'null'
 for k, v in detector_feat.features.collect_params().items():
-    v.grad_req = 'add' if aggretate_grad else 'write'
+    v.grad_req = 'add' if aggregate_grad else 'write'
 det_params = detector_feat.features.collect_params()
 det_trainer = gluon.Trainer(detector_feat.features.collect_params(), 'adam', 
                             {'learning_rate': args.lr_faster_rcnn, 'wd': args.wd_faster_rcnn})
@@ -163,8 +162,8 @@ for epoch in range(nepoch):
         net_trainer.set_learning_rate(net_trainer.learning_rate*0.1)
         det_trainer.set_learning_rate(det_trainer.learning_rate*0.1)
     for i, (G_list, img_list) in enumerate(train_data):
-        if epoch == 0 and i < args.lr_warm_iters:
-            alpha = i / args.lr_warm_iters
+        if epoch == 0 and i < args.lr_warmup_iters:
+            alpha = i / args.lr_warmup_iters
             warmup_factor = 1/3 * (1 - alpha) + alpha
             net_trainer.set_learning_rate(net_trainer_base_lr*warmup_factor)
             det_trainer.set_learning_rate(det_trainer_base_lr*warmup_factor)
@@ -232,7 +231,7 @@ for epoch in range(nepoch):
         if (i+1) % per_device_batch_size == 0 or i == n_batches - 1:
             net_trainer.step(args.batch_size)
             det_trainer.step(args.batch_size)
-            if aggretate_grad:
+            if aggregate_grad:
                 for k, v in net_params.items():
                     v.zero_grad()
                 for k, v in det_params.items():

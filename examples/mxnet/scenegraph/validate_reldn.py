@@ -1,10 +1,9 @@
 import dgl
 import mxnet as mx
 import numpy as np
-import logging, time
+import logging, time, argparse
 from mxnet import nd, gluon
 from gluoncv.data.batchify import Pad
-from gluoncv.utils import makedirs
 
 from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from utils import *
@@ -18,11 +17,11 @@ def parse_args():
                         help="Total batch-size for training.")
     parser.add_argument('--metric', type=str, default='sgdet',
                         help="Evaluation metric, could be 'predcls', 'phrcls', 'sgdet' or 'sgdet+'.")
-    parser.add_argument('--pretrained-faster-rcnn-params', type=str, require=True,
+    parser.add_argument('--pretrained-faster-rcnn-params', type=str, required=True,
                         help="Path to saved Faster R-CNN model parameters.")
-    parser.add_argument('--reldn-params', type=str, require=True,
+    parser.add_argument('--reldn-params', type=str, required=True,
                         help="Path to saved Faster R-CNN model parameters.")
-    parser.add_argument('--faster-rcnn-params', type=str, require=True,
+    parser.add_argument('--faster-rcnn-params', type=str, required=True,
                         help="Path to saved Faster R-CNN model parameters.")
     parser.add_argument('--log-dir', type=str, default='reldn_output.log',
                         help="Path to save training logs.")
@@ -82,7 +81,7 @@ net.load_parameters(args.reldn_params, ctx=ctx)
 # dataset and dataloader
 vg_val = VGRelation(split='val')
 logger.info('data loaded!')
-val_data = gluon.data.DataLoader(vg_val, batch_size=batch_size, shuffle=False, num_workers=16*num_gpus,
+val_data = gluon.data.DataLoader(vg_val, batch_size=len(ctx), shuffle=False, num_workers=16*num_gpus,
                                  batchify_fn=dgl_mp_batchify_fn)
 n_batches = len(val_data)
 
