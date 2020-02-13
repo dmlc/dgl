@@ -747,16 +747,16 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 // Macro to dispatch according to device context and index type.
 #define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
 
 // Macro to dispatch according to device context and index type.
 #define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
