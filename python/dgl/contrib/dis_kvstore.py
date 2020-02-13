@@ -11,6 +11,7 @@ from .. import backend as F
 from .._ffi.ndarray import empty_shared_mem
 
 import os
+import random
 import numpy as np
 import socket
 
