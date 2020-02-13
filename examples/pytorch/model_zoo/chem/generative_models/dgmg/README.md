@@ -83,7 +83,7 @@ You can also use your own dataset with additional arguments
 
 We can monitor the training process with tensorboard as below:
 
-![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/tensorboard.png)
+![](https://data.dgl.ai/dgllife/dgmg/tensorboard.png)
 
 To use tensorboard, you need to install [tensorboardX](https://github.com/lanpa/tensorboardX) and 
 [TensorFlow](https://www.tensorflow.org/). You can lunch tensorboard with `tensorboard --logdir=.`
@@ -130,7 +130,7 @@ and compare their property distributions against the training molecule property 
 
 ![](https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/DGMG_ZINC_canonical_dist.png)
 
-Download it with `wget https://s3.us-east-2.amazonaws.com/dgl.ai/model_zoo/drug_discovery/dgmg/eval_jupyter.ipynb`.
+You can download the notebook with `wget https://data.dgl.ai/dgllife/dgmg/eval_jupyter.ipynb`.
 
 ### Pre-trained models
 

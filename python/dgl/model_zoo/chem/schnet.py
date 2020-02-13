@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from .layers import AtomEmbedding, Interaction, ShiftSoftplus, RBFLayer
+from ...contrib.deprecation import deprecated
 from ...nn.pytorch import SumPooling
 
 
@@ -34,6 +35,7 @@ class SchNet(nn.Module):
         If None, random representation initialization will be used. Otherwise,
         they will be used to initialize atom representations. Default to be None.
     """
+    @deprecated('Import SchNetPredictor from dgllife.model instead.')
     def __init__(self,
                  dim=64,
                  cutoff=5.0,

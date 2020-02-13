@@ -3,9 +3,11 @@
  * \file dgl/sample_utils.h
  * \brief Sampling utilities
  */
-#ifndef DGL_SAMPLE_UTILS_H_
-#define DGL_SAMPLE_UTILS_H_
+#ifndef DGL_RANDOM_CPU_SAMPLE_UTILS_H_
+#define DGL_RANDOM_CPU_SAMPLE_UTILS_H_
 
+#include <dgl/random.h>
+#include <dgl/array.h>
 #include <algorithm>
 #include <utility>
 #include <queue>
@@ -14,7 +16,6 @@
 #include <numeric>
 #include <limits>
 #include <vector>
-#include "random.h"
 
 namespace dgl {
 namespace utils {
@@ -49,7 +50,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   DType accum, taken;             // accumulated likelihood
   std::vector<Idx> K;             // alias table
   std::vector<DType> U;           // probability table
-  std::vector<DType> _prob;       // category distribution
+  FloatArray _prob;               // category distribution
   std::vector<bool> used;         // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;    // index mapping, activated when replace=false;
 
@@ -60,16 +61,18 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
       return id_mapping[x];
   }
 
-  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct alias table
+  void Reconstruct(FloatArray prob) {  // Reconstruct alias table
+    const int64_t prob_size = prob->shape[0];
+    const DType *prob_data = static_cast<DType *>(prob->data);
     N = 0;
     accum = 0.;
     taken = 0.;
     if (!replace)
       id_mapping.clear();
-    for (Idx i = 0; i < prob.size(); ++i)
+    for (Idx i = 0; i < prob_size; ++i)
       if (!used[i]) {
         N++;
-        accum += prob[i];
+        accum += prob_data[i];
         if (!replace)
           id_mapping.push_back(i);
       }
@@ -80,7 +83,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
     std::fill(U.begin(), U.end(), avg);     // initialize U
     std::queue<std::pair<Idx, DType> > under, over;
     for (Idx i = 0; i < N; ++i) {
-      DType p = prob[Map(i)];
+      DType p = prob_data[Map(i)];
       if (p > avg)
         over.push(std::make_pair(i, p));
       else
@@ -103,21 +106,22 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
   }
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
-    used.resize(prob.size());
+  void ResetState(FloatArray prob) {
+    used.resize(prob->shape[0]);
     if (!replace)
       _prob = prob;
     std::fill(used.begin(), used.end(), false);
     Reconstruct(prob);
   }
 
-  explicit AliasSampler(RandomEngine* re, const std::vector<DType>& prob): re(re) {
+  explicit AliasSampler(RandomEngine* re, FloatArray prob): re(re) {
     ResetState(prob);
   }
 
   ~AliasSampler() {}
 
   Idx Draw() {
+    const DType *_prob_data = static_cast<DType *>(_prob->data);
     DType avg = accum / N;
     if (!replace) {
       if (2 * taken >= accum)
@@ -131,7 +135,7 @@ class AliasSampler: public BaseSampler<Idx, DType, replace> {
         } else {
           rst = Map(K[i]);
         }
-        DType cap = _prob[rst];
+        DType cap = _prob_data[rst];
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
@@ -166,7 +170,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   RandomEngine *re;
   Idx N;
   DType accum, taken;
-  std::vector<DType> _prob;     // categorical distribution
+  FloatArray _prob;             // categorical distribution
   std::vector<DType> cdf;       // cumulative distribution function
   std::vector<bool> used;       // indicate availability, activated when replace=false;
   std::vector<Idx> id_mapping;  // indicate index mapping, activated when replace=false;
@@ -178,7 +182,9 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
       return id_mapping[x];
   }
 
-  void Reconstruct(const std::vector<DType>& prob) {  // Reconstruct CDF
+  void Reconstruct(FloatArray prob) {  // Reconstruct CDF
+    int64_t prob_size = prob->shape[0];
+    const DType *prob_data = static_cast<DType *>(prob->data);
     N = 0;
     accum = 0.;
     taken = 0.;
@@ -186,10 +192,10 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
       id_mapping.clear();
     cdf.clear();
     cdf.push_back(0);
-    for (Idx i = 0; i < prob.size(); ++i)
+    for (Idx i = 0; i < prob_size; ++i)
       if (!used[i]) {
         N++;
-        accum += prob[i];
+        accum += prob_data[i];
         if (!replace)
           id_mapping.push_back(i);
         cdf.push_back(accum);
@@ -198,21 +204,22 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
   }
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
-    used.resize(prob.size());
+  void ResetState(FloatArray prob) {
+    used.resize(prob->shape[0]);
     if (!replace)
       _prob = prob;
     std::fill(used.begin(), used.end(), false);
     Reconstruct(prob);
   }
 
-  explicit CDFSampler(RandomEngine *re, const std::vector<DType>& prob): re(re) {
+  explicit CDFSampler(RandomEngine *re, FloatArray prob): re(re) {
     ResetState(prob);
   }
 
   ~CDFSampler() {}
 
   Idx Draw() {
+    const DType *_prob_data = static_cast<DType *>(_prob->data);
     DType eps = std::numeric_limits<DType>::min();
     if (!replace) {
       if (2 * taken >= accum)
@@ -220,7 +227,7 @@ class CDFSampler: public BaseSampler<Idx, DType, replace> {
       while (true) {
         DType p = std::max(re->Uniform<DType>(0., accum), eps);
         Idx rst = Map(std::lower_bound(cdf.begin(), cdf.end(), p) - cdf.begin() - 1);
-        DType cap = _prob[rst];
+        DType cap = _prob_data[rst];
         if (!used[rst]) {
           used[rst] = true;
           taken += cap;
@@ -249,20 +256,23 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
  private:
   RandomEngine *re;
   std::vector<DType> weight;    // accumulated likelihood of subtrees.
-  int64_t N, num_leafs;
+  int64_t N;
+  int64_t num_leafs;
 
  public:
-  void ResetState(const std::vector<DType>& prob) {
+  void ResetState(FloatArray prob) {
+    int64_t prob_size = prob->shape[0];
+    const DType *prob_data = static_cast<DType *>(prob->data);
     std::fill(weight.begin(), weight.end(), 0);
-    for (int i = 0; i < prob.size(); ++i)
-      weight[num_leafs + i] = prob[i];
-    for (int i = num_leafs - 1; i >= 1; --i)
+    for (int64_t i = 0; i < prob_size; ++i)
+      weight[num_leafs + i] = prob_data[i];
+    for (int64_t i = num_leafs - 1; i >= 1; --i)
       weight[i] = weight[i * 2] + weight[i * 2 + 1];
   }
 
-  explicit TreeSampler(RandomEngine *re, const std::vector<DType>& prob): re(re) {
+  explicit TreeSampler(RandomEngine *re, FloatArray prob): re(re) {
     num_leafs = 1;
-    while (num_leafs < prob.size())
+    while (num_leafs < prob->shape[0])
       num_leafs *= 2;
     N = num_leafs * 2;
     weight.resize(N);
@@ -299,4 +309,4 @@ class TreeSampler: public BaseSampler<Idx, DType, replace> {
 };  // namespace utils
 };  // namespace dgl
 
-#endif  // DGL_SAMPLE_UTILS_H_
+#endif  // DGL_RANDOM_CPU_SAMPLE_UTILS_H_

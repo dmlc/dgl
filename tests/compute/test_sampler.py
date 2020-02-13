@@ -228,12 +228,10 @@ def check_head_tail(g):
 
     lsrc = np.unique(F.asnumpy(lsrc))
     head_nid = np.unique(F.asnumpy(g.head_nid))
-    assert len(head_nid) == len(g.head_nid)
     np.testing.assert_equal(lsrc, head_nid)
 
     ldst = np.unique(F.asnumpy(ldst))
     tail_nid = np.unique(F.asnumpy(g.tail_nid))
-    assert len(tail_nid) == len(g.tail_nid)
     np.testing.assert_equal(tail_nid, ldst)
 
 

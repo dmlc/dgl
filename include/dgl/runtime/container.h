@@ -168,6 +168,23 @@ class IterAdapter {
  * operator[] only provide const access, use Set to mutate the content.
  *
  * \tparam T The content ObjectRef type.
+ *
+ * \note The element type must subclass \c ObjectRef.  Otherwise, the
+ * compiler would throw an error:
+ *
+ * <code>
+ *      error: no type named 'type' in 'struct std::enable_if<false, void>'
+ * </code>
+ * 
+ * Example:
+ *
+ * <code>
+ *     // List<int> list;          // fails
+ *     // List<NDArray> list2;     // fails
+ *     List<Value> list;           // works
+ *     list.push_back(Value(MakeValue(1)));  // works
+ *     list.push_back(Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
+ * </code>
  */
 template<typename T,
          typename = typename std::enable_if<std::is_base_of<ObjectRef, T>::value>::type >
@@ -366,6 +383,23 @@ class List : public ObjectRef {
  *
  * \tparam K The key ObjectRef type.
  * \tparam V The value ObjectRef type.
+ *
+ * \note The element type must subclass \c ObjectRef.  Otherwise, the
+ * compiler would throw an error:
+ *
+ * <code>
+ *      error: no type named 'type' in 'struct std::enable_if<false, void>'
+ * </code>
+ * 
+ * Example:
+ *
+ * <code>
+ *     // Map<std::string, int> map;          // fails
+ *     // Map<std::string, NDArray> map2;     // fails
+ *     Map<std::string, Value> map;           // works
+ *     map.Set("key1", Value(MakeValue(1)));  // works
+ *     map.Set("key2", Value(MakeValue(NDArray::Empty(shape, dtype, ctx))));  // works
+ * </code>
  */
 template<typename K,
          typename V,
