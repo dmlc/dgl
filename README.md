@@ -130,7 +130,7 @@ Overall there are 30+ models implemented by using DGL:
 - DGL-RecSys(coming soon)
 
 ### DGL for NLP/CV problems
-- [LSTM](https://github.com/dmlc/dgl/tree/master/examples/pytorch/tree_lstm)
+- [TreeLSTM](https://github.com/dmlc/dgl/tree/master/examples/pytorch/tree_lstm)
 - [GraphWriter](https://github.com/dmlc/dgl/tree/master/examples/pytorch/graphwriter)
 - [Capsule Network](https://github.com/dmlc/dgl/tree/master/examples/pytorch/capsule)
 
