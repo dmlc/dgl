@@ -29,15 +29,13 @@ class ArgParser(argparse.ArgumentParser):
                           help='Unique ID of each server.')
         self.add_argument('--ip_config', type=str, default='ip_config.txt',
                           help='IP configuration file of kvstore.')
-        self.add_argument('--backup_count', type=int, default=1,
+        self.add_argument('--backup_count', type=int, default=2,
                           help='Count of backup server.')
 
 def start_server(args):
     """Start kvstore service
     """
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
-
-    print(server_namebook)
 
     my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
 

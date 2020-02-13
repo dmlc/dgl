@@ -7,15 +7,14 @@ from dgl.contrib import KVClient
 
 import torch as th
 
+partition = th.tensor([0,0,1,1,2,2,3,3])
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
         super(ArgParser, self).__init__()
 
-        self.add_argument('--machine_number', type=int, default=1,
-                          help='Total number of machine.')
-        self.add_argument('--server_id', type=int, default=0,
-                          help='Unique ID of each server.')
+        self.add_argument('--machine_id', type=int, default=0,
+                          help='Unique ID of each machine.')
         self.add_argument('--ip_config', type=str, default='ip_config.txt',
                           help='IP configuration file of kvstore.')
 
@@ -25,17 +24,11 @@ def start_client(args):
     """
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
-    my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
+    my_client = KVClient(server_namebook)
 
-    if args.server_id % args.machine_number == 0:
-        my_server.set_global2local(name='entity_embed', global2local=th.tensor([0,1,2]))
-        my_server.init_data(name='entity_embed', data_tensor=th.zeros(50000000,200))
-    else:
-        time.sleep(2)
-        my_server.set_global2local(name='entity_embed', global2local=None, data_shape=tuple((3,)))
-        my_server.init_data(name='entity_embed', data_tensor=None, data_shape=tuple((50000000,200)))
+    my_client.set_partition_book(name='entity_embed', partition_book=partition)
 
-    my_server.start()
+    my_client.connect()
     
 
 if __name__ == '__main__':
