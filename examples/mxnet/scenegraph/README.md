@@ -4,6 +4,8 @@ Scene graph extraction aims at not only detect objects in the given image, but a
 
 This example reproduces [Graphical Contrastive Losses for Scene Graph Parsing](https://arxiv.org/abs/1903.02728), author's code can be found [here](https://github.com/NVIDIA/ContrastiveLosses4VRD).
 
+![DEMO](demo.jpg)
+
 ## Results
 
 **VisualGenome**
