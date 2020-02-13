@@ -1,42 +1,43 @@
-# This is a simple MXNet server demo shows how to use DGL distributed kvstore.
-import dgl
+import os
 import argparse
+import time
+
+import dgl
+from dgl.contrib import KVServer
+
 import torch as th
 
-ndata_g2l = []
-edata_g2l = []
 
-ndata_g2l.append({'ndata':th.tensor([0,1,0,0,0,0,0,0])})
-ndata_g2l.append({'ndata':th.tensor([0,0,0,1,0,0,0,0])})
-ndata_g2l.append({'ndata':th.tensor([0,0,0,0,0,1,0,0])})
-ndata_g2l.append({'ndata':th.tensor([0,0,0,0,0,0,0,1])})
+class ArgParser(argparse.ArgumentParser):
+    def __init__(self):
+        super(ArgParser, self).__init__()
 
-edata_g2l.append({'edata':th.tensor([0,1,0,0,0,0,0,0])})
-edata_g2l.append({'edata':th.tensor([0,0,0,1,0,0,0,0])})
-edata_g2l.append({'edata':th.tensor([0,0,0,0,0,1,0,0])})
-edata_g2l.append({'edata':th.tensor([0,0,0,0,0,0,0,1])})
+        self.add_argument('--machine_number', type=int, default=1,
+                          help='Total number of machine.')
+        self.add_argument('--server_id', type=int, default=0,
+                          help='Unique ID of each server.')
+        self.add_argument('--ip_config', type=str, default='ip_config.txt',
+                          help='IP configuration file of kvstore.')
 
-DATA = []
-DATA.append(th.tensor([[4.,4.,4.,],[4.,4.,4.,]]))
-DATA.append(th.tensor([[3.,3.,3.,],[3.,3.,3.,]]))
-DATA.append(th.tensor([[2.,2.,2.,],[2.,2.,2.,]]))
-DATA.append(th.tensor([[1.,1.,1.,],[1.,1.,1.,]]))
 
 def start_server(args):
-    
-    dgl.contrib.start_server(
-        server_id=args.id,
-        ip_config='ip_config.txt',
-        num_client=4,
-        ndata={'ndata':DATA[args.id]},
-        edata={'edata':DATA[args.id]},
-        ndata_g2l=ndata_g2l[args.id],
-        edata_g2l=edata_g2l[args.id])
+    """Start kvstore service
+    """
+    server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
+    my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
+
+    if args.server_id % args.machine_number == 0:
+        my_server.set_global2local(name='entity_embed', global2local=th.tensor([0,1,2]))
+        my_server.init_data(name='entity_embed', data_tensor=th.zeros(50000000,200))
+    else:
+        time.sleep(3)
+        my_server.set_global2local(name='entity_embed', global2local=None, shared_server_id=0, data_shape=tuple((3,)))
+        my_server.init_data(name='entity_embed', data_tensor=None, shared_server_id=0, data_shape=tuple((50000000,200)))
+
+    my_server.start()
+    
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='kvstore')
-    parser.add_argument("--id", type=int, default=0, help="node ID")
-    args = parser.parse_args()
-
+    args = ArgParser().parse_args()
     start_server(args)
