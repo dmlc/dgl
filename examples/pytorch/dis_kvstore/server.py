@@ -33,7 +33,7 @@ def start_server(args):
         my_server.set_global2local(name='entity_embed', global2local=th.tensor([0,1,2]))
         my_server.init_data(name='entity_embed', data_tensor=th.zeros(50000000,200))
     else:
-        time.sleep(2)
+        time.sleep(3)
         my_server.set_global2local(name='entity_embed', global2local=None, data_shape=tuple((3,)))
         my_server.init_data(name='entity_embed', data_tensor=None, data_shape=tuple((50000000,200)))
 
