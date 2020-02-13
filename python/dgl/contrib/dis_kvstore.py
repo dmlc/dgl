@@ -67,6 +67,7 @@ def read_ip_config(filename):
         server_id = 0
         lines = [line.rstrip('\n') for line in open(filename)]
         for line in lines:
+            print(line)
             machine_id, ip, port, server_count = line.split(' ')
             for s_count in range(server_count):
                 server_namebook[server_id] = str(machine_id)+'|'+ip+':'+str(int(port)+s_count)
