@@ -17,7 +17,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='Unique ID of each machine.')
         self.add_argument('--ip_config', type=str, default='ip_config.txt',
                           help='IP configuration file of kvstore.')
-
+        self.add_argument('--backup_count', type=int, default=2,
+                          help='Count of backup client.')
 
 def start_client(args):
     """Start kvstore service
@@ -28,7 +29,7 @@ def start_client(args):
 
     my_client.connect()
 
-    if my_client.get_id() % args.num_client == 0:
+    if my_client.get_id() % args.backup_count == 0:
         my_client.set_partition_book(name='entity_embed', partition_book=partition)
     else:
         time.sleep(3)
