@@ -47,6 +47,8 @@ def start_client(args):
         time.sleep(3)
         my_client.set_partition_book(name='entity_embed', partition_book=None, data_shape=tuple((8,)))
 
+    my_client.print()
+
     for i in range(4):
         my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
