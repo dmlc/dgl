@@ -201,7 +201,7 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * \brief Plain CSR matrix
  *
  * The column indices are 0-based and are not necessarily sorted. The data array stores
- * integer ids for reading edge data.
+ * integer ids for reading edge features.
  *
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
@@ -211,18 +211,16 @@ struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
-  runtime::NDArray indptr, indices;
-  /*! \brief data array. */
-  runtime::NDArray data;
+  IdArray indptr, indices;
+  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  IdArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted = false;
   /*! \brief default constructor */
   CSRMatrix() = default;
   /*! \brief constructor */
   CSRMatrix(int64_t nrows, int64_t ncols,
-            runtime::NDArray parr,
-            runtime::NDArray iarr,
-            runtime::NDArray darr,
+            IdArray parr, IdArray iarr, IdArray darr = IdArray(),
             bool sorted_flag = false)
     : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
       data(darr), sorted(sorted_flag) {}
@@ -231,6 +229,8 @@ struct CSRMatrix {
 /*!
  * \brief Plain COO structure
  * 
+ * The data array stores integer ids for reading edge features.
+
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
@@ -241,11 +241,9 @@ struct COOMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
   /*! \brief COO index arrays */
-  runtime::NDArray row, col;
-  /*!
-   * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
-   */
-  runtime::NDArray data;
+  IdArray row, col;
+  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  IdArray data;
   /*! \brief whether the row indices are sorted */
   bool row_sorted = false;
   /*! \brief whether the column indices per row are sorted */
@@ -254,11 +252,8 @@ struct COOMatrix {
   COOMatrix() = default;
   /*! \brief constructor */
   COOMatrix(int64_t nrows, int64_t ncols,
-            runtime::NDArray rarr,
-            runtime::NDArray carr,
-            runtime::NDArray darr = runtime::NDArray(),
-            bool rsorted = false,
-            bool csorted = false)
+            IdArray rarr, IdArray carr, IdArray darr = IdArray(),
+            bool rsorted = false, bool csorted = false)
     : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
       row_sorted(rsorted), col_sorted(csorted) {}
 };
@@ -750,46 +745,16 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }                                                         \
 } while (0)
 
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
-  if (CSRHasData(csr)) {                                 \
-    CHECK_EQ(csr.indptr->dtype.code, csr.data->dtype.code); \
-    CHECK_EQ(csr.indptr->dtype.bits, csr.data->dtype.bits); \
-  }                                                         \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      typedef IdType DType;                                 \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context and index type
-#define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
+// Macro to dispatch according to device context and index type.
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
   ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
     ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
 
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
-  if (COOHasData(coo)) {                                 \
-    CHECK_EQ(coo.row->dtype.code, coo.data->dtype.code);    \
-    CHECK_EQ(coo.row->dtype.bits, coo.data->dtype.bits);    \
-  }                                                         \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
-      typedef IdType DType;                                 \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context and index type
-#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
+// Macro to dispatch according to device context and index type.
+#define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
   ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
     ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
       {__VA_ARGS__}                                         \

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2020 by Contributors
  * \file array/cpu/csr_rowwise_sampling.cc
- * \brief CSR rowwise sampling
+ * \brief COO rowwise sampling
  */
 #include <dgl/random.h>
 #include <numeric>
@@ -27,7 +27,7 @@ inline FloatArray DoubleSlice(FloatArray array, IdArray idx,
 }  // namespace
 
 template <DLDeviceType XPU, typename IdxType, typename FloatType>
-COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
+COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
   const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
   const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
@@ -49,20 +49,20 @@ COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
       }
     };
 
-  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
+  return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
-template COOMatrix CSRRowWiseSampling<kDLCPU, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDLCPU, int32_t, float>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDLCPU, int64_t, float>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDLCPU, int32_t, double>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
+template COOMatrix COORowWiseSampling<kDLCPU, int64_t, double>(
+    COOMatrix, IdArray, int64_t, FloatArray, bool);
 
 template <DLDeviceType XPU, typename IdxType>
-COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
+COOMatrix COORowWiseSamplingUniform(COOMatrix mat, IdArray rows,
                                     int64_t num_samples, bool replace) {
   const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
   const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
@@ -83,13 +83,13 @@ COOMatrix CSRRowWiseSamplingUniform(CSRMatrix mat, IdArray rows,
       }
     };
 
-  return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
+  return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
 
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int32_t>(
-    CSRMatrix, IdArray, int64_t, bool);
-template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
-    CSRMatrix, IdArray, int64_t, bool);
+template COOMatrix COORowWiseSamplingUniform<kDLCPU, int32_t>(
+    COOMatrix, IdArray, int64_t, bool);
+template COOMatrix COORowWiseSamplingUniform<kDLCPU, int64_t>(
+    COOMatrix, IdArray, int64_t, bool);
 
 }  // namespace impl
 }  // namespace aten

@@ -121,17 +121,17 @@ template NDArray COOGetRowNNZ<kDLCPU, int64_t>(COOMatrix, NDArray);
 
 ///////////////////////////// COOGetRowDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
     COOMatrix coo, int64_t row) {
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
 
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* coo_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> indices;
-  std::vector<DType> data;
+  std::vector<IdType> data;
 
   for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     if (coo_row_data[i] == row) {
@@ -144,20 +144,20 @@ std::pair<NDArray, NDArray> COOGetRowDataAndIndices(
 }
 
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t);
+COOGetRowDataAndIndices<kDLCPU, int32_t>(COOMatrix, int64_t);
 template std::pair<NDArray, NDArray>
-COOGetRowDataAndIndices<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t);
+COOGetRowDataAndIndices<kDLCPU, int64_t>(COOMatrix, int64_t);
 
 ///////////////////////////// COOGetData /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
   CHECK(row >= 0 && row < coo.num_rows) << "Invalid row index: " << row;
   CHECK(col >= 0 && col < coo.num_cols) << "Invalid col index: " << col;
-  std::vector<DType> ret_vec;
+  std::vector<IdType> ret_vec;
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
   for (IdType i = 0; i < coo.row->shape[0]; ++i) {
     if (coo_row_data[i] == row && coo_col_data[i] == col)
       ret_vec.push_back(data ? data[i] : i);
@@ -165,12 +165,12 @@ NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col) {
   return NDArray::FromVector(ret_vec);
 }
 
-template NDArray COOGetData<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, int64_t);
-template NDArray COOGetData<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_t);
+template NDArray COOGetData<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
+template NDArray COOGetData<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
 ///////////////////////////// COOGetDataAndIndices /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 std::vector<NDArray> COOGetDataAndIndices(
     COOMatrix coo, NDArray rows, NDArray cols) {
   const int64_t rowlen = rows->shape[0];
@@ -186,10 +186,10 @@ std::vector<NDArray> COOGetDataAndIndices(
 
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_rows, ret_cols;
-  std::vector<DType> ret_data;
+  std::vector<IdType> ret_data;
 
   for (int64_t i = 0, j = 0; i < rowlen && j < collen; i += row_stride, j += col_stride) {
     const IdType row_id = row_data[i], col_id = col_data[j];
@@ -209,25 +209,25 @@ std::vector<NDArray> COOGetDataAndIndices(
           NDArray::FromVector(ret_data)};
 }
 
-template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int32_t, int32_t>(
+template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int32_t>(
     COOMatrix coo, NDArray rows, NDArray cols);
-template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int64_t, int64_t>(
+template std::vector<NDArray> COOGetDataAndIndices<kDLCPU, int64_t>(
     COOMatrix coo, NDArray rows, NDArray cols);
 
 ///////////////////////////// COOTranspose /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo) {
   return COOMatrix{coo.num_cols, coo.num_rows, coo.col, coo.row, coo.data};
 }
 
-template COOMatrix COOTranspose<kDLCPU, int32_t, int32_t>(COOMatrix coo);
-template COOMatrix COOTranspose<kDLCPU, int64_t, int64_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDLCPU, int32_t>(COOMatrix coo);
+template COOMatrix COOTranspose<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOToCSR /////////////////////////////
 
 // complexity: time O(NNZ), space O(1)
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t N = coo.num_rows;
   const int64_t NNZ = coo.row->shape[0];
@@ -264,8 +264,8 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     const IdType r = row_data[i];
     Bi[Bp[r]] = col_data[i];
     if (COOHasData(coo)) {
-      const DType* data = static_cast<DType*>(coo.data->data);
-      DType* Bx = static_cast<DType*>(ret_data->data);
+      const IdType* data = static_cast<IdType*>(coo.data->data);
+      IdType* Bx = static_cast<IdType*>(ret_data->data);
       Bx[Bp[r]] = data[i];
     } else {
       IdType* Bx = static_cast<IdType*>(ret_data->data);
@@ -284,22 +284,22 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   return CSRMatrix{coo.num_rows, coo.num_cols, ret_indptr, ret_indices, ret_data};
 }
 
-template CSRMatrix COOToCSR<kDLCPU, int32_t, int32_t>(COOMatrix coo);
-template CSRMatrix COOToCSR<kDLCPU, int64_t, int64_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDLCPU, int32_t>(COOMatrix coo);
+template CSRMatrix COOToCSR<kDLCPU, int64_t>(COOMatrix coo);
 
 ///////////////////////////// COOSliceRows /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
   CHECK(start >= 0 && start < coo.num_rows) << "Invalid start row " << start;
   CHECK(end > 0 && end <= coo.num_rows) << "Invalid end row " << end;
 
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* coo_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_row, ret_col;
-  std::vector<DType> ret_data;
+  std::vector<IdType> ret_data;
 
   for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     const IdType row_id = coo_row_data[i];
@@ -318,17 +318,17 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
     NDArray::FromVector(ret_data)};
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix, int64_t, int64_t);
-template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix, int64_t, int64_t);
+template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
+template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix, int64_t, int64_t);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* coo_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
 
   std::vector<IdType> ret_row, ret_col;
-  std::vector<DType> ret_data;
+  std::vector<IdType> ret_data;
 
   IdHashMap<IdType> hashmap(rows);
 
@@ -348,24 +348,25 @@ COOMatrix COOSliceRows(COOMatrix coo, NDArray rows) {
     coo.num_cols,
     NDArray::FromVector(ret_row),
     NDArray::FromVector(ret_col),
-    NDArray::FromVector(ret_data)};
+    NDArray::FromVector(ret_data),
+    coo.row_sorted, coo.col_sorted};
 }
 
-template COOMatrix COOSliceRows<kDLCPU, int32_t, int32_t>(COOMatrix , NDArray);
-template COOMatrix COOSliceRows<kDLCPU, int64_t, int64_t>(COOMatrix , NDArray);
+template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix , NDArray);
+template COOMatrix COOSliceRows<kDLCPU, int64_t>(COOMatrix , NDArray);
 
 ///////////////////////////// COOSliceMatrix /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols) {
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
-  const DType* coo_data = COOHasData(coo) ? static_cast<DType*>(coo.data->data) : nullptr;
+  const IdType* coo_data = COOHasData(coo) ? static_cast<IdType*>(coo.data->data) : nullptr;
 
   IdHashMap<IdType> row_map(rows), col_map(cols);
 
   std::vector<IdType> ret_row, ret_col;
-  std::vector<DType> ret_data;
+  std::vector<IdType> ret_data;
 
   for (int64_t i = 0; i < coo.row->shape[0]; ++i) {
     const IdType row_id = coo_row_data[i];
@@ -389,9 +390,9 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
     NDArray::FromVector(ret_data)};
 }
 
-template COOMatrix COOSliceMatrix<kDLCPU, int32_t, int32_t>(
+template COOMatrix COOSliceMatrix<kDLCPU, int32_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
-template COOMatrix COOSliceMatrix<kDLCPU, int64_t, int64_t>(
+template COOMatrix COOSliceMatrix<kDLCPU, int64_t>(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
 }  // namespace impl
