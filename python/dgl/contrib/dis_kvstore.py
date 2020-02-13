@@ -845,7 +845,7 @@ class KVClient(object):
         pre_id = 0
         for ID, data in self._server_namebook.items():
             machine_id, addr = data.split('|')
-            if machine_id != pre_id:
+            if int(machine_id) != pre_id:
                 break
             backup_count += 1
             pre_id = machine_id
