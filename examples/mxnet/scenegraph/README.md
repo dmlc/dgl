@@ -53,3 +53,7 @@ After the training, one can evaluate the results with multiple commonly-used met
 ```
 bash validate_reldn.sh
 ```
+
+## Demo
+
+We provide a demo notebook of running the model with real-world pictures. Be aware that you need trained model to generate meaningful results from the demo.
