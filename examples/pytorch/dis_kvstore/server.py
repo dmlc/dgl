@@ -29,7 +29,7 @@ def start_server(args):
 
     my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
 
-    if args.server_id % args.machine_number == 0:
+    if args.server_id % 2 == 0:
         my_server.set_global2local(name='entity_embed', global2local=th.tensor([0,1,2]))
         my_server.init_data(name='entity_embed', data_tensor=th.zeros(10,200))
     else:
