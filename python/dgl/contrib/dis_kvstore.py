@@ -584,6 +584,8 @@ class KVClient(object):
     def print(self):
         print('--------------')
         print('Client ID %d' % self.get_id())
+        print('Machine ID: %d' % self._machine_id)
+        print('backup count: %d' % self._backup_count)
         for name, data in self._data_store.items():
             print('name: ' + name)
             print(data)
