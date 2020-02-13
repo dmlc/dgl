@@ -711,7 +711,6 @@ class KVClient(object):
         sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
         back_sorted_id = F.tensor(np.argsort(sorted_id))
         id_tensor = id_tensor[sorted_id]
-        data_tensor = data_tensor[sorted_id]
         machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
         # pull data from server by order
         start = 0
@@ -848,7 +847,7 @@ class KVClient(object):
             if int(machine_id) != pre_id:
                 break
             backup_count += 1
-            pre_id = machine_id
+            pre_id = int(machine_id)
 
         return backup_count
 
