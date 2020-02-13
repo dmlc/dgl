@@ -1,58 +1,43 @@
-# This is a simple MXNet server demo shows how to use DGL distributed kvstore.
-import dgl
+import os
 import argparse
-import torch as th
 import time
 
-ID = []
-ID.append(th.tensor([0,1]))
-ID.append(th.tensor([2,3]))
-ID.append(th.tensor([4,5]))
-ID.append(th.tensor([6,7]))
+import dgl
+from dgl.contrib import KVClient
 
-DATA = []
-DATA.append(th.tensor([[1.,1.,1.,],[1.,1.,1.,]]))
-DATA.append(th.tensor([[2.,2.,2.,],[2.,2.,2.,]]))
-DATA.append(th.tensor([[3.,3.,3.,],[3.,3.,3.,]]))
-DATA.append(th.tensor([[4.,4.,4.,],[4.,4.,4.,]]))
+import torch as th
 
-edata_partition_book = {'edata':th.tensor([0,0,1,1,2,2,3,3])}
-ndata_partition_book = {'ndata':th.tensor([0,0,1,1,2,2,3,3])}
 
-def start_client():
-    time.sleep(3)
+class ArgParser(argparse.ArgumentParser):
+    def __init__(self):
+        super(ArgParser, self).__init__()
 
-    client = dgl.contrib.start_client(ip_config='ip_config.txt', 
-                                      ndata_partition_book=ndata_partition_book, 
-                                      edata_partition_book=edata_partition_book,
-                                      close_shared_mem=True)
+        self.add_argument('--machine_number', type=int, default=1,
+                          help='Total number of machine.')
+        self.add_argument('--server_id', type=int, default=0,
+                          help='Unique ID of each server.')
+        self.add_argument('--ip_config', type=str, default='ip_config.txt',
+                          help='IP configuration file of kvstore.')
 
-    tensor_edata = client.pull(name='edata', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
-    tensor_ndata = client.pull(name='ndata', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
 
-    print(tensor_edata)
-    client.barrier()
+def start_client(args):
+    """Start kvstore service
+    """
+    server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
-    print(tensor_ndata)
-    client.barrier()
+    my_server = KVServer(server_id=args.server_id, server_addr=server_namebook[args.server_id], num_client=20)
 
-    client.push(name='edata', id_tensor=ID[client.get_id()], data_tensor=DATA[client.get_id()])
-    client.push(name='ndata', id_tensor=ID[client.get_id()], data_tensor=DATA[client.get_id()])
+    if args.server_id % args.machine_number == 0:
+        my_server.set_global2local(name='entity_embed', global2local=th.tensor([0,1,2]))
+        my_server.init_data(name='entity_embed', data_tensor=th.zeros(50000000,200))
+    else:
+        time.sleep(2)
+        my_server.set_global2local(name='entity_embed', global2local=None, data_shape=tuple((3,)))
+        my_server.init_data(name='entity_embed', data_tensor=None, data_shape=tuple((50000000,200)))
 
-    client.barrier()
-
-    tensor_edata = client.pull(name='edata', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
-    tensor_ndata = client.pull(name='ndata', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
-
-    print(tensor_edata)
-    client.barrier()
-
-    print(tensor_ndata)
-    client.barrier()
-
-    if client.get_id() == 0:
-        client.shut_down()
+    my_server.start()
+    
 
 if __name__ == '__main__':
-
-    start_client()
+    args = ArgParser().parse_args()
+    start_client(args)
