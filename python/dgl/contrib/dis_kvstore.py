@@ -866,7 +866,7 @@ class KVClient(object):
             machine_id, addr = data.split('|')
             ip, port = addr.split(':')
             if ip in self._local_ip4_addr_list():
-                res = machine_id
+                res = int(machine_id)
                 break
 
         return res
