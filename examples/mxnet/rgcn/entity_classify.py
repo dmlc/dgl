@@ -34,7 +34,7 @@ class EntityClassify(BaseRGCN):
 
     def build_output_layer(self):
         return RelGraphConv(self.h_dim, self.out_dim, self.num_rels, "basis",
-                self.num_bases, activation=partial(F.softmax, axis=1),
+                self.num_bases, activation=None,
                 self_loop=self.use_self_loop)
 
 def main(args):
