@@ -41,7 +41,6 @@ inline PickFn<IdxType> GetSamplingPickFn(
           num_samples, prob_selected, replace);
       const IdxType* sampled_data = static_cast<IdxType*>(sampled->data);
       for (int64_t j = 0; j < num_samples; ++j) {
-        LOG(INFO) << "selected: " << sampled_data[j] << " replace? " << replace;
         out_idx[j] = off + sampled_data[j];
       }
     };
