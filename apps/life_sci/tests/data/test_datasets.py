@@ -31,14 +31,13 @@ def test_pdbbind():
 
 def test_uspto():
     dataset = USPTO(subset='full')
-    # dataset = USPTO(subset='train')
-    # dataset = USPTO(subset='val')
-    # dataset = USPTO(subset='test')
+    dataset = USPTO(subset='train')
+    dataset = USPTO(subset='val')
+    dataset = USPTO(subset='test')
 
 if __name__ == '__main__':
-    # Todo: uncomment
-    # test_pubchem_aromaticity()
-    # test_tox21()
-    # test_alchemy()
-    # test_pdbbind()
+    test_pubchem_aromaticity()
+    test_tox21()
+    test_alchemy()
+    test_pdbbind()
     test_uspto()
