@@ -31,7 +31,7 @@ IdArray RandomEngine::Choice(int64_t num, FloatArray prob, bool replace) {
   const int64_t N = prob->shape[0];
   if (!replace)
     CHECK_LE(num, N) << "Cannot take more sample than population when 'replace=false'";
-  if (num == N)
+  if (num == N && !replace)
     return aten::Range(0, N, sizeof(IdxType) * 8, DLContext{kDLCPU, 0});
 
   const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};

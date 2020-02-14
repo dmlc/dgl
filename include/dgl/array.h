@@ -382,7 +382,7 @@ void CSRSort_(CSRMatrix* csr);
  * // csr.num_cols = 4;
  * // csr.indptr = [0, 2, 3, 3, 5]
  * // csr.indices = [0, 1, 1, 2, 3]
- * // csr.data = ...;  // arbitrary data
+ * // csr.data = [2, 3, 0, 1, 4]
  * CSRMatrix csr = ...;
  * IdArray rows = ... ; // [1, 3]
  * COOMatrix sampled = CSRRowWiseSampling(csr, rows, 2, FloatArray(), false);
@@ -391,7 +391,7 @@ void CSRSort_(CSRMatrix* csr);
  * // sampled.num_cols = 4
  * // sampled.rows = [1, 3, 3]
  * // sampled.cols = [1, 2, 3]
- * // sampled.data = [1, 2, 4]
+ * // sampled.data = [3, 0, 4]
  *
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
@@ -399,8 +399,7 @@ void CSRSort_(CSRMatrix* csr);
  * \param prob Unnormalized probability array. Should be of the same length as the data array.
  *             If an empty array is provided, assume uniform.
  * \param replace True if sample with replacement
- * \return A COOMatrix storing the picked row and col indices. Its data field stores the
- *         the index of the picked elements in the value array.
+ * \return A COOMatrix storing the picked row, col and data indices.
  */
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat,
@@ -424,7 +423,7 @@ COOMatrix CSRRowWiseSampling(
  * // csr.num_cols = 4;
  * // csr.indptr = [0, 2, 3, 3, 5]
  * // csr.indices = [0, 1, 1, 2, 3]
- * // csr.data = ...;  // arbitrary data
+ * // csr.data = [2, 3, 0, 1, 4]
  * CSRMatrix csr = ...;
  * IdArray rows = ... ;  // [0, 1, 3]
  * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
@@ -434,7 +433,7 @@ COOMatrix CSRRowWiseSampling(
  * // sampled.num_cols = 4
  * // sampled.rows = [0, 1, 3]
  * // sampled.cols = [1, 1, 2]
- * // sampled.data = [1, 2, 3]
+ * // sampled.data = [3, 0, 1]
  *
  * \param mat Input CSR matrix.
  * \param rows Rows to sample from.
@@ -552,6 +551,7 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  * // coo.num_cols = 4;
  * // coo.rows = [0, 0, 1, 3, 3]
  * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
  * COOMatrix coo = ...;
  * IdArray rows = ... ; // [1, 3]
  * COOMatrix sampled = COORowWiseSampling(coo, rows, 2, FloatArray(), false);
@@ -560,7 +560,7 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  * // sampled.num_cols = 4
  * // sampled.rows = [1, 3, 3]
  * // sampled.cols = [1, 2, 3]
- * // sampled.data = [1, 2, 4]
+ * // sampled.data = [3, 0, 4]
  *
  * \param mat Input coo matrix.
  * \param rows Rows to sample from.
@@ -593,7 +593,7 @@ COOMatrix COORowWiseSampling(
  * // coo.num_cols = 4;
  * // coo.rows = [0, 0, 1, 3, 3]
  * // coo.cols = [0, 1, 1, 2, 3]
- * // coo.data = ...;  // arbitrary data
+ * // coo.data = [2, 3, 0, 1, 4]
  * COOMatrix coo = ...;
  * IdArray rows = ... ;  // [0, 1, 3]
  * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
@@ -603,7 +603,7 @@ COOMatrix COORowWiseSampling(
  * // sampled.num_cols = 4
  * // sampled.rows = [0, 1, 3]
  * // sampled.cols = [1, 1, 2]
- * // sampled.data = [1, 2, 3]
+ * // sampled.data = [3, 0, 1]
  *
  * \param mat Input COO matrix.
  * \param rows Rows to sample from.
