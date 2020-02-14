@@ -68,8 +68,7 @@ HeteroGraphPtr SampleNeighbors(
           break;
         default:
           LOG(FATAL) << "Unsupported sparse format.";
-      };
-      
+      }
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
     }
@@ -127,8 +126,7 @@ HeteroGraphPtr SampleNeighborsTopk(
           break;
         default:
           LOG(FATAL) << "Unsupported sparse format.";
-      };
-      
+      }
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
     }

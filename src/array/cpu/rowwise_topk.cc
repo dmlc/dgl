@@ -19,26 +19,27 @@ inline PickFn<IdxType> GetTopkPickFn(int64_t k, FloatArray weight, bool ascendin
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-
       std::function<bool(IdxType, IdxType)> compare_fn;
       if (ascending) {
-        if (data)
+        if (data) {
           compare_fn = [wdata, data] (IdxType i, IdxType j) {
               return wdata[data[i]] < wdata[data[j]];
             };
-        else
+        } else {
           compare_fn = [wdata, data] (IdxType i, IdxType j) {
               return wdata[i] < wdata[j];
             };
+        }
       } else {
-        if (data)
+        if (data) {
           compare_fn = [wdata, data] (IdxType i, IdxType j) {
               return wdata[data[i]] > wdata[data[j]];
             };
-        else
+        } else {
           compare_fn = [wdata, data] (IdxType i, IdxType j) {
               return wdata[i] > wdata[j];
             };
+        }
       }
 
       std::vector<IdxType> idx(len);

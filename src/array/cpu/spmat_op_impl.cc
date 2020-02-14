@@ -442,7 +442,6 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end) {
   return CSRMatrix(num_rows, csr.num_cols,
                    ret_indptr, ret_indices, ret_data,
                    csr.sorted);
-                   
 }
 
 template CSRMatrix CSRSliceRows<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);

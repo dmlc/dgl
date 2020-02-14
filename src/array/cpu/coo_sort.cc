@@ -26,7 +26,7 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
   IdType* new_col_data = static_cast<IdType*>(new_col->data);
   IdType* new_data_data = static_cast<IdType*>(new_data->data);
   std::iota(new_data_data, new_data_data + nnz, 0);
-  if (sort_column)
+  if (sort_column) {
     std::sort(
         new_data_data,
         new_data_data + nnz,
@@ -35,14 +35,14 @@ COOMatrix COOSort(COOMatrix coo, bool sort_column) {
             (coo_row_data[a] < coo_row_data[b]) :
             (coo_col_data[a] < coo_col_data[b]);
         });
-  else
+  } else {
     std::sort(
         new_data_data,
         new_data_data + nnz,
         [coo_row_data](IdType a, IdType b) {
           return coo_row_data[a] <= coo_row_data[b];
         });
-
+  }
 
   // Reorder according to shuffle
   for (IdType i = 0; i < nnz; ++i) {

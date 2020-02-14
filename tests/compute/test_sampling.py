@@ -108,6 +108,13 @@ def test_sample_neighbors():
     g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
             'user', 'follow')
     g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
 
     def _test1(p, replace):
         for i in range(10):
@@ -149,14 +156,6 @@ def test_sample_neighbors():
     _test2('prob', True)   # w/ replacement
     _test2('prob', False)  # w/o replacement
 
-    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
-    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
-    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
-
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
-
     def _test3(p, replace):
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, prob=p, replace=replace)
@@ -177,6 +176,14 @@ def test_sample_neighbors_topk():
     g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
             'user', 'follow')
     g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
 
     def _test1():
         subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight')
@@ -195,15 +202,6 @@ def test_sample_neighbors_topk():
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
         assert edge_set == {(2,0),(1,0),(0,2)}
     _test2()
-
-    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
-    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
-    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
-    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
-
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
 
     def _test3():
         subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, 2, 'weight')
