@@ -79,7 +79,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  explicit COO(GraphPtr metagraph, const aten::COOMatrix& coo)
+  COO(GraphPtr metagraph, const aten::COOMatrix& coo)
     : BaseHeteroGraph(metagraph), adj_(coo) {}
 
   inline dgl_type_t SrcType() const {
@@ -324,6 +324,25 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    return adj_;
+  }
+
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::CSRMatrix();
+  }
+
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::CSRMatrix();
+  }
+
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return SparseFormat::ANY;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -419,7 +438,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     sorted_ = false;
   }
 
-  explicit CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
+  CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
     : BaseHeteroGraph(metagraph), adj_(csr) {
     sorted_ = false;
   }
@@ -669,6 +688,25 @@ class UnitGraph::CSR : public BaseHeteroGraph {
       dgl_type_t etype, bool transpose, const std::string &fmt) const override {
     CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
     return {adj_.indptr, adj_.indices, adj_.data};
+  }
+
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return aten::COOMatrix();
+  }
+
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return aten::CSRMatrix();
+  }
+
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
+    return adj_;
+  }
+
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return SparseFormat::ANY;
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -982,7 +1020,8 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col,
     SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
@@ -990,6 +1029,18 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
 
+  return HeteroGraphPtr(
+      new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCOO(
+    int64_t num_vtypes, const aten::COOMatrix& mat,
+    SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(mat.num_rows, mat.num_cols);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  COOPtr coo(new COO(mg, mat));
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
@@ -1002,6 +1053,17 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSR(
+    int64_t num_vtypes, const aten::CSRMatrix& mat,
+    SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(mat.num_rows, mat.num_cols);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, mat));
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
@@ -1104,15 +1166,15 @@ UnitGraph::COOPtr UnitGraph::GetCOO() const {
   return coo_;
 }
 
-aten::CSRMatrix UnitGraph::GetInCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetCSCMatrix(dgl_type_t etype) const {
   return GetInCSR()->adj();
 }
 
-aten::CSRMatrix UnitGraph::GetOutCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetCSRMatrix(dgl_type_t etype) const {
   return GetOutCSR()->adj();
 }
 
-aten::COOMatrix UnitGraph::GetCOOMatrix() const {
+aten::COOMatrix UnitGraph::GetCOOMatrix(dgl_type_t etype) const {
   return GetCOO()->adj();
 }
 
@@ -1186,7 +1248,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
 // Using Out CSR
 void UnitGraph::Save(dmlc::Stream* fs) const {
   // Following CreateFromCSR signature
-  aten::CSRMatrix csr_matrix = GetOutCSRMatrix();
+  aten::CSRMatrix csr_matrix = GetCSRMatrix(0);
   uint64_t num_vtypes = NumVertexTypes();
   uint64_t num_src = NumVertices(SrcType());
   uint64_t num_dst = NumVertices(DstType());

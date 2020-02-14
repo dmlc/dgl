@@ -9,7 +9,7 @@
 #include <dgl/array.h>
 #include <dgl/sampling/neighbor.h>
 #include "../../../c_api_common.h"
-#include "./neighbor_impl.h"
+#include "../../unit_graph.h"
 
 using namespace dgl::runtime;
 using namespace dgl::aten;
@@ -24,6 +24,7 @@ HeteroGraphPtr SampleNeighbors(
     EdgeDir dir,
     const std::vector<FloatArray>& prob,
     bool replace) {
+
   // sanity check
   CHECK_EQ(nodes.size(), hg->NumVertexTypes())
     << "Number of node ID tensors must match the number of node types.";
@@ -32,14 +33,49 @@ HeteroGraphPtr SampleNeighbors(
   CHECK_EQ(prob.size(), hg->NumEdgeTypes())
     << "Number of probability tensors must match the number of edge types.";
 
-  HeteroGraphPtr ret;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(hg->DataType(), IdxType, {
-      ret = impl::SampleNeighbors<XPU, IdxType>(
-        hg, nodes, fanouts, dir, prob, replace);
-    });
-  });
-  return ret;
+  std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
+    auto pair = hg->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
+    const int64_t num_nodes = nodes_ntype->shape[0];
+    if (num_nodes == 0) {
+      // No node provided in the type, create a placeholder relation graph
+      subrels[etype] = UnitGraph::Empty(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        hg->DataType(), hg->Context());
+    } else {
+      // sample from one relation graph
+      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
+      auto avail_fmt = hg->SelectFormat(etype, req_fmt);
+      COOMatrix sampled_coo;
+      switch (avail_fmt) {
+        case SparseFormat::COO:
+          sampled_coo = aten::COORowWiseSampling(
+            hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          break;
+        case SparseFormat::CSR:
+          sampled_coo = aten::CSRRowWiseSampling(
+            hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          break;
+        case SparseFormat::CSC:
+          sampled_coo = aten::CSRRowWiseSampling(
+            hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          sampled_coo = aten::COOTranspose(sampled_coo);
+          break;
+        default:
+          LOG(FATAL) << "Unsupported sparse format.";
+      };
+      
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+    }
+  }
+
+  return CreateHeteroGraph(hg->meta_graph(), subrels);
 }
 
 HeteroGraphPtr SampleNeighborsTopk(
@@ -56,14 +92,49 @@ HeteroGraphPtr SampleNeighborsTopk(
   CHECK_EQ(weight.size(), hg->NumEdgeTypes())
     << "Number of weight tensors must match the number of edge types.";
 
-  HeteroGraphPtr ret;
-  ATEN_XPU_SWITCH(hg->Context().device_type, XPU, {
-    ATEN_ID_TYPE_SWITCH(hg->DataType(), IdxType, {
-      ret = impl::SampleNeighborsTopk<XPU, IdxType>(
-        hg, nodes, k, dir, weight);
-    });
-  });
-  return ret;
+  std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
+    auto pair = hg->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
+    const int64_t num_nodes = nodes_ntype->shape[0];
+    if (num_nodes == 0) {
+      // No node provided in the type, create a placeholder relation graph
+      subrels[etype] = UnitGraph::Empty(
+        hg->GetRelationGraph(etype)->NumVertexTypes(),
+        hg->NumVertices(src_vtype),
+        hg->NumVertices(dst_vtype),
+        hg->DataType(), hg->Context());
+    } else {
+      // sample from one relation graph
+      auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
+      auto avail_fmt = hg->SelectFormat(etype, req_fmt);
+      COOMatrix sampled_coo;
+      switch (avail_fmt) {
+        case SparseFormat::COO:
+          sampled_coo = aten::COORowWiseTopk(
+            hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+          break;
+        case SparseFormat::CSR:
+          sampled_coo = aten::CSRRowWiseTopk(
+            hg->GetCSRMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+          break;
+        case SparseFormat::CSC:
+          sampled_coo = aten::CSRRowWiseTopk(
+            hg->GetCSCMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+          sampled_coo = aten::COOTranspose(sampled_coo);
+          break;
+        default:
+          LOG(FATAL) << "Unsupported sparse format.";
+      };
+      
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+    }
+  }
+
+  return CreateHeteroGraph(hg->meta_graph(), subrels);
 }
 
 DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")

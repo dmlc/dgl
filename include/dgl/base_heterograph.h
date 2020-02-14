@@ -35,6 +35,17 @@ enum class EdgeDir {
 };
 
 /*!
+ * \brief Sparse graph format.
+ */
+enum class SparseFormat {
+  ANY = 0,
+  COO = 1,
+  CSR = 2,
+  CSC = 3
+};
+
+
+/*!
  * \brief Base heterogenous graph.
  *
  * In heterograph, nodes represent entities and edges represent relations.
@@ -331,6 +342,8 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the adjacency matrix of the graph.
    *
+   * TODO(minjie): deprecate this interface; replace it with GetXXXMatrix.
+   *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
    *
@@ -346,6 +359,49 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(
       dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
+
+  /*!
+   * \brief Determine which format to use with a preference.
+   *
+   * Return the preferred format if the underlying relation graph supports it.
+   * Otherwise, it will return whatever DGL thinks is the most appropriate given
+   * the arguments.
+   *
+   * \param etype Edge type.
+   * \param preferred_format Preferred sparse format.
+   * \return Available sparse format.
+   */
+  virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in COO format.
+   * \param etype Edge type.
+   * \return COO matrix.
+   */
+  virtual aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in CSR format.
+   *
+   * The row and column sizes are equal to the number of dsttype and srctype
+   * nodes, respectively.
+   *
+   * \param etype Edge type.
+   * \return CSR matrix.
+   */
+  virtual aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in CSC format.
+   *
+   * A CSC matrix is equivalent to the transpose of a CSR matrix.
+   * We reuse the CSRMatrix data structure as return value. The row and column
+   * sizes are equal to the number of dsttype and srctype nodes, respectively.
+   *
+   * \param etype Edge type.
+   * \return A CSR matrix.
+   */
+  virtual aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.
@@ -477,16 +533,6 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 // creators
-
-/*!
- * \brief Sparse graph format.
- */
-enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
-};
 
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")

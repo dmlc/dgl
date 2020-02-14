@@ -178,7 +178,7 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
 }  // namespace
 
 HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs)
-  : BaseHeteroGraph(meta_graph), relation_graphs_(rel_graphs) {
+  : BaseHeteroGraph(meta_graph) {
   // Sanity check
   CHECK_EQ(meta_graph->NumEdges(), rel_graphs.size());
   CHECK(!rel_graphs.empty()) << "Empty heterograph is not allowed.";
@@ -219,13 +219,14 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
         << "Mismatch number of vertices for vertex type " << dsttype;
   }
 
-  // Make sure that all relation graphs are UnitGraphs to avoid too many indirect pointers.
-  for (size_t i = 0; i < relation_graphs_.size(); ++i) {
-    HeteroGraphPtr relg = relation_graphs_[i];
-    while (std::dynamic_pointer_cast<UnitGraph>(relg) == nullptr) {
-      relg = relg->GetRelationGraph(0);
+  relation_graphs_.resize(rel_graphs.size());
+  for (size_t i = 0; i < rel_graphs.size(); ++i) {
+    HeteroGraphPtr relg = rel_graphs[i];
+    if (std::dynamic_pointer_cast<UnitGraph>(relg)) {
+      relation_graphs_[i] = std::dynamic_pointer_cast<UnitGraph>(relg);
+    } else {
+      relation_graphs_[i] = std::dynamic_pointer_cast<UnitGraph>(relg->GetRelationGraph(0));
     }
-    relation_graphs_[i] = relg;
   }
 }
 

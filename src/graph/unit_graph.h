@@ -15,10 +15,14 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "../c_api_common.h"
 
 namespace dgl {
+
+class UnitGraph;
+typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
 /*!
  * \brief UnitGraph graph
@@ -158,10 +162,18 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
 
+  static HeteroGraphPtr CreateFromCOO(
+      int64_t num_vtypes, const aten::COOMatrix& mat,
+      SparseFormat restrict_format = SparseFormat::ANY);
+
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
+      SparseFormat restrict_format = SparseFormat::ANY);
+
+  static HeteroGraphPtr CreateFromCSR(
+      int64_t num_vtypes, const aten::CSRMatrix& mat,
       SparseFormat restrict_format = SparseFormat::ANY);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
@@ -179,14 +191,18 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return the COO format. Create from other format if not exist. */
   COOPtr GetCOO() const;
 
-  /*! \return Return the in-edge CSR in the matrix form */
-  aten::CSRMatrix GetInCSRMatrix() const;
+  /*! \return Return the COO matrix form */
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
+
+  /*! \return Return the in-edge CSC in the matrix form */
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override;
 
   /*! \return Return the out-edge CSR in the matrix form */
-  aten::CSRMatrix GetOutCSRMatrix() const;
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
-  /*! \return Return the COO matrix form */
-  aten::COOMatrix GetCOOMatrix() const;
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    return SelectFormat(preferred_format);
+  }
 
   /*! \return Load UnitGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
