@@ -29,8 +29,16 @@ def test_alchemy():
 def test_pdbbind():
     dataset = PDBBind(subset='core', remove_hs=True)
 
+def test_uspto():
+    dataset = USPTO(subset='full')
+    # dataset = USPTO(subset='train')
+    # dataset = USPTO(subset='val')
+    # dataset = USPTO(subset='test')
+
 if __name__ == '__main__':
-    test_pubchem_aromaticity()
-    test_tox21()
-    test_alchemy()
-    test_pdbbind()
+    # Todo: uncomment
+    # test_pubchem_aromaticity()
+    # test_tox21()
+    # test_alchemy()
+    # test_pdbbind()
+    test_uspto()

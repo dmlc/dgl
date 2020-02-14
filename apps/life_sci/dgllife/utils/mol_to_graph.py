@@ -18,7 +18,7 @@ __all__ = ['mol_to_graph',
            'mol_to_complete_graph',
            'k_nearest_neighbors']
 
-def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
+def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer, canonical_atom_order):
     """Convert an RDKit molecule object into a DGLGraph and featurize for it.
 
     Parameters
@@ -33,14 +33,18 @@ def mol_to_graph(mol, graph_constructor, node_featurizer, edge_featurizer):
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to
         update edata for a DGLGraph.
+    canonical_atom_order : bool
+        Whether to use a canonical order of atoms returned by RDKit. Setting it
+        to true might change the order of atoms in the graph constructed.
 
     Returns
     -------
     g : DGLGraph
         Converted DGLGraph for the molecule
     """
-    new_order = rdmolfiles.CanonicalRankAtoms(mol)
-    mol = rdmolops.RenumberAtoms(mol, new_order)
+    if canonical_atom_order:
+        new_order = rdmolfiles.CanonicalRankAtoms(mol)
+        mol = rdmolops.RenumberAtoms(mol, new_order)
     g = graph_constructor(mol)
 
     if node_featurizer is not None:
@@ -103,7 +107,8 @@ def construct_bigraph_from_mol(mol, add_self_loop=False):
 
 def mol_to_bigraph(mol, add_self_loop=False,
                    node_featurizer=None,
-                   edge_featurizer=None):
+                   edge_featurizer=None,
+                   canonical_atom_order=True):
     """Convert an RDKit molecule object into a bi-directed DGLGraph and featurize for it.
 
     Parameters
@@ -118,6 +123,10 @@ def mol_to_bigraph(mol, add_self_loop=False,
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
+    canonical_atom_order : bool
+        Whether to use a canonical order of atoms returned by RDKit. Setting it
+        to true might change the order of atoms in the graph constructed. Default
+        to True.
 
     Returns
     -------
@@ -125,11 +134,12 @@ def mol_to_bigraph(mol, add_self_loop=False,
         Bi-directed DGLGraph for the molecule
     """
     return mol_to_graph(mol, partial(construct_bigraph_from_mol, add_self_loop=add_self_loop),
-                        node_featurizer, edge_featurizer)
+                        node_featurizer, edge_featurizer, canonical_atom_order)
 
 def smiles_to_bigraph(smiles, add_self_loop=False,
                       node_featurizer=None,
-                      edge_featurizer=None):
+                      edge_featurizer=None,
+                      canonical_atom_order=True):
     """Convert a SMILES into a bi-directed DGLGraph and featurize for it.
 
     Parameters
@@ -144,6 +154,10 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
+    canonical_atom_order : bool
+        Whether to use a canonical order of atoms returned by RDKit. Setting it
+        to true might change the order of atoms in the graph constructed. Default
+        to True.
 
     Returns
     -------
@@ -151,7 +165,8 @@ def smiles_to_bigraph(smiles, add_self_loop=False,
         Bi-directed DGLGraph for the molecule
     """
     mol = Chem.MolFromSmiles(smiles)
-    return mol_to_bigraph(mol, add_self_loop, node_featurizer, edge_featurizer)
+    return mol_to_bigraph(mol, add_self_loop, node_featurizer,
+                          edge_featurizer, canonical_atom_order)
 
 def construct_complete_graph_from_mol(mol, add_self_loop=False):
     """Construct a complete graph with topology only for the molecule
@@ -193,7 +208,8 @@ def construct_complete_graph_from_mol(mol, add_self_loop=False):
 
 def mol_to_complete_graph(mol, add_self_loop=False,
                           node_featurizer=None,
-                          edge_featurizer=None):
+                          edge_featurizer=None,
+                          canonical_atom_order=True):
     """Convert an RDKit molecule into a complete DGLGraph and featurize for it.
 
     Parameters
@@ -208,6 +224,10 @@ def mol_to_complete_graph(mol, add_self_loop=False,
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
+    canonical_atom_order : bool
+        Whether to use a canonical order of atoms returned by RDKit. Setting it
+        to true might change the order of atoms in the graph constructed. Default
+        to True.
 
     Returns
     -------
@@ -215,11 +235,12 @@ def mol_to_complete_graph(mol, add_self_loop=False,
         Complete DGLGraph for the molecule
     """
     return mol_to_graph(mol, partial(construct_complete_graph_from_mol, add_self_loop=add_self_loop),
-                        node_featurizer, edge_featurizer)
+                        node_featurizer, edge_featurizer, canonical_atom_order)
 
 def smiles_to_complete_graph(smiles, add_self_loop=False,
                              node_featurizer=None,
-                             edge_featurizer=None):
+                             edge_featurizer=None,
+                             canonical_atom_order=True):
     """Convert a SMILES into a complete DGLGraph and featurize for it.
 
     Parameters
@@ -234,6 +255,10 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph. Default to None.
+    canonical_atom_order : bool
+        Whether to use a canonical order of atoms returned by RDKit. Setting it
+        to true might change the order of atoms in the graph constructed. Default
+        to True.
 
     Returns
     -------
@@ -241,7 +266,8 @@ def smiles_to_complete_graph(smiles, add_self_loop=False,
         Complete DGLGraph for the molecule
     """
     mol = Chem.MolFromSmiles(smiles)
-    return mol_to_complete_graph(mol, add_self_loop, node_featurizer, edge_featurizer)
+    return mol_to_complete_graph(mol, add_self_loop, node_featurizer,
+                                 edge_featurizer, canonical_atom_order)
 
 def k_nearest_neighbors(coordinates, neighbor_cutoff, max_num_neighbors):
     """Find k nearest neighbors for each atom based on the 3D coordinates and
