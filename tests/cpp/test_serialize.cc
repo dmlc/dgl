@@ -60,8 +60,8 @@ TEST(Serialize, DISABLED_HeteroGraph) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto mg1 = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst);
-  src = VecToIdArray<int64_t>({6, 2, 5, 1, 9});
-  dst = VecToIdArray<int64_t>({5, 2, 4, 9, 0});
+  src = VecToIdArray<int64_t>({6, 2, 5, 1, 8});
+  dst = VecToIdArray<int64_t>({5, 2, 4, 8, 0});
   auto mg2 = dgl::UnitGraph::CreateFromCOO(1, 9, 9, src, dst);
   std::vector<HeteroGraphPtr> relgraphs;
   relgraphs.push_back(mg1);
@@ -78,7 +78,6 @@ TEST(Serialize, DISABLED_HeteroGraph) {
   dmlc::MemoryStringStream ofs(&blob);
   HeteroGraph* gptr = dgl::Serializer::EmptyHeteroGraph();
   static_cast<dmlc::Stream*>(&ofs)->Read(gptr);
-
   EXPECT_EQ(gptr->NumVertices(0), 9);
   EXPECT_EQ(gptr->NumVertices(1), 8);
   delete hrptr;
