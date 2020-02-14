@@ -171,6 +171,76 @@ def test_sample_neighbors():
     _test3('prob', True)   # w/ replacement
     _test3('prob', False)  # w/o replacement
 
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_outedge():
+    g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
+            'user', 'follow')
+    g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+    g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
+    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
+    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+
+    def _test1(p, replace):
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace, edge_dir='out')
+            assert subg.number_of_nodes() == 4
+            assert subg.number_of_edges() == 4
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(u))) == {0, 1}
+            assert F.array_equal(g.has_edges_between(u, v), F.ones((4,), dtype=F.int64))
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            if not replace:
+                # check no duplication
+                assert len(edge_set) == 4
+            if p is not None:
+                assert not (0, 3) in edge_set
+                assert not (1, 3) in edge_set
+    _test1(None, True)   # w/ replacement, uniform
+    _test1(None, False)  # w/o replacement, uniform
+    _test1('prob', True)   # w/ replacement
+    _test1('prob', False)  # w/o replacement
+
+    def _test2(p, replace):  # fanout > #neighbors
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, prob=p, replace=replace, edge_dir='out')
+            assert subg.number_of_nodes() == 4
+            num_edges = 4 if replace else 3
+            assert subg.number_of_edges() == num_edges
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(u))) == {0, 2}
+            assert F.array_equal(g.has_edges_between(u, v), F.ones((num_edges,), dtype=F.int64))
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            if not replace:
+                # check no duplication
+                assert len(edge_set) == num_edges
+            if p is not None:
+                assert not (0, 3) in edge_set
+    _test2(None, True)   # w/ replacement, uniform
+    _test2(None, False)  # w/o replacement, uniform
+    _test2('prob', True)   # w/ replacement
+    _test2('prob', False)  # w/o replacement
+
+    def _test3(p, replace):
+        for i in range(10):
+            subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, 2, prob=p, replace=replace, edge_dir='out')
+            assert len(subg.ntypes) == 3
+            assert len(subg.etypes) == 4
+            assert subg['follow'].number_of_edges() == 4
+            assert subg['play'].number_of_edges() == 2 if replace else 1
+            assert subg['liked-by'].number_of_edges() == 4 if replace else 3
+            assert subg['flips'].number_of_edges() == 0
+
+    _test3(None, True)   # w/ replacement, uniform
+    _test3(None, False)  # w/o replacement, uniform
+    _test3('prob', True)   # w/ replacement
+    _test3('prob', False)  # w/o replacement
+
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_topk():
     g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
@@ -219,8 +289,58 @@ def test_sample_neighbors_topk():
         assert subg['flips'].number_of_edges() == 0
     _test3()
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_topk_outedge():
+    g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
+            'user', 'follow')
+    g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+    g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
+    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+    g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
+    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+    g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
+    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
+
+    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+
+    def _test1():
+        subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight', edge_dir='out')
+        assert subg.number_of_nodes() == 4
+        assert subg.number_of_edges() == 4
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,2),(0,1),(1,2),(1,3)}
+    _test1()
+
+    def _test2():  # k > #neighbors
+        subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight', edge_dir='out')
+        assert subg.number_of_nodes() == 4
+        assert subg.number_of_edges() == 3
+        u, v = subg.edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,2),(0,1),(2,0)}
+    _test2()
+
+    def _test3():
+        subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, 2, 'weight', edge_dir='out')
+        assert len(subg.ntypes) == 3
+        assert len(subg.etypes) == 4
+        u, v = subg['follow'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,2),(0,1),(1,2),(1,3)}
+        u, v = subg['play'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,0)}
+        u, v = subg['liked-by'].edges()
+        edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+        assert edge_set == {(0,2),(1,2),(0,1)}
+        assert subg['flips'].number_of_edges() == 0
+    _test3()
+
 if __name__ == '__main__':
     test_random_walk()
     test_pack_traces()
     test_sample_neighbors()
+    test_sample_neighbors_outedge()
     test_sample_neighbors_topk()
+    test_sample_neighbors_topk_outedge()
