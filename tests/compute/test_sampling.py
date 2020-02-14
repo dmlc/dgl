@@ -171,6 +171,15 @@ def test_sample_neighbors():
     _test3('prob', True)   # w/ replacement
     _test3('prob', False)  # w/o replacement
 
+    # test different fanouts for different relations
+    for i in range(10):
+        subg = dgl.sampling.sample_neighbors(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2])
+        assert len(subg.ntypes) == 3
+        assert len(subg.etypes) == 4
+        assert subg['follow'].number_of_edges() == 2
+        assert subg['play'].number_of_edges() == 2
+        assert subg['liked-by'].number_of_edges() == 0
+        assert subg['flips'].number_of_edges() == 0
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_outedge():
@@ -288,6 +297,15 @@ def test_sample_neighbors_topk():
         assert edge_set == {(2,0),(2,1),(1,0)}
         assert subg['flips'].number_of_edges() == 0
     _test3()
+
+    # test different k for different relations
+    subg = dgl.sampling.sample_neighbors_topk(hg, {'user' : [0,1], 'game' : 0}, [1, 2, 0, 2], 'weight')
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    assert subg['follow'].number_of_edges() == 2
+    assert subg['play'].number_of_edges() == 1
+    assert subg['liked-by'].number_of_edges() == 0
+    assert subg['flips'].number_of_edges() == 0
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
 def test_sample_neighbors_topk_outedge():
