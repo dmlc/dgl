@@ -18,8 +18,8 @@ def array_equal(a, b):
 
 
 def allclose(a, b, rtol=1e-4, atol=1e-4):
-    return np.allclose(a.numpy(),
-                       b.numpy(), rtol=rtol, atol=atol)
+    return np.allclose(tf.convert_to_tensor(a).numpy(),
+                       tf.convert_to_tensor(b).numpy(), rtol=rtol, atol=atol)
 
 
 def randn(shape):

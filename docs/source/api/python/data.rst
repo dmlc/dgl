@@ -1,7 +1,7 @@
 .. _apidata:
 
-Dataset
-=======
+dgl.data
+=========
 
 .. currentmodule:: dgl.data
 

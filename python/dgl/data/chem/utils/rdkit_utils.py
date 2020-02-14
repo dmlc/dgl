@@ -5,6 +5,8 @@ import warnings
 from functools import partial
 from multiprocessing import Pool
 
+from ....contrib.deprecation import deprecated
+
 try:
     import pdbfixer
     import simtk
@@ -20,6 +22,7 @@ __all__ = ['add_hydrogens_to_mol',
            'load_molecule',
            'multiprocess_load_molecules']
 
+@deprecated('')
 def add_hydrogens_to_mol(mol):
     """Add hydrogens to an RDKit molecule instance.
 
@@ -57,6 +60,7 @@ def add_hydrogens_to_mol(mol):
         warnings.warn('Failed to add hydrogens to the molecule.')
     return mol
 
+@deprecated('Import it from dgllife.utils.rdkit_utils instead.')
 def get_mol_3D_coordinates(mol):
     """Get 3D coordinates of the molecule.
 
@@ -83,6 +87,7 @@ def get_mol_3D_coordinates(mol):
         warnings.warn('Unable to get conformation of the molecule.')
         return None
 
+@deprecated('Import it from dgllife.utils.rdkit_utils instead.')
 def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charges=False,
                   remove_hs=False, use_conformation=True):
     """Load a molecule from a file.
@@ -161,6 +166,7 @@ def load_molecule(molecule_file, add_hydrogens=False, sanitize=False, calc_charg
 
     return mol, coordinates
 
+@deprecated('Import it from dgllife.utils.rdkit_utils instead.')
 def multiprocess_load_molecules(files, add_hydrogens=False, sanitize=False, calc_charges=False,
                                 remove_hs=False, use_conformation=True, num_processes=2):
     """Load molecules from files with multiprocessing.

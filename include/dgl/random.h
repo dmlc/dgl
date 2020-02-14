@@ -7,18 +7,28 @@
 #ifndef DGL_RANDOM_H_
 #define DGL_RANDOM_H_
 
+#include <dgl/array.h>
 #include <dmlc/thread_local.h>
 #include <dmlc/logging.h>
 #include <random>
 #include <thread>
+#include <vector>
 
 namespace dgl {
 
 namespace {
 
 inline uint32_t GetThreadId() {
-  static std::hash<std::thread::id> kThreadIdHasher;
-  return kThreadIdHasher(std::this_thread::get_id());
+  static int num_threads = 0;
+  static std::mutex mutex;
+  static thread_local int id = -1;
+
+  if (id == -1) {
+    std::lock_guard<std::mutex> guard(mutex);
+    id = num_threads;
+    num_threads++;
+  }
+  return id;
 }
 
 };  // namespace
@@ -87,8 +97,15 @@ class RandomEngine {
     return dist(rng_);
   }
 
+  /*!
+   * \brief Pick a random integer between 0 to N-1 according to given probabilities
+   * \param prob Array of unnormalized probability of each element.  Must be non-negative.
+   */
+  template<typename IdxType>
+  IdxType Choice(FloatArray prob);
+
  private:
-  std::mt19937 rng_;
+  std::default_random_engine rng_;
 };
 
 };  // namespace dgl

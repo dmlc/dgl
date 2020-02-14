@@ -13,6 +13,7 @@ from ..utils import mol_to_complete_graph, atom_type_one_hot, \
     atom_hybridization_one_hot, atom_is_aromatic
 from ...utils import download, get_download_dir, _get_dgl_url, save_graphs, load_graphs
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 try:
     import pandas as pd
@@ -147,11 +148,6 @@ class TencentAlchemyDataset(object):
         'dev', 'valid' or 'test', separately for training, validation and test.
         Default to be 'dev'. Note that 'test' is not available as the Alchemy
         contest is ongoing.
-    from_raw : bool
-        Whether to process the dataset from scratch or use a
-        processed one for faster speed. If you use different ways
-        to featurize atoms or bonds, you should set this to be True.
-        Default to be False.
     mol_to_graph: callable, str -> DGLGraph
         A function turning an RDKit molecule instance into a DGLGraph.
         Default to :func:`dgl.data.chem.mol_to_complete_graph`.
@@ -174,11 +170,17 @@ class TencentAlchemyDataset(object):
         excluding the self loops. We store the distance between the end atoms under the name
         ``"distance"`` and store the edge features under the name ``"e_feat"``. The edge
         features represent one hot encoding of edge types (bond types and non-bond edges).
+    load : bool
+        Whether to load the previously pre-processed dataset or pre-process from scratch.
+        ``load`` should be False when we want to try different graph construction and
+        featurization methods and need to preprocess from scratch. Default to True.
     """
-    def __init__(self, mode='dev', from_raw=False,
+    @deprecated('Import TencentAlchemyDataset from dgllife.data.alchemy instead.', 'class')
+    def __init__(self, mode='dev',
                  mol_to_graph=mol_to_complete_graph,
                  node_featurizer=alchemy_nodes,
-                 edge_featurizer=alchemy_edges):
+                 edge_featurizer=alchemy_edges,
+                 load=True):
         if mode == 'test':
             raise ValueError('The test mode is not supported before '
                              'the Alchemy contest finishes.')
@@ -189,13 +191,14 @@ class TencentAlchemyDataset(object):
         self.mode = mode
 
         # Construct DGLGraphs from raw data or use the preprocessed data
-        self.from_raw = from_raw
+        self.load = load
         file_dir = osp.join(get_download_dir(), 'Alchemy_data')
 
-        if not from_raw:
+        if load:
             file_name = "%s_processed_dgl" % (mode)
         else:
             file_name = "%s_single_sdf" % (mode)
+
         self.file_dir = pathlib.Path(file_dir, file_name)
 
         self._url = 'dataset/alchemy/'
@@ -209,7 +212,7 @@ class TencentAlchemyDataset(object):
         self._load(mol_to_graph, node_featurizer, edge_featurizer)
 
     def _load(self, mol_to_graph, node_featurizer, edge_featurizer):
-        if not self.from_raw:
+        if self.load:
             self.graphs, label_dict = load_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode))
             self.labels = label_dict['labels']
             with open(osp.join(self.file_dir, "%s_smiles.txt" % self.mode), 'r') as f:
