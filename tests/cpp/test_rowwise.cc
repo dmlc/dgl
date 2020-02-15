@@ -9,29 +9,32 @@ using namespace dgl::runtime;
 using namespace dgl::aten;
 
 template <typename Idx>
-std::set<std::tuple<Idx, Idx, Idx>> AllEdgeSet(bool has_data) {
+using ETuple = std::tuple<Idx, Idx, Idx>;
+
+template <typename Idx>
+std::set<ETuple<Idx>> AllEdgeSet(bool has_data) {
   if (has_data) {
-    std::set<std::tuple<Idx, Idx, Idx>> eset;
-    eset.insert({0, 0, 2});
-    eset.insert({0, 1, 3});
-    eset.insert({1, 1, 0});
-    eset.insert({3, 2, 1});
-    eset.insert({3, 3, 4});
+    std::set<ETuple<Idx>> eset;
+    eset.insert(ETuple<Idx>{0, 0, 2});
+    eset.insert(ETuple<Idx>{0, 1, 3});
+    eset.insert(ETuple<Idx>{1, 1, 0});
+    eset.insert(ETuple<Idx>{3, 2, 1});
+    eset.insert(ETuple<Idx>{3, 3, 4});
     return eset;
   } else {
-    std::set<std::tuple<Idx, Idx, Idx>> eset;
-    eset.insert({0, 0, 0});
-    eset.insert({0, 1, 1});
-    eset.insert({1, 1, 2});
-    eset.insert({3, 2, 3});
-    eset.insert({3, 3, 4});
+    std::set<ETuple<Idx>> eset;
+    eset.insert(ETuple<Idx>{0, 0, 0});
+    eset.insert(ETuple<Idx>{0, 1, 1});
+    eset.insert(ETuple<Idx>{1, 1, 2});
+    eset.insert(ETuple<Idx>{3, 2, 3});
+    eset.insert(ETuple<Idx>{3, 3, 4});
     return eset;
   }
 }
 
 template <typename Idx>
-std::set<std::tuple<Idx, Idx, Idx>> ToEdgeSet(COOMatrix mat) {
-  std::set<std::tuple<Idx, Idx, Idx>> eset;
+std::set<ETuple<Idx>> ToEdgeSet(COOMatrix mat) {
+  std::set<ETuple<Idx>> eset;
   Idx* row = static_cast<Idx*>(mat.row->data);
   Idx* col = static_cast<Idx*>(mat.col->data);
   Idx* data = static_cast<Idx*>(mat.data->data);
