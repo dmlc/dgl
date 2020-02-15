@@ -41,10 +41,9 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
 
     if args.async_update:
         model.create_async_update()
-    if args.strict_rel_part:
+    if args.strict_rel_part or args.soft_rel_part:
         model.prepare_relation(th.device('cuda:' + str(gpu_id)))
     if args.soft_rel_part:
-        model.prepare_relation(th.device('cuda:' + str(gpu_id)))
         model.prepare_cross_rels(cross_rels)
 
     start = time.time()

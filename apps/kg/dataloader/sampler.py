@@ -9,11 +9,12 @@ import pickle
 import time
 
 def SoftRelationPartition(edges, n, threshold=0.05):
-    """This partitions a list of edges based in to n partitions that 
-    SMALL relations (which has only small number of edges) will be put 
-    into a single LARGE partition (relations with large number of edges) 
-    will be evenly divided into all partitions.
-    
+    """This partitions a list of edges to n partitions according to their
+    relation time. For any relation with number of edges larger than the
+    threshold, its edges will be evenly distributed into all partitions.
+    For any relation with number of edges smaller than the threshold, its
+    edges will be put into one single partition.
+
     Algo:
     For r in relations:
         if r.size() > threadold
