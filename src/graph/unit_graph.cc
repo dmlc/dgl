@@ -80,7 +80,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
   }
 
   COO(GraphPtr metagraph, const aten::COOMatrix& coo)
-    : BaseHeteroGraph(metagraph), adj_(coo) {}
+    : BaseHeteroGraph(metagraph), adj_(coo) {
+    // Data index should not be inherited. Edges in COO format are always
+    // assigned ids from 0 to num_edges - 1.
+    adj_.data = IdArray();
+  }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -1153,10 +1157,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
   if (!coo_) {
     if (in_csr_) {
-      const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(
-          meta_graph(),
-          aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
+      const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
+      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
     } else {
       CHECK(out_csr_) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);

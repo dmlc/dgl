@@ -233,18 +233,14 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   const int64_t NNZ = coo.row->shape[0];
   const IdType* row_data = static_cast<IdType*>(coo.row->data);
   const IdType* col_data = static_cast<IdType*>(coo.col->data);
+  const IdType* data = COOHasData(coo)? static_cast<IdType*>(coo.data->data) : nullptr;
   NDArray ret_indptr = NDArray::Empty({N + 1}, coo.row->dtype, coo.row->ctx);
   NDArray ret_indices = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-  NDArray ret_data;
-  if (COOHasData(coo)) {
-    ret_data = NDArray::Empty({NNZ}, coo.data->dtype, coo.data->ctx);
-  } else {
-    // if no data array in the input coo, the return data array is a shuffle index.
-    ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
-  }
+  NDArray ret_data = NDArray::Empty({NNZ}, coo.row->dtype, coo.row->ctx);
 
   IdType* Bp = static_cast<IdType*>(ret_indptr->data);
   IdType* Bi = static_cast<IdType*>(ret_indices->data);
+  IdType* Bx = static_cast<IdType*>(ret_data->data);
 
   std::fill(Bp, Bp + N, 0);
 
@@ -263,14 +259,7 @@ CSRMatrix COOToCSR(COOMatrix coo) {
   for (int64_t i = 0; i < NNZ; ++i) {
     const IdType r = row_data[i];
     Bi[Bp[r]] = col_data[i];
-    if (COOHasData(coo)) {
-      const IdType* data = static_cast<IdType*>(coo.data->data);
-      IdType* Bx = static_cast<IdType*>(ret_data->data);
-      Bx[Bp[r]] = data[i];
-    } else {
-      IdType* Bx = static_cast<IdType*>(ret_data->data);
-      Bx[Bp[r]] = i;
-    }
+    Bx[Bp[r]] = data? data[i] : i;
     Bp[r]++;
   }
 
@@ -281,7 +270,9 @@ CSRMatrix COOToCSR(COOMatrix coo) {
     last = temp;
   }
 
-  return CSRMatrix{coo.num_rows, coo.num_cols, ret_indptr, ret_indices, ret_data};
+  return CSRMatrix(coo.num_rows, coo.num_cols,
+                   ret_indptr, ret_indices, ret_data,
+                   coo.col_sorted);
 }
 
 template CSRMatrix COOToCSR<kDLCPU, int32_t>(COOMatrix coo);
@@ -291,6 +282,7 @@ template CSRMatrix COOToCSR<kDLCPU, int64_t>(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
+  // TODO(minjie): use binary search when coo.row_sorted is true
   CHECK(start >= 0 && start < coo.num_rows) << "Invalid start row " << start;
   CHECK(end > 0 && end <= coo.num_rows) << "Invalid end row " << end;
 
@@ -310,12 +302,14 @@ COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end) {
       ret_data.push_back(coo_data ? coo_data[i] : i);
     }
   }
-  return COOMatrix{
+  return COOMatrix(
     end - start,
     coo.num_cols,
     NDArray::FromVector(ret_row),
     NDArray::FromVector(ret_col),
-    NDArray::FromVector(ret_data)};
+    NDArray::FromVector(ret_data),
+    coo.row_sorted,
+    coo.col_sorted);
 }
 
 template COOMatrix COOSliceRows<kDLCPU, int32_t>(COOMatrix, int64_t, int64_t);
@@ -382,12 +376,11 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
     }
   }
 
-  return COOMatrix{
-    rows->shape[0],
-    cols->shape[0],
-    NDArray::FromVector(ret_row),
-    NDArray::FromVector(ret_col),
-    NDArray::FromVector(ret_data)};
+  return COOMatrix(rows->shape[0], cols->shape[0],
+                   NDArray::FromVector(ret_row),
+                   NDArray::FromVector(ret_col),
+                   NDArray::FromVector(ret_data),
+                   coo.row_sorted, coo.col_sorted);
 }
 
 template COOMatrix COOSliceMatrix<kDLCPU, int32_t>(

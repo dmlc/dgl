@@ -17,7 +17,7 @@ using namespace dgl::aten;
 namespace dgl {
 namespace sampling {
 
-HeteroGraphPtr SampleNeighbors(
+HeteroSubgraph SampleNeighbors(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& fanouts,
@@ -34,6 +34,7 @@ HeteroGraphPtr SampleNeighbors(
     << "Number of probability tensors must match the number of edge types.";
 
   std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(hg->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
     auto pair = hg->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -47,6 +48,7 @@ HeteroGraphPtr SampleNeighbors(
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
+      induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
@@ -71,13 +73,22 @@ HeteroGraphPtr SampleNeighbors(
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+      if (sampled_coo.data.defined()) {
+        induced_edges[etype] = sampled_coo.data;
+      } else {
+        induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
+      }
     }
   }
 
-  return CreateHeteroGraph(hg->meta_graph(), subrels);
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.induced_vertices.resize(hg->NumVertexTypes());
+  ret.induced_edges = std::move(induced_edges);
+  return ret;
 }
 
-HeteroGraphPtr SampleNeighborsTopk(
+HeteroSubgraph SampleNeighborsTopk(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& k,
@@ -92,6 +103,7 @@ HeteroGraphPtr SampleNeighborsTopk(
     << "Number of weight tensors must match the number of edge types.";
 
   std::vector<HeteroGraphPtr> subrels(hg->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(hg->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < hg->NumEdgeTypes(); ++etype) {
     auto pair = hg->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -105,6 +117,7 @@ HeteroGraphPtr SampleNeighborsTopk(
         hg->NumVertices(src_vtype),
         hg->NumVertices(dst_vtype),
         hg->DataType(), hg->Context());
+      induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut)? SparseFormat::CSR : SparseFormat::CSC;
@@ -129,10 +142,19 @@ HeteroGraphPtr SampleNeighborsTopk(
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
         hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+      if (sampled_coo.data.defined()) {
+        induced_edges[etype] = sampled_coo.data;
+      } else {
+        induced_edges[etype] = IdArray::Empty({0}, hg->DataType(), hg->Context());
+      }
     }
   }
 
-  return CreateHeteroGraph(hg->meta_graph(), subrels);
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.induced_vertices.resize(hg->NumVertexTypes());
+  ret.induced_edges = std::move(induced_edges);
+  return ret;
 }
 
 DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
@@ -148,10 +170,11 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighbors")
       << "Invalid edge direction. Must be \"in\" or \"out\".";
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
 
-    HeteroGraphPtr ret = sampling::SampleNeighbors(
+    std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
+    *subg = sampling::SampleNeighbors(
         hg.sptr(), nodes, fanouts, dir, prob, replace);
 
-    *rv = HeteroGraphRef(ret);
+    *rv = HeteroSubgraphRef(subg);
   });
 
 DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
@@ -166,10 +189,11 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
     << "Invalid edge direction. Must be \"in\" or \"out\".";
     EdgeDir dir = (dir_str == "in")? EdgeDir::kIn : EdgeDir::kOut;
 
-    HeteroGraphPtr ret = sampling::SampleNeighborsTopk(
+    std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
+    *subg = sampling::SampleNeighborsTopk(
         hg.sptr(), nodes, k, dir, weight);
 
-    *rv = HeteroGraphRef(ret);
+    *rv = HeteroGraphRef(subg);
   });
 
 }  // namespace sampling

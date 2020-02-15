@@ -2,7 +2,7 @@
 
 from .._ffi.function import _init_api
 from .. import backend as F
-from ..base import DGLError
+from ..base import DGLError, EID
 from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
@@ -17,7 +17,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
     For sampling without replace, if fanout > the number of neighbors, all the
     neighbors are sampled.
 
-    Node/edge features are not preserved.
+    Node/edge features are not preserved. The IDs in the original graph of
+    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters
     ----------
@@ -75,12 +76,19 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
 
     subgidx = _CAPI_DGLSampleNeighbors(g._graph, nodes_all_types, fanout,
                                        edge_dir, prob_arrays, replace)
-    return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
 
 def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
     """Sample neighbors by top-k.
 
     If k > the number of neighbors, all the neighbors are sampled.
+
+    Node/edge features are not preserved. The IDs in the original graph of
+    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters
     ----------
@@ -102,7 +110,8 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
     Returns
     -------
     DGLGraph
-        A sampled subgraph by top k criterion.
+        A sampled subgraph by top k criterion. The sampled subgraph has the same
+        metagraph as the original one.
     """
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
@@ -131,6 +140,10 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
 
     subgidx = _CAPI_DGLSampleNeighborsTopk(
         g._graph, nodes_all_types, k, edge_dir, weight_arrays)
-    return DGLHeteroGraph(subgidx, g.ntypes, g.etypes)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
 
 _init_api('dgl.sampling.neighbor', __name__)

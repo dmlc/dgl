@@ -44,7 +44,6 @@ enum class SparseFormat {
   CSC = 3
 };
 
-
 /*!
  * \brief Base heterogenous graph.
  *
@@ -454,24 +453,43 @@ class BaseHeteroGraph : public runtime::Object {
 // Define HeteroGraphRef
 DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
 
-/*! \brief Heter-subgraph data structure */
+/*! 
+ * \brief Hetero-subgraph data structure.
+ *
+ * This class can be used as arguments and return values of a C API.
+ *
+ * <code>
+ *   DGL_REGISTER_GLOBAL("some_c_api")
+ *   .set_body([] (DGLArgs args, DGLRetValue* rv) {
+ *     HeteroSubgraphRef subg = args[0];
+ *     std::shared_ptr<HeteroSubgraph> ret = do_something( ... );
+ *     *rv = HeteroSubgraphRef(ret);
+ *   });
+ * </code>
+ */
 struct HeteroSubgraph : public runtime::Object {
   /*! \brief The heterograph. */
   HeteroGraphPtr graph;
   /*!
    * \brief The induced vertex ids of each entity type.
    * The vector length is equal to the number of vertex types in the parent graph.
+   * Each array i has the same length as the number of vertices in type i.
+   * Empty array is allowed if the mapping is identity.
    */
   std::vector<IdArray> induced_vertices;
   /*!
-   * \brief The induced vertex ids of each entity type.
-   * The vector length is equal to the number of vertex types in the parent graph.
+   * \brief The induced edge ids of each relation type.
+   * The vector length is equal to the number of edge types in the parent graph.
+   * Each array i has the same length as the number of edges in type i.
+   * Empty array is allowed if the mapping is identity.
    */
   std::vector<IdArray> induced_edges;
 
   static constexpr const char* _type_key = "graph.HeteroSubgraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
+// Define HeteroSubgraphRef
+DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 /*! \brief The flattened heterograph */
 struct FlattenedHeteroGraph : public runtime::Object {
@@ -528,9 +546,6 @@ struct FlattenedHeteroGraph : public runtime::Object {
   DGL_DECLARE_OBJECT_TYPE_INFO(FlattenedHeteroGraph, runtime::Object);
 };
 DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
-
-// Define HeteroSubgraphRef
-DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 // creators
 

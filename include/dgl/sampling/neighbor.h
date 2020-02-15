@@ -31,10 +31,10 @@ namespace sampling {
  * \param probability A vector of 1D float arrays, indicating the transition probability of
  *        each edge by edge type.  An empty float array assumes uniform transition.
  * \param replace If true, sample with replacement.
- * \return Sampled neighborhoods as a graph. The return has the same schema as the original
- *         one.
+ * \return Sampled neighborhoods as a graph. The return graph has the same schema as the
+ *         original one.
  */
-HeteroGraphPtr SampleNeighbors(
+HeteroSubgraph SampleNeighbors(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& fanouts,
@@ -56,10 +56,10 @@ HeteroGraphPtr SampleNeighbors(
  * \param dir Edge direction.
  * \param weight A vector of 1D float arrays, indicating the weights associated with
  *               each edge.
- * \return Sampled neighborhoods as a graph. The return has the same schema as the original
- *         one.
+ * \return Sampled neighborhoods as a graph. The return graph has the same schema as the
+ *         original one.
  */
-HeteroGraphPtr SampleNeighborsTopk(
+HeteroSubgraph SampleNeighborsTopk(
     const HeteroGraphPtr hg,
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& k,
