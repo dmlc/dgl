@@ -56,14 +56,22 @@ HeteroSubgraph SampleNeighbors(
       COOMatrix sampled_coo;
       switch (avail_fmt) {
         case SparseFormat::COO:
-          sampled_coo = aten::COORowWiseSampling(
-            hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          if (dir == EdgeDir::kIn) {
+            sampled_coo = aten::COOTranspose(aten::COORowWiseSampling(
+              aten::COOTranspose(hg->GetCOOMatrix(etype)),
+              nodes_ntype, fanouts[etype], prob[etype], replace));
+          } else {
+            sampled_coo = aten::COORowWiseSampling(
+              hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
+          }
           break;
         case SparseFormat::CSR:
+          CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWiseSampling(
             hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
           break;
         case SparseFormat::CSC:
+          CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWiseSampling(
             hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype], replace);
           sampled_coo = aten::COOTranspose(sampled_coo);
@@ -125,14 +133,22 @@ HeteroSubgraph SampleNeighborsTopk(
       COOMatrix sampled_coo;
       switch (avail_fmt) {
         case SparseFormat::COO:
-          sampled_coo = aten::COORowWiseTopk(
-            hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+          if (dir == EdgeDir::kIn) {
+            sampled_coo = aten::COOTranspose(aten::COORowWiseTopk(
+              aten::COOTranspose(hg->GetCOOMatrix(etype)),
+              nodes_ntype, k[etype], weight[etype]));
+          } else {
+            sampled_coo = aten::COORowWiseTopk(
+              hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+          }
           break;
         case SparseFormat::CSR:
+          CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
             hg->GetCSRMatrix(etype), nodes_ntype, k[etype], weight[etype]);
           break;
         case SparseFormat::CSC:
+          CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
             hg->GetCSCMatrix(etype), nodes_ntype, k[etype], weight[etype]);
           sampled_coo = aten::COOTranspose(sampled_coo);

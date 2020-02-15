@@ -103,23 +103,81 @@ def test_pack_traces():
     assert F.array_equal(result[2], F.tensor([2, 7], dtype=F.int64))
     assert F.array_equal(result[3], F.tensor([0, 2], dtype=F.int64))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors():
-    g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
-            'user', 'follow')
-    g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
-    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
-    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+def _gen_neighbor_sampling_test_graph(hypersparse, reverse):
+    if hypersparse:
+        # should crash if allocated a CSR
+        card = 1 << 50
+        card2 = (1 << 50, 1 << 50)
+    else:
+        card = None
+        card2 = None
+    
+    if reverse:
+        g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
+                'user', 'follow', card=card)
+        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user', card=card2)
+        g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game', card=card2)
+        g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user', card=card2)
 
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+    else:
+        g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
+                'user', 'follow', card=card)
+        g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
+        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game', card=card2)
+        g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
+        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user', card=card2)
+        g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin', card=card2)
+
+        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+    return g, hg
+
+def _gen_neighbor_topk_test_graph(hypersparse, reverse):
+    if hypersparse:
+        # should crash if allocated a CSR
+        card = 1 << 50
+        card2 = (1 << 50, 1 << 50)
+    else:
+        card = None
+        card2 = None
+ 
+    if reverse:
+        g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
+                'user', 'follow')
+        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+        g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
+        g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+        g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
+        g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+        g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
+        g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
+
+        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+    else:
+        g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
+                'user', 'follow')
+        g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
+        g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+        g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
+        g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+        g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
+        g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+        g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
+
+        hg = dgl.hetero_from_relations([g, g1, g2, g3])
+    return g, hg
+
+def _test_sample_neighbors(hypersparse):
+    g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace)
-            assert subg.number_of_nodes() == 4
+            assert subg.number_of_nodes() == g.number_of_nodes()
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
@@ -140,7 +198,7 @@ def test_sample_neighbors():
     def _test2(p, replace):  # fanout > #neighbors
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, prob=p, replace=replace)
-            assert subg.number_of_nodes() == 4
+            assert subg.number_of_nodes() == g.number_of_nodes()
             num_edges = 4 if replace else 3
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
@@ -183,23 +241,13 @@ def test_sample_neighbors():
         assert subg['liked-by'].number_of_edges() == 0
         assert subg['flips'].number_of_edges() == 0
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors_outedge():
-    g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
-            'user', 'follow')
-    g.edata['prob'] = F.tensor([.5, .5, 0., .5, .5, 0., 1.], dtype=F.float32)
-    g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
-    g1.edata['prob'] = F.tensor([.8, .5, .5, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
-    g2.edata['prob'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
-
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+def _test_sample_neighbors_outedge(hypersparse):
+    g, hg = _gen_neighbor_sampling_test_graph(hypersparse, True)
 
     def _test1(p, replace):
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(g, [0, 1], 2, prob=p, replace=replace, edge_dir='out')
-            assert subg.number_of_nodes() == 4
+            assert subg.number_of_nodes() == g.number_of_nodes()
             assert subg.number_of_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
@@ -220,7 +268,7 @@ def test_sample_neighbors_outedge():
     def _test2(p, replace):  # fanout > #neighbors
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(g, [0, 2], 2, prob=p, replace=replace, edge_dir='out')
-            assert subg.number_of_nodes() == 4
+            assert subg.number_of_nodes() == g.number_of_nodes()
             num_edges = 4 if replace else 3
             assert subg.number_of_edges() == num_edges
             u, v = subg.edges()
@@ -253,24 +301,12 @@ def test_sample_neighbors_outedge():
     _test3('prob', True)   # w/ replacement
     _test3('prob', False)  # w/o replacement
 
-
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors_topk():
-    g = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)],
-            'user', 'follow')
-    g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
-    g1 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
-    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
-    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
-    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
-
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+def _test_sample_neighbors_topk(hypersparse):
+    g, hg = _gen_neighbor_topk_test_graph(hypersparse, False)
 
     def _test1():
         subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight')
-        assert subg.number_of_nodes() == 4
+        assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
@@ -280,7 +316,7 @@ def test_sample_neighbors_topk():
 
     def _test2():  # k > #neighbors
         subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight')
-        assert subg.number_of_nodes() == 4
+        assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
         assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
@@ -316,23 +352,12 @@ def test_sample_neighbors_topk():
     assert subg['liked-by'].number_of_edges() == 0
     assert subg['flips'].number_of_edges() == 0
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
-def test_sample_neighbors_topk_outedge():
-    g = dgl.graph([(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0)],
-            'user', 'follow')
-    g.edata['weight'] = F.tensor([.5, .3, 0., -5., 22., 0., 1.], dtype=F.float32)
-    g1 = dgl.bipartite([(0,0),(1,0),(2,1),(2,3)], 'game', 'play', 'user')
-    g1.edata['weight'] = F.tensor([.8, .5, .4, .5], dtype=F.float32)
-    g2 = dgl.bipartite([(0,2),(1,2),(2,2),(0,1),(3,1),(0,0)], 'user', 'liked-by', 'game')
-    g2.edata['weight'] = F.tensor([.3, .5, .2, .5, .1, .1], dtype=F.float32)
-    g3 = dgl.bipartite([(0,0),(0,1),(0,2),(0,3)], 'coin', 'flips', 'user')
-    g3.edata['weight'] = F.tensor([10, 2, 13, -1], dtype=F.float32)
-
-    hg = dgl.hetero_from_relations([g, g1, g2, g3])
+def _test_sample_neighbors_topk_outedge(hypersparse):
+    g, hg = _gen_neighbor_topk_test_graph(hypersparse, True)
 
     def _test1():
         subg = dgl.sampling.sample_neighbors_topk(g, [0, 1], 2, 'weight', edge_dir='out')
-        assert subg.number_of_nodes() == 4
+        assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
@@ -342,7 +367,7 @@ def test_sample_neighbors_topk_outedge():
 
     def _test2():  # k > #neighbors
         subg = dgl.sampling.sample_neighbors_topk(g, [0, 2], 2, 'weight', edge_dir='out')
-        assert subg.number_of_nodes() == 4
+        assert subg.number_of_nodes() == g.number_of_nodes()
         assert subg.number_of_edges() == 3
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
@@ -368,6 +393,26 @@ def test_sample_neighbors_topk_outedge():
         assert edge_set == {(0,2),(1,2),(0,1)}
         assert subg['flips'].number_of_edges() == 0
     _test3()
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors():
+    _test_sample_neighbors(False)
+    _test_sample_neighbors(True)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_outedge():
+    _test_sample_neighbors_outedge(False)
+    _test_sample_neighbors_outedge(True)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_topk():
+    _test_sample_neighbors_topk(False)
+    _test_sample_neighbors_topk(True)
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU sample neighbors not implemented")
+def test_sample_neighbors_topk_outedge():
+    _test_sample_neighbors_topk_outedge(False)
+    _test_sample_neighbors_topk_outedge(True)
 
 if __name__ == '__main__':
     test_random_walk()
