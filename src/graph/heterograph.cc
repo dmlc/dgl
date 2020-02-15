@@ -225,7 +225,8 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
     if (std::dynamic_pointer_cast<UnitGraph>(relg)) {
       relation_graphs_[i] = std::dynamic_pointer_cast<UnitGraph>(relg);
     } else {
-      relation_graphs_[i] = std::dynamic_pointer_cast<UnitGraph>(relg->GetRelationGraph(0));
+      relation_graphs_[i] = CHECK_NOTNULL(
+          std::dynamic_pointer_cast<UnitGraph>(relg->GetRelationGraph(0)));
     }
   }
 }
