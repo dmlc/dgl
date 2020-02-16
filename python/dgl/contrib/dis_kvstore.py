@@ -279,6 +279,15 @@ class KVServer(object):
         return self._msg_count
 
 
+    def print(self):
+        print("----------")
+        print("server id: %d" % self.get_id())
+        print("data:")
+        for name, data in self._data_store.items():
+            print(name)
+            print(data)
+
+
     def start(self):
         """Start service of KVServer
 
@@ -353,14 +362,11 @@ class KVServer(object):
             msg = _recv_kv_msg(self._receiver)
             # Push message
             if msg.type == KVMsgType.PUSH:
-                print("server:1111")
                 if (msg.name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
-                print("server:2222")
                 self._push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
-                print("server:3333")
             # Pull message
             elif msg.type == KVMsgType.PULL:
                 if (msg.name+'-g2l-' in self._has_data) == True:
@@ -699,6 +705,15 @@ class KVClient(object):
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
+
+
+    def print(self):
+        print("----------")
+        print("client id: %d" % self.get_id())
+        print("data:")
+        for name, data in self._data_store.items():
+            print(name)
+            print(data)
 
 
     def get_id(self):
