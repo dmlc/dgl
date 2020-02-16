@@ -233,6 +233,7 @@ def test_partition():
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_compact():
     g1 = dgl.heterograph({
         ('user', 'follow', 'user'): [(1, 3), (3, 5)],
@@ -283,7 +284,8 @@ def test_compact():
     _check(g1, new_g1, induced_nodes)
 
     # Test with always_preserve given a tensor
-    new_g3 = dgl.compact_graphs(g3, always_preserve=F.tensor([1, 7]))
+    new_g3 = dgl.compact_graphs(
+        g3, always_preserve=F.tensor([1, 7], dtype=F.int64))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([0, 1, 2, 7])
@@ -309,7 +311,8 @@ def test_compact():
     _check(g2, new_g2, induced_nodes)
 
     # Test multiple graphs with always_preserve given a tensor
-    new_g3, new_g4 = dgl.compact_graphs([g3, g4], always_preserve=F.tensor([1, 7]))
+    new_g3, new_g4 = dgl.compact_graphs(
+        [g3, g4], always_preserve=F.tensor([1, 7], dtype=F.int64))
     induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
     induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
     assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
