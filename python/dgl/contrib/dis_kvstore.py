@@ -632,7 +632,7 @@ class KVClient(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-part-'][:] = partition_book[:]
-            self._write_data_shape(name+'-part-shape', global2local)
+            self._write_data_shape(name+'-part-shape', partition_book)
             self._open_file_list.append(name+'-part-shape')
         else: # Read shared-tensor
             data_shape = self._read_data_shape(name-'part-shape')
