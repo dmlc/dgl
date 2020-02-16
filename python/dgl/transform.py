@@ -608,6 +608,11 @@ def compact_graphs(graphs):
         of node IDs for each type from the compacted graph(s) to the original graph(s).
         Note that the mapping is the same for all the compacted graphs.
 
+    Bugs
+    ----
+    This function currently requires that the same node type of all graphs should have
+    the same node type ID, i.e. the node types are *ordered* the same.
+
     Examples
     --------
     The following code constructs a bipartite graph with 20 users and 10 games, but
@@ -654,6 +659,12 @@ def compact_graphs(graphs):
     if not isinstance(graphs, Iterable):
         graphs = [graphs]
         return_single = True
+
+    # Ensure the node types are ordered the same.
+    # TODO(BarclayII): we ideally need to remove this constraint.
+    ntypes = graphs[0].ntypes
+    for g in graphs:
+        assert ntypes == g.ntypes, "Node types are not ordered the same"
 
     new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs([g._graph for g in graphs])
     induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
