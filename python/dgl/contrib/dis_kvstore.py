@@ -497,7 +497,7 @@ class KVServer(object):
             machine_id = data[0]
             if machine_id != pre_id:
                 break
-            backup_count += 1
+            group_count += 1
             pre_id = machine_id
 
         return group_count
@@ -940,7 +940,7 @@ class KVClient(object):
         return IP + ':' + str(port)
 
 
-    def _get_backup_count(self):
+    def _get_group_count(self):
         """Get count of backup server
 
         Return
@@ -948,16 +948,16 @@ class KVClient(object):
         int
             count of backup server
         """
-        backup_count = 0
+        group_count = 0
         pre_id = 0
         for ID, data in self._server_namebook.items():
-            machine_id, addr = data.split('|')
-            if int(machine_id) != pre_id:
+            machine_id = data[0]
+            if machine_id != pre_id:
                 break
-            backup_count += 1
-            pre_id = int(machine_id)
+            group_count += 1
+            pre_id = machine_id
 
-        return backup_count
+        return group_count
 
 
     def _get_machine_id(self):
