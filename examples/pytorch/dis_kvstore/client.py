@@ -61,7 +61,11 @@ def start_client(args):
         res = my_client.pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
         print(res)
 
-        my_client.shut_down()
+    my_client.push(name='entity_embed', id_tensor=ID[my_client.get_machine_id()], data_tensor=th.tensor([[0.,0.,0.,0.],[0.,0.,0.,0.]]))
+
+    if my_client.get_id() % args.num_worker == 0:
+        res = my_client.pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
+        print(res)
 
 
 if __name__ == '__main__':
