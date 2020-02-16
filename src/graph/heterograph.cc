@@ -4,19 +4,25 @@
  * \brief Heterograph implementation
  */
 #include "./heterograph.h"
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/immutable_graph.h>
 #include <vector>
 #include <tuple>
 #include <utility>
 #include "../c_api_common.h"
 #include "./unit_graph.h"
+#include "graph_serializer.h"
 
 using namespace dgl::runtime;
 
 namespace dgl {
 namespace {
+
+using dgl::ImmutableGraph;
 
 HeteroSubgraph EdgeSubgraphPreserveNodes(
     const HeteroGraph* hg, const std::vector<IdArray>& eids) {
@@ -420,6 +426,39 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs) {
   return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
+}
+
+constexpr uint64_t kDGLSerialize_HeteroGraph = 0xDD589FBE35224ABF;
+
+bool HeteroGraph::Load(dmlc::Stream* fs) {
+  uint64_t magicNum;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_HeteroGraph) << "Invalid HeteroGraph Data";
+  auto meta_grptr = new ImmutableGraph(static_cast<COOPtr>(nullptr));
+  CHECK(fs->Read(meta_grptr)) << "Invalid Immutable Graph Data";
+  uint64_t num_relation_graphs;
+  CHECK(fs->Read(&num_relation_graphs)) << "Invalid num of relation graphs";
+  std::vector<HeteroGraphPtr> relgraphs;
+  for (size_t i = 0; i < num_relation_graphs; ++i) {
+    UnitGraph* ugptr = Serializer::EmptyUnitGraph();
+    CHECK(fs->Read(ugptr)) << "Invalid UnitGraph Data";
+    relgraphs.emplace_back(dynamic_cast<BaseHeteroGraph*>(ugptr));
+  }
+  HeteroGraph* hgptr = new HeteroGraph(GraphPtr(meta_grptr), relgraphs);
+  *this = *hgptr;
+  return true;
+}
+
+void HeteroGraph::Save(dmlc::Stream* fs) const {
+  fs->Write(kDGLSerialize_HeteroGraph);
+  auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+  ImmutableGraph* meta_rptr = meta_graph_ptr.get();
+  fs->Write(*meta_rptr);
+  fs->Write(static_cast<uint64_t>(relation_graphs_.size()));
+  for (auto hptr : relation_graphs_) {
+    auto rptr = dynamic_cast<UnitGraph*>(hptr.get());
+    fs->Write(*rptr);
+  }
 }
 
 ///////////////////////// C APIs /////////////////////////

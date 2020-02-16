@@ -955,6 +955,12 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraphPtr Reverse() const;
 
+  /*! \return Load HeteroGraph from stream, using CSRMatrix*/
+  bool Load(dmlc::Stream* fs);
+
+  /*! \return Save HeteroGraph to stream, using CSRMatrix */
+  void Save(dmlc::Stream* fs) const;
+
   void SortCSR() {
     GetInCSR()->SortCSR();
     GetOutCSR()->SortCSR();
@@ -1024,5 +1030,9 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges,
 }
 
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::ImmutableGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_
