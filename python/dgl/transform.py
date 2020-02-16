@@ -1,6 +1,6 @@
 """Module for graph transformation utilities."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
@@ -15,6 +15,7 @@ from .heterograph import DGLHeteroGraph
 from .convert import graph, bipartite
 from . import utils
 from .base import EID, NID
+from . import ndarray as nd
 
 
 __all__ = [
@@ -578,7 +579,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def compact_graphs(graphs):
+def compact_graphs(graphs, always_preserve={}):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.
 
@@ -598,6 +599,10 @@ def compact_graphs(graphs):
     ----------
     graphs : DGLHeteroGraph or list[DGLHeteroGraph]
         The graph, or list of graphs
+    always_preserve : Tensor or dict[str, Tensor], optional
+        If a dict of node types and node ID tensors is given, the nodes of given
+        node types would not be removed, regardless of whether they are isolated.
+        If a Tensor is given, assume that all the graphs have one (same) node type.
 
     Returns
     -------
@@ -663,10 +668,28 @@ def compact_graphs(graphs):
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
     ntypes = graphs[0].ntypes
+    graph_dtype = graphs[0]._graph.dtype()
+    graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
         assert ntypes == g.ntypes, "Node types are not ordered the same"
+        assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
+        assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 
-    new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs([g._graph for g in graphs])
+    if not isinstance(always_preserve, Mapping):
+        if len(ntypes) > 1:
+            raise ValueError("Node type must be given if multiple node types exist.")
+        always_preserve = {ntypes[0]: always_preserve}
+    always_preserve_nd = []
+    for ntype in ntypes:
+        nodes = always_preserve.get(ntype, None)
+        if nodes is None:
+            nodes = nd.empty([0], graph_dtype, graph_ctx)
+        else:
+            nodes = F.zerocopy_to_dgl_ndarray(nodes)
+        always_preserve_nd.append(nodes)
+
+    new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
+        [g._graph for g in graphs], always_preserve_nd)
     induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
 
     new_graphs = [

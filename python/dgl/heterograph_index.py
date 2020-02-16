@@ -145,6 +145,16 @@ class HeteroGraphIndex(ObjectBase):
         _CAPI_DGLHeteroClear(self)
         self._cache.clear()
 
+    def dtype(self):
+        """Return the data type of this graph index.
+
+        Returns
+        -------
+        DGLDataType
+            The data type of the graph.
+        """
+        return _CAPI_DGLHeteroDataType(self)
+
     def ctx(self):
         """Return the context of this graph index.
 

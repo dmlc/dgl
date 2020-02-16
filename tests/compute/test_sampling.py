@@ -37,6 +37,7 @@ def test_random_walk():
         ('item', 'viewed-by', 'user'): [(0, 0), (1, 0), (1, 1), (2, 2), (2, 3), (1, 3)]})
 
     g2.edata['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
+    g2.edata['p2'] = F.tensor([[3], [0], [3], [3], [3]], dtype=F.float32)
     g4.edges['follow'].data['p'] = F.tensor([3, 0, 3, 3, 3], dtype=F.float32)
     g4.edges['viewed-by'].data['p'] = F.tensor([1, 1, 1, 1, 1, 1], dtype=F.float32)
 
@@ -61,6 +62,14 @@ def test_random_walk():
     traces, ntypes = dgl.sampling.random_walk(
         g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p')
     check_random_walk(g2, ['follow'] * 4, traces, ntypes, 'p')
+
+    try:
+        traces, ntypes = dgl.sampling.random_walk(
+            g2, [0, 1, 2, 3, 0, 1, 2, 3], length=4, prob='p2')
+        fail = False
+    except dgl.DGLError:
+        fail = True
+    assert fail
 
     metapath = ['follow', 'view', 'viewed-by'] * 2
     traces, ntypes = dgl.sampling.random_walk(

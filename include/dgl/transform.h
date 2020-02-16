@@ -24,11 +24,17 @@ namespace transform {
  * The graphs should have identical node ID space (i.e. should have the same set of nodes,
  * including types and IDs) and metagraph.
  *
+ * \param graphs The list of graphs.
+ * \param always_preserve The list of nodes to preserve regardless of whether the inbound
+ *                        or outbound edges exist.
+ *
  * \return A pair.  The first element is the list of compacted graphs, and the second
  * element is the mapping from the compacted graphs and the original graph.
  */
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
+CompactGraphs(
+    const std::vector<HeteroGraphPtr> &graphs,
+    const std::vector<IdArray> &always_preserve);
 
 /*!
  * \brief Convert a multigraph to a simple graph.

@@ -595,6 +595,12 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroClear")
     hg->Clear();
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroDataType")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef hg = args[0];
+    *rv = hg->DataType();
+  });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroContext")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     HeteroGraphRef hg = args[0];

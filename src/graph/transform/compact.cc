@@ -27,11 +27,16 @@ namespace {
 
 template<typename IdType>
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
+CompactGraphs(
+    const std::vector<HeteroGraphPtr> &graphs,
+    const std::vector<IdArray> &always_preserve) {
   // TODO(BarclayII): check whether the node space and metagraph of each graph is the same.
   // Step 1: Collect the nodes that has connections for each type.
   std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
+
+  for (size_t i = 0; i < always_preserve.size(); ++i)
+    hashmaps[i].Update(always_preserve[i]);
 
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];
@@ -88,10 +93,14 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
 };  // namespace
 
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
+CompactGraphs(
+    const std::vector<HeteroGraphPtr> &graphs,
+    const std::vector<IdArray> &always_preserve) {
   std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>> result;
+  // TODO(BarclayII): check for all IdArrays
+  CHECK(graphs[0]->DataType() == always_preserve[0]->dtype) << "data type mismatch.";
   ATEN_ID_TYPE_SWITCH(graphs[0]->DataType(), IdType, {
-    result = CompactGraphs<IdType>(graphs);
+    result = CompactGraphs<IdType>(graphs, always_preserve);
   });
   return result;
 }
@@ -99,12 +108,16 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLCompactGraphs")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     List<HeteroGraphRef> graph_refs = args[0];
+    List<Value> always_preserve_refs = args[1];
 
     std::vector<HeteroGraphPtr> graphs;
+    std::vector<IdArray> always_preserve;
     for (HeteroGraphRef gref : graph_refs)
       graphs.push_back(gref.sptr());
+    for (Value array : always_preserve_refs)
+      always_preserve.push_back(array->data);
 
-    const auto &result_pair = CompactGraphs(graphs);
+    const auto &result_pair = CompactGraphs(graphs, always_preserve);
 
     List<HeteroGraphRef> compacted_graph_refs;
     List<Value> induced_nodes;
