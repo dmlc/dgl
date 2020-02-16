@@ -27,7 +27,7 @@ GARBAGE_COLLECTION_COUNT = 2000 # Perform grabage collection when message count 
 def read_ip_config(filename):
     """Read network configuration information of kvstore from file.
 
-    The format of configuration should be:
+    The format of configuration file should be:
 
         [machine_id] [ip] [base_port] [server_count]
 
@@ -36,9 +36,8 @@ def read_ip_config(filename):
         2 172.31.47.147 30050 2
         3 172.31.30.180 30050 2
 
-    Note that, DGL KVStore supports backup servers that can shared data with each other 
-    servers on the same machine via shared-tensor, so the server_count should greater than 1. 
-    If server_count == 1, DGL luanches just 1 server node on a single machine.
+    Note that, DGL KVStore supports multiple servers that can shared data with each other 
+    on the same machine via shared-tensor. So the server_count should be >= 1.
 
     Parameters
     ----------
@@ -50,16 +49,16 @@ def read_ip_config(filename):
     dict
         server namebook. e.g.,
 
-        [server_id]:[machine_id|server_addr]
+        [server_id]:[machine_id, ip, port]
 
-          {0:'0|172.31.40.143:30050',
-           1:'0|172.31.40.143:30051',
-           2:'1|172.31.36.140:30050',
-           3:'1|172.31.36.140:30051',
-           4:'2|172.31.47.147:30050',
-           5:'2|172.31.47.147:30051',
-           6:'3|172.31.30.180:30050',
-           7:'3|172.31.30.180:30051'}
+          {0:'[0, 172.31.40.143, 30050],
+           1:'[0, 172.31.40.143, 30051],
+           2:'[1, 172.31.36.140, 30050],
+           3:'[1, 172.31.36.140, 30051],
+           4:'[2, 172.31.47.147, 30050],
+           5:'[2, 172.31.47.147, 30051],
+           6:'[3, 172.31.30.180, 30050],
+           7:'[3, 172.31.30.180, 30051]}
     """
     assert len(filename) > 0, 'filename cannot be empty.'
 
@@ -71,10 +70,10 @@ def read_ip_config(filename):
         for line in lines:
             machine_id, ip, port, server_count = line.split(' ')
             for s_count in range(int(server_count)):
-                server_namebook[server_id] = str(machine_id)+'|'+ip+':'+str(int(port)+s_count)
+                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count]
                 server_id += 1
     except:
-        print("Error. data format on each line should be: [machine_id] [ip] [base_port] [server_count]")
+        print("Error: data format on each line should be: [machine_id] [ip] [base_port] [server_count]")
 
     return server_namebook
 
@@ -83,32 +82,44 @@ class KVServer(object):
     """KVServer is a lightweight key-value store service for DGL distributed training.
 
     In practice, developers can use KVServer to hold large-scale graph features or 
-    graph embeddings across machines in a distributed setting. User can re-wriite _push_handler() 
+    graph embeddings across machines in a distributed setting. Also, user can re-wriite _push_handler() 
     and _pull_handler() API to support flexibale algorithms.
 
-    DGL kvstore supports backup servers. That means we can lunach many servers on the same machine and all of 
-    these servers share the same shared-memory tensor.
+    DGL kvstore supports multiple-servers on single-machine. That means we can lunach many servers on the same machine and all of 
+    these servers will share the same shared-memory tensor.
 
     Note that, DO NOT use KVServer in multiple threads on Python because this behavior is not defined.
 
-    For now, KVServer can only run in CPU, we will support GPU KVServer in the future.
+    For now, KVServer can only run in CPU. We will support GPU KVServer in the future.
 
     Parameters
     ----------
     server_id : int
         KVServer's ID (start from 0).
-    server_addr : str
-        machine ID, IP address and port of KVServer, e.g., '0|127.0.0.1:50051'.
+    server_namebook: dict
+        IP address namebook of KVServer, where key is the KVServer's ID 
+        (start from 0) and value is the server's machine_id, IP address and port, e.g.,
+
+          {0:'[0, 172.31.40.143, 30050],
+           1:'[0, 172.31.40.143, 30051],
+           2:'[1, 172.31.36.140, 30050],
+           3:'[1, 172.31.36.140, 30051],
+           4:'[2, 172.31.47.147, 30050],
+           5:'[2, 172.31.47.147, 30051],
+           6:'[3, 172.31.30.180, 30050],
+           7:'[3, 172.31.30.180, 30051]}
+
     num_client : int
-        Total number of clients connecting to server.
+        Total number of client nodes.
     queue_size : int
         Sise (bytes) of kvstore message queue buffer (~20 GB on default).
+        Note that the 20 GB is just an upper-bound and system will not allocate 20GB memory at once.
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, server_addr, num_client, queue_size=20000000000, net_type='socket'):
+    def __init__(self, server_id, server_namebook, num_client, queue_size=20000000000, net_type='socket'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
-        assert len(server_addr.split('|')) == 2, 'Incorrect IP format: %s' % server_addr
+        assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert num_client >= 0, 'num_client (%d) cannot be a negative number.' % num_client
         assert queue_size > 0, 'queue_size cannot be a negative number.'
         assert net_type == 'socket' or net_type == 'mpi', 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
@@ -119,10 +130,14 @@ class KVServer(object):
         self._data_store = {}
         # Used for barrier() API on KVClient
         self._barrier_count = 0
-        # Server ID starts from zero
+        # Server information
         self._server_id = server_id
-        self._machine_id, self._addr = server_addr.split('|')
-        # client_namebook will be received from remote client nodes
+        self._server_namebook = server_namebook
+        self._machine_id = server_namebook[server_id][0]
+        self._ip = server_namebook[server_id][1]
+        self._port = server_namebook[server_id][2]
+        self._group_count = self._get_group_count()
+        # client_namebook will be sent from remote client nodes
         self._client_namebook = {}
         self._client_count = num_client
         # Create C communicator of sender and receiver
@@ -130,6 +145,9 @@ class KVServer(object):
         self._receiver = _create_receiver(net_type, queue_size)
         # A naive garbage collocetion for kvstore
         self._garbage_msg = []
+        self._open_file_list = []
+        # record for total message count
+        self._msg_count = 0
 
 
     def __del__(self):
@@ -138,9 +156,13 @@ class KVServer(object):
         # Finalize C communicator of sender and receiver
         _finalize_sender(self._sender)
         _finalize_receiver(self._receiver)
+        # Delete temp file
+        for file in self._open_file_list:
+            if(os.path.exists(file)):
+                os.remove(file)
 
 
-    def set_global2local(self, name, global2local=None, data_shape=None):
+    def set_global2local(self, name, global2local=None):
         """Set data of global ID to local ID.
 
         Parameters
@@ -150,9 +172,8 @@ class KVServer(object):
         global2local : list or tensor (mx.ndarray or torch.tensor)
             A data mapping of global ID to local ID. KVStore will use global ID by default 
             if the global2local is not been set.
-        data_shape : tuple
-            The data shape of global2local. 
-            The backup server can only know the data ane and data shape, instead of the whole data.
+
+            Note that, if the global2local is None KVServer will read shared-tensor.
         """
         assert len(name) > 0, 'name cannot be empty.'
 
@@ -163,8 +184,10 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-g2l-'][:] = global2local[:]
+            self._write_data_shape('./tmp'+name+'-g2l-shape', global2local)
+            self._open_file_list.append('./tmp'+name+'-g2l-shape')
         else: # Read shared-tensor
-            assert len(data_shape) > 0, 'data_shape cannot be empty.'
+            data_shape = self._read_data_shape('./tmp/'+name+'-g2l-shape')
             shared_data = empty_shared_mem(name+'-g2l-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
@@ -172,7 +195,7 @@ class KVServer(object):
         self._has_data.add(name+'-g2l-')
 
 
-    def init_data(self, name, data_tensor=None, data_shape=None):
+    def init_data(self, name, data_tensor=None):
         """Initialize data tensor on KVServe.
 
         Parameters
@@ -181,9 +204,8 @@ class KVServer(object):
             data name
         data_tensor : tensor (mx.ndarray or torch.tensor)
             data tensor
-        data_shape : tuple
-            Shape of data_tensor.
-            The backup server can only know the data ane and data shape, instead of the whole data.
+
+            Note that, if the data_tensor is None KVServer will read shared-tensor.
         """
         assert len(name) > 0, 'name cannot be empty.'
 
@@ -192,8 +214,10 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-data-'][:] = data_tensor[:]
+            self._write_data_shape('./tmp/'+name+'-data-shape', data_tensor)
+            self._open_file_list.append('./tmp/'+name+'-data-shape')
         else: # Read shared-tensor
-            assert len(data_shape) > 0, 'data_shape cannot be empty.'
+            data_shape = self._read_data_shape('./tmp/'+name+'-data-shape')
             shared_data = empty_shared_mem(name+'-data-', False, data_shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
@@ -201,7 +225,7 @@ class KVServer(object):
         self._has_data.add(name+'-data-')
 
 
-    def get_id(self):
+    def get_server_id(self):
         """Get current server id
 
         Return
@@ -213,14 +237,14 @@ class KVServer(object):
 
 
     def get_addr(self):
-        """Get current server IP address
+        """Get current server IP address and port
 
         Return
         ------
         str
-            IP address
+            IP address and port
         """
-        return self._addr
+        return self._ip + ':' + str(self._port)
 
 
     def get_machine_id(self):
@@ -232,6 +256,27 @@ class KVServer(object):
             machine ID
         """
         return self._machine_id
+
+
+    def get_group_count(self):
+        """Get count of server inside a machine
+
+        Return
+        ------
+        int
+            count of server
+        """
+        return self._group_count
+
+    def get_message_count(self):
+        """Get total message count on current KVServer
+
+        Return
+        ------
+        int
+            count of message
+        """
+        return self._msg_count
 
 
     def start(self):
@@ -247,8 +292,7 @@ class KVServer(object):
 
         """
         # Get connected with all client nodes
-        server_ip, server_port = self._addr.split(':')
-        _receiver_wait(self._receiver, server_ip, int(server_port), self._client_count)
+        _receiver_wait(self._receiver, self._ip, self._port, self._client_count)
 
         # recv client address information
         addr_list = []
@@ -345,7 +389,7 @@ class KVServer(object):
                     self._barrier_count = 0  
             # Final message              
             elif msg.type == KVMsgType.FINAL:
-                print("Exit KVStore service %d" % self.get_id())
+                print("Exit KVStore service %d, solved message count: %d" % (self.get_id(), self.get_message_count()))
                 break # exit loop
             else:
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
@@ -355,6 +399,8 @@ class KVServer(object):
             if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
                 _clear_kv_msg(self._garbage_msg)
                 self._garbage_msg = []
+
+            self._msg_count += 1
 
 
     def _serialize_shared_tensor(self, name, shape, dtype):
@@ -390,6 +436,71 @@ class KVServer(object):
             raise RuntimeError('We can only process int64 and float32 shared-memory tensor now.')
 
         return str_data
+
+
+    def _write_data_shape(self, filename, data):
+        """Write data shape to a temp file.
+
+        Parameters
+        ----------
+        filename : str
+            name of temp file.
+        data : tensor (mx.ndarray or torch.tensor)
+            data tensor
+        """
+        shape = F.shape(data)
+        str_data = ''
+        f = open(filename, "w");
+        for s in shape: q
+            str_data += str(s)
+            str_data += '|'
+        f.write(str_data)
+        f.close()
+
+
+    def _read_data_shape(self, filename):
+        """Read data shape from a tmp file.
+
+        Parameters
+        ----------
+        filename : str
+            name of temp file
+
+        Return
+        ------
+        tuple
+            data shape
+        """
+        f = open(filename, "r")
+        str_data = f.read()
+        data_list = str_data.split('|')
+        data_shape = []
+        for i in range(len(data_list)-1):
+            data_shape.append(int(data_list[i]))
+
+        f.close()
+
+        return data_shape
+
+
+    def _get_group_count(self):
+        """Get count of backup server
+
+        Return
+        ------
+        int
+            count of backup server
+        """
+        group_count = 0
+        pre_id = 0
+        for ID, data in self._server_namebook.items():
+            machine_id = data[0]
+            if machine_id != pre_id:
+                break
+            backup_count += 1
+            pre_id = machine_id
+
+        return group_count
 
 
     def _push_handler(self, name, ID, data, target):
@@ -447,14 +558,14 @@ class KVClient(object):
         IP address namebook of KVServer, where key is the KVServer's ID 
         (start from 0) and value is the server's machine_id, IP address and port, e.g.,
 
-          {0:'0|172.31.40.143:30050',
-           1:'0|172.31.40.143:30051',
-           2:'1|172.31.36.140:30050',
-           3:'1|172.31.36.140:30051',
-           4:'2|172.31.47.147:30050',
-           5:'2|172.31.47.147:30051',
-           6:'3|172.31.30.180:30050',
-           7:'3|172.31.30.180:30051'}
+          {0:'[0, 172.31.40.143, 30050],
+           1:'[0, 172.31.40.143, 30051],
+           2:'[1, 172.31.36.140, 30050],
+           3:'[1, 172.31.36.140, 30051],
+           4:'[2, 172.31.47.147, 30050],
+           5:'[2, 172.31.47.147, 30051],
+           6:'[3, 172.31.30.180, 30050],
+           7:'[3, 172.31.30.180, 30051]}
 
     queue_size : int
         Sise (bytes) of kvstore message queue buffer (~20 GB on default).
@@ -473,7 +584,7 @@ class KVClient(object):
         # Server information
         self._server_namebook = server_namebook
         self._server_count = len(server_namebook)
-        self._backup_count = self._get_backup_count()
+        self._group_count = self._get_group_count()
         # client ID will be assign by server after connecting to server
         self._client_id = -1
         # Get local machine id via server_namebook
@@ -483,6 +594,7 @@ class KVClient(object):
         self._receiver = _create_receiver(net_type, queue_size)
         # A naive garbage collocetion for kvstore
         self._garbage_msg = []
+        self._open_file_list = []
         # Used load-balance
         random.seed(time.time())
 
@@ -493,9 +605,13 @@ class KVClient(object):
         # finalize C communicator of sender and receiver
         _finalize_sender(self._sender)
         _finalize_receiver(self._receiver)
+        # Delete temp file
+        for file in self._open_file_list:
+            if(os.path.exists(file)):
+                os.remove(file)
 
 
-    def set_partition_book(self, name, partition_book=None, data_shape=None):
+    def set_partition_book(self, name, partition_book=None):
         """Partition book contains the mapping of global ID to machine ID.
 
         Parameters
@@ -504,9 +620,8 @@ class KVClient(object):
             data name
         partition_book : list or tensor (mx.ndarray or torch.tensor)
             Mapping global ID to target machine ID.
-        data_shape : tuple
-            The data shape of partition_book. Client can share partition_book via shared-tensor, 
-            which can just provide data_shape and data name.
+
+        Note that, if the partition_book is None KVClient will read shared-tensor.
         """
         assert len(name) > 0, 'name connot be empty.'
 
@@ -517,8 +632,10 @@ class KVClient(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-part-'][:] = partition_book[:]
+            self._write_data_shape('./tmp'+name+'-part-shape', global2local)
+            self._open_file_list.append('./tmp'+name+'-part-shape')
         else: # Read shared-tensor
-            assert len(data_shape) > 0, 'data_shape cannot be empty.'
+            data_shape = self._read_data_shape('./tmp'+name-'part-shape')
             shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
@@ -539,9 +656,9 @@ class KVClient(object):
         """
         # Get connected with all server nodes
         for ID, addr in self._server_namebook.items():
-            machine_id, ip_port = addr.split('|')
-            server_ip, server_port = ip_port.split(':')
-            _add_receiver_addr(self._sender, server_ip, int(server_port), ID)
+            server_ip = addr[1]
+            server_port = addr[2]
+            _add_receiver_addr(self._sender, server_ip, server_port, ID)
         _sender_connect(self._sender)
 
         # Send client address to server nodes
@@ -579,16 +696,6 @@ class KVClient(object):
                 self._has_data.add(tensor_name)
 
         print("KVClient %d connect to kvstore successfully!" % self.get_id())
-
-
-    def print(self):
-        print('--------------')
-        print('Client ID %d' % self.get_id())
-        print('Machine ID: %d' % self._machine_id)
-        print('backup count: %d' % self._backup_count)
-        for name, data in self._data_store.items():
-            print('name: ' + name)
-            print(data)
 
 
     def get_id(self):
@@ -915,6 +1022,51 @@ class KVClient(object):
         tensor_shape = tuple(tensor_shape)
 
         return tensor_name, tensor_shape, data_type
+
+
+    def _write_data_shape(self, filename, data):
+        """Write data shape to a temp file.
+
+        Parameters
+        ----------
+        filename : str
+            name of temp file.
+        data : tensor (mx.ndarray or torch.tensor)
+            data tensor
+        """
+        shape = F.shape(data)
+        str_data = ''
+        f = open(filename, "w");
+        for s in shape: q
+            str_data += str(s)
+            str_data += '|'
+        f.write(str_data)
+        f.close()
+
+
+    def _read_data_shape(self, filename):
+        """Read data shape from a tmp file.
+
+        Parameters
+        ----------
+        filename : str
+            name of temp file
+
+        Return
+        ------
+        tuple
+            data shape
+        """
+        f = open(filename, "r")
+        str_data = f.read()
+        data_list = str_data.split('|')
+        data_shape = []
+        for i in range(len(data_list)-1):
+            data_shape.append(int(data_list[i]))
+
+        f.close()
+
+        return data_shape
 
 
     def _takeId(self, elem):
