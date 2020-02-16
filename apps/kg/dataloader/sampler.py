@@ -10,7 +10,7 @@ import time
 
 def SoftRelationPartition(edges, n, threshold=0.05):
     """This partitions a list of edges to n partitions according to their
-    relation time. For any relation with number of edges larger than the
+    relation types. For any relation with number of edges larger than the
     threshold, its edges will be evenly distributed into all partitions.
     For any relation with number of edges smaller than the threshold, its
     edges will be put into one single partition.
