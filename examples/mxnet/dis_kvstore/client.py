@@ -63,7 +63,11 @@ def start_client(args):
         res = my_client.pull(name='entity_embed', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
         print(res)
 
+    my_client.barrier()
+
     my_client.push(name='entity_embed', id_tensor=ID[my_client.get_machine_id()], data_tensor=mx.nd.array([[0.,0.,0.],[0.,0.,0.]]))
+
+    my_client.barrier()
 
     if my_client.get_id() % args.num_worker == 0:
         res = my_client.pull(name='entity_embed', id_tensor=mx.nd.arrayr([0,1,2,3,4,5,6,7], dtype='int64'))
