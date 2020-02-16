@@ -1037,7 +1037,7 @@ class KVClient(object):
         shape = F.shape(data)
         str_data = ''
         f = open(filename, "w");
-        for s in shape: q
+        for s in shape:
             str_data += str(s)
             str_data += '|'
         f.write(str_data)
