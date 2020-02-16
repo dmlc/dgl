@@ -184,10 +184,10 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-g2l-'][:] = global2local[:]
-            self._write_data_shape('./tmp'+name+'-g2l-shape', global2local)
-            self._open_file_list.append('./tmp'+name+'-g2l-shape')
+            self._write_data_shape(name+'-g2l-shape', global2local)
+            self._open_file_list.append(name+'-g2l-shape')
         else: # Read shared-tensor
-            data_shape = self._read_data_shape('./tmp/'+name+'-g2l-shape')
+            data_shape = self._read_data_shape(name+'-g2l-shape')
             shared_data = empty_shared_mem(name+'-g2l-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-g2l-'] = F.zerocopy_from_dlpack(dlpack)
@@ -214,10 +214,10 @@ class KVServer(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-data-'][:] = data_tensor[:]
-            self._write_data_shape('./tmp/'+name+'-data-shape', data_tensor)
-            self._open_file_list.append('./tmp/'+name+'-data-shape')
+            self._write_data_shape(name+'-data-shape', data_tensor)
+            self._open_file_list.append(name+'-data-shape')
         else: # Read shared-tensor
-            data_shape = self._read_data_shape('./tmp/'+name+'-data-shape')
+            data_shape = self._read_data_shape(name+'-data-shape')
             shared_data = empty_shared_mem(name+'-data-', False, data_shape, 'float32')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-data-'] = F.zerocopy_from_dlpack(dlpack)
@@ -632,10 +632,10 @@ class KVClient(object):
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
             self._data_store[name+'-part-'][:] = partition_book[:]
-            self._write_data_shape('./tmp'+name+'-part-shape', global2local)
-            self._open_file_list.append('./tmp'+name+'-part-shape')
+            self._write_data_shape(name+'-part-shape', global2local)
+            self._open_file_list.append(name+'-part-shape')
         else: # Read shared-tensor
-            data_shape = self._read_data_shape('./tmp'+name-'part-shape')
+            data_shape = self._read_data_shape(name-'part-shape')
             shared_data = empty_shared_mem(name+'-part-', False, data_shape, 'int64')
             dlpack = shared_data.to_dlpack()
             self._data_store[name+'-part-'] = F.zerocopy_from_dlpack(dlpack)
