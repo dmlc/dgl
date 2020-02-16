@@ -460,6 +460,9 @@ class KVServer(object):
         data : tensor (mx.ndarray or torch.tensor)
             data tensor
         """
+        if(os.path.exists(filename)):
+            os.remove(filename)
+
         shape = F.shape(data)
         str_data = ''
         f = open(filename, "a");
@@ -485,7 +488,6 @@ class KVServer(object):
         """
         f = open(filename, "r")
         str_data = f.read()
-        print(str_data)
         data_list = str_data.split('|')
         data_shape = []
         for i in range(len(data_list)-1):
@@ -1059,6 +1061,9 @@ class KVClient(object):
         data : tensor (mx.ndarray or torch.tensor)
             data tensor
         """
+        if(os.path.exists(filename)):
+            os.remove(filename)
+            
         shape = F.shape(data)
         str_data = ''
         f = open(filename, "a");
