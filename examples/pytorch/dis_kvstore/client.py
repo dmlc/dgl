@@ -41,8 +41,6 @@ def start_client(args):
 
     my_client.connect()
 
-    print("111111")
-
     if my_client.get_id() % args.backup_count == 0:
         my_client.set_partition_book(name='entity_embed', partition_book=partition)
     else:
@@ -56,8 +54,6 @@ def start_client(args):
         my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
     my_client.barrier()
-
-    print("222222")
 
     if my_client.get_id() % args.backup_count == 0:
         res = my_client.pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))

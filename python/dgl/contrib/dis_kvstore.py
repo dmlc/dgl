@@ -698,17 +698,12 @@ class KVClient(object):
         tensor
             a data tensor with the same row size of id_tensor.
         """
-        print("aaaaaaa")
-
         assert len(name) > 0, 'name cannot be empty.'
         assert F.ndim(id_tensor) == 1, 'ID must be a vector.'
 
         if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
             _clear_kv_msg(self._garbage_msg)
             self._garbage_msg = []
-
-
-        print("bbbbbbb")
 
         # partition data
         machine_id = self._data_store[name+'-part-'][id_tensor]
@@ -721,8 +716,6 @@ class KVClient(object):
         start = 0
         pull_count = 0
         local_id = None
- 
-        print("ccccccc")
 
         for idx in range(len(machine)):
             end = start + count[idx]
@@ -748,8 +741,6 @@ class KVClient(object):
 
             start += count[idx]           
 
-        print("ddddddd")
-
         msg_list = []
 
         if local_id is not None:
@@ -765,9 +756,6 @@ class KVClient(object):
             msg_list.append(local_msg)
             self._garbage_msg.append(local_msg)
 
-
-        print("eeeeeee")
-
         # wait message from server nodes
         for idx in range(pull_count):
             remote_msg = _recv_kv_msg(self._receiver)
@@ -777,9 +765,6 @@ class KVClient(object):
         # sort msg by server id
         msg_list.sort(key=self._takeId)
         data_tensor = F.cat(seq=[msg.data for msg in msg_list], dim=0)
-
-
-        print("fffffff")
 
         return data_tensor[back_sorted_id] # return data with original index order
 
