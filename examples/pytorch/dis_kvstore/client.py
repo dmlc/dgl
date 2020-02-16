@@ -51,13 +51,13 @@ def start_client(args):
 
     print("send request...")
 
-    for n in range(1):
+    for n in range(1000):
         for i in range(4):
             my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
     my_client.barrier()
 
-    if my_client.get_id() % args.backup_count == 0:
+    if my_client.get_id() % args.num_worker == 0:
         res = my_client.pull(name='entity_embed', id_tensor=th.tensor([0,1,2,3,4,5,6,7]))
         print(res)
 
