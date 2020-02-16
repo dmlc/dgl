@@ -225,7 +225,7 @@ class KVServer(object):
         self._has_data.add(name+'-data-')
 
 
-    def get_server_id(self):
+    def get_id(self):
         """Get current server id
 
         Return
