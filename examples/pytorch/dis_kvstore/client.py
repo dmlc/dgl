@@ -21,6 +21,7 @@ DATA.append(th.tensor([[2.,2.,2.,],[2.,2.,2.,]]))
 DATA.append(th.tensor([[3.,3.,3.,],[3.,3.,3.,]]))
 DATA.append(th.tensor([[4.,4.,4.,],[4.,4.,4.,]]))
 
+
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
         super(ArgParser, self).__init__()
@@ -29,6 +30,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='IP configuration file of kvstore.')
         self.add_argument('--num_worker', type=int, default=2,
                           help='Number of worker (client nodes) on single-machine.')
+
 
 def start_client(args):
     """Start client
