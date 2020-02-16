@@ -47,6 +47,8 @@ def start_server(args):
         my_server.set_global2local(name='entity_embed')
         my_server.init_data(name='entity_embed')
 
+    my_server.print()
+
     my_server.start()
     
 

@@ -45,6 +45,8 @@ def start_client(args):
         time.sleep(3)
         my_client.set_partition_book(name='entity_embed')
 
+    my_client.print()
+
     my_client.barrier()
 
     print("send request...")
