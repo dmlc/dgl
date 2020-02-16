@@ -971,7 +971,7 @@ class KVClient(object):
         res = 0
         for ID, data in self._server_namebook.items():
             machine_id = data[0]
-            ip = addr[1]
+            ip = data[1]
             if ip in self._local_ip4_addr_list():
                 res = machine_id
                 break
