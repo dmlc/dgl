@@ -353,11 +353,14 @@ class KVServer(object):
             msg = _recv_kv_msg(self._receiver)
             # Push message
             if msg.type == KVMsgType.PUSH:
+                print("server:1111")
                 if (msg.name+'-g2l-' in self._has_data) == True:
                     local_id = self._data_store[msg.name+'-g2l-'][msg.id]
                 else:
                     local_id = msg.id
+                print("server:2222")
                 self._push_handler(msg.name+'-data-', local_id, msg.data, self._data_store)
+                print("server:3333")
             # Pull message
             elif msg.type == KVMsgType.PULL:
                 if (msg.name+'-g2l-' in self._has_data) == True:
