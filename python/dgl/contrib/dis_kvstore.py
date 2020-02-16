@@ -450,7 +450,7 @@ class KVServer(object):
         """
         shape = F.shape(data)
         str_data = ''
-        f = open(filename, "w");
+        f = open(filename, "a");
         for s in shape:
             str_data += str(s)
             str_data += '|'
@@ -1036,7 +1036,7 @@ class KVClient(object):
         """
         shape = F.shape(data)
         str_data = ''
-        f = open(filename, "w");
+        f = open(filename, "a");
         for s in shape:
             str_data += str(s)
             str_data += '|'
