@@ -781,7 +781,7 @@ class KVClient(object):
                     data=partial_data,
                     c_ptr=None)
                 # randomly select a server node in target machine for load-balance
-                s_id = random.randint(machine[idx]*self._backup_count, (machine[idx]+1)*self._backup_count-1)
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
                 _send_kv_msg(self._sender, msg, s_id)
 
             start += count[idx]
@@ -842,7 +842,7 @@ class KVClient(object):
                     id=partial_id,
                     data=None,
                     c_ptr=None)
-                s_id = random.randint(machine[idx]*self._backup_count, (machine[idx]+1)*self._backup_count-1)
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
                 _send_kv_msg(self._sender, msg, s_id)
                 pull_count += 1
 
@@ -852,7 +852,7 @@ class KVClient(object):
 
         if local_id is not None:
             local_data = self._pull_handler(name+'-data-', local_id, self._data_store)
-            s_id = random.randint(self._machine_id*self._backup_count, (self._machine_id+1)*self._backup_count-1)
+            s_id = random.randint(self._machine_id*self._group_count, (self._machine_id+1)*self._group_count-1)
             local_msg = KVStoreMsg(
                 type=KVMsgType.PULL_BACK, 
                 rank=s_id,
