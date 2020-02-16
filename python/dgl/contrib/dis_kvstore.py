@@ -280,12 +280,15 @@ class KVServer(object):
 
 
     def print(self):
+        """Print server information (Used by debug)
+        """
         print("----------")
         print("server id: %d" % self.get_id())
         print("data:")
         for name, data in self._data_store.items():
             print(name)
             print(data)
+        print("---------")
 
 
     def start(self):
@@ -482,6 +485,7 @@ class KVServer(object):
         """
         f = open(filename, "r")
         str_data = f.read()
+        print(str_data)
         data_list = str_data.split('|')
         data_shape = []
         for i in range(len(data_list)-1):
@@ -708,12 +712,15 @@ class KVClient(object):
 
 
     def print(self):
+        """Print client information (Used by debug)
+        """
         print("----------")
         print("client id: %d" % self.get_id())
         print("data:")
         for name, data in self._data_store.items():
             print(name)
             print(data)
+        print("----------")
 
 
     def get_id(self):
