@@ -714,7 +714,7 @@ class KVClient(object):
         machine_id = self._data_store[name+'-part-'][id_tensor]
         # sort index by machine id
         sorted_id = F.tensor(np.argsort(F.asnumpy(machine_id)))
-        back_sorted_id = F.tensor(np.argsort(sorted_id))
+        back_sorted_id = F.tensor(np.argsort(F.asnumpy(sorted_id)))
         id_tensor = id_tensor[sorted_id]
         machine, count = np.unique(F.asnumpy(machine_id), return_counts=True)
         # pull data from server by order
