@@ -362,6 +362,7 @@ class KVServer(object):
 
         # Service loop
         while True:
+            print(self._msg_count)
             msg = _recv_kv_msg(self._receiver)
             # Push message
             if msg.type == KVMsgType.PUSH:
@@ -1063,7 +1064,7 @@ class KVClient(object):
         """
         if(os.path.exists(filename)):
             os.remove(filename)
-            
+
         shape = F.shape(data)
         str_data = ''
         f = open(filename, "a");
