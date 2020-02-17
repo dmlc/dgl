@@ -17,7 +17,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
     For sampling without replace, if fanout > the number of neighbors, all the
     neighbors are sampled.
 
-    Node/edge features are not preserved. The IDs in the original graph of
+    Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters
@@ -87,7 +87,7 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
 
     If k > the number of neighbors, all the neighbors are sampled.
 
-    Node/edge features are not preserved. The IDs in the original graph of
+    Node/edge features are not preserved. The original IDs of
     the sampled edges are stored as the `dgl.EID` feature in the returned graph.
 
     Parameters

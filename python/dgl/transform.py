@@ -569,7 +569,9 @@ def in_subgraph(g, nodes):
     """Extract the subgraph containing only the in edges of the given nodes.
 
     The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved.
+    Node/edge features are not preserved. The original IDs
+    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
+
 
     Parameters
     ----------
@@ -607,7 +609,9 @@ def out_subgraph(g, nodes):
     """Extract the subgraph containing only the out edges of the given nodes.
 
     The subgraph keeps the same type schema and the cardinality of the original one.
-    Node/edge features are not preserved.
+    Node/edge features are not preserved. The original IDs
+    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
+
 
     Parameters
     ----------
@@ -634,7 +638,7 @@ def out_subgraph(g, nodes):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
+    subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):
