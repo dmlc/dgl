@@ -1412,6 +1412,63 @@ def test_compact():
     _check(g2, new_g2, induced_nodes)
 
 
+def test_types_in_function():
+    def mfunc1(edges):
+        assert edges.canonical_etype == ('user', 'follow', 'user')
+        return {}
+
+    def rfunc1(nodes):
+        assert nodes.ntype == 'user'
+        return {}
+
+    def filter_nodes1(nodes):
+        assert nodes.ntype == 'user'
+        return F.zeros((3,))
+
+    def filter_edges1(edges):
+        assert edges.canonical_etype == ('user', 'follow', 'user')
+        return F.zeros((2,))
+
+    def mfunc2(edges):
+        assert edges.canonical_etype == ('user', 'plays', 'game')
+        return {}
+
+    def rfunc2(nodes):
+        assert nodes.ntype == 'game'
+        return {}
+
+    def filter_nodes2(nodes):
+        assert nodes.ntype == 'game'
+        return F.zeros((3,))
+
+    def filter_edges2(edges):
+        assert edges.canonical_etype == ('user', 'plays', 'game')
+        return F.zeros((2,))
+
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow')
+    g.apply_nodes(rfunc1)
+    g.apply_edges(mfunc1)
+    g.update_all(mfunc1, rfunc1)
+    g.send_and_recv([0, 1], mfunc1, rfunc1)
+    g.send([0, 1], mfunc1)
+    g.recv([1, 2], rfunc1)
+    g.push([0], mfunc1, rfunc1)
+    g.pull([1], mfunc1, rfunc1)
+    g.filter_nodes(filter_nodes1)
+    g.filter_edges(filter_edges1)
+
+    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+    g.apply_nodes(rfunc2, ntype='game')
+    g.apply_edges(mfunc2)
+    g.update_all(mfunc2, rfunc2)
+    g.send_and_recv([0, 1], mfunc2, rfunc2)
+    g.send([0, 1], mfunc2)
+    g.recv([1, 2], rfunc2)
+    g.push([0], mfunc2, rfunc2)
+    g.pull([1], mfunc2, rfunc2)
+    g.filter_nodes(filter_nodes2, ntype='game')
+    g.filter_edges(filter_edges2)
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1433,3 +1490,4 @@ if __name__ == '__main__':
     test_backward()
     test_empty_heterograph()
     test_compact()
+    test_types_in_function()
