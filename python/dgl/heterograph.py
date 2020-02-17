@@ -1,4 +1,5 @@
 """Classes for heterogeneous graphs."""
+#pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
 import networkx as nx
