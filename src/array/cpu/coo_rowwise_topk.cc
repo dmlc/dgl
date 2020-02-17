@@ -37,25 +37,29 @@ void PushTopK(
     std::vector<WType> *new_weights) {    // output weight vector
   if (j - i <= K) {
     for (IdType k = i; k < j; ++k) {
+      auto eid = entry_data ? entry_data[k] : k;
       new_rows->push_back(curr_row);
       new_cols->push_back(col_data[k]);
-      new_entries->push_back(entry_data ? entry_data[k] : k);
-      new_weights->push_back(weights_data[k]);
+      new_entries->push_back(eid);
+      new_weights->push_back(weights_data[eid]);
     }
   } else {
     auto begin = indices->begin() + i;
     auto end = indices->begin() + j;
-    std::nth_element(begin, begin + K, end, [weights_data, smallest] (IdType a, IdType b) {
+    std::nth_element(begin, begin + K, end, [entry_data, weights_data, smallest] (IdType a, IdType b) {
+        IdType pa = entry_data ? entry_data[a] : a;
+        IdType pb = entry_data ? entry_data[b] : b;
         return smallest ?
-            (weights_data[a] < weights_data[b]) :
-            (weights_data[a] > weights_data[b]);
+            (weights_data[pa] < weights_data[pb]) :
+            (weights_data[pa] > weights_data[pb]);
       });
 
     for (auto ptr = begin; ptr != begin + K; ++ptr) {
+      auto eid = entry_data ? entry_data[*ptr] : *ptr;
       new_rows->push_back(curr_row);
       new_cols->push_back(col_data[*ptr]);
-      new_entries->push_back(entry_data ? entry_data[*ptr] : *ptr);
-      new_weights->push_back(weights_data[*ptr]);
+      new_entries->push_back(eid);
+      new_weights->push_back(weights_data[eid]);
     }
   }
 }
@@ -89,6 +93,7 @@ std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
   IdType prev_row, i;
   std::vector<IdType> indices(nnz);
   std::iota(indices.begin(), indices.end(), 0);
+
   for (IdType j = 0; j < nnz; ++j) {
     IdType curr_row = coo_row_data[j];
 

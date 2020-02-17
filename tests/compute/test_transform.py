@@ -352,11 +352,11 @@ def test_select_topk():
         ('user', 'follow', 'user'): [(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)],
         ('user', 'plays', 'game'): [(1, 0), (3, 1)]},
         {'user': 7, 'game': 3})     # include nodes with zero incoming edges
-    g.edges['follow'].data['weights'] = F.arange(1, 8)
-    g.edges['plays'].data['weights'] = F.arange(1, 3)
-    follow_weights = np.arange(1, 8)
-    plays_weights = np.arange(1, 3)
-    sg = dgl.select_topk(g, 'weights', 2)
+    follow_weights = np.array([2, 7, 3, 4, 6, 5, 1])
+    plays_weights = np.array([2, 1])
+    g.edges['follow'].data['weights'] = F.zerocopy_from_numpy(follow_weights)
+    g.edges['plays'].data['weights'] = F.zerocopy_from_numpy(plays_weights)
+    sg = dgl.select_topk(g, 'weights', 1)
 
     su, sv = sg.all_edges(form='uv', order='eid', etype='follow')
     su = F.asnumpy(su).tolist()
@@ -365,7 +365,7 @@ def test_select_topk():
     sw = F.asnumpy(sg.edges['follow'].data['weights'])
     induced_edges = F.asnumpy(sg.edges['follow'].data[dgl.EID])
 
-    assert set(suv) == set([(2, 1), (5, 1), (4, 2), (6, 2)])
+    assert set(suv) == set([(2, 1), (3, 2)])
     for i, e in enumerate(suv):
         assert induced_edges[i] == g.edge_id(e[0], e[1], etype='follow')
         assert sw[i] == follow_weights[induced_edges[i]]
@@ -380,7 +380,99 @@ def test_select_topk():
     assert set(suv) == set([(1, 0), (3, 1)])
     for i, e in enumerate(suv):
         assert induced_edges[i] == g.edge_id(e[0], e[1], etype='plays')
+        assert sw[i] == plays_weights[induced_edges[i]]
+
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): [(1, 0), (1, 2), (1, 5), (2, 2), (2, 3), (2, 4), (2, 6)],
+        ('user', 'plays', 'game'): [(0, 1), (1, 3)]},
+        {'user': 7, 'game': 4})     # include nodes with zero incoming edges
+    g.edges['follow'].data['weights'] = F.arange(1, 8)
+    g.edges['plays'].data['weights'] = F.arange(1, 3)
+    follow_weights = np.arange(1, 8)
+    plays_weights = np.arange(1, 3)
+    sg = dgl.select_topk(g, 'weights', 2, inbound=False)
+
+    su, sv = sg.all_edges(form='uv', order='eid', etype='follow')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sw = F.asnumpy(sg.edges['follow'].data['weights'])
+    induced_edges = F.asnumpy(sg.edges['follow'].data[dgl.EID])
+
+    assert set(suv) == set([(1, 2), (1, 5), (2, 4), (2, 6)])
+    for i, e in enumerate(suv):
+        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='follow')
         assert sw[i] == follow_weights[induced_edges[i]]
+
+    su, sv = sg.all_edges(form='uv', order='eid', etype='plays')
+    su = F.asnumpy(su).tolist()
+    sv = F.asnumpy(sv).tolist()
+    suv = list(zip(su, sv))
+    sw = F.asnumpy(sg.edges['plays'].data['weights'])
+    induced_edges = F.asnumpy(sg.edges['plays'].data[dgl.EID])
+
+    assert set(suv) == set([(0, 1), (1, 3)])
+    for i, e in enumerate(suv):
+        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='plays')
+        assert sw[i] == plays_weights[induced_edges[i]]
+
+    # random test
+    x = spsp.random(10, 10, 0.5)
+    w = np.random.permutation(50) + 1
+    x.data = w
+    g = dgl.graph(x)
+    g.edata['w'] = F.zerocopy_from_numpy(w)
+
+    sg = dgl.select_topk(g, 'w', 1)
+    src, dst = sg.all_edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    sg_w = F.asnumpy(sg.edata['w'])
+    ans_w = x.toarray().max(0)
+    ans_src = x.toarray().argmax(0)
+
+    assert np.array_equal(np.sort(dst), np.arange(10))
+    assert np.array_equal(ans_src[dst], src)
+    assert np.array_equal(ans_w[dst], sg_w)
+
+    sg = dgl.select_topk(g, 'w', 1, inbound=False)
+    src, dst = sg.all_edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    sg_w = F.asnumpy(sg.edata['w'])
+    ans_w = x.toarray().max(1)
+    ans_dst = x.toarray().argmax(1)
+
+    assert np.array_equal(np.sort(src), np.arange(10))
+    assert np.array_equal(ans_dst[src], dst)
+    assert np.array_equal(ans_w[src], sg_w)
+
+    neg_x = x.copy()
+    neg_x.data = 100 - neg_x.data
+
+    sg = dgl.select_topk(g, 'w', 1, smallest=True)
+    src, dst = sg.all_edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    sg_w = F.asnumpy(sg.edata['w'])
+    ans_w = 100 - neg_x.toarray().max(0)
+    ans_src = neg_x.toarray().argmax(0)
+
+    assert np.array_equal(np.sort(dst), np.arange(10))
+    assert np.array_equal(ans_src[dst], src)
+    assert np.array_equal(ans_w[dst], sg_w)
+
+    sg = dgl.select_topk(g, 'w', 1, inbound=False, smallest=True)
+    src, dst = sg.all_edges()
+    src = F.asnumpy(src)
+    dst = F.asnumpy(dst)
+    sg_w = F.asnumpy(sg.edata['w'])
+    ans_w = 100 - neg_x.toarray().max(1)
+    ans_dst = neg_x.toarray().argmax(1)
+
+    assert np.array_equal(np.sort(src), np.arange(10))
+    assert np.array_equal(ans_dst[src], dst)
+    assert np.array_equal(ans_w[src], sg_w)
 
 
 if __name__ == '__main__':
