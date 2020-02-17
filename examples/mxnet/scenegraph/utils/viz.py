@@ -3,6 +3,7 @@ import gluoncv as gcv
 from matplotlib import pyplot as plt
 
 def plot_sg(img, preds, obj_classes, rel_classes, topk=1):
+    '''visualization of generated scene graph'''
     size = img.shape[0:2]
     box_scale = np.array([size[1], size[0], size[1], size[0]])
     topk = min(topk, preds.shape[0])

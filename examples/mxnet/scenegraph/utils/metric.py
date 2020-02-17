@@ -81,6 +81,7 @@ class AUCMetric(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('predcls')
 class PredCls(mx.metric.EvalMetric):
+    '''Metric with ground truth object location and label'''
     def __init__(self, topk=20, iou_thresh=0.99):
         super(PredCls, self).__init__('predcls@%d'%(topk))
         self.topk = topk
@@ -113,6 +114,7 @@ class PredCls(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('phrcls')
 class PhrCls(mx.metric.EvalMetric):
+    '''Metric with ground truth object location and predicted object label from detector'''
     def __init__(self, topk=20, iou_thresh=0.99):
         super(PhrCls, self).__init__('phrcls@%d'%(topk))
         self.topk = topk
@@ -146,6 +148,7 @@ class PhrCls(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('sgdet')
 class SGDet(mx.metric.EvalMetric):
+    '''Metric with predicted object information by the detector'''
     def __init__(self, topk=20, iou_thresh=0.5):
         super(SGDet, self).__init__('sgdet@%d'%(topk))
         self.topk = topk
@@ -179,6 +182,7 @@ class SGDet(mx.metric.EvalMetric):
 @mx.metric.register
 @mx.metric.alias('sgdet+')
 class SGDetPlus(mx.metric.EvalMetric):
+    '''Metric proposed by `Graph R-CNN for Scene Graph Generation`'''
     def __init__(self, topk=20, iou_thresh=0.5):
         super(SGDetPlus, self).__init__('sgdet+@%d'%(topk))
         self.topk = topk
@@ -234,65 +238,8 @@ class SGDetPlus(mx.metric.EvalMetric):
         self.sum_metric += count / N
         self.num_inst += 1
 
-def merge_res_iou(g_slice, img_batch, scores, bbox, feat_ind, spatial_feat, cls_pred):
-    n = len(g_slice)
-    for i, g in enumerate(g_slice):
-        img = img_batch[i]
-        img_size = img.shape[1:3]
-
-        gt_bbox = g.ndata['bbox']
-        gt_bbox[:, 0] /= img_size[1]
-        gt_bbox[:, 1] /= img_size[0]
-        gt_bbox[:, 2] /= img_size[1]
-        gt_bbox[:, 3] /= img_size[0]
-        bbox[i, :, 0] /= img_size[1]
-        bbox[i, :, 1] /= img_size[0]
-        bbox[i, :, 2] /= img_size[1]
-        bbox[i, :, 3] /= img_size[0]
-        inds = np.where(scores[i, :, 0].asnumpy() > 0)[0].tolist()
-        if len(inds) == 0:
-            return None
-        ious = nd.contrib.box_iou(gt_bbox, bbox[i, inds])
-        # assignment
-        H, W = ious.shape
-        h = H
-        w = W
-        assign_ind = [-1 for i in range(H)]
-        assign_scores = [-1 for i in range(H)]
-        while h > 0 and w > 0:
-            ind = int(ious.argmax().asscalar())
-            row_ind = ind // W
-            col_ind = ind % W
-            assign_ind[row_ind] = col_ind
-            assign_scores[row_ind] = ious[row_ind, col_ind].asscalar()
-            ious[row_ind, :] = -1
-            ious[:, col_ind] = -1
-            h -= 1
-            w -= 1
-
-        box_ind = [inds[i] for i in assign_ind]
-        roi_ind = feat_ind[i, box_ind].squeeze(1)
-        g.ndata['bbox'] = gt_bbox
-        g.ndata['pred_bbox'] = bbox[i, box_ind]
-        g.ndata['node_feat'] = spatial_feat[i, roi_ind]
-        g.ndata['node_class_pred'] = cls_pred[i, roi_ind, 1:]
-    return dgl.batch(g_slice)
-
-def merge_res(g_slice, img, bbox, spatial_feat, cls_pred):
-    img_size = img.shape[2:4]
-    bbox[:, :, 0] /= img_size[1]
-    bbox[:, :, 1] /= img_size[0]
-    bbox[:, :, 2] /= img_size[1]
-    bbox[:, :, 3] /= img_size[0]
-    for i, g in enumerate(g_slice):
-        n_node = g.number_of_nodes()
-        g.ndata['pred_bbox'] = bbox[i, 0:n_node]
-        # filter out background-class prediction
-        g.ndata['node_class_pred'] = cls_pred[i, 0:n_node, 1:]
-        g.ndata['node_feat'] = spatial_feat[i, 0:n_node]
-    return dgl.batch(g_slice)
-
 def extract_gt(g, img_size):
+    '''extract prediction from ground truth graph'''
     if g is None or g.number_of_nodes() == 0:
         return None, None
     gt_eids = np.where(g.edata['rel_class'].asnumpy() > 0)[0]
@@ -326,6 +273,7 @@ def extract_gt(g, img_size):
     return gt_objects, gt_triplets
 
 def extract_pred(g, topk=100, joint_preds=False):
+    '''extract prediction from prediction graph for validation and visualization'''
     if g is None or g.number_of_nodes() == 0:
         return None, None
 

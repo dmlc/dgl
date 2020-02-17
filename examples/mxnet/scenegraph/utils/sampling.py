@@ -4,6 +4,7 @@ import mxnet as mx
 import numpy as np
 
 def l0_sample(g, positive_max=128, negative_ratio=3):
+    '''sampling positive and negative edges'''
     if g is None:
         return None
     n_eids = g.number_of_edges()

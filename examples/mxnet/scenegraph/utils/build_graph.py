@@ -2,19 +2,13 @@ import dgl
 from mxnet import nd
 import numpy as np
 
-def build_graph_with_reference(g_ref):
-    n_nodes = g_ref.number_of_nodes()
-    g = dgl.DGLGraph()
-    g.add_nodes(n_nodes)
-    gt_eids = g_ref.edges(order='eid')
-    g.add_edges(gt_eids[0], gt_eids[1])
-    return g
-
 def bbox_improve(bbox):
+    '''bbox encoding'''
     area = (bbox[:,2] - bbox[:,0]) * (bbox[:,3] - bbox[:,1])
     return nd.concat(bbox, area.expand_dims(1))
 
 def extract_edge_bbox(g):
+    '''bbox encoding'''
     src, dst = g.edges(order='eid')
     n = g.number_of_edges()
     src_bbox = g.ndata['pred_bbox'][src.asnumpy()]
@@ -29,6 +23,7 @@ def extract_edge_bbox(g):
 def build_graph_train(g_slice, gt_bbox, img, ids, scores, bbox, feat_ind,
                       spatial_feat, iou_thresh=0.5,
                       bbox_improvement=True, scores_top_k=50, overlap=False):
+    '''given ground truth and predicted bboxes, assign the label to the predicted w.r.t iou_thresh'''
     # match and re-factor the graph
     img_size = img.shape[2:4]
     gt_bbox[:, :, 0] /= img_size[1]
@@ -145,6 +140,7 @@ def build_graph_train(g_slice, gt_bbox, img, ids, scores, bbox, feat_ind,
 
 def build_graph_validate_gt_obj(img, gt_ids, bbox, spatial_feat,
                                 bbox_improvement=True, overlap=False):
+    '''given ground truth bbox and label, build graph for validation'''
     n_batch = img.shape[0]
     img_size = img.shape[2:4]
     bbox[:, :, 0] /= img_size[1]
@@ -190,6 +186,7 @@ def build_graph_validate_gt_obj(img, gt_ids, bbox, spatial_feat,
 
 def build_graph_validate_gt_bbox(img, ids, scores, bbox, spatial_feat, gt_ids=None,
                                  bbox_improvement=True, overlap=False):
+    '''given ground truth bbox, build graph for validation'''
     n_batch = img.shape[0]
     img_size = img.shape[2:4]
     bbox[:, :, 0] /= img_size[1]
@@ -237,6 +234,7 @@ def build_graph_validate_gt_bbox(img, ids, scores, bbox, spatial_feat, gt_ids=No
 
 def build_graph_validate_pred(img, ids, scores, bbox, feat_ind, spatial_feat,
                               bbox_improvement=True, scores_top_k=50, overlap=False):
+    '''given predicted bbox, build graph for validation'''
     n_batch = img.shape[0]
     img_size = img.shape[2:4]
     bbox[:, :, 0] /= img_size[1]
