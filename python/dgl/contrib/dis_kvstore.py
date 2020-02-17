@@ -362,7 +362,6 @@ class KVServer(object):
 
         # Service loop
         while True:
-            print(self._msg_count)
             msg = _recv_kv_msg(self._receiver)
             # Push message
             if msg.type == KVMsgType.PUSH:
@@ -408,10 +407,10 @@ class KVServer(object):
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
             # garbage collection
-            #self._garbage_msg.append(msg)
-            #if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
-            #    _clear_kv_msg(self._garbage_msg)
-            #    self._garbage_msg = []
+            self._garbage_msg.append(msg)
+            if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
+                _clear_kv_msg(self._garbage_msg)
+                self._garbage_msg = []
 
             self._msg_count += 1
 
