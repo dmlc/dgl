@@ -408,10 +408,10 @@ class KVServer(object):
                 raise RuntimeError('Unknown type of kvstore message: %d' % msg.type.value)
 
             # garbage collection
-            self._garbage_msg.append(msg)
-            if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
-                _clear_kv_msg(self._garbage_msg)
-                self._garbage_msg = []
+            #self._garbage_msg.append(msg)
+            #if len(self._garbage_msg) > GARBAGE_COLLECTION_COUNT:
+            #    _clear_kv_msg(self._garbage_msg)
+            #    self._garbage_msg = []
 
             self._msg_count += 1
 
@@ -811,15 +811,7 @@ class KVClient(object):
                     data=partial_data,
                     c_ptr=None)
                 # randomly select a server node in target machine for load-balance
-                #s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
-                
-                if self._flag == 0:
-                    s_id = machine[idx]*self._group_count
-                    self._flag = 1
-                else:
-                    s_id = (machine[idx]+1)*self._group_count-1
-                    self._flag = 0
-
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
                 _send_kv_msg(self._sender, msg, s_id)
 
             start += count[idx]
