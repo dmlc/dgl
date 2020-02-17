@@ -53,9 +53,8 @@ def start_client(args):
 
     print("send request...")
 
-    for n in range(1000):
-        for i in range(4):
-            my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
+    for i in range(4):
+        my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
     my_client.barrier()
 
