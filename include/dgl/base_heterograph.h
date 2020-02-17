@@ -21,10 +21,28 @@ namespace dgl {
 
 // Forward declaration
 class BaseHeteroGraph;
-class FlattenedHeteroGraph;
 typedef std::shared_ptr<BaseHeteroGraph> HeteroGraphPtr;
+
+struct FlattenedHeteroGraph;
 typedef std::shared_ptr<FlattenedHeteroGraph> FlattenedHeteroGraphPtr;
+
 struct HeteroSubgraph;
+
+/*! \brief Enum class for edge direction */
+enum class EdgeDir {
+  kIn,  // in edge direction
+  kOut  // out edge direction
+};
+
+/*!
+ * \brief Sparse graph format.
+ */
+enum class SparseFormat {
+  ANY = 0,
+  COO = 1,
+  CSR = 2,
+  CSC = 3
+};
 
 /*!
  * \brief Base heterogenous graph.
@@ -323,6 +341,8 @@ class BaseHeteroGraph : public runtime::Object {
   /*!
    * \brief Get the adjacency matrix of the graph.
    *
+   * TODO(minjie): deprecate this interface; replace it with GetXXXMatrix.
+   *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
    *
@@ -338,6 +358,49 @@ class BaseHeteroGraph : public runtime::Object {
    */
   virtual std::vector<IdArray> GetAdj(
       dgl_type_t etype, bool transpose, const std::string &fmt) const = 0;
+
+  /*!
+   * \brief Determine which format to use with a preference.
+   *
+   * Return the preferred format if the underlying relation graph supports it.
+   * Otherwise, it will return whatever DGL thinks is the most appropriate given
+   * the arguments.
+   *
+   * \param etype Edge type.
+   * \param preferred_format Preferred sparse format.
+   * \return Available sparse format.
+   */
+  virtual SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in COO format.
+   * \param etype Edge type.
+   * \return COO matrix.
+   */
+  virtual aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in CSR format.
+   *
+   * The row and column sizes are equal to the number of dsttype and srctype
+   * nodes, respectively.
+   *
+   * \param etype Edge type.
+   * \return CSR matrix.
+   */
+  virtual aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const = 0;
+
+  /*!
+   * \brief Get adjacency matrix in CSC format.
+   *
+   * A CSC matrix is equivalent to the transpose of a CSR matrix.
+   * We reuse the CSRMatrix data structure as return value. The row and column
+   * sizes are equal to the number of dsttype and srctype nodes, respectively.
+   *
+   * \param etype Edge type.
+   * \return A CSR matrix.
+   */
+  virtual aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const = 0;
 
   /*!
    * \brief Extract the induced subgraph by the given vertices.
@@ -390,24 +453,43 @@ class BaseHeteroGraph : public runtime::Object {
 // Define HeteroGraphRef
 DGL_DEFINE_OBJECT_REF(HeteroGraphRef, BaseHeteroGraph);
 
-/*! \brief Heter-subgraph data structure */
+/*! 
+ * \brief Hetero-subgraph data structure.
+ *
+ * This class can be used as arguments and return values of a C API.
+ *
+ * <code>
+ *   DGL_REGISTER_GLOBAL("some_c_api")
+ *   .set_body([] (DGLArgs args, DGLRetValue* rv) {
+ *     HeteroSubgraphRef subg = args[0];
+ *     std::shared_ptr<HeteroSubgraph> ret = do_something( ... );
+ *     *rv = HeteroSubgraphRef(ret);
+ *   });
+ * </code>
+ */
 struct HeteroSubgraph : public runtime::Object {
   /*! \brief The heterograph. */
   HeteroGraphPtr graph;
   /*!
    * \brief The induced vertex ids of each entity type.
    * The vector length is equal to the number of vertex types in the parent graph.
+   * Each array i has the same length as the number of vertices in type i.
+   * Empty array is allowed if the mapping is identity.
    */
   std::vector<IdArray> induced_vertices;
   /*!
-   * \brief The induced vertex ids of each entity type.
-   * The vector length is equal to the number of vertex types in the parent graph.
+   * \brief The induced edge ids of each relation type.
+   * The vector length is equal to the number of edge types in the parent graph.
+   * Each array i has the same length as the number of edges in type i.
+   * Empty array is allowed if the mapping is identity.
    */
   std::vector<IdArray> induced_edges;
 
   static constexpr const char* _type_key = "graph.HeteroSubgraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
+// Define HeteroSubgraphRef
+DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
 /*! \brief The flattened heterograph */
 struct FlattenedHeteroGraph : public runtime::Object {
@@ -465,20 +547,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
 };
 DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
-// Define HeteroSubgraphRef
-DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
-
 // creators
-
-/*!
- * \brief Sparse graph format.
- */
-enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
-};
 
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")
@@ -496,6 +565,36 @@ HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
 
 /*!
+ * \brief Create a heterograph from COO input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param num_src Number of nodes in the source type.
+ * \param num_dst Number of nodes in the destination type.
+ * \param row Src node ids of the edges.
+ * \param col Dst node ids of the edges.
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
+
+/*!
+ * \brief Create a heterograph from CSR input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param num_src Number of nodes in the source type.
+ * \param num_dst Number of nodes in the destination type.
+ * \param indptr Indptr array
+ * \param indices Indices array
+ * \param edge_ids Edge ids
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format = SparseFormat::ANY);
+
+/*!
  * \brief Given a list of graphs, remove the common nodes that do not have inbound and
  * outbound edges.
  *
@@ -507,6 +606,24 @@ HeteroGraphPtr CreateHeteroGraph(
  */
 std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
 CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
+
+/*!
+ * \brief Extract the subgraph of the in edges of the given nodes.
+ * \param graph Graph
+ * \param nodes Node IDs of each type
+ * \return Subgraph containing only the in edges. The returned graph has the same
+ *         schema as the original one.
+ */
+HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+
+/*!
+ * \brief Extract the subgraph of the out edges of the given nodes.
+ * \param graph Graph
+ * \param nodes Node IDs of each type
+ * \return Subgraph containing only the out edges. The returned graph has the same
+ *         schema as the original one.
+ */
+HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
 };  // namespace dgl
 

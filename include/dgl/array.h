@@ -200,7 +200,8 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
 /*!
  * \brief Plain CSR matrix
  *
- * The column indices are 0-based and are not necessarily sorted.
+ * The column indices are 0-based and are not necessarily sorted. The data array stores
+ * integer ids for reading edge features.
  *
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
@@ -208,18 +209,28 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  */ 
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
-  runtime::NDArray indptr, indices;
-  /*! \brief data array, could be empty. */
-  runtime::NDArray data;
+  IdArray indptr, indices;
+  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  IdArray data;
   /*! \brief whether the column indices per row are sorted */
-  bool sorted;
+  bool sorted = false;
+  /*! \brief default constructor */
+  CSRMatrix() = default;
+  /*! \brief constructor */
+  CSRMatrix(int64_t nrows, int64_t ncols,
+            IdArray parr, IdArray iarr, IdArray darr = IdArray(),
+            bool sorted_flag = false)
+    : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
+      data(darr), sorted(sorted_flag) {}
 };
 
 /*!
  * \brief Plain COO structure
  * 
+ * The data array stores integer ids for reading edge features.
+
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
@@ -228,13 +239,23 @@ struct CSRMatrix {
  */
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
-  int64_t num_rows, num_cols;
+  int64_t num_rows = 0, num_cols = 0;
   /*! \brief COO index arrays */
-  runtime::NDArray row, col;
-  /*!
-   * \brief data array, could be empty.  When empty, assume it is from 0 to NNZ - 1.
-   */
-  runtime::NDArray data;
+  IdArray row, col;
+  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  IdArray data;
+  /*! \brief whether the row indices are sorted */
+  bool row_sorted = false;
+  /*! \brief whether the column indices per row are sorted */
+  bool col_sorted = false;
+  /*! \brief default constructor */
+  COOMatrix() = default;
+  /*! \brief constructor */
+  COOMatrix(int64_t nrows, int64_t ncols,
+            IdArray rarr, IdArray carr, IdArray darr = IdArray(),
+            bool rsorted = false, bool csorted = false)
+    : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
+      row_sorted(rsorted), col_sorted(csorted) {}
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -330,8 +351,106 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);
 
-/*! Sort the columns in each row in the ascending order. */
-void CSRSort(CSRMatrix csr);
+/*!
+ * \brief Sort the column index at each row in the ascending order.
+ *
+ * Examples:
+ * num_rows = 4
+ * num_cols = 4
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [1, 0, 2, 3, 1]
+ *
+ *  After CSRSort_(&csr)
+ *
+ * indptr = [0, 2, 3, 3, 5]
+ * indices = [0, 1, 1, 2, 3]
+ */
+void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = CSRRowWiseSampling(csr, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row, col and data indices.
+ */
+COOMatrix CSRRowWiseSampling(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
+/*!
+ * \brief Select K non-zero entries with the largest weights along each given row.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = CSRRowWiseTopk(csr, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [3, 0, 1]
+ *
+ * \param mat Input CSR matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                 the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat,
+    IdArray rows,
+    int64_t k,
+    FloatArray weight,
+    bool ascending = false);
 
 ///////////////////////// COO routines //////////////////////////
 
@@ -404,6 +523,104 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 /*! \return True if the matrix has duplicate entries */
 bool COOHasDuplicate(COOMatrix coo);
 
+/*!
+ * \brief Sort the indices of a COO matrix.
+ *
+ * The function sorts row indices in ascending order. If sort_column is true,
+ * col indices are sorted in ascending order too. The data array of the returned COOMatrix
+ * stores the shuffled index which could be used to fetch edge data.
+ *
+ * \param mat The input coo matrix
+ * \param sort_column True if column index should be sorted too.
+ * \return COO matrix with index sorted.
+ */
+COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+
+/*!
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * COOMatrix sampled = COORowWiseSampling(coo, rows, 2, FloatArray(), false);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [1, 3, 3]
+ * // sampled.cols = [1, 2, 3]
+ * // sampled.data = [3, 0, 4]
+ *
+ * \param mat Input coo matrix.
+ * \param rows Rows to sample from.
+ * \param num_samples Number of samples
+ * \param prob Unnormalized probability array. Should be of the same length as the data array.
+ *             If an empty array is provided, assume uniform.
+ * \param replace True if sample with replacement
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWiseSampling(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t num_samples,
+    FloatArray prob = FloatArray(),
+    bool replace = true);
+
+/*!
+ * \brief Select K non-zero entries with the largest weights along each given row.
+ *
+ * The function performs top-k selection along each row independently.
+ * The picked indices are returned in the form of a COO matrix.
+ *
+ * If replace is false and a row has fewer non-zero values than k,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // coo.num_rows = 4;
+ * // coo.num_cols = 4;
+ * // coo.rows = [0, 0, 1, 3, 3]
+ * // coo.cols = [0, 1, 1, 2, 3]
+ * // coo.data = [2, 3, 0, 1, 4]
+ * COOMatrix coo = ...;
+ * IdArray rows = ... ;  // [0, 1, 3]
+ * FloatArray weight = ... ;  // [1., 0., -1., 10., 20.]
+ * COOMatrix sampled = COORowWiseTopk(coo, rows, 1, weight);
+ * // possible sampled coo matrix:
+ * // sampled.num_rows = 4
+ * // sampled.num_cols = 4
+ * // sampled.rows = [0, 1, 3]
+ * // sampled.cols = [1, 1, 2]
+ * // sampled.data = [3, 0, 1]
+ *
+ * \param mat Input COO matrix.
+ * \param rows Rows to sample from.
+ * \param k The K value.
+ * \param weight Weight associated with each entry. Should be of the same length as the
+ *               data array. If an empty array is provided, assume uniform.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                  the K smallest values. Otherwise, find K largest values.
+ * \return A COOMatrix storing the picked row and col indices. Its data field stores the
+ *         the index of the picked elements in the value array.
+ */
+COOMatrix COORowWiseTopk(
+    COOMatrix mat,
+    IdArray rows,
+    int64_t k,
+    FloatArray weight,
+    bool ascending = false);
 
 // inline implementations
 template <typename T>
@@ -420,8 +637,6 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }
   return ret.CopyTo(ctx);
 }
-
-
 
 ///////////////////////// Dispatchers //////////////////////////
 
@@ -530,40 +745,18 @@ IdArray VecToIdArray(const std::vector<T>& vec,
   }                                                         \
 } while (0)
 
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_CSR_SWITCH(csr, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      typedef IdType DType;                                 \
+// Macro to dispatch according to device context and index type.
+#define ATEN_CSR_SWITCH(csr, XPU, IdType, ...)              \
+  ATEN_XPU_SWITCH((csr).indptr->ctx.device_type, XPU, {       \
+    ATEN_ID_TYPE_SWITCH((csr).indptr->dtype, IdType, {        \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
 
-// Macro to dispatch according to device context and index type
-#define ATEN_CSR_IDX_SWITCH(csr, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(csr.indptr->ctx.device_type, XPU, {       \
-    ATEN_ID_TYPE_SWITCH(csr.indptr->dtype, IdType, {        \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context, index type and data type
-// TODO(minjie): In our current use cases, data type and id type are the
-//   same. For example, data array is used to store edge ids.
-#define ATEN_COO_SWITCH(coo, XPU, IdType, DType, ...)       \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
-      typedef IdType DType;                                 \
-      {__VA_ARGS__}                                         \
-    });                                                     \
-  });
-
-// Macro to dispatch according to device context and index type
-#define ATEN_COO_IDX_SWITCH(coo, XPU, IdType, ...)          \
-  ATEN_XPU_SWITCH(coo.row->ctx.device_type, XPU, {          \
-    ATEN_ID_TYPE_SWITCH(coo.row->dtype, IdType, {           \
+// Macro to dispatch according to device context and index type.
+#define ATEN_COO_SWITCH(coo, XPU, IdType, ...)              \
+  ATEN_XPU_SWITCH((coo).row->ctx.device_type, XPU, {          \
+    ATEN_ID_TYPE_SWITCH((coo).row->dtype, IdType, {           \
       {__VA_ARGS__}                                         \
     });                                                     \
   });
