@@ -1249,12 +1249,10 @@ def test_level2():
         g['wishes'].update_all(mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
         if cred == 'stack':
-            # stack has two both correct outcomes
-            yy1 = F.stack([y1, y2], 1)
-            yy1 = yy1 + 1  # final afunc
-            yy2 = F.stack([y2, y1], 1)
-            yy2 = yy2 + 1  # final afunc
-            assert F.array_equal(y, yy1) or F.array_equal(y, yy2)
+            # stack has an internal order by edge type id
+            yy = F.stack([y1, y2], 1)
+            yy = yy + 1  # final afunc
+            assert F.array_equal(y, yy)
         else:
             yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
             yy = yy + 1  # final afunc
@@ -1494,7 +1492,6 @@ def test_stack_reduce():
             {'plays' : (mfunc, rfunc)},
             'stack')
     assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
-
 
 if __name__ == '__main__':
     test_create()

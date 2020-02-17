@@ -2653,6 +2653,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for ety, args in reducer_dict.items():
                 outframe = FrameRef(frame_like(self._node_frames[ntid]._frame))
@@ -2667,9 +2668,10 @@ class DGLHeteroGraph(object):
                                         v, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -2855,6 +2857,7 @@ class DGLHeteroGraph(object):
         #   Should replace it with fused kernel.
         all_out = []
         all_vs = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -2883,9 +2886,10 @@ class DGLHeteroGraph(object):
                                        mfunc, rfunc, afunc,
                                        inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             dstnodes = F.unique(F.cat([x.tousertensor() for x in all_vs], 0))
@@ -3043,6 +3047,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3058,9 +3063,10 @@ class DGLHeteroGraph(object):
                                         mfunc, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -3263,6 +3269,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = defaultdict(list)
+        merge_order = defaultdict(list)
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3277,10 +3284,12 @@ class DGLHeteroGraph(object):
                                               mfunc, rfunc, afunc,
                                               outframe=outframe)
                 all_out[dtid].append(outframe)
+                merge_order[dtid].append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         for dtid, frames in all_out.items():
             # merge by cross_reducer
-            self._node_frames[dtid].update(merge_frames(frames, cross_reducer))
+            self._node_frames[dtid].update(
+                merge_frames(frames, cross_reducer, merge_order[dtid]))
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid], inplace=False)
@@ -3845,7 +3854,6 @@ def merge_frames(frames, reducer, order=None):
             sorted_with_key = sorted(zip(frames, order), key=lambda x: x[1])
             frames = list(zip(*sorted_with_key))[0]
         def merger(flist):
-            #flist = [F.unsqueeze(f, 1) for f in flist]
             return F.stack(flist, 1)
     else:
         redfn = getattr(F, reducer, None)
