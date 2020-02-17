@@ -4,7 +4,7 @@ Scene graph extraction aims at not only detect objects in the given image, but a
 
 This example reproduces [Graphical Contrastive Losses for Scene Graph Parsing](https://arxiv.org/abs/1903.02728), author's code can be found [here](https://github.com/NVIDIA/ContrastiveLosses4VRD).
 
-![DEMO](demo.jpg)
+![DEMO](https://raw.githubusercontent.com/dmlc/web-data/master/dgl/examples/mxnet/scenegraph/old-couple-pred.png)
 
 ## Results
 
@@ -38,6 +38,8 @@ First one need to train the object detection model on VisualGenome.
 bash train_faster_rcnn.sh
 ```
 
+It runs for about 20 hours on a machine with 64 CPU cores and 8 V100 GPUs.
+
 ## Training RelDN
 
 With a trained Faster R-CNN model, one can start the training of RelDN model by
@@ -45,6 +47,8 @@ With a trained Faster R-CNN model, one can start the training of RelDN model by
 ```
 bash train_reldn.sh
 ```
+
+It runs for about 2 days with one single GPU and 8 CPU cores.
 
 ## Validate RelDN
 
