@@ -112,6 +112,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--soft_rel_part', action='store_true',
+                          help='enable soft relation partition')
         self.add_argument('--nomp_thread_per_process', type=int, default=-1,
                           help='num of omp threads used per process in multi-process training')
         self.add_argument('--async_update', action='store_true',
@@ -170,7 +172,9 @@ def run(args, logger):
 
     num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
+    args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
 
     # Automatically set number of OMP threads for each process if it is not provided
     # The value for GPU is evaluated in AWS p3.16xlarge
@@ -322,7 +326,8 @@ def run(args, logger):
 
     # train
     start = time.time()
-    rel_parts = train_data.rel_parts if args.strict_rel_part else None
+    rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
+    cross_rels = train_data.cross_rels if args.soft_rel_part else None
     if args.num_proc > 1:
         procs = []
         barrier = mp.Barrier(args.num_proc)
@@ -334,6 +339,7 @@ def run(args, logger):
                                                      valid_sampler,
                                                      i,
                                                      rel_parts,
+                                                     cross_rels,
                                                      barrier))
             procs.append(proc)
             proc.start()
