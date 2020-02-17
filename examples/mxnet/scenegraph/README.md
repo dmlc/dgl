@@ -14,13 +14,53 @@ This example reproduces [Graphical Contrastive Losses for Scene Graph Parsing](h
 | :---      | :---      | :---     | :---     | :---     | :---      | :---      | :---      | :---      | :---       | :---       | :---        |
 | RelDN, L0 | ResNet101 | 29.5     | 22.65    | 30.02    | 35.04     | 32.84     | 35.60     | 36.26     | 60.58      | 65.53      | 66.51       |
 
-## Dependencies
+## Preparation
 
 This implementation is based on GluonCV. Install GluonCV with 
 
 ```
 pip install gluoncv --upgrade
 ```
+
+The implementation contains the following files:
+
+```
+.
+|-- data
+|   |-- dataloader.py
+|   |-- __init__.py
+|   |-- object.py
+|   |-- prepare_visualgenome.py
+|   `-- relation.py
+|-- demo_reldn.py
+|-- model
+|   |-- faster_rcnn.py
+|   |-- __init__.py
+|   `-- reldn.py
+|-- README.md
+|-- train_faster_rcnn.py
+|-- train_faster_rcnn.sh
+|-- train_freq_prior.py
+|-- train_reldn.py
+|-- train_reldn.sh
+|-- utils
+|   |-- build_graph.py
+|   |-- __init__.py
+|   |-- metric.py
+|   |-- sampling.py
+|   `-- viz.py
+|-- validate_reldn.py
+`-- validate_reldn.sh
+```
+
+- The folder `data` contains the data preparation script, and definition of datasets for object detection and scene graph extraction.
+- The folder `model` contains model definition.
+- The folder `utils` contains helper functions for training, validation, and visualization.
+- The script `train_faster_rcnn.py` trains a Faster R-CNN model on VisualGenome dataset, and `train_faster_rcnn.sh` includes preset parameters.
+- The script `train_freq_prior.py` trains the frequency counts for RelDN model training.
+- The script `train_reldn.py` trains a RelDN model, and `train_reldn.sh` includes preset parameters.
+- The script `validate_reldn.py` validate the trained Faster R-CNN and RelDN models, and `validate_reldn.sh` includes preset parameters.
+- The script `demo_reldh.py` makes use of trained parameters and extract an scene graph from an arbitrary input image.
 
 ## Data preparation
 
