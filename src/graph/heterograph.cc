@@ -377,7 +377,7 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   return FlattenedHeteroGraphPtr(result);
 }
 
-HeteroGraphPtr InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
@@ -403,10 +403,12 @@ HeteroGraphPtr InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
         earr.dst);
     }
   }
-  return CreateHeteroGraph(graph->meta_graph(), subrels);
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  return ret;
 }
 
-HeteroGraphPtr OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
@@ -432,7 +434,9 @@ HeteroGraphPtr OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
           earr.dst);
     }
   }
-  return CreateHeteroGraph(graph->meta_graph(), subrels);
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  return ret;
 }
 
 HeteroGraphPtr DisjointUnionHeteroGraph(
@@ -1013,7 +1017,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    HeteroGraphPtr ret = InEdgeGraph(hg.sptr(), nodes);
+    std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
+    *ret = InEdgeGraph(hg.sptr(), nodes);
     *rv = HeteroGraphRef(ret);
   });
 
@@ -1021,7 +1026,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     HeteroGraphRef hg = args[0];
     const auto& nodes = ListValueToVector<IdArray>(args[1]);
-    HeteroGraphPtr ret = OutEdgeGraph(hg.sptr(), nodes);
+    std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
+    *ret = OutEdgeGraph(hg.sptr(), nodes);
     *rv = HeteroGraphRef(ret);
   });
 

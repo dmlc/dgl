@@ -101,7 +101,8 @@ HeteroSubgraph SampleNeighborsTopk(
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& k,
     EdgeDir dir,
-    const std::vector<FloatArray>& weight) {
+    const std::vector<FloatArray>& weight,
+    bool ascending) {
   // sanity check
   CHECK_EQ(nodes.size(), hg->NumVertexTypes())
     << "Number of node ID tensors must match the number of node types.";
@@ -136,21 +137,21 @@ HeteroSubgraph SampleNeighborsTopk(
           if (dir == EdgeDir::kIn) {
             sampled_coo = aten::COOTranspose(aten::COORowWiseTopk(
               aten::COOTranspose(hg->GetCOOMatrix(etype)),
-              nodes_ntype, k[etype], weight[etype]));
+              nodes_ntype, k[etype], weight[etype], ascending));
           } else {
             sampled_coo = aten::COORowWiseTopk(
-              hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+              hg->GetCOOMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
           }
           break;
         case SparseFormat::CSR:
           CHECK(dir == EdgeDir::kOut) << "Cannot sample out edges on CSC matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
-            hg->GetCSRMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+            hg->GetCSRMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
           break;
         case SparseFormat::CSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_coo = aten::CSRRowWiseTopk(
-            hg->GetCSCMatrix(etype), nodes_ntype, k[etype], weight[etype]);
+            hg->GetCSCMatrix(etype), nodes_ntype, k[etype], weight[etype], ascending);
           sampled_coo = aten::COOTranspose(sampled_coo);
           break;
         default:
@@ -200,6 +201,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
     const auto& k = ListValueToVector<int64_t>(args[2]);
     const std::string dir_str = args[3];
     const auto& weight = ListValueToVector<FloatArray>(args[4]);
+    const bool ascending = args[5];
 
   CHECK(dir_str == "in" || dir_str == "out")
     << "Invalid edge direction. Must be \"in\" or \"out\".";
@@ -207,7 +209,7 @@ DGL_REGISTER_GLOBAL("sampling.neighbor._CAPI_DGLSampleNeighborsTopk")
 
     std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
     *subg = sampling::SampleNeighborsTopk(
-        hg.sptr(), nodes, k, dir, weight);
+        hg.sptr(), nodes, k, dir, weight, ascending);
 
     *rv = HeteroGraphRef(subg);
   });

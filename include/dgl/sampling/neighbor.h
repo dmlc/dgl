@@ -56,6 +56,8 @@ HeteroSubgraph SampleNeighbors(
  * \param dir Edge direction.
  * \param weight A vector of 1D float arrays, indicating the weights associated with
  *               each edge.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                  the K smallest values. Otherwise, find K largest values.
  * \return Sampled neighborhoods as a graph. The return graph has the same schema as the
  *         original one.
  */
@@ -64,7 +66,8 @@ HeteroSubgraph SampleNeighborsTopk(
     const std::vector<IdArray>& nodes,
     const std::vector<int64_t>& k,
     EdgeDir dir,
-    const std::vector<FloatArray>& weight);
+    const std::vector<FloatArray>& weight,
+    bool ascending = false);
 
 }  // namespace sampling
 }  // namespace dgl

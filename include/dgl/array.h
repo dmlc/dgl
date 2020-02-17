@@ -440,7 +440,7 @@ COOMatrix CSRRowWiseSampling(
  * \param k The K value.
  * \param weight Weight associated with each entry. Should be of the same length as the
  *               data array. If an empty array is provided, assume uniform.
- * \param asceding If true, elements are sorted by ascending order, equivalent to find
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
  *                 the K smallest values. Otherwise, find K largest values.
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
@@ -610,8 +610,8 @@ COOMatrix COORowWiseSampling(
  * \param k The K value.
  * \param weight Weight associated with each entry. Should be of the same length as the
  *               data array. If an empty array is provided, assume uniform.
- * \param asceding If true, elements are sorted by ascending order, equivalent to find
- *                 the K smallest values. Otherwise, find K largest values.
+ * \param ascending If true, elements are sorted by ascending order, equivalent to find
+ *                  the K smallest values. Otherwise, find K largest values.
  * \return A COOMatrix storing the picked row and col indices. Its data field stores the
  *         the index of the picked elements in the value array.
  */

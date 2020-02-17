@@ -82,7 +82,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
+def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
     """Sample neighbors by top-k.
 
     If k > the number of neighbors, all the neighbors are sampled.
@@ -106,6 +106,9 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
     edge_dir : str, optional
         Edge direction ('in' or 'out'). If is 'in', sample from in edges.
         Otherwise, sample from out edges.
+    ascending : bool, optional
+        If true, elements are sorted by ascending order, equivalent to find
+        the K smallest values. Otherwise, find K largest values.
 
     Returns
     -------
@@ -139,7 +142,7 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in'):
                 weight, etype))
 
     subgidx = _CAPI_DGLSampleNeighborsTopk(
-        g._graph, nodes_all_types, k, edge_dir, weight_arrays)
+        g._graph, nodes_all_types, k, edge_dir, weight_arrays, bool(ascending))
     induced_edges = subgidx.induced_edges
     ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
     for i, etype in enumerate(ret.canonical_etypes):

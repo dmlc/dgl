@@ -611,19 +611,19 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
- * \return Graph containing only the in edges. The returned graph has the same
+ * \return Subgraph containing only the in edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroGraphPtr InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
 /*!
  * \brief Extract the subgraph of the out edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
- * \return Graph containing only the out edges. The returned graph has the same
+ * \return Subgraph containing only the out edges. The returned graph has the same
  *         schema as the original one.
  */
-HeteroGraphPtr OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
+HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
 };  // namespace dgl
 
