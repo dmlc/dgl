@@ -16,7 +16,8 @@ def gen_degree_bucketing_schedule(
         recv_nodes,
         var_nf,
         var_mf,
-        var_out):
+        var_out,
+        ntype=None):
     """Create degree bucketing schedule.
 
     The messages will be divided by their receivers into buckets. Each bucket
@@ -44,6 +45,9 @@ def gen_degree_bucketing_schedule(
         The variable for message frame.
     var_out : var.FEAT_DICT
         The variable for output feature dicts.
+    ntype : str, optional
+        The node type, if running on a heterograph.
+        If None, assuming it's running on a homogeneous graph.
     """
     buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
     # generate schedule
@@ -53,7 +57,7 @@ def gen_degree_bucketing_schedule(
     fd_list = []
     for deg, vbkt, mid in zip(degs, buckets, msg_ids):
         # create per-bkt rfunc
-        rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt)
+        rfunc = _create_per_bkt_rfunc(reduce_udf, deg, vbkt, ntype=ntype)
         # vars
         vbkt = var.IDX(vbkt)
         mid = var.IDX(mid)
@@ -141,7 +145,7 @@ def _process_node_buckets(buckets):
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
 
-def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
+def _create_per_bkt_rfunc(reduce_udf, deg, vbkt, ntype=None):
     """Internal function to generate the per degree bucket node UDF."""
     def _rfunc_wrapper(node_data, mail_data):
         def _reshaped_getter(key):
@@ -149,7 +153,7 @@ def _create_per_bkt_rfunc(reduce_udf, deg, vbkt):
             new_shape = (len(vbkt), deg) + F.shape(msg)[1:]
             return F.reshape(msg, new_shape)
         reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
-        nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data)
+        nbatch = NodeBatch(vbkt, node_data, reshaped_mail_data, ntype=ntype)
         return reduce_udf(nbatch)
     return _rfunc_wrapper
 
@@ -160,7 +164,8 @@ def gen_group_apply_edge_schedule(
         var_src_nf,
         var_dst_nf,
         var_ef,
-        var_out):
+        var_out,
+        canonical_etype=(None, None, None)):
     """Create degree bucketing schedule for group_apply_edge
 
     Edges will be grouped by either its source node or destination node
@@ -189,6 +194,9 @@ def gen_group_apply_edge_schedule(
         The variable for edge frame.
     var_out : var.FEAT_DICT
         The variable for output feature dicts.
+    canonical_etype : tuple[str, str, str], optional
+        Canonical edge type if running on a heterograph.
+        Default: (None, None, None), if running on a homogeneous graph.
     """
     if group_by == "src":
         buckets = _degree_bucketing_for_edge_grouping(u, v, eid)
@@ -204,7 +212,8 @@ def gen_group_apply_edge_schedule(
     for deg, u_bkt, v_bkt, eid_bkt in zip(degs, uids, vids, eids):
         # create per-bkt efunc
         _efunc = var.FUNC(_create_per_bkt_efunc(apply_func, deg,
-                                                u_bkt, v_bkt, eid_bkt))
+                                                u_bkt, v_bkt, eid_bkt,
+                                                canonical_etype=canonical_etype))
         # vars
         var_u = var.IDX(u_bkt)
         var_v = var.IDX(v_bkt)
@@ -274,7 +283,7 @@ def _process_edge_buckets(buckets):
     eids = split(eids)
     return degs, uids, vids, eids
 
-def _create_per_bkt_efunc(apply_func, deg, u, v, eid):
+def _create_per_bkt_efunc(apply_func, deg, u, v, eid, canonical_etype=(None, None, None)):
     """Internal function to generate the per degree bucket edge UDF."""
     batch_size = len(u) // deg
     def _efunc_wrapper(src_data, edge_data, dst_data):
@@ -297,7 +306,8 @@ def _create_per_bkt_efunc(apply_func, deg, u, v, eid):
         reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data),
                                            dst_data.keys())
         ebatch = EdgeBatch((u, v, eid), reshaped_src_data,
-                           reshaped_edge_data, reshaped_dst_data)
+                           reshaped_edge_data, reshaped_dst_data,
+                           canonical_etype=canonical_etype)
         return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
     return _efunc_wrapper
 
