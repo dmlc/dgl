@@ -117,7 +117,7 @@ class KVServer(object):
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi' (do not support yet).
     """
-    def __init__(self, server_id, server_namebook, num_client, queue_size=20000000000, net_type='socket'):
+    def __init__(self, server_id, server_namebook, num_client, queue_size=2*1024*1024*1024, net_type='socket'):
         assert server_id >= 0, 'server_id (%d) cannot be a negative number.' % server_id
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert num_client >= 0, 'num_client (%d) cannot be a negative number.' % num_client
@@ -587,7 +587,7 @@ class KVClient(object):
     net_type : str
         networking type, e.g., 'socket' (default) or 'mpi'.
     """
-    def __init__(self, server_namebook, queue_size=20000000000, net_type='socket'):
+    def __init__(self, server_namebook, queue_size=2*1024*1024*1024, net_type='socket'):
         assert len(server_namebook) > 0, 'server_namebook cannot be empty.'
         assert queue_size > 0, 'queue_size cannot be a negative number.'
         assert net_type == 'socket' or net_type == 'mpi', 'net_type (%s) can only be \'socket\' or \'mpi\'.' % net_type
@@ -612,8 +612,6 @@ class KVClient(object):
         self._open_file_list = []
         # Used load-balance
         random.seed(time.time())
-
-        self._flag = 0
 
 
     def __del__(self):
