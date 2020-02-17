@@ -318,7 +318,7 @@ def _recv_kv_msg(receiver):
         return msg
 
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
-    
+
 
 def _clear_kv_msg(garbage_msg):
     """Clear data of kvstore message
@@ -328,3 +328,4 @@ def _clear_kv_msg(garbage_msg):
         if msg.c_ptr is not None:
             _CAPI_DeleteKVMsg(msg.c_ptr)
     garbage_msg = []
+    
