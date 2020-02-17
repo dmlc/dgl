@@ -83,7 +83,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
     return ret
 
 def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
-    """Sample neighbors by top-k.
+    """Select the neighbors with k-largest weights on the connecting edges for each given node.
 
     If k > the number of neighbors, all the neighbors are sampled.
 

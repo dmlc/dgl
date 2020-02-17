@@ -681,7 +681,7 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
  * \return std vector
  */
 template <typename T>
-inline std::vector<T> ListValueToVector(List<Value> list) {
+inline std::vector<T> ListValueToVector(const List<Value>& list) {
   std::vector<T> ret;
   ret.reserve(list.size());
   for (Value val : list)

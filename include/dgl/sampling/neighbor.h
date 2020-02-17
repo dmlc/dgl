@@ -43,7 +43,7 @@ HeteroSubgraph SampleNeighbors(
     bool replace = true);
 
 /*!
- * \brief Sample from the neighbors of the given nodes by top-k
+ * Select the neighbors with k-largest weights on the connecting edges for each given node.
  *
  * If k > the number of neighbors, all the neighbors are sampled.
  *

@@ -368,7 +368,7 @@ bool CSRHasDuplicate(CSRMatrix csr);
 void CSRSort_(CSRMatrix* csr);
 
 /*!
- * \brief Sample from the non-zero values of the given rows.
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -409,7 +409,7 @@ COOMatrix CSRRowWiseSampling(
     bool replace = true);
 
 /*!
- * \brief Select K non-zero values from the given rows according to some  weights.
+ * \brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -537,7 +537,7 @@ bool COOHasDuplicate(COOMatrix coo);
 COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
 
 /*!
- * \brief Sample from the non-zero values of the given rows.
+ * \brief Randomly select a fixed number of non-zero entries along each given row independently.
  *
  * The function performs random choices along each row independently.
  * The picked indices are returned in the form of a COO matrix.
@@ -579,7 +579,7 @@ COOMatrix COORowWiseSampling(
     bool replace = true);
 
 /*!
- * \brief Select K non-zero values from the given rows according to some  weights.
+ * \brief Select K non-zero entries with the largest weights along each given row.
  *
  * The function performs top-k selection along each row independently.
  * The picked indices are returned in the form of a COO matrix.
