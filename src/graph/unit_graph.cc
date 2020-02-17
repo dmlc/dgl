@@ -14,6 +14,9 @@
 namespace dgl {
 
 namespace {
+
+using namespace dgl::aten;
+
 // create metagraph of one node type
 inline GraphPtr CreateUnitGraphMetaGraph1() {
   // a self-loop edge 0->0
@@ -1150,6 +1153,48 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::CSR;
   else
     return SparseFormat::COO;
+}
+
+UnitGraph* UnitGraph::EmptyGraph() {
+  auto src = NewIdArray(0);
+  auto dst = NewIdArray(0);
+  auto mg = CreateUnitGraphMetaGraph(1);
+  COOPtr coo(new COO(mg, 0, 0, src, dst));
+  return new UnitGraph(mg, nullptr, nullptr, coo);
+}
+
+constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
+
+// Using OurCSR
+bool UnitGraph::Load(dmlc::Stream* fs) {
+  uint64_t magicNum;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
+  uint64_t num_vtypes, num_src, num_dst;
+  CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
+  CHECK(fs->Read(&num_src)) << "Invalid num_src";
+  CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
+  aten::CSRMatrix csr_matrix;
+  CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr,
+                     csr_matrix.indices, csr_matrix.data));
+  *this = UnitGraph(mg, nullptr, csr, nullptr);
+  return true;
+}
+
+// Using Out CSR
+void UnitGraph::Save(dmlc::Stream* fs) const {
+  // Following CreateFromCSR signature
+  aten::CSRMatrix csr_matrix = GetOutCSRMatrix();
+  uint64_t num_vtypes = NumVertexTypes();
+  uint64_t num_src = NumVertices(SrcType());
+  uint64_t num_dst = NumVertices(DstType());
+  fs->Write(kDGLSerialize_UnitGraphMagic);
+  fs->Write(num_vtypes);
+  fs->Write(num_src);
+  fs->Write(num_dst);
+  fs->Write(csr_matrix);
 }
 
 }  // namespace dgl

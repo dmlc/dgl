@@ -15,8 +15,8 @@ if backend.lower() == 'mxnet':
 else:
     import torch.multiprocessing as mp
     from train_pytorch import load_model
-    from train_pytorch import train
-    from train_pytorch import test
+    from train_pytorch import train, train_mp
+    from train_pytorch import test, test_mp
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
@@ -98,7 +98,7 @@ class ArgParser(argparse.ArgumentParser):
                           help='set value > 0.0 if regularization is used')
         self.add_argument('-rn', '--regularization_norm', type=int, default=3,
                           help='norm used in regularization')
-        self.add_argument('--num_worker', type=int, default=16,
+        self.add_argument('--num_worker', type=int, default=32,
                           help='number of workers used for loading data')
         self.add_argument('--non_uni_weight', action='store_true',
                           help='if use uniform weight when computing loss')
@@ -112,6 +112,14 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--soft_rel_part', action='store_true',
+                          help='enable soft relation partition')
+        self.add_argument('--nomp_thread_per_process', type=int, default=-1,
+                          help='num of omp threads used per process in multi-process training')
+        self.add_argument('--async_update', action='store_true',
+                          help='allow async_update on node embedding')
+        self.add_argument('--force_sync_interval', type=int, default=-1,
+                          help='We force a synchronization between processes every x steps')
 
 
 def get_logger(args):
@@ -162,50 +170,72 @@ def run(args, logger):
     if args.neg_chunk_size_test < 0:
         args.neg_chunk_size_test = args.neg_sample_size_test
 
+    num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    # if there is no cross partition relaiton, we fall back to strict_rel_part
+    args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
+    args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
+
+    # Automatically set number of OMP threads for each process if it is not provided
+    # The value for GPU is evaluated in AWS p3.16xlarge
+    # The value for CPU is evaluated in AWS x1.32xlarge
+    if args.nomp_thread_per_process == -1:
+        if len(args.gpu) > 0:
+            # GPU training
+            args.num_thread = 4
+        else:
+            # CPU training
+            args.num_thread = mp.cpu_count() // args.num_proc + 1
+    else:
+        args.num_thread = args.nomp_thread_per_process
+
     if args.num_proc > 1:
         train_samplers = []
         for i in range(args.num_proc):
-            train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+            train_sampler_head = train_data.create_sampler(args.batch_size,
+                                                           args.neg_sample_size,
                                                            args.neg_chunk_size,
-                                                           mode='chunk-head',
-                                                           num_workers=args.num_worker,
+                                                           mode='head',
+                                                           num_workers=num_workers,
                                                            shuffle=True,
-                                                           exclude_positive=True,
+                                                           exclude_positive=False,
                                                            rank=i)
-            train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+            train_sampler_tail = train_data.create_sampler(args.batch_size,
+                                                           args.neg_sample_size,
                                                            args.neg_chunk_size,
-                                                           mode='chunk-tail',
-                                                           num_workers=args.num_worker,
+                                                           mode='tail',
+                                                           num_workers=num_workers,
                                                            shuffle=True,
-                                                           exclude_positive=True,
+                                                           exclude_positive=False,
                                                            rank=i)
             train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                                  args.neg_chunk_size,
+                                                                  args.neg_chunk_size, args.neg_sample_size,
                                                                   True, n_entities))
     else:
-        train_sampler_head = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+        train_sampler_head = train_data.create_sampler(args.batch_size,
+                                                       args.neg_sample_size,
                                                        args.neg_chunk_size,
-                                                       mode='chunk-head',
-                                                       num_workers=args.num_worker,
+                                                       mode='head',
+                                                       num_workers=num_workers,
                                                        shuffle=True,
-                                                       exclude_positive=True)
-        train_sampler_tail = train_data.create_sampler(args.batch_size, args.neg_sample_size,
+                                                       exclude_positive=False)
+        train_sampler_tail = train_data.create_sampler(args.batch_size,
+                                                       args.neg_sample_size,
                                                        args.neg_chunk_size,
-                                                       mode='chunk-tail',
-                                                       num_workers=args.num_worker,
+                                                       mode='tail',
+                                                       num_workers=num_workers,
                                                        shuffle=True,
-                                                       exclude_positive=True)
+                                                       exclude_positive=False)
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                        args.neg_chunk_size,
+                                                        args.neg_chunk_size, args.neg_sample_size,
                                                         True, n_entities)
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
-    num_workers = args.num_worker
     if args.num_proc > 1:
         num_workers = 1
     if args.valid or args.test:
+        args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
         eval_dataset = EvalDataset(dataset, args)
     if args.valid:
         # Here we want to use the regualr negative sampler because we need to ensure that
@@ -248,24 +278,25 @@ def run(args, logger):
     if args.test:
         # Here we want to use the regualr negative sampler because we need to ensure that
         # all positive edges are excluded.
-        if args.num_proc > 1:
+        # We use a maximum of num_gpu in test stage to save GPU memory.
+        if args.num_test_proc > 1:
             test_sampler_tails = []
             test_sampler_heads = []
-            for i in range(args.num_proc):
+            for i in range(args.num_test_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.neg_chunk_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
                                                                 num_workers=num_workers,
-                                                                rank=i, ranks=args.num_proc)
+                                                                rank=i, ranks=args.num_test_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.neg_chunk_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
                                                                 num_workers=num_workers,
-                                                                rank=i, ranks=args.num_proc)
+                                                                rank=i, ranks=args.num_test_proc)
                 test_sampler_heads.append(test_sampler_head)
                 test_sampler_tails.append(test_sampler_tail)
         else:
@@ -290,24 +321,33 @@ def run(args, logger):
     # load model
     model = load_model(logger, args, n_entities, n_relations)
 
-    if args.num_proc > 1:
+    if args.num_proc > 1 or args.async_update:
         model.share_memory()
 
     # train
     start = time.time()
+    rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
+    cross_rels = train_data.cross_rels if args.soft_rel_part else None
     if args.num_proc > 1:
         procs = []
+        barrier = mp.Barrier(args.num_proc)
         for i in range(args.num_proc):
-            rel_parts = train_data.rel_parts if args.rel_part else None
-            valid_samplers = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-            proc = mp.Process(target=train, args=(args, model, train_samplers[i], i, rel_parts, valid_samplers))
+            valid_sampler = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
+            proc = mp.Process(target=train_mp, args=(args,
+                                                     model,
+                                                     train_samplers[i],
+                                                     valid_sampler,
+                                                     i,
+                                                     rel_parts,
+                                                     cross_rels,
+                                                     barrier))
             procs.append(proc)
             proc.start()
         for proc in procs:
             proc.join()
     else:
         valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
-        train(args, model, train_sampler, valid_samplers)
+        train(args, model, train_sampler, valid_samplers, rel_parts=rel_parts)
     print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb is not None:
@@ -318,23 +358,28 @@ def run(args, logger):
     # test
     if args.test:
         start = time.time()
-        if args.num_proc > 1:
-            queue = mp.Queue(args.num_proc)
+        if args.num_test_proc > 1:
+            queue = mp.Queue(args.num_test_proc)
             procs = []
-            for i in range(args.num_proc):
-                proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
-                                  i, 'Test', queue))
+            for i in range(args.num_test_proc):
+                proc = mp.Process(target=test_mp, args=(args,
+                                                        model,
+                                                        [test_sampler_heads[i], test_sampler_tails[i]],
+                                                        i,
+                                                        'Test',
+                                                        queue))
                 procs.append(proc)
                 proc.start()
 
             total_metrics = {}
-            for i in range(args.num_proc):
-                metrics = queue.get()
-                for k, v in metrics.items():
-                    if i == 0:
-                        total_metrics[k] = v / args.num_proc
-                    else:
-                        total_metrics[k] += v / args.num_proc
+            metrics = {}
+            logs = []
+            for i in range(args.num_test_proc):
+                log = queue.get()
+                logs = logs + log
+            
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             for k, v in metrics.items():
                 print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 
