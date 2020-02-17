@@ -3712,3 +3712,8 @@ class AdaptedDGLGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed()
+
+    @property
+    def canonical_etype(self):
+        """Canonical edge type (None for homogeneous graph)"""
+        return (None, None, None)

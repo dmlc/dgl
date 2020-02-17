@@ -89,11 +89,9 @@ def generate_metapath():
     hg, author_names, conf_names, paper_names = construct_graph()
 
     for conf_idx in tqdm.trange(hg.number_of_nodes('conf')):
-        traces = dgl.contrib.sampling.metapath_random_walk(
-                hg, ['cp', 'pa', 'ap', 'pc'] * walk_length, [conf_idx], num_walks_per_node)
-        traces = traces[0]
-        for trace in traces:
-            tr = np.insert(trace.numpy(), 0, conf_idx)
+        traces, _ = dgl.sampling.random_walk(
+                hg, [conf_idx] * num_walks_per_node, metapath=['cp', 'pa', 'ap', 'pc'] * walk_length)
+        for tr in traces:
             outline = ' '.join(
                     (conf_names if i % 4 == 0 else author_names)[tr[i]]
                     for i in range(0, len(tr), 2))  # skip paper

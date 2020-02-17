@@ -15,7 +15,7 @@ if backend.lower() == 'mxnet':
 else:
     import torch.multiprocessing as mp
     from train_pytorch import load_model_from_checkpoint
-    from train_pytorch import test
+    from train_pytorch import test, test_mp
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
@@ -100,7 +100,9 @@ def main(args):
     args.train = False
     args.valid = False
     args.test = True
-    args.rel_part = False
+    args.strict_rel_part = False
+    args.soft_rel_part = False
+    args.async_update = False
     args.batch_size_eval = args.batch_size
 
     logger = get_logger(args)
@@ -172,27 +174,32 @@ def main(args):
         queue = mp.Queue(args.num_proc)
         procs = []
         for i in range(args.num_proc):
-            proc = mp.Process(target=test, args=(args, model, [test_sampler_heads[i], test_sampler_tails[i]],
-                              i, 'Test', queue))
+            proc = mp.Process(target=test_mp, args=(args,
+                                                    model,
+                                                    [test_sampler_heads[i], test_sampler_tails[i]],
+                                                    i,
+                                                    'Test',
+                                                    queue))
             procs.append(proc)
             proc.start()
-        for proc in procs:
-            proc.join()
 
         total_metrics = {}
+        metrics = {}
+        logs = []
         for i in range(args.num_proc):
-            metrics = queue.get()
-            for k, v in metrics.items():
-                if i == 0:
-                    total_metrics[k] = v / args.num_proc
-                else:
-                    total_metrics[k] += v / args.num_proc
+            log = queue.get()
+            logs = logs + log
+
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
         for k, v in metrics.items():
             print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+
+        for proc in procs:
+            proc.join()
     else:
         test(args, model, [test_sampler_head, test_sampler_tail])
     print('Test takes {:.3f} seconds'.format(time.time() - start))
-
 
 if __name__ == '__main__':
     args = ArgParser().parse_args()

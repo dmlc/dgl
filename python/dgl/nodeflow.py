@@ -1017,6 +1017,12 @@ class NodeFlow(DGLBaseGraph):
             self.block_compute(i, message_func, reduce_func, apply_node_func,
                                inplace=inplace)
 
+    @property
+    def canonical_etype(self):
+        """Return canonical edge type to be compatible with GraphAdapter
+        """
+        return (None, None, None)
+
 def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 

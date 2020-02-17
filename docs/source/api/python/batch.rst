@@ -1,6 +1,6 @@
 .. _apibatch:
 
-BatchedDGLGraph -- Enable batched graph operations
+dgl.batched_graph
 ==================================================
 
 .. currentmodule:: dgl

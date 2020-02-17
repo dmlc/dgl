@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from ...nn.pytorch import AtomicConv
+from ...contrib.deprecation import deprecated
 
 def truncated_normal_(tensor, mean=0., std=1.):
     """Fills the given tensor in-place with elements sampled from the truncated normal
@@ -146,6 +147,7 @@ class ACNN(nn.Module):
     num_tasks : int
         Number of output tasks.
     """
+    @deprecated('Import ACNN from dgllife.model instead.')
     def __init__(self, hidden_sizes, weight_init_stddevs, dropouts,
                  features_to_use=None, radial=None, num_tasks=1):
         super(ACNN, self).__init__()

@@ -13,6 +13,7 @@ from torch.distributions import Categorical
 
 import dgl
 from dgl import DGLGraph
+from dgl.contrib.deprecation import deprecated
 
 try:
     from rdkit import Chem
@@ -647,6 +648,7 @@ class DGMG(nn.Module):
     dropout : float
         Probability for dropout
     """
+    @deprecated('Import DGMG from dgllife.model instead.', 'class')
     def __init__(self, atom_types, bond_types, node_hidden_size, num_prop_rounds, dropout):
         super(DGMG, self).__init__()
 

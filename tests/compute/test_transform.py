@@ -5,11 +5,11 @@ import dgl
 import dgl.function as fn
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
+import unittest
 
 D = 5
 
 # line graph related
-
 
 def test_line_graph():
     N = 5
@@ -231,6 +231,56 @@ def test_partition():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_in_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    assert edge_set == {(0,0)}
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
+    assert subg['flips'].number_of_edges() == 0
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_out_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0),(0,1),(0,2)}
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(0,1),(1,2)}
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0)}
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    u, v = subg['flips'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(1,0)}
+    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
 
 if __name__ == '__main__':
     test_line_graph()
@@ -245,3 +295,5 @@ if __name__ == '__main__':
     test_remove_self_loop()
     test_add_self_loop()
     test_partition()
+    test_in_subgraph()
+    test_out_subgraph()

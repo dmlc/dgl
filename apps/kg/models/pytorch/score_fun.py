@@ -19,6 +19,9 @@ def batched_l1_dist(a, b):
     return res
 
 class TransEScore(nn.Module):
+    """TransE score function
+    Paper link: https://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data
+    """
     def __init__(self, gamma, dist_func='l2'):
         super(TransEScore, self).__init__()
         self.gamma = gamma
@@ -79,6 +82,9 @@ class TransEScore(nn.Module):
             return fn
 
 class TransRScore(nn.Module):
+    """TransR score function
+    Paper link: https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/download/9571/9523
+    """
     def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
         super(TransRScore, self).__init__()
         self.gamma = gamma
@@ -141,11 +147,29 @@ class TransRScore(nn.Module):
     def update(self, gpu_id=-1):
         self.projection_emb.update(gpu_id)
 
-    def save(self, path, name):
+    def save(self, path, name):  
         self.projection_emb.save(path, name+'projection')
 
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
+
+    def prepare_local_emb(self, projection_emb):
+        self.global_projection_emb = self.projection_emb
+        self.projection_emb = projection_emb
+
+    def prepare_cross_rels(self, cross_rels):
+        self.projection_emb.setup_cross_rels(cross_rels, self.global_projection_emb)
+
+    def writeback_local_emb(self, idx):
+        self.global_projection_emb.emb[idx] = self.projection_emb.emb.cpu()[idx]
+
+    def load_local_emb(self, projection_emb):
+        device = projection_emb.emb.device
+        projection_emb.emb = self.projection_emb.emb.to(device)
+        self.projection_emb = projection_emb
+
+    def share_memory(self):
+        self.projection_emb.share_memory()  
 
     def create_neg(self, neg_head):
         gamma = self.gamma
@@ -167,6 +191,9 @@ class TransRScore(nn.Module):
             return fn
 
 class DistMultScore(nn.Module):
+    """DistMult score function
+    Paper link: https://arxiv.org/abs/1412.6575
+    """
     def __init__(self):
         super(DistMultScore, self).__init__()
 
@@ -220,6 +247,9 @@ class DistMultScore(nn.Module):
             return fn
 
 class ComplExScore(nn.Module):
+    """ComplEx score function
+    Paper link: https://arxiv.org/abs/1606.06357
+    """
     def __init__(self):
         super(ComplExScore, self).__init__()
 
@@ -291,6 +321,9 @@ class ComplExScore(nn.Module):
             return fn
 
 class RESCALScore(nn.Module):
+    """RESCAL score function
+    Paper link: http://www.icml-2011.org/papers/438_icmlpaper.pdf
+    """
     def __init__(self, relation_dim, entity_dim):
         super(RESCALScore, self).__init__()
         self.relation_dim = relation_dim
@@ -354,6 +387,9 @@ class RESCALScore(nn.Module):
             return fn
 
 class RotatEScore(nn.Module):
+    """RotatE score function
+    Paper link: https://arxiv.org/abs/1902.10197
+    """
     def __init__(self, gamma, emb_init):
         super(RotatEScore, self).__init__()
         self.gamma = gamma

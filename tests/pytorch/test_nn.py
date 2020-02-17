@@ -585,6 +585,41 @@ def test_sequential():
     n_feat = net([g1, g2, g3], n_feat)
     assert n_feat.shape == (4, 4)
 
+def test_atomic_conv():
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    aconv = nn.AtomicConv(interaction_cutoffs=F.tensor([12.0, 12.0]),
+                          rbf_kernel_means=F.tensor([0.0, 2.0]),
+                          rbf_kernel_scaling=F.tensor([4.0, 4.0]),
+                          features_to_use=F.tensor([6.0, 8.0]))
+
+    ctx = F.ctx()
+    if F.gpu_ctx():
+        aconv = aconv.to(ctx)
+
+    feat = F.randn((100, 1))
+    dist = F.randn((g.number_of_edges(), 1))
+
+    h = aconv(g, feat, dist)
+    # current we only do shape check
+    assert h.shape[-1] == 4
+
+def test_cf_conv():
+    g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+    cfconv = nn.CFConv(node_in_feats=2,
+                       edge_in_feats=3,
+                       hidden_feats=2,
+                       out_feats=3)
+
+    ctx = F.ctx()
+    if F.gpu_ctx():
+        cfconv = cfconv.to(ctx)
+
+    node_feats = F.randn((100, 2))
+    edge_feats = F.randn((g.number_of_edges(), 3))
+    h = cfconv(g, node_feats, edge_feats)
+    # current we only do shape check
+    assert h.shape[-1] == 3    
+
 if __name__ == '__main__':
     test_graph_conv()
     test_edge_softmax()
@@ -608,4 +643,5 @@ if __name__ == '__main__':
     test_dense_sage_conv()
     test_dense_cheb_conv()
     test_sequential()
-
+    test_atomic_conv()
+    test_cf_conv()
