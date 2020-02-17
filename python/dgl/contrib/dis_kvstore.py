@@ -809,8 +809,7 @@ class KVClient(object):
                     data=partial_data,
                     c_ptr=None)
                 # randomly select a server node in target machine for load-balance
-                #s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
-                s_id = machine[idx]*self._group_count
+                s_id = random.randint(machine[idx]*self._group_count, (machine[idx]+1)*self._group_count-1)
                 _send_kv_msg(self._sender, msg, s_id)
 
             start += count[idx]

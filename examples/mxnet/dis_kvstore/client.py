@@ -53,7 +53,7 @@ def start_client(args):
 
     print("send request...")
 
-    for n in range(1000):
+    for n in range(100):
         for i in range(4):
             my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
@@ -70,7 +70,7 @@ def start_client(args):
     my_client.barrier()
 
     if my_client.get_id() % args.num_worker == 0:
-        res = my_client.pull(name='entity_embed', id_tensor=mx.nd.arrayr([0,1,2,3,4,5,6,7], dtype='int64'))
+        res = my_client.pull(name='entity_embed', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
         print(res)
 
         my_client.shut_down()
