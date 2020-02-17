@@ -2281,7 +2281,7 @@ class DGLHeteroGraph(object):
             v_ntype = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
-                                           inplace=inplace)
+                                           inplace=inplace, ntype=self._ntypes[ntid])
             Runtime.run(prog)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
@@ -3501,7 +3501,7 @@ class DGLHeteroGraph(object):
             v = utils.toindex(nodes)
 
         n_repr = self._get_n_repr(ntid, v)
-        nbatch = NodeBatch(v, n_repr)
+        nbatch = NodeBatch(v, n_repr, ntype=self.ntypes[ntid])
         n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
@@ -3562,7 +3562,8 @@ class DGLHeteroGraph(object):
         src_data = self._get_n_repr(stid, u)
         edge_data = self._get_e_repr(etid, eid)
         dst_data = self._get_n_repr(dtid, v)
-        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data,
+                           canonical_etype=self.canonical_etypes[etid])
         e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
@@ -3993,3 +3994,8 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed(self.etid)
+
+    @property
+    def canonical_etype(self):
+        """Canonical edge type."""
+        return self.graph.canonical_etypes[self.etid]
