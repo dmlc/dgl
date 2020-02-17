@@ -29,7 +29,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
+def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None):
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
@@ -41,8 +41,10 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
 
     if args.async_update:
         model.create_async_update()
-    if args.strict_rel_part:
+    if args.strict_rel_part or args.soft_rel_part:
         model.prepare_relation(th.device('cuda:' + str(gpu_id)))
+    if args.soft_rel_part:
+        model.prepare_cross_rels(cross_rels)
 
     start = time.time()
     sample_time = 0
@@ -90,20 +92,22 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
 
         if args.valid and (step + 1) % args.eval_interval == 0 and step > 1 and valid_samplers is not None:
             valid_start = time.time()
-            if args.strict_rel_part:
+            if args.strict_rel_part or args.soft_rel_part:
                 model.writeback_relation(rank, rel_parts)
             # forced sync for validation
             if barrier is not None:
                 barrier.wait()
             test(args, model, valid_samplers, rank, mode='Valid')
             print('test:', time.time() - valid_start)
+            if args.soft_rel_part:
+                model.prepare_cross_rels(cross_rels)
             if barrier is not None:
                 barrier.wait()
 
     print('train {} takes {:.3f} seconds'.format(rank, time.time() - start))
     if args.async_update:
         model.finish_async_update()
-    if args.strict_rel_part:
+    if args.strict_rel_part or args.soft_rel_part:
         model.writeback_relation(rank, rel_parts)
 
 def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
@@ -112,7 +116,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     else:
         gpu_id = -1
 
-    if args.strict_rel_part:
+    if args.strict_rel_part or args.soft_rel_part:
         model.load_relation(th.device('cuda:' + str(gpu_id)))
 
     with th.no_grad():
@@ -135,10 +139,10 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     test_samplers[1] = test_samplers[1].reset()
 
 @thread_wrapped_func
-def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, barrier=None):
+def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None):
     if args.num_proc > 1:
         th.set_num_threads(args.num_thread)
-    train(args, model, train_sampler, valid_samplers, rank, rel_parts, barrier)
+    train(args, model, train_sampler, valid_samplers, rank, rel_parts, cross_rels, barrier)
 
 @thread_wrapped_func
 def test_mp(args, model, test_samplers, rank=0, mode='Test', queue=None):
