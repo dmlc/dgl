@@ -579,7 +579,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def compact_graphs(graphs, always_preserve={}):
+def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
     isolated nodes across all graphs.
 
@@ -675,10 +675,14 @@ def compact_graphs(graphs, always_preserve={}):
         assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
         assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 
-    if not isinstance(always_preserve, Mapping):
+    # Process the dictionary or tensor of "always preserve" nodes
+    if always_preserve is None:
+        always_preserve = {}
+    elif not isinstance(always_preserve, Mapping):
         if len(ntypes) > 1:
             raise ValueError("Node type must be given if multiple node types exist.")
         always_preserve = {ntypes[0]: always_preserve}
+
     always_preserve_nd = []
     for ntype in ntypes:
         nodes = always_preserve.get(ntype, None)
@@ -688,6 +692,7 @@ def compact_graphs(graphs, always_preserve={}):
             nodes = F.zerocopy_to_dgl_ndarray(nodes)
         always_preserve_nd.append(nodes)
 
+    # Compact and construct heterographs
     new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
         [g._graph for g in graphs], always_preserve_nd)
     induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
