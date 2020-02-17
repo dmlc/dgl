@@ -243,12 +243,15 @@ def test_in_subgraph():
     assert len(subg.etypes) == 4
     u, v = subg['follow'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
     assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
     u, v = subg['play'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
     assert edge_set == {(0,0)}
     u, v = subg['liked-by'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
     assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
     assert subg['flips'].number_of_edges() == 0
 
@@ -265,15 +268,19 @@ def test_out_subgraph():
     u, v = subg['follow'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(1,0),(0,1),(0,2)}
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
     u, v = subg['play'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0),(0,1),(1,2)}
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
     u, v = subg['liked-by'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0)}
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
     u, v = subg['flips'].edges()
     edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
     assert edge_set == {(0,0),(1,0)}
+    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
 
 if __name__ == '__main__':
     test_line_graph()

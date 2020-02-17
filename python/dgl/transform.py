@@ -3,6 +3,7 @@
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
+from .base import EID
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
@@ -595,8 +596,12 @@ def in_subgraph(g, nodes):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    return DGLHeteroGraph(_CAPI_DGLInSubgraph(g._graph, nodes_all_types),
-                          g.ntypes, g.etypes)
+    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
 
 def out_subgraph(g, nodes):
     """Extract the subgraph containing only the out edges of the given nodes.
@@ -629,7 +634,11 @@ def out_subgraph(g, nodes):
         else:
             nodes_all_types.append(nd.array([], ctx=nd.cpu()))
 
-    return DGLHeteroGraph(_CAPI_DGLOutSubgraph(g._graph, nodes_all_types),
-                          g.ntypes, g.etypes)
+    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
 
 _init_api("dgl.transform")

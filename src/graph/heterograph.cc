@@ -381,6 +381,7 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -393,6 +394,7 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
         graph->NumVertices(src_vtype),
         graph->NumVertices(dst_vtype),
         graph->DataType(), graph->Context());
+      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
       subrels[etype] = UnitGraph::CreateFromCOO(
@@ -401,10 +403,12 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
         graph->NumVertices(dst_vtype),
         earr.src,
         earr.dst);
+      induced_edges[etype] = earr.id;
     }
   }
   HeteroSubgraph ret;
   ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.induced_edges = std::move(induced_edges);
   return ret;
 }
 
@@ -412,6 +416,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
   CHECK_EQ(vids.size(), graph->NumVertexTypes())
     << "Invalid input: the input list size must be the same as the number of vertex types.";
   std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
     auto pair = graph->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
@@ -424,6 +429,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
         graph->NumVertices(src_vtype),
         graph->NumVertices(dst_vtype),
         graph->DataType(), graph->Context());
+      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
     } else {
       const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
       subrels[etype] = UnitGraph::CreateFromCOO(
@@ -432,10 +438,12 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
           graph->NumVertices(dst_vtype),
           earr.src,
           earr.dst);
+      induced_edges[etype] = earr.id;
     }
   }
   HeteroSubgraph ret;
   ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.induced_edges = std::move(induced_edges);
   return ret;
 }
 
