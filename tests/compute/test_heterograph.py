@@ -1250,9 +1250,9 @@ def test_level2():
         y2 = g.nodes['game'].data['y']
         if cred == 'stack':
             # stack has two both correct outcomes
-            yy1 = F.stack([F.unsqueeze(y1, 1), F.unsqueeze(y2, 1)], 1)
+            yy1 = F.stack([y1, y2], 1)
             yy1 = yy1 + 1  # final afunc
-            yy2 = F.stack([F.unsqueeze(y2, 1), F.unsqueeze(y1, 1)], 1)
+            yy2 = F.stack([y2, y1], 1)
             yy2 = yy2 + 1  # final afunc
             assert F.array_equal(y, yy1) or F.array_equal(y, yy2)
         else:
@@ -1469,6 +1469,33 @@ def test_types_in_function():
     g.filter_nodes(filter_nodes2, ntype='game')
     g.filter_edges(filter_edges2)
 
+def test_stack_reduce():
+    #edges = {
+    #    'follows': ([0, 1], [1, 2]),
+    #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+    #    'wishes': ([0, 2], [1, 0]),
+    #    'develops': ([0, 1], [0, 1]),
+    #}
+    g = create_test_heterograph()
+    g.nodes['user'].data['h'] = F.randn((3, 200))
+    def rfunc(nodes):
+        return {'y': F.sum(nodes.mailbox['m'], 1)}
+    def rfunc2(nodes):
+        return {'y': F.max(nodes.mailbox['m'], 1)}
+    def mfunc(edges):
+        return {'m': edges.src['h']}
+    g.multi_update_all(
+            {'plays' : (mfunc, rfunc),
+             'wishes': (mfunc, rfunc2)},
+            'stack')
+    assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 2, 200)
+    # only one type-wise update_all, stack still adds one dimension
+    g.multi_update_all(
+            {'plays' : (mfunc, rfunc)},
+            'stack')
+    assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
+
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1491,3 +1518,4 @@ if __name__ == '__main__':
     test_empty_heterograph()
     test_compact()
     test_types_in_function()
+    test_stack_reduce()

@@ -3813,7 +3813,7 @@ def pad_tuple(tup, length, pad_val=None):
     else:
         return tup + (pad_val,) * (length - len(tup))
 
-def merge_frames(frames, reducer, frame_order=None):
+def merge_frames(frames, reducer, order=None):
     """Merge input frames into one. Resolve conflict fields using reducer.
 
     Parameters
@@ -3822,10 +3822,11 @@ def merge_frames(frames, reducer, frame_order=None):
         Input frames
     reducer : str
         One of "sum", "max", "min", "mean", "stack"
-    frame_order : list[Int], optional
-        Merge order hint. If provided, each integer indicates the relative order
+    order : list[Int], optional
+        Merge order hint. Useful for "stack" reducer.
+        If provided, each integer indicates the relative order
         of the ``frames`` list. Frames are sorted according to this list
-        in ascending order. Tie break is not handled so make sure the order values
+        in ascending order. Tie is not handled so make sure the order values
         are distinct.
 
     Returns
@@ -3833,13 +3834,18 @@ def merge_frames(frames, reducer, frame_order=None):
     FrameRef
         Merged frame
     """
-    if len(frames) == 1:
+    if len(frames) == 1 and reducer != 'stack':
+        # Directly return the only one input. Stack reducer requires
+        # modifying tensor shape.
         return frames[0]
     if reducer == 'stack':
-        # TODO(minjie): Stack order does not matter. However, it must
-        #   be consistent! Need to enforce one type of order.
+        # Stack order does not matter. However, it must be consistent!
+        if order:
+            assert len(order) == len(frames)
+            sorted_with_key = sorted(zip(frames, order), key=lambda x: x[1])
+            frames = list(zip(*sorted_with_key))[0]
         def merger(flist):
-            flist = [F.unsqueeze(f, 1) for f in flist]
+            #flist = [F.unsqueeze(f, 1) for f in flist]
             return F.stack(flist, 1)
     else:
         redfn = getattr(F, reducer, None)
@@ -3847,7 +3853,7 @@ def merge_frames(frames, reducer, frame_order=None):
             raise DGLError('Invalid cross type reducer. Must be one of '
                            '"sum", "max", "min", "mean" or "stack".')
         def merger(flist):
-            return redfn(F.stack(flist, 0), 0)
+            return redfn(F.stack(flist, 0), 0) if len(flist) > 1 else flist[0]
     ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for frm in frames:
@@ -3857,10 +3863,7 @@ def merge_frames(frames, reducer, frame_order=None):
         for frm in frames:
             if k in frm:
                 flist.append(frm[k])
-        if len(flist) > 1:
-            ret[k] = merger(flist)
-        else:
-            ret[k] = flist[0]
+        ret[k] = merger(flist)
     return ret
 
 def combine_frames(frames, ids):
