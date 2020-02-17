@@ -1,4 +1,5 @@
 """Classes for heterogeneous graphs."""
+#pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
 import networkx as nx
@@ -617,6 +618,7 @@ class DGLHeteroGraph(object):
                   "to get view of one relation type. Use : to slice multiple types (e.g. " +\
                   "G['srctype', :, 'dsttype'])."
 
+        orig_key = key
         if not isinstance(key, tuple):
             key = (SLICE_FULL, key, SLICE_FULL)
 
@@ -624,6 +626,10 @@ class DGLHeteroGraph(object):
             raise DGLError(err_msg)
 
         etypes = self._find_etypes(key)
+
+        if len(etypes) == 0:
+            raise DGLError('Invalid key "{}". Must be one of the edge types.'.format(orig_key))
+
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
