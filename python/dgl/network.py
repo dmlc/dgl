@@ -262,7 +262,7 @@ def _send_kv_msg(sender, msg, recv_id):
 
 def _recv_kv_msg(receiver):
     """Receive kvstore message.
-    
+
     Parameters
     ----------
     receiver : ctypes.c_void_p
