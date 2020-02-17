@@ -3807,15 +3807,20 @@ def pad_tuple(tup, length, pad_val=None):
     else:
         return tup + (pad_val,) * (length - len(tup))
 
-def merge_frames(frames, reducer):
+def merge_frames(frames, reducer, frame_order=None):
     """Merge input frames into one. Resolve conflict fields using reducer.
 
     Parameters
     ----------
-    frames : list of FrameRef
+    frames : list[FrameRef]
         Input frames
     reducer : str
         One of "sum", "max", "min", "mean", "stack"
+    frame_order : list[Int], optional
+        Merge order hint. If provided, each integer indicates the relative order
+        of the ``frames`` list. Frames are sorted according to this list
+        in ascending order. Tie break is not handled so make sure the order values
+        are distinct.
 
     Returns
     -------
