@@ -4,7 +4,6 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
-from .base import EID
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
@@ -14,7 +13,6 @@ from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
-from .heterograph import DGLHeteroGraph
 from .convert import graph, bipartite
 from . import utils
 from .base import EID, NID
