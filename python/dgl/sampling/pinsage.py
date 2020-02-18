@@ -7,6 +7,8 @@ from .. import convert
 from .. import transform
 from .. import function as fn
 from .randomwalks import random_walk
+from .neighbor import select_topk
+from ..base import EID
 
 
 class GenericPinSAGESampler(object):
@@ -96,21 +98,19 @@ class GenericPinSAGESampler(object):
         src = F.boolean_mask(src, src_mask)
         dst = F.boolean_mask(dst, src_mask)
 
+        # count the number of visits and pick the K-most frequent neighbors for each node
         neighbor_graph = convert.graph(
             (src, dst), card=self.G.number_of_nodes(self.ntype), ntype=self.ntype)
         neighbor_graph = transform.to_simple(neighbor_graph, return_counts=self.weight_column)
-        neighbor_graph = transform.select_topk(
-            neighbor_graph, self.weight_column, self.num_neighbors)
+        counts = neighbor_graph.edata[self.weight_column]
+        neighbor_graph = select_topk(neighbor_graph, self.num_neighbors, self.weight_column)
+        selected_counts = F.gather_row(counts, neighbor_graph.edata[EID])
 
         # normalize weights
         with neighbor_graph.local_scope():
-            neighbor_graph.edata[self.weight_column] = F.astype(
-                neighbor_graph.edata[self.weight_column], F.float32)
-            neighbor_graph.update_all(
-                fn.copy_e(self.weight_column, 'm'),
-                fn.sum('m', 's'))
-            neighbor_graph.apply_edges(
-                fn.e_div_v(self.weight_column, 's', 'w'))
+            neighbor_graph.edata[self.weight_column] = F.astype(selected_counts, F.float32)
+            neighbor_graph.update_all(fn.copy_e(self.weight_column, 'm'), fn.sum('m', 's'))
+            neighbor_graph.apply_edges(fn.e_div_v(self.weight_column, 's', 'w'))
             new_weights = neighbor_graph.edata['w']
         neighbor_graph.edata[self.weight_column] = new_weights
 

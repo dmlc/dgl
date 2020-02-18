@@ -31,7 +31,7 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto vtypes = graph->GetEndpointTypes(etype);
     const COOMatrix adj = graph->GetCOOMatrix(etype);
-    const COOMatrix sorted_adj = COOSort(adj);
+    const COOMatrix sorted_adj = COOSort(adj, true);
     const IdArray eids_shuffled = sorted_adj.data;
     const COOMatrix coalesced_adj = COOCoalesce(sorted_adj);
     const IdArray &count = coalesced_adj.data;

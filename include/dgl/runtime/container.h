@@ -674,6 +674,21 @@ class Map<std::string, V, T1, T2> : public ObjectRef {
   }
 };
 
+/*!
+ * \brief Helper function to convert a List<Value> object to a vector.
+ * \tparam T element type
+ * \param list Input list object.
+ * \return std vector
+ */
+template <typename T>
+inline std::vector<T> ListValueToVector(const List<Value>& list) {
+  std::vector<T> ret;
+  ret.reserve(list.size());
+  for (Value val : list)
+    ret.push_back(val->data);
+  return ret;
+}
+
 }  // namespace runtime
 }  // namespace dgl
 

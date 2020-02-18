@@ -115,7 +115,7 @@ HeteroSubgraph EdgeSubgraphNoPreserveNodes(
 }  // namespace
 
 HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs)
-  : BaseHeteroGraph(meta_graph), relation_graphs_(rel_graphs) {
+  : BaseHeteroGraph(meta_graph) {
   // Sanity check
   CHECK_EQ(meta_graph->NumEdges(), rel_graphs.size());
   CHECK(!rel_graphs.empty()) << "Empty heterograph is not allowed.";
@@ -154,6 +154,17 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
     else
       CHECK_EQ(num_verts_per_type_[dsttype], nv)
         << "Mismatch number of vertices for vertex type " << dsttype;
+  }
+
+  relation_graphs_.resize(rel_graphs.size());
+  for (size_t i = 0; i < rel_graphs.size(); ++i) {
+    HeteroGraphPtr relg = rel_graphs[i];
+    if (std::dynamic_pointer_cast<UnitGraph>(relg)) {
+      relation_graphs_[i] = std::dynamic_pointer_cast<UnitGraph>(relg);
+    } else {
+      relation_graphs_[i] = CHECK_NOTNULL(
+          std::dynamic_pointer_cast<UnitGraph>(relg->GetRelationGraph(0)));
+    }
   }
 }
 
@@ -303,6 +314,76 @@ FlattenedHeteroGraphPtr HeteroGraph::Flatten(const std::vector<dgl_type_t>& etyp
   return FlattenedHeteroGraphPtr(result);
 }
 
+HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  CHECK_EQ(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    auto relgraph = graph->GetRelationGraph(etype);
+    if (vids[dst_vtype]->shape[0] == 0) {
+      // create a placeholder graph
+      subrels[etype] = UnitGraph::Empty(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        graph->DataType(), graph->Context());
+      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+    } else {
+      const auto& earr = graph->InEdges(etype, {vids[dst_vtype]});
+      subrels[etype] = UnitGraph::CreateFromCOO(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        earr.src,
+        earr.dst);
+      induced_edges[etype] = earr.id;
+    }
+  }
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.induced_edges = std::move(induced_edges);
+  return ret;
+}
+
+HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& vids) {
+  CHECK_EQ(vids.size(), graph->NumVertexTypes())
+    << "Invalid input: the input list size must be the same as the number of vertex types.";
+  std::vector<HeteroGraphPtr> subrels(graph->NumEdgeTypes());
+  std::vector<IdArray> induced_edges(graph->NumEdgeTypes());
+  for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
+    auto pair = graph->meta_graph()->FindEdge(etype);
+    const dgl_type_t src_vtype = pair.first;
+    const dgl_type_t dst_vtype = pair.second;
+    auto relgraph = graph->GetRelationGraph(etype);
+    if (vids[src_vtype]->shape[0] == 0) {
+      // create a placeholder graph
+      subrels[etype] = UnitGraph::Empty(
+        relgraph->NumVertexTypes(),
+        graph->NumVertices(src_vtype),
+        graph->NumVertices(dst_vtype),
+        graph->DataType(), graph->Context());
+      induced_edges[etype] = IdArray::Empty({0}, graph->DataType(), graph->Context());
+    } else {
+      const auto& earr = graph->OutEdges(etype, {vids[src_vtype]});
+      subrels[etype] = UnitGraph::CreateFromCOO(
+          relgraph->NumVertexTypes(),
+          graph->NumVertices(src_vtype),
+          graph->NumVertices(dst_vtype),
+          earr.src,
+          earr.dst);
+      induced_edges[etype] = earr.id;
+    }
+  }
+  HeteroSubgraph ret;
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.induced_edges = std::move(induced_edges);
+  return ret;
+}
+
 HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
@@ -428,6 +509,23 @@ HeteroGraphPtr CreateHeteroGraph(
   return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
 }
 
+HeteroGraphPtr CreateFromCOO(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col, SparseFormat restrict_format) {
+  auto unit_g = UnitGraph::CreateFromCOO(
+      num_vtypes, num_src, num_dst, row, col, restrict_format);
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+}
+
+HeteroGraphPtr CreateFromCSR(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format) {
+  auto unit_g = UnitGraph::CreateFromCSR(
+      num_vtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+  return HeteroGraphPtr(new HeteroGraph(unit_g->meta_graph(), {unit_g}));
+}
+
 constexpr uint64_t kDGLSerialize_HeteroGraph = 0xDD589FBE35224ABF;
 
 bool HeteroGraph::Load(dmlc::Stream* fs) {
@@ -471,8 +569,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCOO")
     IdArray row = args[3];
     IdArray col = args[4];
     SparseFormat restrict_format = ParseSparseFormat(args[5]);
-    auto hgptr = UnitGraph::CreateFromCOO(
-        nvtypes, num_src, num_dst, row, col, restrict_format);
+    auto hgptr = CreateFromCOO(nvtypes, num_src, num_dst, row, col, restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -485,8 +582,8 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateUnitGraphFromCSR")
     IdArray indices = args[4];
     IdArray edge_ids = args[5];
     SparseFormat restrict_format = ParseSparseFormat(args[6]);
-    auto hgptr = UnitGraph::CreateFromCSR(
-        nvtypes, num_src, num_dst, indptr, indices, edge_ids, restrict_format);
+    auto hgptr = CreateFromCSR(nvtypes, num_src, num_dst, indptr, indices, edge_ids,
+                               restrict_format);
     *rv = HeteroGraphRef(hgptr);
   });
 
@@ -831,6 +928,24 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroEdgeSubgraph")
     std::shared_ptr<HeteroSubgraph> subg(
         new HeteroSubgraph(hg->EdgeSubgraph(eid_vec, preserve_nodes)));
     *rv = HeteroSubgraphRef(subg);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLInSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
+    *ret = InEdgeGraph(hg.sptr(), nodes);
+    *rv = HeteroGraphRef(ret);
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLOutSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    HeteroGraphRef hg = args[0];
+    const auto& nodes = ListValueToVector<IdArray>(args[1]);
+    std::shared_ptr<HeteroSubgraph> ret(new HeteroSubgraph);
+    *ret = OutEdgeGraph(hg.sptr(), nodes);
+    *rv = HeteroGraphRef(ret);
   });
 
 // HeteroSubgraph C APIs

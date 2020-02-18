@@ -4,7 +4,10 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
+from .base import EID
 from .graph import DGLGraph
+from .heterograph import DGLHeteroGraph
+from . import ndarray as nd
 from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
@@ -33,7 +36,8 @@ __all__ = [
     'metapath_reachable_graph',
     'compact_graphs',
     'to_simple',
-    'select_topk']
+    'in_subgraph',
+    'out_subgraph']
 
 
 def pairwise_squared_distance(x):
@@ -708,6 +712,84 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
+def in_subgraph(g, nodes):
+    """Extract the subgraph containing only the in edges of the given nodes.
+
+    The subgraph keeps the same type schema and the cardinality of the original one.
+    Node/edge features are not preserved. The original IDs
+    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph structure.
+    nodes : tensor or dict
+        Node ids to sample neighbors from. The allowed types
+        are dictionary of node types to node id tensors, or simply node id tensor if
+        the given graph g has only one type of nodes.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The subgraph.
+    """
+    if not isinstance(nodes, dict):
+        if len(g.ntypes) > 1:
+            raise DGLError("Must specify node type when the graph is not homogeneous.")
+        nodes = {g.ntypes[0] : nodes}
+    nodes_all_types = []
+    for ntype in g.ntypes:
+        if ntype in nodes:
+            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+        else:
+            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+
+    subgidx = _CAPI_DGLInSubgraph(g._graph, nodes_all_types)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
+
+def out_subgraph(g, nodes):
+    """Extract the subgraph containing only the out edges of the given nodes.
+
+    The subgraph keeps the same type schema and the cardinality of the original one.
+    Node/edge features are not preserved. The original IDs
+    the extracted edges are stored as the `dgl.EID` feature in the returned graph.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph structure.
+    nodes : tensor or dict
+        Node ids to sample neighbors from. The allowed types
+        are dictionary of node types to node id tensors, or simply node id tensor if
+        the given graph g has only one type of nodes.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The subgraph.
+    """
+    if not isinstance(nodes, dict):
+        if len(g.ntypes) > 1:
+            raise DGLError("Must specify node type when the graph is not homogeneous.")
+        nodes = {g.ntypes[0] : nodes}
+    nodes_all_types = []
+    for ntype in g.ntypes:
+        if ntype in nodes:
+            nodes_all_types.append(utils.toindex(nodes[ntype]).todgltensor())
+        else:
+            nodes_all_types.append(nd.array([], ctx=nd.cpu()))
+
+    subgidx = _CAPI_DGLOutSubgraph(g._graph, nodes_all_types)
+    induced_edges = subgidx.induced_edges
+    ret = DGLHeteroGraph(subgidx.graph, g.ntypes, g.etypes)
+    for i, etype in enumerate(ret.canonical_etypes):
+        ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
+    return ret
+
 def to_simple(g, return_counts=None, writeback_mapping=False):
     """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
     duplicate edges into one.
@@ -771,68 +853,5 @@ def to_simple(g, return_counts=None, writeback_mapping=False):
             g.edges[canonical_etype].data[EID] = edge_map
 
     return simple_graph
-
-# pylint: disable=invalid-name
-def select_topk(g, weights, K, inbound=True, smallest=False):
-    """Induce an edge subgraph from inbound edges with K-largest weights for each node.
-
-    For each edge type, the edges are grouped by destination nodes.  Then for each edge
-    group, the K edges with largest weights are selected.  The selected edges then form
-    a subgraph which is returned.
-
-    All nodes in the original graph are preserved in the subgraph.
-
-    The selected weights are preserved in the subgraph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        The heterogeneous graph.
-    weights : str
-        The name of the weights column.  Must be a scalar feature.
-
-        Currently only CPU weights are supported; GPU weights must be copied to
-        CPU first.
-    K : int
-        The value of K
-    inbound : bool, default True
-        If False, induce from outbound edges (i.e. edges are grouped by source node
-        instead of destination node) instead.
-    smallest : bool, default False
-        If True, select edges with K-smallest weights instead.
-
-    Returns
-    -------
-    sg : DGLHeteroGraph
-        The returned subgraph.
-        The induced edge IDs are stored as an edge feature named dgl.EID.
-        The weights of the induced edges are also stored.
-
-    Examples
-    --------
-    Consider the following graph:
-    >>> g = dgl.graph([(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)])
-    >>> g.edata['weights'] = torch.LongTensor([1, 2, 3, 4, 5, 6, 7])  # can be any type
-
-    For each node on each edge type, we wish to select the inbound edges with 2 largest
-    weights.  That would be selecting (5, 1) and (2, 1) for node #1, and (4, 2) and
-    (6, 2) for node #2:
-    >>> sg = dgl.select_topk(g, 'weights', 2)
-    >>> sg.all_edges(form='uv', order='eid')
-    (tensor([2, 5, 4, 6]), tensor([1, 1, 2, 2]))
-    >>> sg.edata[dgl.EID]
-    tensor([1, 2, 5, 6])
-    >>> sg.edata['weights']
-    tensor([2, 3, 6, 7])
-    """
-    w = [g.edges[etype].data[weights] for etype in g.canonical_etypes]
-    w_nd = [F.zerocopy_to_dgl_ndarray(_w) for _w in w]
-    subgraph_index, induced_edges = _CAPI_DGLSelectTopK(g._graph, w_nd, K, inbound, smallest)
-    induced_edges = [F.zerocopy_from_dgl_ndarray(e.data) for e in induced_edges]
-    subgraph = DGLHeteroGraph(subgraph_index, g.ntypes, g.etypes)
-    for i, etype in enumerate(subgraph.canonical_etypes):
-        subgraph.edges[etype].data[EID] = induced_edges[i]
-        subgraph.edges[etype].data[weights] = F.gather_row(w[i], induced_edges[i])
-    return subgraph
 
 _init_api("dgl.transform")

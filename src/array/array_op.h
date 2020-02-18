@@ -77,20 +77,20 @@ runtime::NDArray CSRGetRowNNZ(CSRMatrix csr, runtime::NDArray row);
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowColumnIndices(CSRMatrix csr, int64_t row);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetRowData(CSRMatrix csr, int64_t row);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray CSRGetData(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> CSRGetDataAndIndices(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRTranspose(CSRMatrix csr);
 
 // Convert CSR to COO
@@ -101,17 +101,33 @@ COOMatrix CSRToCOO(CSRMatrix csr);
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, int64_t start, int64_t end);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
 
+template <DLDeviceType XPU, typename IdType>
+void CSRSort_(CSRMatrix* csr);
+
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix CSRRowWiseSampling(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix CSRRowWiseSamplingUniform(
+    CSRMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+// FloatType is the type of weight data.
 template <DLDeviceType XPU, typename IdType, typename DType>
-void CSRSort(CSRMatrix* csr);
+COOMatrix CSRRowWiseTopk(
+    CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending);
+
+///////////////////////////////////////////////////////////////////////////////////////////
 
 template <DLDeviceType XPU, typename IdType>
 bool COOIsNonZero(COOMatrix coo, int64_t row, int64_t col);
@@ -128,41 +144,51 @@ int64_t COOGetRowNNZ(COOMatrix coo, int64_t row);
 template <DLDeviceType XPU, typename IdType>
 runtime::NDArray COOGetRowNNZ(COOMatrix coo, runtime::NDArray row);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 std::pair<runtime::NDArray, runtime::NDArray>
 COOGetRowDataAndIndices(COOMatrix coo, int64_t row);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 runtime::NDArray COOGetData(COOMatrix coo, int64_t row, int64_t col);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOTranspose(COOMatrix coo);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, int64_t start, int64_t end);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceRows(COOMatrix coo, runtime::NDArray rows);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
-template <DLDeviceType XPU, typename IdType, typename DType>
-COOMatrix COOSort(COOMatrix coo);
-
-template <DLDeviceType XPU, typename IdType, typename DType>
+template <DLDeviceType XPU, typename IdType>
 COOMatrix COOCoalesce(COOMatrix coo);
 
-template <DLDeviceType XPU, typename IdType, typename DType, typename WType>
-std::pair<COOMatrix, NDArray> COORowwiseTopKNonZero(
-    COOMatrix coo, int64_t K, NDArray weights, bool smallest);
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COOSort(COOMatrix mat, bool sort_column);
+
+// FloatType is the type of probability data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowWiseSampling(
+    COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORowWiseSamplingUniform(
+    COOMatrix mat, IdArray rows, int64_t num_samples, bool replace);
+
+// FloatType is the type of weight data.
+template <DLDeviceType XPU, typename IdType, typename FloatType>
+COOMatrix COORowWiseTopk(
+    COOMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending);
 
 }  // namespace impl
 }  // namespace aten

@@ -1249,12 +1249,10 @@ def test_level2():
         g['wishes'].update_all(mfunc, rfunc2)
         y2 = g.nodes['game'].data['y']
         if cred == 'stack':
-            # stack has two both correct outcomes
-            yy1 = F.stack([F.unsqueeze(y1, 1), F.unsqueeze(y2, 1)], 1)
-            yy1 = yy1 + 1  # final afunc
-            yy2 = F.stack([F.unsqueeze(y2, 1), F.unsqueeze(y1, 1)], 1)
-            yy2 = yy2 + 1  # final afunc
-            assert F.array_equal(y, yy1) or F.array_equal(y, yy2)
+            # stack has an internal order by edge type id
+            yy = F.stack([y1, y2], 1)
+            yy = yy + 1  # final afunc
+            assert F.array_equal(y, yy)
         else:
             yy = get_redfn(cred)(F.stack([y1, y2], 0), 0)
             yy = yy + 1  # final afunc
@@ -1367,6 +1365,89 @@ def test_empty_heterograph():
     assert g.number_of_nodes('developer') == 2
 
 
+def test_types_in_function():
+    def mfunc1(edges):
+        assert edges.canonical_etype == ('user', 'follow', 'user')
+        return {}
+
+    def rfunc1(nodes):
+        assert nodes.ntype == 'user'
+        return {}
+
+    def filter_nodes1(nodes):
+        assert nodes.ntype == 'user'
+        return F.zeros((3,))
+
+    def filter_edges1(edges):
+        assert edges.canonical_etype == ('user', 'follow', 'user')
+        return F.zeros((2,))
+
+    def mfunc2(edges):
+        assert edges.canonical_etype == ('user', 'plays', 'game')
+        return {}
+
+    def rfunc2(nodes):
+        assert nodes.ntype == 'game'
+        return {}
+
+    def filter_nodes2(nodes):
+        assert nodes.ntype == 'game'
+        return F.zeros((3,))
+
+    def filter_edges2(edges):
+        assert edges.canonical_etype == ('user', 'plays', 'game')
+        return F.zeros((2,))
+
+    g = dgl.graph([(0, 1), (1, 2)], 'user', 'follow')
+    g.apply_nodes(rfunc1)
+    g.apply_edges(mfunc1)
+    g.update_all(mfunc1, rfunc1)
+    g.send_and_recv([0, 1], mfunc1, rfunc1)
+    g.send([0, 1], mfunc1)
+    g.recv([1, 2], rfunc1)
+    g.push([0], mfunc1, rfunc1)
+    g.pull([1], mfunc1, rfunc1)
+    g.filter_nodes(filter_nodes1)
+    g.filter_edges(filter_edges1)
+
+    g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+    g.apply_nodes(rfunc2, ntype='game')
+    g.apply_edges(mfunc2)
+    g.update_all(mfunc2, rfunc2)
+    g.send_and_recv([0, 1], mfunc2, rfunc2)
+    g.send([0, 1], mfunc2)
+    g.recv([1, 2], rfunc2)
+    g.push([0], mfunc2, rfunc2)
+    g.pull([1], mfunc2, rfunc2)
+    g.filter_nodes(filter_nodes2, ntype='game')
+    g.filter_edges(filter_edges2)
+
+def test_stack_reduce():
+    #edges = {
+    #    'follows': ([0, 1], [1, 2]),
+    #    'plays': ([0, 1, 2, 1], [0, 0, 1, 1]),
+    #    'wishes': ([0, 2], [1, 0]),
+    #    'develops': ([0, 1], [0, 1]),
+    #}
+    g = create_test_heterograph()
+    g.nodes['user'].data['h'] = F.randn((3, 200))
+    def rfunc(nodes):
+        return {'y': F.sum(nodes.mailbox['m'], 1)}
+    def rfunc2(nodes):
+        return {'y': F.max(nodes.mailbox['m'], 1)}
+    def mfunc(edges):
+        return {'m': edges.src['h']}
+    g.multi_update_all(
+            {'plays' : (mfunc, rfunc),
+             'wishes': (mfunc, rfunc2)},
+            'stack')
+    assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 2, 200)
+    # only one type-wise update_all, stack still adds one dimension
+    g.multi_update_all(
+            {'plays' : (mfunc, rfunc)},
+            'stack')
+    assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
+
 if __name__ == '__main__':
     test_create()
     test_query()
@@ -1387,3 +1468,5 @@ if __name__ == '__main__':
     test_updates()
     test_backward()
     test_empty_heterograph()
+    test_types_in_function()
+    test_stack_reduce()

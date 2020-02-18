@@ -6,11 +6,11 @@ import dgl
 import dgl.function as fn
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
+import unittest
 
 D = 5
 
 # line graph related
-
 
 def test_line_graph():
     N = 5
@@ -232,6 +232,56 @@ def test_partition():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_in_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    assert edge_set == {(0,0)}
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
+    assert subg['flips'].number_of_edges() == 0
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_out_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0),(0,1),(0,2)}
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(0,1),(1,2)}
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0)}
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    u, v = subg['flips'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(1,0)}
+    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_compact():
@@ -346,135 +396,6 @@ def test_to_simple():
             assert eid_map[i] == suv.index(e)
 
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU array ops not implemented")
-def test_select_topk():
-    g = dgl.heterograph({
-        ('user', 'follow', 'user'): [(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)],
-        ('user', 'plays', 'game'): [(1, 0), (3, 1)]},
-        {'user': 7, 'game': 3})     # include nodes with zero incoming edges
-    follow_weights = np.array([2, 7, 3, 4, 6, 5, 1])
-    plays_weights = np.array([2, 1])
-    g.edges['follow'].data['weights'] = F.zerocopy_from_numpy(follow_weights)
-    g.edges['plays'].data['weights'] = F.zerocopy_from_numpy(plays_weights)
-    sg = dgl.select_topk(g, 'weights', 1)
-
-    su, sv = sg.all_edges(form='uv', order='eid', etype='follow')
-    su = F.asnumpy(su).tolist()
-    sv = F.asnumpy(sv).tolist()
-    suv = list(zip(su, sv))
-    sw = F.asnumpy(sg.edges['follow'].data['weights'])
-    induced_edges = F.asnumpy(sg.edges['follow'].data[dgl.EID])
-
-    assert set(suv) == set([(2, 1), (3, 2)])
-    for i, e in enumerate(suv):
-        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='follow')
-        assert sw[i] == follow_weights[induced_edges[i]]
-
-    su, sv = sg.all_edges(form='uv', order='eid', etype='plays')
-    su = F.asnumpy(su).tolist()
-    sv = F.asnumpy(sv).tolist()
-    suv = list(zip(su, sv))
-    sw = F.asnumpy(sg.edges['plays'].data['weights'])
-    induced_edges = F.asnumpy(sg.edges['plays'].data[dgl.EID])
-
-    assert set(suv) == set([(1, 0), (3, 1)])
-    for i, e in enumerate(suv):
-        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='plays')
-        assert sw[i] == plays_weights[induced_edges[i]]
-
-    g = dgl.heterograph({
-        ('user', 'follow', 'user'): [(1, 0), (1, 2), (1, 5), (2, 2), (2, 3), (2, 4), (2, 6)],
-        ('user', 'plays', 'game'): [(0, 1), (1, 3)]},
-        {'user': 7, 'game': 4})     # include nodes with zero incoming edges
-    g.edges['follow'].data['weights'] = F.arange(1, 8)
-    g.edges['plays'].data['weights'] = F.arange(1, 3)
-    follow_weights = np.arange(1, 8)
-    plays_weights = np.arange(1, 3)
-    sg = dgl.select_topk(g, 'weights', 2, inbound=False)
-
-    su, sv = sg.all_edges(form='uv', order='eid', etype='follow')
-    su = F.asnumpy(su).tolist()
-    sv = F.asnumpy(sv).tolist()
-    suv = list(zip(su, sv))
-    sw = F.asnumpy(sg.edges['follow'].data['weights'])
-    induced_edges = F.asnumpy(sg.edges['follow'].data[dgl.EID])
-
-    assert set(suv) == set([(1, 2), (1, 5), (2, 4), (2, 6)])
-    for i, e in enumerate(suv):
-        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='follow')
-        assert sw[i] == follow_weights[induced_edges[i]]
-
-    su, sv = sg.all_edges(form='uv', order='eid', etype='plays')
-    su = F.asnumpy(su).tolist()
-    sv = F.asnumpy(sv).tolist()
-    suv = list(zip(su, sv))
-    sw = F.asnumpy(sg.edges['plays'].data['weights'])
-    induced_edges = F.asnumpy(sg.edges['plays'].data[dgl.EID])
-
-    assert set(suv) == set([(0, 1), (1, 3)])
-    for i, e in enumerate(suv):
-        assert induced_edges[i] == g.edge_id(e[0], e[1], etype='plays')
-        assert sw[i] == plays_weights[induced_edges[i]]
-
-    # random test
-    x = spsp.random(10, 10, 0.5)
-    w = np.random.permutation(50) + 1
-    x.data = w
-    g = dgl.graph(x)
-    g.edata['w'] = F.zerocopy_from_numpy(w)
-
-    sg = dgl.select_topk(g, 'w', 1)
-    src, dst = sg.all_edges()
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    sg_w = F.asnumpy(sg.edata['w'])
-    ans_w = x.toarray().max(0)
-    ans_src = x.toarray().argmax(0)
-
-    assert np.array_equal(np.sort(dst), np.arange(10))
-    assert np.array_equal(ans_src[dst], src)
-    assert np.array_equal(ans_w[dst], sg_w)
-
-    sg = dgl.select_topk(g, 'w', 1, inbound=False)
-    src, dst = sg.all_edges()
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    sg_w = F.asnumpy(sg.edata['w'])
-    ans_w = x.toarray().max(1)
-    ans_dst = x.toarray().argmax(1)
-
-    assert np.array_equal(np.sort(src), np.arange(10))
-    assert np.array_equal(ans_dst[src], dst)
-    assert np.array_equal(ans_w[src], sg_w)
-
-    neg_x = x.copy()
-    neg_x.data = 100 - neg_x.data
-
-    sg = dgl.select_topk(g, 'w', 1, smallest=True)
-    src, dst = sg.all_edges()
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    sg_w = F.asnumpy(sg.edata['w'])
-    ans_w = 100 - neg_x.toarray().max(0)
-    ans_src = neg_x.toarray().argmax(0)
-
-    assert np.array_equal(np.sort(dst), np.arange(10))
-    assert np.array_equal(ans_src[dst], src)
-    assert np.array_equal(ans_w[dst], sg_w)
-
-    sg = dgl.select_topk(g, 'w', 1, inbound=False, smallest=True)
-    src, dst = sg.all_edges()
-    src = F.asnumpy(src)
-    dst = F.asnumpy(dst)
-    sg_w = F.asnumpy(sg.edata['w'])
-    ans_w = 100 - neg_x.toarray().max(1)
-    ans_dst = neg_x.toarray().argmax(1)
-
-    assert np.array_equal(np.sort(src), np.arange(10))
-    assert np.array_equal(ans_dst[src], dst)
-    assert np.array_equal(ans_w[src], sg_w)
-
-
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
@@ -490,4 +411,5 @@ if __name__ == '__main__':
     test_partition()
     test_compact()
     test_to_simple()
-    test_select_topk()
+    test_in_subgraph()
+    test_out_subgraph()

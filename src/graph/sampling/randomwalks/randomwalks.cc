@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file graph/sampler/randomwalks.cc
+ * \file graph/sampling/randomwalks.cc
  * \brief Dispatcher of different DGL random walks by device type
  */
 
@@ -113,10 +113,7 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalk")
     TypeArray metapath = args[2];
     List<Value> prob = args[3];
 
-    std::vector<FloatArray> prob_vec;
-    prob_vec.reserve(prob.size());
-    for (Value val : prob)
-      prob_vec.push_back(val->data);
+    const auto& prob_vec = ListValueToVector<FloatArray>(prob);
 
     auto result = sampling::RandomWalk(hg.sptr(), seeds, metapath, prob_vec);
     List<Value> ret;
@@ -133,10 +130,7 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithRestart
     List<Value> prob = args[3];
     double restart_prob = args[4];
 
-    std::vector<FloatArray> prob_vec;
-    prob_vec.reserve(prob.size());
-    for (Value val : prob)
-      prob_vec.push_back(val->data);
+    const auto& prob_vec = ListValueToVector<FloatArray>(prob);
 
     auto result = sampling::RandomWalkWithRestart(
         hg.sptr(), seeds, metapath, prob_vec, restart_prob);
@@ -154,10 +148,7 @@ DGL_REGISTER_GLOBAL("sampling.randomwalks._CAPI_DGLSamplingRandomWalkWithStepwis
     List<Value> prob = args[3];
     FloatArray restart_prob = args[4];
 
-    std::vector<FloatArray> prob_vec;
-    prob_vec.reserve(prob.size());
-    for (Value val : prob)
-      prob_vec.push_back(val->data);
+    const auto& prob_vec = ListValueToVector<FloatArray>(prob);
 
     auto result = sampling::RandomWalkWithStepwiseRestart(
         hg.sptr(), seeds, metapath, prob_vec, restart_prob);
