@@ -21,6 +21,9 @@ def batched_l1_dist(a, b):
     return res
 
 class TransEScore(nn.Block):
+    """ TransE score function
+    Paper link: https://papers.nips.cc/paper/5071-translating-embeddings-for-modeling-multi-relational-data
+    """
     def __init__(self, gamma, dist_func='l2'):
         super(TransEScore, self).__init__()
         self.gamma = gamma
@@ -81,6 +84,9 @@ class TransEScore(nn.Block):
             return fn
 
 class TransRScore(nn.Block):
+    """TransR score function
+    Paper link: https://www.aaai.org/ocs/index.php/AAAI/AAAI15/paper/download/9571/9523
+    """
     def __init__(self, gamma, projection_emb, relation_dim, entity_dim):
         super(TransRScore, self).__init__()
         self.gamma = gamma
@@ -180,6 +186,18 @@ class TransRScore(nn.Block):
     def load(self, path, name):
         self.projection_emb.load(path, name+'projection')
 
+    def prepare_local_emb(self, projection_emb):
+        self.global_projection_emb = self.projection_emb
+        self.projection_emb = projection_emb
+
+    def writeback_local_emb(self, idx):
+        self.global_projection_emb.emb[idx] = self.projection_emb.emb.as_in_context(mx.cpu())[idx]
+
+    def load_local_emb(self, projection_emb):
+        context = projection_emb.emb.context
+        projection_emb.emb = self.projection_emb.emb.as_in_context(context)
+        self.projection_emb = projection_emb
+
     def create_neg(self, neg_head):
         gamma = self.gamma
         if neg_head:
@@ -200,6 +218,9 @@ class TransRScore(nn.Block):
             return fn
 
 class DistMultScore(nn.Block):
+    """DistMult score function
+    Paper link: https://arxiv.org/abs/1412.6575
+    """
     def __init__(self):
         super(DistMultScore, self).__init__()
 
@@ -253,6 +274,9 @@ class DistMultScore(nn.Block):
             return fn
 
 class ComplExScore(nn.Block):
+    """ComplEx score function
+    Paper link: https://arxiv.org/abs/1606.06357
+    """
     def __init__(self):
         super(ComplExScore, self).__init__()
 
@@ -321,6 +345,9 @@ class ComplExScore(nn.Block):
             return fn
 
 class RESCALScore(nn.Block):
+    """RESCAL score function
+    Paper link: http://www.icml-2011.org/papers/438_icmlpaper.pdf
+    """
     def __init__(self, relation_dim, entity_dim):
         super(RESCALScore, self).__init__()
         self.relation_dim = relation_dim
@@ -384,6 +411,9 @@ class RESCALScore(nn.Block):
             return fn
 
 class RotatEScore(nn.Block):
+    """RotatE score function
+    Paper link: https://arxiv.org/abs/1902.10197
+    """
     def __init__(self, gamma, emb_init, eps=1e-10):
         super(RotatEScore, self).__init__()
         self.gamma = gamma

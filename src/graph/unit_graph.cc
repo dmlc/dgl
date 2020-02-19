@@ -15,6 +15,9 @@
 namespace dgl {
 
 namespace {
+
+using namespace dgl::aten;
+
 // create metagraph of one node type
 inline GraphPtr CreateUnitGraphMetaGraph1() {
   // a self-loop edge 0->0
@@ -77,8 +80,12 @@ class UnitGraph::COO : public BaseHeteroGraph {
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  explicit COO(GraphPtr metagraph, const aten::COOMatrix& coo)
-    : BaseHeteroGraph(metagraph), adj_(coo) {}
+  COO(GraphPtr metagraph, const aten::COOMatrix& coo)
+    : BaseHeteroGraph(metagraph), adj_(coo) {
+    // Data index should not be inherited. Edges in COO format are always
+    // assigned ids from 0 to num_edges - 1.
+    adj_.data = IdArray();
+  }
 
   inline dgl_type_t SrcType() const {
     return 0;
@@ -322,6 +329,25 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    return adj_;
+  }
+
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::CSRMatrix();
+  }
+
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return aten::CSRMatrix();
+  }
+
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    LOG(FATAL) << "Not enabled for COO graph";
+    return SparseFormat::ANY;
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
     CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
@@ -417,7 +443,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     sorted_ = false;
   }
 
-  explicit CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
+  CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
     : BaseHeteroGraph(metagraph), adj_(csr) {
     sorted_ = false;
   }
@@ -568,22 +594,22 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   EdgeArray InEdges(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -614,12 +640,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   uint64_t InDegree(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   DegreeArray InDegrees(dgl_type_t etype, IdArray vids) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -654,12 +680,12 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   }
 
   DGLIdIters PredVec(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
   DGLIdIters InEdgeVec(dgl_type_t etype, dgl_id_t vid) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -667,6 +693,25 @@ class UnitGraph::CSR : public BaseHeteroGraph {
       dgl_type_t etype, bool transpose, const std::string &fmt) const override {
     CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
     return {adj_.indptr, adj_.indices, adj_.data};
+  }
+
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return aten::COOMatrix();
+  }
+
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return aten::CSRMatrix();
+  }
+
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
+    return adj_;
+  }
+
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    LOG(FATAL) << "Not enabled for CSR graph";
+    return SparseFormat::ANY;
   }
 
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
@@ -686,7 +731,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   HeteroSubgraph EdgeSubgraph(
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
-    LOG(INFO) << "Not enabled for CSR graph.";
+    LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
@@ -980,7 +1025,8 @@ HeteroSubgraph UnitGraph::EdgeSubgraph(
 }
 
 HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray row, IdArray col,
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray row, IdArray col,
     SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
   if (num_vtypes == 1)
@@ -988,6 +1034,18 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
 
+  return HeteroGraphPtr(
+      new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCOO(
+    int64_t num_vtypes, const aten::COOMatrix& mat,
+    SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(mat.num_rows, mat.num_cols);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  COOPtr coo(new COO(mg, mat));
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
@@ -1000,6 +1058,17 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
     CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSR(
+    int64_t num_vtypes, const aten::CSRMatrix& mat,
+    SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(mat.num_rows, mat.num_cols);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, mat));
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
@@ -1080,9 +1149,7 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
         return CSR(meta_graph(), newadj);
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
-        const auto& adj = coo_->adj();
-        const auto& newadj = aten::COOToCSR(
-            aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
+        const auto& newadj = aten::COOToCSR(aten::COOTranspose(coo_->adj()));
         return CSR(meta_graph(), newadj);
       }
     });
@@ -1106,10 +1173,8 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
   return LazyInit(&(const_cast<UnitGraph*>(this)->coo_), &lazy_mutex_, [this] () {
       if (in_csr_) {
-        const auto& newadj = aten::CSRToCOO(in_csr_->adj(), true);
-        return COO(
-            meta_graph(),
-            aten::COOMatrix{newadj.num_cols, newadj.num_rows, newadj.col, newadj.row});
+        const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
+        return COO(meta_graph(), newadj);
       } else {
         CHECK(out_csr_) << "Both CSR are missing.";
         const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
@@ -1118,15 +1183,15 @@ UnitGraph::COOPtr UnitGraph::GetCOO() const {
     });
 }
 
-aten::CSRMatrix UnitGraph::GetInCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetCSCMatrix(dgl_type_t etype) const {
   return GetInCSR()->adj();
 }
 
-aten::CSRMatrix UnitGraph::GetOutCSRMatrix() const {
+aten::CSRMatrix UnitGraph::GetCSRMatrix(dgl_type_t etype) const {
   return GetOutCSR()->adj();
 }
 
-aten::COOMatrix UnitGraph::GetCOOMatrix() const {
+aten::COOMatrix UnitGraph::GetCOOMatrix(dgl_type_t etype) const {
   return GetCOO()->adj();
 }
 
@@ -1170,6 +1235,48 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
   // NOTREACHED
   LOG(FATAL) << "[BUG] no format is available.";
   return SparseFormat::ANY;
+}
+
+UnitGraph* UnitGraph::EmptyGraph() {
+  auto src = NewIdArray(0);
+  auto dst = NewIdArray(0);
+  auto mg = CreateUnitGraphMetaGraph(1);
+  COOPtr coo(new COO(mg, 0, 0, src, dst));
+  return new UnitGraph(mg, nullptr, nullptr, coo);
+}
+
+constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
+
+// Using OurCSR
+bool UnitGraph::Load(dmlc::Stream* fs) {
+  uint64_t magicNum;
+  CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+  CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
+  uint64_t num_vtypes, num_src, num_dst;
+  CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
+  CHECK(fs->Read(&num_src)) << "Invalid num_src";
+  CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
+  aten::CSRMatrix csr_matrix;
+  CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr,
+                     csr_matrix.indices, csr_matrix.data));
+  *this = std::move(UnitGraph(mg, nullptr, csr, nullptr));
+  return true;
+}
+
+// Using Out CSR
+void UnitGraph::Save(dmlc::Stream* fs) const {
+  // Following CreateFromCSR signature
+  aten::CSRMatrix csr_matrix = GetCSRMatrix(0);
+  uint64_t num_vtypes = NumVertexTypes();
+  uint64_t num_src = NumVertices(SrcType());
+  uint64_t num_dst = NumVertices(DstType());
+  fs->Write(kDGLSerialize_UnitGraphMagic);
+  fs->Write(num_vtypes);
+  fs->Write(num_src);
+  fs->Write(num_dst);
+  fs->Write(csr_matrix);
 }
 
 }  // namespace dgl

@@ -104,7 +104,7 @@ def schedule_recv(graph,
         #   2) no send has been called
         if apply_func is not None:
             schedule_apply_nodes(recv_nodes, apply_func, graph.dstframe,
-                                 inplace, outframe)
+                                 inplace, outframe, ntype=graph.canonical_etype[-1])
     else:
         var_dst_nf = var.FEAT_DICT(graph.dstframe, 'dst_nf')
         var_out_nf = var_dst_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
@@ -117,7 +117,8 @@ def schedule_recv(graph,
                                    recv_nodes)
         # apply
         final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf,
-                                       reduced_feat, apply_func)
+                                       reduced_feat, apply_func,
+                                       ntype=graph.canonical_etype[-1])
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
         else:
@@ -182,10 +183,11 @@ def schedule_snr(graph,
                                     var_reduce_nodes=var_recv_nodes,
                                     uv_getter=uv_getter,
                                     adj_creator=adj_creator,
-                                    out_map_creator=out_map_creator)
+                                    out_map_creator=out_map_creator,
+                                    canonical_etype=graph.canonical_etype)
     # generate apply schedule
     final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf, reduced_feat,
-                                   apply_func)
+                                   apply_func, ntype=graph.canonical_etype[-1])
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_out_nf, var_recv_nodes, final_feat)
     else:
@@ -216,7 +218,8 @@ def schedule_update_all(graph,
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph.num_dst()))
             schedule_apply_nodes(nodes, apply_func, graph.dstframe,
-                                 inplace=False, outframe=outframe)
+                                 inplace=False, outframe=outframe,
+                                 ntype=graph.canonical_etype[-1])
     else:
         eid = utils.toindex(slice(0, graph.num_edges())) # ALL
         recv_nodes = utils.toindex(slice(0, graph.num_dst())) # ALL
@@ -240,17 +243,20 @@ def schedule_update_all(graph,
                                         var_reduce_nodes=var_recv_nodes,
                                         uv_getter=uv_getter,
                                         adj_creator=adj_creator,
-                                        out_map_creator=out_map_creator)
+                                        out_map_creator=out_map_creator,
+                                        canonical_etype=graph.canonical_etype)
         # generate optional apply
         final_feat = _apply_with_accum(var_recv_nodes, var_dst_nf,
-                                       reduced_feat, apply_func)
+                                       reduced_feat, apply_func,
+                                       ntype=graph.canonical_etype[-1])
         ir.WRITE_DICT_(var_out_nf, final_feat)
 
 def schedule_apply_nodes(v,
                          apply_func,
                          node_frame,
                          inplace,
-                         outframe=None):
+                         outframe=None,
+                         ntype=None):
     """Get apply nodes schedule
 
     Parameters
@@ -265,6 +271,9 @@ def schedule_apply_nodes(v,
         If True, the update will be done in place
     outframe : FrameRef, optional
         The storage to write output data. If None, use the given node_frame.
+    ntype : str, optional
+        The node type, if running on a heterograph.
+        If None, assuming it's running on a homogeneous graph.
 
     Returns
     -------
@@ -275,7 +284,7 @@ def schedule_apply_nodes(v,
     var_out_nf = var_nf if outframe is None else var.FEAT_DICT(outframe, name='out_nf')
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
-        nbatch = NodeBatch(v, node_data)
+        nbatch = NodeBatch(v, node_data, ntype=ntype)
         return apply_func(nbatch)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
@@ -472,7 +481,8 @@ def schedule_pull(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_apply_nodes(pull_nodes, apply_func, graph.dstframe, inplace, outframe)
+            schedule_apply_nodes(pull_nodes, apply_func, graph.dstframe, inplace,
+                                 outframe, ntype=graph.canonical_etype[-1])
     else:
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
@@ -492,10 +502,12 @@ def schedule_pull(graph,
                                         graph.dstframe, graph.edgeframe,
                                         message_func, reduce_func, var_eid,
                                         var_pull_nodes, uv_getter, adj_creator,
-                                        out_map_creator)
+                                        out_map_creator,
+                                        canonical_etype=graph.canonical_etype)
         # generate optional apply
         final_feat = _apply_with_accum(var_pull_nodes, var_dst_nf,
-                                       reduced_feat, apply_func)
+                                       reduced_feat, apply_func,
+                                       ntype=graph.canonical_etype[-1])
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_out_nf, var_pull_nodes, final_feat)
         else:
@@ -535,7 +547,8 @@ def schedule_group_apply_edge(graph,
     var_out_ef = var_ef if outframe is None else var.FEAT_DICT(outframe, name='out_ef')
     var_out = var.FEAT_DICT(name='new_ef')
     db.gen_group_apply_edge_schedule(apply_func, u, v, eid, group_by,
-                                     var_src_nf, var_dst_nf, var_ef, var_out)
+                                     var_src_nf, var_dst_nf, var_ef, var_out,
+                                     canonical_etype=graph.canonical_etype)
     var_eid = var.IDX(eid)
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_out_ef, var_eid, var_out)
@@ -700,7 +713,7 @@ def _standardize_func_usage(func, func_name):
                            ' Got: %s' % (func_name, str(func)))
         return func
 
-def _apply_with_accum(var_nodes, var_nf, var_accum, apply_func):
+def _apply_with_accum(var_nodes, var_nf, var_accum, apply_func, ntype=None):
     """Apply with accumulated features.
 
     Paramters
@@ -713,6 +726,9 @@ def _apply_with_accum(var_nodes, var_nf, var_accum, apply_func):
         The accumulated features.
     apply_func : callable, None
         The apply function.
+    ntype : str, optional
+        The node type, if running on a heterograph.
+        If None, assuming it's running on a homogeneous graph.
     """
     if apply_func:
         # To avoid writing reduced features back to node frame and reading
@@ -722,7 +738,7 @@ def _apply_with_accum(var_nodes, var_nf, var_accum, apply_func):
         v_nf = ir.UPDATE_DICT(v_nf, var_accum)
 
         def _afunc_wrapper(node_data):
-            nbatch = NodeBatch(var_nodes.data, node_data)
+            nbatch = NodeBatch(var_nodes.data, node_data, ntype=ntype)
             return apply_func(nbatch)
         afunc = var.FUNC(_afunc_wrapper)
         applied_feat = ir.NODE_UDF(afunc, v_nf)
@@ -778,7 +794,8 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     else:
         # gen degree bucketing schedule for UDF recv
         db.gen_degree_bucketing_schedule(rfunc, eid, dst, recv_nodes,
-                                         var_dst_nf, var_msg, var_out)
+                                         var_dst_nf, var_msg, var_out,
+                                         ntype=graph.canonical_etype[-1])
         return var_out
 
 def _gen_send_reduce(
@@ -791,7 +808,8 @@ def _gen_send_reduce(
         var_reduce_nodes,
         uv_getter,
         adj_creator,
-        out_map_creator):
+        out_map_creator,
+        canonical_etype=(None, None, None)):
     """Generate send and reduce schedule.
 
     The function generates symbolic program for computing
@@ -832,9 +850,12 @@ def _gen_send_reduce(
     adj_creator : callable
         Function that returns the adjmat, edge order of csr matrix, and
         bit-width.
-    out_map_creator: callable
+    out_map_creator : callable
         A function that returns a mapping from reduce_nodes to relabeled
         consecutive ids
+    canonical_etype : tuple[str, str, str], optional
+        Canonical edge type if running on a heterograph.
+        Default: (None, None, None), if running on a homogeneous graph.
 
     Returns
     -------
@@ -917,7 +938,7 @@ def _gen_send_reduce(
     else:
         # generate UDF send schedule
         var_mf = _gen_udf_send(var_src_nf, var_dst_nf, var_ef, var_u,
-                               var_v, var_eid, mfunc)
+                               var_v, var_eid, mfunc, canonical_etype=canonical_etype)
 
     # 6. Generate reduce
     if rfunc_is_list:
@@ -935,17 +956,18 @@ def _gen_send_reduce(
         mid = utils.toindex(slice(0, len(var_v.data)))
         db.gen_degree_bucketing_schedule(rfunc, mid, var_v.data,
                                          reduce_nodes, var_dst_nf, var_mf,
-                                         var_out)
+                                         var_out, ntype=canonical_etype[-1])
         return var_out
 
-def _gen_udf_send(var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc):
+def _gen_udf_send(var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc,
+                  canonical_etype=(None, None, None)):
     """Internal function to generate send schedule for UDF message function."""
     fdsrc = ir.READ_ROW(var_src_nf, u)
     fddst = ir.READ_ROW(var_dst_nf, v)
     fdedge = ir.READ_ROW(var_ef, eid)
     def _mfunc_wrapper(src_data, edge_data, dst_data):
         ebatch = EdgeBatch((u.data, v.data, eid.data),
-                           src_data, edge_data, dst_data)
+                           src_data, edge_data, dst_data, canonical_etype=canonical_etype)
         return mfunc(ebatch)
     _mfunc_wrapper = var.FUNC(_mfunc_wrapper)
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
@@ -982,7 +1004,8 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
     else:
         # UDF send
         var_out = _gen_udf_send(var_src_nf, var_dst_nf, var_ef, var_u,
-                                var_v, var_eid, mfunc)
+                                var_v, var_eid, mfunc,
+                                canonical_etype=graph.canonical_etype)
     return var_out
 
 def _build_idx_map(idx, nbits):

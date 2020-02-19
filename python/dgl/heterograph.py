@@ -1,4 +1,5 @@
 """Classes for heterogeneous graphs."""
+#pylint: disable= too-many-lines
 from collections import defaultdict
 from contextlib import contextmanager
 import networkx as nx
@@ -617,6 +618,7 @@ class DGLHeteroGraph(object):
                   "to get view of one relation type. Use : to slice multiple types (e.g. " +\
                   "G['srctype', :, 'dsttype'])."
 
+        orig_key = key
         if not isinstance(key, tuple):
             key = (SLICE_FULL, key, SLICE_FULL)
 
@@ -624,6 +626,10 @@ class DGLHeteroGraph(object):
             raise DGLError(err_msg)
 
         etypes = self._find_etypes(key)
+
+        if len(etypes) == 0:
+            raise DGLError('Invalid key "{}". Must be one of the edge types.'.format(orig_key))
+
         if len(etypes) == 1:
             # no ambiguity: return the unitgraph itself
             srctype, etype, dsttype = self._canonical_etypes[etypes[0]]
@@ -2276,7 +2282,7 @@ class DGLHeteroGraph(object):
             v_ntype = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_apply_nodes(v_ntype, func, self._node_frames[ntid],
-                                           inplace=inplace)
+                                           inplace=inplace, ntype=self._ntypes[ntid])
             Runtime.run(prog)
 
     def apply_edges(self, func, edges=ALL, etype=None, inplace=False):
@@ -2647,6 +2653,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for ety, args in reducer_dict.items():
                 outframe = FrameRef(frame_like(self._node_frames[ntid]._frame))
@@ -2661,9 +2668,10 @@ class DGLHeteroGraph(object):
                                         v, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[ntid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -2849,6 +2857,7 @@ class DGLHeteroGraph(object):
         #   Should replace it with fused kernel.
         all_out = []
         all_vs = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -2877,9 +2886,10 @@ class DGLHeteroGraph(object):
                                        mfunc, rfunc, afunc,
                                        inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             dstnodes = F.unique(F.cat([x.tousertensor() for x in all_vs], 0))
@@ -3037,6 +3047,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = []
+        merge_order = []
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3052,9 +3063,10 @@ class DGLHeteroGraph(object):
                                         mfunc, rfunc, afunc,
                                         inplace=inplace, outframe=outframe)
                 all_out.append(outframe)
+                merge_order.append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         # merge by cross_reducer
-        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer))
+        self._node_frames[dtid].update(merge_frames(all_out, cross_reducer, merge_order))
         # apply
         if apply_node_func is not None:
             self.apply_nodes(apply_node_func, v, ntype, inplace)
@@ -3257,6 +3269,7 @@ class DGLHeteroGraph(object):
         # TODO(minjie): currently loop over each edge type and reuse the old schedule.
         #   Should replace it with fused kernel.
         all_out = defaultdict(list)
+        merge_order = defaultdict(list)
         with ir.prog() as prog:
             for etype, args in etype_dict.items():
                 etid = self.get_etype_id(etype)
@@ -3271,10 +3284,12 @@ class DGLHeteroGraph(object):
                                               mfunc, rfunc, afunc,
                                               outframe=outframe)
                 all_out[dtid].append(outframe)
+                merge_order[dtid].append(etid)  # use edge type id as merge order hint
             Runtime.run(prog)
         for dtid, frames in all_out.items():
             # merge by cross_reducer
-            self._node_frames[dtid].update(merge_frames(frames, cross_reducer))
+            self._node_frames[dtid].update(
+                merge_frames(frames, cross_reducer, merge_order[dtid]))
             # apply
             if apply_node_func is not None:
                 self.apply_nodes(apply_node_func, ALL, self.ntypes[dtid], inplace=False)
@@ -3496,7 +3511,7 @@ class DGLHeteroGraph(object):
             v = utils.toindex(nodes)
 
         n_repr = self._get_n_repr(ntid, v)
-        nbatch = NodeBatch(v, n_repr)
+        nbatch = NodeBatch(v, n_repr, ntype=self.ntypes[ntid])
         n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
@@ -3557,7 +3572,8 @@ class DGLHeteroGraph(object):
         src_data = self._get_n_repr(stid, u)
         edge_data = self._get_e_repr(etid, eid)
         dst_data = self._get_n_repr(dtid, v)
-        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data)
+        ebatch = EdgeBatch((u, v, eid), src_data, edge_data, dst_data,
+                           canonical_etype=self.canonical_etypes[etid])
         e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
@@ -3806,28 +3822,38 @@ def pad_tuple(tup, length, pad_val=None):
     else:
         return tup + (pad_val,) * (length - len(tup))
 
-def merge_frames(frames, reducer):
+def merge_frames(frames, reducer, order=None):
     """Merge input frames into one. Resolve conflict fields using reducer.
 
     Parameters
     ----------
-    frames : list of FrameRef
+    frames : list[FrameRef]
         Input frames
     reducer : str
         One of "sum", "max", "min", "mean", "stack"
+    order : list[Int], optional
+        Merge order hint. Useful for "stack" reducer.
+        If provided, each integer indicates the relative order
+        of the ``frames`` list. Frames are sorted according to this list
+        in ascending order. Tie is not handled so make sure the order values
+        are distinct.
 
     Returns
     -------
     FrameRef
         Merged frame
     """
-    if len(frames) == 1:
+    if len(frames) == 1 and reducer != 'stack':
+        # Directly return the only one input. Stack reducer requires
+        # modifying tensor shape.
         return frames[0]
     if reducer == 'stack':
-        # TODO(minjie): Stack order does not matter. However, it must
-        #   be consistent! Need to enforce one type of order.
+        # Stack order does not matter. However, it must be consistent!
+        if order:
+            assert len(order) == len(frames)
+            sorted_with_key = sorted(zip(frames, order), key=lambda x: x[1])
+            frames = list(zip(*sorted_with_key))[0]
         def merger(flist):
-            flist = [F.unsqueeze(f, 1) for f in flist]
             return F.stack(flist, 1)
     else:
         redfn = getattr(F, reducer, None)
@@ -3835,7 +3861,7 @@ def merge_frames(frames, reducer):
             raise DGLError('Invalid cross type reducer. Must be one of '
                            '"sum", "max", "min", "mean" or "stack".')
         def merger(flist):
-            return redfn(F.stack(flist, 0), 0)
+            return redfn(F.stack(flist, 0), 0) if len(flist) > 1 else flist[0]
     ret = FrameRef(frame_like(frames[0]._frame))
     keys = set()
     for frm in frames:
@@ -3845,10 +3871,7 @@ def merge_frames(frames, reducer):
         for frm in frames:
             if k in frm:
                 flist.append(frm[k])
-        if len(flist) > 1:
-            ret[k] = merger(flist)
-        else:
-            ret[k] = flist[0]
+        ret[k] = merger(flist)
     return ret
 
 def combine_frames(frames, ids):
@@ -3988,3 +4011,8 @@ class AdaptedHeteroGraph(GraphAdapter):
 
     def bits_needed(self):
         return self.graph._graph.bits_needed(self.etid)
+
+    @property
+    def canonical_etype(self):
+        """Canonical edge type."""
+        return self.graph.canonical_etypes[self.etid]

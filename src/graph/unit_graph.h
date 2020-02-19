@@ -10,14 +10,20 @@
 #include <dgl/base_heterograph.h>
 #include <dgl/lazy.h>
 #include <dgl/array.h>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <utility>
 #include <string>
 #include <vector>
 #include <mutex>
+#include <memory>
 
 #include "../c_api_common.h"
 
 namespace dgl {
+
+class UnitGraph;
+typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
 /*!
  * \brief UnitGraph graph
@@ -143,15 +149,32 @@ class UnitGraph : public BaseHeteroGraph {
       const std::vector<IdArray>& eids, bool preserve_nodes = false) const override;
 
   // creators
+  /*! \brief Create a graph with no edges */
+  static HeteroGraphPtr Empty(
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+      DLDataType dtype, DLContext ctx) {
+    IdArray row = IdArray::Empty({0}, dtype, ctx);
+    IdArray col = IdArray::Empty({0}, dtype, ctx);
+    return CreateFromCOO(num_vtypes, num_src, num_dst, row, col);
+  }
+
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
 
+  static HeteroGraphPtr CreateFromCOO(
+      int64_t num_vtypes, const aten::COOMatrix& mat,
+      SparseFormat restrict_format = SparseFormat::ANY);
+
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
+      SparseFormat restrict_format = SparseFormat::ANY);
+
+  static HeteroGraphPtr CreateFromCSR(
+      int64_t num_vtypes, const aten::CSRMatrix& mat,
       SparseFormat restrict_format = SparseFormat::ANY);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
@@ -178,16 +201,38 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Return the COO format. Create from other format if not exist. */
   COOPtr GetCOO() const;
 
-  /*! \return Return the in-edge CSR in the matrix form */
-  aten::CSRMatrix GetInCSRMatrix() const;
+  /*! \return Return the COO matrix form */
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override;
+
+  /*! \return Return the in-edge CSC in the matrix form */
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override;
 
   /*! \return Return the out-edge CSR in the matrix form */
-  aten::CSRMatrix GetOutCSRMatrix() const;
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override;
 
-  /*! \return Return the COO matrix form */
-  aten::COOMatrix GetCOOMatrix() const;
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    return SelectFormat(preferred_format);
+  }
+
+  /*! \return Load UnitGraph from stream, using CSRMatrix*/
+  bool Load(dmlc::Stream* fs);
+
+  /*! \return Save UnitGraph to stream, using CSRMatrix */
+  void Save(dmlc::Stream* fs) const;
+
+  /*! \brief Move assignment operator that overrides the default because of mutex */
+  UnitGraph& operator=(UnitGraph&& other) {
+    in_csr_ = std::move(other.in_csr_);
+    out_csr_ = std::move(other.out_csr_);
+    coo_ = std::move(other.coo_);
+    // skip lazy_mutex_
+    restrict_format_ = std::move(other.restrict_format_);
+    return *this;
+  }
 
  private:
+  friend class Serializer;
+
   /*!
    * \brief constructor
    * \param metagraph metagraph
@@ -221,6 +266,9 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
+  // Empty Graph for Serializer Usgae
+  static UnitGraph* EmptyGraph();
+
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
   /*! \brief CSR graph that stores reverse edges */
@@ -244,5 +292,9 @@ class UnitGraph : public BaseHeteroGraph {
 };
 
 };  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
+}  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_
