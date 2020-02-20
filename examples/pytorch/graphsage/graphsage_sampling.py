@@ -4,12 +4,43 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.multiprocessing as mp
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import time
 import argparse
+from _thread import start_new_thread
+from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
+
+# According to https://github.com/pytorch/pytorch/issues/17199, this decorator
+# is necessary to make fork() and openmp work together.
+#
+# TODO: confirm if this is necessary for MXNet and Tensorflow.  If so, we need
+# to standardize worker process creation since our operators are implemented with
+# OpenMP.
+def thread_wrapped_func(func):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        queue = mp.Queue()
+        def _queue_result():
+            exception, trace, res = None, None, None
+            try:
+                res = func(*args, **kwargs)
+            except Exception as e:
+                exception = e
+                trace = traceback.format_exc()
+            queue.put((res, exception, trace))
+
+        start_new_thread(_queue_result, ())
+        result, exception, trace = queue.get()
+        if exception is None:
+            return result
+        else:
+            assert isinstance(exception, Exception)
+            raise exception.__class__(trace)
+    return decorated_function
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -60,6 +91,7 @@ def evaluate(model, frontiers, inputs, labels, mask):
     model.train()
     return compute_acc(pred[mask], labels[mask])
 
+@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
 
@@ -135,8 +167,6 @@ def run(proc_id, n_gpus, args, devices, data):
                         th.distributed.all_reduce(param.grad.data,
                                                   op=th.distributed.ReduceOp.SUM)
                         param.grad.data /= n_gpus
-            #if n_gpus > 1:
-                #th.distributed.barrier()
             optimizer.step()
             if proc_id == 0:
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
@@ -196,7 +226,6 @@ if __name__ == '__main__':
         run(0, n_gpus, args, devices, data)
     else:
         procs = []
-        mp = th.multiprocessing
         for proc_id in range(n_gpus):
             p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, data))
             p.start()
