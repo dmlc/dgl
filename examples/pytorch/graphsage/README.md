@@ -25,3 +25,17 @@ python3 graphsage.py --dataset cora --gpu 0
 * cora: ~0.8330 
 * citeseer: ~0.7110
 * pubmed: ~0.7830
+
+### Minibatch training with neighbor sampling on Reddit
+
+Run with following for Reddit with minibatch training:
+```bash
+python3 graphsage_sampling.py
+```
+
+Run with following for Reddit with minibatch training on 4 GPUs:
+```bash
+python3 graphsage_sampling.py --gpu 0,1,2,3
+```
+
+The accuracy can go to around 0.95.

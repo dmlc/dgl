@@ -202,7 +202,7 @@ if __name__ == '__main__':
     argparser.add_argument('--batch-size', type=int, default=1000)
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=5)
-    argparser.add_argument('--lr', type=float, default=0.03)
+    argparser.add_argument('--lr', type=float, default=0.003)
     args = argparser.parse_args()
     
     devices = list(map(int, args.gpu.split(',')))
