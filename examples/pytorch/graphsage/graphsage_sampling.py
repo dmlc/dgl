@@ -28,7 +28,7 @@ class SAGE(nn.Module):
             self.layers.append(dglnn.SAGEConv(
                 n_hidden, n_hidden, 'mean', feat_drop=dropout, activation=activation))
         self.layers.append(dglnn.SAGEConv(
-            n_hidden, n_classes, 'mean', feat_drop=dropout, activation=activation))
+            n_hidden, n_classes, 'mean', feat_drop=dropout))
 
     def forward(self, frontiers, x):
         h = x
@@ -89,8 +89,9 @@ def run(proc_id, n_gpus, args, devices, data):
     val_frontiers = sampler.sample_frontiers(val_nid)
     val_induced_nodes = val_frontiers[0].ndata[dgl.NID]
     batch_val_inputs = g.ndata['features'][val_induced_nodes].to(dev_id)
-    batch_val_mask = val_mask[val_induced_nodes].to(dev_id)
     batch_val_labels = labels[val_induced_nodes].to(dev_id)
+    induced_nodes_in_val = th.BoolTensor(
+        np.isin(val_induced_nodes.numpy(), val_nid.numpy(), assume_unique=True)).to(dev_id)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, dropout)
@@ -106,20 +107,23 @@ def run(proc_id, n_gpus, args, devices, data):
     iter_tput = []
     for epoch in range(args.num_epochs):
         tic = time.time()
-        train_nid_batches = train_nid[th.randperm(len(train_nid))].split(args.batch_size)
-        for step, seeds in enumerate(train_nid_batches):
+        train_nid_batches = train_nid[th.randperm(len(train_nid))]
+        n_batches = (len(train_nid_batches) + args.batch_size - 1) // args.batch_size
+        for step in range(n_batches):
+            seeds = train_nid_batches[step * args.batch_size:(step+1) * args.batch_size]
             if proc_id == 0:
                 tic_step = time.time()
 
             frontiers = sampler.sample_frontiers(seeds)
             induced_nodes = frontiers[0].ndata[dgl.NID]
             batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
-            batch_train_mask = train_mask[induced_nodes].to(dev_id)
             batch_labels = labels[induced_nodes].to(dev_id)
+            induced_nodes_in_seeds = th.BoolTensor(
+                np.isin(induced_nodes.numpy(), seeds.numpy(), assume_unique=True)).to(dev_id)
 
             # forward
-            batch_pred = model(frontiers, batch_inputs)[batch_train_mask]
-            batch_labels = batch_labels[batch_train_mask]
+            batch_pred = model(frontiers, batch_inputs)[induced_nodes_in_seeds]
+            batch_labels = batch_labels[induced_nodes_in_seeds]
             # compute loss
             loss = loss_fcn(batch_pred, batch_labels)
             # backward
@@ -150,7 +154,7 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch >= 5:
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
-                eval_acc = evaluate(model, val_frontiers, batch_val_inputs, batch_val_labels, batch_val_mask)
+                eval_acc = evaluate(model, val_frontiers, batch_val_inputs, batch_val_labels, induced_nodes_in_val)
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
     if n_gpus > 1:
