@@ -45,7 +45,8 @@ class NeighborSampler(object):
         frontiers = []
         for fanout in self.fanouts:
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
-            seeds = th.unique(th.cat(frontier.all_edges()))
+            src, dst = frontier.all_edges()
+            seeds = th.unique(th.cat([src, dst]))
             frontiers.insert(0, frontier)
         return dgl.compact_graphs(frontiers)
 
@@ -87,9 +88,9 @@ def run(proc_id, n_gpus, args, devices, data):
     sampler = NeighborSampler(g, [args.fan_out] * args.num_layers)
     val_frontiers = sampler.sample_frontiers(val_nid)
     val_induced_nodes = val_frontiers[0].ndata[dgl.NID]
-    batch_val_inputs = g.ndata['features'][val_induced_nodes]
-    batch_val_mask = val_mask[val_induced_nodes]
-    batch_val_labels = labels[val_induced_nodes]
+    batch_val_inputs = g.ndata['features'][val_induced_nodes].to(dev_id)
+    batch_val_mask = val_mask[val_induced_nodes].to(dev_id)
+    batch_val_labels = labels[val_induced_nodes].to(dev_id)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, dropout)
@@ -111,7 +112,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 tic_step = time.time()
 
             frontiers = sampler.sample_frontiers(seeds)
-            induced_nodes = frontiers.ndata[dgl.NID]
+            induced_nodes = frontiers[0].ndata[dgl.NID]
             batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
             batch_train_mask = train_mask[induced_nodes].to(dev_id)
             batch_labels = labels[induced_nodes].to(dev_id)
@@ -134,7 +135,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 #th.distributed.barrier()
             optimizer.step()
             if proc_id == 0:
-                iter_tput.append(len(batch_nids) * n_gpus / (time.time() - tic_step))
+                iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
             if step % args.log_every == 0 and proc_id == 0:
                 acc = compute_acc(batch_pred, batch_labels)
                 print('Epoch {:05d} | Step {:05d} | Loss {:.4f} | Train Acc {:.4f} | Speed (samples/sec) {:.4f}'.format(
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-hidden', type=int, default=64)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--fan-out', type=int, default=10)
-    argparser.add_argument('--batch-size', type=int, default=32)
+    argparser.add_argument('--batch-size', type=int, default=1000)
     argparser.add_argument('--log-every', type=int, default=20)
     argparser.add_argument('--eval-every', type=int, default=5)
     argparser.add_argument('--lr', type=float, default=0.03)
