@@ -324,6 +324,7 @@ def _recv_kv_msg(receiver):
 def _clear_kv_msg(msg):
     """Clear data of kvstore message
     """
-    F.sync()
-    if msg.c_ptr is not None:
-        _CAPI_DeleteKVMsg(msg.c_ptr)
+    #F.sync()
+    #if msg.c_ptr is not None:
+    #    _CAPI_DeleteKVMsg(msg.c_ptr)
+    return
