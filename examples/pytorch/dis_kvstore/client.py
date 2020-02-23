@@ -44,7 +44,6 @@ def start_client(args):
     if my_client.get_id() % args.num_worker == 0:
         my_client.set_partition_book(name='entity_embed', partition_book=partition)
     else:
-        time.sleep(3)
         my_client.set_partition_book(name='entity_embed')
 
     my_client.print()
@@ -53,8 +52,9 @@ def start_client(args):
 
     print("send request...")
 
-    for i in range(4):
-        my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
+    for i in range(100):
+        for i in range(4):
+            my_client.push(name='entity_embed', id_tensor=ID[i], data_tensor=DATA[i])
 
     my_client.barrier()
 
@@ -64,7 +64,8 @@ def start_client(args):
 
     my_client.barrier()
 
-    my_client.push(name='entity_embed', id_tensor=ID[my_client.get_machine_id()], data_tensor=th.tensor([[0.,0.,0.],[0.,0.,0.]]))
+    for i in range(100):
+        my_client.push(name='entity_embed', id_tensor=ID[my_client.get_machine_id()], data_tensor=th.tensor([[0.,0.,0.],[0.,0.,0.]]))
 
     my_client.barrier()
 
