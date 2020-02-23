@@ -712,7 +712,7 @@ class KVClient(object):
     def print(self):
         """Print client information (Used by debug)
         """
-        print("----- KVStore Info -----")
+        print("----- KVClient Info -----")
         print("client id: %d" % self.get_id())
         print("data:")
         for name, data in self._data_store.items():

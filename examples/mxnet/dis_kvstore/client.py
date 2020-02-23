@@ -76,6 +76,7 @@ def start_client(args):
         my_client.shut_down()
 
 
+
 if __name__ == '__main__':
     args = ArgParser().parse_args()
     start_client(args)
