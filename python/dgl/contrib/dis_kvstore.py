@@ -353,7 +353,6 @@ class KVServer(object):
         if self._server_id == 0:
             shared_tensor = ''
             for name in self._has_data:
-                print(name)
                 shared_tensor += self._serialize_shared_tensor(
                     name, F.dtype(self._data_store[name]))
                 shared_tensor += '|'
@@ -696,12 +695,11 @@ class KVClient(object):
         for data in data_str:
             if data != '':
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
-                print(tensor_name)
-                #if (os.path.exists(tensor_name+'shape')):
-                #    time.sleep(2) # wait writing finish
-                #    break
-                #else:
-                #    time.sleep(2) # wait until the file been created  
+                if (os.path.exists(tensor_name+'shape')):
+                    time.sleep(2) # wait writing finish
+                    break
+                else:
+                    time.sleep(2) # wait until the file been created  
                 shape = self._read_data_shape(tensor_name+'shape')
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
@@ -720,7 +718,7 @@ class KVClient(object):
         for name, data in self._data_store.items():
             print(name)
             print(data)
-        print("------------------------")
+        print("-------------------------")
 
 
     def get_id(self):
