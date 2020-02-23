@@ -44,7 +44,6 @@ def start_client(args):
     if my_client.get_id() % args.num_worker == 0:
         my_client.set_partition_book(name='entity_embed', partition_book=partition)
     else:
-        time.sleep(3)
         my_client.set_partition_book(name='entity_embed')
 
     my_client.print()
