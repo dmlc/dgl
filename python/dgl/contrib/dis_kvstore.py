@@ -68,7 +68,7 @@ def read_ip_config(filename):
         for line in lines:
             ip, port, server_count = line.split(' ')
             for s_count in range(int(server_count)):
-                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count, server_count]
+                server_namebook[server_id] = [int(machine_id), ip, int(port)+s_count, int(server_count)]
                 server_id += 1
             machine_id += 1
     except:
