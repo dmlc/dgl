@@ -699,7 +699,8 @@ class KVClient(object):
                     time.sleep(2) # wait writing finish
                     break
                 else:
-                    time.sleep(2) # wait until the file been created  
+                    time.sleep(2) # wait until the file been created 
+                print(tensor_name)
                 shape = self._read_data_shape(tensor_name+'shape')
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
