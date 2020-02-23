@@ -15,6 +15,35 @@ import logging
 import time
 from functools import wraps
 
+from kvclient import KGEClient
+
+from dataloader import EvalDataset
+from dataloader import get_dataset
+
+
+def connect_to_kvstore(args, entity_pb, relation_pb, l2g):
+    """Create kvclient and connect to kvstore service
+    """
+    server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
+
+    my_client = KGEClient(server_namebook=server_namebook)
+
+    my_client.set_clr(args.lr)
+
+    my_client.connect()
+
+    if my_client.get_id() % args.num_client == 0:
+        my_client.set_partition_book(name='entity_emb', partition_book=entity_pb)
+        my_client.set_partition_book(name='relation_emb', partition_book=relation_pb)
+    else:
+        my_client.set_partition_book(name='entity_emb')
+        my_client.set_partition_book(name='relation_emb')
+
+    my_client.set_local2global(l2g)
+
+    return my_client
+
+
 def load_model(logger, args, n_entities, n_relations, ckpt=None):
     model = KEModel(args, args.model_name, n_entities, n_relations,
                     args.hidden_dim, args.gamma,
@@ -29,7 +58,7 @@ def load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
     model.load_emb(ckpt_path, args.dataset)
     return model
 
-def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None):
+def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=None, cross_rels=None, barrier=None, client=None):
     logs = []
     for arg in vars(args):
         logging.info('{:20}:{}'.format(arg, getattr(args, arg)))
@@ -57,6 +86,9 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         sample_time += time.time() - start1
         args.step = step
 
+        if client is not None:
+            model.pull_model(client, pos_g, neg_g)
+
         start1 = time.time()
         loss, log = model.forward(pos_g, neg_g, gpu_id)
         forward_time += time.time() - start1
@@ -66,7 +98,10 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         backward_time += time.time() - start1
 
         start1 = time.time()
-        model.update(gpu_id)
+        if client is not None:
+            model.push_gradient(client)
+        else:
+            model.update(gpu_id)
         update_time += time.time() - start1
         logs.append(log)
 
@@ -147,3 +182,125 @@ def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=
 @thread_wrapped_func
 def test_mp(args, model, test_samplers, rank=0, mode='Test', queue=None):
     test(args, model, test_samplers, rank, mode, queue)
+
+@thread_wrapped_func
+def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, rank=0, rel_parts=None, cross_rels=None, barrier=None):
+    if args.num_proc > 1:
+        th.set_num_threads(args.num_thread)
+
+    client = connect_to_kvstore(args, entity_pb, relation_pb, l2g)
+    client.barrier()
+    train(args, model, train_sampler, valid_samplers, rank, rel_parts, cross_rels, barrier, client)
+    print("Finish training. Pull model from kvstore ...")
+    client.barrier()
+
+    model = None
+
+    if client.get_id() % args.num_client == 0: # pull full model from kvstore
+
+        args.num_test_proc = args.num_client
+        dataset_full = get_dataset(args.data_path, args.dataset, args.format)
+
+        print('Full data n_entities: ' + str(dataset_full.n_entities))
+        print("Full data n_relations: " + str(dataset_full.n_relations))
+
+        model_test = load_model(None, args, dataset_full.n_entities, dataset_full.n_relations)
+        eval_dataset = EvalDataset(dataset_full, args)
+
+        if args.test:
+            model_test.share_memory()
+
+        if args.neg_sample_size_test < 0:
+            args.neg_sample_size_test = dataset_full.n_entities
+        args.eval_filter = not args.no_eval_filter
+        if args.neg_deg_sample_eval:
+            assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
+
+        if args.neg_chunk_size_valid < 0:
+            args.neg_chunk_size_valid = args.neg_sample_size_valid
+        if args.neg_chunk_size_test < 0:
+            args.neg_chunk_size_test = args.neg_sample_size_test
+
+        print("Pull relation_emb ...")
+        relation_id = F.arange(0, model_test.n_relations)
+        relation_data = client.pull(name='relation_emb', id_tensor=relation_id)
+        model_test.relation_emb.emb[relation_id] = relation_data
+ 
+        print("Pull entity_emb ... ")
+        # split model into 100 small parts
+        start = 0
+        percent = 0
+        entity_id = F.arange(0, model_test.n_entities)
+        count = int(model_test.n_entities / 100)
+        end = start + count
+        while True:
+            print("%d % 100 ..." % percent)
+            if end >= model_test.n_entities:
+                end = -1
+            tmp_id = entity_id[start:end]
+            entity_data = client.pull(name='entity_emb', id_tensor=tmp_id)
+            model_test.entity_emb.emb[tmp_id] = entity_data
+            if end == -1:
+                break
+            start = end
+            end += count
+            percent += 1
+
+        if args.save_emb is not None:
+            if not os.path.exists(args.save_emb):
+                os.mkdir(args.save_emb)
+            model_test.save_emb(args.save_emb, args.dataset)
+
+        if args.test:
+            test_sampler_tails = []
+            test_sampler_heads = []
+            for i in range(args.num_test_proc):
+                test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                args.neg_sample_size_test,
+                                                                args.neg_chunk_size_test,
+                                                                args.eval_filter,
+                                                                mode='chunk-head',
+                                                                num_workers=arg.num_thread,
+                                                                rank=i, ranks=args.num_test_proc)
+                test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                args.neg_sample_size_test,
+                                                                args.neg_chunk_size_test,
+                                                                args.eval_filter,
+                                                                mode='chunk-tail',
+                                                                num_workers=args.num_thread,
+                                                                rank=i, ranks=args.num_test_proc)
+                test_sampler_heads.append(test_sampler_head)
+                test_sampler_tails.append(test_sampler_tail)
+
+            eval_dataset = None
+            dataset_full = None
+
+            queue = mp.Queue(args.num_test_proc)
+            procs = []
+            for i in range(args.num_test_proc):
+                proc = mp.Process(target=test_mp, args=(args,
+                                                        model_test,
+                                                        [test_sampler_heads[i], test_sampler_tails[i]],
+                                                        i,
+                                                        'Test',
+                                                        queue))
+                procs.append(proc)
+                proc.start()
+
+            total_metrics = {}
+            metrics = {}
+            logs = []
+            for i in range(args.num_test_proc):
+                log = queue.get()
+                logs = logs + log
+            
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+            for k, v in metrics.items():
+                print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+
+            for proc in procs:
+                proc.join()
+
+        if client.get_id() == 0:
+            client.shut_down()
