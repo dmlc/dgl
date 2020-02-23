@@ -43,7 +43,6 @@ def start_server(args):
         my_server.set_global2local(name='entity_embed', global2local=g2l[my_server.get_machine_id()])
         my_server.init_data(name='entity_embed', data_tensor=data[my_server.get_machine_id()])
     else:
-        time.sleep(3)
         my_server.set_global2local(name='entity_embed')
         my_server.init_data(name='entity_embed')
 
