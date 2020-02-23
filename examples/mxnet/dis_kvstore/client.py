@@ -73,8 +73,8 @@ def start_client(args):
         res = my_client.pull(name='entity_embed', id_tensor=mx.nd.array([0,1,2,3,4,5,6,7], dtype='int64'))
         print(res)
 
+    if my_client.get_id() == 0:
         my_client.shut_down()
-
 
 
 if __name__ == '__main__':
