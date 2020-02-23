@@ -353,6 +353,7 @@ class KVServer(object):
         if self._server_id == 0:
             shared_tensor = ''
             for name in self._has_data:
+                print(name)
                 shared_tensor += self._serialize_shared_tensor(
                     name, F.dtype(self._data_store[name]))
                 shared_tensor += '|'
@@ -695,6 +696,7 @@ class KVClient(object):
         for data in data_str:
             if data != '':
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
+                print(tensor_name)
                 #if (os.path.exists(tensor_name+'shape')):
                 #    time.sleep(2) # wait writing finish
                 #    break
