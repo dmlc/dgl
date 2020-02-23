@@ -695,11 +695,11 @@ class KVClient(object):
         for data in data_str:
             if data != '':
                 tensor_name, dtype = self._deserialize_shared_tensor(data)
-                if (os.path.exists(tensor_name+'shape')):
-                    time.sleep(2) # wait writing finish
-                    break
-                else:
-                    time.sleep(2) # wait until the file been created  
+                #if (os.path.exists(tensor_name+'shape')):
+                #    time.sleep(2) # wait writing finish
+                #    break
+                #else:
+                #    time.sleep(2) # wait until the file been created  
                 shape = self._read_data_shape(tensor_name+'shape')
                 shared_data = empty_shared_mem(tensor_name, False, shape, dtype)
                 dlpack = shared_data.to_dlpack()
