@@ -107,11 +107,7 @@ def get_server_data(args, machine_id):
 
    model = load_model(None, args, dataset.n_entities, dataset.n_relations)
 
-   return g2l,
-     model.entity_emb.emb, 
-     model.entity_emb.state_sum, 
-     model.relation_emb.emb, 
-     model.relation_emb.state_sum
+   return g2l, model.entity_emb.emb, model.entity_emb.state_sum, model.relation_emb.emb, model.relation_emb.state_sum
 
 
 def start_server(args):
