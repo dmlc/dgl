@@ -17,10 +17,8 @@ from dataloader import get_dataset, get_partition_dataset
 
 import dgl.backend as F
 
-
 NUM_THREAD = 1 # Fix the number of threads to 1 on kvclient
 NUM_WORKER = 1 # Fix the number of worker for sampler to 1
-
 
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
