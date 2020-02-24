@@ -960,7 +960,7 @@ def _gen_send_reduce(
         return var_out
 
 def _gen_udf_send(var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc,
-                  canonical_etype=(None, None, None), block_id=None):
+                  canonical_etype=(None, None, None)):
     """Internal function to generate send schedule for UDF message function."""
     fdsrc = ir.READ_ROW(var_src_nf, u)
     fddst = ir.READ_ROW(var_dst_nf, v)
@@ -974,7 +974,7 @@ def _gen_udf_send(var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc,
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
 
-def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
+def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef, block_id=None):
     """Internal function to generate send schedule"""
     mfunc = _standardize_func_usage(mfunc, 'message')
     mfunc_is_list = utils.is_iterable(mfunc)
@@ -987,7 +987,7 @@ def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
         if not hasattr(graph, 'num_edges'):
             # XXX(minjie): a temporary hack to detect Nodeflow object
             res = spmv.build_gidx_and_mapping_block(graph, block_id)
-        if eid.is_slice(0, graph.num_edges()):
+        elif eid.is_slice(0, graph.num_edges()):
             # full graph case
             res = spmv.build_gidx_and_mapping_graph(graph)
         else:
