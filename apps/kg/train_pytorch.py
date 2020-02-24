@@ -15,6 +15,9 @@ import logging
 import time
 from functools import wraps
 
+import dgl
+from dgl.contrib import KVClient
+
 from dataloader import EvalDataset
 from dataloader import get_dataset
 
@@ -47,7 +50,7 @@ class KGEClient(KVClient):
     def get_local2global(self):
         return self._l2g
 
-        
+
 def connect_to_kvstore(args, entity_pb, relation_pb, l2g):
     """Create kvclient and connect to kvstore service
     """
