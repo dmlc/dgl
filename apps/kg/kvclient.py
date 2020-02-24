@@ -15,6 +15,7 @@ from train import get_logger
 from dataloader import TrainDataset, NewBidirectionalOneShotIterator
 from dataloader import get_dataset, get_partition_dataset
 
+import dgl
 import dgl.backend as F
 
 NUM_THREAD = 1 # Fix the number of threads to 1 on kvclient
