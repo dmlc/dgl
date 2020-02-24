@@ -63,9 +63,9 @@ def main(args):
     feats = torch.arange(num_nodes)
 
     # edge type and normalization factor
-    edge_type = torch.from_numpy(data.edge_type)
-    edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
-    labels = torch.from_numpy(labels).view(-1)
+    edge_type = torch.from_numpy(data.edge_type).long()
+    edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1).long()
+    labels = torch.from_numpy(labels).view(-1).long()
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
