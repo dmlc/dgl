@@ -677,7 +677,7 @@ def compact_graphs(graphs, always_preserve=None):
     for g in graphs:
         assert ntypes == g.ntypes, \
             ("All graphs should have the same node types in the same order, got %s and %s" %
-                ntypes, g.ntypes)
+             ntypes, g.ntypes)
         assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
         assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 

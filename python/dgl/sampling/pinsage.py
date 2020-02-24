@@ -5,7 +5,6 @@ import numpy as np
 from .. import backend as F
 from .. import convert
 from .. import transform
-from .. import function as fn
 from .randomwalks import random_walk
 from .neighbor import select_topk
 from ..base import EID
