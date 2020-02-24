@@ -53,6 +53,8 @@ class ArgParser(argparse.ArgumentParser):
 
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
+        self.add_argument('--lr', type=float, default=0.0001,
+                          help='learning rate')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
 
