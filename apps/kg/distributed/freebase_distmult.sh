@@ -4,7 +4,7 @@ SERVER_ID_HIGH=$2
 while [ $SERVER_ID_LOW -lt $SERVER_ID_HIGH ]
 do
     MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 ../kvserver.py --model DistMult --dataset Freebase \
-    --hidden_dim 400 --gamma 143 --lr 0.08 --num_client 140 --server_id $SERVER_ID_LOW &
+    --hidden_dim 400 --gamma 143 --lr 0.08 --total_client 140 --server_id $SERVER_ID_LOW &
     let SERVER_ID_LOW+=1
 done
 
