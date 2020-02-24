@@ -87,8 +87,8 @@ class GenericPinSAGESampler(object):
 
         self.metapath_hops = len(metapath)
         self.metapath = metapath * random_walk_length
-        restart_prob = np.tile(np.array([random_walk_restart_prob, 0]), random_walk_length)
-        restart_prob[0] = 0     # allow at least one step
+        restart_prob = np.zeros(self.metapath_hops * random_walk_length)
+        restart_prob[self.metapath_hops::self.metapath_hops] = random_walk_restart_prob
         self.restart_prob = F.zerocopy_from_numpy(restart_prob)
 
     # pylint: disable=no-member
