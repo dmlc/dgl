@@ -264,7 +264,7 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
         count = int(model_test.n_entities / 100)
         end = start + count
         while True:
-            print("%d % 100 ..." % percent)
+            print("Load %d / 100 ..." % percent)
             if end >= model_test.n_entities:
                 end = -1
             tmp_id = entity_id[start:end]
