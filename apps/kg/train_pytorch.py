@@ -220,7 +220,7 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
 
     client = connect_to_kvstore(args, entity_pb, relation_pb, l2g)
     client.barrier()
-    train(args, model, train_sampler, valid_samplers, rank, rel_parts, cross_rels, barrier, client)
+    train(args, model, train_sampler, None, rank, rel_parts, cross_rels, barrier, client)
     print("Finish training. Pull model from kvstore ...")
     client.barrier()
 
