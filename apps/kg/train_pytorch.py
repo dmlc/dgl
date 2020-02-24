@@ -1,5 +1,6 @@
 from models import KEModel
 
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch as th
@@ -17,6 +18,7 @@ from functools import wraps
 
 import dgl
 from dgl.contrib import KVClient
+import dgl.backend as F
 
 from dataloader import EvalDataset
 from dataloader import get_dataset
@@ -105,7 +107,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
     if args.soft_rel_part:
         model.prepare_cross_rels(cross_rels)
 
-    start = time.time()
+    train_start = start = time.time()
     sample_time = 0
     update_time = 0
     forward_time = 0
@@ -169,7 +171,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
             if barrier is not None:
                 barrier.wait()
 
-    print('train {} takes {:.3f} seconds'.format(rank, time.time() - start))
+    print('train {} takes {:.3f} seconds'.format(rank, time.time() - train_start))
     if args.async_update:
         model.finish_async_update()
     if args.strict_rel_part or args.soft_rel_part:
