@@ -22,36 +22,6 @@ NUM_THREAD = 1 # Fix the number of threads to 1 on kvclient
 NUM_WORKER = 1 # Fix the number of worker for sampler to 1
 
 
-class KGEClient(KVClient):
-    """User-defined kvclient for DGL-KGE
-    """
-    def _push_handler(self, name, ID, data, target):
-        """Row-Sparse Adagrad updater
-        """
-        original_name = name[0:-6]
-        state_sum = target[original_name+'_state-data-']
-        grad_sum = (data * data).mean(1)
-        state_sum.index_add_(0, ID, grad_sum)
-        std = state_sum[ID]  # _sparse_mask
-        std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
-        tmp = (-self.clr * data / std_values)
-        target[name].index_add_(0, ID, tmp)
-
-
-    def set_clr(self, learning_rate):
-        """Set learning rate
-        """
-        self.clr = learning_rate
-
-
-    def set_local2global(self, l2g):
-        self._l2g = l2g
-
-
-    def get_local2global(self):
-        return self._l2g
-
-
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
         super(ArgParser, self).__init__()
