@@ -19,33 +19,25 @@ class GenericPinSAGESampler(object):
     same type by random walk with restarts.  The random walk with restarts are based
     on a given metapath, which should have the same beginning and ending node type.
 
+    The homogeneous graph also has a feature that stores the number of visits to
+    the corresponding neighbors from the seed nodes.
+
     Parameters
     ----------
     G : DGLHeteroGraph
-        The bidirectional bipartite graph.
-
-        The graph should only have two node types: ``ntype`` and ``other_type``.
-        The graph should only have two edge types, one connecting from ``ntype`` to
-        ``other_type``, and another connecting from ``other_type`` to ``ntype``.
-
-        PinSAGE works on a bidirectional bipartite graph where for each edge
-        going from node u to node v, there exists an edge going from node v to node u.
-    ntype : str
-        The node type for which the graph would be constructed on.
-    metapath : list[str]
-        The metapath.
+        The heterogeneous graph.
     random_walk_length : int
         The maximum number of steps of random walk with restarts.
 
-        Note that here we consider traversing from ``ntype`` to ``other_type`` then back
-        to ``ntype`` as a single step (i.e. a single step consists of two hops).
+        Note that here we consider a full traversal of the given metapath as a single
+        random walk "step" (i.e. a single step may consist of multiple hops).
 
         Usually considered a hyperparameter.
     random_walk_restart_prob : int
         Restart probability of random walk with restarts.
 
-        Note that the random walks only would halt on node type ``ntype``, and would
-        never halt on ``other_type``.
+        Note that the random walks only would halt after a full traversal of a metapath.
+        It will never halt in the middle of a metapath.
 
         Usually considered a hyperparameter.
     num_random_walks : int
@@ -54,6 +46,10 @@ class GenericPinSAGESampler(object):
         Usually considered a hyperparameter.
     num_neighbors : int
         Number of neighbors to select for each seed.
+    metapath : list[str] or list[tuple[str, str, str]], optional
+        The metapath.
+
+        If not given, assumes that the graph is homogeneous.
     weight_column : str, default "weights"
         The weight of each neighbor, stored as an edge feature.
 
@@ -72,15 +68,25 @@ class GenericPinSAGESampler(object):
     --------
     See examples in :any:`PinSAGESampler`.
     """
-    def __init__(self, G, ntype, metapath, random_walk_length, random_walk_restart_prob,
-                 num_random_walks, num_neighbors, weight_column='weights'):
+    def __init__(self, G, random_walk_length, random_walk_restart_prob,
+                 num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
         self.G = G
-        self.ntype = ntype
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
         self.num_neighbors = num_neighbors
         self.random_walk_length = random_walk_length
 
+        if metapath is None:
+            if len(G.ntypes) > 1 or len(G.etypes) > 1:
+                raise ValueError('Metapath must be specified if the graph is homogeneous.')
+            metapath = [G.canonical_etypes[0]]
+        start_ntype = G.to_canonical_etype(metapath[0])[0]
+        end_ntype = G.to_canonical_etype(metapath[-1])[-1]
+        if start_ntype != end_ntype:
+            raise ValueError('The metapath must start and end at the same node type.')
+        self.ntype = start_ntype
+
+        self.metapath_hops = len(metapath)
         self.metapath = metapath * random_walk_length
         restart_prob = np.tile(np.array([random_walk_restart_prob, 0]), random_walk_length)
         restart_prob[0] = 0     # allow at least one step
@@ -91,7 +97,7 @@ class GenericPinSAGESampler(object):
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
             self.G, seed_nodes, metapath=self.metapath, restart_prob=self.restart_prob)
-        src = F.reshape(paths[:, 2::2], (-1,))
+        src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
         dst = F.repeat(paths[:, 0], self.random_walk_length, 0)
 
         src_mask = (src != -1)
@@ -105,14 +111,7 @@ class GenericPinSAGESampler(object):
         counts = neighbor_graph.edata[self.weight_column]
         neighbor_graph = select_topk(neighbor_graph, self.num_neighbors, self.weight_column)
         selected_counts = F.gather_row(counts, neighbor_graph.edata[EID])
-
-        # normalize weights
-        with neighbor_graph.local_scope():
-            neighbor_graph.edata[self.weight_column] = F.astype(selected_counts, F.float32)
-            neighbor_graph.update_all(fn.copy_e(self.weight_column, 'm'), fn.sum('m', 's'))
-            neighbor_graph.apply_edges(fn.e_div_v(self.weight_column, 's', 'w'))
-            new_weights = neighbor_graph.edata['w']
-        neighbor_graph.edata[self.weight_column] = new_weights
+        neighbor_graph.edata[self.weight_column] = selected_counts
 
         return neighbor_graph
 
@@ -209,6 +208,6 @@ class PinSAGESampler(GenericPinSAGESampler):
         metagraph = G.metagraph
         fw_etype = list(metagraph[ntype][other_type])[0]
         bw_etype = list(metagraph[other_type][ntype])[0]
-        super().__init__(G, ntype, [fw_etype, bw_etype], random_walk_length,
+        super().__init__(G, random_walk_length,
                          random_walk_restart_prob, num_random_walks, num_neighbors,
-                         weight_column=weight_column)
+                         metapath=[fw_etype, bw_etype], weight_column=weight_column)

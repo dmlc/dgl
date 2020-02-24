@@ -127,7 +127,12 @@ NDArray IndexSelect(NDArray array, IdArray index);
  */
 NDArray Scatter(NDArray array, IdArray indices);
 
-/*! \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats) */
+/*!
+ * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
+ * \param array A 1D vector
+ * \param repeats A 1D integer vector for number of times to repeat for each element in
+ *                \c array.  Must have the same shape as \c array.
+ */
 NDArray Repeat(NDArray array, IdArray repeats);
 
 /*!
@@ -542,7 +547,7 @@ bool COOHasDuplicate(COOMatrix coo);
  * \brief Deduplicate the entries of a sorted COO matrix, replacing the data with the
  * number of occurrences of the row-col coordinates.
  */
-COOMatrix COOCoalesce(COOMatrix coo);
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 /*!
  * \brief Sort the indices of a COO matrix.

@@ -33,8 +33,9 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
     const COOMatrix adj = graph->GetCOOMatrix(etype);
     const COOMatrix sorted_adj = COOSort(adj, true);
     const IdArray eids_shuffled = sorted_adj.data;
-    const COOMatrix coalesced_adj = COOCoalesce(sorted_adj);
-    const IdArray &count = coalesced_adj.data;
+    const auto &coalesced_result = COOCoalesce(sorted_adj);
+    const COOMatrix &coalesced_adj = coalesced_result.first;
+    const IdArray &count = coalesced_result.second;
 
     /*
      * eids_shuffled actually already contains the mapping from old edge space to the

@@ -171,7 +171,7 @@ template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray cols);
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOCoalesce(COOMatrix coo);
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSort(COOMatrix mat, bool sort_column);

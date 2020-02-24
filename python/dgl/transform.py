@@ -666,6 +666,8 @@ def compact_graphs(graphs, always_preserve=None):
     if not isinstance(graphs, Iterable):
         graphs = [graphs]
         return_single = True
+    if len(graphs) == 0:
+        return []
 
     # Ensure the node types are ordered the same.
     # TODO(BarclayII): we ideally need to remove this constraint.
@@ -673,7 +675,9 @@ def compact_graphs(graphs, always_preserve=None):
     graph_dtype = graphs[0]._graph.dtype()
     graph_ctx = graphs[0]._graph.ctx()
     for g in graphs:
-        assert ntypes == g.ntypes, "Node types are not ordered the same"
+        assert ntypes == g.ntypes, \
+            ("All graphs should have the same node types in the same order, got %s and %s" %
+                ntypes, g.ntypes)
         assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
         assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
 
@@ -788,7 +792,7 @@ def out_subgraph(g, nodes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def to_simple(g, return_counts=None, writeback_mapping=False):
+def to_simple(g, return_counts='count', writeback_mapping=None):
     """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
     duplicate edges into one.
 
@@ -801,9 +805,9 @@ def to_simple(g, return_counts=None, writeback_mapping=False):
     return_counts : str, optional
         If given, the returned graph would have a column with the same name that stores
         the number of duplicated edges from the original graph.
-    writeback_mapping : bool, default False
-        If True, the mapping from the edge IDs of original graph to those of the returned
-        graph would be written into edge feature ``dgl.EID`` in the original graph for
+    writeback_mapping : str, optional
+        If given, the mapping from the edge IDs of original graph to those of the returned
+        graph would be written into edge feature with this name in the original graph for
         each edge type.
 
     Returns
@@ -815,7 +819,7 @@ def to_simple(g, return_counts=None, writeback_mapping=False):
     --------
     Consider the following graph
     >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
-    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
+    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
 
     The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
     >>> sg.all_edges(form='uv', order='eid')
@@ -831,7 +835,7 @@ def to_simple(g, return_counts=None, writeback_mapping=False):
 
     One can also retrieve the mapping from the edges in the original graph to edges in
     the new graph by setting ``writeback_mapping`` and running
-    >>> g.edata[dgl.EID]
+    >>> g.edata['new_eid']
     tensor([0, 1, 3, 1, 2, 2])
 
     This tells us that the first edge in ``g`` is mapped to the first edge in ``sg``, and
@@ -846,9 +850,9 @@ def to_simple(g, return_counts=None, writeback_mapping=False):
         for count, canonical_etype in zip(counts, g.canonical_etypes):
             simple_graph.edges[canonical_etype].data[return_counts] = count
 
-    if writeback_mapping:
+    if writeback_mapping is not None:
         for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
-            g.edges[canonical_etype].data[EID] = edge_map
+            g.edges[canonical_etype].data[writeback_mapping] = edge_map
 
     return simple_graph
 

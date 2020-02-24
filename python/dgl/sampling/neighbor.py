@@ -9,7 +9,6 @@ from .. import utils
 
 __all__ = [
     'sample_neighbors',
-    'sample_neighbors_topk',
     'select_topk']
 
 def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
@@ -85,7 +84,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
 
-def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
+def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False):
     """Select the neighbors with k-largest weights on the connecting edges for each given node.
 
     If k > the number of neighbors, all the neighbors are sampled.
@@ -97,15 +96,15 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
     ----------
     g : DGLHeteroGraph
         Full graph structure.
-    nodes : tensor or dict
-        Node ids to sample neighbors from. The allowed types
-        are dictionary of node types to node id tensors, or simply node id
-        tensor if the given graph g has only one type of nodes.
     k : int
         The K value.
     weight : str
         Feature name of the weights associated with each edge. Its shape should be
         compatible with a scalar edge feature tensor.
+    nodes : tensor or dict, optional
+        Node ids to sample neighbors from. The allowed types
+        are dictionary of node types to node id tensors, or simply node id
+        tensor if the given graph g has only one type of nodes.
     edge_dir : str, optional
         Edge direction ('in' or 'out'). If is 'in', sample from in edges.
         Otherwise, sample from out edges.
@@ -119,10 +118,15 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
         A sampled subgraph by top k criterion. The sampled subgraph has the same
         metagraph as the original one.
     """
-    if not isinstance(nodes, dict):
+    # Rectify nodes to a dictionary
+    if nodes is None:
+        nodes = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
+    elif not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
             raise DGLError("Must specify node type when the graph is not homogeneous.")
         nodes = {g.ntypes[0] : nodes}
+
+    # Parse nodes into a list of NDArrays.
     nodes_all_types = []
     for ntype in g.ntypes:
         if ntype in nodes:
@@ -151,38 +155,5 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
     for i, etype in enumerate(ret.canonical_etypes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
-
-def select_topk(g, k, weight, edge_dir='in', ascending=False):
-    """Select the neighbors with k-largest weights on the connecting edges for every node.
-
-    If k > the number of neighbors, all the neighbors are sampled.
-
-    Node/edge features are not preserved. The original IDs of
-    the sampled edges are stored as the `dgl.EID` feature in the returned graph.
-
-    Parameters
-    ----------
-    g : DGLHeteroGraph
-        Full graph structure.
-    k : int
-        The K value.
-    weight : str
-        Feature name of the weights associated with each edge. Its shape should be
-        compatible with a scalar edge feature tensor.
-    edge_dir : str, optional
-        Edge direction ('in' or 'out'). If is 'in', sample from in edges.
-        Otherwise, sample from out edges.
-    ascending : bool, optional
-        If true, elements are sorted by ascending order, equivalent to find
-        the K smallest values. Otherwise, find K largest values.
-
-    Returns
-    -------
-    DGLHeteroGraph
-        A sampled subgraph by top k criterion. The sampled subgraph has the same
-        metagraph as the original one.
-    """
-    nodes = {ntype: F.arange(0, g.number_of_nodes(ntype)) for ntype in g.ntypes}
-    return sample_neighbors_topk(g, nodes, k, weight, edge_dir=edge_dir, ascending=ascending)
 
 _init_api('dgl.sampling.neighbor', __name__)

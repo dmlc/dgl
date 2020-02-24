@@ -1,5 +1,5 @@
 /*!
- *  Copyright (c) 2019 by Contributors
+ *  Copyright (c) 2020 by Contributors
  * \file array/cpu/array_repeat.cc
  * \brief Array repeat CPU implementation
  */

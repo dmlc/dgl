@@ -604,8 +604,8 @@ COOMatrix COORowWiseTopk(
   return ret;
 }
 
-COOMatrix COOCoalesce(COOMatrix coo) {
-  COOMatrix ret;
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
+  std::pair<COOMatrix, IdArray> ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, {
     ret = impl::COOCoalesce<XPU, IdType>(coo);
   });

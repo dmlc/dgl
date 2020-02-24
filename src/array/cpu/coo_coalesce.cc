@@ -14,12 +14,13 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-COOMatrix COOCoalesce(COOMatrix coo) {
-  CHECK(coo.row_sorted && coo.col_sorted) << "[BUG] Coalescing is only supported on sorted matrix";
-
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
+
+  if (!coo.row_sorted || !coo.col_sorted)
+    coo = COOSort(coo);
 
   std::vector<IdType> new_row, new_col, new_data;
   IdType prev_row = -1, prev_col = -1;
@@ -37,13 +38,14 @@ COOMatrix COOCoalesce(COOMatrix coo) {
     }
   }
 
-  return COOMatrix{
+  COOMatrix coo_result = COOMatrix{
       coo.num_rows, coo.num_cols, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-      NDArray::FromVector(new_data), true};
+      NDArray(), true};
+  return std::make_pair(coo_result, NDArray::FromVector(new_data));
 }
 
-template COOMatrix COOCoalesce<kDLCPU, int32_t>(COOMatrix);
-template COOMatrix COOCoalesce<kDLCPU, int64_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int32_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int64_t>(COOMatrix);
 
 };  // namespace impl
 };  // namespace aten

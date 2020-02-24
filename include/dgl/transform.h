@@ -67,47 +67,6 @@ CompactGraphs(
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 ToSimpleGraph(const HeteroGraphPtr graph);
 
-/*!
- * \brief Induce an edge subgraph from inbound edges with K-largest weights for each node.
- *
- * For each edge type, the edges are grouped by destination nodes.  Then for each edge
- * group, the K edges with largest weights are selected.  The selected edges then form
- * a subgraph which is returned.
- *
- * All nodes in the original graph are preserved in the subgraph.
- *
- * \param graph The graph
- * \param weights The edge weights for each edge type
- * \param inbound If true (default), group edges by destination.  Otherwise, group by source.
- * \param smallest If true, select the K edges with smallest weights instead.  Default: false.
- * \return A triplet of the subgraph, the IDs of induced edges, and the weights of induced
- * edges.
- *
- * \note Example: consider the following graph:
- *
- *     g = dgl.graph([(0, 1), (2, 1), (5, 1), (2, 2), (3, 2), (4, 2), (6, 2)])
- *
- * with weights
- *
- *     weights = [1, 2, 3, 4, 5, 6, 7]
- *
- * Then the result of SelectTopK(g, weights, 2) is a triplet of:
- *
- * 1. The subgraph:
- *
- *     sg = dgl.graph([(2, 1), (5, 1), (4, 2), (6, 2)])
- *
- * 2. The edge IDs induced from the original graph
- *
- *     induced_edges = [1, 2, 5, 6]
- */
-std::pair<HeteroGraphPtr, std::vector<IdArray>> SelectTopK(
-    const HeteroGraphPtr graph,
-    const std::vector<NDArray> &weights,
-    int K,
-    bool inbound = true,
-    bool smallest = false);
-
 };  // namespace transform
 
 };  // namespace dgl

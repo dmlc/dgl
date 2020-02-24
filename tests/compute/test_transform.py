@@ -374,14 +374,14 @@ def test_to_simple():
     g = dgl.heterograph({
         ('user', 'follow', 'user'): [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)],
         ('user', 'plays', 'game'): [(3, 5), (2, 3), (1, 4), (1, 4), (3, 5), (2, 3), (2, 3)]})
-    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping=True)
+    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
 
     for etype in g.canonical_etypes:
         u, v = g.all_edges(form='uv', order='eid', etype=etype)
         u = F.asnumpy(u).tolist()
         v = F.asnumpy(v).tolist()
         uv = list(zip(u, v))
-        eid_map = F.asnumpy(g.edges[etype].data[dgl.EID])
+        eid_map = F.asnumpy(g.edges[etype].data['new_eid'])
 
         su, sv = sg.all_edges(form='uv', order='eid', etype=etype)
         su = F.asnumpy(su).tolist()
