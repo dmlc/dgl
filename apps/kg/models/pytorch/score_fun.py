@@ -157,6 +157,9 @@ class TransRScore(nn.Module):
         self.global_projection_emb = self.projection_emb
         self.projection_emb = projection_emb
 
+    def prepare_cross_rels(self, cross_rels):
+        self.projection_emb.setup_cross_rels(cross_rels, self.global_projection_emb)
+
     def writeback_local_emb(self, idx):
         self.global_projection_emb.emb[idx] = self.projection_emb.emb.cpu()[idx]
 

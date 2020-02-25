@@ -141,7 +141,7 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
     g.add_edges(src, dst)
     norm = comp_deg_norm(g)
     print("# nodes: {}, # edges: {}".format(num_nodes, len(src)))
-    return g, rel, norm
+    return g, rel.astype('int64'), norm.astype('int64')
 
 def build_test_graph(num_nodes, num_rels, edges):
     src, rel, dst = edges.transpose()

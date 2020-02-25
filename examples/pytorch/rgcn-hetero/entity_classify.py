@@ -239,7 +239,7 @@ class EntityClassify(nn.Module):
         # h2o
         self.layers.append(RelGraphConvHetero(
             self.h_dim, self.out_dim, self.rel_names, "basis",
-            self.num_bases, activation=partial(F.softmax, dim=1),
+            self.num_bases, activation=None,
             self_loop=self.use_self_loop))
 
     def forward(self):

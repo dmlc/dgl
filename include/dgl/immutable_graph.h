@@ -240,11 +240,10 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
-  void SortCSR() {
+  void SortCSR() override {
     if (adj_.sorted)
       return;
-    aten::CSRSort(adj_);
-    adj_.sorted = true;
+    aten::CSRSort_(&adj_);
   }
 
  private:

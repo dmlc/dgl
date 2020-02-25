@@ -23,6 +23,7 @@ def _network_wait():
     """
     time.sleep(_WAIT_TIME_SEC)
 
+
 def _create_sender(net_type, msg_queue_size=2*1024*1024*1024):
     """Create a Sender communicator via C api
 
@@ -35,6 +36,7 @@ def _create_sender(net_type, msg_queue_size=2*1024*1024*1024):
     """
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
     return _CAPI_DGLSenderCreate(net_type, msg_queue_size)
+
 
 def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
     """Create a Receiver communicator via C api
@@ -49,6 +51,7 @@ def _create_receiver(net_type, msg_queue_size=2*1024*1024*1024):
     assert net_type in ('socket', 'mpi'), 'Unknown network type.'
     return _CAPI_DGLReceiverCreate(net_type, msg_queue_size)
 
+
 def _finalize_sender(sender):
     """Finalize Sender communicator
 
@@ -59,10 +62,12 @@ def _finalize_sender(sender):
     """
     _CAPI_DGLFinalizeSender(sender)
 
+
 def _finalize_receiver(receiver):
     """Finalize Receiver Communicator
     """
     _CAPI_DGLFinalizeReceiver(receiver)
+
 
 def _add_receiver_addr(sender, ip_addr, port, recv_id):
     """Add Receiver IP address to namebook
@@ -81,6 +86,7 @@ def _add_receiver_addr(sender, ip_addr, port, recv_id):
     assert recv_id >= 0, 'recv_id cannot be a negative number.'
     _CAPI_DGLSenderAddReceiver(sender, ip_addr, int(port), int(recv_id))
 
+
 def _sender_connect(sender):
     """Connect to all the Receiver
 
@@ -91,8 +97,9 @@ def _sender_connect(sender):
     """
     _CAPI_DGLSenderConnect(sender)
 
+
 def _receiver_wait(receiver, ip_addr, port, num_sender):
-    """Wait all Sender to connect..
+    """Wait all Sender to connect.
 
     Parameters
     ----------
@@ -186,7 +193,8 @@ class KVMsgType(Enum):
     BARRIER = 6
     IP_ID = 7
 
-KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data, c_ptr")
+
+KVStoreMsg = namedtuple("KVStoreMsg", "type rank name id data c_ptr")
 """Message of DGL kvstore
 
 Data Field
@@ -201,6 +209,8 @@ id : tensor (mx.ndarray or torch.tensor)
     data vector storing the global IDs
 data : tensor (mx.ndarray or torch.tensor)
     data matrix with the same row size of id
+c_ptr : void*
+    c pointer of message
 """
 
 def _send_kv_msg(sender, msg, recv_id):
@@ -249,6 +259,7 @@ def _send_kv_msg(sender, msg, recv_id):
             tensor_id,
             data)
 
+
 def _recv_kv_msg(receiver):
     """Receive kvstore message.
 
@@ -256,7 +267,6 @@ def _recv_kv_msg(receiver):
     ----------
     receiver : ctypes.c_void_p
         C Receiver handle
-
     Return
     ------
     KVStoreMsg
@@ -311,12 +321,9 @@ def _recv_kv_msg(receiver):
     raise RuntimeError('Unknown message type: %d' % msg_type.value)
 
 
-def _clear_kv_msg(garbage_msg):
+def _clear_kv_msg(msg):
     """Clear data of kvstore message
     """
     F.sync()
-    for msg in garbage_msg:
-        if msg.c_ptr is not None:
-            _CAPI_DeleteKVMsg(msg.c_ptr)
-    garbage_msg = []
-        
+    if msg.c_ptr is not None:
+        _CAPI_DeleteKVMsg(msg.c_ptr)

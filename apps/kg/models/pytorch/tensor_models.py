@@ -117,11 +117,13 @@ class ExternalEmbedding:
     def __init__(self, args, num, dim, device):
         self.gpu = args.gpu
         self.args = args
+        self.num = num
         self.trace = []
 
         self.emb = th.empty(num, dim, dtype=th.float32, device=device)
         self.state_sum = self.emb.new().resize_(self.emb.size(0)).zero_()
         self.state_step = 0
+        self.has_cross_rel = False
         # queue used by asynchronous update
         self.async_q = None
         # asynchronous update process
@@ -137,6 +139,19 @@ class ExternalEmbedding:
         """
         INIT.uniform_(self.emb, -emb_init, emb_init)
         INIT.zeros_(self.state_sum)
+
+    def setup_cross_rels(self, cross_rels, global_emb):
+        cpu_bitmap = th.zeros((self.num,), dtype=th.bool)
+        for i, rel in enumerate(cross_rels):
+            cpu_bitmap[rel] = 1
+        self.cpu_bitmap = cpu_bitmap
+        self.has_cross_rel = True
+        self.global_emb = global_emb
+
+    def get_noncross_idx(self, idx):
+        cpu_mask = self.cpu_bitmap[idx]
+        gpu_mask = ~cpu_mask
+        return idx[gpu_mask]
 
     def share_memory(self):
         """Use torch.tensor.share_memory_() to allow cross process tensor access
@@ -158,6 +173,14 @@ class ExternalEmbedding:
             If False, do not trace the computation.
             Default: True
         """
+        if self.has_cross_rel:
+            cpu_idx = idx.cpu()
+            cpu_mask = self.cpu_bitmap[cpu_idx]
+            cpu_idx = cpu_idx[cpu_mask]
+            cpu_idx = th.unique(cpu_idx)
+            if cpu_idx.shape[0] != 0:
+                cpu_emb = self.global_emb.emb[cpu_idx]
+                self.emb[cpu_idx] = cpu_emb.cuda(gpu_id)
         s = self.emb[idx]
         if gpu_id >= 0:
             s = s.cuda(gpu_id)
@@ -202,6 +225,22 @@ class ExternalEmbedding:
                         grad_indices = grad_indices.to(device)
                     if device != grad_sum.device:
                         grad_sum = grad_sum.to(device)
+
+                    if self.has_cross_rel:
+                        cpu_mask = self.cpu_bitmap[grad_indices]
+                        cpu_idx = grad_indices[cpu_mask]
+                        if cpu_idx.shape[0] > 0:
+                            cpu_grad = grad_values[cpu_mask]
+                            cpu_sum = grad_sum[cpu_mask].cpu()
+                            cpu_idx = cpu_idx.cpu()
+                            self.global_emb.state_sum.index_add_(0, cpu_idx, cpu_sum)
+                            std = self.global_emb.state_sum[cpu_idx]
+                            if gpu_id >= 0:
+                                std = std.cuda(gpu_id)
+                            std_values = std.sqrt_().add_(1e-10).unsqueeze(1)
+                            tmp = (-clr * cpu_grad / std_values)
+                            tmp = tmp.cpu()
+                            self.global_emb.emb.index_add_(0, cpu_idx, tmp)
                     self.state_sum.index_add_(0, grad_indices, grad_sum)
                     std = self.state_sum[grad_indices]  # _sparse_mask
                     if gpu_id >= 0:
