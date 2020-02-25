@@ -50,7 +50,7 @@ TYPED_TEST(SmartPtrTest, Obj_Test) {
   auto copy_data = SmartPtr(new MyClass());
   CHECK(static_cast<dmlc::Stream *>(&fs)->Read(&copy_data));
 
-  ASSERT_EQ(myc->data_, copy_data->data_);
+  EXPECT_EQ(myc->data_, copy_data->data_);
 }
 
 TYPED_TEST(SmartPtrTest, Vector_Test1) {
@@ -70,10 +70,12 @@ TYPED_TEST(SmartPtrTest, Vector_Test1) {
   std::vector<Pair> copy_myclasses;
   static_cast<dmlc::Stream *>(&ofs)->Read<std::vector<Pair>>(&copy_myclasses);
 
-  // std::equal(myclasses.begin(), myclasses.end(), copy_myclasses.begin(),
-  //            [](const Pair &left, const Pair &right) {
-  //              return left.second->data_ == right.second->data_;
-  //            });
+  EXPECT_TRUE(std::equal(myclasses.begin(), myclasses.end(),
+                         copy_myclasses.begin(),
+                         [](const Pair &left, const Pair &right) {
+                           return (left.second->data_ == right.second->data_) &&
+                                  (left.first == right.first);
+                         }));
 }
 
 TYPED_TEST(SmartPtrTest, Vector_Test2) {
@@ -93,8 +95,9 @@ TYPED_TEST(SmartPtrTest, Vector_Test2) {
   static_cast<dmlc::Stream *>(&ofs)->Read<std::vector<SmartPtr>>(
       &copy_myclasses);
 
-  std::equal(myclasses.begin(), myclasses.end(), copy_myclasses.begin(),
-             [](const SmartPtr &left, const SmartPtr &right) {
-               return left->data_ == right->data_;
-             });
+  EXPECT_TRUE(std::equal(myclasses.begin(), myclasses.end(),
+                         copy_myclasses.begin(),
+                         [](const SmartPtr &left, const SmartPtr &right) {
+                           return left->data_ == right->data_;
+                         }));
 }
