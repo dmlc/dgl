@@ -100,4 +100,4 @@ bash validate_reldn.sh
 
 ## Demo
 
-We provide a demo notebook of running the model with real-world pictures. Be aware that you need trained model to generate meaningful results from the demo.
+We provide a demo script of running the model with real-world pictures. Be aware that you need trained model to generate meaningful results from the demo.
