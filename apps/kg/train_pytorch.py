@@ -278,6 +278,8 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             end += count
             percent += 1
 
+        client.barrier()
+
         if args.save_emb is not None:
             if not os.path.exists(args.save_emb):
                 os.mkdir(args.save_emb)
