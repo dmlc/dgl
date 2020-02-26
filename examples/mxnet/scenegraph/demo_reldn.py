@@ -8,7 +8,7 @@ from utils import *
 from data import *
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser = argparse.ArgumentParser(description='Demo of Scene Graph Extraction.')
     parser.add_argument('--image', type=str, default='',
                         help="The image for scene graph extraction.")
     parser.add_argument('--gpu', type=str, default='',
