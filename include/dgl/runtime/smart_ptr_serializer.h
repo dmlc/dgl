@@ -23,7 +23,7 @@ struct Handler<std::shared_ptr<T>> {
     // When read, the default initialization behavior of shared_ptr is
     // shared_ptr<T>(), which is holding a nullptr. Here we need to manually
     // reset to a real object for further loading
-    if (data->get() == nullptr) {
+    if (!(*data)) {
       data->reset(new T());
     }
     return Handler<T>::Read(strm, data->get());
@@ -39,7 +39,7 @@ struct Handler<std::unique_ptr<T>> {
     // When read, the default initialization behavior of unique_ptr is
     // unique_ptr<T>(), which is holding a nullptr. Here we need to manually
     // reset to a real object for further loading
-    if (data->get() == nullptr) {
+    if (!(*data)) {
       data->reset(new T());
     }
     return Handler<T>::Read(strm, data->get());
