@@ -310,6 +310,8 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             eval_dataset = None
             dataset_full = None
 
+            print("Run test, test processes: %d" % args.num_test_proc)
+
             queue = mp.Queue(args.num_test_proc)
             procs = []
             for i in range(args.num_test_proc):
