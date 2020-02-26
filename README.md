@@ -189,7 +189,7 @@ Refer to the guide [here](https://docs.dgl.ai/install/index.html#install-from-so
 
 Check out the open source book [*Dive into Deep Learning*](http://gluon.ai/).
 
-For those who are new to graph nerual network, please see the [basic of DGL](https://docs.dgl.ai/tutorials/basics/index.html).
+For those who are new to graph neural network, please see the [basic of DGL](https://docs.dgl.ai/tutorials/basics/index.html).
 
 For audience who are looking for more advanced, realistic, and end-to-end examples, please see [model tutorials](https://docs.dgl.ai/tutorials/models/index.html).
 
