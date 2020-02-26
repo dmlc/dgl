@@ -2,6 +2,7 @@ import dgl
 import argparse
 import mxnet as mx
 import gluoncv as gcv
+from gluoncv.utilz import download
 from gluoncv.data.transforms import presets
 from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from utils import *
@@ -13,11 +14,11 @@ def parse_args():
                         help="The image for scene graph extraction.")
     parser.add_argument('--gpu', type=str, default='',
                         help="GPU id to use for inference, default is not using GPU.")
-    parser.add_argument('--pretrained-faster-rcnn-params', type=str, required=True,
+    parser.add_argument('--pretrained-faster-rcnn-params', type=str, default='',
                         help="Path to saved Faster R-CNN model parameters.")
-    parser.add_argument('--reldn-params', type=str, required=True,
+    parser.add_argument('--reldn-params', type=str, default='',
                         help="Path to saved Faster R-CNN model parameters.")
-    parser.add_argument('--faster-rcnn-params', type=str, required=True,
+    parser.add_argument('--faster-rcnn-params', type=str, default='',
                         help="Path to saved Faster R-CNN model parameters.")
     parser.add_argument('--freq-prior', type=str, default='freq_prior.pkl',
                         help="Path to saved frequency prior data.")
@@ -31,21 +32,33 @@ else:
     ctx = mx.cpu()
 
 net = RelDN(n_classes=50, prior_pkl=args.freq_prior, semantic_only=False)
-net.load_parameters(args.reldn_params, ctx=ctx)
+if args.reldn_params == '':
+    download('http://data.dgl.ai/models/SceneGraph/reldn.params')
+    net.load_parameters('rendl.params', ctx=ctx)
+else:
+    net.load_parameters(args.reldn_params, ctx=ctx)
 
 # dataset and dataloader
 vg_val = VGRelation(split='val')
 detector = faster_rcnn_resnet101_v1d_custom(classes=vg_val.obj_classes,
                                             pretrained_base=False, pretrained=False,
                                             additional_output=True)
-params_path = args.pretrained_faster_rcnn_params
+if args.pretrained_faster_rcnn_params == '':
+    download('http://data.dgl.ai/models/SceneGraph/faster_rcnn_resnet101_v1d_visualgenome.params')
+    params_path = 'faster_rcnn_resnet101_v1d_visualgenome.params'
+else:
+    params_path = args.pretrained_faster_rcnn_params
 detector.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
 
 detector_feat = faster_rcnn_resnet101_v1d_custom(classes=vg_val.obj_classes,
                                                  pretrained_base=False, pretrained=False,
                                                  additional_output=True)
 detector_feat.load_parameters(params_path, ctx=ctx, ignore_extra=True, allow_missing=True)
-detector_feat.features.load_parameters(args.faster_rcnn_params, ctx=ctx)
+if args.faster_rcnn_params == '':
+    download('http://data.dgl.ai/models/SceneGraph/faster_rcnn_resnet101_v1d_visualgenome.params')
+    detector_feat.features.load_parameters('faster_rcnn_resnet101_v1d_visualgenome.params', ctx=ctx)
+else:
+    detector_feat.features.load_parameters(args.faster_rcnn_params, ctx=ctx)
 
 # image input
 if args.image:
