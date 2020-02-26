@@ -73,7 +73,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   if (replace) {
     all_has_fanout = true;
   } else {
-#pragma omp parallel for reduction(&&:all_has_fanout)
+//#pragma omp parallel for reduction(&&:all_has_fanout)
     for (int64_t i = 0; i < num_rows; ++i) {
       const IdxType rid = rows_data[i];
       const IdxType len = indptr[rid + 1] - indptr[rid];
@@ -81,7 +81,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     }
   }
 
-#pragma omp parallel for
+//#pragma omp parallel for
   for (int64_t i = 0; i < num_rows; ++i) {
     const IdxType rid = rows_data[i];
     CHECK_LT(rid, mat.num_rows);

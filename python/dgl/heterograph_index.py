@@ -28,7 +28,6 @@ class HeteroGraphIndex(ObjectBase):
         metagraph = self.metagraph
         number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
         edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
-        # multigraph and readonly are not used.
         return metagraph, number_of_nodes, edges
 
     def __setstate__(self, state):

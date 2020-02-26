@@ -8,6 +8,7 @@ import time
 data = RedditDataset(self_loop=True)
 train_nid = th.LongTensor(np.nonzero(data.train_mask)[0])
 num_train = len(train_nid)
+print('#Train nodes:', num_train)
 g = dgl.DGLGraph(data.graph, readonly=True)
 print('Homo-graph created')
 
@@ -16,7 +17,7 @@ print('hetero-graph created')
 
 #print(train_nid[0:1000])
 
-L = 4
+L = 2
 FAN = 10
 
 ##################### Test 1: Use the new subgraph sampling API ####################
@@ -43,22 +44,79 @@ print('Time:', dur)
 print('v05 Tput(KETPS):', np.sum(ne) / dur / 1000)
 print('v05 (w/o compact) Tput(KETPS):', np.sum(ne) / (dur - compact_dur) / 1000)
 
-exit(1)
-
 ##################### Test 1.5: Use the new subgraph sampling API + multi-process dataloader ####################
-#ne = []
-#t = time.time()
-#for i in range(100):
-#    seed_nodes = train_nid[i*1000:(i+1)*1000]
-#    f1 = dgl.sampling.sample_neighbors(hg, seed_nodes, 10, replace=False)
-#    u, _ = f1.edges(form='uv')
-#    f2 = dgl.sampling.sample_neighbors(hg, th.unique(u), 10, replace=False)
-#    ne.append(f1.number_of_edges() + f2.number_of_edges())
-#    #f1, f2 = dgl.compact_graphs([f1, f2])
-#    #print(i, f2.number_of_nodes(), f2.number_of_edges())
-#dur = time.time() - t
-#print('Time:', dur)
-#print('Tput(KETPS):', np.average(ne) / dur / 1000)
+import multiprocessing as mp
+
+class MyNeighborSampler:
+    def __init__(self, g, seed_nodes, fanout, hops, replace, batch_size, num_workers=1):
+        self.g = g
+        self.seed_nodes = seed_nodes
+        if not isinstance(fanout, list):
+            fanout = [fanout] * hops
+        self.fanout = fanout
+        self.hops = hops
+        self.replace = replace
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.queue = mp.Queue()
+        self.workers = []
+
+    def __iter__(self):
+        if len(self.workers) == 0:
+            self.start()
+        return iter(self.queue.get, None)
+
+    def __del__(self):
+        for worker in self.workers: 
+            worker.join()
+
+    def start(self):
+        # split seeds
+        splits = self.seed_nodes.split(self.batch_size)
+        per_worker = (len(splits) + self.num_workers) // self.num_workers
+        for i in range(self.num_workers):
+            workload = splits[i * per_worker : (i+1) * per_worker]
+            worker = mp.Process(target=self.worker_loop, args=(i, workload))
+            worker.start()
+            self.workers.append(worker)
+
+    def wait(self):
+        for worker in self.workers: 
+            worker.join()
+
+    def worker_loop(self, pid, workload):
+        print('Process #%d launched, #works=%d' % (pid, len(workload)))
+        for seeds in workload:
+            frs = []
+            for i in range(self.hops):
+                fr = dgl.sampling.sample_neighbors(self.g, seeds, self.fanout[i], replace=self.replace)
+                u, _ = fr.edges(form='uv')
+                seeds = th.unique(u)
+                frs.append(fr)
+            frs = dgl.compact_graphs(frs)
+            #self.queue.put(frs)
+            self.queue.put(sum([frs[j].number_of_edges() for j in range(self.hops)]))
+        print('Process #%d finished' % pid)
+
+sampler_x = MyNeighborSampler(
+        hg, train_nid, FAN, L, False, 1000,
+        num_workers=4)
+
+ne = []
+for i, frs in enumerate(sampler_x):
+    if i == 20:
+        print('Dry run finished')
+        t = time.time()
+    #print(i, len(nf.block_eid(0)))
+    if i >= 20:
+        #ne.append(sum([frs[j].number_of_edges() for j in range(L)]))
+        ne.append(frs)
+    if i == 149:
+        break
+print(i)
+dur = time.time() - t
+print('Time:', dur)
+print('v05 MP Tput(KETPS):', np.sum(ne) / dur / 1000)
 
 ##################### Test 2: Use the old sampler data loader ####################
 sampler = NeighborSampler(
@@ -67,7 +125,7 @@ sampler = NeighborSampler(
         shuffle=False,
         num_hops=L,
         seed_nodes=train_nid,
-        num_workers=64)
+        num_workers=4)
 
 ne = []
 for i, nf in enumerate(sampler):
@@ -83,8 +141,6 @@ print(i)
 dur = time.time() - t
 print('Time:', dur)
 print('NF Tput(KETPS):', np.sum(ne) / dur / 1000)
-
-exit(0)
 
 ##################### Test 3: PyG ####################
 from torch_geometric.datasets import Reddit
