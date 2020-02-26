@@ -158,8 +158,10 @@ CompactGraphs(const std::vector<HeteroGraphPtr> &graphs) {
       std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
       const EdgeArray &edges = all_edges[i][etype];
 
-      const IdArray mapped_rows = hashmaps[srctype].Map(edges.src, -1);
-      const IdArray mapped_cols = hashmaps[dsttype].Map(edges.dst, -1);
+      //const IdArray mapped_rows = hashmaps[srctype].Map(edges.src, -1);
+      //const IdArray mapped_cols = hashmaps[dsttype].Map(edges.dst, -1);
+      const IdArray mapped_rows = edges.src;
+      const IdArray mapped_cols = edges.dst;
 
       rel_graphs.push_back(UnitGraph::CreateFromCOO(
           srctype == dsttype ? 1 : 2,

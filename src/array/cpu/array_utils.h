@@ -39,13 +39,12 @@ class IdHashMap {
   void Update(IdArray ids) {
     const IdType* ids_data = static_cast<IdType*>(ids->data);
     const int64_t len = ids->shape[0];
-    IdType newid = oldv2newv_.size();
     for (int64_t i = 0; i < len; ++i) {
       const IdType id = ids_data[i];
-      if (!Contains(id)) {
-        oldv2newv_[id] = newid++;
-        filter_[id & kFilterMask] = true;
-      }
+      // std::unorderd_map::insert assures that an insertion will not happen if the
+      // key already exists.
+      oldv2newv_.insert({id, oldv2newv_.size()});
+      filter_[id & kFilterMask] = true;
     }
   }
 
