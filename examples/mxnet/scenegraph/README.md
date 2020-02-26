@@ -62,6 +62,12 @@ The implementation contains the following files:
 - The script `validate_reldn.py` validate the trained Faster R-CNN and RelDN models, and `validate_reldn.sh` includes preset parameters.
 - The script `demo_reldh.py` makes use of trained parameters and extract an scene graph from an arbitrary input image.
 
+Below are further steps on training your own models. Besides, we also provide pretrained model files for validation and demo:
+
+1. [Faster R-CNN Model for Object Detection](http://dgl-data/models/SceneGraph/faster_rcnn_resnet101_v1d_visualgenome.params)
+2. [RelDN Model](http://dgl-data/models/SceneGraph/reldn.params)
+3. [Faster R-CNN Model for Edge Feature](http://dgl-data/models/SceneGraph/detector_feature.params)
+
 ## Data preparation
 
 We provide scripts to download and prepare the VisualGenome dataset. One can run with
