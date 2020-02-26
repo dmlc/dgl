@@ -113,6 +113,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='pickle built graph, building a huge graph is slow.')
         self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
+        self.add_argument('--num_test_proc', type=int, default=1,
+                          help='number of test process used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
         self.add_argument('--soft_rel_part', action='store_true',
@@ -258,7 +260,6 @@ def start_worker(args, logger):
 
     args.num_thread = NUM_THREAD
 
-    start = time.time()
     procs = []
     barrier = mp.Barrier(args.num_client)
     for i in range(args.num_client):
@@ -276,8 +277,6 @@ def start_worker(args, logger):
         proc.start()
     for proc in procs:
         proc.join()
-
-    print('Total time of train and test:', time.time() - start)
 
 
 if __name__ == '__main__':

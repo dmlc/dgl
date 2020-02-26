@@ -222,15 +222,15 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
 
     client = connect_to_kvstore(args, entity_pb, relation_pb, l2g)
     client.barrier()
+    train_time_start = time.time()
     train(args, model, train_sampler, None, rank, rel_parts, cross_rels, barrier, client)
-    print("Finish training. Pull model from kvstore ...")
+    print('Total train time {:.3f} seconds'.format(time.time() - train_time_start))
     client.barrier()
 
     model = None
 
     if client.get_id() % args.num_client == 0: # pull full model from kvstore
 
-        args.num_test_proc = args.num_client
         dataset_full = get_dataset(args.data_path, args.dataset, args.format)
 
         print('Full data n_entities: ' + str(dataset_full.n_entities))
