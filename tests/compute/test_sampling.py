@@ -126,19 +126,19 @@ def test_pinsage_sampling():
         ('user', 'bought', 'item'): [(0, 0), (1, 0), (0, 1), (1, 1), (2, 2), (3, 2), (2, 3), (3, 3)]})
     sampler = dgl.sampling.PinSAGESampler(g, 'item', 'user', 4, 0.5, 3, 2)
     _test_sampler(g, sampler, 'item')
-    sampler = dgl.sampling.GenericPinSAGESampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['bought-by', 'bought'])
     _test_sampler(g, sampler, 'item')
-    sampler = dgl.sampling.GenericPinSAGESampler(g, 4, 0.5, 3, 2, 
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, 
         [('item', 'bought-by', 'user'), ('user', 'bought', 'item')])
     _test_sampler(g, sampler, 'item')
     g = dgl.graph([(0, 0), (0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2), (3, 3)])
-    sampler = dgl.sampling.GenericPinSAGESampler(g, 4, 0.5, 3, 2)
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2)
     _test_sampler(g, sampler, g.ntypes[0])
     g = dgl.heterograph({
         ('A', 'AB', 'B'): [(0, 1), (2, 3)],
         ('B', 'BC', 'C'): [(1, 2), (3, 1)],
         ('C', 'CA', 'A'): [(2, 0), (1, 2)]})
-    sampler = dgl.sampling.GenericPinSAGESampler(g, 4, 0.5, 3, 2, ['AB', 'BC', 'CA'])
+    sampler = dgl.sampling.RandomWalkNeighborSampler(g, 4, 0.5, 3, 2, ['AB', 'BC', 'CA'])
     _test_sampler(g, sampler, 'A')
 
 def _gen_neighbor_sampling_test_graph(hypersparse, reverse):

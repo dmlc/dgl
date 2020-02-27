@@ -10,16 +10,19 @@ from .neighbor import select_topk
 from ..base import EID
 
 
-class GenericPinSAGESampler(object):
+class RandomWalkNeighborSampler(object):
     """PinSAGE-like sampler extended to any heterographs, given a metapath.
 
-    Given a heterogeneous graph, PinSAGE neighbor sampler would generate a homogeneous
+    Given a heterogeneous graph, this neighbor sampler would generate a homogeneous
     graph where the neighbors of each node are the most commonly visited nodes of the
     same type by random walk with restarts.  The random walk with restarts are based
     on a given metapath, which should have the same beginning and ending node type.
 
     The homogeneous graph also has a feature that stores the number of visits to
     the corresponding neighbors from the seed nodes.
+
+    This is a generalization of PinSAGE sampler which only works on bidirectional
+    bipartite graphs.
 
     Parameters
     ----------
@@ -86,7 +89,8 @@ class GenericPinSAGESampler(object):
         self.ntype = start_ntype
 
         self.metapath_hops = len(metapath)
-        self.metapath = metapath * random_walk_length
+        self.metapath = metapath
+        self.full_metapath = metapath * random_walk_length
         restart_prob = np.zeros(self.metapath_hops * random_walk_length)
         restart_prob[self.metapath_hops::self.metapath_hops] = random_walk_restart_prob
         self.restart_prob = F.zerocopy_from_numpy(restart_prob)
@@ -95,7 +99,7 @@ class GenericPinSAGESampler(object):
     def __call__(self, seed_nodes):
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
-            self.G, seed_nodes, metapath=self.metapath, restart_prob=self.restart_prob)
+            self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)
         src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
         dst = F.repeat(paths[:, 0], self.random_walk_length, 0)
 
@@ -115,7 +119,7 @@ class GenericPinSAGESampler(object):
         return neighbor_graph
 
 
-class PinSAGESampler(GenericPinSAGESampler):
+class PinSAGESampler(RandomWalkNeighborSampler):
     """PinSAGE neighbor sampler.
 
     Given a bidirectional bipartite graph, PinSAGE neighbor sampler would generate
