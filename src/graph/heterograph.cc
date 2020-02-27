@@ -604,31 +604,20 @@ bool HeteroGraph::Load(dmlc::Stream* fs) {
   uint64_t magicNum;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_HeteroGraph) << "Invalid HeteroGraph Data";
-  auto meta_grptr = new ImmutableGraph(static_cast<COOPtr>(nullptr));
-  CHECK(fs->Read(meta_grptr)) << "Invalid Immutable Graph Data";
-  uint64_t num_relation_graphs;
-  CHECK(fs->Read(&num_relation_graphs)) << "Invalid num of relation graphs";
-  std::vector<HeteroGraphPtr> relgraphs;
-  for (size_t i = 0; i < num_relation_graphs; ++i) {
-    UnitGraph* ugptr = Serializer::EmptyUnitGraph();
-    CHECK(fs->Read(ugptr)) << "Invalid UnitGraph Data";
-    relgraphs.emplace_back(dynamic_cast<BaseHeteroGraph*>(ugptr));
-  }
-  HeteroGraph* hgptr = new HeteroGraph(GraphPtr(meta_grptr), relgraphs);
-  *this = *hgptr;
+  auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+  CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+  meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+  CHECK(fs->Read(&relation_graphs_)) << "Invalid relation_graphs_";
+  CHECK(fs->Read(&num_verts_per_type_)) << "Invalid num_verts_per_type_";
   return true;
 }
 
 void HeteroGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_HeteroGraph);
   auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
-  ImmutableGraph* meta_rptr = meta_graph_ptr.get();
-  fs->Write(*meta_rptr);
-  fs->Write(static_cast<uint64_t>(relation_graphs_.size()));
-  for (auto hptr : relation_graphs_) {
-    auto rptr = dynamic_cast<UnitGraph*>(hptr.get());
-    fs->Write(*rptr);
-  }
+  fs->Write(meta_graph_ptr);
+  fs->Write(relation_graphs_);
+  fs->Write(num_verts_per_type_);
 }
 
 ///////////////////////// C APIs /////////////////////////

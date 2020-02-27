@@ -4,22 +4,25 @@
  * \brief DGL serializer APIs
  */
 
-#pragma once
+#ifndef DGL_GRAPH_SERIALIZER_H_
+#define DGL_GRAPH_SERIALIZER_H_
 
-#include <dgl/immutable_graph.h>
-#include "heterograph.h"
-#include "unit_graph.h"
+#include <memory>
 
 namespace dgl {
 
 class Serializer {
  public:
-  static HeteroGraph* EmptyHeteroGraph() { return new HeteroGraph(); }
-  static ImmutableGraph* EmptyImmutableGraph() {
-    return new ImmutableGraph(static_cast<COOPtr>(nullptr));
-  }
-  static UnitGraph* EmptyUnitGraph() {
-    return UnitGraph::EmptyGraph();
+  template <typename T>
+  static T* new_object() {
+    return new T();
+  };
+
+  template <typename T>
+  static std::shared_ptr<T> make_shared() {
+    return std::shared_ptr<T>(new T());
   }
 };
 }  // namespace dgl
+
+#endif  // DGL_GRAPH_SERIALIZER_H_
