@@ -1,5 +1,5 @@
 SCRIPT_PATH=~/dgl/apps/kg/distributed
-SCRIPT_FILE=./freebase_distmult.sh
+SCRIPT_FILE=./fb15k_transe_l2.sh
 KEY=~/mctt.pem
 
 ssh -i $KEY ubuntu@18.216.60.5 'cd '$SCRIPT_PATH'; '$SCRIPT_FILE' 13 26' &
