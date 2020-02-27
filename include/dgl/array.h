@@ -206,7 +206,10 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- */ 
+ */
+
+constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
+
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
@@ -219,11 +222,38 @@ struct CSRMatrix {
   /*! \brief default constructor */
   CSRMatrix() = default;
   /*! \brief constructor */
-  CSRMatrix(int64_t nrows, int64_t ncols,
-            IdArray parr, IdArray iarr, IdArray darr = IdArray(),
-            bool sorted_flag = false)
-    : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
-      data(darr), sorted(sorted_flag) {}
+  CSRMatrix(int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
+            IdArray darr = IdArray(), bool sorted_flag = false)
+      : num_rows(nrows),
+        num_cols(ncols),
+        indptr(parr),
+        indices(iarr),
+        data(darr),
+        sorted(sorted_flag) {}
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
+        << "Invalid CSRMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&indices)) << "Invalid indices";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&sorted)) << "Invalid sorted";
+    return true;
+  };
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(indptr);
+    fs->Write(indices);
+    fs->Write(data);
+    fs->Write(sorted);
+  };
 };
 
 /*!
@@ -795,39 +825,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 }  // namespace dgl
 
 namespace dmlc {
-
-namespace serializer {
-
-using dgl::aten::CSRMatrix;
-
-constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
-
-template <>
-struct Handler<CSRMatrix> {
-  inline static void Write(Stream* fs, const CSRMatrix& csr) {
-    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
-    fs->Write(csr.num_cols);
-    fs->Write(csr.num_rows);
-    fs->Write(csr.indptr);
-    fs->Write(csr.indices);
-    fs->Write(csr.data);
-    fs->Write(csr.sorted);
-  }
-  inline static bool Read(Stream* fs, CSRMatrix* csr) {
-    uint64_t magicNum;
-    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
-        << "Invalid CSRMatrix Data";
-    CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
-    CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
-    CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
-    CHECK(fs->Read(&csr->indices)) << "Invalid indices";
-    CHECK(fs->Read(&csr->data)) << "Invalid data";
-    CHECK(fs->Read(&csr->sorted)) << "Invalid sorted";
-    return true;
-  }
-};
-}  // namespace serializer
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
 }  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_

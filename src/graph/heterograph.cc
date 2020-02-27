@@ -15,7 +15,7 @@
 #include <utility>
 #include "../c_api_common.h"
 #include "./unit_graph.h"
-#include "graph_serializer.h"
+#include <dgl/graph_serializer.h>
 // TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation which
 // only works on CPU.  Should fix later to make it device agnostic.
 #include "../array/cpu/array_utils.h"

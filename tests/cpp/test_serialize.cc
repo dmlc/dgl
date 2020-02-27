@@ -35,16 +35,16 @@ TEST(Serialize, DISABLED_UnitGraph) {
   delete ug2;
 }
 
-TEST(Serialize, DISABLED_ImmutableGraph) {
+TEST(Serialize, ImmutableGraph) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto gptr = ImmutableGraph::CreateFromCOO(10, src, dst);
-  ImmutableGraph* rptr = gptr.get();
+  // ImmutableGraph* rptr = gptr.get();
 
   std::string blob;
   dmlc::MemoryStringStream ifs(&blob);
 
-  static_cast<dmlc::Stream*>(&ifs)->Write(*rptr);
+  static_cast<dmlc::Stream*>(&ifs)->Write(gptr);
 
   dmlc::MemoryStringStream ofs(&blob);
   ImmutableGraph* rptr_read = new ImmutableGraph(static_cast<COOPtr>(nullptr));
