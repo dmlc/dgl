@@ -442,6 +442,23 @@ class BaseHeteroGraph : public runtime::Object {
     return nullptr;
   }
 
+  /*!
+   * \brief Get the pickling state of the relation graph structure in backend tensors.
+   *
+   * The graph is converted to a list of adjacency matrices, each for one relation graph.
+   * For a graph with R relation graphs, it returns 1+3*R tensors. The first one
+   * is a 1D tensor of length R, with each element indicating the storage type
+   * of the adjacency matrix (i.e., COO, CSR, CSC). The i^th graph is stored in
+   * the (1 + 3*i) to (1 + 3*(i+1)) tensors.
+   *
+   * \returnAdjacency matrices of all relation graphs in a list of arrays.
+   */
+  virtual std::vector<IdArray> GetRelationStates() const {
+    LOG(FATAL) << "GetRelationStates not implemented";
+    return {};
+  }
+
+
   static constexpr const char* _type_key = "graph.HeteroGraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(BaseHeteroGraph, runtime::Object);
 
@@ -593,6 +610,24 @@ HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
     SparseFormat restrict_format = SparseFormat::ANY);
+
+
+/*!
+ * \brief Create a heterograph from pickling states.
+ *
+ * For a graph with R relation graphs, it returns 1+3*R tensors. The first one
+ * is a 1D tensor of length R, with each element indicating the storage type
+ * of the adjacency matrix (i.e., COO, CSR, CSC). The i^th graph is stored in
+ * the (1 + 3*i) to (1 + 3*(i+1)) tensors.
+ *
+ * \param meta_graph Metagraph
+ * \param num_nodes_per_type Number of nodes of each node type.
+ * \param states Picking states of relation graphs.
+ * \return A heterograph pointer
+ */
+HeteroGraphPtr CreateFromRelationStates(
+    GraphPtr meta_graph, const std::vector<int64_t>& num_nodes_per_type,
+    const std::vector<IdArray>& states);
 
 /*!
  * \brief Given a list of graphs, remove the common nodes that do not have inbound and

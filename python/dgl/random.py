@@ -1,5 +1,9 @@
-"""Pyhton interfaces to DGL random number generators."""
+"""Python interfaces to DGL random number generators."""
+import numpy as np
+
 from ._ffi.function import _init_api
+from . import backend as F
+from . import ndarray as nd
 
 def seed(val):
     """Set the seed of randomized methods in DGL.
@@ -12,5 +16,55 @@ def seed(val):
         The seed
     """
     _CAPI_SetSeed(val)
+
+def choice(a, size, replace=True, prob=None):
+    """An equivalent to :func:`numpy.random.choice` but with more efficient implementation.
+
+    TODO(minjie): support RNG as one of the arguments.
+
+    Parameters
+    ----------
+    a : 1-D tensor or int
+        If an ndarray, a random sample is generated from its elements. If an int,
+        the random sample is generated as if a were F.arange(a)
+    size : int or tuple of ints
+        Output shape. E.g., for size ``(m, n, k)``, then ``m * n * k`` samples are drawn.
+    replace : bool, optional
+        If true, sample with replacement.
+    prob : 1-D tensor, optional
+        The probabilities associated with each entry in a.
+        If not given the sample assumes a uniform distribution over all entries in a.
+
+    Returns
+    -------
+    samples : 1-D tensor
+        The generated random samples
+    """
+    if isinstance(size, tuple):
+        num = np.prod(size)
+    else:
+        num = size
+
+    if F.is_tensor(a):
+        population = F.shape(a)[0]
+    else:
+        population = a
+
+    if prob is None:
+        prob = nd.array([], ctx=nd.cpu())
+
+    bits = 64  # index array is in 64-bit
+    chosen_idx = _CAPI_Choice(int(num), int(population), prob, bool(replace), bits)
+    chosen_idx = F.zerocopy_from_dgl_ndarray(chosen_idx)
+
+    if F.is_tensor(a):
+        chosen = F.gather_row(a, chosen_idx)
+    else:
+        chosen = chosen_idx
+
+    if isinstance(size, tuple):
+        return F.reshape(chosen, size)
+    else:
+        return chosen
 
 _init_api('dgl.rng', __name__)
