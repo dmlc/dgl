@@ -116,6 +116,26 @@ ValueType IndexSelect(NDArray array, uint64_t index);
 NDArray IndexSelect(NDArray array, IdArray index);
 
 /*!
+ * \brief Permute the elements of an array according to given indices.
+ *
+ * Equivalent to:
+ *
+ * <code>
+ *     result = np.zeros_like(array)
+ *     result[indices] = array
+ * </code>
+ */
+NDArray Scatter(NDArray array, IdArray indices);
+
+/*!
+ * \brief Repeat each element a number of times.  Equivalent to np.repeat(array, repeats)
+ * \param array A 1D vector
+ * \param repeats A 1D integer vector for number of times to repeat for each element in
+ *                \c array.  Must have the same shape as \c array.
+ */
+NDArray Repeat(NDArray array, IdArray repeats);
+
+/*!
  * \brief Relabel the given ids to consecutive ids.
  *
  * Relabeling is done inplace. The mapping is created from the union
@@ -264,12 +284,12 @@ struct CSRMatrix {
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- *
- * We call a COO matrix is *coalesced* if its row index is sorted.
  */
 
 constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
 
+// TODO(BarclayII): Graph queries on COO formats should support the case where
+// data ordered by rows/columns instead of EID.
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
@@ -583,6 +603,12 @@ COOMatrix COOSliceMatrix(COOMatrix coo, runtime::NDArray rows, runtime::NDArray 
 bool COOHasDuplicate(COOMatrix coo);
 
 /*!
+ * \brief Deduplicate the entries of a sorted COO matrix, replacing the data with the
+ * number of occurrences of the row-col coordinates.
+ */
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
+
+/*!
  * \brief Sort the indices of a COO matrix.
  *
  * The function sorts row indices in ascending order. If sort_column is true,
@@ -678,7 +704,7 @@ COOMatrix COORowWiseTopk(
     COOMatrix mat,
     IdArray rows,
     int64_t k,
-    FloatArray weight,
+    NDArray weight,
     bool ascending = false);
 
 // inline implementations
