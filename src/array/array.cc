@@ -230,6 +230,30 @@ template uint64_t IndexSelect<uint64_t>(NDArray array, uint64_t index);
 template float IndexSelect<float>(NDArray array, uint64_t index);
 template double IndexSelect<double>(NDArray array, uint64_t index);
 
+NDArray Scatter(NDArray array, IdArray indices) {
+  NDArray ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(indices->dtype, IdType, {
+        ret = impl::Scatter<XPU, DType, IdType>(array, indices);
+      });
+    });
+  });
+  return ret;
+}
+
+NDArray Repeat(NDArray array, IdArray repeats) {
+  NDArray ret;
+  ATEN_XPU_SWITCH(array->ctx.device_type, XPU, {
+    ATEN_DTYPE_SWITCH(array->dtype, DType, "values", {
+      ATEN_ID_TYPE_SWITCH(repeats->dtype, IdType, {
+        ret = impl::Repeat<XPU, DType, IdType>(array, repeats);
+      });
+    });
+  });
+  return ret;
+}
+
 IdArray Relabel_(const std::vector<IdArray>& arrays) {
   IdArray ret;
   ATEN_XPU_SWITCH(arrays[0]->ctx.device_type, XPU, {
@@ -426,11 +450,11 @@ COOMatrix CSRRowWiseSampling(
 }
 
 COOMatrix CSRRowWiseTopk(
-    CSRMatrix mat, IdArray rows, int64_t k, FloatArray weight, bool ascending) {
+    CSRMatrix mat, IdArray rows, int64_t k, NDArray weight, bool ascending) {
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, {
-    ATEN_FLOAT_TYPE_SWITCH(weight->dtype, FloatType, "weight", {
-      ret = impl::CSRRowWiseTopk<XPU, IdType, FloatType>(
+    ATEN_DTYPE_SWITCH(weight->dtype, DType, "weight", {
+      ret = impl::CSRRowWiseTopk<XPU, IdType, DType>(
           mat, rows, k, weight, ascending);
     });
   });
@@ -576,6 +600,14 @@ COOMatrix COORowWiseTopk(
       ret = impl::COORowWiseTopk<XPU, IdType, FloatType>(
           mat, rows, k, weight, ascending);
     });
+  });
+  return ret;
+}
+
+std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
+  std::pair<COOMatrix, IdArray> ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, {
+    ret = impl::COOCoalesce<XPU, IdType>(coo);
   });
   return ret;
 }

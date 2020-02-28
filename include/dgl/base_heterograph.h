@@ -630,19 +630,6 @@ HeteroGraphPtr CreateFromRelationStates(
     const std::vector<IdArray>& states);
 
 /*!
- * \brief Given a list of graphs, remove the common nodes that do not have inbound and
- * outbound edges.
- *
- * The graphs should have identical node ID space (i.e. should have the same set of nodes,
- * including types and IDs) and metagraph.
- *
- * \return A pair.  The first element is the list of compacted graphs, and the second
- * element is the mapping from the compacted graphs and the original graph.
- */
-std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
-
-/*!
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
