@@ -653,7 +653,8 @@ bool ImmutableGraph::Load(dmlc::Stream *fs) {
   uint64_t magicNum;
   aten::CSRMatrix out_csr_matrix;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-  CHECK_EQ(magicNum, kDGLSerialize_ImGraph) << "Invalid ImmutableGraph Data: ";
+  CHECK_EQ(magicNum, kDGLSerialize_ImGraph)
+      << "Invalid ImmutableGraph Magic Number";
   CHECK(fs->Read(&out_csr_)) << "Invalid csr matrix";
   return true;
 }
