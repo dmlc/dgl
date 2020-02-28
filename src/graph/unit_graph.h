@@ -214,7 +214,7 @@ class UnitGraph : public BaseHeteroGraph {
   friend class Serializer;
 
   // private empty constructor
-  UnitGraph() {};
+  UnitGraph() {}
 
   /*!
    * \brief constructor

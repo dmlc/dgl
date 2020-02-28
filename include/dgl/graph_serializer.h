@@ -8,15 +8,13 @@
 #define DGL_GRAPH_SERIALIZER_H_
 
 #include <memory>
-
 namespace dgl {
-
 class Serializer {
  public:
   template <typename T>
   static T* new_object() {
     return new T();
-  };
+  }
 
   template <typename T>
   static std::shared_ptr<T> make_shared() {

@@ -400,7 +400,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
            (NumVertices(SrcType()) > 1000000);
   }
- 
+
   bool Load(dmlc::Stream* fs) {
     auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
     CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
@@ -1270,7 +1270,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   int64_t format_code;
   CHECK(fs->Read(&format_code)) << "Invalid format";
   restrict_format_ = static_cast<SparseFormat>(format_code);
-  
+
   switch (restrict_format_) {
     case SparseFormat::COO:
       fs->Read(&coo_);

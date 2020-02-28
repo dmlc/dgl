@@ -4,20 +4,20 @@
  * \brief Heterograph implementation
  */
 #include "./heterograph.h"
-#include <dmlc/io.h>
-#include <dmlc/type_traits.h>
 #include <dgl/array.h>
+#include <dgl/graph_serializer.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
-#include <dgl/immutable_graph.h>
-#include <vector>
+#include <dmlc/io.h>
+#include <dmlc/type_traits.h>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include "../c_api_common.h"
 #include "./unit_graph.h"
-#include <dgl/graph_serializer.h>
-// TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation which
-// only works on CPU.  Should fix later to make it device agnostic.
+// TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation
+// which only works on CPU.  Should fix later to make it device agnostic.
 #include "../array/cpu/array_utils.h"
 
 using namespace dgl::runtime;

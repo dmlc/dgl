@@ -243,7 +243,7 @@ struct CSRMatrix {
     CHECK(fs->Read(&data)) << "Invalid data";
     CHECK(fs->Read(&sorted)) << "Invalid sorted";
     return true;
-  };
+  }
 
   void Save(dmlc::Stream* fs) const {
     fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
@@ -253,7 +253,7 @@ struct CSRMatrix {
     fs->Write(indices);
     fs->Write(data);
     fs->Write(sorted);
-  };
+  }
 };
 
 /*!
@@ -303,7 +303,7 @@ struct COOMatrix {
     CHECK(fs->Read(&row_sorted)) << "Invalid row_sorted";
     CHECK(fs->Read(&col_sorted)) << "Invalid col_sorted";
     return true;
-  };
+  }
 
   void Save(dmlc::Stream* fs) const {
     fs->Write(kDGLSerialize_AtenCooMatrixMagic);
@@ -314,7 +314,7 @@ struct COOMatrix {
     fs->Write(data);
     fs->Write(row_sorted);
     fs->Write(col_sorted);
-  };
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
