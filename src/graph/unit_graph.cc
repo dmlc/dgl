@@ -400,8 +400,25 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
            (NumVertices(SrcType()) > 1000000);
   }
+ 
+  bool Load(dmlc::Stream* fs) {
+    auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+    CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+    meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+    CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
+    return true;
+  }
+  void Save(dmlc::Stream* fs) const {
+    auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+    fs->Write(meta_graph_ptr);
+    fs->Write(adj_);
+  }
 
  private:
+  friend class Serializer;
+
+  COO(){};
+
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
 
@@ -1249,11 +1266,31 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
   CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
   meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
-  
-  CHECK(fs->Read(&out_csr_)) << "Invalid out csr matrix";
+
   int64_t format_code;
   CHECK(fs->Read(&format_code)) << "Invalid format";
   restrict_format_ = static_cast<SparseFormat>(format_code);
+  
+  switch (restrict_format_) {
+    case SparseFormat::COO:
+      fs->Read(&coo_);
+      break;
+    case SparseFormat::CSR:
+      fs->Read(&out_csr_);
+      break;
+    case SparseFormat::CSC:
+      fs->Read(&in_csr_);
+      break;
+    case SparseFormat::ANY:
+      // If not specified using CSR
+      fs->Read(&out_csr_);
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
+
+  CHECK(fs->Read(&out_csr_)) << "Invalid out csr matrix";
   return true;
 }
 
@@ -1265,8 +1302,27 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
   fs->Write(meta_graph_ptr);
-  fs->Write(out_csr_);
   fs->Write(static_cast<int64_t>(restrict_format_));
+  switch (restrict_format_) {
+    case SparseFormat::COO:
+      fs->Write(GetCOO());
+      break;
+    case SparseFormat::CSR:
+      fs->Write(GetOutCSR());
+      break;
+    case SparseFormat::CSC:
+      fs->Write(GetInCSR());
+      break;
+    case SparseFormat::ANY:
+      // If not specified using CSR
+      fs->Write(GetOutCSR());
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
+
+  fs->Write(out_csr_);
 }
 
 }  // namespace dgl

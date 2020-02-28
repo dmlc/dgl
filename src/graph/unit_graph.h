@@ -272,6 +272,7 @@ class UnitGraph : public BaseHeteroGraph {
 namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_

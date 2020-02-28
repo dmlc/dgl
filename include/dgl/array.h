@@ -267,6 +267,9 @@ struct CSRMatrix {
  *
  * We call a COO matrix is *coalesced* if its row index is sorted.
  */
+
+constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
+
 struct COOMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
@@ -286,6 +289,32 @@ struct COOMatrix {
             bool rsorted = false, bool csorted = false)
     : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
       row_sorted(rsorted), col_sorted(csorted) {}
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCooMatrixMagic)
+        << "Invalid COOMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&row)) << "Invalid row";
+    CHECK(fs->Read(&col)) << "Invalid col";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&row_sorted)) << "Invalid row_sorted";
+    CHECK(fs->Read(&col_sorted)) << "Invalid col_sorted";
+    return true;
+  };
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCooMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(row);
+    fs->Write(col);
+    fs->Write(data);
+    fs->Write(row_sorted);
+    fs->Write(col_sorted);
+  };
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -826,6 +855,7 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 
 namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::COOMatrix, true);
 }  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_
