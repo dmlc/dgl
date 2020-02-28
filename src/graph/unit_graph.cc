@@ -401,7 +401,24 @@ class UnitGraph::COO : public BaseHeteroGraph {
            (NumVertices(SrcType()) > 1000000);
   }
 
+  bool Load(dmlc::Stream* fs) {
+    auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+    CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+    meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+    CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
+    return true;
+  }
+  void Save(dmlc::Stream* fs) const {
+    auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+    fs->Write(meta_graph_ptr);
+    fs->Write(adj_);
+  }
+
  private:
+  friend class Serializer;
+
+  COO(){};
+
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
 
@@ -738,7 +755,26 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_;
   }
 
+  bool Load(dmlc::Stream* fs) {
+    auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+    CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+    meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+    CHECK(fs->Read(&sorted_)) << "Invalid boolean for sorted_";
+    CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
+    return true;
+  }
+  void Save(dmlc::Stream* fs) const {
+    auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+    fs->Write(meta_graph_ptr);
+    fs->Write(sorted_);
+    fs->Write(adj_);
+  }
+
  private:
+  friend class Serializer;
+
+  CSR(){};
+
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
 
@@ -1219,14 +1255,6 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::COO;
 }
 
-UnitGraph* UnitGraph::EmptyGraph() {
-  auto src = NewIdArray(0);
-  auto dst = NewIdArray(0);
-  auto mg = CreateUnitGraphMetaGraph(1);
-  COOPtr coo(new COO(mg, 0, 0, src, dst));
-  return new UnitGraph(mg, nullptr, nullptr, coo);
-}
-
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
 // Using OurCSR
@@ -1234,31 +1262,67 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
   uint64_t magicNum;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
-  uint64_t num_vtypes, num_src, num_dst;
-  CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
-  CHECK(fs->Read(&num_src)) << "Invalid num_src";
-  CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
-  aten::CSRMatrix csr_matrix;
-  CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
-  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr,
-                     csr_matrix.indices, csr_matrix.data));
-  *this = UnitGraph(mg, nullptr, csr, nullptr);
+
+  auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+  CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+  meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+
+  int64_t format_code;
+  CHECK(fs->Read(&format_code)) << "Invalid format";
+  restrict_format_ = static_cast<SparseFormat>(format_code);
+
+  switch (restrict_format_) {
+    case SparseFormat::COO:
+      fs->Read(&coo_);
+      break;
+    case SparseFormat::CSR:
+      fs->Read(&out_csr_);
+      break;
+    case SparseFormat::CSC:
+      fs->Read(&in_csr_);
+      break;
+    case SparseFormat::ANY:
+      // If not specified using CSR
+      fs->Read(&out_csr_);
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
+
+  CHECK(fs->Read(&out_csr_)) << "Invalid out csr matrix";
   return true;
 }
 
 // Using Out CSR
 void UnitGraph::Save(dmlc::Stream* fs) const {
   // Following CreateFromCSR signature
+  // Make out_csr prepared
   aten::CSRMatrix csr_matrix = GetCSRMatrix(0);
-  uint64_t num_vtypes = NumVertexTypes();
-  uint64_t num_src = NumVertices(SrcType());
-  uint64_t num_dst = NumVertices(DstType());
   fs->Write(kDGLSerialize_UnitGraphMagic);
-  fs->Write(num_vtypes);
-  fs->Write(num_src);
-  fs->Write(num_dst);
-  fs->Write(csr_matrix);
+  auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+  fs->Write(meta_graph_ptr);
+  fs->Write(static_cast<int64_t>(restrict_format_));
+  switch (restrict_format_) {
+    case SparseFormat::COO:
+      fs->Write(GetCOO());
+      break;
+    case SparseFormat::CSR:
+      fs->Write(GetOutCSR());
+      break;
+    case SparseFormat::CSC:
+      fs->Write(GetInCSR());
+      break;
+    case SparseFormat::ANY:
+      // If not specified using CSR
+      fs->Write(GetOutCSR());
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
+
+  fs->Write(out_csr_);
 }
 
 }  // namespace dgl

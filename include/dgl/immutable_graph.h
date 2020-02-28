@@ -976,6 +976,8 @@ class ImmutableGraph: public GraphInterface {
   }
 
  protected:
+  friend class Serializer;
+
   /* !\brief internal default constructor */
   ImmutableGraph() {}
 

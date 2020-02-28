@@ -21,7 +21,10 @@ inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
 
 /*! \brief Output the string representation of device context.*/
 inline std::ostream& operator << (std::ostream& os, const DLDataType& ty) {
-  return os << "code=" << ty.code << ",bits=" << ty.bits << "lanes=" << ty.lanes;
+  return os <<
+    "code=" << static_cast<int>(ty.code) <<
+    ",bits=" << static_cast<int>(ty.bits) <<
+    "lanes=" << static_cast<int>(ty.lanes);
 }
 
 /*! \brief Check whether two device contexts are the same.*/

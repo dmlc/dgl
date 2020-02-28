@@ -6,6 +6,7 @@
 
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/smart_ptr_serializer.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <string.h>
@@ -13,7 +14,6 @@
 #include <numeric>
 #include <tuple>
 
-#include <dgl/runtime/smart_ptr_serializer.h>
 #include "../c_api_common.h"
 
 using namespace dgl::runtime;

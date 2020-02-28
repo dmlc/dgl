@@ -213,6 +213,9 @@ class UnitGraph : public BaseHeteroGraph {
  private:
   friend class Serializer;
 
+  // private empty constructor
+  UnitGraph() {}
+
   /*!
    * \brief constructor
    * \param metagraph metagraph
@@ -246,9 +249,6 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
-  // Empty Graph for Serializer Usgae
-  static UnitGraph* EmptyGraph();
-
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
   /*! \brief CSR graph that stores reverse edges */
@@ -271,6 +271,8 @@ class UnitGraph : public BaseHeteroGraph {
 
 namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_
