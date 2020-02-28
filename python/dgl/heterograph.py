@@ -243,6 +243,7 @@ class DGLHeteroGraph(object):
         self._is_multigraph = multigraph
 
     def _get_msg_index(self, etid):
+        """Internal function for getting the message index array of the given edge type id."""
         if self._msg_indices[etid] is None:
             self._msg_indices[etid] = utils.zero_index(
                 size=self._graph.number_of_edges(etid))

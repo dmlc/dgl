@@ -7,9 +7,10 @@ from ..heterograph import DGLHeteroGraph
 from .. import ndarray as nd
 from .. import utils
 
-__all__ = ['sample_neighbors', 'sample_neighbors_topk']
+__all__ = ['sample_neighbors', 'sample_neighbors_topk',
+           'NeighborSampler']
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes and return the induced subgraph.
 
     When sampling with replacement, the sampled subgraph could have parallel edges.
@@ -148,5 +149,71 @@ def sample_neighbors_topk(g, nodes, k, weight, edge_dir='in', ascending=False):
     for i, etype in enumerate(ret.canonical_etypes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
+
+class NeighborSampler:
+    r"""Class for neighborhood-based mini-batch sampling.
+
+    An iterator wrapper class of :func:`~dgl.sampling.sample_neighbors`. Each iteration
+    generates a mini-batch, which contains ``num_hops`` graphs representing sampled
+    neighborhood at each step.
+
+    As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
+    of the initial nodes (number of nodes in the last layer).
+
+    The implementation is roughly equal to:
+
+    .. code::
+
+        num_batches = (len(seed_nodes) + batch_size) // batch_size
+        for bid in range(num_batches):
+            nodes = seed_nodes[bid * batch_size : (bid + 1) * batch_size]
+            frs = []
+            for i in range(num_hops):
+                cur = sample_neighbors(g, nodes, fanout[i], edge_dir, prob[i], replace)
+                u, _ = cur.edges(form='uv')
+                frs.append(cur)
+                if i != num_hops - 1:
+                    nodes = unique(u)
+            frs = compact_graphs(frs)
+            yield frs
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        Full graph structure.
+    seed_nodes : tensor or dict
+        Node ids to sample neighbors from. The allowed types
+        are dictionary of node types to node id tensors, or simply node id tensor if
+        the given graph g has only one type of nodes.
+    fanout : int or list[int]
+        The number of sampled neighbors for each node on each edge type. Provide a list
+        to specify different fanout values for each edge type.
+    num_hops : int
+        Number of hops
+    edge_dir : str, optional
+        Edge direction ('in' or 'out'). If is 'in', sample from in edges. Otherwise,
+        sample from out edges.
+    prob : str, optional
+        Feature name used as the probabilities associated with each neighbor of a node.
+        Its shape should be compatible with a scalar edge feature tensor.
+    replace : bool, optional
+        If True, sample with replacement.
+    shuffle : bool, optional
+        If True, shuffle the ``seed_nodes`` at each epoch.
+    num_workers : int, optional
+        Number of worker threads used to sample mini-batches in parallel.
+    """
+    def __init__(self,
+                 g,
+                 seed_nodes,
+                 fanout,
+                 num_hops,
+                 batch_size,
+                 edge_dir='in',
+                 prob=None,
+                 replace=False,
+                 shuffle=False,
+                 num_workers=1):
+        pass
 
 _init_api('dgl.sampling.neighbor', __name__)
