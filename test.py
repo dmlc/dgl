@@ -20,6 +20,7 @@ print('hetero-graph created')
 L = 4
 FAN = 10
 
+'''
 ##################### Test 1: Use the new subgraph sampling API ####################
 ne = []
 compact_dur = 0.
@@ -45,7 +46,6 @@ print('v05 Tput(KETPS):', np.sum(ne) / dur / 1000)
 print('v05 (w/o compact) Tput(KETPS):', np.sum(ne) / (dur - compact_dur) / 1000)
 print(np.sum(ne))
 
-'''
 ##################### Test 1.5: Use the new subgraph sampling API + multi-process dataloader ####################
 import multiprocessing as mp
 
@@ -173,13 +173,14 @@ def mycollate(seeds):
         us.append(u)
         vs.append(v)
     frs = dgl.compact_graphs(frs)
-    return us + vs
+    #return us + vs
+    return frs
 
 loader = DataLoader(dataset=list(train_nid.numpy()),
                     batch_size=1000,
                     collate_fn=mycollate,
                     shuffle=False,
-                    num_workers=64)
+                    num_workers=32)
 
 ne = []
 for i, frs in enumerate(loader):
@@ -187,7 +188,8 @@ for i, frs in enumerate(loader):
         print('Dry run finished')
         t = time.time()
     if i >= 20:
-        ne.append(sum([len(fr) for fr in frs]) / 2)
+        #ne.append(sum([len(fr) for fr in frs]) / 2)
+        ne.append(sum([frs[j].number_of_edges() for j in range(L)]))
     if i == 149:
         break
 print(i)

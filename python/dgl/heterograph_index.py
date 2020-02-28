@@ -25,32 +25,35 @@ class HeteroGraphIndex(ObjectBase):
         obj._cache = {}
         return obj
 
-    def __get_relation_states__(self):
+    def __getstate__(self):
         metagraph = self.metagraph
         number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
-        return metagraph, number_of_nodes, self._get_relation_states()
-        #edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
-        #return metagraph, number_of_nodes, edges
+        #return metagraph, number_of_nodes, self._get_relation_states()
+        edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
+        return metagraph, number_of_nodes, edges
 
     def __setstate__(self, state):
-        metagraph, number_of_nodes, relstates = state
-        number_of_nodes = nd.array(np.array(number_of_nodes, dtype=np.int64))
-        relstates = [F.zerocopy_to_dgl_ndarray(arr) for arr in relstates]
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLHeteroCreateHeteroGraphFromRelationStates,
-            metagraph, number_of_nodes, relstates)
+        #metagraph, number_of_nodes, relstates = state
+        #number_of_nodes = nd.array(np.array(number_of_nodes, dtype=np.int64))
+        #relstates = [F.zerocopy_to_dgl_ndarray(arr) for arr in relstates]
+        #self.__init_handle_by_constructor__(
+        #    _CAPI_DGLHeteroCreateHeteroGraphFromRelationStates,
+        #    metagraph, number_of_nodes, relstates)
+        #self._cache = {}
+
+        metagraph, number_of_nodes, edges = state
         self._cache = {}
         # loop over etypes and recover unit graphs
-        #rel_graphs = []
-        #for i, edges_per_type in enumerate(edges):
-        #    src_ntype, dst_ntype = metagraph.find_edge(i)
-        #    num_src = number_of_nodes[src_ntype]
-        #    num_dst = number_of_nodes[dst_ntype]
-        #    src_id, dst_id, _ = edges_per_type
-        #    rel_graphs.append(create_unitgraph_from_coo(
-        #        1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
-        #self.__init_handle_by_constructor__(
-        #    _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
+        rel_graphs = []
+        for i, edges_per_type in enumerate(edges):
+            src_ntype, dst_ntype = metagraph.find_edge(i)
+            num_src = number_of_nodes[src_ntype]
+            num_dst = number_of_nodes[dst_ntype]
+            src_id, dst_id, _ = edges_per_type
+            rel_graphs.append(create_unitgraph_from_coo(
+                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
 
     def _get_relation_states(self):
         """Get the pickling state of the relation graph structure in backend tensors.
