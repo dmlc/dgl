@@ -149,6 +149,147 @@ class GCMCLayer(nn.Module):
         ifeat = self.ifc(ifeat)
         return self.out_act(ufeat), self.out_act(ifeat)
 
+class SampleGCMCLayer(GCMCLayer):
+    r"""Sample based GCMC layer
+
+    .. math::
+        z_j^{(l+1)} = \sigma_{agg}\left[\mathrm{agg}\left(
+        \sum_{j\in\mathcal{N}_1}\frac{1}{c_{ij}}W_1h_j, \ldots,
+        \sum_{j\in\mathcal{N}_R}\frac{1}{c_{ij}}W_Rh_j
+        \right)\right]
+
+    After that, apply an extra output projection:
+
+    .. math::
+        h_j^{(l+1)} = \sigma_{out}W_oz_j^{(l+1)}
+
+    The equation is applied to both user nodes and movie nodes and the parameters
+    are not shared unless ``share_user_item_param`` is true.
+
+    Parameters
+    ----------
+    rating_vals : list of int or float
+        Possible rating values.
+    user_in_units : int
+        Size of user input feature
+    movie_in_units : int
+        Size of movie input feature
+    msg_units : int
+        Size of message :math:`W_rh_j`
+    out_units : int
+        Size of of final output user and movie features
+    dropout_rate : float, optional
+        Dropout rate (Default: 0.0)
+    agg : str, optional
+        Function to aggregate messages of different ratings.
+        Could be any of the supported cross type reducers:
+        "sum", "max", "min", "mean", "stack".
+        (Default: "stack")
+    agg_act : callable, str, optional
+        Activation function :math:`sigma_{agg}`. (Default: None)
+    out_act : callable, str, optional
+        Activation function :math:`sigma_{agg}`. (Default: None)
+    share_user_item_param : bool, optional
+        If true, user node and movie node share the same set of parameters.
+        Require ``user_in_units`` and ``move_in_units`` to be the same.
+        (Default: False)
+    """
+    def __init__(self,
+                 rating_vals,
+                 user_in_units,
+                 movie_in_units,
+                 msg_units,
+                 out_units,
+                 dropout_rate=0.0,
+                 agg='stack',  # or 'sum'
+                 agg_act=None,
+                 out_act=None,
+                 share_user_item_param=False):
+        super(SampleGCMCLayer, self).__init__(rating_vals,
+                                              user_in_units,
+                                              movie_in_units,
+                                              msg_units,
+                                              out_units,
+                                              dropout_rate,
+                                              agg,  # or 'sum'
+                                              agg_act,
+                                              out_act,
+                                              share_user_item_param)
+        # move part of mode params into GPU when required
+        self.device = None
+        self.share_user_item_param
+        
+    def partial_to(self, device):
+        """Put parameters into device except W_r
+        
+        Parameters
+        ----------
+        device : torch device
+            Which device the parameters are put in.
+        """
+        self.device = device
+        if device is not None:
+            self.ufc.to(device)
+            if self.share_user_item_param is False:
+                self.ifc.to(device)
+            self.dropout.to(device)
+
+    def forward(self, ugraph, igraph, ufeat=None, ifeat=None):
+        """Forward function
+
+        Normalizer constant :math:`c_{ij}` is stored as two node data "ci"
+        and "cj".
+
+        Parameters
+        ----------
+        graph : DGLHeteroGraph
+            User-movie rating graph. It should contain two node types: "user"
+            and "movie" and many edge types each for one rating value.
+        ufeat : torch.Tensor, optional
+            User features. If None, using an identity matrix.
+        ifeat : torch.Tensor, optional
+            Movie features. If None, using an identity matrix.
+
+        Returns
+        -------
+        new_ufeat : torch.Tensor
+            New user features
+        new_ifeat : torch.Tensor
+            New movie features
+        """
+        num_u = ugraph.number_of_nodes('user')
+        num_i = igraph.number_of_nodes('movie')
+        ufuncs = {}
+        ifuncs = {}
+        for i, rating in enumerate(self.rating_vals):
+            rating = str(rating)
+            # W_r * x
+            x_u = dot_or_identity(ufeat, self.W_r[rating.replace('.', '_')], self.device)
+            x_i = dot_or_identity(ifeat, self.W_r['rev-%s' % rating.replace('.', '_')], self.device)
+            # left norm and dropout
+            x_u = x_u * self.dropout(igraph.nodes['user'].data['cj'])
+            x_i = x_i * self.dropout(ugraph.nodes['movie'].data['cj'])
+            igraph.nodes['user'].data['h%d' % i] = x_u
+            ugraph.nodes['movie'].data['h%d' % i] = x_i
+            ifuncs[rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+            ufuncs['rev-%s' % rating] = (fn.copy_u('h%d' % i, 'm'), fn.sum('m', 'h'))
+        # message passing
+        ugraph.multi_update_all(ufuncs, self.agg)
+        igraph.multi_update_all(ifuncs, self.agg)
+        ufeat = ugraph.nodes['user'].data.pop('h').view(num_u, -1)
+        ifeat = igraph.nodes['movie'].data.pop('h').view(num_i, -1)
+        # right norm
+        ufeat = ufeat * ugraph.nodes['user'].data['ci']
+        ifeat = ifeat * igraph.nodes['movie'].data['ci']
+        # fc and non-linear
+        ufeat = self.agg_act(ufeat)
+        ifeat = self.agg_act(ifeat)
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
+        ufeat = self.ufc(ufeat)
+        ifeat = self.ifc(ifeat)
+        return self.out_act(ufeat), self.out_act(ifeat)
+
 class BiDecoder(nn.Module):
     r"""Bilinear decoder.
 
@@ -222,9 +363,75 @@ class BiDecoder(nn.Module):
         out = self.rate_out(out)
         return out
 
-def dot_or_identity(A, B):
+class SampleBiDecoder(BiDecoder):
+    r"""Sample based Bilinear decoder.
+
+    .. math::
+        p(M_{ij}=r) = \text{softmax}(u_i^TQ_rv_j)
+
+    The trainable parameter :math:`Q_r` is further decomposed to a linear
+    combination of basis weight matrices :math:`P_s`:
+
+    .. math::
+        Q_r = \sum_{s=1}^{b} a_{rs}P_s
+
+    Parameters
+    ----------
+    rating_vals : list of int or float
+        Possible rating values.
+    in_units : int
+        Size of input user and movie features
+    num_basis_functions : int, optional
+        Number of basis. (Default: 2)
+    dropout_rate : float, optional
+        Dropout raite (Default: 0.0)
+    """
+    def __init__(self,
+                 rating_vals,
+                 in_units,
+                 num_basis_functions=2,
+                 dropout_rate=0.0):
+        super(SampleBiDecoder, self).__init__(rating_vals,
+                                              in_units,
+                                              num_basis_functions,
+                                              dropout_rate)
+
+    def forward(self, ufeat, ifeat):
+        """Forward function.
+
+        Parameters
+        ----------
+        graph : DGLHeteroGraph
+            "Flattened" user-movie graph with only one edge type.
+        ufeat : th.Tensor
+            User embeddings. Shape: (|V_u|, D)
+        ifeat : th.Tensor
+            Movie embeddings. Shape: (|V_m|, D)
+
+        Returns
+        -------
+        th.Tensor
+            Predicting scores for each user-movie edge.
+        """
+        ufeat = self.dropout(ufeat)
+        ifeat = self.dropout(ifeat)
+        basis_out = []
+        for i in range(self._num_basis_functions):
+            ufeat_i = ufeat @ self.Ps[i]
+            out = th.einsum('ab,ab->a', ufeat_i, ifeat)
+            basis_out.append(out.unsqueeze(1))
+        out = th.cat(basis_out, dim=1)
+        out = self.rate_out(out)
+        return out
+
+def dot_or_identity(A, B, device=None):
     # if A is None, treat as identity matrix
     if A is None:
         return B
+    elif len(A.shape) == 1:
+        if device is None:
+            return B[A]
+        else:
+            return B[A].to(device)
     else:
         return A @ B
