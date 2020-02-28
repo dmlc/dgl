@@ -564,8 +564,6 @@ struct FlattenedHeteroGraph : public runtime::Object {
 };
 DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
-// creators
-
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")
     return SparseFormat::COO;
@@ -576,6 +574,8 @@ inline SparseFormat ParseSparseFormat(const std::string& name) {
   else
     return SparseFormat::ANY;
 }
+
+// creators
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
 HeteroGraphPtr CreateHeteroGraph(
