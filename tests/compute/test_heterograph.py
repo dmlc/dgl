@@ -1365,51 +1365,6 @@ def test_empty_heterograph():
     assert g.number_of_nodes('developer') == 2
 
 
-def test_compact():
-    g1 = dgl.heterograph({
-        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
-        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
-        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
-        {'user': 20, 'game': 10})
-
-    g2 = dgl.heterograph({
-        ('game', 'clicked-by', 'user'): [(3, 1)],
-        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
-        {'user': 20, 'game': 10})
-
-    def _check(g, new_g, induced_nodes):
-        assert g.ntypes == new_g.ntypes
-        assert g.canonical_etypes == new_g.canonical_etypes
-
-        for ntype in g.ntypes:
-            assert -1 not in induced_nodes[ntype]
-
-        for etype in g.canonical_etypes:
-            g_src, g_dst = g.all_edges(order='eid', etype=etype)
-            g_src = F.asnumpy(g_src)
-            g_dst = F.asnumpy(g_dst)
-            new_g_src, new_g_dst = new_g.all_edges(order='eid', etype=etype)
-            new_g_src_mapped = induced_nodes[etype[0]][F.asnumpy(new_g_src)]
-            new_g_dst_mapped = induced_nodes[etype[2]][F.asnumpy(new_g_dst)]
-            assert (g_src == new_g_src_mapped).all()
-            assert (g_dst == new_g_dst_mapped).all()
-
-    new_g1 = dgl.compact_graphs(g1)
-    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
-    assert set(induced_nodes['game']) == set([4, 5, 6])
-    _check(g1, new_g1, induced_nodes)
-
-    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
-    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
-    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
-    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
-    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
-    _check(g1, new_g1, induced_nodes)
-    _check(g2, new_g2, induced_nodes)
-
-
 def test_types_in_function():
     def mfunc1(edges):
         assert edges.canonical_etype == ('user', 'follow', 'user')
@@ -1513,6 +1468,5 @@ if __name__ == '__main__':
     test_updates()
     test_backward()
     test_empty_heterograph()
-    test_compact()
     test_types_in_function()
     test_stack_reduce()

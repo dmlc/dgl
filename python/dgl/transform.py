@@ -1,9 +1,9 @@
 """Module for graph transformation utilities."""
 
+from collections.abc import Iterable, Mapping
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
-from .base import EID
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
@@ -15,11 +15,27 @@ from .graph_index import _get_halo_subgraph_inner_edge
 from .batched_graph import BatchedDGLGraph, unbatch
 from .convert import graph, bipartite
 from . import utils
+from .base import EID, NID
+from . import ndarray as nd
 
 
-__all__ = ['line_graph', 'khop_adj', 'khop_graph', 'reverse', 'to_simple_graph', 'to_bidirected',
-           'laplacian_lambda_max', 'knn_graph', 'segmented_knn_graph', 'add_self_loop',
-           'remove_self_loop', 'metapath_reachable_graph', 'in_subgraph', 'out_subgraph']
+__all__ = [
+    'line_graph',
+    'khop_adj',
+    'khop_graph',
+    'reverse',
+    'to_simple_graph',
+    'to_bidirected',
+    'laplacian_lambda_max',
+    'knn_graph',
+    'segmented_knn_graph',
+    'add_self_loop',
+    'remove_self_loop',
+    'metapath_reachable_graph',
+    'compact_graphs',
+    'to_simple',
+    'in_subgraph',
+    'out_subgraph']
 
 
 def pairwise_squared_distance(x):
@@ -565,13 +581,145 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
+def compact_graphs(graphs, always_preserve=None):
+    """Given a list of graphs with the same set of nodes, find and eliminate the common
+    isolated nodes across all graphs.
+
+    This function requires the graphs to have the same set of nodes (i.e. the node types
+    must be the same, and the number of nodes of each node type must be the same).  The
+    metagraph does not have to be the same.
+
+    It finds all the nodes that have zero in-degree and zero out-degree in all the given
+    graphs, and eliminates them from all the graphs.
+
+    Useful for graph sampling where we have a giant graph but we only wish to perform
+    message passing on a smaller graph with a (tiny) subset of nodes.
+
+    The node and edge features are not preserved.
+
+    Parameters
+    ----------
+    graphs : DGLHeteroGraph or list[DGLHeteroGraph]
+        The graph, or list of graphs
+    always_preserve : Tensor or dict[str, Tensor], optional
+        If a dict of node types and node ID tensors is given, the nodes of given
+        node types would not be removed, regardless of whether they are isolated.
+        If a Tensor is given, assume that all the graphs have one (same) node type.
+
+    Returns
+    -------
+    DGLHeteroGraph or list[DGLHeteroGraph]
+        The compacted graph or list of compacted graphs.
+
+        Each returned graph would have a feature ``dgl.NID`` containing the mapping
+        of node IDs for each type from the compacted graph(s) to the original graph(s).
+        Note that the mapping is the same for all the compacted graphs.
+
+    Bugs
+    ----
+    This function currently requires that the same node type of all graphs should have
+    the same node type ID, i.e. the node types are *ordered* the same.
+
+    Examples
+    --------
+    The following code constructs a bipartite graph with 20 users and 10 games, but
+    only user #1 and #3, as well as game #3 and #5, have connections:
+
+    >>> g = dgl.bipartite([(1, 3), (3, 5)], 'user', 'plays', 'game', card=(20, 10))
+
+    The following would compact the graph above to another bipartite graph with only
+    two users and two games.
+
+    >>> new_g, induced_nodes = dgl.compact_graphs(g)
+    >>> induced_nodes
+    {'user': tensor([1, 3]), 'game': tensor([3, 5])}
+
+    The mapping tells us that only user #1 and #3 as well as game #3 and #5 are kept.
+    Furthermore, the first user and second user in the compacted graph maps to
+    user #1 and #3 in the original graph.  Games are similar.
+
+    One can verify that the edge connections are kept the same in the compacted graph.
+
+    >>> new_g.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
+
+    When compacting multiple graphs, nodes that do not have any connections in any
+    of the given graphs are removed.  So if we compact ``g`` and the following ``g2``
+    graphs together:
+
+    >>> g2 = dgl.bipartite([(1, 6), (6, 8)], 'user', 'plays', 'game', card=(20, 10))
+    >>> (new_g, new_g2), induced_nodes = dgl.compact_graphs([g, g2])
+    >>> induced_nodes
+    {'user': tensor([1, 3, 6]), 'game': tensor([3, 5, 6, 8])}
+
+    Then one can see that user #1 from both graphs, users #3 from the first graph, as
+    well as user #6 from the second graph, are kept.  Games are similar.
+
+    Similarly, one can also verify the connections:
+
+    >>> new_g.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 1]), tensor([0, 1]), tensor([0, 1]))
+    >>> new_g2.edges(form='all', order='eid', etype='plays')
+    (tensor([0, 2]), tensor([2, 3]), tensor([0, 1]))
+    """
+    return_single = False
+    if not isinstance(graphs, Iterable):
+        graphs = [graphs]
+        return_single = True
+    if len(graphs) == 0:
+        return []
+
+    # Ensure the node types are ordered the same.
+    # TODO(BarclayII): we ideally need to remove this constraint.
+    ntypes = graphs[0].ntypes
+    graph_dtype = graphs[0]._graph.dtype()
+    graph_ctx = graphs[0]._graph.ctx()
+    for g in graphs:
+        assert ntypes == g.ntypes, \
+            ("All graphs should have the same node types in the same order, got %s and %s" %
+             ntypes, g.ntypes)
+        assert graph_dtype == g._graph.dtype(), "Graph data type mismatch"
+        assert graph_ctx == g._graph.ctx(), "Graph device mismatch"
+
+    # Process the dictionary or tensor of "always preserve" nodes
+    if always_preserve is None:
+        always_preserve = {}
+    elif not isinstance(always_preserve, Mapping):
+        if len(ntypes) > 1:
+            raise ValueError("Node type must be given if multiple node types exist.")
+        always_preserve = {ntypes[0]: always_preserve}
+
+    always_preserve_nd = []
+    for ntype in ntypes:
+        nodes = always_preserve.get(ntype, None)
+        if nodes is None:
+            nodes = nd.empty([0], graph_dtype, graph_ctx)
+        else:
+            nodes = F.zerocopy_to_dgl_ndarray(nodes)
+        always_preserve_nd.append(nodes)
+
+    # Compact and construct heterographs
+    new_graph_indexes, induced_nodes = _CAPI_DGLCompactGraphs(
+        [g._graph for g in graphs], always_preserve_nd)
+    induced_nodes = [F.zerocopy_from_dgl_ndarray(nodes.data) for nodes in induced_nodes]
+
+    new_graphs = [
+        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+        for new_graph_index, graph in zip(new_graph_indexes, graphs)]
+    for g in new_graphs:
+        for i, ntype in enumerate(graphs[0].ntypes):
+            g.nodes[ntype].data[NID] = induced_nodes[i]
+    if return_single:
+        new_graphs = new_graphs[0]
+
+    return new_graphs
+
 def in_subgraph(g, nodes):
     """Extract the subgraph containing only the in edges of the given nodes.
 
     The subgraph keeps the same type schema and the cardinality of the original one.
     Node/edge features are not preserved. The original IDs
     the extracted edges are stored as the `dgl.EID` feature in the returned graph.
-
 
     Parameters
     ----------
@@ -612,7 +760,6 @@ def out_subgraph(g, nodes):
     Node/edge features are not preserved. The original IDs
     the extracted edges are stored as the `dgl.EID` feature in the returned graph.
 
-
     Parameters
     ----------
     g : DGLHeteroGraph
@@ -644,5 +791,69 @@ def out_subgraph(g, nodes):
     for i, etype in enumerate(ret.canonical_etypes):
         ret.edges[etype].data[EID] = induced_edges[i].tousertensor()
     return ret
+
+def to_simple(g, return_counts='count', writeback_mapping=None):
+    """Convert a heterogeneous multigraph to a heterogeneous simple graph, coalescing
+    duplicate edges into one.
+
+    This function does not preserve node and edge features.
+
+    Parameters
+    ----------
+    g : DGLHeteroGraph
+        The heterogeneous graph
+    return_counts : str, optional
+        If given, the returned graph would have a column with the same name that stores
+        the number of duplicated edges from the original graph.
+    writeback_mapping : str, optional
+        If given, the mapping from the edge IDs of original graph to those of the returned
+        graph would be written into edge feature with this name in the original graph for
+        each edge type.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new heterogeneous simple graph.
+
+    Examples
+    --------
+    Consider the following graph
+    >>> g = dgl.graph([(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)])
+    >>> sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+
+    The returned graph would have duplicate edges connecting (1, 3) and (1, 4) removed:
+    >>> sg.all_edges(form='uv', order='eid')
+    (tensor([0, 1, 1, 2]), tensor([1, 3, 4, 2]))
+
+    If ``return_counts`` is set, the returned graph will also return how many edges
+    in the original graph are connecting the endpoints of the edges in the new graph:
+    >>> sg.edata['weights']
+    tensor([1, 2, 2, 1])
+
+    This essentially reads that one edge is connecting (0, 1) in ``g``, whereas 2 edges
+    are connecting (1, 3) in ``g``, etc.
+
+    One can also retrieve the mapping from the edges in the original graph to edges in
+    the new graph by setting ``writeback_mapping`` and running
+    >>> g.edata['new_eid']
+    tensor([0, 1, 3, 1, 2, 2])
+
+    This tells us that the first edge in ``g`` is mapped to the first edge in ``sg``, and
+    the second and the fourth edge are mapped to the second edge in ``sg``, etc.
+    """
+    simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
+    simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
+    counts = [F.zerocopy_from_dgl_ndarray(count.data) for count in counts]
+    edge_maps = [F.zerocopy_from_dgl_ndarray(edge_map.data) for edge_map in edge_maps]
+
+    if return_counts is not None:
+        for count, canonical_etype in zip(counts, g.canonical_etypes):
+            simple_graph.edges[canonical_etype].data[return_counts] = count
+
+    if writeback_mapping is not None:
+        for edge_map, canonical_etype in zip(edge_maps, g.canonical_etypes):
+            g.edges[canonical_etype].data[writeback_mapping] = edge_map
+
+    return simple_graph
 
 _init_api("dgl.transform")
