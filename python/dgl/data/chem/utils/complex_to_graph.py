@@ -4,6 +4,7 @@ import numpy as np
 from ..utils import k_nearest_neighbors
 from .... import graph, bipartite, hetero_from_relations
 from .... import backend as F
+from ....contrib.deprecation import deprecated
 
 __all__ = ['ACNN_graph_construction_and_featurization']
 
@@ -49,6 +50,7 @@ def get_atomic_numbers(mol, indices):
         atomic_numbers.append(atom.GetAtomicNum())
     return atomic_numbers
 
+@deprecated('Import it from dgllife.utils instead.')
 def ACNN_graph_construction_and_featurization(ligand_mol,
                                               protein_mol,
                                               ligand_coordinates,
@@ -72,11 +74,13 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_coordinates : Float Tensor of shape (V2, 3)
         Atom coordinates in a protein.
     max_num_ligand_atoms : int or None
-        Maximum number of atoms in ligands for zero padding.
-        If None, no zero padding will be performed. Default to None.
+        Maximum number of atoms in ligands for zero padding, which should be no smaller than
+        ligand_mol.GetNumAtoms() if not None. If None, no zero padding will be performed.
+        Default to None.
     max_num_protein_atoms : int or None
-        Maximum number of atoms in proteins for zero padding.
-        If None, no zero padding will be performed. Default to None.
+        Maximum number of atoms in proteins for zero padding, which should be no smaller than
+        protein_mol.GetNumAtoms() if not None. If None, no zero padding will be performed.
+        Default to None.
     neighbor_cutoff : float
         Distance cutoff to define 'neighboring'. Default to 12.
     max_num_neighbors : int
@@ -86,6 +90,12 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     """
     assert ligand_coordinates is not None, 'Expect ligand_coordinates to be provided.'
     assert protein_coordinates is not None, 'Expect protein_coordinates to be provided.'
+    if max_num_ligand_atoms is not None:
+        assert max_num_ligand_atoms >= ligand_mol.GetNumAtoms(), \
+            'Expect max_num_ligand_atoms to be no smaller than ligand_mol.GetNumAtoms()'
+    if max_num_protein_atoms is not None:
+        assert max_num_protein_atoms >= protein_mol.GetNumAtoms(), \
+            'Expect max_num_protein_atoms to be no smaller than protein_mol.GetNumAtoms()'
 
     if strip_hydrogens:
         # Remove hydrogen atoms and their corresponding coordinates

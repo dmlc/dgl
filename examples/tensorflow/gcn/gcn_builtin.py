@@ -21,7 +21,8 @@ class GCNLayer(layers.Layer):
         super(GCNLayer, self).__init__()
         self.g = g
 
-        w_init = tf.random_normal_initializer()
+        w_init = tf.keras.initializers.VarianceScaling(
+            scale=1.0, mode="fan_out", distribution="uniform")
         self.weight = tf.Variable(initial_value=w_init(shape=(in_feats, out_feats),
                                                        dtype='float32'),
                                   trainable=True)
@@ -144,7 +145,7 @@ def main(args):
                     args.dropout)
 
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=args.lr, decay=args.weight_decay)
+            learning_rate=args.lr)
 
         loss_fcn = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True)
@@ -157,6 +158,13 @@ def main(args):
             with tf.GradientTape() as tape:
                 logits = model(features)
                 loss_value = loss_fcn(labels[train_mask], logits[train_mask])
+                # Manually Weight Decay
+                # We found Tensorflow has a different implementation on weight decay 
+                # of Adam(W) optimizer with PyTorch. And this results in worse results.
+                # Manually adding weights to the loss to do weight decay solves this problem.
+                for weight in model.trainable_weights:
+                    loss_value = loss_value + \
+                        args.weight_decay*tf.nn.l2_loss(weight)
 
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))

@@ -11,8 +11,7 @@ class DenseChebConv(nn.Block):
     Neural Networks on Graphs with Fast Localized Spectral Filtering
     <https://arxiv.org/pdf/1606.09375.pdf>`__.
 
-    We recommend to use this module when inducing ChebConv operations on dense
-    graphs / k-hop graphs.
+    We recommend to use this module when applying ChebConv on dense graphs.
 
     Parameters
     ----------

@@ -12,6 +12,7 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include "./unit_graph.h"
 
 namespace dgl {
 
@@ -39,6 +40,10 @@ class HeteroGraph : public BaseHeteroGraph {
 
   void Clear() override {
     LOG(FATAL) << "Bipartite graph is not mutable.";
+  }
+
+  DLDataType DataType() const override {
+    return relation_graphs_[0]->DataType();
   }
 
   DLContext Context() const override {
@@ -159,6 +164,22 @@ class HeteroGraph : public BaseHeteroGraph {
     return GetRelationGraph(etype)->GetAdj(0, transpose, fmt);
   }
 
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
+    return GetRelationGraph(etype)->GetCOOMatrix(0);
+  }
+
+  aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
+    return GetRelationGraph(etype)->GetCSCMatrix(0);
+  }
+
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
+    return GetRelationGraph(etype)->GetCSRMatrix(0);
+  }
+
+  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+    return GetRelationGraph(etype)->SelectFormat(0, preferred_format);
+  }
+
   HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override;
 
   HeteroSubgraph EdgeSubgraph(
@@ -166,9 +187,21 @@ class HeteroGraph : public BaseHeteroGraph {
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
+  /*! \return Load HeteroGraph from stream, using CSRMatrix*/
+  bool Load(dmlc::Stream* fs);
+
+  /*! \return Save HeteroGraph to stream, using CSRMatrix */
+  void Save(dmlc::Stream* fs) const;
+
  private:
+  // To create empty class
+  friend class Serializer;
+
+  // Empty Constructor, only for serializer
+  HeteroGraph() : BaseHeteroGraph(static_cast<GraphPtr>(nullptr)) {}
+
   /*! \brief A map from edge type to unit graph */
-  std::vector<HeteroGraphPtr> relation_graphs_;
+  std::vector<UnitGraphPtr> relation_graphs_;
 
   /*! \brief A map from vert type to the number of verts in the type */
   std::vector<int64_t> num_verts_per_type_;
@@ -178,5 +211,11 @@ class HeteroGraph : public BaseHeteroGraph {
 };
 
 }  // namespace dgl
+
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::HeteroGraph, true);
+}  // namespace dmlc
+
 
 #endif  // DGL_GRAPH_HETEROGRAPH_H_

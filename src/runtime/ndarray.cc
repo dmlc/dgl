@@ -223,6 +223,46 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
+template<typename T>
+NDArray NDArray::FromVector(const std::vector<T>& vec, DLDataType dtype, DLContext ctx) {
+  int64_t size = static_cast<int64_t>(vec.size());
+  NDArray ret = NDArray::Empty({size}, dtype, DLContext{kDLCPU, 0});
+  DeviceAPI::Get(ctx)->CopyDataFromTo(
+      vec.data(),
+      0,
+      static_cast<T*>(ret->data),
+      0,
+      size * sizeof(T),
+      DLContext{kDLCPU, 0},
+      ctx,
+      dtype,
+      nullptr);
+  return ret;
+}
+
+// export specializations
+template NDArray NDArray::FromVector(const std::vector<int32_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<int64_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<uint32_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<uint64_t>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<float>&, DLDataType, DLContext);
+template NDArray NDArray::FromVector(const std::vector<double>&, DLDataType, DLContext);
+
+// specializations of FromVector
+#define GEN_FROMVECTOR_FOR(T, DTypeCode, DTypeBits) \
+  template<> \
+  NDArray NDArray::FromVector<T>(const std::vector<T> &vec, DLContext ctx) { \
+    return FromVector<T>(vec, DLDataType{DTypeCode, DTypeBits, 1}, ctx); \
+  }
+GEN_FROMVECTOR_FOR(int32_t, kDLInt, 32);
+GEN_FROMVECTOR_FOR(int64_t, kDLInt, 64);
+// XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
+// converting uints to signed NDArrays.
+GEN_FROMVECTOR_FOR(uint32_t, kDLInt, 32);
+GEN_FROMVECTOR_FOR(uint64_t, kDLInt, 64);
+GEN_FROMVECTOR_FOR(float, kDLFloat, 32);
+GEN_FROMVECTOR_FOR(double, kDLFloat, 64);
+
 }  // namespace runtime
 }  // namespace dgl
 

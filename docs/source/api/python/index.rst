@@ -6,9 +6,10 @@ API Reference
 
    graph
    heterograph
-   init
    batch
    batch_heterograph
+   nn
+   init
    function
    traversal
    propagate
@@ -16,7 +17,6 @@ API Reference
    sampler
    data
    transform
-   nn
    subgraph
    graph_store
    nodeflow

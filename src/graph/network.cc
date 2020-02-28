@@ -24,6 +24,13 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace network {
 
+static void NaiveDeleter(DLManagedTensor* managed_tensor) {
+  delete [] managed_tensor->dl_tensor.shape;
+  delete [] managed_tensor->dl_tensor.strides;
+  delete [] managed_tensor->dl_tensor.data;
+  delete managed_tensor;
+}
+
 NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
                              DLDataType dtype,
                              DLContext ctx,
@@ -46,6 +53,7 @@ NDArray CreateNDArrayFromRaw(std::vector<int64_t> shape,
   tensor.data = raw;
   DLManagedTensor *managed_tensor = new DLManagedTensor();
   managed_tensor->dl_tensor = tensor;
+  managed_tensor->deleter = NaiveDeleter;
   return NDArray::FromDLPack(managed_tensor);
 }
 
@@ -591,12 +599,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
     *rv = msg->data;
   });
 
-DGL_REGISTER_GLOBAL("network._CAPI_DeleteNDArrayData")
+DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    NDArray data = args[0];
-    delete [] data->data;
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
+    delete msg;
   });
-
 
 }  // namespace network
 }  // namespace dgl

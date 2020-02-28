@@ -240,14 +240,8 @@ class NeighborSampler(NodeFlowSampler):
         The DGLGraph where we sample NodeFlows.
     batch_size : int
         The batch size (i.e, the number of nodes in the last layer)
-    expand_factor : int, float, str
+    expand_factor : int
         The number of neighbors sampled from the neighbor list of a vertex.
-        The value of this parameter can be:
-
-        * int: indicates the number of neighbors sampled from a neighbor list.
-        * float: indicates the ratio of the sampled neighbors in a neighbor list.
-        * str: indicates some common ways of calculating the number of sampled neighbors,
-          e.g., ``sqrt(deg)``.
 
         Note that no matter how large the expand_factor, the max number of sampled neighbors
         is the neighborhood size.

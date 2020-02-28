@@ -155,7 +155,7 @@ class MovieLens(object):
         # bag-of-words
         g.ndata['title'] = torch.zeros(g.number_of_nodes(), len(vocab))
         for i, tw in enumerate(tqdm.tqdm(title_words)):
-            g.ndata['title'][i, [vocab_invmap[w] for w in tw]] = 1
+            g.ndata['title'][len(user_ids) + i, [vocab_invmap[w] for w in tw]] = 1
         self.vocab = vocab
         self.vocab_invmap = vocab_invmap
 

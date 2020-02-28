@@ -2,11 +2,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
-from dgl import BatchedDGLGraph
 
 from .gnn import GCNLayer, GATLayer
+from ...batched_graph import BatchedDGLGraph, max_nodes
 from ...nn.pytorch import WeightAndSum
+from ...contrib.deprecation import deprecated
 
 class MLPBinaryClassifier(nn.Module):
     """MLP for soft binary classification over multiple tasks from molecule representations.
@@ -98,7 +98,7 @@ class BaseGNNClassifier(nn.Module):
 
         with bg.local_scope():
             bg.ndata['h'] = feats
-            h_g_max = dgl.max_nodes(bg, 'h')
+            h_g_max = max_nodes(bg, 'h')
 
         if not isinstance(bg, BatchedDGLGraph):
             h_g_sum = h_g_sum.unsqueeze(0)
@@ -127,6 +127,7 @@ class GCNClassifier(BaseGNNClassifier):
         The probability for dropout. Default to be 0., i.e. no
         dropout is performed.
     """
+    @deprecated('Import GCNPredictor from dgllife.model instead.', 'class')
     def __init__(self, in_feats, gcn_hidden_feats, n_tasks,
                  classifier_hidden_feats=128, dropout=0.):
         super(GCNClassifier, self).__init__(gnn_out_feats=gcn_hidden_feats[-1],
@@ -148,6 +149,7 @@ class GATClassifier(BaseGNNClassifier):
     in_feats : int
         Number of input atom features
     """
+    @deprecated('Import GATPredictor from dgllife.model instead.', 'class')
     def __init__(self, in_feats, gat_hidden_feats, num_heads,
                  n_tasks, classifier_hidden_feats=128, dropout=0):
         super(GATClassifier, self).__init__(gnn_out_feats=gat_hidden_feats[-1],

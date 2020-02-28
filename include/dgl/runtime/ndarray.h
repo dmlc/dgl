@@ -182,6 +182,18 @@ class NDArray {
    * \return The created NDArray view.
    */
   DGL_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
+
+  /*!
+   * \brief Create a NDArray by copying from std::vector.
+   * \tparam T Type of vector data.  Determines the dtype of returned array.
+   */
+  template<typename T>
+  DGL_DLL static NDArray FromVector(
+      const std::vector<T>& vec, DLContext ctx = DLContext{kDLCPU, 0});
+
+  template<typename T>
+  static NDArray FromVector(const std::vector<T>& vec, DLDataType dtype, DLContext ctx);
+
   /*!
    * \brief Function to copy data from one array to another.
    * \param from The source array.
@@ -455,4 +467,9 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
 
 }  // namespace runtime
 }  // namespace dgl
+
+namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::runtime::NDArray, true);
+}  // namespace dmlc
+
 #endif  // DGL_RUNTIME_NDARRAY_H_
