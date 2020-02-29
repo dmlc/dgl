@@ -187,6 +187,8 @@ class HeteroGraph : public BaseHeteroGraph {
 
   FlattenedHeteroGraphPtr Flatten(const std::vector<dgl_type_t>& etypes) const override;
 
+  std::vector<IdArray> GetRelationStates() const override;
+
   /*! \return Load HeteroGraph from stream, using CSRMatrix*/
   bool Load(dmlc::Stream* fs);
 
