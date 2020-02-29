@@ -4,14 +4,15 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/container.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
 
+using namespace dgl::runtime;
+
 namespace dgl {
-
-using runtime::NDArray;
-
 namespace aten {
 
 IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
@@ -611,6 +612,45 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   });
   return ret;
 }
+
+///////////////////////// C APIs ///////////////////////// 
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->format;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetNumRows")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->num_rows;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetNumCols")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->num_cols;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetIndices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    List<Value> indices;
+    for (IdArray arr : spmat->indices) {
+      indices.push_back(Value(MakeValue(arr)));
+    }
+    *rv = indices;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFlags")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    List<Value> flags;
+    for (bool flg : spmat->flags) {
+      flags.push_back(Value(MakeValue(flg)));
+    }
+    *rv = flags;
+  });
 
 }  // namespace aten
 }  // namespace dgl

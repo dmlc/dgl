@@ -9,13 +9,15 @@
 #ifndef DGL_ARRAY_H_
 #define DGL_ARRAY_H_
 
-#include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
 #include <utility>
+
+#include "./runtime/ndarray.h"
+#include "./runtime/object.h"
 
 namespace dgl {
 
@@ -30,6 +32,57 @@ typedef NDArray BoolArray;
 typedef NDArray IntArray;
 typedef NDArray FloatArray;
 typedef NDArray TypeArray;
+
+/*!
+ * \brief Sparse format.
+ */
+enum class SparseFormat {
+  ANY = 0,
+  COO = 1,
+  CSR = 2,
+  CSC = 3
+};
+
+// Parse sparse format from string.
+inline SparseFormat ParseSparseFormat(const std::string& name) {
+  if (name == "coo")
+    return SparseFormat::COO;
+  else if (name == "csr")
+    return SparseFormat::CSR;
+  else if (name == "csc")
+    return SparseFormat::CSC;
+  else
+    return SparseFormat::ANY;
+}
+
+// Sparse matrix object that is exposed to python API.
+struct SparseMatrix : public runtime::Object {
+  // Sparse format.
+  int32_t format = 0;
+
+  // Shape of this matrix.
+  int64_t num_rows = 0, num_cols = 0;
+
+  // Index arrays. For CSR, it is {indptr, indices, data}. For COO, it is {row, col, data}.
+  std::vector<IdArray> indices;
+
+  // Boolean flags.
+  // TODO(minjie): We might revisit this later to provide a more general solution. Currently,
+  //   we only consider aten::COOMatrix and aten::CSRMatrix.
+  std::vector<bool> flags;
+
+  SparseMatrix() {}
+
+  SparseMatrix(int32_t fmt, int64_t nrows, int64_t ncols,
+               const std::vector<IdArray>& idx,
+               const std::vector<bool>& flg)
+    : format(fmt), num_rows(nrows), num_cols(ncols), indices(idx), flags(flg) {}
+
+  static constexpr const char* _type_key = "aten.SparseMatrix";
+  DGL_DECLARE_OBJECT_TYPE_INFO(SparseMatrix, runtime::Object);
+};
+// Define SparseMatrixRef
+DGL_DEFINE_OBJECT_REF(SparseMatrixRef, SparseMatrix);
 
 namespace aten {
 
@@ -244,6 +297,20 @@ struct CSRMatrix {
             bool sorted_flag = false)
     : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
       data(darr), sorted(sorted_flag) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit CSRMatrix(const SparseMatrix& spmat)
+    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
+      indptr(spmat.indices[0]), indices(spmat.indices[1]), data(spmat.indices[2]),
+      sorted(spmat.flags[0]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::CSR),
+                        num_rows, num_cols,
+                        {indptr, indices, data},
+                        {sorted});
+  }
 };
 
 /*!
@@ -276,6 +343,20 @@ struct COOMatrix {
             bool rsorted = false, bool csorted = false)
     : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
       row_sorted(rsorted), col_sorted(csorted) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit COOMatrix(const SparseMatrix& spmat)
+    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
+      row(spmat.indices[0]), col(spmat.indices[1]), data(spmat.indices[2]),
+      row_sorted(spmat.flags[0]), col_sorted(spmat.flags[1]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::COO),
+                        num_rows, num_cols,
+                        {row, col, data},
+                        {row_sorted, col_sorted});
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////

@@ -35,16 +35,6 @@ enum class EdgeDir {
 };
 
 /*!
- * \brief Sparse graph format.
- */
-enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
-};
-
-/*!
  * \brief Base heterogenous graph.
  *
  * In heterograph, nodes represent entities and edges represent relations.
@@ -548,17 +538,6 @@ struct FlattenedHeteroGraph : public runtime::Object {
 };
 DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
-inline SparseFormat ParseSparseFormat(const std::string& name) {
-  if (name == "coo")
-    return SparseFormat::COO;
-  else if (name == "csr")
-    return SparseFormat::CSR;
-  else if (name == "csc")
-    return SparseFormat::CSC;
-  else
-    return SparseFormat::ANY;
-}
-
 // Declarations of functions and algorithms
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
@@ -660,8 +639,8 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  * that when they are converted to backend-specific tensors, we could leverage
  * the efficient pickle/unpickle solutios from the backend framework.
  *
- * NOTE(minjie): This is a temporary walkaround before we have a good solution
- *   using shared memory for pickling ourselves.
+ * NOTE(minjie): This is a temporary solution before we support shared memory
+ *   storage ourselves.
  *
  * This class can be used as arguments and return values of a C API.
  */
@@ -669,19 +648,8 @@ struct HeteroPickleStates : public runtime::Object {
   /*! \brief Metagraph. */
   GraphPtr metagraph;
 
-  /*! \brief number of nodes of each type */
-  IdArray num_nodes;
-
-  /*! \brief Array stores the adjacency format type of each relation graph */
-  IdArray formats;
-
-  /*! 
-   * \brief Arrays for the adjacency matrices of all relation graphs.
-   * 
-   * For a graph with R relation graphs, it has 3*R tensors. The i^th graph is stored by 
-   * the 3*i to 3*(i+1) tensors.
-   */
-  std::vector<IdArray> adj_arrays;
+  /*! \brief adjacency matrices of each relation graph */
+  std::vector<std::shared_ptr<SparseMatrix> > adjs;
 
   static constexpr const char* _type_key = "graph.HeteroPickleStates";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroPickleStates, runtime::Object);
