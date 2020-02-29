@@ -4,12 +4,12 @@
  * \brief UnitGraph graph implementation
  */
 #include <dgl/array.h>
-#include <dgl/lazy.h>
-#include <dgl/immutable_graph.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/immutable_graph.h>
+#include <dgl/lazy.h>
 
-#include "./unit_graph.h"
 #include "../c_api_common.h"
+#include "./unit_graph.h"
 
 namespace dgl {
 
@@ -61,46 +61,42 @@ inline GraphPtr CreateUnitGraphMetaGraph(int num_vtypes) {
 
 class UnitGraph::COO : public BaseHeteroGraph {
  public:
-  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src, IdArray dst)
-    : BaseHeteroGraph(metagraph) {
+  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src,
+      IdArray dst)
+      : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(src));
     CHECK(aten::IsValidIdArray(dst));
-    CHECK_EQ(src->shape[0], dst->shape[0]) << "Input arrays should have the same length.";
+    CHECK_EQ(src->shape[0], dst->shape[0])
+        << "Input arrays should have the same length.";
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
-  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
-      IdArray src, IdArray dst, bool is_multigraph)
-    : BaseHeteroGraph(metagraph),
-      is_multigraph_(is_multigraph) {
+  COO(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray src,
+      IdArray dst, bool is_multigraph)
+      : BaseHeteroGraph(metagraph), is_multigraph_(is_multigraph) {
     CHECK(aten::IsValidIdArray(src));
     CHECK(aten::IsValidIdArray(dst));
-    CHECK_EQ(src->shape[0], dst->shape[0]) << "Input arrays should have the same length.";
+    CHECK_EQ(src->shape[0], dst->shape[0])
+        << "Input arrays should have the same length.";
     adj_ = aten::COOMatrix{num_src, num_dst, src, dst};
   }
 
   COO(GraphPtr metagraph, const aten::COOMatrix& coo)
-    : BaseHeteroGraph(metagraph), adj_(coo) {
+      : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
     // assigned ids from 0 to num_edges - 1.
     adj_.data = IdArray();
   }
 
-  inline dgl_type_t SrcType() const {
-    return 0;
-  }
+  inline dgl_type_t SrcType() const { return 0; }
 
-  inline dgl_type_t DstType() const {
-    return NumVertexTypes() == 1? 0 : 1;
-  }
+  inline dgl_type_t DstType() const { return NumVertexTypes() == 1 ? 0 : 1; }
 
-  inline dgl_type_t EdgeType() const {
-    return 0;
-  }
+  inline dgl_type_t EdgeType() const { return 0; }
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
     LOG(FATAL) << "The method shouldn't be called for UnitGraph graph. "
-      << "The relation graph is simply this graph itself.";
+               << "The relation graph is simply this graph itself.";
     return {};
   }
 
@@ -116,57 +112,38 @@ class UnitGraph::COO : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  void Clear() override {
-    LOG(FATAL) << "UnitGraph graph is not mutable.";
-  }
+  void Clear() override { LOG(FATAL) << "UnitGraph graph is not mutable."; }
 
-  DLDataType DataType() const override {
-    return adj_.row->dtype;
-  }
+  DLDataType DataType() const override { return adj_.row->dtype; }
 
-  DLContext Context() const override {
-    return adj_.row->ctx;
-  }
+  DLContext Context() const override { return adj_.row->ctx; }
 
-  uint8_t NumBits() const override {
-    return adj_.row->dtype.bits;
-  }
+  uint8_t NumBits() const override { return adj_.row->dtype.bits; }
 
   COO AsNumBits(uint8_t bits) const {
-    if (NumBits() == bits)
-      return *this;
+    if (NumBits() == bits) return *this;
 
-    COO ret(
-        meta_graph_,
-        adj_.num_rows, adj_.num_cols,
-        aten::AsNumBits(adj_.row, bits),
-        aten::AsNumBits(adj_.col, bits));
+    COO ret(meta_graph_, adj_.num_rows, adj_.num_cols,
+            aten::AsNumBits(adj_.row, bits), aten::AsNumBits(adj_.col, bits));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
 
   COO CopyTo(const DLContext& ctx) const {
-    if (Context() == ctx)
-      return *this;
+    if (Context() == ctx) return *this;
 
-    COO ret(
-        meta_graph_,
-        adj_.num_rows, adj_.num_cols,
-        adj_.row.CopyTo(ctx),
-        adj_.col.CopyTo(ctx));
+    COO ret(meta_graph_, adj_.num_rows, adj_.num_cols, adj_.row.CopyTo(ctx),
+            adj_.col.CopyTo(ctx));
     ret.is_multigraph_ = is_multigraph_;
     return ret;
   }
 
   bool IsMultigraph() const override {
-    return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
-        return aten::COOHasDuplicate(adj_);
-      });
+    return const_cast<COO*>(this)->is_multigraph_.Get(
+        [this]() { return aten::COOHasDuplicate(adj_); });
   }
 
-  bool IsReadonly() const override {
-    return true;
-  }
+  bool IsReadonly() const override { return true; }
 
   uint64_t NumVertices(dgl_type_t vtype) const override {
     if (vtype == SrcType()) {
@@ -192,13 +169,15 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return {};
   }
 
-  bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
+  bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src,
+                      dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
     return aten::COOIsNonZero(adj_, src, dst);
   }
 
-  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids,
+                            IdArray dst_ids) const override {
     CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
     return aten::COOIsNonZero(adj_, src_ids, dst_ids);
@@ -227,7 +206,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return EdgeArray{arrs[0], arrs[1], arrs[2]};
   }
 
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype,
+                                         dgl_id_t eid) const override {
     CHECK(eid < NumEdges(etype)) << "Invalid edge id: " << eid;
     const dgl_id_t src = aten::IndexSelect<int64_t>(adj_.row, eid);
     const dgl_id_t dst = aten::IndexSelect<int64_t>(adj_.col, eid);
@@ -237,15 +217,15 @@ class UnitGraph::COO : public BaseHeteroGraph {
   EdgeArray FindEdges(dgl_type_t etype, IdArray eids) const override {
     CHECK(aten::IsValidIdArray(eids)) << "Invalid edge id array";
     return EdgeArray{aten::IndexSelect(adj_.row, eids),
-                     aten::IndexSelect(adj_.col, eids),
-                     eids};
+                     aten::IndexSelect(adj_.col, eids), eids};
   }
 
   EdgeArray InEdges(dgl_type_t etype, dgl_id_t vid) const override {
     IdArray ret_src, ret_eid;
-    std::tie(ret_eid, ret_src) = aten::COOGetRowDataAndIndices(
-        aten::COOTranspose(adj_), vid);
-    IdArray ret_dst = aten::Full(vid, ret_src->shape[0], NumBits(), ret_src->ctx);
+    std::tie(ret_eid, ret_src) =
+        aten::COOGetRowDataAndIndices(aten::COOTranspose(adj_), vid);
+    IdArray ret_dst =
+        aten::Full(vid, ret_src->shape[0], NumBits(), ret_src->ctx);
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
@@ -259,7 +239,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
   EdgeArray OutEdges(dgl_type_t etype, dgl_id_t vid) const override {
     IdArray ret_dst, ret_eid;
     std::tie(ret_eid, ret_dst) = aten::COOGetRowDataAndIndices(adj_, vid);
-    IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+    IdArray ret_src =
+        aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
@@ -270,10 +251,11 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+  EdgeArray Edges(dgl_type_t etype,
+                  const std::string& order = "") const override {
     CHECK(order.empty() || order == std::string("eid"))
-      << "COO only support Edges of order \"eid\", but got \""
-      << order << "\".";
+        << "COO only support Edges of order \"eid\", but got \"" << order
+        << "\".";
     IdArray rst_eid = aten::Range(0, NumEdges(etype), NumBits(), Context());
     return EdgeArray{adj_.row, adj_.col, rst_eid};
   }
@@ -318,8 +300,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return {};
   }
 
-  std::vector<IdArray> GetAdj(
-      dgl_type_t etype, bool transpose, const std::string &fmt) const override {
+  std::vector<IdArray> GetAdj(dgl_type_t etype, bool transpose,
+                              const std::string& fmt) const override {
     CHECK(fmt == "coo") << "Not valid adj format request.";
     if (transpose) {
       return {aten::HStack(adj_.col, adj_.row)};
@@ -328,9 +310,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
-  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override {
-    return adj_;
-  }
+  aten::COOMatrix GetCOOMatrix(dgl_type_t etype) const override { return adj_; }
 
   aten::CSRMatrix GetCSCMatrix(dgl_type_t etype) const override {
     LOG(FATAL) << "Not enabled for COO graph";
@@ -342,28 +322,32 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return aten::CSRMatrix();
   }
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+  SparseFormat SelectFormat(dgl_type_t etype,
+                            SparseFormat preferred_format) const override {
     LOG(FATAL) << "Not enabled for COO graph";
     return SparseFormat::ANY;
   }
 
-  HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
-    CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
+  HeteroSubgraph VertexSubgraph(
+      const std::vector<IdArray>& vids) const override {
+    CHECK_EQ(vids.size(), NumVertexTypes())
+        << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
     CHECK(aten::IsValidIdArray(srcvids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::COOSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
-    subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows, submat.num_cols,
-        submat.row, submat.col);
+    IdArray sub_eids =
+        aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    subg.graph = std::make_shared<COO>(meta_graph(), submat.num_rows,
+                                       submat.num_cols, submat.row, submat.col);
     subg.induced_vertices = vids;
     subg.induced_edges.emplace_back(submat.data);
     return subg;
   }
 
-  HeteroSubgraph EdgeSubgraph(
-      const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
+  HeteroSubgraph EdgeSubgraph(const std::vector<IdArray>& eids,
+                              bool preserve_nodes = false) const override {
     CHECK_EQ(eids.size(), 1) << "Edge type number mismatch.";
     HeteroSubgraph subg;
     if (!preserve_nodes) {
@@ -373,28 +357,28 @@ class UnitGraph::COO : public BaseHeteroGraph {
       subg.induced_vertices.emplace_back(aten::Relabel_({new_dst}));
       const auto new_nsrc = subg.induced_vertices[0]->shape[0];
       const auto new_ndst = subg.induced_vertices[1]->shape[0];
-      subg.graph = std::make_shared<COO>(
-          meta_graph(), new_nsrc, new_ndst, new_src, new_dst);
+      subg.graph = std::make_shared<COO>(meta_graph(), new_nsrc, new_ndst,
+                                         new_src, new_dst);
       subg.induced_edges = eids;
     } else {
       IdArray new_src = aten::IndexSelect(adj_.row, eids[0]);
       IdArray new_dst = aten::IndexSelect(adj_.col, eids[0]);
-      subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(0), NumBits(), Context()));
-      subg.induced_vertices.emplace_back(aten::Range(0, NumVertices(1), NumBits(), Context()));
-      subg.graph = std::make_shared<COO>(
-          meta_graph(), NumVertices(0), NumVertices(1), new_src, new_dst);
+      subg.induced_vertices.emplace_back(
+          aten::Range(0, NumVertices(0), NumBits(), Context()));
+      subg.induced_vertices.emplace_back(
+          aten::Range(0, NumVertices(1), NumBits(), Context()));
+      subg.graph = std::make_shared<COO>(meta_graph(), NumVertices(0),
+                                         NumVertices(1), new_src, new_dst);
       subg.induced_edges = eids;
     }
     return subg;
   }
 
-  aten::COOMatrix adj() const {
-    return adj_;
-  }
+  aten::COOMatrix adj() const { return adj_; }
 
   /*!
-   * \brief Determines whether the graph is "hypersparse", i.e. having significantly more
-   * nodes than edges.
+   * \brief Determines whether the graph is "hypersparse", i.e. having
+   * significantly more nodes than edges.
    */
   bool IsHypersparse() const {
     return (NumVertices(SrcType()) / 8 > NumEdges(EdgeType())) &&
@@ -435,50 +419,44 @@ class UnitGraph::COO : public BaseHeteroGraph {
 /*! \brief CSR graph */
 class UnitGraph::CSR : public BaseHeteroGraph {
  public:
-  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
-      IdArray indptr, IdArray indices, IdArray edge_ids)
-    : BaseHeteroGraph(metagraph) {
+  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray indptr,
+      IdArray indices, IdArray edge_ids)
+      : BaseHeteroGraph(metagraph) {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
     CHECK(aten::IsValidIdArray(edge_ids));
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
+        << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
     sorted_ = false;
   }
 
-  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
-      IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-    : BaseHeteroGraph(metagraph), is_multigraph_(is_multigraph) {
+  CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray indptr,
+      IdArray indices, IdArray edge_ids, bool is_multigraph)
+      : BaseHeteroGraph(metagraph), is_multigraph_(is_multigraph) {
     CHECK(aten::IsValidIdArray(indptr));
     CHECK(aten::IsValidIdArray(indices));
     CHECK(aten::IsValidIdArray(edge_ids));
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
-      << "indices and edge id arrays should have the same length";
+        << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
     sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
-    : BaseHeteroGraph(metagraph), adj_(csr) {
+      : BaseHeteroGraph(metagraph), adj_(csr) {
     sorted_ = false;
   }
 
-  inline dgl_type_t SrcType() const {
-    return 0;
-  }
+  inline dgl_type_t SrcType() const { return 0; }
 
-  inline dgl_type_t DstType() const {
-    return NumVertexTypes() == 1? 0 : 1;
-  }
+  inline dgl_type_t DstType() const { return NumVertexTypes() == 1 ? 0 : 1; }
 
-  inline dgl_type_t EdgeType() const {
-    return 0;
-  }
+  inline dgl_type_t EdgeType() const { return 0; }
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
     LOG(FATAL) << "The method shouldn't be called for UnitGraph graph. "
-      << "The relation graph is simply this graph itself.";
+               << "The relation graph is simply this graph itself.";
     return {};
   }
 
@@ -494,32 +472,22 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     LOG(FATAL) << "UnitGraph graph is not mutable.";
   }
 
-  void Clear() override {
-    LOG(FATAL) << "UnitGraph graph is not mutable.";
-  }
+  void Clear() override { LOG(FATAL) << "UnitGraph graph is not mutable."; }
 
-  DLDataType DataType() const override {
-    return adj_.indices->dtype;
-  }
+  DLDataType DataType() const override { return adj_.indices->dtype; }
 
-  DLContext Context() const override {
-    return adj_.indices->ctx;
-  }
+  DLContext Context() const override { return adj_.indices->ctx; }
 
-  uint8_t NumBits() const override {
-    return adj_.indices->dtype.bits;
-  }
+  uint8_t NumBits() const override { return adj_.indices->dtype.bits; }
 
   CSR AsNumBits(uint8_t bits) const {
     if (NumBits() == bits) {
       return *this;
     } else {
-      CSR ret(
-          meta_graph_,
-          adj_.num_rows, adj_.num_cols,
-          aten::AsNumBits(adj_.indptr, bits),
-          aten::AsNumBits(adj_.indices, bits),
-          aten::AsNumBits(adj_.data, bits));
+      CSR ret(meta_graph_, adj_.num_rows, adj_.num_cols,
+              aten::AsNumBits(adj_.indptr, bits),
+              aten::AsNumBits(adj_.indices, bits),
+              aten::AsNumBits(adj_.data, bits));
       ret.is_multigraph_ = is_multigraph_;
       return ret;
     }
@@ -529,26 +497,20 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     if (Context() == ctx) {
       return *this;
     } else {
-      CSR ret(
-          meta_graph_,
-          adj_.num_rows, adj_.num_cols,
-          adj_.indptr.CopyTo(ctx),
-          adj_.indices.CopyTo(ctx),
-          adj_.data.CopyTo(ctx));
+      CSR ret(meta_graph_, adj_.num_rows, adj_.num_cols,
+              adj_.indptr.CopyTo(ctx), adj_.indices.CopyTo(ctx),
+              adj_.data.CopyTo(ctx));
       ret.is_multigraph_ = is_multigraph_;
       return ret;
     }
   }
 
   bool IsMultigraph() const override {
-    return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
-        return aten::CSRHasDuplicate(adj_);
-      });
+    return const_cast<CSR*>(this)->is_multigraph_.Get(
+        [this]() { return aten::CSRHasDuplicate(adj_); });
   }
 
-  bool IsReadonly() const override {
-    return true;
-  }
+  bool IsReadonly() const override { return true; }
 
   uint64_t NumVertices(dgl_type_t vtype) const override {
     if (vtype == SrcType()) {
@@ -574,13 +536,15 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const override {
+  bool HasEdgeBetween(dgl_type_t etype, dgl_id_t src,
+                      dgl_id_t dst) const override {
     CHECK(HasVertex(SrcType(), src)) << "Invalid src vertex id: " << src;
     CHECK(HasVertex(DstType(), dst)) << "Invalid dst vertex id: " << dst;
     return aten::CSRIsNonZero(adj_, src, dst);
   }
 
-  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids, IdArray dst_ids) const override {
+  BoolArray HasEdgesBetween(dgl_type_t etype, IdArray src_ids,
+                            IdArray dst_ids) const override {
     CHECK(aten::IsValidIdArray(src_ids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
     return aten::CSRIsNonZero(adj_, src_ids, dst_ids);
@@ -609,7 +573,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return EdgeArray{arrs[0], arrs[1], arrs[2]};
   }
 
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype, dgl_id_t eid) const override {
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_type_t etype,
+                                         dgl_id_t eid) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
@@ -633,7 +598,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(HasVertex(SrcType(), vid)) << "Invalid src vertex id: " << vid;
     IdArray ret_dst = aten::CSRGetRowColumnIndices(adj_, vid);
     IdArray ret_eid = aten::CSRGetRowData(adj_, vid);
-    IdArray ret_src = aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
+    IdArray ret_src =
+        aten::Full(vid, ret_dst->shape[0], NumBits(), ret_dst->ctx);
     return EdgeArray{ret_src, ret_dst, ret_eid};
   }
 
@@ -647,10 +613,11 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return EdgeArray{row, coosubmat.col, coosubmat.data};
   }
 
-  EdgeArray Edges(dgl_type_t etype, const std::string &order = "") const override {
+  EdgeArray Edges(dgl_type_t etype,
+                  const std::string& order = "") const override {
     CHECK(order.empty() || order == std::string("srcdst"))
-      << "CSR only support Edges of order \"srcdst\","
-      << " but got \"" << order << "\".";
+        << "CSR only support Edges of order \"srcdst\","
+        << " but got \"" << order << "\".";
     const auto& coo = aten::CSRToCOO(adj_, false);
     return EdgeArray{coo.row, coo.col, coo.data};
   }
@@ -705,8 +672,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return {};
   }
 
-  std::vector<IdArray> GetAdj(
-      dgl_type_t etype, bool transpose, const std::string &fmt) const override {
+  std::vector<IdArray> GetAdj(dgl_type_t etype, bool transpose,
+                              const std::string& fmt) const override {
     CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
     return {adj_.indptr, adj_.indices, adj_.data};
   }
@@ -721,39 +688,40 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return aten::CSRMatrix();
   }
 
-  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override {
-    return adj_;
-  }
+  aten::CSRMatrix GetCSRMatrix(dgl_type_t etype) const override { return adj_; }
 
-  SparseFormat SelectFormat(dgl_type_t etype, SparseFormat preferred_format) const override {
+  SparseFormat SelectFormat(dgl_type_t etype,
+                            SparseFormat preferred_format) const override {
     LOG(FATAL) << "Not enabled for CSR graph";
     return SparseFormat::ANY;
   }
 
-  HeteroSubgraph VertexSubgraph(const std::vector<IdArray>& vids) const override {
-    CHECK_EQ(vids.size(), NumVertexTypes()) << "Number of vertex types mismatch";
+  HeteroSubgraph VertexSubgraph(
+      const std::vector<IdArray>& vids) const override {
+    CHECK_EQ(vids.size(), NumVertexTypes())
+        << "Number of vertex types mismatch";
     auto srcvids = vids[SrcType()], dstvids = vids[DstType()];
     CHECK(aten::IsValidIdArray(srcvids)) << "Invalid vertex id array.";
     CHECK(aten::IsValidIdArray(dstvids)) << "Invalid vertex id array.";
     HeteroSubgraph subg;
     const auto& submat = aten::CSRSliceMatrix(adj_, srcvids, dstvids);
-    IdArray sub_eids = aten::Range(0, submat.data->shape[0], NumBits(), Context());
-    subg.graph = std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
-        submat.indptr, submat.indices, sub_eids);
+    IdArray sub_eids =
+        aten::Range(0, submat.data->shape[0], NumBits(), Context());
+    subg.graph =
+        std::make_shared<CSR>(meta_graph(), submat.num_rows, submat.num_cols,
+                              submat.indptr, submat.indices, sub_eids);
     subg.induced_vertices = vids;
     subg.induced_edges.emplace_back(submat.data);
     return subg;
   }
 
-  HeteroSubgraph EdgeSubgraph(
-      const std::vector<IdArray>& eids, bool preserve_nodes = false) const override {
+  HeteroSubgraph EdgeSubgraph(const std::vector<IdArray>& eids,
+                              bool preserve_nodes = false) const override {
     LOG(FATAL) << "Not enabled for CSR graph.";
     return {};
   }
 
-  aten::CSRMatrix adj() const {
-    return adj_;
-  }
+  aten::CSRMatrix adj() const { return adj_; }
 
   bool Load(dmlc::Stream* fs) {
     auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
@@ -791,21 +759,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 //
 //////////////////////////////////////////////////////////
 
-DLDataType UnitGraph::DataType() const {
-  return GetAny()->DataType();
-}
+DLDataType UnitGraph::DataType() const { return GetAny()->DataType(); }
 
-DLContext UnitGraph::Context() const {
-  return GetAny()->Context();
-}
+DLContext UnitGraph::Context() const { return GetAny()->Context(); }
 
-uint8_t UnitGraph::NumBits() const {
-  return GetAny()->NumBits();
-}
+uint8_t UnitGraph::NumBits() const { return GetAny()->NumBits(); }
 
-bool UnitGraph::IsMultigraph() const {
-  return GetAny()->IsMultigraph();
-}
+bool UnitGraph::IsMultigraph() const { return GetAny()->IsMultigraph(); }
 
 uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
   const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
@@ -834,7 +794,8 @@ BoolArray UnitGraph::HasVertices(dgl_type_t vtype, IdArray vids) const {
   return aten::LT(vids, NumVertices(vtype));
 }
 
-bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) const {
+bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src,
+                               dgl_id_t dst) const {
   const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::CSC)
@@ -843,8 +804,8 @@ bool UnitGraph::HasEdgeBetween(dgl_type_t etype, dgl_id_t src, dgl_id_t dst) con
     return ptr->HasEdgeBetween(etype, src, dst);
 }
 
-BoolArray UnitGraph::HasEdgesBetween(
-    dgl_type_t etype, IdArray src, IdArray dst) const {
+BoolArray UnitGraph::HasEdgesBetween(dgl_type_t etype, IdArray src,
+                                     IdArray dst) const {
   const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
   const auto ptr = GetFormat(fmt);
   if (fmt == SparseFormat::CSC)
@@ -888,7 +849,8 @@ EdgeArray UnitGraph::EdgeIds(dgl_type_t etype, IdArray src, IdArray dst) const {
   }
 }
 
-std::pair<dgl_id_t, dgl_id_t> UnitGraph::FindEdge(dgl_type_t etype, dgl_id_t eid) const {
+std::pair<dgl_id_t, dgl_id_t> UnitGraph::FindEdge(dgl_type_t etype,
+                                                  dgl_id_t eid) const {
   const SparseFormat fmt = SelectFormat(SparseFormat::COO);
   const auto ptr = GetFormat(fmt);
   return ptr->FindEdge(etype, eid);
@@ -934,7 +896,7 @@ EdgeArray UnitGraph::OutEdges(dgl_type_t etype, IdArray vids) const {
   return ptr->OutEdges(etype, vids);
 }
 
-EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string &order) const {
+EdgeArray UnitGraph::Edges(dgl_type_t etype, const std::string& order) const {
   SparseFormat fmt;
   if (order == std::string("eid")) {
     fmt = SelectFormat(SparseFormat::COO);
@@ -1015,18 +977,19 @@ DGLIdIters UnitGraph::InEdgeVec(dgl_type_t etype, dgl_id_t vid) const {
     return ptr->InEdgeVec(etype, vid);
 }
 
-std::vector<IdArray> UnitGraph::GetAdj(
-    dgl_type_t etype, bool transpose, const std::string &fmt) const {
-  // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
-  //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
-  //   is equal to in edge CSR.
-  //   We have this behavior because previously we use framework's SPMM and we don't cache
-  //   reverse adj. This is not intuitive and also not consistent with networkx's
-  //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
-  //   behavior and make row for src and col for dst.
+std::vector<IdArray> UnitGraph::GetAdj(dgl_type_t etype, bool transpose,
+                                       const std::string& fmt) const {
+  // TODO(minjie): Our current semantics of adjacency matrix is row for dst
+  // nodes and col for
+  //   src nodes. Therefore, we need to flip the transpose flag. For example,
+  //   transpose=False is equal to in edge CSR. We have this behavior because
+  //   previously we use framework's SPMM and we don't cache reverse adj. This
+  //   is not intuitive and also not consistent with networkx's
+  //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should
+  //   change the behavior and make row for src and col for dst.
   if (fmt == std::string("csr")) {
-    return transpose? GetOutCSR()->GetAdj(etype, false, "csr")
-      : GetInCSR()->GetAdj(etype, false, "csr");
+    return transpose ? GetOutCSR()->GetAdj(etype, false, "csr")
+                     : GetInCSR()->GetAdj(etype, false, "csr");
   } else if (fmt == std::string("coo")) {
     return GetCOO()->GetAdj(etype, !transpose, fmt);
   } else {
@@ -1035,37 +998,39 @@ std::vector<IdArray> UnitGraph::GetAdj(
   }
 }
 
-HeteroSubgraph UnitGraph::VertexSubgraph(const std::vector<IdArray>& vids) const {
+HeteroSubgraph UnitGraph::VertexSubgraph(
+    const std::vector<IdArray>& vids) const {
   // We prefer to generate a subgraph from out-csr.
   SparseFormat fmt = SelectFormat(SparseFormat::CSR);
   HeteroSubgraph sg = GetFormat(fmt)->VertexSubgraph(vids);
   CSRPtr subcsr = std::dynamic_pointer_cast<CSR>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
+  ret.graph =
+      HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, subcsr, nullptr));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
 }
 
-HeteroSubgraph UnitGraph::EdgeSubgraph(
-    const std::vector<IdArray>& eids, bool preserve_nodes) const {
+HeteroSubgraph UnitGraph::EdgeSubgraph(const std::vector<IdArray>& eids,
+                                       bool preserve_nodes) const {
   SparseFormat fmt = SelectFormat(SparseFormat::COO);
   auto sg = GetFormat(fmt)->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   HeteroSubgraph ret;
-  ret.graph = HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
+  ret.graph =
+      HeteroGraphPtr(new UnitGraph(meta_graph(), nullptr, nullptr, subcoo));
   ret.induced_vertices = std::move(sg.induced_vertices);
   ret.induced_edges = std::move(sg.induced_edges);
   return ret;
 }
 
-HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col,
-    SparseFormat restrict_format) {
+HeteroGraphPtr UnitGraph::CreateFromCOO(int64_t num_vtypes, int64_t num_src,
+                                        int64_t num_dst, IdArray row,
+                                        IdArray col,
+                                        SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
-  if (num_vtypes == 1)
-    CHECK_EQ(num_src, num_dst);
+  if (num_vtypes == 1) CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, num_src, num_dst, row, col));
 
@@ -1073,38 +1038,38 @@ HeteroGraphPtr UnitGraph::CreateFromCOO(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
 
-HeteroGraphPtr UnitGraph::CreateFromCOO(
-    int64_t num_vtypes, const aten::COOMatrix& mat,
-    SparseFormat restrict_format) {
+HeteroGraphPtr UnitGraph::CreateFromCOO(int64_t num_vtypes,
+                                        const aten::COOMatrix& mat,
+                                        SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
-  if (num_vtypes == 1)
-    CHECK_EQ(mat.num_rows, mat.num_cols);
+  if (num_vtypes == 1) CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   COOPtr coo(new COO(mg, mat));
   return HeteroGraphPtr(
       new UnitGraph(mg, nullptr, nullptr, coo, restrict_format));
 }
 
-HeteroGraphPtr UnitGraph::CreateFromCSR(
-    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray indptr, IdArray indices, IdArray edge_ids, SparseFormat restrict_format) {
+HeteroGraphPtr UnitGraph::CreateFromCSR(int64_t num_vtypes, int64_t num_src,
+                                        int64_t num_dst, IdArray indptr,
+                                        IdArray indices, IdArray edge_ids,
+                                        SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
-  if (num_vtypes == 1)
-    CHECK_EQ(num_src, num_dst);
+  if (num_vtypes == 1) CHECK_EQ(num_src, num_dst);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+  return HeteroGraphPtr(
+      new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
-HeteroGraphPtr UnitGraph::CreateFromCSR(
-    int64_t num_vtypes, const aten::CSRMatrix& mat,
-    SparseFormat restrict_format) {
+HeteroGraphPtr UnitGraph::CreateFromCSR(int64_t num_vtypes,
+                                        const aten::CSRMatrix& mat,
+                                        SparseFormat restrict_format) {
   CHECK(num_vtypes == 1 || num_vtypes == 2);
-  if (num_vtypes == 1)
-    CHECK_EQ(mat.num_rows, mat.num_cols);
+  if (num_vtypes == 1) CHECK_EQ(mat.num_rows, mat.num_cols);
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, mat));
-  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+  return HeteroGraphPtr(
+      new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -1120,8 +1085,8 @@ HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
 
     CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->AsNumBits(bits)));
     CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->AsNumBits(bits)));
-    return HeteroGraphPtr(
-        new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
+    return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr,
+                                        nullptr, bg->restrict_format_));
   }
 }
 
@@ -1138,21 +1103,24 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DLContext& ctx) {
 
   CSRPtr new_incsr = CSRPtr(new CSR(bg->GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(bg->GetOutCSR()->CopyTo(ctx)));
-  return HeteroGraphPtr(
-      new UnitGraph(g->meta_graph(), new_incsr, new_outcsr, nullptr, bg->restrict_format_));
+  return HeteroGraphPtr(new UnitGraph(g->meta_graph(), new_incsr, new_outcsr,
+                                      nullptr, bg->restrict_format_));
 }
 
-UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-                     SparseFormat restrict_format)
-  : BaseHeteroGraph(metagraph), in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
+UnitGraph::UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr,
+                     COOPtr coo, SparseFormat restrict_format)
+    : BaseHeteroGraph(metagraph),
+      in_csr_(in_csr),
+      out_csr_(out_csr),
+      coo_(coo) {
   restrict_format_ = restrict_format;
 
-  // If the graph is hypersparse and in COO format, switch the restricted format to COO.
-  // If the graph is given as CSR, the indptr array is already materialized so we don't
-  // care about restricting conversion anyway (even if it is hypersparse).
+  // If the graph is hypersparse and in COO format, switch the restricted format
+  // to COO. If the graph is given as CSR, the indptr array is already
+  // materialized so we don't care about restricting conversion anyway (even if
+  // it is hypersparse).
   if (restrict_format == SparseFormat::ANY) {
-    if (coo && coo->IsHypersparse())
-      restrict_format_ = SparseFormat::COO;
+    if (coo && coo->IsHypersparse()) restrict_format_ = SparseFormat::COO;
   }
 
   CHECK(GetAny()) << "At least one graph structure should exist.";
@@ -1162,13 +1130,15 @@ UnitGraph::CSRPtr UnitGraph::GetInCSR() const {
   if (!in_csr_) {
     if (out_csr_) {
       const auto& newadj = aten::CSRTranspose(out_csr_->adj());
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      const_cast<UnitGraph*>(this)->in_csr_ =
+          std::make_shared<CSR>(meta_graph(), newadj);
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& adj = coo_->adj();
       const auto& newadj = aten::COOToCSR(
           aten::COOMatrix{adj.num_cols, adj.num_rows, adj.col, adj.row});
-      const_cast<UnitGraph*>(this)->in_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      const_cast<UnitGraph*>(this)->in_csr_ =
+          std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return in_csr_;
@@ -1179,11 +1149,13 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
   if (!out_csr_) {
     if (in_csr_) {
       const auto& newadj = aten::CSRTranspose(in_csr_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      const_cast<UnitGraph*>(this)->out_csr_ =
+          std::make_shared<CSR>(meta_graph(), newadj);
     } else {
       CHECK(coo_) << "None of CSR, COO exist";
       const auto& newadj = aten::COOToCSR(coo_->adj());
-      const_cast<UnitGraph*>(this)->out_csr_ = std::make_shared<CSR>(meta_graph(), newadj);
+      const_cast<UnitGraph*>(this)->out_csr_ =
+          std::make_shared<CSR>(meta_graph(), newadj);
     }
   }
   return out_csr_;
@@ -1193,12 +1165,15 @@ UnitGraph::CSRPtr UnitGraph::GetOutCSR() const {
 UnitGraph::COOPtr UnitGraph::GetCOO() const {
   if (!coo_) {
     if (in_csr_) {
-      const auto& newadj = aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
+      const auto& newadj =
+          aten::COOTranspose(aten::CSRToCOO(in_csr_->adj(), true));
+      const_cast<UnitGraph*>(this)->coo_ =
+          std::make_shared<COO>(meta_graph(), newadj);
     } else {
       CHECK(out_csr_) << "Both CSR are missing.";
       const auto& newadj = aten::CSRToCOO(out_csr_->adj(), true);
-      const_cast<UnitGraph*>(this)->coo_ = std::make_shared<COO>(meta_graph(), newadj);
+      const_cast<UnitGraph*>(this)->coo_ =
+          std::make_shared<COO>(meta_graph(), newadj);
     }
   }
   return coo_;
@@ -1228,17 +1203,17 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   switch (format) {
-  case SparseFormat::CSR:
-    return GetOutCSR();
-  case SparseFormat::CSC:
-    return GetInCSR();
-  case SparseFormat::COO:
-    return GetCOO();
-  case SparseFormat::ANY:
-    return GetAny();
-  default:
-    LOG(FATAL) << "unsupported format code";
-    return nullptr;
+    case SparseFormat::CSR:
+      return GetOutCSR();
+    case SparseFormat::CSC:
+      return GetInCSR();
+    case SparseFormat::COO:
+      return GetCOO();
+    case SparseFormat::ANY:
+      return GetAny();
+    default:
+      LOG(FATAL) << "unsupported format code";
+      return nullptr;
   }
 }
 
@@ -1298,7 +1273,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
   fs->Write(meta_graph_ptr);
-  auto avail_fmt = SelectFormat(SparseFormat::ANY); 
+  auto avail_fmt = SelectFormat(SparseFormat::ANY);
   fs->Write(static_cast<int64_t>(avail_fmt));
   switch (restrict_format_) {
     case SparseFormat::COO:

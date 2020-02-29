@@ -120,7 +120,7 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
   CHECK_EQ(meta_graph->NumEdges(), rel_graphs.size());
   CHECK(!rel_graphs.empty()) << "Empty heterograph is not allowed.";
   // all relation graphs must have only one edge type
-  for (const auto rg : rel_graphs) {
+  for (const auto &rg : rel_graphs) {
     CHECK_EQ(rg->NumEdgeTypes(), 1) << "Each relation graph must have only one edge type.";
   }
   // create num verts per type
@@ -170,7 +170,7 @@ HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>&
 
 bool HeteroGraph::IsMultigraph() const {
   return const_cast<HeteroGraph*>(this)->is_multigraph_.Get([this] () {
-      for (const auto hg : relation_graphs_) {
+      for (const auto &hg : relation_graphs_) {
         if (hg->IsMultigraph()) {
           return true;
         }
