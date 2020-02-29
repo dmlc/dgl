@@ -149,6 +149,7 @@ def get_logger(args):
 
 
 def run(args, logger):
+    train_time_start = time.time()
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     n_entities = dataset.n_entities
@@ -323,6 +324,8 @@ def run(args, logger):
 
     if args.num_proc > 1 or args.async_update:
         model.share_memory()
+
+    print('Total data loading time {:.3f} seconds'.format(time.time() - train_time_start))
 
     # train
     start = time.time()

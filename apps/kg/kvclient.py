@@ -191,6 +191,8 @@ def get_local_machine_id(server_namebook):
 def start_worker(args, logger):
     """Start kvclient for training
     """
+    train_time_start = time.time()
+
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
     args.machine_id = get_local_machine_id(server_namebook)
@@ -252,6 +254,8 @@ def start_worker(args, logger):
                                                               True, n_entities))
 
     dataset = None
+
+    print('Total data loading time {:.3f} seconds'.format(time.time() - train_time_start))
 
     rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
     cross_rels = train_data.cross_rels if args.soft_rel_part else None
