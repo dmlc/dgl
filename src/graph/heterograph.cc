@@ -16,9 +16,6 @@
 #include <vector>
 #include "../c_api_common.h"
 #include "./unit_graph.h"
-// TODO(BarclayII): currently CompactGraphs depend on IdHashMap implementation
-// which only works on CPU.  Should fix later to make it device agnostic.
-#include "../array/cpu/array_utils.h"
 
 using namespace dgl::runtime;
 

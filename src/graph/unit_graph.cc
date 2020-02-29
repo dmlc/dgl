@@ -417,7 +417,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
  private:
   friend class Serializer;
 
-  COO(){};
+  COO() {}
 
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
@@ -1281,10 +1281,6 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
     case SparseFormat::CSC:
       fs->Read(&in_csr_);
       break;
-    case SparseFormat::ANY:
-      // If not specified using CSR
-      fs->Read(&out_csr_);
-      break;
     default:
       LOG(FATAL) << "unsupported format code";
       break;
@@ -1302,7 +1298,8 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
   auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
   fs->Write(meta_graph_ptr);
-  fs->Write(static_cast<int64_t>(restrict_format_));
+  auto avail_fmt = SelectFormat(SparseFormat::ANY); 
+  fs->Write(static_cast<int64_t>(avail_fmt));
   switch (restrict_format_) {
     case SparseFormat::COO:
       fs->Write(GetCOO());
@@ -1312,10 +1309,6 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
       break;
     case SparseFormat::CSC:
       fs->Write(GetInCSR());
-      break;
-    case SparseFormat::ANY:
-      // If not specified using CSR
-      fs->Write(GetOutCSR());
       break;
     default:
       LOG(FATAL) << "unsupported format code";
