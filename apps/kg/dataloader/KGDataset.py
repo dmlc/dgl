@@ -163,9 +163,9 @@ def get_dataset(data_path, data_name, format_str):
 
 
 def get_partition_dataset(data_path, data_name, format_str, part_id, part_method):
-    if part_name == 'metis':
+    if part_method == 'metis':
         part_name = os.path.join(data_name, 'part_'+str(part_id))
-    elif part_name == 'random':
+    elif part_method == 'random':
         part_name = os.path.join(data_name, 'rand_part_'+str(part_id))
 
     if data_name == 'Freebase':
@@ -191,9 +191,9 @@ def get_partition_dataset(data_path, data_name, format_str, part_id, part_method
 
 
 def get_server_partition_dataset(data_path, data_name, format_str, part_id, part_method):
-    if part_name == 'metis':
+    if part_method == 'metis':
         part_name = os.path.join(data_name, 'part_'+str(part_id))
-    elif part_name == 'random':
+    elif part_method == 'random':
         part_name = os.path.join(data_name, 'rand_part_'+str(part_id))
 
     if data_name == 'Freebase':
