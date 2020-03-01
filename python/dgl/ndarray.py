@@ -175,7 +175,8 @@ class SparseMatrix(ObjectBase):
         #return self.indices
         #print(len(self.indices))
         #return [xxxx, yyyy, zzzz]
-        return [F.zerocopy_from_dgl_ndarray(xxxx), F.zerocopy_from_dgl_ndarray(yyyy), F.zerocopy_from_dgl_ndarray(zzzz)]
+        #return [F.zerocopy_from_dgl_ndarray(xxxx), F.zerocopy_from_dgl_ndarray(yyyy), F.zerocopy_from_dgl_ndarray(zzzz)]
+        return [F.zerocopy_from_numpy(xxxx).clone(), F.zerocopy_from_numpy(yyyy).clone(), F.zerocopy_from_numpy(zzzz).clone()]
 
     def __setstate__(self, state):
         fmt = state

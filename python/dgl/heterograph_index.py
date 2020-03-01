@@ -26,8 +26,7 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        #return _CAPI_DGLHeteroPickle(self).__getstate__()
-        return self.edges(0, form='eid')
+        return _CAPI_DGLHeteroPickle(self).__getstate__()
 
     def __setstate__(self, state):
         self._cache = {}
