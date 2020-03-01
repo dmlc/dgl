@@ -14,12 +14,11 @@ namespace aten {
 namespace impl {
 
 template <DLDeviceType XPU, typename IdType>
-std::pair<COOMatrix, IdArray> COORemoveValue(COOMatrix coo, IdArray entries) {
-  const int64_t num_eids = entries->shape[0];
+std::pair<COOMatrix, IdArray> COORemove(COOMatrix coo, IdArray entries) {
   const int64_t nnz = coo.row->shape[0];
-  const IdArray *row_data = static_cast<IdArray *>(coo.row->data);
-  const IdArray *col_data = static_cast<IdArray *>(coo.row->data);
-  const IdArray *eid_data = COOHasData(coo) ? static_cast<IdArray *>(coo.data->data) : nullptr;
+  const IdType *row_data = static_cast<IdType *>(coo.row->data);
+  const IdType *col_data = static_cast<IdType *>(coo.row->data);
+  const IdType *eid_data = COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
 
   IdHashMap<IdType> eid_map(entries);
 
@@ -42,7 +41,7 @@ std::pair<COOMatrix, IdArray> COORemoveValue(COOMatrix coo, IdArray entries) {
 }
 
 template std::pair<COOMatrix, IdArray> COORemove<kDLCPU, int32_t>(COOMatrix coo, IdArray entries);
-template std::pair<COOMatrix, IdArray> COORemove<kDLCPU, int32_t>(COOMatrix coo, IdArray entries);
+template std::pair<COOMatrix, IdArray> COORemove<kDLCPU, int64_t>(COOMatrix coo, IdArray entries);
 
 };  // namespace impl
 };  // namespace aten

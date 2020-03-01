@@ -8,6 +8,8 @@
 #include <dgl/transform.h>
 #include <dgl/array.h>
 #include <dgl/packed_func_ext.h>
+#include <dgl/runtime/registry.h>
+#include <dgl/runtime/container.h>
 #include <vector>
 #include <utility>
 #include <tuple>
@@ -19,15 +21,13 @@ using namespace dgl::aten;
 
 namespace transform {
 
-namespace {
-
 std::pair<HeteroGraphPtr, std::vector<IdArray>>
 RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
   std::vector<IdArray> induced_eids;
   std::vector<HeteroGraphPtr> rel_graphs;
   const int64_t num_etypes = graph->NumEdgeTypes();
 
-  for (dgl_type_t etype = 0; etype < num_etypes; ++etype) {
+  for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
@@ -75,12 +75,10 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
   return std::make_pair(new_graph, induced_eids);
 }
 
-};  // namespace
-
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLRemoveEdges")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const HeteroGraphRef graph_ref = args[0];
-    const std::vector<IdArray> &eids = ListValueToVector(args[1]);
+    const std::vector<IdArray> &eids = ListValueToVector<IdArray>(args[1]);
 
     HeteroGraphPtr new_graph;
     std::vector<IdArray> induced_eids;
