@@ -93,7 +93,7 @@ def evaluate(model, frontiers, inputs, labels):
     model.train()
     return compute_acc(pred, labels)
 
-#@thread_wrapped_func
+@thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
 
