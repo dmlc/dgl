@@ -652,5 +652,19 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFlags")
     *rv = flags;
   });
 
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const int32_t format = args[0];
+    const int64_t nrows = args[1];
+    const int64_t ncols = args[2];
+    const List<Value> indices = args[3];
+    const List<Value> flags = args[4];
+    std::shared_ptr<SparseMatrix> spmat(new SparseMatrix(
+          format, nrows, ncols,
+          ListValueToVector<IdArray>(indices),
+          ListValueToVector<bool>(flags)));
+    *rv = SparseMatrixRef(spmat);
+  });
+
 }  // namespace aten
 }  // namespace dgl

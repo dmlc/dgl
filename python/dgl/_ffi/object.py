@@ -52,21 +52,6 @@ class ObjectBase(_ObjectBase):
         cls = type(self)
         return (_new_object, (cls, ), self.__getstate__())
 
-    def __getstate__(self):
-        # TODO(minjie): TVM assumes that a Node (Object in DGL) can be serialized
-        #   to json. However, this is not true in DGL because DGL Object is meant
-        #   for runtime API, so it could contain binary data such as NDArray.
-        #   If this feature is required, please raise a RFC to DGL issue.
-        raise RuntimeError("__getstate__ is not supported for object type")
-
-    def __setstate__(self, state):
-        # pylint: disable=assigning-non-slot
-        # TODO(minjie): TVM assumes that a Node (Object in DGL) can be serialized
-        #   to json. However, this is not true in DGL because DGL Object is meant
-        #   for runtime API, so it could contain binary data such as NDArray.
-        #   If this feature is required, please raise a RFC to DGL issue.
-        raise RuntimeError("__setstate__ is not supported for object type")
-
     def same_as(self, other):
         """check object identity equality"""
         if not isinstance(other, ObjectBase):

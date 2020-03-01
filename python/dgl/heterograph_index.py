@@ -26,54 +26,11 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        metagraph = self.metagraph
-        number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
-        return metagraph, number_of_nodes, self._get_relation_states()
-        #edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
-        #return metagraph, number_of_nodes, edges
+        return _CAPI_DGLHeteroPickle(self)
 
     def __setstate__(self, state):
-        metagraph, number_of_nodes, relstates = state
-        number_of_nodes = nd.array(np.array(number_of_nodes, dtype=np.int64))
-        relstates = [F.zerocopy_to_dgl_ndarray(arr) for arr in relstates]
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLHeteroCreateHeteroGraphFromRelationStates,
-            metagraph, number_of_nodes, relstates)
         self._cache = {}
-
-        #metagraph, number_of_nodes, edges = state
-        #self._cache = {}
-        ## loop over etypes and recover unit graphs
-        #rel_graphs = []
-        #for i, edges_per_type in enumerate(edges):
-        #    src_ntype, dst_ntype = metagraph.find_edge(i)
-        #    num_src = number_of_nodes[src_ntype]
-        #    num_dst = number_of_nodes[dst_ntype]
-        #    src_id, dst_id, _ = edges_per_type
-        #    rel_graphs.append(create_unitgraph_from_coo(
-        #        1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
-        #self.__init_handle_by_constructor__(
-        #    _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
-
-    def _get_relation_states(self):
-        """Get the pickling state of the relation graph structure in backend tensors.
-
-        The graph is converted to a list of adjacency matrices, each for one relation graph.
-        Each adjacency matrix is stored by several backend tensors, allowing it to utilize
-        efficient pickling methods provided by the backend framework.
-
-        For a graph with R relation graphs, it returns 1+3*R tensors. The first one
-        is a 1D tensor of length R, with each element indicating the storage type
-        of the adjacency matrix (i.e., COO, CSR, CSC). The i^th graph is stored in
-        the (1 + 3*i) to (1 + 3*(i+1)) tensors.
-
-        Returns
-        -------
-        A list of 1D tensors
-            Adjacency matrices of all relation graphs.
-        """
-        states = _CAPI_DGLHeteroGraphGetRelationStates(self)
-        return [F.zerocopy_from_dgl_ndarray(arr) for arr in states]
+        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
 
     @property
     def metagraph(self):
@@ -1107,8 +1064,45 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
+#################################################################
+# Data structure used by C APIs
+#################################################################
+
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
     """FlattenedHeteroGraph object class in C++ backend."""
+
+@register_object("graph.HeteroPickleStates")
+class HeteroPickleStates(ObjectBase):
+    """Pickle states object class in C++ backend."""
+    @property
+    def metagraph(self):
+        """Metagraph
+
+        Returns
+        -------
+        GraphIndex
+            Metagraph structure
+        """
+        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+
+    @property
+    def adjs(self):
+        """Adjacency matrices of all the relation graphs
+
+        Returns
+        -------
+        list of SparseMatrix
+            Adjacency matrices
+        """
+        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+
+    def __getstate__(self):
+        return self.metagraph, self.adjs
+
+    def __setstate__(self, state):
+        metagraph, adjs = state
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLCreateHeteroPickleStates, metagraph, adjs)
 
 _init_api("dgl.heterograph_index")

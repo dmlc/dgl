@@ -74,4 +74,31 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickleStatesGetAdjs")
     *rv = List<SparseMatrixRef>(refs);
   });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLCreateHeteroPickleStates")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef metagraph = args[0];
+    List<SparseMatrixRef> adjs = args[1];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    st->metagraph = metagraph.sptr();
+    st->adjs.reserve(adjs.size());
+    for (const auto& ref : adjs)
+      st->adjs.push_back(ref.sptr());
+    *rv = HeteroPickleStatesRef(st);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPickle")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroGraphRef ref = args[0];
+    std::shared_ptr<HeteroPickleStates> st( new HeteroPickleStates );
+    *st = HeteroPickle(ref.sptr());
+    *rv = HeteroPickleStatesRef(st);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroUnpickle")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    HeteroPickleStatesRef ref = args[0];
+    HeteroGraphPtr graph = HeteroUnpickle(*ref.sptr());
+    *rv = HeteroGraphRef(graph);
+  });
+
 }  // namespace dgl
