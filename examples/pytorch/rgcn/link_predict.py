@@ -186,8 +186,8 @@ def main(args):
             model.eval()
             print("start eval")
             embed = model(test_graph, test_node_id, test_rel, test_norm)
-            mrr = utils.calc_mrr(embed, model.w_relation, valid_data,
-                                 hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+            mrr = utils.calc_filtered_mrr(embed, model.w_relation, torch.LongTensor(train_data),
+                                          valid_data, test_data, hits=[1, 3, 10])
             # save best model
             if mrr < best_mrr:
                 if epoch >= args.n_epochs:
@@ -212,8 +212,8 @@ def main(args):
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
     embed = model(test_graph, test_node_id, test_rel, test_norm)
-    utils.calc_mrr(embed, model.w_relation, test_data,
-                   hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+    utils.calc_filtered_mrr(embed, model.w_relation, torch.LongTensor(train_data),
+                            valid_data, test_data, hits=[1, 3, 10])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
