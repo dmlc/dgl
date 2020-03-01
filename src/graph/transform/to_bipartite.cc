@@ -68,7 +68,7 @@ ToBipartite(
   const EdgeArray etypes = meta_graph->Edges("eid");
   const IdArray new_dst = Add(etypes.dst, num_ntypes);
   const auto new_meta_graph = ImmutableGraph::CreateFromCOO(
-      num_ntypes * 2, etypes.src, etypes.dst);
+      num_ntypes * 2, etypes.src, new_dst);
 
   std::vector<HeteroGraphPtr> rel_graphs;
   std::vector<IdArray> induced_edges;

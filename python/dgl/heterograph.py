@@ -559,7 +559,7 @@ class DGLHeteroGraph(object):
         return HeteroNodeDataView(self, None, ALL)
 
     @property
-    def srcdata(self):
+    def sdata(self):
         """Return the data view of all source nodes.
 
         **Only works if the graph has only one edge type.**
@@ -571,7 +571,7 @@ class DGLHeteroGraph(object):
         To set features of all source nodes in a graph with only one edge type:
 
         >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
+        >>> g.sdata['h'] = torch.zeros(2, 5)
 
         This is equivalent to
 
@@ -590,7 +590,7 @@ class DGLHeteroGraph(object):
         return HeteroNodeDataView(self, srctype, ALL)
 
     @property
-    def dstdata(self):
+    def ddata(self):
         """Return the data view of all destination nodes.
 
         **Only works if the graph has only one edge type.**
@@ -602,11 +602,11 @@ class DGLHeteroGraph(object):
         To set features of all source nodes in a graph with only one edge type:
 
         >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
-        >>> g.srcdata['h'] = torch.zeros(2, 5)
+        >>> g.ddata['h'] = torch.zeros(3, 5)
 
         This is equivalent to
 
-        >>> g.nodes['user'].data['h'] = torch.zeros(2, 5)
+        >>> g.nodes['game'].data['h'] = torch.zeros(3, 5)
 
         Notes
         -----

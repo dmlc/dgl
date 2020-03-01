@@ -769,37 +769,35 @@ def to_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l
     computation of message passing.  See [TODO] for a detailed example.
     """
     if rhs_nodes is None:
-        rhs_nodes_nd = []       # C API will find dst nodes by its own.
+        rhs_nodes = []       # C API will find dst nodes by its own.
     elif not isinstance(rhs_nodes, Mapping):
         # rhs_nodes is a Tensor, check if the graph has only one type.
         if len(graph.ntypes) > 1:
             raise ValueError(
                 'Graph has more than one node type; please specify a dict for rhs_nodes.')
-        rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(rhs_nodes)]
+        rhs_nodes = [rhs_nodes]
     else:
         # rhs_nodes is a dict
-        rhs_nodes_nd = [
-            F.zerocopy_to_dgl_ndarray(rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)))
-            for ntype in graph.ntypes]
+        rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in graph.ntypes]
+    rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(nodes) for nodes in rhs_nodes]
 
     new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBipartite(
         graph._graph, rhs_nodes_nd, include_rhs_in_lhs)
+    lhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in lhs_nodes_nd]
 
     new_ntypes = [ntype + lhs_suffix for ntype in graph.ntypes] + \
                  [ntype + rhs_suffix for ntype in graph.ntypes]
     new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, graph.etypes)
 
     for i, ntype in enumerate(graph.ntypes):
-        lhs_induced_nodes = F.zerocopy_from_dgl_ndarray(lhs_nodes[i])
-        rhs_induced_nodes = F.zerocopy_from_dgl_ndarray(rhs_nodes[i])
-        new_graph.nodes[ntype + lhs_suffix].data[dgl.NID] = lhs_induced_nodes
-        new_graph.nodes[ntype + rhs_suffix].data[dgl.NID] = rhs_induced_nodes
+        new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
+        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
 
     for i, canonical_etype in enumerate(graph.canonical_etypes):
-        induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i])
+        induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
         utype, etype, vtype = canonical_etype
         new_canonical_etype = (utype + lhs_suffix, etype, vtype + rhs_suffix)
-        new_graph.edges[new_canonical_etype].data[dgl.EID] = induced_edges
+        new_graph.edges[new_canonical_etype].data[EID] = induced_edges
 
     return new_graph
 
