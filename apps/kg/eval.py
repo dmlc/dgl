@@ -29,8 +29,12 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
-        self.add_argument('--format', type=str, default='1',
+        self.add_argument('--format', type=str, default='built_in',
+                          choices=['built_in', 'raw_udd', 'udd'],
+                          help='the format of the dataset.')elf.add_argument('--format', type=str, default='1',
                           help='the format of the dataset.')
+        self.add_argument('--data_files', type=str, default=None, nargs='+',
+                          help='a list of data files, e.g. entity relation train valid test')
         self.add_argument('--model_path', type=str, default='ckpts',
                           help='the place where models are saved')
 
@@ -95,7 +99,7 @@ def main(args):
         assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
 
     # load dataset and samplers
-    dataset = get_dataset(args.data_path, args.dataset, args.format)
+    dataset = get_dataset(args.data_path, args.dataset, args.format, args.data_files)
     args.pickle_graph = False
     args.train = False
     args.valid = False
