@@ -30,8 +30,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
-        self.add_argument('--format', type=str, default='1',
+        self.add_argument('--format', type=str, default='raw',
                           help='the format of the dataset.')
+        self.add_argument('--data_files', type=str, default=None, nargs='+',
+                          help='a list of data files, e.g. entity relation train valid test')
         self.add_argument('--save_path', type=str, default='ckpts',
                           help='place to save models and logs')
         self.add_argument('--save_emb', type=str, default=None,
@@ -150,7 +152,7 @@ def get_logger(args):
 
 def run(args, logger):
     # load dataset and samplers
-    dataset = get_dataset(args.data_path, args.dataset, args.format)
+    dataset = get_dataset(args.data_path, args.dataset, args.format, args.data_files)
     n_entities = dataset.n_entities
     n_relations = dataset.n_relations
     if args.neg_sample_size_test < 0:

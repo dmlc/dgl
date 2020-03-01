@@ -23,59 +23,58 @@ def _download_and_extract(url, path, filename):
                     writer.write(chunk)
             print('Download finished. Unzipping the file...')
 
-class KGDataset1:
-    '''Load a knowledge graph with format 1
+class KGDataset:
+    '''Load a knowledge graph
 
-    In this format, the folder with a knowledge graph has five files:
-    * entities.dict stores the mapping between entity Id and entity name.
-    * relations.dict stores the mapping between relation Id and relation name.
-    * train.txt stores the triples in the training set.
-    * valid.txt stores the triples in the validation set.
-    * test.txt stores the triples in the test set.
+    The folder with a knowledge graph has five files:
+    * entities stores the mapping between entity Id and entity name.
+    * relations stores the mapping between relation Id and relation name.
+    * train stores the triples in the training set.
+    * valid stores the triples in the validation set.
+    * test stores the triples in the test set.
 
     The mapping between entity (relation) Id and entity (relation) name is stored as 'id\tname'.
 
     The triples are stored as 'head_name\trelation_name\ttail_name'.
     '''
-    def __init__(self, path, name):
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+    def __init__(self, entity_path, relation_path,
+                 train_path, valid_path=None, test_path=None,
+                 skip_first_line=False):
+        self.entity2id, self.n_entities = self.read_entity(entity_path)
+        self.relation2id, self.n_relations = self.read_relation(relation_path)
+        self.train = self.read_triple(train_path, "train", skip_first_line)
+        self.valid = self.read_triple(valid_path, "valid", skip_first_line)
+        self.test = self.read_triple(test_path, "test", skip_first_line)
 
-        if not os.path.exists(os.path.join(path, name)):
-            print('File not found. Downloading from', url)
-            _download_and_extract(url, path, name + '.zip')
-        path = os.path.join(path, name)
-
-        with open(os.path.join(path, 'entities.dict')) as f:
+    def read_entity(self, entity_path):
+        with open(entity_path) as f:
             entity2id = {}
             for line in f:
                 eid, entity = line.strip().split('\t')
                 entity2id[entity] = int(eid)
 
-        self.entity2id = entity2id
+        return entity2id, len(entity2id)
 
-        with open(os.path.join(path, 'relations.dict')) as f:
+    def read_relation(self, relation_path):
+        with open(relation_path) as f:
             relation2id = {}
             for line in f:
                 rid, relation = line.strip().split('\t')
                 relation2id[relation] = int(rid)
 
-        self.relation2id = relation2id
+        return relation2id, len(relation2id)
 
-        # TODO: to deal with contries dataset.
-
-        self.n_entities = len(self.entity2id)
-        self.n_relations = len(self.relation2id)
-
-        self.train = self.read_triple(path, 'train')
-        self.valid = self.read_triple(path, 'valid')
-        self.test = self.read_triple(path, 'test')
-
-    def read_triple(self, path, mode):
+    def read_triple(self, path, mode, skip_first_line=False):
         # mode: train/valid/test
+        if path is None:
+            return None
+
         heads = []
         tails = []
         rels = []
-        with open(os.path.join(path, '{}.txt'.format(mode))) as f:
+        with open(path) as f:
+            if skip_first_line:
+                _ = f.readline()
             for line in f:
                 h, r, t = line.strip().split('\t')
                 heads.append(self.entity2id[h])
@@ -87,11 +86,68 @@ class KGDataset1:
 
         return (heads, rels, tails)
 
+class KGDatasetFB15k(KGDataset):
+    '''Load a knowledge graph FB15k
 
-class KGDataset2:
-    '''Load a knowledge graph with format 2
+    The FB15k dataset has five files:
+    * entities.dict stores the mapping between entity Id and entity name.
+    * relations.dict stores the mapping between relation Id and relation name.
+    * train.txt stores the triples in the training set.
+    * valid.txt stores the triples in the validation set.
+    * test.txt stores the triples in the test set.
 
-    In this format, the folder with a knowledge graph has five files:
+    The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
+    The triples are stored as 'head_nid\trelation_id\ttail_nid'.
+    '''
+    def __init__(self, path):
+        name = 'FB15k'
+        self.name = name
+        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+
+        if not os.path.exists(os.path.join(path, name)):
+            print('File not found. Downloading from', url)
+            _download_and_extract(url, path, name + '.zip')
+        path = os.path.join(path, name)
+
+        super(KGDatasetFB15k, self).__init__(os.path.join(path, 'entities.dict'),
+                                             os.path.join(path, 'relations.dict'),
+                                             os.path.join(path, 'train.txt'),
+                                             os.path.join(path, 'valid.txt'),
+                                             os.path.join(path, 'test.txt'))
+
+class KGDatasetWN18(KGDataset):
+    '''Load a knowledge graph wn18
+
+    The FB15k dataset has five files:
+    * entities.dict stores the mapping between entity Id and entity name.
+    * relations.dict stores the mapping between relation Id and relation name.
+    * train.txt stores the triples in the training set.
+    * valid.txt stores the triples in the validation set.
+    * test.txt stores the triples in the test set.
+
+    The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
+    The triples are stored as 'head_nid\trelation_id\ttail_nid'.
+    '''
+    def __init__(self, path):
+        name = 'wn18'
+        self.name = name
+        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+
+        if not os.path.exists(os.path.join(path, name)):
+            print('File not found. Downloading from', url)
+            _download_and_extract(url, path, name + '.zip')
+        path = os.path.join(path, name)
+
+        super(KGDatasetWN18, self).__init__(os.path.join(path, 'entities.dict'),
+                                            os.path.join(path, 'relations.dict'),
+                                            os.path.join(path, 'train.txt'),
+                                            os.path.join(path, 'valid.txt'),
+                                            os.path.join(path, 'test.txt'))
+
+class KGDatasetFreebase(KGDataset):
+    '''Load a knowledge graph Full Freebase
+
+    The Freebase dataset has five files:
     * entity2id.txt stores the mapping between entity name and entity Id.
     * relation2id.txt stores the mapping between relation name relation Id.
     * train.txt stores the triples in the training set.
@@ -99,10 +155,11 @@ class KGDataset2:
     * test.txt stores the triples in the test set.
 
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
-
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name):
+    def __init__(self, path):
+        name = 'Freebase'
+        self.name = name
         url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
@@ -113,14 +170,21 @@ class KGDataset2:
         f_ent2id = os.path.join(self.path, 'entity2id.txt')
         f_rel2id = os.path.join(self.path, 'relation2id.txt')
 
-        with open(f_ent2id) as f_ent:
-            self.n_entities = int(f_ent.readline()[:-1])
-        with open(f_rel2id) as f_rel:
-            self.n_relations = int(f_rel.readline()[:-1])
+        super(KGDatasetFreebase, self).__init__(os.path.join(path, 'entity2id.txt'),
+                                                os.path.join(path, 'relation2id.txt'),
+                                                os.path.join(path, 'train.txt'),
+                                                os.path.join(path, 'valid.txt'),
+                                                os.path.join(path, 'test.txt'))
 
-        self.train = self.read_triple(self.path, 'train')
-        self.valid = self.read_triple(self.path, 'valid')
-        self.test = self.read_triple(self.path, 'test')
+    def read_entity(self, entity_path):
+        with open(entity_path) as f_ent:
+            n_entities = int(f_ent.readline()[:-1])
+        return None, n_entities
+
+    def read_relation(self, relation_path):
+        with open(relation_path) as f_rel:
+            n_relations = int(f_rel.readline()[:-1])
+        return None, n_relations
 
     def read_triple(self, path, mode, skip_first_line=False):
         heads = []
@@ -141,13 +205,118 @@ class KGDataset2:
         print('Finished. Read {} {} triples.'.format(len(heads), mode))
         return (heads, rels, tails)
 
+class KGDatasetUDFRaw(KGDataset):
+    '''Load a knowledge graph user defined dataset
 
-def get_dataset(data_path, data_name, format_str):
+    The user defined dataset has five files:
+    * entities stores the mapping between entity name and entity Id.
+    * relations stores the mapping between relation name relation Id.
+    * train stores the triples in the training set. In format [src_name, rel_name, dst_name]
+    * valid stores the triples in the validation set. In format [src_name, rel_name, dst_name]
+    * test stores the triples in the test set. In format [src_name, rel_name, dst_name]
+
+    The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
+    The triples are stored as 'head_nid\trelation_id\ttail_nid'.
+    '''
+    def __init__(self, path, name, files):
+        self.name = name
+        for f in files:
+            assert os.path.exists(os.path.join(path, f)), \
+                'File {} now exist in {}'.format(f, path)
+
+        if len(files) == 3:
+            super(KGDatasetUDFRaw, self).__init__(os.path.join(path, files[0]),
+                                                  os.path.join(path, files[1]),
+                                                  os.path.join(path, files[2]),
+                                                  os.path.join(path, None),
+                                                  os.path.join(path, None))
+        if len(files) == 5:
+            super(KGDatasetUDFRaw, self).__init__(os.path.join(path, files[0]),
+                                                  os.path.join(path, files[1]),
+                                                  os.path.join(path, files[2]),
+                                                  os.path.join(path, files[3]),
+                                                  os.path.join(path, files[4]))
+
+class KGDatasetUDF(KGDataset):
+    '''Load a knowledge graph user defined dataset
+
+    The user defined dataset has five files:
+    * entities stores the mapping between entity name and entity Id.
+    * relations stores the mapping between relation name relation Id.
+    * train stores the triples in the training set. In format [src_name, rel_name, dst_name]
+    * valid stores the triples in the validation set. In format [src_name, rel_name, dst_name]
+    * test stores the triples in the test set. In format [src_name, rel_name, dst_name]
+
+    The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
+    The triples are stored as 'head_nid\trelation_id\ttail_nid'.
+    '''
+    def __init__(self, path, name, files):
+        self.name = name
+        for f in files:
+            assert os.path.exists(os.path.join(path, f)), \
+                'File {} now exist in {}'.format(f, path)
+
+        print("UDF")
+        if len(files) == 3:
+            super(KGDatasetUDF, self).__init__(os.path.join(path, files[0]),
+                                               os.path.join(path, files[1]),
+                                               os.path.join(path, files[2]),
+                                               os.path.join(path, None),
+                                               os.path.join(path, None))
+        if len(files) == 5:
+            super(KGDatasetUDF, self).__init__(os.path.join(path, files[0]),
+                                               os.path.join(path, files[1]),
+                                               os.path.join(path, files[2]),
+                                               os.path.join(path, files[3]),
+                                               os.path.join(path, files[4]))
+
+    def read_entity(self, entity_path):
+        n_entities = 0
+        with open(entity_path) as f_ent:
+            for line in f_ent:
+                n_entities += 1
+        return None, n_entities
+
+    def read_relation(self, relation_path):
+        n_relations = 0
+        with open(relation_path) as f_rel:
+            for line in f_rel:
+                n_relations += 1
+        return None, n_relations
+
+    def read_triple(self, path, mode, skip_first_line=False):
+        heads = []
+        tails = []
+        rels = []
+        print('Reading {} triples....'.format(mode))
+        with open(path) as f:
+            if skip_first_line:
+                _ = f.readline()
+            for line in f:
+                h, r, t = line.strip().split('\t')
+                heads.append(int(h))
+                tails.append(int(t))
+                rels.append(int(r))
+        heads = np.array(heads, dtype=np.int64)
+        tails = np.array(tails, dtype=np.int64)
+        rels = np.array(rels, dtype=np.int64)
+        print('Finished. Read {} {} triples.'.format(len(heads), mode))
+        return (heads, rels, tails)
+
+def get_dataset(data_path, data_name, format_str, files=None):
     if data_name == 'Freebase':
-        dataset = KGDataset2(data_path, data_name)
-    elif format_str == '1':
-        dataset = KGDataset1(data_path, data_name)
-    else:
-        dataset = KGDataset2(data_path, data_name)
+        dataset = KGDatasetFreebase(data_path)
+    elif data_name == 'FB15k':
+        dataset = KGDatasetFB15k(data_path)
+    elif data_name == 'wn18':
+        dataset = KGDatasetWN18(data_path)
+    else: 
+        # user defined dataset
+        if format_str == 'raw_udf':
+            dataset = KGDatasetUDFRaw(data_path, data_name, files)
+        elif format_str == 'udf':
+            dataset = KGDatasetUDF(data_path, data_name, files)
+        else:
+            assert False, "Unknow format {}".format(format_str)
 
     return dataset
