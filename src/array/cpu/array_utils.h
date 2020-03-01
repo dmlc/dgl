@@ -30,9 +30,14 @@ class IdHashMap {
 
   // Construct the hashmap using the given id array.
   // The id array could contain duplicates.
+  // If the id array has no duplicates, the array will be relabeled to consecutive
+  // integers starting from 0.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
     Update(ids);
   }
+
+  // copy ctor
+  IdHashMap(const IdHashMap &other) = default;
 
   // Update the hashmap with given id array.
   // The id array could contain duplicates.
@@ -83,6 +88,10 @@ class IdHashMap {
     for (auto pair : oldv2newv_)
       values_data[pair.second] = pair.first;
     return values;
+  }
+
+  size_t Size() const {
+    return oldv2newv_.size();
   }
 
  private:

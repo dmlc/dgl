@@ -38,10 +38,10 @@ enum class EdgeDir {
  * \brief Sparse graph format.
  */
 enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
+  kAny = 0,
+  kCOO = 1,
+  kCSR = 2,
+  kCSC = 3
 };
 
 /*!
@@ -551,13 +551,13 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")
-    return SparseFormat::COO;
+    return SparseFormat::kCOO;
   else if (name == "csr")
-    return SparseFormat::CSR;
+    return SparseFormat::kCSR;
   else if (name == "csc")
-    return SparseFormat::CSC;
+    return SparseFormat::kCSC;
   else
-    return SparseFormat::ANY;
+    return SparseFormat::kAny;
 }
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
@@ -576,7 +576,7 @@ HeteroGraphPtr CreateHeteroGraph(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
+    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::kAny);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -592,7 +592,7 @@ HeteroGraphPtr CreateFromCOO(
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    SparseFormat restrict_format = SparseFormat::ANY);
+    SparseFormat restrict_format = SparseFormat::kAny);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.

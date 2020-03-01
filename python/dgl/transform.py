@@ -33,9 +33,11 @@ __all__ = [
     'remove_self_loop',
     'metapath_reachable_graph',
     'compact_graphs',
+    'to_bipartite',
     'to_simple',
     'in_subgraph',
-    'out_subgraph']
+    'out_subgraph',
+    'remove_edges']
 
 
 def pairwise_squared_distance(x):
@@ -713,6 +715,128 @@ def compact_graphs(graphs, always_preserve=None):
         new_graphs = new_graphs[0]
 
     return new_graphs
+
+def to_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
+                 rhs_suffix="_r"):
+    """Convert a graph into a bipartite-structured graph for message passing.
+
+    Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
+    node type ``ntype_r`` on the "right hand" side for each node type ``ntype``.  The
+    nodes of type ``ntype_r`` would contain the nodes that are destination of an edge,
+    while ``ntype_l`` would contain the nodes that are the source nodes of an edge.
+
+    Edges connecting from node type ``utype`` to node type ``vtype`` are preserved,
+    except that the source node type and destination node type become ``utype_l`` and
+    ``vtype_r`` in the new graph.
+
+    If ``rhs_nodes`` is given, the right hand side would contain the given nodes instead.
+
+    If ``include_rhs_in_lhs`` is True, the left hand side would contain all the nodes
+    that appeared in the right hand side.
+
+    Parameters
+    ----------
+    graph : DGLHeteroGraph
+        The graph.
+    rhs_nodes : Tensor or dict[str, Tensor], optional
+        Optional nodes that would appear on the right hand side.
+
+        If a tensor is given, the graph must have only one node type.
+    include_rhs_in_lhs : bool, default False
+        Whether to always include the right hand side nodes in the left hand side.
+    lhs_suffix : str, default "_l"
+        The suffix attached to all node types on the left hand side.
+    rhs_suffix : str, default "_r"
+        The suffix attached to all node types on the right hand side.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new graph with the bipartite structure.
+
+        The node IDs induced for each type in both sides would be stored in feature
+        ``dgl.NID``.
+
+        The edge IDs induced for each type would be stored in feature ``dgl.EID``.
+
+        If ``include_rhs_in_lhs`` is True, then for each node type ``ntype``, the first
+        few nodes with type ``ntype_l`` are guaranteed to be identical to the nodes with
+        type ``ntype_r`` (in the sense of both values and order).
+
+    Notes
+    -----
+    A special use case of this function is to create a graph structure for efficient
+    computation of message passing.  See [TODO] for a detailed example.
+    """
+    if rhs_nodes is None:
+        rhs_nodes_nd = []       # C API will find dst nodes by its own.
+    elif not isinstance(rhs_nodes, Mapping):
+        # rhs_nodes is a Tensor, check if the graph has only one type.
+        if len(graph.ntypes) > 1:
+            raise ValueError(
+                'Graph has more than one node type; please specify a dict for rhs_nodes.')
+        rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(rhs_nodes)]
+    else:
+        # rhs_nodes is a dict
+        rhs_nodes_nd = [
+            F.zerocopy_to_dgl_ndarray(rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)))
+            for ntype in graph.ntypes]
+
+    new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBipartite(
+        graph._graph, rhs_nodes_nd, include_rhs_in_lhs)
+
+    new_ntypes = [ntype + lhs_suffix for ntype in graph.ntypes] + \
+                 [ntype + rhs_suffix for ntype in graph.ntypes]
+    new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, graph.etypes)
+
+    for i, ntype in enumerate(graph.ntypes):
+        lhs_induced_nodes = F.zerocopy_from_dgl_ndarray(lhs_nodes[i])
+        rhs_induced_nodes = F.zerocopy_from_dgl_ndarray(rhs_nodes[i])
+        new_graph.nodes[ntype + lhs_suffix].data[dgl.NID] = lhs_induced_nodes
+        new_graph.nodes[ntype + rhs_suffix].data[dgl.NID] = rhs_induced_nodes
+
+    for i, canonical_etype in enumerate(graph.canonical_etypes):
+        induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i])
+        utype, etype, vtype = canonical_etype
+        new_canonical_etype = (utype + lhs_suffix, etype, vtype + rhs_suffix)
+        new_graph.edges[new_canonical_etype].data[dgl.EID] = induced_edges
+
+    return new_graph
+
+def remove_edges(graph, edge_ids):
+    """Return a new graph with given edge IDs removed.
+
+    Parameters
+    ----------
+    graph : DGLHeteroGraph
+        The graph
+    edge_ids : Tensor or dict[etypes, Tensor]
+        The edge IDs for each edge type.
+
+    Returns
+    -------
+    DGLHeteroGraph
+        The new graph.
+        The edge ID mapping from the new graph to the original graph is stored as
+        ``dgl.EID`` on edge features.
+    """
+    if not isinstance(edge_ids, Mapping):
+        if len(graph.etypes) != 1:
+            raise ValueError(
+                "Graph has more than one edge type; specify a dict for edge_id instead.")
+        edge_ids = {graph.canonical_etypes[0]: edge_ids}
+
+    edge_ids_nd = [None] * len(graph.etypes)
+    for key, value in edge_ids.items():
+        edge_ids_nd[graph.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
+    new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(graph._graph, edge_ids_nd)
+
+    new_graph = DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+    for i, canonical_etype in enumerate(graph.canonical_etypes):
+        new_graph.edges[canonical_etype].data[dgl.EID] = F.zerocopy_from_dgl_ndarray(
+            induced_eids_nd[i])
+
+    return new_graph
 
 def in_subgraph(g, nodes):
     """Extract the subgraph containing only the in edges of the given nodes.
