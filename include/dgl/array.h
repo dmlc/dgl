@@ -15,6 +15,7 @@
 #include <vector>
 #include <tuple>
 #include <utility>
+#include <string>
 
 #include "./runtime/ndarray.h"
 #include "./runtime/object.h"

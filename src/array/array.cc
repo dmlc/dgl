@@ -613,7 +613,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   return ret;
 }
 
-///////////////////////// C APIs ///////////////////////// 
+///////////////////////// C APIs /////////////////////////
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     SparseMatrixRef spmat = args[0];
