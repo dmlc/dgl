@@ -26,11 +26,11 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        return _CAPI_DGLHeteroPickle(self)
+        return _CAPI_DGLHeteroPickle(self).__getstate__()
 
     def __setstate__(self, state):
         self._cache = {}
-        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
+        #self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
 
     @property
     def metagraph(self):
@@ -1098,11 +1098,13 @@ class HeteroPickleStates(ObjectBase):
         return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
 
     def __getstate__(self):
-        return self.metagraph, self.adjs
+        #return self.metagraph, self.adjs
+        return self.adjs[0].__getstate__()
 
     def __setstate__(self, state):
-        metagraph, adjs = state
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateHeteroPickleStates, metagraph, adjs)
+        x = state
+        #metagraph, adjs = state
+        #self.__init_handle_by_constructor__(
+        #    _CAPI_DGLCreateHeteroPickleStates, metagraph, adjs)
 
 _init_api("dgl.heterograph_index")

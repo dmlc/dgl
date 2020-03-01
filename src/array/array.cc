@@ -634,12 +634,15 @@ DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetNumCols")
 
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetIndices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    //SparseMatrixRef spmat = args[0];
+    //List<Value> indices;
+    //for (IdArray arr : spmat->indices) {
+    //  indices.push_back(Value(MakeValue(arr)));
+    //}
+    //*rv = indices;
     SparseMatrixRef spmat = args[0];
-    List<Value> indices;
-    for (IdArray arr : spmat->indices) {
-      indices.push_back(Value(MakeValue(arr)));
-    }
-    *rv = indices;
+    const int64_t i = args[1];
+    *rv = spmat->indices[i];
   });
 
 DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFlags")
