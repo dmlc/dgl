@@ -93,6 +93,11 @@ def evaluate(model, frontiers, inputs, labels):
     model.train()
     return compute_acc(pred, labels)
 
+def load_subtensor(g, labels, seeds, induced_nodes, dev_id):
+    batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
+    batch_labels = labels[seeds].to(dev_id)
+    return batch_inputs, batch_labels
+
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
@@ -149,9 +154,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             frontiers = sampler.sample_frontiers(seeds)
             induced_nodes = frontiers[0].sdata[dgl.NID]
-            induced_targets = frontiers[-1].ddata[dgl.NID]
-            batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
-            batch_labels = labels[induced_targets].to(dev_id)
+            batch_inputs, batch_labels = load_subtensor(g, labels, seeds, induced_nodes, dev_id)
 
             # forward
             batch_pred = model(frontiers, batch_inputs)
