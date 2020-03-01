@@ -182,6 +182,7 @@ def train(args):
     dur = []
     iter_idx = 1
     for epoch in range(1, args.train_max_epoch):
+        # generate edge seed
         num_edges = train_truths.shape[0]
         seed = th.randperm(num_edges)
 
@@ -194,6 +195,7 @@ def train(args):
                              if (sample_idx + 1) * args.minibatch_size < num_edges \
                              else num_edges]
 
+            # generate frontiners for user and item
             true_relation_ratings = train_truths[edge_ids]
             true_relation_labels = train_labels[edge_ids]
             head_id, tail_id = dataset.train_dec_graph.find_edges(edge_ids)
@@ -202,9 +204,10 @@ def train(args):
             tails = {tail_type : th.unique(tail_id)}
             head_frontier = dgl.in_subgraph(dataset.train_enc_graph, heads)
             tail_frontier = dgl.in_subgraph(dataset.train_enc_graph, tails)
-
             head_frontier = dgl.compact_graphs(head_frontier)
             tail_frontier = dgl.compact_graphs(tail_frontier)
+
+            # copy from parent
             head_frontier.nodes['user'].data['ci'] = \
                 dataset.train_enc_graph.nodes['user'].data['ci'][head_frontier.nodes['user'].data[dgl.NID]]
             head_frontier.nodes['movie'].data['cj'] = \
@@ -219,6 +222,7 @@ def train(args):
             dataset.train_enc_graph.nodes['movie'].data['ids'][tail_frontier.nodes['movie'].data[dgl.NID]] = \
                 th.arange(tail_frontier.nodes['movie'].data[dgl.NID].shape[0])
 
+            # handle features
             head_feat = tail_frontier.nodes['user'].data[dgl.NID].long().to(args.device) \
                         if dataset.user_feature is None else \
                            dataset.user_feature[tail_frontier.nodes['user'].data[dgl.NID]]
@@ -330,8 +334,8 @@ def config():
     parser.add_argument('--train_lr', type=float, default=0.01)
     parser.add_argument('--train_min_lr', type=float, default=0.0001)
     parser.add_argument('--train_lr_decay_factor', type=float, default=0.5)
-    parser.add_argument('--train_decay_patience', type=int, default=20)
-    parser.add_argument('--train_early_stopping_patience', type=int, default=50)
+    parser.add_argument('--train_decay_patience', type=int, default=5)
+    parser.add_argument('--train_early_stopping_patience', type=int, default=10)
     parser.add_argument('--share_param', default=False, action='store_true')
     parser.add_argument('--mix_cpu_gpu', default=False, action='store_true')
     parser.add_argument('--minibatch_size', type=int, default=10000)

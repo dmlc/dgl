@@ -152,19 +152,9 @@ class GCMCLayer(nn.Module):
 class SampleGCMCLayer(GCMCLayer):
     r"""Sample based GCMC layer
 
-    .. math::
-        z_j^{(l+1)} = \sigma_{agg}\left[\mathrm{agg}\left(
-        \sum_{j\in\mathcal{N}_1}\frac{1}{c_{ij}}W_1h_j, \ldots,
-        \sum_{j\in\mathcal{N}_R}\frac{1}{c_{ij}}W_Rh_j
-        \right)\right]
-
-    After that, apply an extra output projection:
-
-    .. math::
-        h_j^{(l+1)} = \sigma_{out}W_oz_j^{(l+1)}
-
-    The equation is applied to both user nodes and movie nodes and the parameters
-    are not shared unless ``share_user_item_param`` is true.
+    Implemented a sample based GCMC algorithm. It accepts two minibatch
+    graph: ugraph for generating user embeddings and igraph for generating
+    item embeddings.
 
     Parameters
     ----------
@@ -242,9 +232,12 @@ class SampleGCMCLayer(GCMCLayer):
 
         Parameters
         ----------
-        graph : DGLHeteroGraph
-            User-movie rating graph. It should contain two node types: "user"
-            and "movie" and many edge types each for one rating value.
+        ugraph : DGLHeteroGraph
+            User-item rating graph. It should be a bipartite graph containing
+            edges only from item to user. Used in generating user embeddings.
+        igraph : DGLHeteroGraph
+            User-item rating graph. It should be a bipartite graph containing
+            edges only from user to item. Used in generating item embeddings.
         ufeat : torch.Tensor, optional
             User features. If None, using an identity matrix.
         ifeat : torch.Tensor, optional
@@ -366,14 +359,8 @@ class BiDecoder(nn.Module):
 class SampleBiDecoder(BiDecoder):
     r"""Sample based Bilinear decoder.
 
-    .. math::
-        p(M_{ij}=r) = \text{softmax}(u_i^TQ_rv_j)
-
-    The trainable parameter :math:`Q_r` is further decomposed to a linear
-    combination of basis weight matrices :math:`P_s`:
-
-    .. math::
-        Q_r = \sum_{s=1}^{b} a_{rs}P_s
+    Implemented a sample based GCMC algorithm. It accepts user embeddings and
+    item embeddings and output a score for each possible label.
 
     Parameters
     ----------
@@ -401,12 +388,10 @@ class SampleBiDecoder(BiDecoder):
 
         Parameters
         ----------
-        graph : DGLHeteroGraph
-            "Flattened" user-movie graph with only one edge type.
         ufeat : th.Tensor
-            User embeddings. Shape: (|V_u|, D)
+            User embeddings. Shape: (Batsh_Size, D)
         ifeat : th.Tensor
-            Movie embeddings. Shape: (|V_m|, D)
+            Movie embeddings. Shape: (Batsh_Size, D)
 
         Returns
         -------
