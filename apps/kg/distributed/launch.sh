@@ -15,8 +15,8 @@ machine_count=$(awk 'END{print NR}' ip_config.txt)
 # run command on remote machine
 for i in {2..$machine_count}
 do
-    ip = $(awk 'NR=='$i' {print $1}' ip_config.txt)
-    echo yes | ssh -i $ssh_key $user_nameu@ip 'cd '$script_path'; '$script_file' $i $server_count' &
+    ip=$(awk 'NR=='$i' {print $1}' ip_config.txt)
+    echo yes | ssh -i $ssh_key $user_nameu@ip 'cd '$script_path'; '$script_file' '$i' '$server_count' ' &
 done
 
 # run command on local machine
