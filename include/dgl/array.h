@@ -395,7 +395,7 @@ runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /*! \brief Whether the CSR matrix contains data */
 inline bool CSRHasData(CSRMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
@@ -587,7 +587,7 @@ COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
 /*! \brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */
