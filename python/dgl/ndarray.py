@@ -171,32 +171,17 @@ class SparseMatrix(ObjectBase):
         return [v.data for v in _CAPI_DGLSparseMatrixGetFlags(self)]
 
     def __getstate__(self):
-        #return self.format, self.num_rows, self.num_cols, self.indices, [0,0]#self.flags
-        #return self.indices
-        #print(len(self.indices))
-        #return [xxxx, yyyy, zzzz]
-        #return [F.zerocopy_from_dgl_ndarray(xxxx), F.zerocopy_from_dgl_ndarray(yyyy), F.zerocopy_from_dgl_ndarray(zzzz)]
-        return [F.zerocopy_from_numpy(xxxx).clone(), F.zerocopy_from_numpy(yyyy).clone(), F.zerocopy_from_numpy(zzzz).clone()]
+        return self.format, self.num_rows, self.num_cols, self.indices, self.flags
 
     def __setstate__(self, state):
-        fmt = state
-        #fmt, nrows, ncols, indices, flags = state
-        #indices = [F.zerocopy_to_dgl_ndarray(idx) for idx in indices]
-        #self.__init_handle_by_constructor__(
-        #    _CAPI_DGLCreateSparseMatrix, fmt, nrows, ncols, indices, flags)
+        fmt, nrows, ncols, indices, flags = state
+        indices = [F.zerocopy_to_dgl_ndarray(idx) for idx in indices]
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLCreateSparseMatrix, fmt, nrows, ncols, indices, flags)
 
     def __repr__(self):
         return 'SparseMatrix(fmt="{}", shape=({},{}))'.format(
             SparseFormat.FORMAT2STR[self.format], self.num_rows, self.num_cols)
-
-import torch
-#xxxx = torch.arange(100000).long()
-#yyyy = torch.arange(100000).long()
-#xxxx = array(_np.arange(100000, dtype=_np.int64))
-#yyyy = array(_np.arange(100000, dtype=_np.int64))
-xxxx = None
-yyyy = None
-zzzz = None
 
 _set_class_ndarray(NDArray)
 _init_api("dgl.ndarray")

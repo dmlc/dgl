@@ -238,13 +238,10 @@ class DGLHeteroGraph(object):
         self._is_multigraph = None
 
     def __getstate__(self):
-        st = self._graph.__getstate__()
-        return st
-        #return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
 
     def __setstate__(self, state):
-        x = state
-        #self._init(*state)
+        self._init(*state)
 
     def _get_msg_index(self, etid):
         """Internal function for getting the message index array of the given edge type id."""
