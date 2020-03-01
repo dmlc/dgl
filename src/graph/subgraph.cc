@@ -18,7 +18,7 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     auto relgraph = graph->GetRelationGraph(etype);
-    if (vids[dst_vtype]->shape[0] == 0) {
+    if (aten::IsNullArray(vids[dst_vtype])) {
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
         relgraph->NumVertexTypes(),
@@ -53,7 +53,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
     auto relgraph = graph->GetRelationGraph(etype);
-    if (vids[src_vtype]->shape[0] == 0) {
+    if (aten::IsNullArray(vids[src_vtype])) {
       // create a placeholder graph
       subrels[etype] = UnitGraph::Empty(
         relgraph->NumVertexTypes(),

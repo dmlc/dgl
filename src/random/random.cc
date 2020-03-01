@@ -31,7 +31,7 @@ DGL_REGISTER_GLOBAL("rng._CAPI_Choice")
     const int bits = args[4];
     CHECK(bits == 32 || bits == 64)
       << "Supported bit widths are 32 and 64, but got " << bits << ".";
-    if (prob->shape[0] == 0) {
+    if (aten::IsNullArray(prob)) {
       if (bits == 32) {
         *rv = RandomEngine::ThreadLocal()->UniformChoice<int32_t>(num, population, replace);
       } else {

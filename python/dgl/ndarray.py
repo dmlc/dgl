@@ -90,6 +90,17 @@ def zerocopy_from_numpy(np_data):
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
+def null():
+    """Return a ndarray representing null value. It can be safely converted
+    to other backend tensors.
+
+    Returns
+    -------
+    NDArray
+        A null array
+    """
+    return array([])
+
 class SparseFormat:
     """Format code"""
     ANY = 0
@@ -145,7 +156,8 @@ class SparseMatrix(ObjectBase):
         -------
         list of ndarrays
         """
-        return list(_CAPI_DGLSparseMatrixGetIndices(self))
+        ret = _CAPI_DGLSparseMatrixGetIndices(self)
+        return [F.zerocopy_from_dgl_ndarray(v.data) for v in ret]
 
     @property
     def flags(self):
@@ -155,18 +167,19 @@ class SparseMatrix(ObjectBase):
         -------
         list of boolean
         """
-        return list(_CAPI_DGLSparseMatrixGetFlags(self))
+        return [v.data for v in _CAPI_DGLSparseMatrixGetFlags(self)]
 
     def __getstate__(self):
         return self.format, self.num_rows, self.num_cols, self.indices, self.flags
 
     def __setstate__(self, state):
         fmt, nrows, ncols, indices, flags = state
+        indices = [F.zerocopy_to_dgl_ndarray(idx) for idx in indices]
         self.__init_handle_by_constructor__(
             _CAPI_DGLCreateSparseMatrix, fmt, nrows, ncols, indices, flags)
 
     def __repr__(self):
-        return 'SparseMatrix(fmt="%s", shape=(%d,%d))' % (
+        return 'SparseMatrix(fmt="{}", shape=({},{}))'.format(
             SparseFormat.FORMAT2STR[self.format], self.num_rows, self.num_cols)
 
 _set_class_ndarray(NDArray)

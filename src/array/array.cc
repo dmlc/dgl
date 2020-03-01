@@ -438,7 +438,7 @@ COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, {
-    if (!prob.defined() || prob->shape[0] == 0) {
+    if (IsNullArray(prob)) {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
@@ -581,7 +581,7 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, {
-    if (!prob.defined() || prob->shape[0] == 0) {
+    if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
