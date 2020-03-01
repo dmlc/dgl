@@ -86,8 +86,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='IP configuration file of kvstore')
         self.add_argument('--total_client', type=int, default=1,
                           help='Total number of client worker nodes')
-        self.add_argument('--partition', type=str, default='metis',
-                          help='partition method')
 
 
 def get_server_data(args, machine_id):
@@ -103,8 +101,7 @@ def get_server_data(args, machine_id):
     args.data_path, 
     args.dataset, 
     args.format, 
-    machine_id,
-    args.partition)
+    machine_id)
 
    # Note that the dataset doesn't ccontain the triple
    print('n_entities: ' + str(dataset.n_entities))

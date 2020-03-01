@@ -162,11 +162,8 @@ def get_dataset(data_path, data_name, format_str):
     return dataset
 
 
-def get_partition_dataset(data_path, data_name, format_str, part_id, part_method):
-    if part_method == 'metis':
-        part_name = os.path.join(data_name, 'part_'+str(part_id))
-    elif part_method == 'random':
-        part_name = os.path.join(data_name, 'rand_part_'+str(part_id))
+def get_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
 
     if data_name == 'Freebase':
         dataset = KGDataset2(data_path, part_name, read_triple=True, only_train=True)
@@ -190,11 +187,8 @@ def get_partition_dataset(data_path, data_name, format_str, part_id, part_method
     return dataset, partition_book, local_to_global
 
 
-def get_server_partition_dataset(data_path, data_name, format_str, part_id, part_method):
-    if part_method == 'metis':
-        part_name = os.path.join(data_name, 'part_'+str(part_id))
-    elif part_method == 'random':
-        part_name = os.path.join(data_name, 'rand_part_'+str(part_id))
+def get_server_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
 
     if data_name == 'Freebase':
         dataset = KGDataset2(data_path, part_name, read_triple=False, only_train=True)

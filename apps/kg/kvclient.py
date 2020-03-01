@@ -134,8 +134,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='IP configuration file of kvstore')
         self.add_argument('--num_client', type=int, default=1,
                           help='Number of client on each machine.')
-        self.add_argument('--partition', type=str, default='metis',
-                          help='partition method')
 
 
 def get_long_tail_partition(n_relations, n_machine):
@@ -203,8 +201,7 @@ def start_worker(args, logger):
         args.data_path,
         args.dataset,
         args.format,
-        args.machine_id,
-        args.partition)
+        args.machine_id)
 
     n_entities = dataset.n_entities
     n_relations = dataset.n_relations
