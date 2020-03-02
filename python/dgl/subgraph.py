@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from .graph import DGLGraph
 from .base import DGLError
 
+DGLSubGraph = DGLGraph
+
 class DGLSubGraph(DGLGraph):
     """The subgraph class.
 
@@ -22,18 +24,12 @@ class DGLSubGraph(DGLGraph):
       (1) Use ``copy_to_parent`` API to write node/edge features back.
       (2) [TODO] Use ``dgl.merge`` to merge multiple subgraphs back to one parent.
 
-    The "shared" mode is currently not supported.
-
-    The subgraph is read-only on structure; graph mutation is not allowed.
-
     Parameters
     ----------
     parent : DGLGraph
         The parent graph
     sgi : SubgraphIndex
         Internal subgraph data structure.
-    shared : bool, optional
-        Whether the subgraph shares node/edge features with the parent graph.
     """
     def __init__(self, parent, sgi, shared=False):
         super(DGLSubGraph, self).__init__(graph_data=sgi.graph,

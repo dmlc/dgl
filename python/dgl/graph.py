@@ -734,6 +734,23 @@ class DGLBaseGraph(object):
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
+
+def mutation(func):
+    def inner(g, *args, **kwargs):
+        if g.is_readonly:
+            raise DGLError("Readonly graph. Mutation is not allowed.")
+        if g.batch_size > 1:
+            raise DGLError("The graph has batch_size > 1, and mutation would break"
+                           " batching related properties, please call `flatten`"
+                           " before mutate on this graph.")
+        if g._parent is not None:
+            raise DGLError("The graph is a subgraph of a parent graph, and mutation"
+                           " would break subgraph related properties, please call"
+                           " `flatten` before mutate on this graph.")
+        func(g, *args, **kwargs)
+    return inner
+
+
 class DGLGraph(DGLBaseGraph):
     """Base graph class.
 
@@ -963,6 +980,7 @@ class DGLGraph(DGLBaseGraph):
     def _set_msg_index(self, index):
         self._msg_index = index
 
+    @mutation
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
 
@@ -1007,9 +1025,6 @@ class DGLGraph(DGLBaseGraph):
                 [1., 1., 1., 1.],
                 [1., 1., 1., 1.]])
         """
-        if self.is_readonly:
-            raise DGLError("Readonly graph. Mutation is not allowed.")
-
         self._graph.add_nodes(num)
         if data is None:
             # Initialize feature placeholders if there are features existing
@@ -1017,6 +1032,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._node_frame.append(data)
 
+    @mutation
     def add_edge(self, u, v, data=None):
         """Add one new edge between u and v.
 
@@ -1064,9 +1080,6 @@ class DGLGraph(DGLBaseGraph):
         --------
         add_edges
         """
-        if self.is_readonly:
-            raise DGLError("Readonly graph. Mutation is not allowed.")
-
         self._graph.add_edge(u, v)
         if data is None:
             # Initialize feature placeholders if there are features existing
@@ -1078,6 +1091,7 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
 
+    @mutation
     def add_edges(self, u, v, data=None):
         """Add multiple edges for list of source nodes u and destination nodes
         v.  A single edge is added between every pair of ``u[i]`` and ``v[i]``.
@@ -1124,9 +1138,6 @@ class DGLGraph(DGLBaseGraph):
         --------
         add_edge
         """
-        if self.is_readonly:
-            raise DGLError("Readonly graph. Mutation is not allowed.")
-
         u = utils.toindex(u)
         v = utils.toindex(v)
         self._graph.add_edges(u, v)
@@ -1142,6 +1153,7 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
+    @mutation
     def remove_nodes(self, vids):
         """Remove multiple nodes, edges that have connection with these nodes would also be removed.
 
@@ -1191,8 +1203,6 @@ class DGLGraph(DGLBaseGraph):
         add_edges
         remove_edges
         """
-        if self.is_readonly:
-            raise DGLError("remove_nodes is not supported by read-only graph.")
         induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
         sgi = self._graph.node_subgraph(induced_nodes)
 
@@ -1208,6 +1218,7 @@ class DGLGraph(DGLBaseGraph):
 
         self._graph = sgi.graph
 
+    @mutation
     def remove_edges(self, eids):
         """Remove multiple edges.
 
@@ -1254,8 +1265,6 @@ class DGLGraph(DGLBaseGraph):
         add_edges
         remove_nodes
         """
-        if self.is_readonly:
-            raise DGLError("remove_edges is not supported by read-only graph.")
         induced_edges = utils.set_diff(
             utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
@@ -1284,6 +1293,8 @@ class DGLGraph(DGLBaseGraph):
         Tensor
             The parent node id array.
         """
+        if self._parent is None:
+            raise DGLError("We only support parent_nid for subgraphs.")
         return self._parent_nid.tousertensor()
 
     def _get_parent_eid(self):
@@ -1307,6 +1318,8 @@ class DGLGraph(DGLBaseGraph):
         Tensor
             The parent edge id array.
         """
+        if self._parent is None:
+            raise DGLError("We only support parent_eid for subgraphs.")
         return self._get_parent_eid().tousertensor()
 
     def copy_to_parent(self, inplace=False):
@@ -1317,6 +1330,8 @@ class DGLGraph(DGLBaseGraph):
         inplace : bool
             If true, use inplace write (no gradient but faster)
         """
+        if self._parent is None:
+            raise DGLError("We only support copy_to_parent for subgraphs.")
         self._parent._node_frame.update_rows(
             self._parent_nid, self._node_frame, inplace=inplace)
         if self._parent._edge_frame.num_rows != 0:
@@ -1328,6 +1343,8 @@ class DGLGraph(DGLBaseGraph):
 
         All old features will be removed.
         """
+        if self._parent is None:
+            raise DGLError("We only support copy_from_parent for subgraphs.")
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             self._node_frame = FrameRef(Frame(
                 self._parent._node_frame[self._parent_nid]))
@@ -1348,8 +1365,24 @@ class DGLGraph(DGLBaseGraph):
         tensor
             The node ID array in the subgraph.
         """
+        if self._parent is None:
+            raise DGLError("We only support map_to_subgraph_nid for subgraphs.")
         v = graph_index.map_to_subgraph_nid(self._subgraph_index, utils.toindex(parent_vids))
         return v.tousertensor()
+
+    def flatten(self):
+        """Remove all batched-graph/subgraphs related features, and regard the
+        current graph as a single graph with no batching information or parent.
+        """
+        # Remove batching information
+        self._batch_size = 1
+        self._batch_num_nodes = None
+        self._batch_num_edges = None
+        # Remove subgraph information
+        self._parent = None
+        self._parent_nid = None
+        self._parent_eid = None
+        self._subgraph_index = None
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -3056,7 +3089,7 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : DGLSubGraph
+        G : DGLGraph
             The subgraph.
             The nodes are relabeled so that node `i` in the subgraph is mapped
             to node `nodes[i]` in the original graph.
@@ -3084,14 +3117,15 @@ class DGLGraph(DGLBaseGraph):
 
         See Also
         --------
-        DGLSubGraph
         subgraphs
         edge_subgraph
         """
-        from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return subgraph.DGLSubGraph(self, sgi)
+        return DGLGraph(graph_data=sgi.graph,
+                        readonly=True,
+                        parent=self,
+                        sgi=sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -3108,18 +3142,19 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : A list of DGLSubGraph
+        G : A list of DGLGraph
             The subgraphs.
 
         See Also
         --------
-        DGLSubGraph
         subgraph
         """
-        from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [subgraph.DGLSubGraph(self, sgi) for sgi in sgis]
+        return [DGLGraph(graph_data=sgi.graph,
+                         readonly=True,
+                         parent=self,
+                         sgi=sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
@@ -3136,7 +3171,7 @@ class DGLGraph(DGLBaseGraph):
 
         Returns
         -------
-        G : DGLSubGraph
+        G : DGLGraph
             The subgraph.
             The edges are relabeled so that edge `i` in the subgraph is mapped
             to edge `edges[i]` in the original graph.
@@ -3173,13 +3208,14 @@ class DGLGraph(DGLBaseGraph):
 
         See Also
         --------
-        DGLSubGraph
         subgraph
         """
-        from . import subgraph
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
-        return subgraph.DGLSubGraph(self, sgi)
+        return DGLGraph(graph_data=sgi.graph,
+                        readonly=True,
+                        parent=self,
+                        sgi=sgi)
 
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
@@ -3636,6 +3672,7 @@ class DGLGraph(DGLBaseGraph):
         yield
         self._node_frame = old_nframe
         self._edge_frame = old_eframe
+
 
 ############################################################
 # Internal APIs
