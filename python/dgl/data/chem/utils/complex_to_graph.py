@@ -124,7 +124,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     ligand_graph = graph((ligand_srcs, ligand_dsts),
                          'ligand_atom', 'ligand', num_ligand_atoms)
     ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.asarray(ligand_dists).astype(np.float32)), (-1, 1))
+        np.asarray(ligand_dists, dtype=np.float32)), (-1, 1))
 
     # Construct graph for atoms in the protein
     protein_srcs, protein_dsts, protein_dists = k_nearest_neighbors(
@@ -132,7 +132,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_graph = graph((protein_srcs, protein_dsts),
                           'protein_atom', 'protein', num_protein_atoms)
     protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.asarray(protein_dists).astype(np.float32)), (-1, 1))
+        np.asarray(protein_dists, dtype=np.float32)), (-1, 1))
 
     # Construct 4 graphs for complex representation, including the connection within
     # protein atoms, the connection within ligand atoms and the connection between
