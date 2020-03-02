@@ -740,13 +740,13 @@ def mutation(func):
         if g.is_readonly:
             raise DGLError("Readonly graph. Mutation is not allowed.")
         if g.batch_size > 1:
-            raise DGLError("The graph has batch_size > 1, and mutation would break"
-                           " batching related properties, please call `flatten`"
-                           " before mutate on this graph.")
+            raise dgl_warning("The graph has batch_size > 1, and mutation would break"
+                              " batching related properties, call `flatten` to remove"
+                              " batching information of the graph.")
         if g._parent is not None:
-            raise DGLError("The graph is a subgraph of a parent graph, and mutation"
-                           " would break subgraph related properties, please call"
-                           " `flatten` before mutate on this graph.")
+            raise dgl_warning("The graph is a subgraph of a parent graph, and mutation"
+                              " would break subgraph related properties, call `detach"
+                              "_parent` to remove its connection with its parent.")
         func(g, *args, **kwargs)
     return inner
 
@@ -1371,14 +1371,19 @@ class DGLGraph(DGLBaseGraph):
         return v.tousertensor()
 
     def flatten(self):
-        """Remove all batched-graph/subgraphs related features, and regard the
-        current graph as a single graph with no batching information or parent.
+        """Remove all batching information of the graph, and regard the current
+        graph as an independent graph rather then a batched graph.
+        Graph topology and attributes would not be influenced.
         """
-        # Remove batching information
         self._batch_size = 1
         self._batch_num_nodes = None
         self._batch_num_edges = None
-        # Remove subgraph information
+
+    def detach_parent(self):
+        """Detach the current graph from its parent, and regard the current graph
+        as an independent graph rather then a subgraph.
+        Graph topology and attributes would not be influenced.
+        """
         self._parent = None
         self._parent_nid = None
         self._parent_eid = None
