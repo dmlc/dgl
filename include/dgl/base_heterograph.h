@@ -637,7 +637,7 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
  *
  * The design principle is to leverage the NDArray class as much as possible so
  * that when they are converted to backend-specific tensors, we could leverage
- * the efficient pickle/unpickle solutios from the backend framework.
+ * the efficient pickle/unpickle solutions from the backend framework.
  *
  * NOTE(minjie): This is a temporary solution before we support shared memory
  *   storage ourselves.

@@ -42,7 +42,7 @@ HeteroSubgraph SampleNeighbors(
     const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
     const int64_t num_nodes = nodes_ntype->shape[0];
     if (num_nodes == 0 || fanouts[etype] == 0) {
-      // Nothing to sample for thie etype, create a placeholder relation graph
+      // Nothing to sample for this etype, create a placeholder relation graph
       subrels[etype] = UnitGraph::Empty(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),
@@ -116,7 +116,7 @@ HeteroSubgraph SampleNeighborsTopk(
     const IdArray nodes_ntype = nodes[(dir == EdgeDir::kOut)? src_vtype : dst_vtype];
     const int64_t num_nodes = nodes_ntype->shape[0];
     if (num_nodes == 0 || k[etype] == 0) {
-      // Nothing to sample for thie etype, create a placeholder relation graph
+      // Nothing to sample for this etype, create a placeholder relation graph
       subrels[etype] = UnitGraph::Empty(
         hg->GetRelationGraph(etype)->NumVertexTypes(),
         hg->NumVertices(src_vtype),

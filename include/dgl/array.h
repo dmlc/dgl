@@ -100,9 +100,7 @@ inline NDArray NullArray() {
  * \return Whether the input array is a null array.
  */
 inline bool IsNullArray(NDArray array) {
-  // Although we recommend using NullArray(), sometimes people like to use
-  // an empty scalar array too.
-  return array->ndim == 0 || array->shape[0] == 0;
+  return array->shape[0] == 0;
 }
 
 /*!
