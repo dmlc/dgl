@@ -6,9 +6,6 @@ script_file=./freebase_transe_l2.sh
 user_name=ubuntu
 ssh_key=~/mctt.pem
 
-# Delete the temp file
-rm *-shape
-
 server_count=$(awk 'NR==1 {print $3}' ip_config.txt)
 machine_count=$(awk 'END{print NR}' ip_config.txt)
 
