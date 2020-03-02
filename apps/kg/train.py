@@ -110,6 +110,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='pickle built graph, building a huge graph is slow.')
         self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
+        self.add_argument('--num_test_proc', type=int, default=1,
+                          help='number of process used for test')
+        self.add_argument('--num_thread', type=int, default=1,
+                          help='number of thread used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
         self.add_argument('--soft_rel_part', action='store_true',

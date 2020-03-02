@@ -287,6 +287,7 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             model_test.save_emb(args.save_emb, args.dataset)
 
         if args.test:
+            args.num_thread = 1
             test_sampler_tails = []
             test_sampler_heads = []
             for i in range(args.num_test_proc):
