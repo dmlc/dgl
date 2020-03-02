@@ -1,6 +1,7 @@
 """Module for graph transformation utilities."""
 
 from collections.abc import Iterable, Mapping
+from collections import defaultdict
 import numpy as np
 from scipy import sparse
 from ._ffi.function import _init_api
@@ -769,16 +770,21 @@ def compact_as_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_su
     computation of message passing.  See [TODO] for a detailed example.
     """
     if rhs_nodes is None:
-        rhs_nodes = []       # C API will find dst nodes by its own.
+        # Find all nodes that appeared as destinations
+        rhs_nodes = defaultdict(list)
+        for etype in graph.canonical_etypes:
+            _, dst = graph.edges(etype=etype)
+            rhs_nodes[etype[2]].append(dst)
+        rhs_nodes = {ntype: F.unique(F.cat(values, 0)) for ntype, values in rhs_nodes.items()}
     elif not isinstance(rhs_nodes, Mapping):
         # rhs_nodes is a Tensor, check if the graph has only one type.
         if len(graph.ntypes) > 1:
             raise ValueError(
                 'Graph has more than one node type; please specify a dict for rhs_nodes.')
-        rhs_nodes = [rhs_nodes]
-    else:
-        # rhs_nodes is a dict
-        rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in graph.ntypes]
+        rhs_nodes = {graph.ntypes[0]: rhs_nodes}
+
+    # rhs_nodes is now a dict
+    rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in graph.ntypes]
     rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(nodes) for nodes in rhs_nodes]
 
     new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBipartite(

@@ -37,31 +37,24 @@ ToBipartite(
   const int64_t num_ntypes = graph->NumVertexTypes();
   std::vector<EdgeArray> edge_arrays;
 
-  if (rhs_nodes.size() > 0) {
-    for (const IdArray &nodes : rhs_nodes)
-      rhs_node_mappings.emplace_back(nodes);
+  CHECK(rhs_nodes.size() == static_cast<size_t>(num_ntypes))
+    << "rhs_nodes not given for every node type";
 
-    if (include_rhs_in_lhs)
-      lhs_node_mappings = rhs_node_mappings;    // copy
+  for (const IdArray &nodes : rhs_nodes)
+    rhs_node_mappings.emplace_back(nodes);
 
-    for (int64_t etype = 0; etype < num_etypes; ++etype) {
-      const auto src_dst_types = graph->GetEndpointTypes(etype);
-      const dgl_type_t srctype = src_dst_types.first;
-      const dgl_type_t dsttype = src_dst_types.second;
-      const EdgeArray edges = graph->InEdges(etype, rhs_nodes[dsttype]);
-      lhs_node_mappings[srctype].Update(edges.src);
-      edge_arrays.push_back(edges);
-    }
-  } else {
-    rhs_node_mappings.resize(num_ntypes);
+  if (include_rhs_in_lhs)
+    lhs_node_mappings = rhs_node_mappings;    // copy
+  else
     lhs_node_mappings.resize(num_ntypes);
 
-    for (int64_t etype = 0; etype < num_etypes; ++etype) {
-      const auto srctype = graph->GetEndpointTypes(etype).first;
-      const EdgeArray edges = graph->Edges(etype, "eid");
-      lhs_node_mappings[srctype].Update(edges.src);
-      edge_arrays.push_back(edges);
-    }
+  for (int64_t etype = 0; etype < num_etypes; ++etype) {
+    const auto src_dst_types = graph->GetEndpointTypes(etype);
+    const dgl_type_t srctype = src_dst_types.first;
+    const dgl_type_t dsttype = src_dst_types.second;
+    const EdgeArray edges = graph->InEdges(etype, rhs_nodes[dsttype]);
+    lhs_node_mappings[srctype].Update(edges.src);
+    edge_arrays.push_back(edges);
   }
 
   const auto meta_graph = graph->meta_graph();
