@@ -21,7 +21,7 @@ do
     ip=$(awk 'NR=='$LINE_LOW' {print $1}' ip_config.txt)
     let LINE_LOW+=1
     let s_id+=1
-    echo yes | ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' ' &
+    ssh -i $ssh_key $user_name@$ip 'cd '$script_path'; '$script_file' '$s_id' '$server_count' ' &
 done
 
 # run command on local machine
