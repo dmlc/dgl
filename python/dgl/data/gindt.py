@@ -194,7 +194,7 @@ class GINDataset(object):
                 else:
                     nattrs = None
 
-                g.ndata['label'] = np.array(nlabels)
+                g.ndata['label'] = np.asarray(nlabels)
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
