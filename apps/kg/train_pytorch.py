@@ -226,8 +226,8 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
     client.barrier()
     train_time_start = time.time()
     train(args, model, train_sampler, None, rank, rel_parts, cross_rels, barrier, client)
-    print('Total train time {:.3f} seconds'.format(time.time() - train_time_start))
     client.barrier()
+    print('Total train time {:.3f} seconds'.format(time.time() - train_time_start))
 
     model = None
 
