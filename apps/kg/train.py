@@ -186,7 +186,7 @@ def run(args, logger):
             args.num_thread = 4
         else:
             # CPU training
-            args.num_thread = mp.cpu_count() // args.num_proc + 1
+            args.num_thread = 1
     else:
         args.num_thread = args.nomp_thread_per_process
 
