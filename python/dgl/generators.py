@@ -1,5 +1,6 @@
 """Module for various graph generator functions."""
 
+from . import backend as F
 from . import convert
 from . import random
 
@@ -27,7 +28,9 @@ def rand_graph(num_nodes, num_edges, restrict_format='any'):
         Generated random graph.
     """
     eids = random.choice(num_nodes * num_nodes, num_edges, replace=False)
-    g = convert.graph((eids / num_nodes, eids % num_nodes),
+    rows = F.astype(eids / num_nodes, F.dtype(eids))
+    cols = F.astype(eids % num_nodes, F.dtype(eids))
+    g = convert.graph((rows, cols),
                       card=num_nodes, validate=False,
                       restrict_format=restrict_format)
     return g
