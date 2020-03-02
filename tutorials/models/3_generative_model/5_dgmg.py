@@ -798,9 +798,8 @@ print('Among 100 graphs generated, {}% are valid.'.format(num_valid))
 # <http://docs.dgl.ai/tutorials/models/3_tree-lstm.html#sphx-glr-tutorials-models-3-tree-lstm-py>`__
 # , and it is worth explaining one more time why this is so.
 #
-# By batching many small graphs, DGL internally maintains a large *container*
-# graph (``BatchedDGLGraph``) over which ``update_all`` propels message-passing
-# on all the edges and nodes.
+# By batching many small graphs, DGL parallels message passing on each individual
+# graphs of a batch.
 #
 # With ``dgl.batch``, you merge ``g_{1}, ..., g_{N}`` into one single giant
 # graph consisting of :math:`N` isolated small graphs. For example, if we
@@ -833,7 +832,7 @@ print('Among 100 graphs generated, {}% are valid.'.format(num_valid))
 # internally groups nodes with the same in-degrees and calls reduce UDF once
 # for each group. Thus, batching also reduces number of calls to these UDFs.
 #
-# The modification of the node/edge features of a ``BatchedDGLGraph`` object
+# The modification of the node/edge features of the batched graph object
 # does not take effect on the features of the original small graphs, so we
 # need to replace the old graph list with the new graph list
 # ``g_list = dgl.unbatch(bg)``.
