@@ -63,7 +63,7 @@ void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out, 
     for (IdxType i = 0; i < num; ++i)
       out[i] = RandInt(population);
   } else {
-    if (num < population / 10) {
+    if (num < population / 10) {  // TODO(minjie): may need a better threshold here
       // use hash set
       // In the best scenario, time complexity is O(num), i.e., no conflict.
       //
