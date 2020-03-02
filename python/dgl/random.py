@@ -51,7 +51,9 @@ def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
         population = a
 
     if prob is None:
-        prob = nd.array([], ctx=nd.cpu())
+        prob = nd.null()
+    else:
+        prob = F.zerocopy_to_dgl_ndarray(prob)
 
     bits = 64  # index array is in 64-bit
     chosen_idx = _CAPI_Choice(int(num), int(population), prob, bool(replace), bits)
