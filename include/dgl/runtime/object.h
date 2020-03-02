@@ -63,7 +63,7 @@ class Object {
    */
   virtual void VisitAttrs(AttrVisitor* visitor) {}
   /*! \return the type index of the object */
-  virtual const uint32_t type_index() const = 0;
+  virtual uint32_t type_index() const = 0;
   /*!
    * \brief Whether this object derives from object with type_index=tid.
    *  Implemented by DGL_DECLARE_OBJECT_TYPE_INFO
@@ -71,7 +71,7 @@ class Object {
    * \param tid The type index.
    * \return the check result.
    */
-  virtual const bool _DerivedFrom(uint32_t tid) const;
+  virtual bool _DerivedFrom(uint32_t tid) const;
   /*!
    * \brief get a runtime unique type index given a type key
    * \param type_key Type key of a type.
@@ -211,11 +211,11 @@ class ObjectRef {
   const char* type_key() const final {                                  \
     return TypeName::_type_key;                                         \
   }                                                                     \
-  const uint32_t type_index() const final {                             \
+  uint32_t type_index() const final {                                   \
     static uint32_t tidx = TypeKey2Index(TypeName::_type_key);          \
     return tidx;                                                        \
   }                                                                     \
-  const bool _DerivedFrom(uint32_t tid) const final {                   \
+  bool _DerivedFrom(uint32_t tid) const final {                         \
     static uint32_t tidx = TypeKey2Index(TypeName::_type_key);          \
     if (tidx == tid) return true;                                       \
     return Parent::_DerivedFrom(tid);                                   \
@@ -235,14 +235,14 @@ class ObjectRef {
     return CHECK_NOTNULL(std::dynamic_pointer_cast<ObjectName>(obj_));           \
   }                                                                              \
   operator bool() const { return this->defined(); }                              \
-  using ContainerType = ObjectName;
+  using ContainerType = ObjectName
 
 /*! \brief Macro to generate object reference class definition */
 #define DGL_DEFINE_OBJECT_REF(TypeName, ObjectName)                                  \
   class TypeName : public ::dgl::runtime::ObjectRef {                                \
    public:                                                                           \
     DGL_DEFINE_OBJECT_REF_METHODS(TypeName, ::dgl::runtime::ObjectRef, ObjectName);  \
-  };
+  }
 
 // implementations of inline functions after this
 template<typename T>

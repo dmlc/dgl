@@ -137,7 +137,7 @@ TEST(RowwiseTest, TestCSRSampling) {
 template <typename Idx, typename FloatType>
 void _TestCSRSamplingUniform(bool has_data) {
   auto mat = CSR<Idx>(has_data);
-  FloatArray prob;
+  FloatArray prob = aten::NullArray();
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = CSRRowWiseSampling(mat, rows, 2, prob, true);
@@ -229,7 +229,7 @@ TEST(RowwiseTest, TestCOOSampling) {
 template <typename Idx, typename FloatType>
 void _TestCOOSamplingUniform(bool has_data) {
   auto mat = COO<Idx>(has_data);
-  FloatArray prob;
+  FloatArray prob = aten::NullArray();
   IdArray rows = NDArray::FromVector(std::vector<Idx>({0, 3}));
   for (int k = 0; k < 10; ++k) {
     auto rst = COORowWiseSampling(mat, rows, 2, prob, true);
