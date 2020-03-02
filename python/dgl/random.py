@@ -18,7 +18,26 @@ def seed(val):
     _CAPI_SetSeed(val)
 
 def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
-    """An equivalent to :func:`numpy.random.choice` but with more efficient implementation.
+    """An equivalent to :func:`numpy.random.choice`.
+
+    Use this function if you:
+
+    * Perform a non-uniform sampling (probability tensor is given).
+    * Sample a small set from a very large population (ratio <5%) uniformly
+      *without* replacement.
+    * Have a backend tensor on hand and does not want to convert it to numpy
+      back and forth.
+
+    Compared to :func:`numpy.random.choice`, it is slower when replace is True
+    and is comparable when replace is False. It wins when the population is
+    very large and the number of draws are quite small (e.g., draw <5%). The
+    reasons are two folds:
+
+    * When ``a`` is a large integer, it avoids creating a large range array as
+      numpy does.
+    * When draw ratio is small, it switches to a hashmap based implementation.
+
+    It out-performs numpy for non-uniform sampling in general cases.
 
     TODO(minjie): support RNG as one of the arguments.
 

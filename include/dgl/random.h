@@ -122,7 +122,7 @@ class RandomEngine {
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType, typename FloatType>
-  void Choice(int64_t num, FloatArray prob, IdxType* out, bool replace = true);
+  void Choice(IdxType num, FloatArray prob, IdxType* out, bool replace = true);
 
   /*!
    * \brief Pick random integers between 0 to N-1 according to given probabilities
@@ -156,7 +156,7 @@ class RandomEngine {
    * \param replace If true, choose with replacement.
    */
   template <typename IdxType>
-  void UniformChoice(int64_t num, int64_t population, IdxType* out, bool replace = true);
+  void UniformChoice(IdxType num, IdxType population, IdxType* out, bool replace = true);
 
   /*!
    * \brief Pick random integers from population by uniform distribution.
@@ -170,7 +170,7 @@ class RandomEngine {
    * \return Picked indices
    */
   template <typename IdxType>
-  IdArray UniformChoice(int64_t num, int64_t population, bool replace = true) {
+  IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     // TODO(minjie): only CPU implementation right now
     IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
