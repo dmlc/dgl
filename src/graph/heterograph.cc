@@ -534,7 +534,7 @@ bool HeteroGraph::Load(dmlc::Stream* fs) {
   CHECK_EQ(magicNum, kDGLSerialize_HeteroGraph) << "Invalid HeteroGraph Data";
   auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
   CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
-  meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+  meta_graph_ = meta_imgraph;
   CHECK(fs->Read(&relation_graphs_)) << "Invalid relation_graphs_";
   CHECK(fs->Read(&num_verts_per_type_)) << "Invalid num_verts_per_type_";
   return true;

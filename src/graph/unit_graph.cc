@@ -388,7 +388,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
   bool Load(dmlc::Stream* fs) {
     auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
     CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
-    meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+    meta_graph_ = meta_imgraph;
     CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
     return true;
   }
@@ -428,7 +428,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
         << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst, IdArray indptr,
@@ -440,12 +439,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
         << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
       : BaseHeteroGraph(metagraph), adj_(csr) {
-    sorted_ = false;
   }
 
   inline dgl_type_t SrcType() const { return 0; }
@@ -726,15 +723,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   bool Load(dmlc::Stream* fs) {
     auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
     CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
-    meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
-    CHECK(fs->Read(&sorted_)) << "Invalid boolean for sorted_";
+    meta_graph_ = meta_imgraph;
     CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
     return true;
   }
   void Save(dmlc::Stream* fs) const {
     auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
     fs->Write(meta_graph_ptr);
-    fs->Write(sorted_);
     fs->Write(adj_);
   }
 
@@ -749,8 +744,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
 
-  /*! \brief indicate that the edges are stored in the sorted order. */
-  bool sorted_;
 };
 
 //////////////////////////////////////////////////////////
@@ -1240,7 +1233,7 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
 
   auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
   CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
-  meta_graph_ = std::dynamic_pointer_cast<GraphInterface>(meta_imgraph);
+  meta_graph_ = meta_imgraph;
 
   int64_t format_code;
   CHECK(fs->Read(&format_code)) << "Invalid format";
@@ -1261,7 +1254,6 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
       break;
   }
 
-  CHECK(fs->Read(&out_csr_)) << "Invalid out csr matrix";
   return true;
 }
 
@@ -1275,7 +1267,7 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(meta_graph_ptr);
   auto avail_fmt = SelectFormat(SparseFormat::ANY);
   fs->Write(static_cast<int64_t>(avail_fmt));
-  switch (restrict_format_) {
+  switch (avail_fmt) {
     case SparseFormat::COO:
       fs->Write(GetCOO());
       break;
@@ -1289,8 +1281,6 @@ void UnitGraph::Save(dmlc::Stream* fs) const {
       LOG(FATAL) << "unsupported format code";
       break;
   }
-
-  fs->Write(out_csr_);
 }
 
 }  // namespace dgl
