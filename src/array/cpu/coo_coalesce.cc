@@ -40,7 +40,7 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
 
   COOMatrix coo_result = COOMatrix{
       coo.num_rows, coo.num_cols, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-      NDArray(), true};
+      NullArray(), true};
   return std::make_pair(coo_result, NDArray::FromVector(count));
 }
 

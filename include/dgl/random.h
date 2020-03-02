@@ -118,11 +118,45 @@ class RandomEngine {
    * \tparam FloatType Probability value type
    * \param num Number of integers to choose
    * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
+   * \param out The output buffer to write selected indices.
    * \param replace If true, choose with replacement.
-   * \return Integer array
    */
   template <typename IdxType, typename FloatType>
-  IdArray Choice(int64_t num, FloatArray prob, bool replace = true);
+  void Choice(IdxType num, FloatArray prob, IdxType* out, bool replace = true);
+
+  /*!
+   * \brief Pick random integers between 0 to N-1 according to given probabilities
+   * 
+   * If replace is false, the number of picked integers must not larger than N.
+   *
+   * \tparam IdxType Id type
+   * \tparam FloatType Probability value type
+   * \param num Number of integers to choose
+   * \param prob Array of N unnormalized probability of each element.  Must be non-negative.
+   * \param replace If true, choose with replacement.
+   * \return Picked indices
+   */
+  template <typename IdxType, typename FloatType>
+  IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
+    const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
+    IdArray ret = IdArray::Empty({num}, dtype, prob->ctx);
+    Choice<IdxType, FloatType>(num, prob, static_cast<IdxType*>(ret->data), replace);
+    return ret;
+  }
+
+  /*!
+   * \brief Pick random integers from population by uniform distribution.
+   *
+   * If replace is false, num must not be larger than population.
+   *
+   * \tparam IdxType Return integer type
+   * \param num Number of integers to choose
+   * \param population Total number of elements to choose from.
+   * \param out The output buffer to write selected indices.
+   * \param replace If true, choose with replacement.
+   */
+  template <typename IdxType>
+  void UniformChoice(IdxType num, IdxType population, IdxType* out, bool replace = true);
 
   /*!
    * \brief Pick random integers from population by uniform distribution.
@@ -133,10 +167,16 @@ class RandomEngine {
    * \param num Number of integers to choose
    * \param population Total number of elements to choose from.
    * \param replace If true, choose with replacement.
-   * \return Integer array
+   * \return Picked indices
    */
   template <typename IdxType>
-  IdArray UniformChoice(int64_t num, int64_t population, bool replace = true);
+  IdArray UniformChoice(IdxType num, IdxType population, bool replace = true) {
+    const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
+    // TODO(minjie): only CPU implementation right now
+    IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
+    UniformChoice<IdxType>(num, population, static_cast<IdxType*>(ret->data), replace);
+    return ret;
+  }
 
  private:
   std::default_random_engine rng_;

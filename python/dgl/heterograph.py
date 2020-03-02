@@ -183,12 +183,6 @@ class DGLHeteroGraph(object):
         Edge feature storage. If None, empty frame is created.
         Otherwise, ``edge_frames[i]`` stores the edge features
         of edge type i. (default: None)
-    multigraph : bool, optional
-        Whether the graph would be a multigraph. If none, the flag will be
-        determined by scanning the whole graph. (default: None)
-    readonly : bool, optional
-        Whether the graph structure is read-only. Currently, only readonly
-        is allowed. (default: True).
     """
     # pylint: disable=unused-argument
     def __init__(self,
@@ -196,25 +190,26 @@ class DGLHeteroGraph(object):
                  ntypes,
                  etypes,
                  node_frames=None,
-                 edge_frames=None,
-                 multigraph=None,
-                 readonly=True):
-        assert readonly, "Only readonly heterogeneous graphs are supported"
+                 edge_frames=None):
+        self._init(gidx, ntypes, etypes, node_frames, edge_frames)
 
+    def _init(self, gidx, ntypes, etypes, node_frames, edge_frames):
+        """Init internal states."""
         self._graph = gidx
-        self._nx_metagraph = None
         self._ntypes = ntypes
         self._etypes = etypes
-        self._canonical_etypes = make_canonical_etypes(etypes, ntypes, self._graph.metagraph)
+        self._nx_metagraph = None
+        self._canonical_etypes = make_canonical_etypes(
+            self._etypes, self._ntypes, self._graph.metagraph)
         # An internal map from etype to canonical etype tuple.
         # If two etypes have the same name, an empty tuple is stored instead to indicte ambiguity.
         self._etype2canonical = {}
-        for i, ety in enumerate(etypes):
+        for i, ety in enumerate(self._etypes):
             if ety in self._etype2canonical:
                 self._etype2canonical[ety] = tuple()
             else:
                 self._etype2canonical[ety] = self._canonical_etypes[i]
-        self._ntypes_invmap = {t : i for i, t in enumerate(ntypes)}
+        self._ntypes_invmap = {t : i for i, t in enumerate(self._ntypes)}
         self._etypes_invmap = {t : i for i, t in enumerate(self._canonical_etypes)}
 
         # node and edge frame
@@ -240,9 +235,16 @@ class DGLHeteroGraph(object):
             frame.set_initializer(init.zero_initializer)
             self._msg_frames.append(frame)
 
-        self._is_multigraph = multigraph
+        self._is_multigraph = None
+
+    def __getstate__(self):
+        return self._graph, self._ntypes, self._etypes, self._node_frames, self._edge_frames
+
+    def __setstate__(self, state):
+        self._init(*state)
 
     def _get_msg_index(self, etid):
+        """Internal function for getting the message index array of the given edge type id."""
         if self._msg_indices[etid] is None:
             self._msg_indices[etid] = utils.zero_index(
                 size=self._graph.number_of_edges(etid))

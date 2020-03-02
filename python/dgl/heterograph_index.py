@@ -25,27 +25,11 @@ class HeteroGraphIndex(ObjectBase):
         return obj
 
     def __getstate__(self):
-        metagraph = self.metagraph
-        number_of_nodes = [self.number_of_nodes(i) for i in range(self.number_of_ntypes())]
-        edges = [self.edges(i, order='eid') for i in range(self.number_of_etypes())]
-        # multigraph and readonly are not used.
-        return metagraph, number_of_nodes, edges
+        return _CAPI_DGLHeteroPickle(self)
 
     def __setstate__(self, state):
-        metagraph, number_of_nodes, edges = state
-
         self._cache = {}
-        # loop over etypes and recover unit graphs
-        rel_graphs = []
-        for i, edges_per_type in enumerate(edges):
-            src_ntype, dst_ntype = metagraph.find_edge(i)
-            num_src = number_of_nodes[src_ntype]
-            num_dst = number_of_nodes[dst_ntype]
-            src_id, dst_id, _ = edges_per_type
-            rel_graphs.append(create_unitgraph_from_coo(
-                1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id, 'any'))
-        self.__init_handle_by_constructor__(
-            _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
+        self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
 
     @property
     def metagraph(self):
@@ -1079,8 +1063,45 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     return _CAPI_DGLHeteroDisjointPartitionBySizes(
         graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
 
+#################################################################
+# Data structure used by C APIs
+#################################################################
+
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
     """FlattenedHeteroGraph object class in C++ backend."""
+
+@register_object("graph.HeteroPickleStates")
+class HeteroPickleStates(ObjectBase):
+    """Pickle states object class in C++ backend."""
+    @property
+    def metagraph(self):
+        """Metagraph
+
+        Returns
+        -------
+        GraphIndex
+            Metagraph structure
+        """
+        return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
+
+    @property
+    def adjs(self):
+        """Adjacency matrices of all the relation graphs
+
+        Returns
+        -------
+        list of dgl.ndarray.SparseMatrix
+            Adjacency matrices
+        """
+        return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
+
+    def __getstate__(self):
+        return self.metagraph, self.adjs
+
+    def __setstate__(self, state):
+        metagraph, adjs = state
+        self.__init_handle_by_constructor__(
+            _CAPI_DGLCreateHeteroPickleStates, metagraph, adjs)
 
 _init_api("dgl.heterograph_index")
