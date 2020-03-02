@@ -137,7 +137,7 @@ class RandomEngine {
    * \return Picked indices
    */
   template <typename IdxType, typename FloatType>
-  IdArray Choice(int64_t num, FloatArray prob, bool replace = true) {
+  IdArray Choice(IdxType num, FloatArray prob, bool replace = true) {
     const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
     IdArray ret = IdArray::Empty({num}, dtype, prob->ctx);
     Choice<IdxType, FloatType>(num, prob, static_cast<IdxType*>(ret->data), replace);
