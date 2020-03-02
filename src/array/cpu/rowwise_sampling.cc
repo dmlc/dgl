@@ -66,6 +66,7 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
 template <DLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  CHECK(prob.defined());
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
@@ -96,6 +97,7 @@ template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
 template <DLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  CHECK(prob.defined());
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
