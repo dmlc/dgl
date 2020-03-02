@@ -3,9 +3,9 @@
  * \file graph/pickle.cc
  * \brief Functions for pickle and unpickle a graph
  */
-#include "./heterograph.h"
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include "./heterograph.h"
 #include "../c_api_common.h"
 
 using namespace dgl::runtime;
