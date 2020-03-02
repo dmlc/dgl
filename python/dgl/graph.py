@@ -1651,6 +1651,16 @@ class DGLGraph(DGLBaseGraph):
         return self.nodes[:].data
 
     @property
+    def sdata(self):
+        """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
+        return self.ndata
+
+    @property
+    def ddata(self):
+        """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
+        return self.ndata
+
+    @property
     def edges(self):
         """Return a edges view that can used to set/get feature data.
 
