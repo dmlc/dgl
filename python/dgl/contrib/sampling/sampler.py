@@ -13,6 +13,8 @@ from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
 from ... import subgraph
+from ...graph import DGLGraph
+from ...base import NID, EID
 
 try:
     import Queue as queue
@@ -431,13 +433,17 @@ class LayerSampler(NodeFlowSampler):
         nflows = [NodeFlow(self.g, obj) for obj in nfobjs]
         return nflows
 
-class EdgeSubgraph(subgraph.DGLSubGraph):
+class EdgeSubgraph(DGLGraph):
     ''' The subgraph sampled from an edge sampler.
 
     A user can access the head nodes and tail nodes of the subgraph directly.
     '''
     def __init__(self, parent, sgi, neg):
-        super(EdgeSubgraph, self).__init__(parent, sgi)
+        super(EdgeSubgraph, self).__init__(graph_data=sgi.graph,
+                                           readonly=True,
+                                           parent=parent)
+        self.ndata[NID] = sgi.induced_nodes.tousertensor()
+        self.edata[EID] = sgi.induced_edges.tousertensor()
         self.sgi = sgi
         self.neg = neg
         self.head = None
@@ -735,7 +741,9 @@ class EdgeSampler(object):
 
         if self._negative_mode == "":
             # If no negative subgraphs.
-            return [subgraph.DGLSubGraph(self.g, subg) for subg in subgs]
+            return [self.g._create_subgraph(subg,
+                                            subg.induced_nodes,
+                                            subg.induced_edges) for subg in subgs]
         else:
             rets = []
             assert len(subgs) % 2 == 0

@@ -549,7 +549,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
         inner_edge = _get_halo_subgraph_inner_edge(subg)
-        subg = DGLSubGraph(g, subg)
+        subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
         inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
