@@ -1284,9 +1284,6 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
 
 // Using Out CSR
 void UnitGraph::Save(dmlc::Stream* fs) const {
-  // Following CreateFromCSR signature
-  // Make out_csr prepared
-  aten::CSRMatrix csr_matrix = GetCSRMatrix(0);
   fs->Write(kDGLSerialize_UnitGraphMagic);
   auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
   fs->Write(meta_graph_ptr);
