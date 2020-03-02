@@ -743,7 +743,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
 
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
-
 };
 
 //////////////////////////////////////////////////////////
