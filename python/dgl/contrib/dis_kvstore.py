@@ -72,7 +72,7 @@ def read_ip_config(filename):
                 server_id += 1
             machine_id += 1
     except:
-        print("Error: data format on each line should be: [machine_id] [ip] [base_port] [server_count]")
+        print("Error: data format on each line should be: [ip] [base_port] [server_count]")
 
     return server_namebook
 

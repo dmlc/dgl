@@ -23,6 +23,7 @@ from .batched_graph import *
 from .batched_heterograph import *
 from .convert import *
 from .graph import DGLGraph
+from .generators import *
 from .heterograph import DGLHeteroGraph
 from .nodeflow import *
 from .traversal import *
