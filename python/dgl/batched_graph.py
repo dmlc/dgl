@@ -11,63 +11,13 @@ from . import graph_index as gi
 from . import backend as F
 from . import utils
 
-__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
+__all__ = ['BatchedDGLGraph', 'batch', 'unbatch',
            'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
            'max_nodes', 'max_edges', 'softmax_nodes', 'softmax_edges',
            'broadcast_nodes', 'broadcast_edges', 'topk_nodes', 'topk_edges']
 
 BatchedDGLGraph = DGLGraph
 
-def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
-    """Split the batch."""
-    # TODO(minjie): could follow torch.split syntax
-    raise NotImplementedError
-
-def unbatch(graph):
-    """Return the list of graphs in this batch.
-
-    Parameters
-    ----------
-    graph : BatchedDGLGraph
-        The batched graph.
-
-    Returns
-    -------
-    list
-        A list of :class:`~dgl.DGLGraph` objects whose attributes are obtained
-        by partitioning the attributes of the :attr:`graph`. The length of the
-        list is the same as the batch size of :attr:`graph`.
-
-    Notes
-    -----
-    Unbatching will break each field tensor of the batched graph into smaller
-    partitions.
-
-    For simpler tasks such as node/edge state aggregation, try to use
-    readout functions.
-
-    See Also
-    --------
-    batch
-    """
-    bsize = graph.batch_size
-    bnn = graph.batch_num_nodes
-    bne = graph.batch_num_edges
-    pttns = gi.disjoint_partition(graph._graph, utils.toindex(bnn))
-    # split the frames
-    node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
-    edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
-    for attr, col in graph._node_frame.items():
-        col_splits = F.split(col, bnn, dim=0)
-        for i in range(bsize):
-            node_frames[i][attr] = col_splits[i]
-    for attr, col in graph._edge_frame.items():
-        col_splits = F.split(col, bne, dim=0)
-        for i in range(bsize):
-            edge_frames[i][attr] = col_splits[i]
-    return [DGLGraph(graph_data=pttns[i],
-                     node_frame=node_frames[i],
-                     edge_frame=edge_frames[i]) for i in range(bsize)]
 
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     """Batch a collection of :class:`~dgl.DGLGraph` and return a
@@ -94,32 +44,47 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     --------
     unbatch
     """
-
-    def _get_num_item_and_attr_types(g, mode):
-        if mode == 'node':
-            num_items = g.number_of_nodes()
-            attr_types = set(g.node_attr_schemes().keys())
-        elif mode == 'edge':
-            num_items = g.number_of_edges()
-            attr_types = set(g.edge_attr_schemes().keys())
-        return num_items, attr_types
+    if len(graph_list) == 1:
+        return graph_list[0]
 
     def _init_attrs(attrs, mode):
+        """Collect attributes of given mode (node/edge) from graph_list.
+
+        Parameters
+        ----------
+        attrs: None or ALL or str or iterator
+            The attributes to collect. If ALL, check if all graphs have the same
+            attribute set and return the attribute set. If None, return an empty
+            list. If it is a string or a iterator of string, return these
+            attributes.
+        mode: str
+            Suggest to collect node attributes or edge attributes.
+
+        Returns
+        -------
+        Iterable
+            The obtained attribute set.
+        """
+        if mode == 'node':
+            nitems_list = [g.number_of_nodes() for g in graph_list]
+            attrs_list = [set(g.node_attr_schemes().keys()) for g in graph_list]
+        else:
+            nitems_list = [g.number_of_edges() for g in graph_list]
+            attrs_list = [set(g.edge_attr_schemes().keys()) for g in graph_list]
+
         if attrs is None:
             return []
         elif is_all(attrs):
             attrs = set()
             # Check if at least a graph has mode items and associated features.
-            for i, g in enumerate(graph_list):
-                g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
+            for i, (g_num_items, g_attrs) in enumerate(zip(nitems_list, attrs_list)):
                 if g_num_items > 0 and len(g_attrs) > 0:
                     attrs = g_attrs
                     ref_g_index = i
                     break
             # Check if all the graphs with mode items have the same associated features.
             if len(attrs) > 0:
-                for i, g in enumerate(graph_list):
-                    g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
+                for i, (g_num_items, g_attrs) in enumerate(zip(nitems_list, attrs_list)):
                     if g_attrs != attrs and g_num_items > 0:
                         raise ValueError('Expect graph {0} and {1} to have the same {2} '
                                          'attributes when {2}_attrs=ALL, got {3} and {4}.'
@@ -170,6 +135,55 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
                     edge_frame=batched_edge_frame,
                     batch_num_nodes=batch_num_nodes,
                     batch_num_edges=batch_num_edges)
+
+def unbatch(graph):
+    """Return the list of graphs in this batch.
+
+    Parameters
+    ----------
+    graph : BatchedDGLGraph
+        The batched graph.
+
+    Returns
+    -------
+    list
+        A list of :class:`~dgl.DGLGraph` objects whose attributes are obtained
+        by partitioning the attributes of the :attr:`graph`. The length of the
+        list is the same as the batch size of :attr:`graph`.
+
+    Notes
+    -----
+    Unbatching will break each field tensor of the batched graph into smaller
+    partitions.
+
+    For simpler tasks such as node/edge state aggregation, try to use
+    readout functions.
+
+    See Also
+    --------
+    batch
+    """
+    if graph.batch_size == 1:
+        return [graph]
+
+    bsize = graph.batch_size
+    bnn = graph.batch_num_nodes
+    bne = graph.batch_num_edges
+    pttns = gi.disjoint_partition(graph._graph, utils.toindex(bnn))
+    # split the frames
+    node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
+    edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
+    for attr, col in graph._node_frame.items():
+        col_splits = F.split(col, bnn, dim=0)
+        for i in range(bsize):
+            node_frames[i][attr] = col_splits[i]
+    for attr, col in graph._edge_frame.items():
+        col_splits = F.split(col, bne, dim=0)
+        for i in range(bsize):
+            edge_frames[i][attr] = col_splits[i]
+    return [DGLGraph(graph_data=pttns[i],
+                     node_frame=node_frames[i],
+                     edge_frame=edge_frames[i]) for i in range(bsize)]
 
 
 READOUT_ON_ATTRS = {
