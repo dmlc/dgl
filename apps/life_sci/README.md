@@ -10,6 +10,8 @@ with graph neural networks.
 We provide various functionalities, including but not limited to methods for graph construction, 
 featurization, and evaluation, model architectures, training scripts and pre-trained models.
 
+**For a full list of work implemented in DGL-LifeSci, see [here](examples/README.md).**
+
 ## Dependencies
 
 For the time being, we only support PyTorch.
@@ -19,13 +21,11 @@ Depending on the features you want to use, you may need to manually install the 
 - RDKit 2018.09.3
     - We recommend installation with `conda install -c conda-forge rdkit==2018.09.3`. For other installation recipes,
     see the [official documentation](https://www.rdkit.org/docs/Install.html).
-- MDTraj
+- (optional) MDTraj
     - We recommend installation with `conda install -c conda-forge mdtraj`. For alternative ways of installation, 
     see the [official documentation](http://mdtraj.org/1.9.3/installation.html).
 
 ## Organization
-
-For a full list of work implemented in DGL-LifeSci, **see implemented.md**.
 
 ```
 dgllife

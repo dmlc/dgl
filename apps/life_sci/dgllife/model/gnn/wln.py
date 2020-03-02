@@ -37,7 +37,7 @@ class WLN(nn.Module):
     """Weisfeiler-Lehman Network (WLN)
 
     WLN is introduced in `Predicting Organic Reaction Outcomes with
-    Weisfeiler-Lehman Network`__.
+    Weisfeiler-Lehman Network <https://arxiv.org/abs/1709.04555>`__.
 
     This class performs message passing and updates node representations.
 

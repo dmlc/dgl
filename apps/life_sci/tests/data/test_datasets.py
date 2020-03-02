@@ -1,6 +1,7 @@
 import os
 
 from dgllife.data import *
+from dgllife.utils import mol_to_bigraph
 
 def remove_file(fname):
     if os.path.isfile(fname):
