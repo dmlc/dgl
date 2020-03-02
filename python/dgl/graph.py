@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import networkx as nx
 
 import dgl
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, NID, EID, is_all, DGLError, dgl_warning
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme, sync_frame_initializer
@@ -920,11 +920,8 @@ class DGLGraph(DGLBaseGraph):
                  multigraph=None,
                  readonly=False,
                  sort_csr=False,
-                 batch_size=1,
                  batch_num_nodes=None,
-                 batch_num_edges=None,
-                 parent=None,
-                 sgi=None):
+                 batch_num_edges=None):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
@@ -959,18 +956,19 @@ class DGLGraph(DGLBaseGraph):
         self._apply_edge_func = None
 
         # batched graph
-        self._batch_size = batch_size
         self._batch_num_nodes = batch_num_nodes
         self._batch_num_edges = batch_num_edges
 
         # subgraph
-        self._parent = parent
-        self._parent_nid = None
-        self._parent_eid = None
-        self._subgraph_index = sgi
-        if sgi is not None:
-            self._parent_nid = sgi.induced_nodes
-            self._parent_eid = sgi.induced_edges
+        self._parent = None
+
+    def _create_subgraph(self, sgi, induced_nodes, induced_edges):
+        sg = DGLGraph(graph_data=sgi.graph,
+                      readonly=True)
+        sg._parent = self
+        sg.ndata[NID] = induced_nodes.tousertensor()
+        sg.edata[EID] = induced_edges.tousertensor()
+        return sg
 
     def _get_msg_index(self):
         if self._msg_index is None:
@@ -1295,16 +1293,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if self._parent is None:
             raise DGLError("We only support parent_nid for subgraphs.")
-        return self._parent_nid.tousertensor()
-
-    def _get_parent_eid(self):
-        # The parent eid might be lazily evaluated and thus may not
-        # be an index. Instead, it's a lambda function that returns
-        # an index.
-        if isinstance(self._parent_eid, utils.Index):
-            return self._parent_eid
-        else:
-            return self._parent_eid()
+        return self.ndata[NID]
 
     @property
     def parent_eid(self):
@@ -1320,7 +1309,7 @@ class DGLGraph(DGLBaseGraph):
         """
         if self._parent is None:
             raise DGLError("We only support parent_eid for subgraphs.")
-        return self._get_parent_eid().tousertensor()
+        return self.edata[EID]
 
     def copy_to_parent(self, inplace=False):
         """Write node/edge features to the parent graph.
@@ -1332,11 +1321,15 @@ class DGLGraph(DGLBaseGraph):
         """
         if self._parent is None:
             raise DGLError("We only support copy_to_parent for subgraphs.")
+        nids = self.ndata.pop(NID)
+        eids = self.edata.pop(EID)
         self._parent._node_frame.update_rows(
-            self._parent_nid, self._node_frame, inplace=inplace)
+            utils.toindex(nids), self._node_frame, inplace=inplace)
         if self._parent._edge_frame.num_rows != 0:
             self._parent._edge_frame.update_rows(
-                self._get_parent_eid(), self._edge_frame, inplace=inplace)
+                utils.toindex(eids), self._edge_frame, inplace=inplace)
+        self.ndata[NID] = nids
+        self.edata[EID] = eids
 
     def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
@@ -1345,12 +1338,16 @@ class DGLGraph(DGLBaseGraph):
         """
         if self._parent is None:
             raise DGLError("We only support copy_from_parent for subgraphs.")
+        nids = self.ndata[NID]
+        eids = self.edata[EID]
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             self._node_frame = FrameRef(Frame(
-                self._parent._node_frame[self._parent_nid]))
+                self._parent._node_frame[utils.toindex(nids)]))
         if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._get_parent_eid()]))
+                self._parent._edge_frame[utils.toindex(eids)]))
+        self.ndata[NID] = nids
+        self.edata[NID] = eids
 
     def map_to_subgraph_nid(self, parent_vids):
         """Map the node Ids in the parent graph to the node Ids in the subgraph.
@@ -1367,7 +1364,8 @@ class DGLGraph(DGLBaseGraph):
         """
         if self._parent is None:
             raise DGLError("We only support map_to_subgraph_nid for subgraphs.")
-        v = graph_index.map_to_subgraph_nid(self._subgraph_index, utils.toindex(parent_vids))
+        v = graph_index.map_to_subgraph_nid(
+            utils.toindex(self.ndata[NID]), utils.toindex(parent_vids))
         return v.tousertensor()
 
     def flatten(self):
@@ -1375,7 +1373,6 @@ class DGLGraph(DGLBaseGraph):
         graph as an independent graph rather then a batched graph.
         Graph topology and attributes would not be influenced.
         """
-        self._batch_size = 1
         self._batch_num_nodes = None
         self._batch_num_edges = None
 
@@ -1385,9 +1382,8 @@ class DGLGraph(DGLBaseGraph):
         Graph topology and attributes would not be influenced.
         """
         self._parent = None
-        self._parent_nid = None
-        self._parent_eid = None
-        self._subgraph_index = None
+        self.ndata.pop(NID)
+        self.edata.pop(EID)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -1863,7 +1859,7 @@ class DGLGraph(DGLBaseGraph):
         -------
         int
             Number of graphs in this batch."""
-        return self._batch_size
+        return 1 if self.batch_num_nodes is None else len(self.batch_num_nodes)
 
     @property
     def batch_num_nodes(self):
@@ -3127,10 +3123,7 @@ class DGLGraph(DGLBaseGraph):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return DGLGraph(graph_data=sgi.graph,
-                        readonly=True,
-                        parent=self,
-                        sgi=sgi)
+        return self._create_subgraph(sgi, sgi.induced_nodes, sgi.induced_edges)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -3156,10 +3149,8 @@ class DGLGraph(DGLBaseGraph):
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [DGLGraph(graph_data=sgi.graph,
-                         readonly=True,
-                         parent=self,
-                         sgi=sgi) for sgi in sgis]
+        return [self._create_subgraph(
+            sgi, sgi.induced_nodes, sgi.induced_edges) for sgi in sgis]
 
     def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
@@ -3217,10 +3208,7 @@ class DGLGraph(DGLBaseGraph):
         """
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
-        return DGLGraph(graph_data=sgi.graph,
-                        readonly=True,
-                        parent=self,
-                        sgi=sgi)
+        return self._create_subgraph(sgi, sgi.induced_nodes, sgi.induced_edges)
 
     def adjacency_matrix_scipy(self, transpose=None, fmt='csr', return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
@@ -3614,7 +3602,6 @@ class DGLGraph(DGLBaseGraph):
                         node_frame=local_node_frame,
                         edge_frame=local_edge_frame,
                         readonly=self.is_readonly,
-                        batch_size=self.batch_size,
                         batch_num_nodes=self.batch_num_nodes,
                         batch_num_edges=self.batch_num_edges,
                         parent=self._parent,

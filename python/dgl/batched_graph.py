@@ -168,7 +168,6 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     return DGLGraph(graph_data=batched_index,
                     node_frame=batched_node_frame,
                     edge_frame=batched_edge_frame,
-                    batch_size=batch_size,
                     batch_num_nodes=batch_num_nodes,
                     batch_num_edges=batch_num_edges)
 
