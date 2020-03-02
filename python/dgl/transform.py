@@ -234,7 +234,6 @@ def reverse(g, share_ndata=False, share_edata=False):
 
     Notes
     -----
-    * This function does not support :class:`~dgl.BatchedDGLGraph` objects.
     * We do not dynamically update the topology of a graph once that of its reverse changes.
       This can be particularly problematic when the node/edge attrs are shared. For example,
       if the topology of both the original graph and its reverse get changed independently,
@@ -291,8 +290,6 @@ def reverse(g, share_ndata=False, share_edata=False):
             [2.],
             [3.]])
     """
-    assert g.batch_size == 1, \
-        'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
     g_edges = g.all_edges(order='eid')

@@ -736,6 +736,7 @@ class DGLBaseGraph(object):
 
 
 def mutation(func):
+    """A decorator to decorate functions that might change graph structure."""
     def inner(g, *args, **kwargs):
         if g.is_readonly:
             raise DGLError("Readonly graph. Mutation is not allowed.")
@@ -921,7 +922,8 @@ class DGLGraph(DGLBaseGraph):
                  readonly=False,
                  sort_csr=False,
                  batch_num_nodes=None,
-                 batch_num_edges=None):
+                 batch_num_edges=None,
+                 parent=None):
         # graph
         if isinstance(graph_data, DGLGraph):
             gidx = graph_data._graph
@@ -960,15 +962,15 @@ class DGLGraph(DGLBaseGraph):
         self._batch_num_edges = batch_num_edges
 
         # subgraph
-        self._parent = None
+        self._parent = parent
 
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
-        sg = DGLGraph(graph_data=sgi.graph,
-                      readonly=True)
-        sg._parent = self
-        sg.ndata[NID] = induced_nodes.tousertensor()
-        sg.edata[EID] = induced_edges.tousertensor()
-        return sg
+        subg = DGLGraph(graph_data=sgi.graph,
+                        readonly=True,
+                        parent=self)
+        subg.ndata[NID] = induced_nodes.tousertensor()
+        subg.edata[EID] = induced_edges.tousertensor()
+        return subg
 
     def _get_msg_index(self):
         if self._msg_index is None:
@@ -1886,6 +1888,18 @@ class DGLGraph(DGLBaseGraph):
             return [self.number_of_edges()]
         else:
             return self._batch_num_edges
+
+    @property
+    def parent(self):
+        """If current graph is a induced subgraph of a parent graph, return
+        its parent graph, else return None.
+
+        Returns
+        -------
+        DGLGraph or None
+            The parent graph of current graph.
+        """
+        return self._parent
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
@@ -3604,8 +3618,7 @@ class DGLGraph(DGLBaseGraph):
                         readonly=self.is_readonly,
                         batch_num_nodes=self.batch_num_nodes,
                         batch_num_edges=self.batch_num_edges,
-                        parent=self._parent,
-                        sgi=self._subgraph_index)
+                        parent=self._parent)
 
     @contextmanager
     def local_scope(self):
