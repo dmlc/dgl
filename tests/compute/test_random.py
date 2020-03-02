@@ -1,8 +1,9 @@
 import dgl
-from dgl import utils
 import backend as F
 import numpy as np
+import unittest
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random choice not implemented")
 def test_random_choice():
     # test 1
     a = F.arange(0, 100)
