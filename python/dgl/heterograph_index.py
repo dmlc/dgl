@@ -9,7 +9,6 @@ from ._ffi.object import register_object, ObjectBase
 from ._ffi.function import _init_api
 from .base import DGLError, dgl_warning
 from . import backend as F
-from . import ndarray as nd
 from . import utils
 
 @register_object('graph.HeteroGraph')
@@ -1092,7 +1091,7 @@ class HeteroPickleStates(ObjectBase):
 
         Returns
         -------
-        list of SparseMatrix
+        list of dgl.ndarray.SparseMatrix
             Adjacency matrices
         """
         return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))

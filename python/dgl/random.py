@@ -17,7 +17,7 @@ def seed(val):
     """
     _CAPI_SetSeed(val)
 
-def choice(a, size, replace=True, prob=None):
+def choice(a, size, replace=True, prob=None):  # pylint: disable=invalid-name
     """An equivalent to :func:`numpy.random.choice` but with more efficient implementation.
 
     TODO(minjie): support RNG as one of the arguments.
