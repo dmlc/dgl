@@ -78,7 +78,7 @@ class NeighborSampler(object):
         for fanout in self.fanouts:
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
             src, dst = frontier.all_edges()
-            dataflow_piece = dgl.to_bipartite(frontier, seeds, True)
+            dataflow_piece = dgl.compact_as_bipartite(frontier, seeds, True)
             seeds = dataflow_piece.sdata[dgl.NID]
             dataflow.insert(0, dataflow_piece)
         return dataflow

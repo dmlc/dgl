@@ -33,7 +33,7 @@ __all__ = [
     'remove_self_loop',
     'metapath_reachable_graph',
     'compact_graphs',
-    'to_bipartite',
+    'compact_as_bipartite',
     'to_simple',
     'in_subgraph',
     'out_subgraph',
@@ -716,8 +716,8 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def to_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
-                 rhs_suffix="_r"):
+def compact_as_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
+                         rhs_suffix="_r"):
     """Convert a graph into a bipartite-structured graph for message passing.
 
     Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
