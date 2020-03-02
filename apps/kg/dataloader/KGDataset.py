@@ -37,7 +37,7 @@ class KGDataset1:
 
     The triples are stored as 'head_name\trelation_name\ttail_name'.
     '''
-    def __init__(self, path, name):
+    def __init__(self, path, name, read_triple=True, only_train=False):
         url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
@@ -66,9 +66,11 @@ class KGDataset1:
         self.n_entities = len(self.entity2id)
         self.n_relations = len(self.relation2id)
 
-        self.train = self.read_triple(path, 'train')
-        self.valid = self.read_triple(path, 'valid')
-        self.test = self.read_triple(path, 'test')
+        if read_triple == True:
+            self.train = self.read_triple(path, 'train')
+            if only_train == False:
+                self.valid = self.read_triple(path, 'valid')
+                self.test = self.read_triple(path, 'test')
 
     def read_triple(self, path, mode):
         # mode: train/valid/test
@@ -102,7 +104,7 @@ class KGDataset2:
 
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name):
+    def __init__(self, path, name, read_triple=True, only_train=False):
         url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
@@ -110,17 +112,24 @@ class KGDataset2:
             _download_and_extract(url, path, '{}.zip'.format(name))
         self.path = os.path.join(path, name)
 
-        f_ent2id = os.path.join(self.path, 'entity2id.txt')
         f_rel2id = os.path.join(self.path, 'relation2id.txt')
-
-        with open(f_ent2id) as f_ent:
-            self.n_entities = int(f_ent.readline()[:-1])
         with open(f_rel2id) as f_rel:
             self.n_relations = int(f_rel.readline()[:-1])
 
-        self.train = self.read_triple(self.path, 'train')
-        self.valid = self.read_triple(self.path, 'valid')
-        self.test = self.read_triple(self.path, 'test')
+        if only_train == True:
+            f_ent2id = os.path.join(self.path, 'local_to_global.txt')
+            with open(f_ent2id) as f_ent:
+                self.n_entities = len(f_ent.readlines())
+        else:
+            f_ent2id = os.path.join(self.path, 'entity2id.txt')
+            with open(f_ent2id) as f_ent:
+                self.n_entities = int(f_ent.readline()[:-1])
+
+        if read_triple == True:
+            self.train = self.read_triple(self.path, 'train')
+            if only_train == False:
+                self.valid = self.read_triple(self.path, 'valid')
+                self.test = self.read_triple(self.path, 'test')
 
     def read_triple(self, path, mode, skip_first_line=False):
         heads = []
@@ -151,3 +160,57 @@ def get_dataset(data_path, data_name, format_str):
         dataset = KGDataset2(data_path, data_name)
 
     return dataset
+
+
+def get_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
+
+    if data_name == 'Freebase':
+        dataset = KGDataset2(data_path, part_name, read_triple=True, only_train=True)
+    elif format_str == '1':
+        dataset = KGDataset1(data_path, part_name, read_triple=True, only_train=True)
+    else:
+        dataset = KGDataset2(data_path, part_name, read_triple=True, only_train=True)
+
+    path = os.path.join(data_path, part_name)
+
+    partition_book = []
+    with open(os.path.join(path, 'partition_book.txt')) as f:
+        for line in f:
+            partition_book.append(int(line))
+
+    local_to_global = []
+    with open(os.path.join(path, 'local_to_global.txt')) as f:
+        for line in f:
+            local_to_global.append(int(line))
+
+    return dataset, partition_book, local_to_global
+
+
+def get_server_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
+
+    if data_name == 'Freebase':
+        dataset = KGDataset2(data_path, part_name, read_triple=False, only_train=True)
+    elif format_str == '1':
+        dataset = KGDataset1(data_path, part_name, read_triple=False, only_train=True)
+    else:
+        dataset = KGDataset2(data_path, part_name, read_triple=False, only_train=True)
+
+    path = os.path.join(data_path, part_name)
+
+    n_entities = len(open(os.path.join(path, 'partition_book.txt')).readlines())
+
+    local_to_global = []
+    with open(os.path.join(path, 'local_to_global.txt')) as f:
+        for line in f:
+            local_to_global.append(int(line))
+
+    global_to_local = [0] * n_entities
+    for i in range(len(local_to_global)):
+        global_id = local_to_global[i]
+        global_to_local[global_id] = i
+
+    local_to_global = None
+
+    return global_to_local, dataset
