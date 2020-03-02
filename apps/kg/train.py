@@ -236,8 +236,10 @@ def run(args, logger):
     if args.num_proc > 1:
         num_workers = 1
     if args.valid or args.test:
-        #args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
-        args.num_test_proc = args.num_proc
+        if len(args.gpu) > 1:
+            args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
+        else:
+            args.num_test_proc = args.num_proc
         eval_dataset = EvalDataset(dataset, args)
     if args.valid:
         # Here we want to use the regualr negative sampler because we need to ensure that
