@@ -93,7 +93,7 @@ namespace aten {
 
 /*! \return A special array to represent null. */
 inline NDArray NullArray() {
-  return NDArray::Empty({0}, DLDataType{kDLInt, 32, 1}, DLContext{kDLCPU, 0});
+  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 }
 
 /*!

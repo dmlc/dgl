@@ -99,7 +99,7 @@ def null():
     NDArray
         A null array
     """
-    return array([])
+    return array(_np.array([], dtype=_np.int64))
 
 class SparseFormat:
     """Format code"""
