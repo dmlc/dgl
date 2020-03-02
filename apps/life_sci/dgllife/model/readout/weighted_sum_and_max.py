@@ -3,7 +3,6 @@ import dgl
 import torch
 import torch.nn as nn
 
-from dgl import BatchedDGLGraph
 from dgl.nn.pytorch import WeightAndSum
 
 __all__ = ['WeightedSumAndMax']
@@ -45,10 +44,5 @@ class WeightedSumAndMax(nn.Module):
         with bg.local_scope():
             bg.ndata['h'] = feats
             h_g_max = dgl.max_nodes(bg, 'h')
-
-        if not isinstance(bg, BatchedDGLGraph):
-            h_g_sum = h_g_sum.unsqueeze(0)
-            h_g_max = h_g_max.unsqueeze(0)
         h_g = torch.cat([h_g_sum, h_g_max], dim=1)
-
         return h_g

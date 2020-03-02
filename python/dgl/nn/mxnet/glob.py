@@ -23,7 +23,7 @@ class SumPooling(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
@@ -32,9 +32,8 @@ class SumPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -60,7 +59,7 @@ class AvgPooling(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
@@ -69,9 +68,8 @@ class AvgPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -97,7 +95,7 @@ class MaxPooling(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, *)` where
@@ -106,9 +104,8 @@ class MaxPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -138,7 +135,7 @@ class SortPooling(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
@@ -147,9 +144,8 @@ class SortPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(k * D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, k * D)`.
+            The output feature with shape :math:`(B, k * D)`, where
+            :math:`B` refers to the batch size.
         """
         # Sort the feature of each node in ascending order.
         with graph.local_scope():
@@ -191,7 +187,7 @@ class GlobalAttentionPooling(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
@@ -200,9 +196,8 @@ class GlobalAttentionPooling(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -259,7 +254,7 @@ class Set2Set(nn.Block):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : mxnet.NDArray
             The input feature with shape :math:`(N, D)` where
@@ -268,9 +263,8 @@ class Set2Set(nn.Block):
         Returns
         -------
         mxnet.NDArray
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             batch_size = graph.batch_size

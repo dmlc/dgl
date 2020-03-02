@@ -374,17 +374,14 @@ def laplacian_lambda_max(g):
 
     Parameters
     ----------
-    g : DGLGraph or BatchedDGLGraph
+    g : DGLGraph
         The input graph, it should be an undirected graph.
 
     Returns
     -------
     list :
-        * If the input g is a DGLGraph, the returned value would be
-          a list with one element, indicating the largest eigenvalue of g.
-        * If the input g is a BatchedDGLGraph, the returned value would
-          be a list, where the i-th item indicates the largest eigenvalue
-          of i-th graph in g.
+        Return a list, where the i-th item indicates the largest eigenvalue
+        of i-th graph in g.
 
     Examples
     --------

@@ -176,7 +176,7 @@ def test_simple_pool():
     h1 = max_pool(g, h0)
     assert F.allclose(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
-    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 22
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
