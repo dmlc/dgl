@@ -294,6 +294,8 @@ def reverse(g, share_ndata=False, share_edata=False):
     g_reversed.add_nodes(g.number_of_nodes())
     g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
+    g_reversed._batch_num_nodes = g._batch_num_nodes
+    g_reversed._batch_num_edges = g._batch_num_edges
     if share_ndata:
         g_reversed._node_frame = g._node_frame
     if share_edata:

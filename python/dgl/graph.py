@@ -961,7 +961,7 @@ class DGLGraph(DGLBaseGraph):
         self._batch_num_nodes = batch_num_nodes
         self._batch_num_edges = batch_num_edges
 
-        # subgraph
+        # set parent if the graph is a induced subgraph.
         self._parent = parent
 
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
@@ -1373,7 +1373,7 @@ class DGLGraph(DGLBaseGraph):
     def flatten(self):
         """Remove all batching information of the graph, and regard the current
         graph as an independent graph rather then a batched graph.
-        Graph topology and attributes would not be influenced.
+        Graph topology and attributes would not be affected.
         """
         self._batch_num_nodes = None
         self._batch_num_edges = None
@@ -1381,7 +1381,7 @@ class DGLGraph(DGLBaseGraph):
     def detach_parent(self):
         """Detach the current graph from its parent, and regard the current graph
         as an independent graph rather then a subgraph.
-        Graph topology and attributes would not be influenced.
+        Graph topology and attributes would not be affected.
         """
         self._parent = None
         self.ndata.pop(NID)
