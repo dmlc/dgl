@@ -5,7 +5,7 @@ from utils import setup, load_data
 def main(args):
     setup(args)
     t0 = time.time()
-    train_set, val_set, test_set = load_data()
+    train_set, val_set, test_set = load_data(args['num_processes'])
     print(time.time() - t0)
 
 if __name__ == '__main__':
