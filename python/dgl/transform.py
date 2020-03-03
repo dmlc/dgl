@@ -717,7 +717,7 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def compact_as_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
+def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
                          rhs_suffix="_r"):
     """Convert a graph into a bipartite-structured graph for message passing.
 
@@ -772,34 +772,34 @@ def compact_as_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_su
     if rhs_nodes is None:
         # Find all nodes that appeared as destinations
         rhs_nodes = defaultdict(list)
-        for etype in graph.canonical_etypes:
-            _, dst = graph.edges(etype=etype)
+        for etype in g.canonical_etypes:
+            _, dst = g.edges(etype=etype)
             rhs_nodes[etype[2]].append(dst)
         rhs_nodes = {ntype: F.unique(F.cat(values, 0)) for ntype, values in rhs_nodes.items()}
     elif not isinstance(rhs_nodes, Mapping):
-        # rhs_nodes is a Tensor, check if the graph has only one type.
-        if len(graph.ntypes) > 1:
+        # rhs_nodes is a Tensor, check if the g has only one type.
+        if len(g.ntypes) > 1:
             raise ValueError(
                 'Graph has more than one node type; please specify a dict for rhs_nodes.')
-        rhs_nodes = {graph.ntypes[0]: rhs_nodes}
+        rhs_nodes = {g.ntypes[0]: rhs_nodes}
 
     # rhs_nodes is now a dict
-    rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in graph.ntypes]
+    rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in g.ntypes]
     rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(nodes) for nodes in rhs_nodes]
 
     new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBipartite(
-        graph._graph, rhs_nodes_nd, include_rhs_in_lhs)
+        g._graph, rhs_nodes_nd, include_rhs_in_lhs)
     lhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in lhs_nodes_nd]
 
-    new_ntypes = [ntype + lhs_suffix for ntype in graph.ntypes] + \
-                 [ntype + rhs_suffix for ntype in graph.ntypes]
-    new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, graph.etypes)
+    new_ntypes = [ntype + lhs_suffix for ntype in g.ntypes] + \
+                 [ntype + rhs_suffix for ntype in g.ntypes]
+    new_graph = DGLHeteroGraph(new_graph_index, new_ntypes, g.etypes)
 
-    for i, ntype in enumerate(graph.ntypes):
+    for i, ntype in enumerate(g.ntypes):
         new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
         new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
 
-    for i, canonical_etype in enumerate(graph.canonical_etypes):
+    for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
         utype, etype, vtype = canonical_etype
         new_canonical_etype = (utype + lhs_suffix, etype, vtype + rhs_suffix)
@@ -807,7 +807,7 @@ def compact_as_bipartite(graph, rhs_nodes=None, include_rhs_in_lhs=False, lhs_su
 
     return new_graph
 
-def remove_edges(graph, edge_ids):
+def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
 
     Parameters
@@ -825,18 +825,18 @@ def remove_edges(graph, edge_ids):
         ``dgl.EID`` on edge features.
     """
     if not isinstance(edge_ids, Mapping):
-        if len(graph.etypes) != 1:
+        if len(g.etypes) != 1:
             raise ValueError(
                 "Graph has more than one edge type; specify a dict for edge_id instead.")
-        edge_ids = {graph.canonical_etypes[0]: edge_ids}
+        edge_ids = {g.canonical_etypes[0]: edge_ids}
 
-    edge_ids_nd = [None] * len(graph.etypes)
+    edge_ids_nd = [None] * len(g.etypes)
     for key, value in edge_ids.items():
-        edge_ids_nd[graph.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
-    new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(graph._graph, edge_ids_nd)
+        edge_ids_nd[g.get_etype_id(key)] = F.zerocopy_to_dgl_ndarray(value)
+    new_graph_index, induced_eids_nd = _CAPI_DGLRemoveEdges(g._graph, edge_ids_nd)
 
-    new_graph = DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
-    for i, canonical_etype in enumerate(graph.canonical_etypes):
+    new_graph = DGLHeteroGraph(new_graph_index, g.ntypes, g.etypes)
+    for i, canonical_etype in enumerate(g.canonical_etypes):
         new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(
             induced_eids_nd[i].data)
 

@@ -13,6 +13,94 @@ from _thread import start_new_thread
 from functools import wraps
 from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
+import tqdm
+
+#### Neighbor sampler
+
+class NeighborSampler(object):
+    def __init__(self, g, fanouts):
+        self.g = g
+        self.fanouts = fanouts
+
+    def sample_blocks(self, seeds):
+        blocks = []
+        for fanout in self.fanouts:
+            # For each seed node, sample ``fanout`` neighbors.
+            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
+            # Then we compact the frontier into a bipartite graph for message passing.
+            block = dgl.compact_as_bipartite(frontier, seeds, True)
+            # Obtain the seed nodes for next layer.
+            seeds = dataflow_piece.sdata[dgl.NID]
+
+            blocks.insert(0, block)
+        return blocks
+
+class SAGE(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 n_hidden,
+                 n_classes,
+                 n_layers,
+                 activation,
+                 dropout):
+        super().__init__()
+        self.n_layers = n_layers
+        self.layers = nn.ModuleList()
+        self.layers.append(dglnn.SAGEConv(
+            in_feats, n_hidden, 'mean', feat_drop=dropout, activation=activation))
+        for i in range(1, n_layers - 1):
+            self.layers.append(dglnn.SAGEConv(
+                n_hidden, n_hidden, 'mean', feat_drop=dropout, activation=activation))
+        self.layers.append(dglnn.SAGEConv(
+            n_hidden, n_classes, 'mean', feat_drop=dropout))
+
+    def forward(self, blocks, x):
+        h = x
+        for layer, block in zip(self.layers, blocks):
+            # We need to first copy the representation of nodes on the RHS from the
+            # appropriate nodes on the LHS.
+            # Note that the shape of h is (num_nodes_LHS, D) and the shape of h_dst
+            # would be (num_nodes_RHS, D)
+            h_dst = h[:block.number_of_nodes(block.dsttype)]
+            # Then we compute the updated representation on the RHS.
+            # The shape of h now becomes (num_nodes_RHS, D)
+            h = layer(block, (h, h_dst))
+        return h
+
+    def inference(self, g, x, batch_size, device):
+        """
+        Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
+        g : the entire graph.
+        x : the input of entire node set.
+
+        The inference code is written in a fashion that it could handle any number of nodes and
+        layers.
+        """
+        # During inference with sampling, multi-layer blocks are very inefficient because
+        # lots of computations in the first few layers are repeated.
+        # Therefore, we compute the representation of all nodes layer by layer.  The nodes
+        # on each layer are of course splitted in batches.
+        # TODO: can we standardize this?
+        nodes = th.arange(g.number_of_nodes())
+        for l, layer in enumerate(self.layers):
+            y = th.zeros(g.number_of_nodes(), self.n_hidden if l != len(self.layers) - 1 else self.n_classes)
+
+            for start in tqdm.trange(0, len(nodes), batch_size):
+                end = start + batch_size
+                batch_nodes = nodes[start:end]
+                block = dgl.compact_as_bipartite(dgl.in_subgraph(g, batch_nodes), batch_nodes, True)
+                induced_nodes = block.sdata[dgl.NID]
+
+                h = x[induced_nodes].to(device)
+                h_dst = h[:block.number_of_nodes(block.dsttype)]
+                h = layer(block, (h, h_dst))
+
+                y[start:end] = h.cpu()
+
+            x = y
+        return y
+
+#### Miscellaneous functions
 
 # According to https://github.com/pytorch/pytorch/issues/17199, this decorator
 # is necessary to make fork() and openmp work together.
@@ -21,6 +109,9 @@ from torch.nn.parallel import DistributedDataParallel
 # to standardize worker process creation since our operators are implemented with
 # OpenMP.
 def thread_wrapped_func(func):
+    """
+    Wraps a process entry point to make it work with OpenMP.
+    """
     @wraps(func)
     def decorated_function(*args, **kwargs):
         queue = mp.Queue()
@@ -42,66 +133,43 @@ def thread_wrapped_func(func):
             raise exception.__class__(trace)
     return decorated_function
 
-class SAGE(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
-        super().__init__()
-        self.n_layers = n_layers
-        self.layers = nn.ModuleList()
-        self.layers.append(dglnn.SAGEConv(
-            in_feats, n_hidden, 'mean', feat_drop=dropout, activation=activation))
-        for i in range(1, n_layers - 1):
-            self.layers.append(dglnn.SAGEConv(
-                n_hidden, n_hidden, 'mean', feat_drop=dropout, activation=activation))
-        self.layers.append(dglnn.SAGEConv(
-            n_hidden, n_classes, 'mean', feat_drop=dropout))
-
-    def forward(self, frontiers, x):
-        h = x
-        for layer, frontier in zip(self.layers, frontiers):
-            h_dst = h[:frontier.number_of_nodes(frontier.dsttype)]
-            h = layer(frontier, (h, h_dst))
-        return h
-
-class NeighborSampler(object):
-    def __init__(self, g, fanouts):
-        self.g = g
-        self.fanouts = fanouts
-
-    def sample_frontiers(self, seeds):
-        dataflow = []
-        for fanout in self.fanouts:
-            frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
-            src, dst = frontier.all_edges()
-            dataflow_piece = dgl.compact_as_bipartite(frontier, seeds, True)
-            seeds = dataflow_piece.sdata[dgl.NID]
-            dataflow.insert(0, dataflow_piece)
-        return dataflow
-
 def compute_acc(pred, labels):
+    """
+    Compute the accuracy of prediction given the labels.
+    """
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
-def evaluate(model, frontiers, inputs, labels):
+def evaluate(model, g, inputs, labels, val_mask, batch_size, device):
+    """
+    Evaluate the model on the validation set specified by ``val_mask``.
+    g : The entire graph.
+    inputs : The features of all the nodes.
+    labels : The labels of all the nodes.
+    val_mask : A 0-1 mask indicating which nodes do we actually compute the accuracy for.
+    batch_size : Number of nodes to compute at the same time.
+    device : The GPU device to evaluate on.
+    """
     model.eval()
     with th.no_grad():
-        pred = model(frontiers, inputs)
+        pred = model.inference(g, inputs, batch_size, device)
     model.train()
-    return compute_acc(pred, labels)
+    return compute_acc(pred[val_mask], labels[val_mask])
 
 def load_subtensor(g, labels, seeds, induced_nodes, dev_id):
+    """
+    Copys features and labels of a set of nodes onto GPU.
+    """
     batch_inputs = g.ndata['features'][induced_nodes].to(dev_id)
     batch_labels = labels[seeds].to(dev_id)
     return batch_inputs, batch_labels
+
+#### Entry point
 
 @thread_wrapped_func
 def run(proc_id, n_gpus, args, devices, data):
     dropout = 0.2
 
+    # Start up distributed training, if enabled.
     dev_id = devices[proc_id]
     if n_gpus > 1:
         dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
@@ -125,11 +193,6 @@ def run(proc_id, n_gpus, args, devices, data):
 
     # Create sampler
     sampler = NeighborSampler(g, [args.fan_out] * args.num_layers)
-    val_frontiers = sampler.sample_frontiers(val_nid)
-    val_induced_nodes = val_frontiers[0].sdata[dgl.NID]
-    val_induced_targets = val_frontiers[-1].ddata[dgl.NID]
-    batch_val_inputs = g.ndata['features'][val_induced_nodes].to(dev_id)
-    batch_val_labels = labels[val_induced_targets].to(dev_id)
 
     # Define model and optimizer
     model = SAGE(in_feats, args.num_hidden, n_classes, args.num_layers, F.relu, dropout)
@@ -152,17 +215,18 @@ def run(proc_id, n_gpus, args, devices, data):
             if proc_id == 0:
                 tic_step = time.time()
 
-            frontiers = sampler.sample_frontiers(seeds)
-            induced_nodes = frontiers[0].sdata[dgl.NID]
+            # Sample blocks for message propagation
+            blocks = sampler.sample_blocks(seeds)
+            induced_nodes = blocks[0].sdata[dgl.NID]
+            # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, induced_nodes, dev_id)
 
-            # forward
-            batch_pred = model(frontiers, batch_inputs)
-            # compute loss
+            # Compute loss and prediction
+            batch_pred = model(blocks, batch_inputs)
             loss = loss_fcn(batch_pred, batch_labels)
-            # backward
             optimizer.zero_grad()
             loss.backward()
+
             if n_gpus > 1:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
@@ -170,6 +234,7 @@ def run(proc_id, n_gpus, args, devices, data):
                                                   op=th.distributed.ReduceOp.SUM)
                         param.grad.data /= n_gpus
             optimizer.step()
+
             if proc_id == 0:
                 iter_tput.append(len(seeds) * n_gpus / (time.time() - tic_step))
             if step % args.log_every == 0 and proc_id == 0:
@@ -186,7 +251,7 @@ def run(proc_id, n_gpus, args, devices, data):
             if epoch >= 5:
                 avg += toc - tic
             if epoch % args.eval_every == 0 and epoch != 0:
-                eval_acc = evaluate(model, val_frontiers, batch_val_inputs, batch_val_labels)
+                eval_acc = evaluate(model, g, g.ndata['features'], labels, val_mask, args.batch_size, 0)
                 print('Eval Acc {:.4f}'.format(eval_acc))
 
     if n_gpus > 1:
