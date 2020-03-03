@@ -29,7 +29,7 @@ struct TypeManager {
 };
 }  // namespace
 
-const bool Object::_DerivedFrom(uint32_t tid) const {
+bool Object::_DerivedFrom(uint32_t tid) const {
   static uint32_t tindex = TypeKey2Index(Object::_type_key);
   return tid == tindex;
 }

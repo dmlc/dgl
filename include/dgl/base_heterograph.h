@@ -35,16 +35,6 @@ enum class EdgeDir {
 };
 
 /*!
- * \brief Sparse graph format.
- */
-enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
-};
-
-/*!
  * \brief Base heterogenous graph.
  *
  * In heterograph, nodes represent entities and edges represent relations.
@@ -488,6 +478,7 @@ struct HeteroSubgraph : public runtime::Object {
   static constexpr const char* _type_key = "graph.HeteroSubgraph";
   DGL_DECLARE_OBJECT_TYPE_INFO(HeteroSubgraph, runtime::Object);
 };
+
 // Define HeteroSubgraphRef
 DGL_DEFINE_OBJECT_REF(HeteroSubgraphRef, HeteroSubgraph);
 
@@ -547,18 +538,7 @@ struct FlattenedHeteroGraph : public runtime::Object {
 };
 DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
-// creators
-
-inline SparseFormat ParseSparseFormat(const std::string& name) {
-  if (name == "coo")
-    return SparseFormat::COO;
-  else if (name == "csr")
-    return SparseFormat::CSR;
-  else if (name == "csc")
-    return SparseFormat::CSC;
-  else
-    return SparseFormat::ANY;
-}
+// Declarations of functions and algorithms
 
 /*! \brief Create a heterograph from meta graph and a list of bipartite graph */
 HeteroGraphPtr CreateHeteroGraph(
@@ -595,19 +575,6 @@ HeteroGraphPtr CreateFromCSR(
     SparseFormat restrict_format = SparseFormat::ANY);
 
 /*!
- * \brief Given a list of graphs, remove the common nodes that do not have inbound and
- * outbound edges.
- *
- * The graphs should have identical node ID space (i.e. should have the same set of nodes,
- * including types and IDs) and metagraph.
- *
- * \return A pair.  The first element is the list of compacted graphs, and the second
- * element is the mapping from the compacted graphs and the original graph.
- */
-std::pair<std::vector<HeteroGraphPtr>, std::vector<IdArray>>
-CompactGraphs(const std::vector<HeteroGraphPtr> &graphs);
-
-/*!
  * \brief Extract the subgraph of the in edges of the given nodes.
  * \param graph Graph
  * \param nodes Node IDs of each type
@@ -625,6 +592,87 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
  */
 HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray>& nodes);
 
-};  // namespace dgl
+
+/*!
+ * \brief Union multiple graphs into one with each input graph as one disjoint component.
+ *
+ * All input graphs should have the same metagraph.
+ *
+ * TODO(minjie): remove the meta_graph argument
+ * 
+ * \param meta_graph Metagraph of the inputs and result.
+ * \param component_graphs Input graphs
+ * \return One graph that unions all the components
+ */
+HeteroGraphPtr DisjointUnionHeteroGraph(
+    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs);
+
+/*!
+ * \brief Split a graph into multiple disjoin components.
+ *
+ * Edges across different components are ignored. All the result graphs have the same
+ * metagraph as the input one.
+ *
+ * The `vertex_sizes` and `edge_sizes` arrays the concatenation of arrays of each
+ * node/edge type. Suppose there are N vertex types, then the array length should
+ * be B*N, where B is the number of components to split.
+ *
+ * TODO(minjie): remove the meta_graph argument; use vector<IdArray> for vertex_sizes
+ *   and edge_sizes.
+ *
+ * \param meta_graph Metagraph.
+ * \param batched_graph Input graph.
+ * \param vertex_sizes Number of vertices of each component.
+ * \param edge_sizes Number of vertices of each component.
+ * \return A list of graphs representing each disjoint components.
+ */
+std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
+    GraphPtr meta_graph,
+    HeteroGraphPtr batched_graph,
+    IdArray vertex_sizes,
+    IdArray edge_sizes);
+
+/*! 
+ * \brief Structure for pickle/unpickle.
+ *
+ * The design principle is to leverage the NDArray class as much as possible so
+ * that when they are converted to backend-specific tensors, we could leverage
+ * the efficient pickle/unpickle solutions from the backend framework.
+ *
+ * NOTE(minjie): This is a temporary solution before we support shared memory
+ *   storage ourselves.
+ *
+ * This class can be used as arguments and return values of a C API.
+ */
+struct HeteroPickleStates : public runtime::Object {
+  /*! \brief Metagraph. */
+  GraphPtr metagraph;
+
+  /*! \brief adjacency matrices of each relation graph */
+  std::vector<std::shared_ptr<SparseMatrix> > adjs;
+
+  static constexpr const char* _type_key = "graph.HeteroPickleStates";
+  DGL_DECLARE_OBJECT_TYPE_INFO(HeteroPickleStates, runtime::Object);
+};
+
+// Define HeteroPickleStatesRef
+DGL_DEFINE_OBJECT_REF(HeteroPickleStatesRef, HeteroPickleStates);
+
+/*!
+ * \brief Create a heterograph from pickling states.
+ *
+ * \param states Pickle states
+ * \return A heterograph pointer
+ */
+HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states);
+
+/*!
+ * \brief Get the pickling state of the relation graph structure in backend tensors.
+ *
+ * \returnAdjacency matrices of all relation graphs in a list of arrays.
+ */
+HeteroPickleStates HeteroPickle(HeteroGraphPtr graph);
+
+}  // namespace dgl
 
 #endif  // DGL_BASE_HETEROGRAPH_H_

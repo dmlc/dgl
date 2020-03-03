@@ -272,8 +272,7 @@ class NDArrayBase(_NDArrayBase):
         return self
 
     def __repr__(self):
-        res = "<dgl.NDArray shape={0}, {1}>\n".format(self.shape, self.context)
-        res += self.asnumpy().__repr__()
+        res = "dgl.{0}@{1}".format(self.asnumpy().__repr__(), self.context)
         return res
 
     def __str__(self):
