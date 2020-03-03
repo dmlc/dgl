@@ -63,7 +63,7 @@ class Index(object):
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                data = np.array(data).astype(np.int64)
+                data = np.asarray(data, dtype=np.int64)
             except Exception:  # pylint: disable=broad-except
                 raise DGLError('Error index data: %s' % str(data))
             if data.ndim == 0:  # scalar array
@@ -517,5 +517,5 @@ def make_invmap(array, use_numpy=True):
     else:
         uniques = list(set(array))
     invmap = {x: i for i, x in enumerate(uniques)}
-    remapped = np.array([invmap[x] for x in array])
+    remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped
