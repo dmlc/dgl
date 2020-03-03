@@ -171,7 +171,11 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     docstring = """Builtin message function that computes a message on an edge
     by performing element-wise {} between features of {} and {}
     if the features have the same shape; otherwise, it first broadcasts the features
-    to a new shape and performs element-wise {}.
+    to a new shape and performs the element-wise operation.
+
+    Broadcasting follows NumPy semantics. Please see
+    https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
+    for more details about the NumPy broadcasting semantics.
 
     Parameters
     ----------
@@ -189,7 +193,6 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     """.format(binary_op,
                TargetCode.CODE2STR[_TARGET_MAP[lhs]],
                TargetCode.CODE2STR[_TARGET_MAP[rhs]],
-               binary_op,
                TargetCode.CODE2STR[_TARGET_MAP[lhs]],
                TargetCode.CODE2STR[_TARGET_MAP[rhs]],
                name)
