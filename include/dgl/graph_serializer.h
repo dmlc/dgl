@@ -9,6 +9,8 @@
 
 #include <memory>
 namespace dgl {
+
+// Util class to call the private/public empty constructor, which is needed for serialization
 class Serializer {
  public:
   template <typename T>
