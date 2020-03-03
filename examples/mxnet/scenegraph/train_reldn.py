@@ -11,7 +11,7 @@ from utils import *
 from data import *
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser = argparse.ArgumentParser(description='Train RelDN Model.')
     parser.add_argument('--gpus', type=str, default='0',
                         help="Training with GPUs, you can specify 1,3 for example.")
     parser.add_argument('--batch-size', type=int, default=8,

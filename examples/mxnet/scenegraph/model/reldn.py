@@ -12,6 +12,7 @@ from dgl.nn.mxnet import GraphConv
 __all__ = ['RelDN']
 
 class EdgeConfMLP(nn.Block):
+    '''compute the confidence for edges'''
     def __init__(self):
         super(EdgeConfMLP, self).__init__()
 
@@ -22,6 +23,7 @@ class EdgeConfMLP(nn.Block):
                 'score_phr': score_phr}
 
 class EdgeBBoxExtend(nn.Block):
+    '''encode the bounding boxes'''
     def __init__(self):
         super(EdgeBBoxExtend, self).__init__()
 
@@ -47,6 +49,7 @@ class EdgeBBoxExtend(nn.Block):
         return {'pred_bbox_additional': result}
 
 class EdgeFreqPrior(nn.Block):
+    '''make use of the pre-trained frequency prior'''
     def __init__(self, prior_pkl):
         super(EdgeFreqPrior, self).__init__()
         with open(prior_pkl, 'rb') as f:
@@ -62,6 +65,7 @@ class EdgeFreqPrior(nn.Block):
         return {'freq_prior': out}
 
 class EdgeSpatial(nn.Block):
+    '''spatial feature branch'''
     def __init__(self, n_classes):
         super(EdgeSpatial, self).__init__()
         self.mlp = nn.Sequential()
@@ -78,6 +82,7 @@ class EdgeSpatial(nn.Block):
         return {'spatial': out}
 
 class EdgeVisual(nn.Block):
+    '''visual feature branch'''
     def __init__(self, n_classes, vis_feat_dim=7*7*3):
         super(EdgeVisual, self).__init__()
         self.dim_in = vis_feat_dim
@@ -100,6 +105,7 @@ class EdgeVisual(nn.Block):
         return {'visual': out}
 
 class RelDN(nn.Block):
+    '''The RelDN Model'''
     def __init__(self, n_classes, prior_pkl, semantic_only=False):
         super(RelDN, self).__init__()
         # output layers

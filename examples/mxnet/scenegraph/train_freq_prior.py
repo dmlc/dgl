@@ -2,7 +2,7 @@ import numpy as np
 import json, pickle, os, argparse
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster-RCNN networks e2e.')
+    parser = argparse.ArgumentParser(description='Train the Frequenct Prior For RelDN.')
     parser.add_argument('--overlap', action='store_true',
                         help="Only count overlap boxes.")
     parser.add_argument('--json-path', type=str, default='~/.mxnet/datasets/visualgenome',

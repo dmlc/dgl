@@ -7,7 +7,6 @@ import random
 import json
 import tqdm
 import pickle
-import gdown
 from gluoncv.utils import download, makedirs
 
 _TARGET_DIR = os.path.expanduser('~/.mxnet/datasets/visualgenome')
@@ -47,9 +46,9 @@ def download_vg(path, overwrite=False):
                     os.path.join(vg_100k_path, fl))
 
 def download_json(path, overwrite=False):
-    url = 'https://drive.google.com/uc?id=1VDuba95vIPVhg5DiriPtwuVA6mleYGad'
+    url = 'https://data.dgl.ai/dataset/vg.zip'
     output = 'vg.zip'
-    gdown.download(url, output=output, quiet=False, proxy=None)
+    download(url, path=path)
     with zipfile.ZipFile(output) as zf:
         zf.extractall(path=path)
     json_path = os.path.join(path, 'vg')
