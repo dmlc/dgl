@@ -74,7 +74,7 @@ ToBipartite(
     rel_graphs.push_back(CreateFromCOO(
         2, lhs_map.Size(), rhs_map.Size(),
         lhs_map.Map(edge_arrays[etype].src, -1),
-	rhs_map.Map(edge_arrays[etype].dst, -1)));
+        rhs_map.Map(edge_arrays[etype].dst, -1)));
     induced_edges.push_back(edge_arrays[etype].id);
   }
 
