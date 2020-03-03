@@ -1,4 +1,7 @@
+import errno
 import numpy as np
+import os
+import random
 import torch
 
 from functools import partial
@@ -15,6 +18,54 @@ atom_types = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 
               'Se', 'Ti', 'Zn', 'H', 'Li', 'Ge', 'Cu', 'Au', 'Ni', 'Cd', 'In', 'Mn', 'Zr',
               'Cr', 'Pt', 'Hg', 'Pb', 'W', 'Ru', 'Nb', 'Re', 'Te', 'Rh', 'Tc', 'Ba', 'Bi',
               'Hf', 'Mo', 'U', 'Sm', 'Os', 'Ir', 'Ce', 'Gd', 'Ga', 'Cs']
+
+def mkdir_p(path):
+    """Create a folder for the given path.
+    Parameters
+    ----------
+    path: str
+        Folder to create
+    """
+    try:
+        os.makedirs(path)
+        print('Created directory {}'.format(path))
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            print('Directory {} already exists.'.format(path))
+        else:
+            raise
+
+def setup(args, seed=0):
+    """Setup for the experiment:
+
+    1. Decide whether to use CPU or GPU for training
+    2. Fix random seed for python, NumPy and PyTorch.
+
+    Parameters
+    ----------
+    seed : int
+        Random seed to use.
+
+    Returns
+    -------
+    args
+        Updated configuration
+    """
+    if torch.cuda.is_available():
+        args['device'] = 'cuda:0'
+    else:
+        args['device'] = 'cpu'
+
+    # Set random seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+
+    mkdir_p(args['result_path'])
+
+    return args
 
 def atom_pair_featurizer(reactants, data_field='atom_pair'):
     """Featurize each pair of atoms, which will be used in updating
@@ -57,7 +108,7 @@ def atom_pair_featurizer(reactants, data_field='atom_pair'):
         return bond_type_one_hot(bond) + bond_is_conjugated(bond) + bond_is_in_ring(bond)
 
     features = []
-    num_atoms = mol.GetNumAtoms()
+    num_atoms = all_reactant_mol.GetNumAtoms()
     for j in range(num_atoms):
         for i in range(num_atoms):
             pair_feature = np.zeros(10)
@@ -77,10 +128,15 @@ def atom_pair_featurizer(reactants, data_field='atom_pair'):
             features.append(pair_feature)
     return {data_field: torch.from_numpy(np.stack(features, axis=0).astype(np.float32))}
 
-def load_data():
+def load_data(num_processes):
     """Load and pre-process the dataset.
 
     Construct DGLGraphs and featurize their nodes/edges.
+
+    Parameters
+    ----------
+    num_processes : int
+        Number of processes to use for preprocessing the dataset.
 
     Returns
     -------
@@ -105,14 +161,18 @@ def load_data():
             bond_type_one_hot, bond_is_conjugated, bond_is_in_ring]
         )
     })
+
     train_set = USPTO('train', node_featurizer=atom_featurizer,
                       edge_featurizer=bond_featurizer,
-                      atom_pair_featurizer=atom_pair_featurizer)
+                      atom_pair_featurizer=atom_pair_featurizer,
+                      num_processes=num_processes)
     val_set = USPTO('val', node_featurizer=atom_featurizer,
                     edge_featurizer=bond_featurizer,
-                    atom_pair_featurizer=atom_pair_featurizer)
+                    atom_pair_featurizer=atom_pair_featurizer,
+                    num_processes=num_processes)
     test_set = USPTO('test', node_featurizer=atom_featurizer,
                      edge_featurizer=bond_featurizer,
-                     atom_pair_featurizer=atom_pair_featurizer)
+                     atom_pair_featurizer=atom_pair_featurizer,
+                     num_processes=num_processes)
 
     return train_set, val_set, test_set

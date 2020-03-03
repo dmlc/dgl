@@ -5,6 +5,8 @@ import torch
 from collections import defaultdict
 from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive
 from dgllife.utils import mol_to_bigraph, mol_to_complete_graph
+from functools import partial
+from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
 
@@ -34,8 +36,8 @@ def get_pair_label(reactants_mol, graph_edits):
     pair_to_changes = defaultdict(list)
     for edit in graph_edits.split(';'):
         a1, a2, change = edit.split('-')
-        atom1 = a1 - 1
-        atom2 = a2 - 1
+        atom1 = int(a1) - 1
+        atom2 = int(a2) - 1
         change = bond_change_to_id[float(change)]
         pair_to_changes[(atom1, atom2)].append(change)
         pair_to_changes[(atom2, atom1)].append(change)
@@ -49,6 +51,88 @@ def get_pair_label(reactants_mol, graph_edits):
             labels.append(pair_label)
 
     return torch.stack(labels, dim=0)
+
+def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer,
+                                    edge_featurizer, atom_pair_featurizer):
+    """Construct DGLGraphs and featurize them for a single reaction data.
+
+    Parameters
+    ----------
+    reaction_data : 2-tuple
+        The first element in the tuple stands for reaction. The second element in the tuple
+        stands for graph edits in the reaction.
+    mol_to_graph: callable, str -> DGLGraph
+        A function turning RDKit molecule instances into DGLGraphs.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
+    atom_pair_featurizer : callable, str -> dict
+        Featurization for each pair of atoms in multiple reactants. The result will be
+        used to update edata in the complete DGLGraphs.
+    """
+    reaction = reaction_data[0]
+    graph_edits = reaction_data[1]
+    reactants = reaction.split('>')[0]
+    mol = Chem.MolFromSmiles(reactants)
+    # Reorder atoms according to the order specified in the atom map
+    atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
+    for i in range(mol.GetNumAtoms()):
+        atom = mol.GetAtomWithIdx(i)
+        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
+    mol = rdmolops.RenumberAtoms(mol, atom_map_order)
+    reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
+                                      edge_featurizer=edge_featurizer,
+                                      canonical_atom_order=False)
+    complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
+                                           canonical_atom_order=False)
+    if atom_pair_featurizer is not None:
+        complete_graph.edata.update(atom_pair_featurizer(reactants))
+    label = get_pair_label(mol, graph_edits)
+
+    return mol, reactant_mol_graph, complete_graph, label
+
+def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
+                             edge_featurizer, atom_pair_featurizer, num_processes, load):
+    """Construct DGLGraphs and featurize them.
+
+    Parameters
+    ----------
+    all_reaction_data : list of 2-tuples
+        The first element in the tuple stands for reaction. The second element in the tuple
+        stands for graph edits in the reaction.
+    mol_to_graph: callable, str -> DGLGraph
+        A function turning RDKit molecule instances into DGLGraphs.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph.
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
+        edata for a DGLGraph.
+    atom_pair_featurizer : callable, str -> dict
+        Featurization for each pair of atoms in multiple reactants. The result will be
+        used to update edata in the complete DGLGraphs.
+    num_processes : int
+        Number of processes for multiprocessing.
+    load : bool
+        Whether to load the previously pre-processed dataset or pre-process from scratch.
+        ``load`` should be False when we want to try different graph construction and
+        featurization methods and need to preprocess from scratch.
+    """
+    # Todo: check whether the storage files exist
+    if not load:
+        return NotImplementedError
+    else:
+        with Pool(processes=num_processes) as pool:
+            results = pool.map_async(partial(
+                preprocess_single_reaction_data, mol_to_graph=mol_to_graph,
+                node_featurizer=node_featurizer, edge_featurizer=edge_featurizer,
+                atom_pair_featurizer=atom_pair_featurizer), all_reaction_data)
+            results = results.get()
+        mols, reactant_mol_graphs, complete_graphs, labels = map(list, zip(*results))
+    return mols, reactant_mol_graphs, complete_graphs, labels
 
 class USPTO(object):
     """USPTO dataset for reaction prediction.
@@ -84,6 +168,8 @@ class USPTO(object):
     atom_pair_featurizer : callable, str -> dict
         Featurization for each pair of atoms in multiple reactants. The result will be
         used to update edata in the complete DGLGraphs.
+    num_processes : int
+        Number of processes for multiprocessing. Default to 8.
     load : bool
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
@@ -95,17 +181,13 @@ class USPTO(object):
                  node_featurizer=None,
                  edge_featurizer=None,
                  atom_pair_featurizer=None,
+                 num_processes=8,
                  load=True):
         super(USPTO, self).__init__()
 
         assert subset in ['full', 'train', 'val', 'test'], \
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         self._subset = subset
-        self._mol_to_graph = mol_to_graph
-        self._node_featurizer = node_featurizer
-        self._edge_featurizer = edge_featurizer
-        self._atom_pair_featurizer = atom_pair_featurizer
-        self._load = load
 
         self._url = 'dataset/uspto.zip'
         data_path = get_download_dir() + '/uspto.zip'
@@ -118,22 +200,40 @@ class USPTO(object):
         self.reactant_complete_graphs = []
         self.labels = []
 
-        if self.subset in ['full', 'train']:
-            self.preprocess(extracted_data_path + '/train.txt.proc')
-        if self.subset in ['full', 'val']:
-            self.preprocess(extracted_data_path + '/valid.txt.proc')
-        if self.subset in ['full', 'test']:
-            self.preprocess(extracted_data_path + '/test.txt.proc')
+        if self.subset == 'full':
+            subsets = ['train', 'valid', 'test']
+        elif self.subset == 'val':
+            subsets = ['valid']
+        else:
+            subsets = [self.subset]
 
-    def preprocess(self, file_path):
-        """Read the raw data file and pre-process it.
+        for set in subsets:
+            file_path = extracted_data_path + '/{}.txt.proc'.format(set)
+            all_reaction_data = self.load_reaction_data(file_path)
 
-        During the pre-processing, DGLGraphs are constructed with nodes and edges featurized.
+            # Todo: remove the line below
+            all_reaction_data = all_reaction_data[:1000]
+            mols, reactant_mol_graphs, complete_graphs, labels = preprocess_reaction_data(
+                all_reaction_data,  mol_to_graph, node_featurizer,
+                edge_featurizer, atom_pair_featurizer, num_processes, load)
+            self.mols.extend(mols)
+            self.reactant_mol_graphs.extend(reactant_mol_graphs)
+            self.reactant_complete_graphs.extend(complete_graphs)
+            self.labels.extend(labels)
+
+    def load_reaction_data(self, file_path):
+        """Load reaction data from the raw file.
 
         Parameters
         ----------
         file_path : str
             Path to read the file.
+
+        Returns
+        -------
+        list of 2-tuples
+            The first element in the tuple stands for reaction. The second element in the tuple
+            stands for graph edits in the reaction.
         """
         all_reaction_data = []
         with open(file_path, 'r') as f:
@@ -156,27 +256,8 @@ class USPTO(object):
                 all_reaction_data.append((reaction, graph_edits))
 
         random.shuffle(all_reaction_data)
-        for reaction, graph_edits in all_reaction_data:
-            reactants = reaction.split('>')[0]
-            mol = Chem.MolFromSmiles(reactants)
-            # Reorder atoms according to the order specified in the atom map
-            atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
-            for i in range(mol.GetNumAtoms()):
-                atom = mol.GetAtomWithIdx(i)
-                atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
-            mol = rdmolops.RenumberAtoms(mol, atom_map_order)
-            self.mols.append(mol)
-            self.reactant_mol_graphs.append(
-                self._mol_to_graph(mol, node_featurizer=self._node_featurizer,
-                                   edge_featurizer=self._edge_featurizer,
-                                   canonical_atom_order=False))
-            complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
-                                                   edge_featurizer=self._atom_pair_featurizer,
-                                                   canonical_atom_order=False)
-            if self._atom_pair_featurizer is not None:
-                complete_graph.edata.update(self._atom_pair_featurizer(reaction))
-            self.reactant_complete_graphs.append(complete_graph)
-            self.labels.append(get_pair_label(mol, graph_edits))
+
+        return all_reaction_data
 
     @property
     def subset(self):
