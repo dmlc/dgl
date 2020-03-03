@@ -65,7 +65,7 @@ def split_dataset(dataset, frac_list=None, shuffle=False, random_state=None):
     from itertools import accumulate
     if frac_list is None:
         frac_list = [0.8, 0.1, 0.1]
-    frac_list = np.array(frac_list)
+    frac_list = np.asarray(frac_list)
     assert np.allclose(np.sum(frac_list), 1.), \
         'Expect frac_list sum to 1, got {:.4f}'.format(np.sum(frac_list))
     num_data = len(dataset)
