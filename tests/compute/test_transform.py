@@ -395,7 +395,7 @@ def test_to_simple():
         for i, e in enumerate(uv):
             assert eid_map[i] == suv.index(e)
 
-
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
 def test_compact_as_bipartite():
     def check(g, bg, rhs_nodes, include_rhs_in_lhs):
         if rhs_nodes is not None:
@@ -409,10 +409,10 @@ def test_compact_as_bipartite():
         bg_src, bg_dst = bg.all_edges(order='eid')
         src_ans, dst_ans = g.all_edges(order='eid')
 
-        induced_src_bg = F.take(induced_src, bg_src, 0)
-        induced_dst_bg = F.take(induced_dst, bg_dst, 0)
-        induced_src_ans = F.take(src_ans, induced_eid, 0)
-        induced_dst_ans = F.take(dst_ans, induced_eid, 0)
+        induced_src_bg = F.gather_row(induced_src, bg_src)
+        induced_dst_bg = F.gather_row(induced_dst, bg_dst)
+        induced_src_ans = F.gather_row(src_ans, induced_eid)
+        induced_dst_ans = F.gather_row(dst_ans, induced_eid)
 
         assert F.array_equal(induced_src_bg, induced_src_ans)
         assert F.array_equal(induced_dst_bg, induced_dst_ans)
@@ -446,6 +446,7 @@ def test_compact_as_bipartite():
     rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
     bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes, include_rhs_in_lhs=True)
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_remove_edges():
     def check(g, etype, edgeset):
         src, dst = g.edges(etype=etype)
