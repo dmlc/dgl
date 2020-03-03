@@ -171,7 +171,7 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     docstring = """Builtin message function that computes a message on an edge
     by performing element-wise {} between features of {} and {}
     if the features have the same shape; otherwise, it first broadcasts the features
-    of {} and {} to a new shape and performs element-wise {}.
+    to a new shape and performs element-wise {}.
 
     Parameters
     ----------
@@ -187,8 +187,6 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     >>> import dgl
     >>> message_func = dgl.function.{}('h', 'h', 'm')
     """.format(binary_op,
-               TargetCode.CODE2STR[_TARGET_MAP[lhs]],
-               TargetCode.CODE2STR[_TARGET_MAP[rhs]],
                TargetCode.CODE2STR[_TARGET_MAP[lhs]],
                TargetCode.CODE2STR[_TARGET_MAP[rhs]],
                binary_op,
