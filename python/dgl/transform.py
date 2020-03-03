@@ -7,7 +7,6 @@ from .base import EID
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
-from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
