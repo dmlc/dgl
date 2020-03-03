@@ -23,7 +23,7 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_OPENMP "Build with OpenMP" OFF)
+dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
