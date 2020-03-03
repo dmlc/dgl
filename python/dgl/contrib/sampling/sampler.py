@@ -12,7 +12,6 @@ from ..._ffi.ndarray import empty
 from ... import utils
 from ...nodeflow import NodeFlow
 from ... import backend as F
-from ... import subgraph
 from ...graph import DGLGraph
 from ...base import NID, EID
 
