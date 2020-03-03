@@ -17,7 +17,7 @@ template <DLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COORemove(COOMatrix coo, IdArray entries) {
   const int64_t nnz = coo.row->shape[0];
   const IdType *row_data = static_cast<IdType *>(coo.row->data);
-  const IdType *col_data = static_cast<IdType *>(coo.row->data);
+  const IdType *col_data = static_cast<IdType *>(coo.col->data);
   const IdType *eid_data = COOHasData(coo) ? static_cast<IdType *>(coo.data->data) : nullptr;
 
   IdHashMap<IdType> eid_map(entries);

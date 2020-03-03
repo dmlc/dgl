@@ -83,7 +83,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
     // assigned ids from 0 to num_edges - 1.
-    adj_.data = IdArray();
+    adj_.data = aten::NullArray();
   }
 
   inline dgl_type_t SrcType() const {
@@ -1069,6 +1069,28 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csr(new CSR(mg, mat));
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSC(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids, SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(num_src, num_dst);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csc(new CSR(mg, num_src, num_dst, indptr, indices, edge_ids));
+  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_format));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSC(
+    int64_t num_vtypes, const aten::CSRMatrix& mat,
+    SparseFormat restrict_format) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  if (num_vtypes == 1)
+    CHECK_EQ(mat.num_rows, mat.num_cols);
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csc(new CSR(mg, mat));
+  return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, restrict_format));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {

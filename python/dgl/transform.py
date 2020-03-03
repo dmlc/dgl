@@ -837,8 +837,8 @@ def remove_edges(graph, edge_ids):
 
     new_graph = DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
     for i, canonical_etype in enumerate(graph.canonical_etypes):
-        new_graph.edges[canonical_etype].data[dgl.EID] = F.zerocopy_from_dgl_ndarray(
-            induced_eids_nd[i])
+        new_graph.edges[canonical_etype].data[EID] = F.zerocopy_from_dgl_ndarray(
+            induced_eids_nd[i].data)
 
     return new_graph
 

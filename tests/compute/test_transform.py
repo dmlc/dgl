@@ -396,6 +396,77 @@ def test_to_simple():
             assert eid_map[i] == suv.index(e)
 
 
+def test_compact_as_bipartite():
+    def check(g, bg, rhs_nodes, include_rhs_in_lhs):
+        if rhs_nodes is not None:
+            assert F.array_equal(bg.ddata[dgl.NID], rhs_nodes)
+        if include_rhs_in_lhs:
+            n_rhs_nodes = len(rhs_nodes)
+            assert F.array_equal(bg.sdata[dgl.NID][:n_rhs_nodes], rhs_nodes)
+        induced_src = bg.sdata[dgl.NID]
+        induced_dst = bg.ddata[dgl.NID]
+        induced_eid = bg.edata[dgl.EID]
+        bg_src, bg_dst = bg.all_edges(order='eid')
+        src_ans, dst_ans = g.all_edges(order='eid')
+
+        induced_src_bg = F.take(induced_src, bg_src, 0)
+        induced_dst_bg = F.take(induced_dst, bg_dst, 0)
+        induced_src_ans = F.take(src_ans, induced_eid, 0)
+        induced_dst_ans = F.take(dst_ans, induced_eid, 0)
+
+        assert F.array_equal(induced_src_bg, induced_src_ans)
+        assert F.array_equal(induced_dst_bg, induced_dst_ans)
+
+    def checkall(g, bg, rhs_nodes, include_rhs_in_lhs):
+        for etype in g.etypes:
+            check(g[etype], bg[etype], rhs_nodes, include_rhs_in_lhs)
+
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
+        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
+        ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
+    g_a = g['AA']
+    bg = dgl.compact_as_bipartite(g_a)
+    check(g_a, bg, None, False)
+    rhs_nodes = F.tensor([3, 4], dtype=F.int64)
+    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes)
+    check(g_a, bg, rhs_nodes, False)
+    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
+    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes)
+    check(g_a, bg, rhs_nodes, False)
+    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
+    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes, include_rhs_in_lhs=True)
+    check(g_a, bg, rhs_nodes, True)
+
+    bg = dgl.compact_as_bipartite(g)
+    rhs_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes)
+    rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
+    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes)
+    rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
+    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes, include_rhs_in_lhs=True)
+
+def test_remove_edges():
+    def check(g, etype, edgeset):
+        src, dst = g.edges(etype=etype)
+        src = F.asnumpy(src)
+        dst = F.asnumpy(dst)
+        src_dst_set = set(zip(src, dst))
+        assert src_dst_set == edgeset
+    for fmt in ['coo', 'csr', 'csc']:
+        g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt)
+        g1 = dgl.remove_edges(g, F.tensor([2]))
+        check(g1, None, set([(0, 1), (2, 3), (3, 4)]))
+
+    g = dgl.heterograph({
+        ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
+        ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
+        ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
+    g2 = dgl.remove_edges(g, {'AA': F.tensor([2]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
+    check(g2, 'AA', set([(0, 1), (2, 3), (3, 4)]))
+    check(g2, 'AB', set([(0, 1), (1, 3), (3, 5)]))
+    check(g2, 'BA', set([(2, 3)]))
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
@@ -413,3 +484,5 @@ if __name__ == '__main__':
     test_to_simple()
     test_in_subgraph()
     test_out_subgraph()
+    test_compact_as_bipartite()
+    test_remove_edges()

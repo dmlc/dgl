@@ -21,6 +21,7 @@
 
 namespace dgl {
 
+class HeteroGraph;
 class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
@@ -176,6 +177,16 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, const aten::CSRMatrix& mat,
       SparseFormat restrict_format = SparseFormat::kAny);
 
+  /*! \brief Create a graph from (in) CSC arrays */
+  static HeteroGraphPtr CreateFromCSC(
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      SparseFormat restrict_format = SparseFormat::kAny);
+
+  static HeteroGraphPtr CreateFromCSC(
+      int64_t num_vtypes, const aten::CSRMatrix& mat,
+      SparseFormat restrict_format = SparseFormat::kAny);
+
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
 
@@ -212,6 +223,7 @@ class UnitGraph : public BaseHeteroGraph {
 
  private:
   friend class Serializer;
+  friend class HeteroGraph;
 
   /*!
    * \brief constructor
@@ -227,8 +239,10 @@ class UnitGraph : public BaseHeteroGraph {
   HeteroGraphPtr GetAny() const;
 
   /*!
-   * \return Return the given format.  Perform format conversion if requested format does
-   * not exist.
+   * \brief Return the graph in the given format. Perform format conversion if the
+   * requested format does not exist.
+   *
+   * \return A graph in the requested format.
    */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
 

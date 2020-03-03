@@ -9,13 +9,16 @@
 #ifndef DGL_ARRAY_H_
 #define DGL_ARRAY_H_
 
-#include <dgl/runtime/ndarray.h>
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include <algorithm>
 #include <vector>
 #include <tuple>
 #include <utility>
+#include <string>
+
+#include "./runtime/ndarray.h"
+#include "./runtime/object.h"
 
 namespace dgl {
 
@@ -31,11 +34,74 @@ typedef NDArray IntArray;
 typedef NDArray FloatArray;
 typedef NDArray TypeArray;
 
+/*!
+ * \brief Sparse format.
+ */
+enum class SparseFormat {
+  kAny = 0,
+  kCOO = 1,
+  kCSR = 2,
+  kCSC = 3
+};
+
+// Parse sparse format from string.
+inline SparseFormat ParseSparseFormat(const std::string& name) {
+  if (name == "coo")
+    return SparseFormat::kCOO;
+  else if (name == "csr")
+    return SparseFormat::kCSR;
+  else if (name == "csc")
+    return SparseFormat::kCSC;
+  else
+    return SparseFormat::kAny;
+}
+
+// Sparse matrix object that is exposed to python API.
+struct SparseMatrix : public runtime::Object {
+  // Sparse format.
+  int32_t format = 0;
+
+  // Shape of this matrix.
+  int64_t num_rows = 0, num_cols = 0;
+
+  // Index arrays. For CSR, it is {indptr, indices, data}. For COO, it is {row, col, data}.
+  std::vector<IdArray> indices;
+
+  // Boolean flags.
+  // TODO(minjie): We might revisit this later to provide a more general solution. Currently,
+  //   we only consider aten::COOMatrix and aten::CSRMatrix.
+  std::vector<bool> flags;
+
+  SparseMatrix() {}
+
+  SparseMatrix(int32_t fmt, int64_t nrows, int64_t ncols,
+               const std::vector<IdArray>& idx,
+               const std::vector<bool>& flg)
+    : format(fmt), num_rows(nrows), num_cols(ncols), indices(idx), flags(flg) {}
+
+  static constexpr const char* _type_key = "aten.SparseMatrix";
+  DGL_DECLARE_OBJECT_TYPE_INFO(SparseMatrix, runtime::Object);
+};
+// Define SparseMatrixRef
+DGL_DEFINE_OBJECT_REF(SparseMatrixRef, SparseMatrix);
+
 namespace aten {
 
 //////////////////////////////////////////////////////////////////////
 // ID array
 //////////////////////////////////////////////////////////////////////
+
+/*! \return A special array to represent null. */
+inline NDArray NullArray() {
+  return NDArray::Empty({0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+}
+
+/*!
+ * \return Whether the input array is a null array.
+ */
+inline bool IsNullArray(NDArray array) {
+  return array->shape[0] == 0;
+}
 
 /*!
  * \brief Create a new id array with given length
@@ -232,7 +298,7 @@ struct CSRMatrix {
   int64_t num_rows = 0, num_cols = 0;
   /*! \brief CSR index arrays */
   IdArray indptr, indices;
-  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
   /*! \brief whether the column indices per row are sorted */
   bool sorted = false;
@@ -240,10 +306,24 @@ struct CSRMatrix {
   CSRMatrix() = default;
   /*! \brief constructor */
   CSRMatrix(int64_t nrows, int64_t ncols,
-            IdArray parr, IdArray iarr, IdArray darr = IdArray(),
+            IdArray parr, IdArray iarr, IdArray darr = NullArray(),
             bool sorted_flag = false)
     : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
       data(darr), sorted(sorted_flag) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit CSRMatrix(const SparseMatrix& spmat)
+    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
+      indptr(spmat.indices[0]), indices(spmat.indices[1]), data(spmat.indices[2]),
+      sorted(spmat.flags[0]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCSR),
+                        num_rows, num_cols,
+                        {indptr, indices, data},
+                        {sorted});
+  }
 };
 
 /*!
@@ -262,7 +342,7 @@ struct COOMatrix {
   int64_t num_rows = 0, num_cols = 0;
   /*! \brief COO index arrays */
   IdArray row, col;
-  /*! \brief data index array. When empty, assume it is from 0 to NNZ - 1. */
+  /*! \brief data index array. When is null, assume it is from 0 to NNZ - 1. */
   IdArray data;
   /*! \brief whether the row indices are sorted */
   bool row_sorted = false;
@@ -272,10 +352,24 @@ struct COOMatrix {
   COOMatrix() = default;
   /*! \brief constructor */
   COOMatrix(int64_t nrows, int64_t ncols,
-            IdArray rarr, IdArray carr, IdArray darr = IdArray(),
+            IdArray rarr, IdArray carr, IdArray darr = NullArray(),
             bool rsorted = false, bool csorted = false)
     : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
       row_sorted(rsorted), col_sorted(csorted) {}
+
+  /*! \brief constructor from SparseMatrix object */
+  explicit COOMatrix(const SparseMatrix& spmat)
+    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
+      row(spmat.indices[0]), col(spmat.indices[1]), data(spmat.indices[2]),
+      row_sorted(spmat.flags[0]), col_sorted(spmat.flags[1]) {}
+
+  // Convert to a SparseMatrix object that can return to python.
+  SparseMatrix ToSparseMatrix() const {
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCOO),
+                        num_rows, num_cols,
+                        {row, col, data},
+                        {row_sorted, col_sorted});
+  }
 };
 
 ///////////////////////// CSR routines //////////////////////////
@@ -300,7 +394,7 @@ runtime::NDArray CSRGetRowData(CSRMatrix , int64_t row);
 
 /*! \brief Whether the CSR matrix contains data */
 inline bool CSRHasData(CSRMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /* \brief Get data. The return type is an ndarray due to possible duplicate entries. */
@@ -499,7 +593,7 @@ COOGetRowDataAndIndices(COOMatrix , int64_t row);
 
 /*! \brief Whether the COO matrix contains data */
 inline bool COOHasData(COOMatrix csr) {
-  return csr.data.defined();
+  return !IsNullArray(csr.data);
 }
 
 /*! \brief Get data. The return type is an ndarray due to possible duplicate entries. */

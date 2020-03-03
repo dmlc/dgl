@@ -41,29 +41,17 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
     if (fmt == SparseFormat::kCOO) {
       const COOMatrix &coo = graph->GetCOOMatrix(etype);
       auto result = COORemove(coo, eids[etype]);
-      new_rel_graph = CreateFromCOO(
-          num_ntypes_rel, num_nodes_srctype, num_nodes_dsttype,
-          result.first.row, result.first.col);
+      new_rel_graph = CreateFromCOO(num_ntypes_rel, result.first);
       induced_eids_rel = result.second;
     } else if (fmt == SparseFormat::kCSR) {
       const CSRMatrix &csr = graph->GetCSRMatrix(etype);
       auto result = CSRRemove(csr, eids[etype]);
-      CSRMatrix new_csr = std::move(result.first);
-      const IdArray new_eids = Range(
-          0, new_csr.indices->shape[0], new_csr.indices->dtype.bits, new_csr.indices->ctx);
-      new_rel_graph = CreateFromCSR(
-          num_ntypes_rel, num_nodes_srctype, num_nodes_dsttype,
-          new_csr.indptr, new_csr.indices, new_eids);
+      new_rel_graph = CreateFromCSR(num_ntypes_rel, result.first);
       induced_eids_rel = result.second;
     } else if (fmt == SparseFormat::kCSC) {
       const CSRMatrix &csc = graph->GetCSCMatrix(etype);
       auto result = CSRRemove(csc, eids[etype]);
-      CSRMatrix new_csr = CSRTranspose(result.first);
-      const IdArray new_eids = Range(
-          0, new_csr.indices->shape[0], new_csr.indices->dtype.bits, new_csr.indices->ctx);
-      new_rel_graph = CreateFromCSR(
-          num_ntypes_rel, num_nodes_srctype, num_nodes_dsttype,
-          new_csr.indptr, new_csr.indices, new_eids);
+      new_rel_graph = CreateFromCSC(num_ntypes_rel, result.first);
       induced_eids_rel = result.second;
     }
 

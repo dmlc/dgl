@@ -34,14 +34,11 @@ inline PickFn<IdxType> GetSamplingPickFn(
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      // TODO(minjie): If efficiency is a problem, consider avoid creating
-      //   explicit NDArrays by directly manipulating buffers.
       FloatArray prob_selected = DoubleSlice<IdxType, FloatType>(prob, data, off, len);
-      IdArray sampled = RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
-          num_samples, prob_selected, replace);
-      const IdxType* sampled_data = static_cast<IdxType*>(sampled->data);
+      RandomEngine::ThreadLocal()->Choice<IdxType, FloatType>(
+          num_samples, prob_selected, out_idx, replace);
       for (int64_t j = 0; j < num_samples; ++j) {
-        out_idx[j] = off + sampled_data[j];
+        out_idx[j] += off;
       }
     };
   return pick_fn;
@@ -54,13 +51,10 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
     (IdxType rowid, IdxType off, IdxType len,
      const IdxType* col, const IdxType* data,
      IdxType* out_idx) {
-      // TODO(minjie): If efficiency is a problem, consider avoid creating
-      //   explicit NDArrays by directly manipulating buffers.
-      IdArray sampled = RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
-          num_samples, len, replace);
-      const IdxType* sampled_data = static_cast<IdxType*>(sampled->data);
+      RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
+          num_samples, len, out_idx, replace);
       for (int64_t j = 0; j < num_samples; ++j) {
-        out_idx[j] = off + sampled_data[j];
+        out_idx[j] += off;
       }
     };
   return pick_fn;
@@ -72,6 +66,7 @@ inline PickFn<IdxType> GetSamplingUniformPickFn(
 template <DLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix CSRRowWiseSampling(CSRMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  CHECK(prob.defined());
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
   return CSRRowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
@@ -102,6 +97,7 @@ template COOMatrix CSRRowWiseSamplingUniform<kDLCPU, int64_t>(
 template <DLDeviceType XPU, typename IdxType, typename FloatType>
 COOMatrix COORowWiseSampling(COOMatrix mat, IdArray rows, int64_t num_samples,
                              FloatArray prob, bool replace) {
+  CHECK(prob.defined());
   auto pick_fn = GetSamplingPickFn<IdxType, FloatType>(num_samples, prob, replace);
   return COORowWisePick(mat, rows, num_samples, replace, pick_fn);
 }
