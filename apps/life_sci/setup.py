@@ -13,12 +13,12 @@ else:
 setup(
     name='dgllife',
     version=dgllife.__version__,
-    description='DGL-based package for Chemistry',
+    description='DGL-based package for Life Science',
     keywords=[
         'pytorch',
         'dgl',
         'graph-neural-networks',
-        'chemistry',
+        'life-science',
         'drug-discovery'
     ],
     zip_safe=False,
@@ -32,7 +32,7 @@ setup(
         'pandas>=0.25.1',
         'requests>=2.22.0'
     ],
-    url='https://github.com/dmlc/dgl/tree/master/apps/chem',
+    url='https://github.com/dmlc/dgl/tree/master/apps/life_sci',
     classifiers=[
         'Programming Language :: Python :: 3',
     ]

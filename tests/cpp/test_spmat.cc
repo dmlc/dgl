@@ -14,14 +14,12 @@ aten::CSRMatrix CSR1() {
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   // data: [0, 2, 3, 1, 4]
-  aten::CSRMatrix csr;
-  csr.num_rows = 4;
-  csr.num_cols = 5;
-  csr.indptr = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, CTX);
-  csr.indices = aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
-  csr.data = aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 1, 4}), sizeof(IDX)*8, CTX);
-  csr.sorted = false;
-  return csr;
+  return aten::CSRMatrix(
+      4, 5,
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      false);
 }
 
 template <typename IDX>
@@ -32,14 +30,12 @@ aten::CSRMatrix CSR2() {
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   // data: [0, 2, 5, 3, 1, 4]
-  aten::CSRMatrix csr;
-  csr.num_rows = 4;
-  csr.num_cols = 5;
-  csr.indptr = aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX);
-  csr.indices = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX);
-  csr.data = aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX);
-  csr.sorted = false;
-  return csr;
+  return aten::CSRMatrix(
+      4, 5,
+      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, CTX),
+      false);
 }
 
 template <typename IDX>
@@ -51,12 +47,10 @@ aten::COOMatrix COO1() {
   // data: [0, 2, 3, 1, 4]
   // row : [0, 2, 0, 1, 2]
   // col : [1, 2, 2, 0, 3]
-  aten::COOMatrix coo;
-  coo.num_rows = 4;
-  coo.num_cols = 5;
-  coo.row = aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX)*8, CTX);
-  coo.col = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX)*8, CTX);
-  return coo;
+  return aten::COOMatrix(
+      4, 5,
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX)*8, CTX));
 }
 
 template <typename IDX>
@@ -69,12 +63,10 @@ aten::COOMatrix COO2() {
   // data: [0, 2, 5, 3, 1, 4]
   // row : [0, 2, 0, 1, 2, 0]
   // col : [1, 2, 2, 0, 3, 2]
-  aten::COOMatrix coo;
-  coo.num_rows = 4;
-  coo.num_cols = 5;
-  coo.row = aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, CTX);
-  coo.col = aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX)*8, CTX);
-  return coo;
+  return aten::COOMatrix(
+      4, 5,
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, CTX),
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX)*8, CTX));
 }
 
 }

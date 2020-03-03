@@ -9,15 +9,9 @@ import zipfile
 import tarfile
 import numpy as np
 import warnings
+import requests
 
 from .graph_serialize import save_graphs, load_graphs, load_labels
-
-try:
-    import requests
-except ImportError:
-    class requests_failed_to_import(object):
-        pass
-    requests = requests_failed_to_import
 
 __all__ = ['loadtxt','download', 'check_sha1', 'extract_archive',
            'get_download_dir', 'Subset', 'split_dataset',
