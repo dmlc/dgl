@@ -81,27 +81,23 @@ def construct_bigraph_from_mol(mol, add_self_loop=False):
     g : DGLGraph
         Empty bigraph topology of the molecule
     """
-    g = DGLGraph()
-
-    # Add nodes
     num_atoms = mol.GetNumAtoms()
-    g.add_nodes(num_atoms)
 
-    # Add edges
-    src_list = []
-    dst_list = []
+    edge_list = []
     num_bonds = mol.GetNumBonds()
     for i in range(num_bonds):
         bond = mol.GetBondWithIdx(i)
         u = bond.GetBeginAtomIdx()
         v = bond.GetEndAtomIdx()
-        src_list.extend([u, v])
-        dst_list.extend([v, u])
-    g.add_edges(src_list, dst_list)
-
+        edge_list.extend([(u, v), (v, u)])
     if add_self_loop:
-        nodes = g.nodes()
-        g.add_edges(nodes, nodes)
+        edge_list.extend([(i, i) for i in range(num_atoms)])
+
+    g = DGLGraph(edge_list)
+    num_nodes = g.number_of_nodes()
+    # Handle disconnected compound
+    if num_nodes < num_atoms:
+        g.add_nodes(num_atoms - num_nodes)
 
     return g
 
@@ -189,20 +185,13 @@ def construct_complete_graph_from_mol(mol, add_self_loop=False):
     g : DGLGraph
         Empty complete graph topology of the molecule
     """
-    g = DGLGraph()
     num_atoms = mol.GetNumAtoms()
-    g.add_nodes(num_atoms)
-
-    if add_self_loop:
-        g.add_edges(
-            [i for i in range(num_atoms) for j in range(num_atoms)],
-            [j for i in range(num_atoms) for j in range(num_atoms)])
-    else:
-        g.add_edges(
-            [i for i in range(num_atoms) for j in range(num_atoms - 1)], [
-                j for i in range(num_atoms)
-                for j in range(num_atoms) if i != j
-            ])
+    edge_list = []
+    for i in range(num_atoms):
+        for j in range(num_atoms):
+            if i != j or add_self_loop:
+                edge_list.append((i, j))
+    g = DGLGraph(edge_list)
 
     return g
 

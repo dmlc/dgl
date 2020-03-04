@@ -109,8 +109,8 @@ def atom_pair_featurizer(reactants, data_field='atom_pair'):
 
     features = []
     num_atoms = all_reactant_mol.GetNumAtoms()
-    for j in range(num_atoms):
-        for i in range(num_atoms):
+    for i in range(num_atoms):
+        for j in range(num_atoms):
             pair_feature = np.zeros(10)
             if i == j:
                 features.append(pair_feature)

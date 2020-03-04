@@ -44,14 +44,12 @@ def get_pair_label(reactants_mol, graph_edits):
         pair_to_changes[(atom2, atom1)].append(change)
 
     num_atoms = reactants_mol.GetNumAtoms()
-    labels = []
-    for j in range(num_atoms):
-        for i in range(num_atoms):
-            pair_label = torch.zeros(5)
-            pair_label[pair_to_changes[(j, i)]] = 1.
-            labels.append(pair_label)
+    labels = torch.zeros((num_atoms, num_atoms, 5))
+    for pair in pair_to_changes.keys():
+        i, j = pair
+        labels[i, j, pair_to_changes[(j, i)]] = 1.
 
-    return torch.stack(labels, dim=0)
+    return labels.reshape(-1, 5)
 
 def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer,
                                     edge_featurizer, atom_pair_featurizer):
@@ -59,9 +57,10 @@ def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer
 
     Parameters
     ----------
-    reaction_data : 2-tuple
-        The first element in the tuple stands for reaction. The second element in the tuple
-        stands for graph edits in the reaction.
+    reaction_data : 3-tuple
+        The first element in the tuple stands for RDKit molecule instance of the reactants.
+        The second element in the tuple stands for reaction. The third element in the
+        tuple stands for graph edits in the reaction.
     mol_to_graph: callable, str -> DGLGraph
         A function turning RDKit molecule instances into DGLGraphs.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
@@ -74,16 +73,10 @@ def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer
         Featurization for each pair of atoms in multiple reactants. The result will be
         used to update edata in the complete DGLGraphs.
     """
-    reaction = reaction_data[0]
-    graph_edits = reaction_data[1]
+    mol = reaction_data[0]
+    reaction = reaction_data[1]
+    graph_edits = reaction_data[2]
     reactants = reaction.split('>')[0]
-    mol = Chem.MolFromSmiles(reactants)
-    # Reorder atoms according to the order specified in the atom map
-    atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
-    for i in range(mol.GetNumAtoms()):
-        atom = mol.GetAtomWithIdx(i)
-        atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
-    mol = rdmolops.RenumberAtoms(mol, atom_map_order)
     reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
                                       edge_featurizer=edge_featurizer,
                                       canonical_atom_order=False)
@@ -101,9 +94,10 @@ def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
 
     Parameters
     ----------
-    all_reaction_data : list of 2-tuples
-        The first element in the tuple stands for reaction. The second element in the tuple
-        stands for graph edits in the reaction.
+    all_reaction_data : list of 3-tuples
+        The first element in the tuple stands for RDKit molecule instance of the reactants.
+        The second element in the tuple stands for reaction. The third element in the
+        tuple stands for graph edits in the reaction.
     mol_to_graph: callable, str -> DGLGraph
         A function turning RDKit molecule instances into DGLGraphs.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
@@ -232,13 +226,15 @@ class USPTO(object):
 
         Returns
         -------
-        list of 2-tuples
-            The first element in the tuple stands for reaction. The second element in the tuple
-            stands for graph edits in the reaction.
+        list of 3-tuples
+            The first element in the tuple stands for RDKit molecule instance of the reactants.
+            The second element in the tuple stands for reaction. The third element in the
+            tuple stands for graph edits in the reaction.
         """
         all_reaction_data = []
         with open(file_path, 'r') as f:
-            for line in f:
+            for i, line in enumerate(f):
+                print('Processing line {:d}'.format(i))
                 # Each line represents a reaction and the corresponding graph edits
                 #
                 # reaction example:
@@ -254,7 +250,16 @@ class USPTO(object):
                 # c specifies the particular change, 0.0 for losing a bond, 1.0, 2.0, 3.0 and
                 # 1.5 separately for forming a single, double, triple or aromatic bond.
                 reaction, graph_edits = line.strip("\r\n ").split()
-                all_reaction_data.append((reaction, graph_edits))
+                reactants = reaction.split('>')[0]
+                mol = Chem.MolFromSmiles(reactants)
+                # Reorder atoms according to the order specified in the atom map
+                atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
+                for i in range(mol.GetNumAtoms()):
+                    atom = mol.GetAtomWithIdx(i)
+                    atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
+                mol = rdmolops.RenumberAtoms(mol, atom_map_order)
+                if mol is not None:
+                    all_reaction_data.append((mol, reaction, graph_edits))
 
         random.shuffle(all_reaction_data)
 
