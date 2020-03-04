@@ -4,11 +4,12 @@ import torch
 
 from collections import defaultdict
 from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive
-from dgllife.utils import mol_to_bigraph, mol_to_complete_graph
 from functools import partial
 from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
+
+from ..utils.mol_to_graph import mol_to_bigraph, mol_to_complete_graph
 
 __all__ = ['USPTO']
 
