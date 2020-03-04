@@ -242,6 +242,7 @@ def test_metis_partition():
         ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
         num_inner_nodes += len(lnode_ids)
         num_inner_edges += len(ledge_ids)
+        assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
     assert num_inner_nodes == g.number_of_nodes()
     print(g.number_of_edges() - num_inner_edges)
 

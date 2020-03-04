@@ -581,9 +581,14 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def metis_partition(g, k):
+def metis_partition(g, k, num_hops=1):
     '''
     This is to partition a graph with Metis partitioning.
+
+    The partitioned graph is stored in DGLGraph. The DGLGraph has the `inner_node` node data
+    that indicates whether a node is inside a partition and has the `inner_edge` edge data
+    that indicates whether an edge is inside a partition. In addition, it has the `part_id`
+    node data that indicates the partition a node belongs to.
 
     Parameters
     ------------
@@ -593,6 +598,9 @@ def metis_partition(g, k):
     k: int
         The number of partitions.
 
+    num_hops: int
+        The number of hops a HALO node can be accessed.
+
     Returns
     --------
     a dict of DGLGraphs
@@ -600,7 +608,12 @@ def metis_partition(g, k):
     '''
     node_part = _CAPI_DGLMetisPartition(g._graph, k)
     node_part = utils.toindex(node_part)
-    return partition_graph_with_halo(g, node_part, 1)
+    parts = partition_graph_with_halo(g, node_part, num_hops)
+    node_part = node_part.tousertensor()
+    for part_id in parts:
+        part = parts[part_id]
+        part.ndata['part_id'] = node_part[part.parent_nid]
+    return parts
 
 def compact_graphs(graphs, always_preserve=None):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
