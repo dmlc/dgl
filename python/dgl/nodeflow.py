@@ -82,7 +82,7 @@ class NodeFlow(DGLBaseGraph):
     We store extra information, such as the node and edge mapping from
     the NodeFlow graph to the parent graph.
 
-    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/api/sampling.nodeflow.png
+    .. image:: https://data.dgl.ai/api/sampling.nodeflow.png
 
     DO NOT create NodeFlow object directly. Use sampling method to
     generate NodeFlow instead.
