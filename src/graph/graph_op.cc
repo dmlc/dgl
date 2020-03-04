@@ -3,6 +3,7 @@
  * \file graph/graph.cc
  * \brief Graph operation implementation
  */
+#include <metis.h>
 #include <dgl/graph_op.h>
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
@@ -651,6 +652,65 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray parent_vids = args[0];
     const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
+  });
+
+IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
+	// The index type of Metis needs to be compatible with DGL index type.
+	assert(sizeof(idx_t) == sizeof(dgl_id_t));
+	ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g);
+	if (ig == NULL) {
+		std::cerr << "The input graph isn't immutable graph" << std::endl;
+		return aten::NewIdArray(0);
+	}
+	// TODO is this right to get an in-CSR?
+	CSRPtr csr = ig->GetInCSR();
+	auto mat = csr->ToCSRMatrix();
+
+	idx_t nvtxs = g->NumVertices();
+	idx_t ncon = 1;        // # balacing constraints.
+	idx_t *xadj = static_cast<idx_t*>(mat.indptr->data);
+	idx_t *adjncy = static_cast<idx_t*>(mat.indices->data);
+	// TODO we could use this to create partitions that balance both #vertices and #edges.
+	idx_t *vwgt = NULL;
+	idx_t nparts = k;
+    IdArray part_arr = aten::NewIdArray(nvtxs);
+	idx_t objval = 0;
+	idx_t *part = static_cast<idx_t*>(part_arr->data);
+	int ret = METIS_PartGraphKway(&nvtxs,      // The number of vertices
+			                      &ncon,       // The number of balancing constraints.
+								  xadj,        // indptr
+								  adjncy,      // indices
+								  NULL,        // the weights of the vertices
+								  NULL,        // The size of the vertices for computing
+								               // the total communication volume
+								  NULL,        // The weights of the edges
+								  &nparts,     // The number of partitions.
+								  NULL,        // the desired weight for each partition and constraint
+								  NULL,        // the allowed load imbalance tolerance
+								  NULL,        // the array of options
+								  &objval,      // the edge-cut or the total communication volume of
+                                               // the partitioning solution
+								  part);
+	printf("Partition a graph with %ld nodes and %ld edges into %d parts and get %ld edge cuts\n",
+			g->NumVertices(), g->NumEdges(), k, objval);
+	if (ret == METIS_OK) {
+	  return part_arr;
+	} else if (ret == METIS_ERROR_INPUT) {
+	  std::cerr << "Error in Metis partitioning: input error" << std::endl;
+	} else if (ret == METIS_ERROR_MEMORY) {
+	  std::cerr << "Error in Metis partitioning: cannot allocate memory" << std::endl;
+	} else {
+	  std::cerr << "Error in Metis partitioning: other errors" << std::endl;
+	}
+	// return an array of 0 elements to indicate the error.
+	return aten::NewIdArray(0);
+}
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    int k = args[1];
+    *rv = GraphOp::MetisPartition(g.sptr(), k);
   });
 
 }  // namespace dgl
