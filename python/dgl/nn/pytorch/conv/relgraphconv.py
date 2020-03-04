@@ -72,7 +72,7 @@ class RelGraphConv(nn.Module):
         self.num_rels = num_rels
         self.regularizer = regularizer
         self.num_bases = num_bases
-        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases < 0:
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
             self.num_bases = self.num_rels
         self.bias = bias
         self.activation = activation
