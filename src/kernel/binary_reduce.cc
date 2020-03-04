@@ -181,7 +181,7 @@ inline void CheckCtx(
     const std::vector<NDArray>& arrays,
     const std::vector<std::string>& names) {
   for (size_t i = 0; i < arrays.size(); ++i) {
-    if (utils::IsNoneArray(arrays[i]))
+    if (aten::IsNullArray(arrays[i]))
       continue;
     CHECK_EQ(ctx, arrays[i]->ctx)
       << "Expected device context " << ctx << ". But got "
@@ -195,7 +195,7 @@ inline void CheckIdArray(
     const std::vector<NDArray>& arrays,
     const std::vector<std::string>& names) {
   for (size_t i = 0; i < arrays.size(); ++i) {
-    if (utils::IsNoneArray(arrays[i]))
+    if (aten::IsNullArray(arrays[i]))
       continue;
     CHECK(arrays[i]->dtype.code == kDLInt);
     CHECK_EQ(arrays[i]->ndim, 1);
@@ -415,14 +415,14 @@ void BackwardLhsBinaryOpReduce(
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          grad_lhs_data, utils::NoneArray());
+          grad_lhs_data, aten::NullArray());
     } else {
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
           reducer, op, graph,
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          grad_lhs_data, utils::NoneArray());
+          grad_lhs_data, aten::NullArray());
     }
   }
 }
@@ -491,14 +491,14 @@ void BackwardRhsBinaryOpReduce(
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          utils::NoneArray(), grad_rhs_data);
+          aten::NullArray(), grad_rhs_data);
     } else {
       DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
           reducer, op, graph,
           lhs, rhs,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
-          utils::NoneArray(), grad_rhs_data);
+          aten::NullArray(), grad_rhs_data);
     }
   }
 }
@@ -548,8 +548,8 @@ void CopyReduce(
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
       target, binary_op::kNone,
-      in_data, utils::NoneArray(), out_data,
-      in_mapping, utils::NoneArray(), out_mapping);
+      in_data, aten::NullArray(), out_data,
+      in_mapping, aten::NullArray(), out_mapping);
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyReduce")
@@ -588,16 +588,16 @@ void BackwardCopyReduce(
   CheckIdArray(graph.NumBits(),
       {in_mapping, out_mapping},
       {"in_mapping", "out_mapping"});
-  if (!utils::IsNoneArray(out_mapping)) {
+  if (!aten::IsNullArray(out_mapping)) {
     CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
       << ". But got " << out_mapping->ctx << " for rhs_data.";
   }
   DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
       target, binary_op::kNone,
-      in_mapping, utils::NoneArray(), out_mapping,
-      in_data, utils::NoneArray(), out_data, grad_out_data,
-      grad_in_data, utils::NoneArray());
+      in_mapping, aten::NullArray(), out_mapping,
+      in_data, aten::NullArray(), out_data, grad_out_data,
+      grad_in_data, aten::NullArray());
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")

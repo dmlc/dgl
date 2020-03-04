@@ -17,16 +17,6 @@ namespace dgl {
 namespace kernel {
 namespace utils {
 
-/* !\brief Return an NDArray that represents none value. */
-inline runtime::NDArray NoneArray() {
-  return runtime::NDArray::Empty({}, DLDataType{kDLInt, 32, 1}, DLContext{kDLCPU, 0});
-}
-
-/* !\brief Return true if the NDArray is none. */
-inline bool IsNoneArray(runtime::NDArray array) {
-  return array->ndim == 0;
-}
-
 /*
  * !\brief Find number of threads is smaller than dim and max_nthrs
  * and is also the power of two.

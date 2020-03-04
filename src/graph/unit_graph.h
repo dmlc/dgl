@@ -21,6 +21,7 @@
 
 namespace dgl {
 
+class HeteroGraph;
 class UnitGraph;
 typedef std::shared_ptr<UnitGraph> UnitGraphPtr;
 
@@ -212,6 +213,7 @@ class UnitGraph : public BaseHeteroGraph {
 
  private:
   friend class Serializer;
+  friend class HeteroGraph;
 
   /*!
    * \brief constructor
@@ -227,8 +229,10 @@ class UnitGraph : public BaseHeteroGraph {
   HeteroGraphPtr GetAny() const;
 
   /*!
-   * \return Return the given format.  Perform format conversion if requested format does
-   * not exist.
+   * \brief Return the graph in the given format. Perform format conversion if the
+   * requested format does not exist.
+   *
+   * \return A graph in the requested format.
    */
   HeteroGraphPtr GetFormat(SparseFormat format) const;
 

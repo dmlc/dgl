@@ -4,14 +4,15 @@
  * \brief DGL array utilities implementation
  */
 #include <dgl/array.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/container.h>
 #include "../c_api_common.h"
 #include "./array_op.h"
 #include "./arith.h"
 
+using namespace dgl::runtime;
+
 namespace dgl {
-
-using runtime::NDArray;
-
 namespace aten {
 
 IdArray NewIdArray(int64_t length, DLContext ctx, uint8_t nbits) {
@@ -437,7 +438,7 @@ COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, {
-    if (!prob.defined() || prob->shape[0] == 0) {
+    if (IsNullArray(prob)) {
       ret = impl::CSRRowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
@@ -580,7 +581,7 @@ COOMatrix COORowWiseSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, {
-    if (!prob.defined() || prob->shape[0] == 0) {
+    if (IsNullArray(prob)) {
       ret = impl::COORowWiseSamplingUniform<XPU, IdType>(mat, rows, num_samples, replace);
     } else {
       ATEN_FLOAT_TYPE_SWITCH(prob->dtype, FloatType, "probability", {
@@ -611,6 +612,56 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   });
   return ret;
 }
+
+///////////////////////// C APIs /////////////////////////
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFormat")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->format;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetNumRows")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->num_rows;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetNumCols")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    *rv = spmat->num_cols;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetIndices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    const int64_t i = args[1];
+    *rv = spmat->indices[i];
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLSparseMatrixGetFlags")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    SparseMatrixRef spmat = args[0];
+    List<Value> flags;
+    for (bool flg : spmat->flags) {
+      flags.push_back(Value(MakeValue(flg)));
+    }
+    *rv = flags;
+  });
+
+DGL_REGISTER_GLOBAL("ndarray._CAPI_DGLCreateSparseMatrix")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const int32_t format = args[0];
+    const int64_t nrows = args[1];
+    const int64_t ncols = args[2];
+    const List<Value> indices = args[3];
+    const List<Value> flags = args[4];
+    std::shared_ptr<SparseMatrix> spmat(new SparseMatrix(
+          format, nrows, ncols,
+          ListValueToVector<IdArray>(indices),
+          ListValueToVector<bool>(flags)));
+    *rv = SparseMatrixRef(spmat);
+  });
 
 }  // namespace aten
 }  // namespace dgl
