@@ -38,7 +38,7 @@ class KGDataset1:
     The triples are stored as 'head_name\trelation_name\ttail_name'.
     '''
     def __init__(self, path, name, read_triple=True, only_train=False):
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
@@ -105,7 +105,7 @@ class KGDataset2:
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
     def __init__(self, path, name, read_triple=True, only_train=False):
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
