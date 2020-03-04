@@ -107,13 +107,13 @@ class KGDatasetFB15k(KGDataset):
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
             _download_and_extract(url, path, name + '.zip')
-        path = os.path.join(path, name)
+        self.path = os.path.join(path, name)
 
-        super(KGDatasetFB15k, self).__init__(os.path.join(path, 'entities.dict'),
-                                             os.path.join(path, 'relations.dict'),
-                                             os.path.join(path, 'train.txt'),
-                                             os.path.join(path, 'valid.txt'),
-                                             os.path.join(path, 'test.txt'))
+        super(KGDatasetFB15k, self).__init__(os.path.join(self.path, 'entities.dict'),
+                                             os.path.join(self.path, 'relations.dict'),
+                                             os.path.join(self.path, 'train.txt'),
+                                             os.path.join(self.path, 'valid.txt'),
+                                             os.path.join(self.path, 'test.txt'))
 
 class KGDatasetFB15k237(KGDataset):
     '''Load a knowledge graph FB15k-237
@@ -136,13 +136,13 @@ class KGDatasetFB15k237(KGDataset):
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
             _download_and_extract(url, path, name + '.zip')
-        path = os.path.join(path, name)
+        self.path = os.path.join(path, name)
 
-        super(KGDatasetFB15k237, self).__init__(os.path.join(path, 'entities.dict'),
-                                                os.path.join(path, 'relations.dict'),
-                                                os.path.join(path, 'train.txt'),
-                                                os.path.join(path, 'valid.txt'),
-                                                os.path.join(path, 'test.txt'))
+        super(KGDatasetFB15k237, self).__init__(os.path.join(self.path, 'entities.dict'),
+                                                os.path.join(self.path, 'relations.dict'),
+                                                os.path.join(self.path, 'train.txt'),
+                                                os.path.join(self.path, 'valid.txt'),
+                                                os.path.join(self.path, 'test.txt'))
 
 class KGDatasetWN18(KGDataset):
     '''Load a knowledge graph wn18
@@ -165,13 +165,13 @@ class KGDatasetWN18(KGDataset):
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
             _download_and_extract(url, path, name + '.zip')
-        path = os.path.join(path, name)
+        self.path = os.path.join(path, name)
 
-        super(KGDatasetWN18, self).__init__(os.path.join(path, 'entities.dict'),
-                                            os.path.join(path, 'relations.dict'),
-                                            os.path.join(path, 'train.txt'),
-                                            os.path.join(path, 'valid.txt'),
-                                            os.path.join(path, 'test.txt'))
+        super(KGDatasetWN18, self).__init__(os.path.join(self.path, 'entities.dict'),
+                                            os.path.join(self.path, 'relations.dict'),
+                                            os.path.join(self.path, 'train.txt'),
+                                            os.path.join(self.path, 'valid.txt'),
+                                            os.path.join(self.path, 'test.txt'))
 
 class KGDatasetWN18rr(KGDataset):
     '''Load a knowledge graph wn18rr
@@ -194,13 +194,13 @@ class KGDatasetWN18rr(KGDataset):
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
             _download_and_extract(url, path, name + '.zip')
-        path = os.path.join(path, name)
+        self.path = os.path.join(path, name)
 
-        super(KGDatasetWN18rr, self).__init__(os.path.join(path, 'entities.dict'),
-                                              os.path.join(path, 'relations.dict'),
-                                              os.path.join(path, 'train.txt'),
-                                              os.path.join(path, 'valid.txt'),
-                                              os.path.join(path, 'test.txt'))
+        super(KGDatasetWN18rr, self).__init__(os.path.join(self.path, 'entities.dict'),
+                                              os.path.join(self.path, 'relations.dict'),
+                                              os.path.join(self.path, 'train.txt'),
+                                              os.path.join(self.path, 'valid.txt'),
+                                              os.path.join(self.path, 'test.txt'))
 
 class KGDatasetFreebase(KGDataset):
     '''Load a knowledge graph Full Freebase
@@ -225,14 +225,11 @@ class KGDatasetFreebase(KGDataset):
             _download_and_extract(url, path, '{}.zip'.format(name))
         self.path = os.path.join(path, name)
 
-        f_ent2id = os.path.join(self.path, 'entity2id.txt')
-        f_rel2id = os.path.join(self.path, 'relation2id.txt')
-
-        super(KGDatasetFreebase, self).__init__(os.path.join(path, 'entity2id.txt'),
-                                                os.path.join(path, 'relation2id.txt'),
-                                                os.path.join(path, 'train.txt'),
-                                                os.path.join(path, 'valid.txt'),
-                                                os.path.join(path, 'test.txt'))
+        super(KGDatasetFreebase, self).__init__(os.path.join(self.path, 'entity2id.txt'),
+                                                os.path.join(self.path, 'relation2id.txt'),
+                                                os.path.join(self.path, 'train.txt'),
+                                                os.path.join(self.path, 'valid.txt'),
+                                                os.path.join(self.path, 'test.txt'))
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
@@ -249,7 +246,7 @@ class KGDatasetFreebase(KGDataset):
         tails = []
         rels = []
         print('Reading {} triples....'.format(mode))
-        with open(os.path.join(path, '{}.txt'.format(mode))) as f:
+        with open(path) as f:
             if skip_first_line:
                 _ = f.readline()
             for line in f:
