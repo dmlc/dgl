@@ -39,6 +39,6 @@ We repeat the experiment five times.
 ### Examples
 
 We also provide the output of our implementation on test set together with the reference text.
-- [GraphWriter's output](https://s3.us-east-2.amazonaws.com/dgl.ai/models/graphwriter/tmp_pred.txt)
-- [Reference text](https://s3.us-east-2.amazonaws.com/dgl.ai/models/graphwriter/tmp_gold.txt)
+- [GraphWriter's output](https://data.dgl.ai/models/graphwriter/tmp_pred.txt)
+- [Reference text](https://data.dgl.ai/models/graphwriter/tmp_gold.txt)
 
