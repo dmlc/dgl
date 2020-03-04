@@ -124,7 +124,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     ligand_graph = graph((ligand_srcs, ligand_dsts),
                          'ligand_atom', 'ligand', num_ligand_atoms)
     ligand_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.array(ligand_dists).astype(np.float32)), (-1, 1))
+        np.asarray(ligand_dists, dtype=np.float32)), (-1, 1))
 
     # Construct graph for atoms in the protein
     protein_srcs, protein_dsts, protein_dists = k_nearest_neighbors(
@@ -132,7 +132,7 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     protein_graph = graph((protein_srcs, protein_dsts),
                           'protein_atom', 'protein', num_protein_atoms)
     protein_graph.edata['distance'] = F.reshape(F.zerocopy_from_numpy(
-        np.array(protein_dists).astype(np.float32)), (-1, 1))
+        np.asarray(protein_dists, dtype=np.float32)), (-1, 1))
 
     # Construct 4 graphs for complex representation, including the connection within
     # protein atoms, the connection within ligand atoms and the connection between
@@ -140,9 +140,9 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     complex_srcs, complex_dsts, complex_dists = k_nearest_neighbors(
         np.concatenate([ligand_coordinates, protein_coordinates]),
         neighbor_cutoff, max_num_neighbors)
-    complex_srcs = np.array(complex_srcs)
-    complex_dsts = np.array(complex_dsts)
-    complex_dists = np.array(complex_dists)
+    complex_srcs = np.asarray(complex_srcs)
+    complex_dsts = np.asarray(complex_dsts)
+    complex_dists = np.asarray(complex_dists)
     offset = num_ligand_atoms
 
     # ('ligand_atom', 'complex', 'ligand_atom')
@@ -206,11 +206,11 @@ def ACNN_graph_construction_and_featurization(ligand_mol,
     )
 
     # Get atomic numbers for all atoms left and set node features
-    ligand_atomic_numbers = np.array(get_atomic_numbers(ligand_mol, ligand_atom_indices_left))
+    ligand_atomic_numbers = np.asarray(get_atomic_numbers(ligand_mol, ligand_atom_indices_left))
     # zero padding
     ligand_atomic_numbers = np.concatenate([
         ligand_atomic_numbers, np.zeros(num_ligand_atoms - len(ligand_atom_indices_left))])
-    protein_atomic_numbers = np.array(get_atomic_numbers(protein_mol, protein_atom_indices_left))
+    protein_atomic_numbers = np.asarray(get_atomic_numbers(protein_mol, protein_atom_indices_left))
     # zero padding
     protein_atomic_numbers = np.concatenate([
         protein_atomic_numbers, np.zeros(num_protein_atoms - len(protein_atom_indices_left))])

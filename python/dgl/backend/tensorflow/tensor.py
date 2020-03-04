@@ -365,7 +365,7 @@ def zerocopy_from_dlpack(dlpack_tensor):
 
 def zerocopy_to_numpy(input):
     # NOTE: not zerocopy
-    return np.array(memoryview(input))
+    return np.asarray(memoryview(input))
 
 
 def zerocopy_from_numpy(np_array):
@@ -548,8 +548,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad inshape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = np.array(np.nonzero(
-        np.array(grad_shape) - np.array(in_shape)))
+    reduce_idx = np.asarray(np.nonzero(np.asarray(grad_shape) - np.asarray(in_shape)))
     reduce_idx += 1  # skip batch dim
     reduce_idx_tensor = tf.constant(tuple(
         reduce_idx.flatten().tolist()))
