@@ -74,11 +74,11 @@ def alchemy_nodes(mol):
                                                  Chem.rdchem.HybridizationType.SP2,
                                                  Chem.rdchem.HybridizationType.SP3])
         h_u.append(num_h)
-        atom_feats_dict['n_feat'].append(F.tensor(np.array(h_u).astype(np.float32)))
+        atom_feats_dict['n_feat'].append(F.tensor(np.asarray(h_u, dtype=np.float32)))
 
     atom_feats_dict['n_feat'] = F.stack(atom_feats_dict['n_feat'], dim=0)
-    atom_feats_dict['node_type'] = F.tensor(np.array(
-        atom_feats_dict['node_type']).astype(np.int64))
+    atom_feats_dict['node_type'] = F.tensor(
+        np.asarray(atom_feats_dict['node_type'], dtype=np.int64))
 
     return atom_feats_dict
 
@@ -126,9 +126,9 @@ def alchemy_edges(mol, self_loop=False):
                 np.linalg.norm(geom[u] - geom[v]))
 
     bond_feats_dict['e_feat'] = F.tensor(
-        np.array(bond_feats_dict['e_feat']).astype(np.float32))
+        np.asarray(bond_feats_dict['e_feat'], dtype=np.float32))
     bond_feats_dict['distance'] = F.tensor(
-        np.array(bond_feats_dict['distance']).astype(np.float32)).reshape(-1 , 1)
+        np.asarray(bond_feats_dict['distance'], dtype=np.float32)).reshape(-1, 1)
 
     return bond_feats_dict
 
@@ -239,7 +239,7 @@ class TencentAlchemyDataset(object):
                 smiles = Chem.MolToSmiles(mol)
                 self.smiles.append(smiles)
                 self.graphs.append(graph)
-                label = F.tensor(np.array(label[1].tolist()).astype(np.float32))
+                label = F.tensor(np.asarray(label[1].tolist(), dtype=np.float32))
                 self.labels.append(label)
 
             save_graphs(osp.join(self.file_dir, "%s_graphs.bin" % self.mode), self.graphs,
@@ -290,7 +290,7 @@ class TencentAlchemyDataset(object):
         std : int or float
             Default to be None.
         """
-        labels = np.array([i.numpy() for i in self.labels])
+        labels = np.asarray([i.numpy() for i in self.labels])
         if mean is None:
             mean = np.mean(labels, axis=0)
         if std is None:

@@ -541,7 +541,7 @@ def _reduce_grad(grad, shape):
     num_to_squeeze = len(grad_shape) - len(in_shape)
     # pad in_shape
     in_shape = (1,) * num_to_squeeze + in_shape
-    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))[0]
+    reduce_idx = np.nonzero(np.asarray(grad_shape) - np.asarray(in_shape))[0]
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
