@@ -92,7 +92,10 @@ class RelGraphConv(nn.Module):
             self.message_func = self.basis_message_func
         elif regularizer == "bdd":
             if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
-                raise ValueError('Feature size must be a multiplier of num_bases.')
+                raise ValueError(
+                    'Feature size must be a multiplier of num_bases (%d).'
+                    % self.num_bases
+                )
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
             self.submat_out = out_feat // self.num_bases
