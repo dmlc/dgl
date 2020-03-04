@@ -87,7 +87,7 @@ class GATLayer(nn.Module):
 ```
 ## Performance and Scalability
 
-**Microbenchmark on speed and memory usage**: While leaving tensor and autograd functions to backend frameworks (e.g. PyTorch, MXNet, and TensorFlow), DGL aggressively optimizes storage and computation with its own kernels. Here's a comparison to another pupular package -- PyG. The short story is that raw speed is similar, but DGL has much better memory management.
+**Microbenchmark on speed and memory usage**: While leaving tensor and autograd functions to backend frameworks (e.g. PyTorch, MXNet, and TensorFlow), DGL aggressively optimizes storage and computation with its own kernels. Here's a comparison to another popular package -- PyG. The short story is that raw speed is similar, but DGL has much better memory management.
 
 
 | Dataset  |    Model     |                   Accuracy                   |                    Time <br> PyG &emsp;&emsp; DGL                    |           Memory <br> PyG &emsp;&emsp; DGL            |
