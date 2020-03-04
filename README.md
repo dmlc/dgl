@@ -15,7 +15,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
 </p>
 
 ## ![new](https://i.imgur.com/1NilWUd.png =40x)DGL News
-Recently DGL has be chosen as the implemenation base for [Graph Neural Network benchmark framework](https://arxiv.org/abs/2003.00982), which enchmarks framework to novel medium-scale graph datasets from mathematical modeling, computer vision, chemistry and combinatorial problems. Models implemented are [here](https://github.com/graphdeeplearning/benchmarking-gnns).
+03/02/2020: DGL has be chosen as the implemenation base for [Graph Neural Network benchmark framework](https://arxiv.org/abs/2003.00982), which enchmarks framework to novel medium-scale graph datasets from mathematical modeling, computer vision, chemistry and combinatorial problems. Models implemented are [here](https://github.com/graphdeeplearning/benchmarking-gnns).
 
 ## Using DGL
 
