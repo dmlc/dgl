@@ -600,7 +600,6 @@ def metis_partition(g, k):
     '''
     node_part = _CAPI_DGLMetisPartition(g._graph, k)
     node_part = utils.toindex(node_part)
-    print(node_part.tousertensor())
     return partition_graph_with_halo(g, node_part, 1)
 
 def compact_graphs(graphs, always_preserve=None):

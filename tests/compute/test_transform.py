@@ -211,7 +211,7 @@ def get_nodeflow(g, node_ids, num_layers):
             seed_nodes=node_ids)
     return next(iter(sampler))
 
-def test_partition():
+def test_partition_with_halo():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     node_part = np.random.choice(4, g.number_of_nodes())
     subgs = dgl.transform.partition_graph_with_halo(g, node_part, 2)
@@ -231,6 +231,19 @@ def test_partition():
             block_eids2 = lnf.block_parent_eid(i)
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
+
+def test_metis_partition():
+    g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
+    subgs = dgl.transform.metis_partition(g, 4)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    for part_id, subg in subgs.items():
+        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+        ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
+        num_inner_nodes += len(lnode_ids)
+        num_inner_edges += len(ledge_ids)
+    assert num_inner_nodes == g.number_of_nodes()
+    print(g.number_of_edges() - num_inner_edges)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_in_subgraph():
