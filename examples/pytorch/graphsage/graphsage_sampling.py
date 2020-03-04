@@ -30,7 +30,7 @@ class NeighborSampler(object):
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.compact_as_bipartite(frontier, seeds, True)
             # Obtain the seed nodes for next layer.
-            seeds = dataflow_piece.sdata[dgl.NID]
+            seeds = block.sdata[dgl.NID]
 
             blocks.insert(0, block)
         return blocks
