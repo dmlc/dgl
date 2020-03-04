@@ -241,6 +241,7 @@ class KGDatasetFreebase(KGDataset):
             n_relations = int(f_rel.readline()[:-1])
         return None, n_relations
 
+
     def read_triple(self, path, mode, skip_first_line=False):
         heads = []
         tails = []
@@ -381,3 +382,57 @@ def get_dataset(data_path, data_name, format_str, files=None):
         assert False, "Unknown format {}".format(format_str)
 
     return dataset
+
+
+def get_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
+
+    if data_name == 'Freebase':
+        dataset = KGDataset2(data_path, part_name, read_triple=True, only_train=True)
+    elif format_str == '1':
+        dataset = KGDataset1(data_path, part_name, read_triple=True, only_train=True)
+    else:
+        dataset = KGDataset2(data_path, part_name, read_triple=True, only_train=True)
+
+    path = os.path.join(data_path, part_name)
+
+    partition_book = []
+    with open(os.path.join(path, 'partition_book.txt')) as f:
+        for line in f:
+            partition_book.append(int(line))
+
+    local_to_global = []
+    with open(os.path.join(path, 'local_to_global.txt')) as f:
+        for line in f:
+            local_to_global.append(int(line))
+
+    return dataset, partition_book, local_to_global
+
+
+def get_server_partition_dataset(data_path, data_name, format_str, part_id):
+    part_name = os.path.join(data_name, 'part_'+str(part_id))
+
+    if data_name == 'Freebase':
+        dataset = KGDataset2(data_path, part_name, read_triple=False, only_train=True)
+    elif format_str == '1':
+        dataset = KGDataset1(data_path, part_name, read_triple=False, only_train=True)
+    else:
+        dataset = KGDataset2(data_path, part_name, read_triple=False, only_train=True)
+
+    path = os.path.join(data_path, part_name)
+
+    n_entities = len(open(os.path.join(path, 'partition_book.txt')).readlines())
+
+    local_to_global = []
+    with open(os.path.join(path, 'local_to_global.txt')) as f:
+        for line in f:
+            local_to_global.append(int(line))
+
+    global_to_local = [0] * n_entities
+    for i in range(len(local_to_global)):
+        global_id = local_to_global[i]
+        global_to_local[global_id] = i
+
+    local_to_global = None
+
+    return global_to_local, dataset
