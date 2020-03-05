@@ -33,6 +33,7 @@ class IdHashMap {
   // If the id array has no duplicates, the array will be relabeled to consecutive
   // integers starting from 0.
   explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
+    oldv2newv_.reserve(ids->shape[0]);
     Update(ids);
   }
 

@@ -33,26 +33,31 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
     const dgl_type_t srctype = src_dst_types.first;
     const dgl_type_t dsttype = src_dst_types.second;
     const int num_ntypes_rel = (srctype == dsttype) ? 1 : 2;
-    const int64_t num_nodes_srctype = graph->NumVertices(srctype);
-    const int64_t num_nodes_dsttype = graph->NumVertices(dsttype);
     HeteroGraphPtr new_rel_graph;
     IdArray induced_eids_rel;
 
     if (fmt == SparseFormat::kCOO) {
       const COOMatrix &coo = graph->GetCOOMatrix(etype);
-      auto result = COORemove(coo, eids[etype]);
-      new_rel_graph = CreateFromCOO(num_ntypes_rel, result.first);
-      induced_eids_rel = result.second;
+      const COOMatrix &result = COORemove(coo, eids[etype]);
+      new_rel_graph = CreateFromCOO(
+          num_ntypes_rel, result.num_rows, result.num_cols, result.row, result.col);
+      induced_eids_rel = result.data;
     } else if (fmt == SparseFormat::kCSR) {
       const CSRMatrix &csr = graph->GetCSRMatrix(etype);
-      auto result = CSRRemove(csr, eids[etype]);
-      new_rel_graph = CreateFromCSR(num_ntypes_rel, result.first);
-      induced_eids_rel = result.second;
+      const CSRMatrix &result = CSRRemove(csr, eids[etype]);
+      new_rel_graph = CreateFromCSR(
+          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr, result.indices,
+          // TODO(BarclayII): make CSR support null eid array
+          Range(0, result.indices->shape[0], result.indices->dtype.bits, result.indices->ctx));
+      induced_eids_rel = result.data;
     } else if (fmt == SparseFormat::kCSC) {
       const CSRMatrix &csc = graph->GetCSCMatrix(etype);
-      auto result = CSRRemove(csc, eids[etype]);
-      new_rel_graph = CreateFromCSC(num_ntypes_rel, result.first);
-      induced_eids_rel = result.second;
+      const CSRMatrix &result = CSRRemove(csc, eids[etype]);
+      new_rel_graph = CreateFromCSC(
+          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr, result.indices,
+          // TODO(BarclayII): make CSR support null eid array
+          Range(0, result.indices->shape[0], result.indices->dtype.bits, result.indices->ctx));
+      induced_eids_rel = result.data;
     }
 
     rel_graphs.push_back(new_rel_graph);

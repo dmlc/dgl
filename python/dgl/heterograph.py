@@ -366,19 +366,19 @@ class DGLHeteroGraph(object):
     @property
     def ntype(self):
         """Return the node type if the graph has only one node type."""
-        assert len(self.ntypes) == 0
+        assert len(self.ntypes) == 1, "The graph has more than one node type."
         return self.ntypes[0]
 
     @property
     def srctype(self):
         """Return the source node type if the graph has only one edge type."""
-        assert len(self.etypes) == 1
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
         return self.canonical_etypes[0][0]
 
     @property
     def dsttype(self):
         """Return the destination node type if the graph has only one edge type."""
-        assert len(self.etypes) == 1
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
         return self.canonical_etypes[0][2]
 
     @property
@@ -561,7 +561,7 @@ class DGLHeteroGraph(object):
         return HeteroNodeDataView(self, None, ALL)
 
     @property
-    def sdata(self):
+    def srcdata(self):
         """Return the data view of all source nodes.
 
         **Only works if the graph has only one edge type.**
@@ -573,7 +573,7 @@ class DGLHeteroGraph(object):
         To set features of all source nodes in a graph with only one edge type:
 
         >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
-        >>> g.sdata['h'] = torch.zeros(2, 5)
+        >>> g.srcdata['h'] = torch.zeros(2, 5)
 
         This is equivalent to
 
@@ -592,7 +592,7 @@ class DGLHeteroGraph(object):
         return HeteroNodeDataView(self, srctype, ALL)
 
     @property
-    def ddata(self):
+    def dstdata(self):
         """Return the data view of all destination nodes.
 
         **Only works if the graph has only one edge type.**
@@ -604,7 +604,7 @@ class DGLHeteroGraph(object):
         To set features of all source nodes in a graph with only one edge type:
 
         >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
-        >>> g.ddata['h'] = torch.zeros(3, 5)
+        >>> g.dstdata['h'] = torch.zeros(3, 5)
 
         This is equivalent to
 

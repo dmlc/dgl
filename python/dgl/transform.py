@@ -34,7 +34,7 @@ __all__ = [
     'remove_self_loop',
     'metapath_reachable_graph',
     'compact_graphs',
-    'compact_as_bipartite',
+    'to_block',
     'to_simple',
     'in_subgraph',
     'out_subgraph',
@@ -717,23 +717,24 @@ def compact_graphs(graphs, always_preserve=None):
 
     return new_graphs
 
-def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix="_l",
-                         rhs_suffix="_r"):
+def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
     """Convert a graph into a bipartite-structured graph for message passing.
 
     Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
     node type ``ntype_r`` on the "right hand" side for each node type ``ntype``.  The
-    nodes of type ``ntype_r`` would contain the nodes that are destination of an edge,
-    while ``ntype_l`` would contain the nodes that are the source nodes of an edge.
+    nodes of type ``ntype_r`` would contain the nodes that have an edge of any type
+    pointing towards it, while ``ntype_l`` would contain the nodes that have an edge
+    of any type going out from it.  In addition, the left hand side would contain all
+    the nodes that appeared in the right hand side.
 
-    Edges connecting from node type ``utype`` to node type ``vtype`` are preserved,
-    except that the source node type and destination node type become ``utype_l`` and
-    ``vtype_r`` in the new graph.
+    For each relation graph of canonical edge type ``(utype, etype, vtype)``, edges
+    from node type ``utype`` to node type ``vtype`` are preserved, except that the
+    source node type and destination node type become ``utype_l`` and ``vtype_r`` in
+    the new graph.  The resulting relation graph would have a canonical edge type
+    ``(utype_l, etype, vtype_r)``.
 
-    If ``rhs_nodes`` is given, the right hand side would contain the given nodes instead.
-
-    If ``include_rhs_in_lhs`` is True, the left hand side would contain all the nodes
-    that appeared in the right hand side.
+    If ``rhs_nodes`` is given, the right hand side would contain the given nodes.
+    Otherwise, the right hand side would be determined by DGL via the rules above.
 
     Parameters
     ----------
@@ -743,8 +744,6 @@ def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix
         Optional nodes that would appear on the right hand side.
 
         If a tensor is given, the graph must have only one node type.
-    include_rhs_in_lhs : bool, default False
-        Whether to always include the right hand side nodes in the left hand side.
     lhs_suffix : str, default "_l"
         The suffix attached to all node types on the left hand side.
     rhs_suffix : str, default "_r"
@@ -760,14 +759,17 @@ def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix
 
         The edge IDs induced for each type would be stored in feature ``dgl.EID``.
 
-        If ``include_rhs_in_lhs`` is True, then for each node type ``ntype``, the first
-        few nodes with type ``ntype_l`` are guaranteed to be identical to the nodes with
-        type ``ntype_r`` (in the sense of both values and order).
+        For each node type ``ntype``, the first few nodes with type ``ntype_l`` are
+        guaranteed to be identical to the nodes with type ``ntype_r``.
 
     Notes
     -----
-    A special use case of this function is to create a graph structure for efficient
+    This function is primarily for creating graph structures for efficient
     computation of message passing.  See [TODO] for a detailed example.
+
+    Examples
+    --------
+    >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
     """
     if rhs_nodes is None:
         # Find all nodes that appeared as destinations
@@ -784,11 +786,15 @@ def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix
         rhs_nodes = {g.ntypes[0]: rhs_nodes}
 
     # rhs_nodes is now a dict
-    rhs_nodes = [rhs_nodes.get(ntype, F.tensor([], dtype=F.int64)) for ntype in g.ntypes]
-    rhs_nodes_nd = [F.zerocopy_to_dgl_ndarray(nodes) for nodes in rhs_nodes]
+    rhs_nodes_nd = []
+    for ntype in g.ntypes:
+        nodes = rhs_nodes.get(ntype, None)
+        if nodes is not None:
+            rhs_nodes_nd.append(F.zerocopy_to_dgl_ndarray(nodes))
+        else:
+            rhs_nodes_nd.append(nd.null())
 
-    new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBipartite(
-        g._graph, rhs_nodes_nd, include_rhs_in_lhs)
+    new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, rhs_nodes_nd)
     lhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in lhs_nodes_nd]
 
     new_ntypes = [ntype + lhs_suffix for ntype in g.ntypes] + \
@@ -797,7 +803,7 @@ def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix
 
     for i, ntype in enumerate(g.ntypes):
         new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
-        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
+        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[ntype]
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
@@ -809,6 +815,8 @@ def compact_as_bipartite(g, rhs_nodes=None, include_rhs_in_lhs=False, lhs_suffix
 
 def remove_edges(g, edge_ids):
     """Return a new graph with given edge IDs removed.
+
+    The nodes are preserved.
 
     Parameters
     ----------

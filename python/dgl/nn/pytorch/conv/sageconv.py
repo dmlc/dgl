@@ -1,5 +1,6 @@
 """Torch Module for GraphSAGE layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+from numbers import Integral
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -22,17 +23,17 @@ class SAGEConv(nn.Module):
 
     Parameters
     ----------
-    in_feats : int
+    in_feats : int, or pair of ints
         Input feature size.
+
+        If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
+        specifies the input feature size on both the source and destination nodes.
     out_feats : int
         Output feature size.
     feat_drop : float
         Dropout rate on features, default: ``0``.
     aggregator_type : str
         Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
-    in_dst_feats : int, optional
-        If the layer is to be applied on a unidirectional bipartite graph,
-        specifies the input feature size on the destination nodes.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -51,21 +52,28 @@ class SAGEConv(nn.Module):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
-        self._in_feats = in_feats
+
+        if isinstance(in_feats, tuple):
+            self._in_src_feats = in_feats[0]
+            self._in_dst_feats = in_feats[1]
+        elif isinstance(in_feats, Integral):
+            self._in_src_feats = self._in_dst_feats = in_feats
+        else:
+            raise TypeError('in_feats must be either int or pair of ints')
+
         self._out_feats = out_feats
-        self._in_dst_feats = in_dst_feats or in_feats
         self._aggre_type = aggregator_type
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
-            self.fc_pool = nn.Linear(in_feats, in_feats)
+            self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
-            self.lstm = nn.LSTM(in_feats, in_feats, batch_first=True)
+            self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
         if aggregator_type != 'gcn':
             self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
-        self.fc_neigh = nn.Linear(in_feats, out_feats, bias=bias)
+        self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=bias)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -86,8 +94,8 @@ class SAGEConv(nn.Module):
         """
         m = nodes.mailbox['m'] # (B, L, D)
         batch_size = m.shape[0]
-        h = (m.new_zeros((1, batch_size, self._in_feats)),
-             m.new_zeros((1, batch_size, self._in_feats)))
+        h = (m.new_zeros((1, batch_size, self._in_src_feats)),
+             m.new_zeros((1, batch_size, self._in_src_feats)))
         _, (rst, _) = self.lstm(m, h)
         return {'neigh': rst.squeeze(0)}
 
@@ -102,7 +110,7 @@ class SAGEConv(nn.Module):
             If a torch.Tensor is given, the input feature of shape :math:`(N, D_{in})` where
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
-            :math:`(N_{in}, D_{in})` and :math:`(N_{out}, D_{in})`.
+            :math:`(N_{in}, D_{in_{src}})` and :math:`(N_{out}, D_{in_{dst}})`.
 
         Returns
         -------
@@ -121,25 +129,25 @@ class SAGEConv(nn.Module):
         h_self = feat_dst
 
         if self._aggre_type == 'mean':
-            graph.sdata['h'] = feat_src
+            graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
-            h_neigh = graph.ddata['neigh']
+            h_neigh = graph.dstdata['neigh']
         elif self._aggre_type == 'gcn':
-            graph.sdata['h'] = feat_src
-            graph.ddata['h'] = feat_dst     # same as above if homogeneous
+            graph.srcdata['h'] = feat_src
+            graph.dstdata['h'] = feat_dst     # same as above if homogeneous
             graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
             # divide in_degrees
             degs = graph.in_degrees().float()
             degs = degs.to(feat_dst.device)
-            h_neigh = (graph.ddata['neigh'] + graph.ddata['h']) / (degs.unsqueeze(-1) + 1)
+            h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']) / (degs.unsqueeze(-1) + 1)
         elif self._aggre_type == 'pool':
-            graph.sdata['h'] = F.relu(self.fc_pool(feat_src))
+            graph.srcdata['h'] = F.relu(self.fc_pool(feat_src))
             graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
-            h_neigh = graph.ddata['neigh']
+            h_neigh = graph.dstdata['neigh']
         elif self._aggre_type == 'lstm':
-            graph.sdata['h'] = feat_src
+            graph.srcdata['h'] = feat_src
             graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
-            h_neigh = graph.ddata['neigh']
+            h_neigh = graph.dstdata['neigh']
         else:
             raise KeyError('Aggregator type {} not recognized.'.format(self._aggre_type))
 

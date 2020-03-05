@@ -13,7 +13,7 @@
 #include <dgl/runtime/container.h>
 #include <vector>
 #include <tuple>
-// TODO(BarclayII): currently ToBipartite depend on IdHashMap<IdType> implementation which
+// TODO(BarclayII): currently ToBlock depend on IdHashMap<IdType> implementation which
 // only works on CPU.  Should fix later to make it device agnostic.
 #include "../../array/cpu/array_utils.h"
 
@@ -28,25 +28,16 @@ namespace {
 
 template<typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBipartite(
-    HeteroGraphPtr graph,
-    const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs) {
-  std::vector<IdHashMap<IdType>> rhs_node_mappings, lhs_node_mappings;
+ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes) {
   const int64_t num_etypes = graph->NumEdgeTypes();
   const int64_t num_ntypes = graph->NumVertexTypes();
-  std::vector<EdgeArray> edge_arrays;
+  std::vector<EdgeArray> edge_arrays(num_etypes);
 
   CHECK(rhs_nodes.size() == static_cast<size_t>(num_ntypes))
     << "rhs_nodes not given for every node type";
 
-  for (const IdArray &nodes : rhs_nodes)
-    rhs_node_mappings.emplace_back(nodes);
-
-  if (include_rhs_in_lhs)
-    lhs_node_mappings = rhs_node_mappings;    // copy
-  else
-    lhs_node_mappings.resize(num_ntypes);
+  const std::vector<IdHashMap<IdType>> rhs_node_mappings(rhs_nodes.begin(), rhs_nodes.end());
+  std::vector<IdHashMap<IdType>> lhs_node_mappings(rhs_node_mappings);  // copy
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
@@ -54,7 +45,7 @@ ToBipartite(
     const dgl_type_t dsttype = src_dst_types.second;
     const EdgeArray edges = graph->InEdges(etype, rhs_nodes[dsttype]);
     lhs_node_mappings[srctype].Update(edges.src);
-    edge_arrays.push_back(edges);
+    edge_arrays[etype] = edges;
   }
 
   const auto meta_graph = graph->meta_graph();
@@ -88,28 +79,23 @@ ToBipartite(
 };  // namespace
 
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBipartite(
-    HeteroGraphPtr graph,
-    const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs) {
+ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes) {
   std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>> ret;
   ATEN_ID_TYPE_SWITCH(graph->DataType(), IdType, {
-    ret = ToBipartite<IdType>(graph, rhs_nodes, include_rhs_in_lhs);
+    ret = ToBlock<IdType>(graph, rhs_nodes);
   });
   return ret;
 }
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBipartite")
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
 .set_body([] (DGLArgs args, DGLRetValue *rv) {
     const HeteroGraphRef graph_ref = args[0];
     const std::vector<IdArray> &rhs_nodes = ListValueToVector<IdArray>(args[1]);
-    const bool include_rhs_in_lhs = args[2];
 
     HeteroGraphPtr new_graph;
     std::vector<IdArray> lhs_nodes;
     std::vector<IdArray> induced_edges;
-    std::tie(new_graph, lhs_nodes, induced_edges) = ToBipartite(
-        graph_ref.sptr(), rhs_nodes, include_rhs_in_lhs);
+    std::tie(new_graph, lhs_nodes, induced_edges) = ToBlock(graph_ref.sptr(), rhs_nodes);
 
     List<Value> lhs_nodes_ref;
     for (IdArray &array : lhs_nodes)

@@ -396,15 +396,19 @@ def test_to_simple():
             assert eid_map[i] == suv.index(e)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
-def test_compact_as_bipartite():
-    def check(g, bg, rhs_nodes, include_rhs_in_lhs):
+def test_to_block():
+    def check(g, bg, ntype, etype, rhs_nodes):
         if rhs_nodes is not None:
-            assert F.array_equal(bg.ddata[dgl.NID], rhs_nodes)
-        if include_rhs_in_lhs:
-            n_rhs_nodes = len(rhs_nodes)
-            assert F.array_equal(bg.sdata[dgl.NID][:n_rhs_nodes], rhs_nodes)
-        induced_src = bg.sdata[dgl.NID]
-        induced_dst = bg.ddata[dgl.NID]
+            assert F.array_equal(bg.nodes[ntype + '_r'].data[dgl.NID], rhs_nodes)
+        n_rhs_nodes = bg.number_of_nodes(ntype + '_r')
+        assert F.array_equal(
+            bg.nodes[ntype + '_l'].data[dgl.NID][:n_rhs_nodes],
+            bg.nodes[ntype + '_r'].data[dgl.NID])
+
+        g = g[etype]
+        bg = bg[etype]
+        induced_src = bg.srcdata[dgl.NID]
+        induced_dst = bg.dstdata[dgl.NID]
         induced_eid = bg.edata[dgl.EID]
         bg_src, bg_dst = bg.all_edges(order='eid')
         src_ans, dst_ans = g.all_edges(order='eid')
@@ -417,56 +421,71 @@ def test_compact_as_bipartite():
         assert F.array_equal(induced_src_bg, induced_src_ans)
         assert F.array_equal(induced_dst_bg, induced_dst_ans)
 
-    def checkall(g, bg, rhs_nodes, include_rhs_in_lhs):
+    def checkall(g, bg, rhs_nodes):
         for etype in g.etypes:
-            check(g[etype], bg[etype], rhs_nodes, include_rhs_in_lhs)
+            ntype = g.to_canonical_etype(etype)[2]
+            check(g, bg, ntype, etype, rhs_nodes[ntype])
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
         ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
         ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
     g_a = g['AA']
-    bg = dgl.compact_as_bipartite(g_a)
-    check(g_a, bg, None, False)
-    rhs_nodes = F.tensor([3, 4], dtype=F.int64)
-    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes)
-    check(g_a, bg, rhs_nodes, False)
-    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
-    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes)
-    check(g_a, bg, rhs_nodes, False)
-    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
-    bg = dgl.compact_as_bipartite(g_a, rhs_nodes=rhs_nodes, include_rhs_in_lhs=True)
-    check(g_a, bg, rhs_nodes, True)
 
-    bg = dgl.compact_as_bipartite(g)
+    bg = dgl.to_block(g_a)
+    check(g_a, bg, 'A', 'AA', None)
+
+    rhs_nodes = F.tensor([3, 4], dtype=F.int64)
+    bg = dgl.to_block(g_a, rhs_nodes)
+    check(g_a, bg, 'A', 'AA', rhs_nodes)
+
+    rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
+    bg = dgl.to_block(g_a, rhs_nodes)
+    check(g_a, bg, 'A', 'AA', rhs_nodes)
+
     rhs_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
-    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes)
+    bg = dgl.to_block(g, rhs_nodes)
+    checkall(g, bg, rhs_nodes)
+
     rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
-    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes)
-    rhs_nodes = {'A': F.tensor([4, 3, 2, 1], dtype=F.int64), 'B': F.tensor([3, 5, 6, 1], dtype=F.int64)}
-    bg = dgl.compact_as_bipartite(g, rhs_nodes=rhs_nodes, include_rhs_in_lhs=True)
+    bg = dgl.to_block(g, rhs_nodes=rhs_nodes)
+    checkall(g, bg, rhs_nodes)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_remove_edges():
-    def check(g, etype, edgeset):
-        src, dst = g.edges(etype=etype)
+    def check(g1, etype, g, edges_removed):
+        src, dst, eid = g.edges(etype=etype, form='all')
+        src1, dst1 = g1.edges(etype=etype, order='eid')
+        if etype is not None:
+            eid1 = g1.edges[etype].data[dgl.EID]
+        else:
+            eid1 = g1.edata[dgl.EID]
+        src1 = F.asnumpy(src1)
+        dst1 = F.asnumpy(dst1)
+        eid1 = F.asnumpy(eid1)
         src = F.asnumpy(src)
         dst = F.asnumpy(dst)
-        src_dst_set = set(zip(src, dst))
-        assert src_dst_set == edgeset
+        eid = F.asnumpy(eid)
+        sde_set = set(zip(src, dst, eid))
+
+        for s, d, e in zip(src1, dst1, eid1):
+            assert (s, d, e) in sde_set
+        assert not np.isin(edges_removed, eid1).any()
+
     for fmt in ['coo', 'csr', 'csc']:
-        g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt)
-        g1 = dgl.remove_edges(g, F.tensor([2]))
-        check(g1, None, set([(0, 1), (2, 3), (3, 4)]))
+        for edges_to_remove in [[2], [2, 2], [3, 2], [1, 3, 1, 2]]:
+            g = dgl.graph([(0, 1), (2, 3), (1, 2), (3, 4)], restrict_format=fmt)
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove))
+            check(g1, None, g, edges_to_remove)
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
         ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],
         ('B', 'BA', 'A'): [(2, 3), (3, 2)]})
     g2 = dgl.remove_edges(g, {'AA': F.tensor([2]), 'AB': F.tensor([3]), 'BA': F.tensor([1])})
-    check(g2, 'AA', set([(0, 1), (2, 3), (3, 4)]))
-    check(g2, 'AB', set([(0, 1), (1, 3), (3, 5)]))
-    check(g2, 'BA', set([(2, 3)]))
+    check(g2, 'AA', g, [2])
+    check(g2, 'AB', g, [3])
+    check(g2, 'BA', g, [1])
 
 if __name__ == '__main__':
     test_line_graph()
@@ -485,5 +504,5 @@ if __name__ == '__main__':
     test_to_simple()
     test_in_subgraph()
     test_out_subgraph()
-    test_compact_as_bipartite()
+    test_to_block()
     test_remove_edges()

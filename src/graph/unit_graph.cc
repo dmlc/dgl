@@ -83,6 +83,7 @@ class UnitGraph::COO : public BaseHeteroGraph {
     : BaseHeteroGraph(metagraph), adj_(coo) {
     // Data index should not be inherited. Edges in COO format are always
     // assigned ids from 0 to num_edges - 1.
+    CHECK(!COOHasData(coo)) << "[BUG] COO should not contain data.";
     adj_.data = aten::NullArray();
   }
 
@@ -426,6 +427,7 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK(aten::IsValidIdArray(edge_ids));
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
+
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
     sorted_ = false;
   }

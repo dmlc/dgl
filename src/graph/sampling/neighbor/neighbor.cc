@@ -80,7 +80,8 @@ HeteroSubgraph SampleNeighbors(
           LOG(FATAL) << "Unsupported sparse format.";
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
+        sampled_coo.row, sampled_coo.col);
       induced_edges[etype] = sampled_coo.data;
     }
   }
@@ -154,7 +155,8 @@ HeteroSubgraph SampleNeighborsTopk(
           LOG(FATAL) << "Unsupported sparse format.";
       }
       subrels[etype] = UnitGraph::CreateFromCOO(
-        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo);
+        hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows, sampled_coo.num_cols,
+        sampled_coo.row, sampled_coo.col);
       induced_edges[etype] = sampled_coo.data;
     }
   }

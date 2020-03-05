@@ -486,7 +486,7 @@ void CSRSort_(CSRMatrix* csr);
  * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
  *         entries.
  */
-std::pair<CSRMatrix, IdArray> CSRRemove(CSRMatrix csr, IdArray entries);
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
@@ -668,7 +668,7 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
  * \return A new COO matrix as well as a mapping from the new COO entries to the old COO
  *         entries.
  */
-std::pair<COOMatrix, IdArray> COORemove(COOMatrix coo, IdArray entries);
+COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.

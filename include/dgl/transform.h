@@ -37,16 +37,15 @@ CompactGraphs(
     const std::vector<IdArray> &always_preserve);
 
 /*!
- * \brief Convert a graph into a bipartite-structured graph.
+ * \brief Convert a graph into a bipartite-structured graph for message passing.
  *
  * Specifically, we create one node type \c ntype_l on the "left" side and another
  * node type \c ntype_r on the "right" side for each node type \c ntype.  The nodes of
- * type \c ntype_r and would contain the nodes designated by the caller, and node type
+ * type \c ntype_r would contain the nodes designated by the caller, and node type
  * \c ntype_l would contain the nodes that has an edge connecting to one of the
  * designated nodes.
  *
- * Optionally, the nodes of \c ntype_l would also contain the nodes in node type
- * \c ntype_r.
+ * The nodes of \c ntype_l would also contain the nodes in node type \c ntype_r.
  *
  * This function is often used for constructing a series of dependency graphs for
  * multi-layer message passing, where we first construct a series of frontier graphs
@@ -56,7 +55,7 @@ CompactGraphs(
  * <code>
  *     bipartites = [None] * len(num_layers)
  *     for l in reversed(range(len(layers))):
- *         bipartites[l], seeds = to_bipartite(frontier[l], seeds, True)
+ *         bipartites[l], seeds = to_bipartite(frontier[l], seeds)
  *     x = graph.ndata["h"][seeds]
  *     for g, layer in zip(bipartites, layers):
  *         x_src = x
@@ -67,8 +66,6 @@ CompactGraphs(
  *
  * \param graph The graph.
  * \param rhs_nodes Designated nodes that would appear on the right side.
- * \param include_rhs_in_lhs Whether to always include the nodes on the right side within
- *                           nodes on the left side.
  *
  * \return A triplet containing
  *         * The bipartite-structured graph,
@@ -76,14 +73,10 @@ CompactGraphs(
  *         * The induced edges.
  *
  * \note For each node type \c ntype, the nodes in rhs_nodes[ntype] would always
- *       appear first in the nodes of type \c ntype_l in the new graph, if \c
- *       include_rhs_in_lhs is True.
+ *       appear first in the nodes of type \c ntype_l in the new graph.
  */
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
-ToBipartite(
-    HeteroGraphPtr graph,
-    const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs);
+ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes);
 
 /*!
  * \brief Convert a multigraph to a simple graph.

@@ -30,7 +30,7 @@ class NeighborSampler(object):
             # Then we compact the frontier into a bipartite graph for message passing.
             block = dgl.compact_as_bipartite(frontier, seeds, True)
             # Obtain the seed nodes for next layer.
-            seeds = block.sdata[dgl.NID]
+            seeds = block.srcdata[dgl.NID]
 
             blocks.insert(0, block)
         return blocks
@@ -89,7 +89,7 @@ class SAGE(nn.Module):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
                 block = dgl.compact_as_bipartite(dgl.in_subgraph(g, batch_nodes), batch_nodes, True)
-                induced_nodes = block.sdata[dgl.NID]
+                induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
                 h_dst = h[:block.number_of_nodes(block.dsttype)]
@@ -217,7 +217,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
             # Sample blocks for message propagation
             blocks = sampler.sample_blocks(seeds)
-            induced_nodes = blocks[0].sdata[dgl.NID]
+            induced_nodes = blocks[0].srcdata[dgl.NID]
             # Load the input features as well as output labels
             batch_inputs, batch_labels = load_subtensor(g, labels, seeds, induced_nodes, dev_id)
 

@@ -434,8 +434,8 @@ void CSRSort_(CSRMatrix* csr) {
   });
 }
 
-std::pair<CSRMatrix, IdArray> CSRRemove(CSRMatrix csr, IdArray entries) {
-  std::pair<CSRMatrix, IdArray> ret;
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
+  CSRMatrix ret;
   ATEN_CSR_SWITCH(csr, XPU, IdType, {
     ret = impl::CSRRemove<XPU, IdType>(csr, entries);
   });
@@ -585,8 +585,8 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column) {
   return ret;
 }
 
-std::pair<COOMatrix, IdArray> COORemove(COOMatrix coo, IdArray entries) {
-  std::pair<COOMatrix, IdArray> ret;
+COOMatrix COORemove(COOMatrix coo, IdArray entries) {
+  COOMatrix ret;
   ATEN_COO_SWITCH(coo, XPU, IdType, {
     ret = impl::COORemove<XPU, IdType>(coo, entries);
   });
