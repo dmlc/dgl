@@ -135,13 +135,7 @@ class KGDatasetFB15k237(KGDataset):
     '''
     def __init__(self, path, name='FB15k-237', read_triple=True, only_train=False):
         self.name = name
-        url = '
-        
-        
-        
-        
-        
-        /{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
