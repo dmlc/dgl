@@ -741,13 +741,13 @@ def mutation(func):
         if g.is_readonly:
             raise DGLError("Readonly graph. Mutation is not allowed.")
         if g.batch_size > 1:
-            raise dgl_warning("The graph has batch_size > 1, and mutation would break"
-                              " batching related properties, call `flatten` to remove"
-                              " batching information of the graph.")
+            dgl_warning("The graph has batch_size > 1, and mutation would break"
+                        " batching related properties, call `flatten` to remove"
+                        " batching information of the graph.")
         if g._parent is not None:
-            raise dgl_warning("The graph is a subgraph of a parent graph, and mutation"
-                              " would break subgraph related properties, call `detach"
-                              "_parent` to remove its connection with its parent.")
+            dgl_warning("The graph is a subgraph of a parent graph, and mutation"
+                        " would break subgraph related properties, call `detach"
+                        "_parent` to remove its connection with its parent.")
         func(g, *args, **kwargs)
     return inner
 
@@ -965,6 +965,7 @@ class DGLGraph(DGLBaseGraph):
         self._parent = parent
 
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
+        """Internal function to create a subgraph from index."""
         subg = DGLGraph(graph_data=sgi.graph,
                         readonly=True,
                         parent=self)
