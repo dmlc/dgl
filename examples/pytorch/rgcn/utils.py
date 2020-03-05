@@ -175,7 +175,7 @@ def sort_and_rank(score, target):
     indices = indices[:, 1].view(-1)
     return indices
 
-def perturb_and_get_rank(embedding, w, a, r, b, test_size, batch_size=100):
+def perturb_and_get_raw_rank(embedding, w, a, r, b, test_size, batch_size=100):
     """ Perturb one element in the triplets
     """
     n_batch = (test_size + batch_size - 1) // batch_size
@@ -198,7 +198,7 @@ def perturb_and_get_rank(embedding, w, a, r, b, test_size, batch_size=100):
     return torch.cat(ranks)
 
 # return MRR (raw), and Hits @ (1, 3, 10)
-def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
+def calc_raw_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
     with torch.no_grad():
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
@@ -206,9 +206,9 @@ def calc_mrr(embedding, w, test_triplets, hits=[], eval_bz=100):
         test_size = test_triplets.shape[0]
 
         # perturb subject
-        ranks_s = perturb_and_get_rank(embedding, w, o, r, s, test_size, eval_bz)
+        ranks_s = perturb_and_get_raw_rank(embedding, w, o, r, s, test_size, eval_bz)
         # perturb object
-        ranks_o = perturb_and_get_rank(embedding, w, s, r, o, test_size, eval_bz)
+        ranks_o = perturb_and_get_raw_rank(embedding, w, s, r, o, test_size, eval_bz)
 
         ranks = torch.cat([ranks_s, ranks_o])
         ranks += 1 # change to 1-indexed
@@ -321,3 +321,16 @@ def calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplet
             avg_count = torch.mean((ranks <= hit).float())
             print("Hits (filtered) @ {}: {:.6f}".format(hit, avg_count.item()))
     return mrr.item()
+
+#######################################################################
+#
+# Main evaluation function
+#
+#######################################################################
+
+def calc_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits=[], eval_bz=100, eval_p="filtered"):
+    if eval_p == "filtered":
+        mrr = calc_filtered_mrr(embedding, w, train_triplets, valid_triplets, test_triplets, hits)
+    else:
+        mrr = calc_raw_mrr(embedding, w, test_triplets, hits, eval_bz)
+    return mrr
