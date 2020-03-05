@@ -847,17 +847,22 @@ inline const char* TypeCode2Str(int type_code) {
   }
 }
 
-#ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator<<(std::ostream& os, DGLType t) {  // NOLINT(*)
-  os << TypeCode2Str(t.code);
-  if (t.code == kHandle) return os;
-  os << static_cast<int>(t.bits);
-  if (t.lanes != 1) {
-    os << 'x' << static_cast<int>(t.lanes);
-  }
-  return os;
-}
-#endif
+// C++ will look over the symbol based on Argument-dependent name lookup(ADL).
+// Therefore theoratically the operator << of DLDataType should be placed in the
+// same namespace as DLDataType (DGLType). Thus the one in c_api_common.h (in
+// global namespace) is preserved, and the one below is commented out.
+
+// #ifndef _LIBCPP_SGX_NO_IOSTREAMS
+// inline std::ostream& operator<<(std::ostream& os, const DGLType& t) {  // NOLINT(*)
+//   os << TypeCode2Str(t.code);
+//   if (t.code == kHandle) return os;
+//   os << static_cast<int>(t.bits);
+//   if (t.lanes != 1) {
+//     os << 'x' << static_cast<int>(t.lanes);
+//   }
+//   return os;
+// }
+// #endif
 
 inline std::string DGLType2String(DGLType t) {
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
