@@ -227,6 +227,7 @@ class USPTO(object):
             subsets = [self.subset]
 
         for set in subsets:
+            print('Preparing {} set'.format(set))
             file_path = extracted_data_path + '/{}.txt.proc'.format(set)
             all_reaction_data = self.load_reaction_data(file_path)
 
