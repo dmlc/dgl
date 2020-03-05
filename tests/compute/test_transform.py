@@ -1,15 +1,16 @@
 from scipy import sparse as spsp
+import unittest
 import networkx as nx
 import numpy as np
 import dgl
 import dgl.function as fn
 import backend as F
 from dgl.graph_index import from_scipy_sparse_matrix
+import unittest
 
 D = 5
 
 # line graph related
-
 
 def test_line_graph():
     N = 5
@@ -231,6 +232,169 @@ def test_partition():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_in_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.in_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    assert edge_set == {(1,0),(2,0),(3,0),(0,1),(2,1),(3,1)}
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    assert edge_set == {(0,0)}
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    assert edge_set == {(2,0),(2,1),(1,0),(0,0)}
+    assert subg['flips'].number_of_edges() == 0
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+def test_out_subgraph():
+    g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
+    g2 = dgl.bipartite([(0,0),(0,1),(1,2),(3,2)], 'user', 'play', 'game')
+    g3 = dgl.bipartite([(2,0),(2,1),(2,2),(1,0),(1,3),(0,0)], 'game', 'liked-by', 'user')
+    g4 = dgl.bipartite([(0,0),(1,0),(2,0),(3,0)], 'user', 'flips', 'coin')
+    hg = dgl.hetero_from_relations([g1, g2, g3, g4])
+    subg = dgl.out_subgraph(hg, {'user' : [0,1], 'game' : 0})
+    assert len(subg.ntypes) == 3
+    assert len(subg.etypes) == 4
+    u, v = subg['follow'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(1,0),(0,1),(0,2)}
+    assert F.array_equal(hg['follow'].edge_ids(u, v), subg['follow'].edata[dgl.EID])
+    u, v = subg['play'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(0,1),(1,2)}
+    assert F.array_equal(hg['play'].edge_ids(u, v), subg['play'].edata[dgl.EID])
+    u, v = subg['liked-by'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0)}
+    assert F.array_equal(hg['liked-by'].edge_ids(u, v), subg['liked-by'].edata[dgl.EID])
+    u, v = subg['flips'].edges()
+    edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+    assert edge_set == {(0,0),(1,0)}
+    assert F.array_equal(hg['flips'].edge_ids(u, v), subg['flips'].edata[dgl.EID])
+
+@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU compaction not implemented")
+def test_compact():
+    g1 = dgl.heterograph({
+        ('user', 'follow', 'user'): [(1, 3), (3, 5)],
+        ('user', 'plays', 'game'): [(2, 4), (3, 4), (2, 5)],
+        ('game', 'wished-by', 'user'): [(6, 7), (5, 7)]},
+        {'user': 20, 'game': 10})
+
+    g2 = dgl.heterograph({
+        ('game', 'clicked-by', 'user'): [(3, 1)],
+        ('user', 'likes', 'user'): [(1, 8), (8, 9)]},
+        {'user': 20, 'game': 10})
+
+    g3 = dgl.graph([(0, 1), (1, 2)], card=10, ntype='user')
+    g4 = dgl.graph([(1, 3), (3, 5)], card=10, ntype='user')
+
+    def _check(g, new_g, induced_nodes):
+        assert g.ntypes == new_g.ntypes
+        assert g.canonical_etypes == new_g.canonical_etypes
+
+        for ntype in g.ntypes:
+            assert -1 not in induced_nodes[ntype]
+
+        for etype in g.canonical_etypes:
+            g_src, g_dst = g.all_edges(order='eid', etype=etype)
+            g_src = F.asnumpy(g_src)
+            g_dst = F.asnumpy(g_dst)
+            new_g_src, new_g_dst = new_g.all_edges(order='eid', etype=etype)
+            new_g_src_mapped = induced_nodes[etype[0]][F.asnumpy(new_g_src)]
+            new_g_dst_mapped = induced_nodes[etype[2]][F.asnumpy(new_g_dst)]
+            assert (g_src == new_g_src_mapped).all()
+            assert (g_dst == new_g_dst_mapped).all()
+
+    # Test default
+    new_g1 = dgl.compact_graphs(g1)
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
+    assert set(induced_nodes['game']) == set([4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+
+    # Test with always_preserve given a dict
+    new_g1 = dgl.compact_graphs(
+        g1, always_preserve={'game': F.tensor([4, 7], dtype=F.int64)})
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7])
+    assert set(induced_nodes['game']) == set([4, 5, 6, 7])
+    _check(g1, new_g1, induced_nodes)
+
+    # Test with always_preserve given a tensor
+    new_g3 = dgl.compact_graphs(
+        g3, always_preserve=F.tensor([1, 7], dtype=F.int64))
+    induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([0, 1, 2, 7])
+    _check(g3, new_g3, induced_nodes)
+
+    # Test multiple graphs
+    new_g1, new_g2 = dgl.compact_graphs([g1, g2])
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
+    assert set(induced_nodes['game']) == set([3, 4, 5, 6])
+    _check(g1, new_g1, induced_nodes)
+    _check(g2, new_g2, induced_nodes)
+
+    # Test multiple graphs with always_preserve given a dict
+    new_g1, new_g2 = dgl.compact_graphs(
+        [g1, g2], always_preserve={'game': F.tensor([4, 7], dtype=F.int64)})
+    induced_nodes = {ntype: new_g1.nodes[ntype].data[dgl.NID] for ntype in new_g1.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([1, 3, 5, 2, 7, 8, 9])
+    assert set(induced_nodes['game']) == set([3, 4, 5, 6, 7])
+    _check(g1, new_g1, induced_nodes)
+    _check(g2, new_g2, induced_nodes)
+
+    # Test multiple graphs with always_preserve given a tensor
+    new_g3, new_g4 = dgl.compact_graphs(
+        [g3, g4], always_preserve=F.tensor([1, 7], dtype=F.int64))
+    induced_nodes = {ntype: new_g3.nodes[ntype].data[dgl.NID] for ntype in new_g3.ntypes}
+    induced_nodes = {k: F.asnumpy(v) for k, v in induced_nodes.items()}
+    assert set(induced_nodes['user']) == set([0, 1, 2, 3, 5, 7])
+    _check(g3, new_g3, induced_nodes)
+    _check(g4, new_g4, induced_nodes)
+
+
+def test_to_simple():
+    g = dgl.heterograph({
+        ('user', 'follow', 'user'): [(0, 1), (1, 3), (2, 2), (1, 3), (1, 4), (1, 4)],
+        ('user', 'plays', 'game'): [(3, 5), (2, 3), (1, 4), (1, 4), (3, 5), (2, 3), (2, 3)]})
+    sg = dgl.to_simple(g, return_counts='weights', writeback_mapping='new_eid')
+
+    for etype in g.canonical_etypes:
+        u, v = g.all_edges(form='uv', order='eid', etype=etype)
+        u = F.asnumpy(u).tolist()
+        v = F.asnumpy(v).tolist()
+        uv = list(zip(u, v))
+        eid_map = F.asnumpy(g.edges[etype].data['new_eid'])
+
+        su, sv = sg.all_edges(form='uv', order='eid', etype=etype)
+        su = F.asnumpy(su).tolist()
+        sv = F.asnumpy(sv).tolist()
+        suv = list(zip(su, sv))
+        sw = F.asnumpy(sg.edges[etype].data['weights'])
+
+        assert set(uv) == set(suv)
+        for i, e in enumerate(suv):
+            assert sw[i] == sum(e == _e for _e in uv)
+        for i, e in enumerate(uv):
+            assert eid_map[i] == suv.index(e)
+
 
 if __name__ == '__main__':
     test_line_graph()
@@ -245,3 +409,7 @@ if __name__ == '__main__':
     test_remove_self_loop()
     test_add_self_loop()
     test_partition()
+    test_compact()
+    test_to_simple()
+    test_in_subgraph()
+    test_out_subgraph()

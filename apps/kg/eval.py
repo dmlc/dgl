@@ -66,6 +66,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='number of workers used for loading data')
         self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
+        self.add_argument('--num_thread', type=int, default=1,
+                          help='number of thread used')
 
     def parse_args(self):
         args = super().parse_args()
@@ -101,6 +103,7 @@ def main(args):
     args.valid = False
     args.test = True
     args.strict_rel_part = False
+    args.soft_rel_part = False
     args.async_update = False
     args.batch_size_eval = args.batch_size
 

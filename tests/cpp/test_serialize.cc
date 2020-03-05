@@ -13,7 +13,7 @@ using namespace dgl;
 using namespace dgl::aten;
 using namespace dmlc;
 
-TEST(Serialize, UnitGraph) {
+TEST(Serialize, DISABLED_UnitGraph) {
   aten::CSRMatrix csr_matrix;
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
@@ -32,9 +32,10 @@ TEST(Serialize, UnitGraph) {
   EXPECT_EQ(ug2->NumEdges(0), 4);
   EXPECT_EQ(ug2->FindEdge(0, 1).first, 2);
   EXPECT_EQ(ug2->FindEdge(0, 1).second, 6);
+  delete ug2;
 }
 
-TEST(Serialize, ImmutableGraph) {
+TEST(Serialize, DISABLED_ImmutableGraph) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto gptr = ImmutableGraph::CreateFromCOO(10, src, dst);
@@ -52,14 +53,15 @@ TEST(Serialize, ImmutableGraph) {
   EXPECT_EQ(rptr_read->NumVertices(), 10);
   EXPECT_EQ(rptr_read->FindEdge(2).first, 5);
   EXPECT_EQ(rptr_read->FindEdge(2).second, 2);
+  delete rptr_read;
 }
 
-TEST(Serialize, HeteroGraph) {
+TEST(Serialize, DISABLED_HeteroGraph) {
   auto src = VecToIdArray<int64_t>({1, 2, 5, 3});
   auto dst = VecToIdArray<int64_t>({1, 6, 2, 6});
   auto mg1 = dgl::UnitGraph::CreateFromCOO(2, 9, 8, src, dst);
-  src = VecToIdArray<int64_t>({6, 2, 5, 1, 9});
-  dst = VecToIdArray<int64_t>({5, 2, 4, 9, 0});
+  src = VecToIdArray<int64_t>({6, 2, 5, 1, 8});
+  dst = VecToIdArray<int64_t>({5, 2, 4, 8, 0});
   auto mg2 = dgl::UnitGraph::CreateFromCOO(1, 9, 9, src, dst);
   std::vector<HeteroGraphPtr> relgraphs;
   relgraphs.push_back(mg1);
@@ -76,7 +78,8 @@ TEST(Serialize, HeteroGraph) {
   dmlc::MemoryStringStream ofs(&blob);
   HeteroGraph* gptr = dgl::Serializer::EmptyHeteroGraph();
   static_cast<dmlc::Stream*>(&ofs)->Read(gptr);
-
   EXPECT_EQ(gptr->NumVertices(0), 9);
   EXPECT_EQ(gptr->NumVertices(1), 8);
+  delete hrptr;
+  delete gptr;
 }

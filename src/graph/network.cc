@@ -24,7 +24,6 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace network {
 
-
 static void NaiveDeleter(DLManagedTensor* managed_tensor) {
   delete [] managed_tensor->dl_tensor.shape;
   delete [] managed_tensor->dl_tensor.strides;
@@ -606,8 +605,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_DeleteKVMsg")
     network::KVStoreMsg* msg = static_cast<KVStoreMsg*>(chandle);
     delete msg;
   });
-
-
 
 }  // namespace network
 }  // namespace dgl

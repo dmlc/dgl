@@ -110,8 +110,14 @@ class ArgParser(argparse.ArgumentParser):
                           help='pickle built graph, building a huge graph is slow.')
         self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
+        self.add_argument('--num_test_proc', type=int, default=1,
+                          help='number of process used for test')
+        self.add_argument('--num_thread', type=int, default=1,
+                          help='number of thread used')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
+        self.add_argument('--soft_rel_part', action='store_true',
+                          help='enable soft relation partition')
         self.add_argument('--nomp_thread_per_process', type=int, default=-1,
                           help='num of omp threads used per process in multi-process training')
         self.add_argument('--async_update', action='store_true',
@@ -147,6 +153,7 @@ def get_logger(args):
 
 
 def run(args, logger):
+    train_time_start = time.time()
     # load dataset and samplers
     dataset = get_dataset(args.data_path, args.dataset, args.format)
     n_entities = dataset.n_entities
@@ -170,7 +177,9 @@ def run(args, logger):
 
     num_workers = args.num_worker
     train_data = TrainDataset(dataset, args, ranks=args.num_proc)
+    # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
+    args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
 
     # Automatically set number of OMP threads for each process if it is not provided
     # The value for GPU is evaluated in AWS p3.16xlarge
@@ -181,7 +190,7 @@ def run(args, logger):
             args.num_thread = 4
         else:
             # CPU training
-            args.num_thread = mp.cpu_count() // args.num_proc + 1
+            args.num_thread = 1
     else:
         args.num_thread = args.nomp_thread_per_process
 
@@ -231,7 +240,10 @@ def run(args, logger):
     if args.num_proc > 1:
         num_workers = 1
     if args.valid or args.test:
-        args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
+        if len(args.gpu) > 1:
+            args.num_test_proc = args.num_proc if args.num_proc < len(args.gpu) else len(args.gpu)
+        else:
+            args.num_test_proc = args.num_proc
         eval_dataset = EvalDataset(dataset, args)
     if args.valid:
         # Here we want to use the regualr negative sampler because we need to ensure that
@@ -320,9 +332,12 @@ def run(args, logger):
     if args.num_proc > 1 or args.async_update:
         model.share_memory()
 
+    print('Total data loading time {:.3f} seconds'.format(time.time() - train_time_start))
+
     # train
     start = time.time()
-    rel_parts = train_data.rel_parts if args.strict_rel_part else None
+    rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
+    cross_rels = train_data.cross_rels if args.soft_rel_part else None
     if args.num_proc > 1:
         procs = []
         barrier = mp.Barrier(args.num_proc)
@@ -334,6 +349,7 @@ def run(args, logger):
                                                      valid_sampler,
                                                      i,
                                                      rel_parts,
+                                                     cross_rels,
                                                      barrier))
             procs.append(proc)
             proc.start()
