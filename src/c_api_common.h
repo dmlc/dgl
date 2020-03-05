@@ -21,7 +21,6 @@ inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
-
 /*! \brief Check whether two device contexts are the same.*/
 inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
