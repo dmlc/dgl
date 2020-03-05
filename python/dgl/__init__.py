@@ -8,7 +8,6 @@ import socket
 from .backend import load_backend
 
 from . import function
-from . import nn
 from . import contrib
 from . import container
 from . import random
