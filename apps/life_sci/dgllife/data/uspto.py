@@ -1,21 +1,107 @@
 """USPTO for reaction prediction"""
-import random
-import time
+import numpy as np
 import torch
 
 from collections import defaultdict
-from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive
+from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_archive, \
+    save_graphs, load_graphs
 from functools import partial
-from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
 
-from ..utils.mol_to_graph import mol_to_bigraph
+from ..utils.featurizers import BaseAtomFeaturizer, ConcatFeaturizer, atom_type_one_hot, \
+    atom_degree_one_hot, atom_explicit_valence_one_hot, atom_implicit_valence_one_hot, \
+    atom_is_aromatic, BaseBondFeaturizer, bond_type_one_hot, bond_is_conjugated, bond_is_in_ring
+from ..utils.mol_to_graph import mol_to_bigraph, mol_to_complete_graph
 
 __all__ = ['USPTO']
 
 # Disable RDKit warnings
 RDLogger.DisableLog('rdApp.*')
+
+# Atom types distinguished in featurization
+atom_types = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe',
+              'As', 'Al', 'I', 'B', 'V', 'K', 'Tl', 'Yb', 'Sb', 'Sn', 'Ag', 'Pd', 'Co',
+              'Se', 'Ti', 'Zn', 'H', 'Li', 'Ge', 'Cu', 'Au', 'Ni', 'Cd', 'In', 'Mn', 'Zr',
+              'Cr', 'Pt', 'Hg', 'Pb', 'W', 'Ru', 'Nb', 'Re', 'Te', 'Rh', 'Tc', 'Ba', 'Bi',
+              'Hf', 'Mo', 'U', 'Sm', 'Os', 'Ir', 'Ce', 'Gd', 'Ga', 'Cs']
+
+default_node_featurizer = BaseAtomFeaturizer({
+    'hv': ConcatFeaturizer(
+        [partial(atom_type_one_hot, allowable_set=atom_types, encode_unknown=True),
+         partial(atom_degree_one_hot, allowable_set=list(range(6))),
+         atom_explicit_valence_one_hot,
+         partial(atom_implicit_valence_one_hot, allowable_set=list(range(6))),
+         atom_is_aromatic]
+    )
+})
+
+default_edge_featurizer = BaseBondFeaturizer({
+    'he': ConcatFeaturizer([
+        bond_type_one_hot, bond_is_conjugated, bond_is_in_ring]
+    )
+})
+
+def default_atom_pair_featurizer(reactants, data_field='atom_pair'):
+    """Featurize each pair of atoms, which will be used in updating
+    the edata of a complete DGLGraph.
+
+    The features include the bond type between the atoms (if any) and whether
+    they belong to the same molecule. It is used in the global attention mechanism.
+
+    Parameters
+    ----------
+    reactants : str
+        SMILES for reactants
+    data_field : str
+        Key for storing the features in DGLGraph.edata. Default to 'atom_pair'
+
+    Returns
+    -------
+    dict
+        Mapping data_field to a float32 tensor of shape (V^2, 10), which are
+        features for each pair of atoms.
+    """
+    # Decide the reactant membership for each atom
+    atom_to_reactant = dict()
+    reactant_list = reactants.split('.')
+    for id, s in enumerate(reactant_list):
+        mol = Chem.MolFromSmiles(s)
+        for atom in mol.GetAtoms():
+            atom_to_reactant[atom.GetIntProp('molAtomMapNumber') - 1] = id
+
+    # Construct mapping from atom pair to RDKit bond object
+    all_reactant_mol = Chem.MolFromSmiles(reactants)
+    atom_pair_to_bond = dict()
+    for bond in all_reactant_mol.GetBonds():
+        atom1 = bond.GetBeginAtom().GetIntProp('molAtomMapNumber') - 1
+        atom2 = bond.GetEndAtom().GetIntProp('molAtomMapNumber') - 1
+        atom_pair_to_bond[(atom1, atom2)] = bond
+        atom_pair_to_bond[(atom2, atom1)] = bond
+
+    def _featurize_a_bond(bond):
+        return bond_type_one_hot(bond) + bond_is_conjugated(bond) + bond_is_in_ring(bond)
+
+    features = []
+    num_atoms = all_reactant_mol.GetNumAtoms()
+    for i in range(num_atoms):
+        for j in range(num_atoms):
+            pair_feature = np.zeros(10)
+            if i == j:
+                features.append(pair_feature)
+                continue
+
+            bond = atom_pair_to_bond.get((i, j), None)
+            if bond is not None:
+                pair_feature[1:7] = _featurize_a_bond(bond)
+            else:
+                pair_feature[0] = 1.
+            pair_feature[-4] = 1. if atom_to_reactant[i] != atom_to_reactant[j] else 0.
+            pair_feature[-3] = 1. if atom_to_reactant[i] == atom_to_reactant[j] else 0.
+            pair_feature[-2] = 1. if len(reactant_list) == 1 else 0.
+            pair_feature[-1] = 1. if len(reactant_list) > 1 else 0.
+            features.append(pair_feature)
+    return {data_field: torch.from_numpy(np.stack(features, axis=0).astype(np.float32))}
 
 def get_pair_label(reactants_mol, graph_edits):
     """Construct labels for each pair of atoms in reaction center prediction
@@ -52,108 +138,6 @@ def get_pair_label(reactants_mol, graph_edits):
 
     return labels.reshape(-1, 5)
 
-def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer,
-                                    edge_featurizer, atom_pair_featurizer):
-    """Construct DGLGraphs and featurize them for a single reaction data.
-
-    Parameters
-    ----------
-    reaction_data : 3-tuple
-        The first element in the tuple stands for RDKit molecule instance of the reactants.
-        The second element in the tuple stands for reaction. The third element in the
-        tuple stands for graph edits in the reaction.
-    mol_to_graph: callable, str -> DGLGraph
-        A function turning RDKit molecule instances into DGLGraphs.
-    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for nodes like atoms in a molecule, which can be used to update
-        ndata for a DGLGraph.
-    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for edges like bonds in a molecule, which can be used to update
-        edata for a DGLGraph.
-    atom_pair_featurizer : None or callable, str -> dict
-        If not None, featurization for each pair of atoms in multiple reactants. The result
-        will be used to update edata in the complete DGLGraphs.
-
-    Returns
-    -------
-    mol : rdkit.Chem.rdchem.Mol
-        RDKit molecule instance
-    reactant_mol_graph : DGLGraph
-        DGLGraph for the reactants
-    atom_pair_features : None or float32 tensor of shape (V^2, dim)
-        If not None, features for each pair of atoms in multiple reactants.
-        V for the number of atoms in the reactants.
-    label : float32 tensor of shape (V^2, 5)
-        Labels constructed for each pair of atoms in multiple reactants.
-    """
-    mol = reaction_data[0]
-    reaction = reaction_data[1]
-    graph_edits = reaction_data[2]
-    reactants = reaction.split('>')[0]
-    reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
-                                      edge_featurizer=edge_featurizer,
-                                      canonical_atom_order=False)
-    if atom_pair_featurizer is not None:
-        atom_pair_features = atom_pair_featurizer(reactants)
-    else:
-        atom_pair_features = None
-    label = get_pair_label(mol, graph_edits)
-
-    return mol, reactant_mol_graph, atom_pair_features, label
-
-def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
-                             edge_featurizer, atom_pair_featurizer, num_processes, load):
-    """Construct DGLGraphs and featurize them.
-
-    Parameters
-    ----------
-    all_reaction_data : list of 3-tuples
-        The first element in the tuple stands for RDKit molecule instance of the reactants.
-        The second element in the tuple stands for reaction. The third element in the
-        tuple stands for graph edits in the reaction.
-    mol_to_graph: callable, str -> DGLGraph
-        A function turning RDKit molecule instances into DGLGraphs.
-    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for nodes like atoms in a molecule, which can be used to update
-        ndata for a DGLGraph.
-    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
-        Featurization for edges like bonds in a molecule, which can be used to update
-        edata for a DGLGraph.
-    atom_pair_featurizer : callable, str -> dict
-        Featurization for each pair of atoms in multiple reactants. The result will be
-        used to update edata in the complete DGLGraphs.
-    num_processes : int
-        Number of processes for multiprocessing.
-    load : bool
-        Whether to load the previously pre-processed dataset or pre-process from scratch.
-        ``load`` should be False when we want to try different graph construction and
-        featurization methods and need to preprocess from scratch.
-
-    Returns
-    -------
-    mols : list of rdkit.Chem.rdchem.Mol
-        RDKit molecules for reactants.
-    reactant_mol_graphs : list of DGLGraphs
-        DGLGraphs for reactants.
-    atom_pair_features : list of None or float32 tensor of shape (V_i^2, dim)
-        If not None, features for each pair of atoms in multiple reactants.
-        V_i for the number of atoms in the i-th reactants.
-    labels : list of float32 tensor of shape (V_i^2, 5)
-        Labels constructed for each pair of atoms in multiple reactants.
-    """
-    # Todo: check whether the storage files exist
-    if not load:
-        return NotImplementedError
-    else:
-        with Pool(processes=num_processes) as pool:
-            results = pool.map_async(partial(
-                preprocess_single_reaction_data, mol_to_graph=mol_to_graph,
-                node_featurizer=node_featurizer, edge_featurizer=edge_featurizer,
-                atom_pair_featurizer=atom_pair_featurizer), all_reaction_data)
-            results = results.get()
-        mols, reactant_mol_graphs, atom_pair_features, labels = map(list, zip(*results))
-    return mols, reactant_mol_graphs, atom_pair_features, labels
-
 class USPTO(object):
     """USPTO dataset for reaction prediction.
 
@@ -181,15 +165,16 @@ class USPTO(object):
         Default to :func:`dgllife.utils.mol_to_bigraph`.
     node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for nodes like atoms in a molecule, which can be used to update
-        ndata for a DGLGraph. Default to None.
+        ndata for a DGLGraph. By default, we consider descriptors including atom type,
+        atom degree, atom explicit valence, atom implicit valence, aromaticity.
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
-        edata for a DGLGraph. Default to None.
+        edata for a DGLGraph. By default, we consider descriptors including bond type,
+        whether bond is conjugated and whether bond is in ring.
     atom_pair_featurizer : callable, str -> dict
         Featurization for each pair of atoms in multiple reactants. The result will be
-        used to update edata in the complete DGLGraphs.
-    num_processes : int
-        Number of processes for multiprocessing. Default to 8.
+        used to update edata in the complete DGLGraphs. By default, the features include
+        the bond type between the atoms (if any) and whether they belong to the same molecule.
     load : bool
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
@@ -198,10 +183,9 @@ class USPTO(object):
     def __init__(self,
                  subset,
                  mol_to_graph=mol_to_bigraph,
-                 node_featurizer=None,
-                 edge_featurizer=None,
-                 atom_pair_featurizer=None,
-                 num_processes=8,
+                 node_featurizer=default_node_featurizer,
+                 edge_featurizer=default_edge_featurizer,
+                 atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True):
         super(USPTO, self).__init__()
 
@@ -217,8 +201,7 @@ class USPTO(object):
 
         self.mols = []
         self.reactant_mol_graphs = []
-        self.atom_pair_features = []
-        self.labels = []
+        self.reactant_complete_graphs = []
 
         if self.subset == 'full':
             subsets = ['train', 'valid', 'test']
@@ -227,22 +210,48 @@ class USPTO(object):
         else:
             subsets = [self.subset]
 
-        t0 = time.time()
         for set in subsets:
             print('Preparing {} set'.format(set))
             file_path = extracted_data_path + '/{}.txt.proc'.format(set)
-            all_reaction_data = self.load_reaction_data(file_path)
+            set_mols, set_reactions, set_graph_edits = self.load_reaction_data(file_path)
+            self.mols.extend(set_mols)
+            set_reactant_mol_graphs = []
+            set_reactant_complete_graphs = []
+            if load:
+                set_reactant_mol_graphs, _ = load_graphs(
+                    extracted_data_path + '/{}_mol_graphs.bin'.format(set))
+                set_reactant_complete_graphs, _ = load_graphs(
+                    extracted_data_path + '/{}_complete_graphs.bin'.format(set))
+            else:
+                for i in range(len(set_mols)):
+                    print('Processing reaction {:d}/{:d} for {} set'.format(
+                        i + 1, len(set_mols), set))
+                    mol = set_mols[i]
+                    reaction = set_reactions[i]
+                    graph_edits = set_graph_edits[i]
+                    reactants = reaction.split('>')[0]
+                    reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
+                                                      edge_featurizer=edge_featurizer,
+                                                      canonical_atom_order=False)
+                    set_reactant_mol_graphs.append(reactant_mol_graph)
+                    if atom_pair_featurizer is not None:
+                        atom_pair_features = atom_pair_featurizer(reactants)
+                    else:
+                        atom_pair_features = dict()
+                    reactant_complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
+                                                                    canonical_atom_order=False)
+                    reactant_complete_graph.edata.updated(atom_pair_features)
+                    reactant_complete_graph.edata['label'] = get_pair_label(mol, graph_edits)
+                    set_reactant_complete_graphs.append(reactant_complete_graph)
 
-            # Todo: remove the line below
-            all_reaction_data = all_reaction_data[:1000]
-            mols, reactant_mol_graphs, atom_pair_features, labels = preprocess_reaction_data(
-                all_reaction_data,  mol_to_graph, node_featurizer,
-                edge_featurizer, atom_pair_featurizer, num_processes, load)
-            self.mols.extend(mols)
-            self.reactant_mol_graphs.extend(reactant_mol_graphs)
-            self.atom_pair_features.extend(atom_pair_features)
-            self.labels.extend(labels)
-        print(time.time() - t0)
+                save_graphs(extracted_data_path + '/{}_mol_graphs.bin'.format(set),
+                            set_reactant_mol_graphs)
+                save_graphs(extracted_data_path + '/{}_complete_graphs.bin'.format(set),
+                            set_reactant_complete_graphs)
+
+            self.mols.extend(set_mols)
+            self.reactant_mol_graphs.extend(set_reactant_mol_graphs)
+            self.reactant_complete_graphs.extend(set_reactant_complete_graphs)
 
     def load_reaction_data(self, file_path):
         """Load reaction data from the raw file.
@@ -254,12 +263,16 @@ class USPTO(object):
 
         Returns
         -------
-        list of 3-tuples
-            The first element in the tuple stands for RDKit molecule instance of the reactants.
-            The second element in the tuple stands for reaction. The third element in the
-            tuple stands for graph edits in the reaction.
+        all_mols : list of rdkit.Chem.rdchem.Mol
+            RDKit molecule instances
+        all_reactions : list of str
+            Reactions
+        all_graph_edits : list of str
+            Graph edits in the reactions.
         """
-        all_reaction_data = []
+        all_mols = []
+        all_reactions = []
+        all_graph_edits = []
         with open(file_path, 'r') as f:
             for i, line in enumerate(f):
                 print('Processing line {:d}'.format(i))
@@ -280,18 +293,20 @@ class USPTO(object):
                 reaction, graph_edits = line.strip("\r\n ").split()
                 reactants = reaction.split('>')[0]
                 mol = Chem.MolFromSmiles(reactants)
+                if mol is None:
+                    continue
+
                 # Reorder atoms according to the order specified in the atom map
                 atom_map_order = [-1 for _ in range(mol.GetNumAtoms())]
                 for i in range(mol.GetNumAtoms()):
                     atom = mol.GetAtomWithIdx(i)
                     atom_map_order[atom.GetIntProp('molAtomMapNumber') - 1] = i
                 mol = rdmolops.RenumberAtoms(mol, atom_map_order)
-                if mol is not None:
-                    all_reaction_data.append((mol, reaction, graph_edits))
+                all_mols.append(mol)
+                all_reactions.append(reaction)
+                all_graph_edits.append(graph_edits)
 
-        random.shuffle(all_reaction_data)
-
-        return all_reaction_data
+        return all_mols, all_reactions, all_graph_edits
 
     @property
     def subset(self):
@@ -335,4 +350,5 @@ class USPTO(object):
             V for the number of atoms in the reactants.
         """
         return self.mols[item], self.reactant_mol_graphs[item], \
-               self.reactant_complete_graphs[item], self.labels[item]
+               self.reactant_complete_graphs[item], \
+               self.reactant_complete_graphs[item].edata['label']
