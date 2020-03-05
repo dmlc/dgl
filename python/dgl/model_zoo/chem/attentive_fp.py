@@ -147,7 +147,7 @@ class GetContext(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -202,7 +202,7 @@ class GNNLayer(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -248,7 +248,7 @@ class GlobalPool(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
@@ -326,7 +326,7 @@ class AttentiveFP(nn.Module):
         """
         Parameters
         ----------
-        g : DGLGraph or BatchedDGLGraph
+        g : DGLGraph
             Constructed DGLGraphs.
         node_feats : float32 tensor of shape (V, N1)
             Input node features. V for the number of nodes and N1 for the feature size.
