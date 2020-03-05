@@ -41,13 +41,13 @@ def test_basics():
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(F.zerocopy_to_numpy(sg.parent_eid)) == eid
     eid = F.tensor(sg.parent_eid)
-    # the subgraph is empty initially
-    assert len(sg.ndata) == 0
-    assert len(sg.edata) == 0
-    # the data is copied after explict copy from
-    sg.copy_from_parent()
+    # the subgraph is empty initially except for NID/EID field
     assert len(sg.ndata) == 1
     assert len(sg.edata) == 1
+    # the data is copied after explict copy from
+    sg.copy_from_parent()
+    assert len(sg.ndata) == 2
+    assert len(sg.edata) == 2
     sh = sg.ndata['h']
     assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
     '''

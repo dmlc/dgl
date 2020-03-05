@@ -1,7 +1,6 @@
 """For Graph Serialization"""
 from __future__ import absolute_import
 from ..graph import DGLGraph
-from ..batched_graph import BatchedDGLGraph
 from .._ffi.object import ObjectBase, register_object
 from .._ffi.function import _init_api
 from .. import backend as F
@@ -29,7 +28,7 @@ class GraphData(ObjectBase):
     @staticmethod
     def create(g: DGLGraph):
         """Create GraphData"""
-        assert not isinstance(g, BatchedDGLGraph), "BatchedDGLGraph is not supported for serialization"
+        assert g.batch_size == 1, "BatchedDGLGraph is not supported for serialization"
         ghandle = g._graph
         if len(g.ndata) != 0:
             node_tensors = dict()

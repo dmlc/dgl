@@ -101,12 +101,11 @@ a useful manual for in-depth developers.
 
    api/python/graph
    api/python/heterograph
-   api/python/batch
+   api/python/readout
    api/python/batch_heterograph
    api/python/nn
    api/python/function
    api/python/udf
-   api/python/subgraph
    api/python/traversal
    api/python/propagate
    api/python/transform
