@@ -715,7 +715,7 @@ class DGMG(DGMGSkeleton):
 import torch.utils.model_zoo as model_zoo
 
 # Download a pre-trained model state dict for generating cycles with 10-20 nodes.
-state_dict = model_zoo.load_url('https://s3.us-east-2.amazonaws.com/dgl.ai/model/dgmg_cycles-5a0c40be.pth')
+state_dict = model_zoo.load_url('https://data.dgl.ai/model/dgmg_cycles-5a0c40be.pth')
 model = DGMG(v_max=20, node_hidden_size=16, num_prop_rounds=2)
 model.load_state_dict(state_dict)
 model.eval()

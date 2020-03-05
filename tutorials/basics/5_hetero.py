@@ -46,7 +46,7 @@ using the heterograph class and its associated API.
 # The following diagram shows several entities in the ACM dataset and the relationships among them 
 # (taken from `Shi et al., 2015 <https://arxiv.org/pdf/1511.04854.pdf>`_).
 #
-# .. figure:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/hetero/acm-example.png# 
+# .. figure:: https://data.dgl.ai/tutorial/hetero/acm-example.png# 
 # 
 # This graph has three types of entities that correspond to papers, authors, and publication venues.
 # It also contains three types of edges that connect the following:
@@ -70,7 +70,7 @@ using the heterograph class and its associated API.
 # marked with a rating, then each rating value could correspond to a different edge type.
 # The following diagram shows an example of user-item interactions as a heterograph.
 #
-# .. figure:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/hetero/recsys-example.png
+# .. figure:: https://data.dgl.ai/tutorial/hetero/recsys-example.png
 #
 #
 # Knowledge graph 
@@ -81,7 +81,7 @@ using the heterograph class and its associated API.
 # occupation (item P106) is politician (item Q82955). The relationships are shown in the following.
 # diagram.
 #
-# .. figure:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/hetero/kg-example.png
+# .. figure:: https://data.dgl.ai/tutorial/hetero/kg-example.png
 #
 
 ###############################################################################
@@ -144,7 +144,7 @@ ratings = dgl.heterograph(
 import scipy.io
 import urllib.request
 
-data_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/ACM.mat'
+data_url = 'https://data.dgl.ai/dataset/ACM.mat'
 data_file_path = '/tmp/ACM.mat'
 
 urllib.request.urlretrieve(data_url, data_file_path)

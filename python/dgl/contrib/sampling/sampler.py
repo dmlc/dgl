@@ -225,7 +225,7 @@ class NeighborSampler(NodeFlowSampler):
     layer :math:`i+1` are in layer :math:`i`. All the edges are from nodes
     in layer :math:`i` to layer :math:`i+1`.
 
-    .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NodeFlow.png
+    .. image:: https://data.dgl.ai/tutorial/sampling/NodeFlow.png
     
     As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
     of the initial seed nodes (number of nodes in the last layer).
