@@ -226,8 +226,8 @@ def collate_molgraphs(data):
     -------
     smiles : list
         List of smiles
-    bg : BatchedDGLGraph
-        Batched DGLGraphs
+    bg : DGLGraph
+        The batched DGLGraph.
     labels : Tensor of dtype float32 and shape (B, T)
         Batched datapoint labels. B is len(data) and
         T is the number of total tasks.

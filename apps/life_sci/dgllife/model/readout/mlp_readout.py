@@ -2,8 +2,6 @@
 import dgl
 import torch.nn as nn
 
-from dgl import BatchedDGLGraph
-
 __all__ = ['MLPNodeReadout']
 
 class MLPNodeReadout(nn.Module):
@@ -64,6 +62,4 @@ class MLPNodeReadout(nn.Module):
             elif self.mode == 'sum':
                 graph_feats = dgl.sum_nodes(g, 'h')
 
-        if not isinstance(g, BatchedDGLGraph):
-            graph_feats = graph_feats.unsqueeze(0)
         return graph_feats

@@ -20,7 +20,7 @@ def solve_sudoku(puzzle):
     model_filename = os.path.join(model_path, 'rrn-sudoku.pkl')
     if not os.path.exists(model_filename):
         print('Downloading model...')
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/models/rrn-sudoku.pkl'
+        url = 'https://data.dgl.ai/models/rrn-sudoku.pkl'
         urllib.request.urlretrieve(url, model_filename)
 
     model = torch.load(model_filename, map_location='cpu')
