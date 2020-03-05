@@ -8,6 +8,8 @@ import sys
 import pickle
 import time
 
+from dgl.base import NID, EID
+
 def SoftRelationPartition(edges, n, threshold=0.05):
     """This partitions a list of edges to n partitions according to their
     relation types. For any relation with number of edges larger than the
@@ -359,7 +361,7 @@ class TrainDataset(object):
                            return_false_neg=False)
 
 
-class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
+class ChunkNegEdgeSubgraph(dgl.DGLGraph):
     """Wrapper for negative graph
 
         Parameters
@@ -378,7 +380,11 @@ class ChunkNegEdgeSubgraph(dgl.subgraph.DGLSubGraph):
     """
     def __init__(self, subg, num_chunks, chunk_size,
                  neg_sample_size, neg_head):
-        super(ChunkNegEdgeSubgraph, self).__init__(subg._parent, subg.sgi)
+        super(ChunkNegEdgeSubgraph, self).__init__(graph_data=subg.sgi.graph,
+                                                   readonly=True,
+                                                   parent=subg._parent)
+        self.ndata[NID] = subg.sgi.induced_nodes.tousertensor()
+        self.edata[EID] = subg.sgi.induced_edges.tousertensor()
         self.subg = subg
         self.num_chunks = num_chunks
         self.chunk_size = chunk_size

@@ -4,8 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-from ... import BatchedDGLGraph
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, \
+from ...readout import sum_nodes, mean_nodes, max_nodes, \
     softmax_nodes, topk_nodes
 
 
@@ -29,7 +28,7 @@ class SumPooling(layers.Layer):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : tf.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -38,9 +37,8 @@ class SumPooling(layers.Layer):
         Returns
         -------
         tf.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -63,7 +61,7 @@ class AvgPooling(layers.Layer):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : tf.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -72,9 +70,8 @@ class AvgPooling(layers.Layer):
         Returns
         -------
         tf.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -97,7 +94,7 @@ class MaxPooling(layers.Layer):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : tf.Tensor
             The input feature with shape :math:`(N, *)` where
@@ -106,9 +103,8 @@ class MaxPooling(layers.Layer):
         Returns
         -------
         tf.Tensor
-            The output feature with shape :math:`(*)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, *)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             graph.ndata['h'] = feat
@@ -135,7 +131,7 @@ class SortPooling(layers.Layer):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : tf.Tensor
             The input feature with shape :math:`(N, D)` where
@@ -144,9 +140,8 @@ class SortPooling(layers.Layer):
         Returns
         -------
         tf.Tensor
-            The output feature with shape :math:`(k * D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, k * D)`.
+            The output feature with shape :math:`(B, k * D)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             # Sort the feature of each node in ascending order.
@@ -155,10 +150,7 @@ class SortPooling(layers.Layer):
             # Sort nodes according to their last features.
             ret = tf.reshape(topk_nodes(graph, 'h', self.k, idx=-1)[0], (
                 -1, self.k * feat.shape[-1]))
-            if isinstance(graph, BatchedDGLGraph):
-                return ret
-            else:
-                return tf.squeeze(ret, 0)
+            return ret
 
 
 class GlobalAttentionPooling(layers.Layer):
@@ -197,9 +189,8 @@ class GlobalAttentionPooling(layers.Layer):
         Returns
         -------
         tf.Tensor
-            The output feature with shape :math:`(D)` (if
-            input graph is a BatchedDGLGraph, the result shape
-            would be :math:`(B, D)`.
+            The output feature with shape :math:`(B, *)`, where
+            :math:`B` refers to the batch size.
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
@@ -234,13 +225,13 @@ class WeightAndSum(layers.Layer):
             layers.Activation(tf.nn.sigmoid)
         )
 
-    def call(self, bg, feats):
+    def call(self, g, feats):
         """Compute molecule representations out of atom representations
 
         Parameters
         ----------
-        bg : BatchedDGLGraph
-            B Batched DGLGraphs for processing multiple molecules in parallel
+        g : DGLGraph
+            DGLGraph with batch size B for processing multiple molecules in parallel
         feats : FloatTensor of shape (N, self.in_feats)
             Representations for all atoms in the molecules
             * N is the total number of atoms in all molecules
@@ -250,9 +241,9 @@ class WeightAndSum(layers.Layer):
         FloatTensor of shape (B, self.in_feats)
             Representations for B molecules
         """
-        with bg.local_scope():
-            bg.ndata['h'] = feats
-            bg.ndata['w'] = self.atom_weighting(bg.ndata['h'])
-            h_g_sum = sum_nodes(bg, 'h', 'w')
+        with g.local_scope():
+            g.ndata['h'] = feats
+            g.ndata['w'] = self.atom_weighting(g.ndata['h'])
+            h_g_sum = sum_nodes(g, 'h', 'w')
 
         return h_g_sum

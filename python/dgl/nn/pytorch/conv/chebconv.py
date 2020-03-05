@@ -68,7 +68,7 @@ class ChebConv(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             The graph.
         feat : torch.Tensor
             The input feature of shape :math:`(N, D_{in})` where :math:`D_{in}`
