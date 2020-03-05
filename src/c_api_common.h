@@ -14,17 +14,13 @@
 #include <algorithm>
 #include <vector>
 
+using dgl::runtime::operator<<;
+
 /*! \brief Check whether two data types are the same.*/
 inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
 }
 
-/*! \brief Output the string representation of DLDataType.*/
-inline std::ostream& operator<<(std::ostream& os, const DLDataType& ty) {
-  return os << "code=" << static_cast<int>(ty.code)
-            << ",bits=" << static_cast<int>(ty.bits)
-            << "lanes=" << static_cast<int>(ty.lanes);
-}
 
 /*! \brief Check whether two device contexts are the same.*/
 inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
