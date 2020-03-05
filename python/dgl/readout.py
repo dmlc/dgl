@@ -4,7 +4,6 @@ from __future__ import absolute_import
 import numpy as np
 
 from .base import DGLError
-from .graph import DGLGraph
 from . import backend as F
 
 __all__ = ['sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
