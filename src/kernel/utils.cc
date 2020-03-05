@@ -3,6 +3,7 @@
  * \file kernel/utils.cc
  * \brief Kernel utilities
  */
+#include <dgl/array.h>
 #include <vector>
 #include <string>
 
@@ -30,7 +31,7 @@ int64_t ComputeXLength(runtime::NDArray feat_array) {
 }
 
 int64_t NElements(const runtime::NDArray& array) {
-  if (IsNoneArray(array)) {
+  if (aten::IsNullArray(array)) {
     return 0;
   } else {
     int64_t ret = 1;

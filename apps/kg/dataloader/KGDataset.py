@@ -105,7 +105,7 @@ class KGDatasetFB15k(KGDataset):
     '''
     def __init__(self, path, name='FB15k', read_triple=True, only_train=False):
         self.name = name
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
@@ -135,7 +135,13 @@ class KGDatasetFB15k237(KGDataset):
     '''
     def __init__(self, path, name='FB15k-237', read_triple=True, only_train=False):
         self.name = name
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = '
+        
+        
+        
+        
+        
+        /{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
@@ -165,7 +171,7 @@ class KGDatasetWN18(KGDataset):
     '''
     def __init__(self, path, name='wn18', read_triple=True, only_train=False):
         self.name = name
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
@@ -195,7 +201,7 @@ class KGDatasetWN18rr(KGDataset):
     '''
     def __init__(self, path, name='wn18rr', read_triple=True, only_train=False):
         self.name = name
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)
@@ -225,7 +231,7 @@ class KGDatasetFreebase(KGDataset):
     '''
     def __init__(self, path, name='Freebase', read_triple=True, only_train=False):
         self.name = name
-        url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/{}.zip'.format(name)
+        url = 'https://data.dgl.ai/dataset/{}.zip'.format(name)
 
         if not os.path.exists(os.path.join(path, name)):
             print('File not found. Downloading from', url)

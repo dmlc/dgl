@@ -11,7 +11,7 @@ __all__ = [
     'sample_neighbors',
     'select_topk']
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=True):
+def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None, replace=False):
     """Sample from the neighbors of the given nodes and return the induced subgraph.
 
     When sampling with replacement, the sampled subgraph could have parallel edges.

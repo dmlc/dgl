@@ -7,6 +7,7 @@
 #include <dgl/random.h>
 #include <dgl/array.h>
 #include <vector>
+#include <numeric>
 #include "sample_utils.h"
 
 namespace dgl {
@@ -27,63 +28,71 @@ template int64_t RandomEngine::Choice<int64_t>(FloatArray);
 
 
 template<typename IdxType, typename FloatType>
-IdArray RandomEngine::Choice(int64_t num, FloatArray prob, bool replace) {
-  const int64_t N = prob->shape[0];
+void RandomEngine::Choice(IdxType num, FloatArray prob, IdxType* out, bool replace) {
+  const IdxType N = prob->shape[0];
   if (!replace)
     CHECK_LE(num, N) << "Cannot take more sample than population when 'replace=false'";
   if (num == N && !replace)
-    return aten::Range(0, N, sizeof(IdxType) * 8, DLContext{kDLCPU, 0});
+    std::iota(out, out + num, 0);
 
-  const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
-  IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
-  IdxType* ret_data = static_cast<IdxType*>(ret->data);
   utils::BaseSampler<IdxType>* sampler = nullptr;
   if (replace) {
     sampler = new utils::TreeSampler<IdxType, FloatType, true>(this, prob);
   } else {
     sampler = new utils::TreeSampler<IdxType, FloatType, false>(this, prob);
   }
-  for (int64_t i = 0; i < num; ++i)
-    ret_data[i] = sampler->Draw();
+  for (IdxType i = 0; i < num; ++i)
+    out[i] = sampler->Draw();
   delete sampler;
-  return ret;
 }
 
-template IdArray RandomEngine::Choice<int32_t, float>(
-    int64_t num, FloatArray prob, bool replace);
-template IdArray RandomEngine::Choice<int64_t, float>(
-    int64_t num, FloatArray prob, bool replace);
-template IdArray RandomEngine::Choice<int32_t, double>(
-    int64_t num, FloatArray prob, bool replace);
-template IdArray RandomEngine::Choice<int64_t, double>(
-    int64_t num, FloatArray prob, bool replace);
+template void RandomEngine::Choice<int32_t, float>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, float>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
+template void RandomEngine::Choice<int32_t, double>(
+    int32_t num, FloatArray prob, int32_t* out, bool replace);
+template void RandomEngine::Choice<int64_t, double>(
+    int64_t num, FloatArray prob, int64_t* out, bool replace);
 
 template <typename IdxType>
-IdArray RandomEngine::UniformChoice(int64_t num, int64_t population, bool replace) {
+void RandomEngine::UniformChoice(IdxType num, IdxType population, IdxType* out, bool replace) {
   if (!replace)
     CHECK_LE(num, population) << "Cannot take more sample than population when 'replace=false'";
-  const DLDataType dtype{kDLInt, sizeof(IdxType) * 8, 1};
-  IdArray ret = IdArray::Empty({num}, dtype, DLContext{kDLCPU, 0});
-  IdxType* ret_data = static_cast<IdxType*>(ret->data);
   if (replace) {
-    for (int64_t i = 0; i < num; ++i)
-      ret_data[i] = RandInt(population);
+    for (IdxType i = 0; i < num; ++i)
+      out[i] = RandInt(population);
   } else {
-    // time: O(population), space: O(num)
-    for (int64_t i = 0; i < num; ++i)
-      ret_data[i] = i;
-    for (uint64_t i = num; i < population; ++i) {
-      const int64_t j = RandInt(i);
-      if (j < num)
-        ret_data[j] = i;
+    if (num < population / 10) {  // TODO(minjie): may need a better threshold here
+      // use hash set
+      // In the best scenario, time complexity is O(num), i.e., no conflict.
+      //
+      // Let k be num / population, the expected number of extra sampling steps is roughly
+      // k^2 / (1-k) * population, which means in the worst case scenario,
+      // the time complexity is O(population^2). In practice, we use 1/10 since
+      // std::unordered_set is pretty slow.
+      std::unordered_set<IdxType> selected;
+      while (selected.size() < num) {
+        selected.insert(RandInt(population));
+      }
+      std::copy(selected.begin(), selected.end(), out);
+    } else {
+      // reservoir algorithm
+      // time: O(population), space: O(num)
+      for (IdxType i = 0; i < num; ++i)
+        out[i] = i;
+      for (IdxType i = num; i < population; ++i) {
+        const IdxType j = RandInt(i);
+        if (j < num)
+          out[j] = i;
+      }
     }
   }
-  return ret;
 }
 
-template IdArray RandomEngine::UniformChoice<int32_t>(
-    int64_t num, int64_t population, bool replace);
-template IdArray RandomEngine::UniformChoice<int64_t>(
-    int64_t num, int64_t population, bool replace);
+template void RandomEngine::UniformChoice<int32_t>(
+    int32_t num, int32_t population, int32_t* out, bool replace);
+template void RandomEngine::UniformChoice<int64_t>(
+    int64_t num, int64_t population, int64_t* out, bool replace);
 
 };  // namespace dgl

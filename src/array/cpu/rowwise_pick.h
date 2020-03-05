@@ -62,6 +62,9 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   // array. The implementation consumes a little extra memory than the actual requirement.
   //
   // Otherwise, directly use the row and col arrays to construct the result COO matrix.
+  //
+  // [02/29/2020 update]: OMP is disabled for now since batch-wise parallelism is more
+  //   significant. (minjie)
   IdArray picked_row = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
   IdArray picked_col = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
   IdArray picked_idx = Full(-1, num_rows * num_picks, sizeof(IdxType) * 8, ctx);
@@ -73,7 +76,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
   if (replace) {
     all_has_fanout = true;
   } else {
-#pragma omp parallel for reduction(&&:all_has_fanout)
+    // #pragma omp parallel for reduction(&&:all_has_fanout)
     for (int64_t i = 0; i < num_rows; ++i) {
       const IdxType rid = rows_data[i];
       const IdxType len = indptr[rid + 1] - indptr[rid];
@@ -81,7 +84,7 @@ COOMatrix CSRRowWisePick(CSRMatrix mat, IdArray rows,
     }
   }
 
-#pragma omp parallel for
+  // #pragma omp parallel for
   for (int64_t i = 0; i < num_rows; ++i) {
     const IdxType rid = rows_data[i];
     CHECK_LT(rid, mat.num_rows);

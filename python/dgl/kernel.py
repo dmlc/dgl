@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
-from .ndarray import empty
+from .ndarray import null
 
 # pylint: disable=invalid-name
 def infer_binary_feature_shape(op, lhs, rhs):
@@ -136,11 +136,11 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
         The rows to write to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -200,11 +200,11 @@ def backward_lhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -265,11 +265,11 @@ def backward_rhs_binary_op_reduce(
         The rows written to output tensor.
     """
     if A_rows is None:
-        A_rows = empty([])
+        A_rows = null()
     if B_rows is None:
-        B_rows = empty([])
+        B_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
         reducer, op, G,
         int(A_target), int(B_target),
@@ -364,9 +364,9 @@ def copy_reduce(reducer, G, target,
         The rows to write to output tensor.
     """
     if X_rows is None:
-        X_rows = empty([])
+        X_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelCopyReduce(
         reducer, G, int(target),
         X, out, X_rows, out_rows)
@@ -406,9 +406,9 @@ def backward_copy_reduce(reducer, G, target,
         The rows written to output tensor.
     """
     if X_rows is None:
-        X_rows = empty([])
+        X_rows = null()
     if out_rows is None:
-        out_rows = empty([])
+        out_rows = null()
     _CAPI_DGLKernelBackwardCopyReduce(
         reducer, G, int(target),
         X, out, grad_out, grad_X,

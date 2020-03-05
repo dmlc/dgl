@@ -108,7 +108,7 @@ def indices_split(dataset, frac_train, frac_val, frac_test, indices):
     list of length 3
         Subsets for training, validation and test, which are all :class:`Subset` instances.
     """
-    frac_list = np.array([frac_train, frac_val, frac_test])
+    frac_list = np.asarray([frac_train, frac_val, frac_test])
     assert np.allclose(np.sum(frac_list), 1.), \
         'Expect frac_list sum to 1, got {:.4f}'.format(np.sum(frac_list))
     num_data = len(dataset)

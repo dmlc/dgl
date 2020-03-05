@@ -604,7 +604,7 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
             etype_id = etypes_invmap[etype]
             dsttype_id = ntypes_invmap[dsttype]
             canonical_etids.append((srctype_id, etype_id, dsttype_id))
-        canonical_etids = np.array(canonical_etids)
+        canonical_etids = np.asarray(canonical_etids)
         etype_mask = (edge_ctids[None, :] == canonical_etids[:, None]).all(2)
     edge_groups = [etype_mask[i].nonzero()[0] for i in range(len(canonical_etids))]
 
