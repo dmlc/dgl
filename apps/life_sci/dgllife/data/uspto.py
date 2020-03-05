@@ -1,5 +1,6 @@
 """USPTO for reaction prediction"""
 import random
+import time
 import torch
 
 from collections import defaultdict
@@ -226,6 +227,7 @@ class USPTO(object):
         else:
             subsets = [self.subset]
 
+        t0 = time.time()
         for set in subsets:
             print('Preparing {} set'.format(set))
             file_path = extracted_data_path + '/{}.txt.proc'.format(set)
@@ -240,6 +242,7 @@ class USPTO(object):
             self.reactant_mol_graphs.extend(reactant_mol_graphs)
             self.atom_pair_features.extend(atom_pair_features)
             self.labels.extend(labels)
+        print(time.time() - t0)
 
     def load_reaction_data(self, file_path):
         """Load reaction data from the raw file.
