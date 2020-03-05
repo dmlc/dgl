@@ -28,7 +28,7 @@ class NeighborSampler(object):
             # For each seed node, sample ``fanout`` neighbors.
             frontier = dgl.sampling.sample_neighbors(g, seeds, fanout)
             # Then we compact the frontier into a bipartite graph for message passing.
-            block = dgl.compact_as_bipartite(frontier, seeds, True)
+            block = dgl.to_block(frontier, seeds)
             # Obtain the seed nodes for next layer.
             seeds = block.srcdata[dgl.NID]
 
@@ -88,7 +88,7 @@ class SAGE(nn.Module):
             for start in tqdm.trange(0, len(nodes), batch_size):
                 end = start + batch_size
                 batch_nodes = nodes[start:end]
-                block = dgl.compact_as_bipartite(dgl.in_subgraph(g, batch_nodes), batch_nodes, True)
+                block = dgl.to_block(dgl.in_subgraph(g, batch_nodes), batch_nodes)
                 induced_nodes = block.srcdata[dgl.NID]
 
                 h = x[induced_nodes].to(device)
