@@ -15,6 +15,7 @@
 #include <utility>
 #include <string>
 #include <vector>
+#include <mutex>
 #include <memory>
 
 #include "../c_api_common.h"
@@ -183,6 +184,15 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Copy the data to another context */
   static HeteroGraphPtr CopyTo(HeteroGraphPtr g, const DLContext& ctx);
 
+  /*! \return Return whether the in-edge CSR format is initialized. */
+  bool HasInCSR() const;
+
+  /*! \return Return whether the out-edge CSR format is initialized. */
+  bool HasOutCSR() const;
+
+  /*! \return Return whether the COO format is initialized. */
+  bool HasCOO() const;
+
   /*! \return Return the in-edge CSR format. Create from other format if not exist. */
   CSRPtr GetInCSR() const;
 
@@ -210,6 +220,16 @@ class UnitGraph : public BaseHeteroGraph {
 
   /*! \return Save UnitGraph to stream, using CSRMatrix */
   void Save(dmlc::Stream* fs) const;
+
+  /*! \brief Move assignment operator that overrides the default because of mutex */
+  UnitGraph& operator=(UnitGraph&& other) {
+    in_csr_ = std::move(other.in_csr_);
+    out_csr_ = std::move(other.out_csr_);
+    coo_ = std::move(other.coo_);
+    // skip lazy_mutex_
+    restrict_format_ = std::move(other.restrict_format_);
+    return *this;
+  }
 
  private:
   friend class Serializer;
@@ -261,6 +281,10 @@ class UnitGraph : public BaseHeteroGraph {
   CSRPtr out_csr_;
   /*! \brief COO representation */
   COOPtr coo_;
+
+  /*! \brief Mutex for lazy initialization */
+  mutable std::mutex lazy_mutex_;
+
   /*!
    * \brief Storage format restriction.
    * If it is not ANY, then conversion is not allowed for graph queries.
