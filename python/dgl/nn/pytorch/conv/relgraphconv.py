@@ -72,7 +72,7 @@ class RelGraphConv(nn.Module):
         self.num_rels = num_rels
         self.regularizer = regularizer
         self.num_bases = num_bases
-        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases < 0:
+        if self.num_bases is None or self.num_bases > self.num_rels or self.num_bases <= 0:
             self.num_bases = self.num_rels
         self.bias = bias
         self.activation = activation
@@ -91,8 +91,11 @@ class RelGraphConv(nn.Module):
             # message func
             self.message_func = self.basis_message_func
         elif regularizer == "bdd":
-            if in_feat % num_bases != 0 or out_feat % num_bases != 0:
-                raise ValueError('Feature size must be a multiplier of num_bases.')
+            if in_feat % self.num_bases != 0 or out_feat % self.num_bases != 0:
+                raise ValueError(
+                    'Feature size must be a multiplier of num_bases (%d).'
+                    % self.num_bases
+                )
             # add block diagonal weights
             self.submat_in = in_feat // self.num_bases
             self.submat_out = out_feat // self.num_bases
