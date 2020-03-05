@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <vector>
 
+using dgl::runtime::operator<<;
+
 /*! \brief Check whether two data types are the same.*/
 inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
   return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;

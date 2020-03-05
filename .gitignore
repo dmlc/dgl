@@ -147,3 +147,6 @@ cscope.*
 *.swo
 *.un~
 *~
+
+# parameters
+*.params

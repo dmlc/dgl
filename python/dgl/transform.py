@@ -8,12 +8,11 @@ from ._ffi.function import _init_api
 from .graph import DGLGraph
 from .heterograph import DGLHeteroGraph
 from . import ndarray as nd
-from .subgraph import DGLSubGraph
 from . import backend as F
 from .graph_index import from_coo
 from .graph_index import _get_halo_subgraph_inner_node
 from .graph_index import _get_halo_subgraph_inner_edge
-from .batched_graph import BatchedDGLGraph, unbatch
+from .graph import unbatch
 from .convert import graph, bipartite
 from . import utils
 from .base import EID, NID
@@ -253,7 +252,6 @@ def reverse(g, share_ndata=False, share_edata=False):
 
     Notes
     -----
-    * This function does not support :class:`~dgl.BatchedDGLGraph` objects.
     * We do not dynamically update the topology of a graph once that of its reverse changes.
       This can be particularly problematic when the node/edge attrs are shared. For example,
       if the topology of both the original graph and its reverse get changed independently,
@@ -310,12 +308,12 @@ def reverse(g, share_ndata=False, share_edata=False):
             [2.],
             [3.]])
     """
-    assert not isinstance(g, BatchedDGLGraph), \
-        'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
     g_edges = g.all_edges(order='eid')
     g_reversed.add_edges(g_edges[1], g_edges[0])
+    g_reversed._batch_num_nodes = g._batch_num_nodes
+    g_reversed._batch_num_edges = g._batch_num_edges
     if share_ndata:
         g_reversed._node_frame = g._node_frame
     if share_edata:
@@ -394,17 +392,14 @@ def laplacian_lambda_max(g):
 
     Parameters
     ----------
-    g : DGLGraph or BatchedDGLGraph
+    g : DGLGraph
         The input graph, it should be an undirected graph.
 
     Returns
     -------
     list :
-        * If the input g is a DGLGraph, the returned value would be
-          a list with one element, indicating the largest eigenvalue of g.
-        * If the input g is a BatchedDGLGraph, the returned value would
-          be a list, where the i-th item indicates the largest eigenvalue
-          of i-th graph in g.
+        Return a list, where the i-th item indicates the largest eigenvalue
+        of i-th graph in g.
 
     Examples
     --------
@@ -416,11 +411,7 @@ def laplacian_lambda_max(g):
     >>> dgl.laplacian_lambda_max(g)
     [1.809016994374948]
     """
-    if isinstance(g, BatchedDGLGraph):
-        g_arr = unbatch(g)
-    else:
-        g_arr = [g]
-
+    g_arr = unbatch(g)
     rst = []
     for g_i in g_arr:
         n = g_i.number_of_nodes()
@@ -576,7 +567,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
     for i, subg in enumerate(subgs):
         inner_node = _get_halo_subgraph_inner_node(subg)
         inner_edge = _get_halo_subgraph_inner_edge(subg)
-        subg = DGLSubGraph(g, subg)
+        subg = g._create_subgraph(subg, subg.induced_nodes, subg.induced_edges)
         inner_node = F.zerocopy_from_dlpack(inner_node.to_dlpack())
         subg.ndata['inner_node'] = inner_node
         inner_edge = F.zerocopy_from_dlpack(inner_edge.to_dlpack())
