@@ -9,7 +9,7 @@ from multiprocessing import Pool
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
 
-from ..utils.mol_to_graph import mol_to_bigraph, mol_to_complete_graph
+from ..utils.mol_to_graph import mol_to_bigraph
 
 __all__ = ['USPTO']
 
@@ -69,9 +69,21 @@ def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer
     edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
         Featurization for edges like bonds in a molecule, which can be used to update
         edata for a DGLGraph.
-    atom_pair_featurizer : callable, str -> dict
-        Featurization for each pair of atoms in multiple reactants. The result will be
-        used to update edata in the complete DGLGraphs.
+    atom_pair_featurizer : None or callable, str -> dict
+        If not None, featurization for each pair of atoms in multiple reactants. The result
+        will be used to update edata in the complete DGLGraphs.
+
+    Returns
+    -------
+    mol : rdkit.Chem.rdchem.Mol
+        RDKit molecule instance
+    reactant_mol_graph : DGLGraph
+        DGLGraph for the reactants
+    atom_pair_features : None or float32 tensor of shape (V^2, dim)
+        If not None, features for each pair of atoms in multiple reactants.
+        V for the number of atoms in the reactants.
+    label : float32 tensor of shape (V^2, 5)
+        Labels constructed for each pair of atoms in multiple reactants.
     """
     mol = reaction_data[0]
     reaction = reaction_data[1]
@@ -80,13 +92,13 @@ def preprocess_single_reaction_data(reaction_data, mol_to_graph, node_featurizer
     reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
                                       edge_featurizer=edge_featurizer,
                                       canonical_atom_order=False)
-    complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
-                                           canonical_atom_order=False)
     if atom_pair_featurizer is not None:
-        complete_graph.edata.update(atom_pair_featurizer(reactants))
+        atom_pair_features = atom_pair_featurizer(reactants)
+    else:
+        atom_pair_features = None
     label = get_pair_label(mol, graph_edits)
 
-    return mol, reactant_mol_graph, complete_graph, label
+    return mol, reactant_mol_graph, atom_pair_features, label
 
 def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
                              edge_featurizer, atom_pair_featurizer, num_processes, load):
@@ -115,6 +127,18 @@ def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
         Whether to load the previously pre-processed dataset or pre-process from scratch.
         ``load`` should be False when we want to try different graph construction and
         featurization methods and need to preprocess from scratch.
+
+    Returns
+    -------
+    mols : list of rdkit.Chem.rdchem.Mol
+        RDKit molecules for reactants.
+    reactant_mol_graphs : list of DGLGraphs
+        DGLGraphs for reactants.
+    atom_pair_features : list of None or float32 tensor of shape (V_i^2, dim)
+        If not None, features for each pair of atoms in multiple reactants.
+        V_i for the number of atoms in the i-th reactants.
+    labels : list of float32 tensor of shape (V_i^2, 5)
+        Labels constructed for each pair of atoms in multiple reactants.
     """
     # Todo: check whether the storage files exist
     if not load:
@@ -126,8 +150,8 @@ def preprocess_reaction_data(all_reaction_data, mol_to_graph, node_featurizer,
                 node_featurizer=node_featurizer, edge_featurizer=edge_featurizer,
                 atom_pair_featurizer=atom_pair_featurizer), all_reaction_data)
             results = results.get()
-        mols, reactant_mol_graphs, complete_graphs, labels = map(list, zip(*results))
-    return mols, reactant_mol_graphs, complete_graphs, labels
+        mols, reactant_mol_graphs, atom_pair_features, labels = map(list, zip(*results))
+    return mols, reactant_mol_graphs, atom_pair_features, labels
 
 class USPTO(object):
     """USPTO dataset for reaction prediction.
@@ -192,7 +216,7 @@ class USPTO(object):
 
         self.mols = []
         self.reactant_mol_graphs = []
-        self.reactant_complete_graphs = []
+        self.atom_pair_features = []
         self.labels = []
 
         if self.subset == 'full':
@@ -208,12 +232,12 @@ class USPTO(object):
 
             # Todo: remove the line below
             all_reaction_data = all_reaction_data[:1000]
-            mols, reactant_mol_graphs, complete_graphs, labels = preprocess_reaction_data(
+            mols, reactant_mol_graphs, atom_pair_features, labels = preprocess_reaction_data(
                 all_reaction_data,  mol_to_graph, node_featurizer,
                 edge_featurizer, atom_pair_featurizer, num_processes, load)
             self.mols.extend(mols)
             self.reactant_mol_graphs.extend(reactant_mol_graphs)
-            self.reactant_complete_graphs.extend(complete_graphs)
+            self.atom_pair_features.extend(atom_pair_features)
             self.labels.extend(labels)
 
     def load_reaction_data(self, file_path):
