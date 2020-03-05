@@ -47,7 +47,6 @@ class SAGEConv(nn.Module):
                  out_feats,
                  aggregator_type,
                  feat_drop=0.,
-                 in_dst_feats=None,
                  bias=True,
                  norm=None,
                  activation=None):

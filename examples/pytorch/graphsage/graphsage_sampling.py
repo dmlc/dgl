@@ -45,6 +45,7 @@ class SAGE(nn.Module):
                  dropout):
         super().__init__()
         self.n_layers = n_layers
+        self.n_hidden = n_hidden
         self.layers = nn.ModuleList()
         self.layers.append(dglnn.SAGEConv(
             in_feats, n_hidden, 'mean', feat_drop=dropout, activation=activation))
