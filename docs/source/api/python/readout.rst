@@ -1,18 +1,9 @@
 .. _apibatch:
 
-dgl.batched_graph
+dgl.readout
 ==================================================
 
 .. currentmodule:: dgl
-
-Merge and decompose
--------------------
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    batch
-    unbatch
 
 Graph Readout
 -------------

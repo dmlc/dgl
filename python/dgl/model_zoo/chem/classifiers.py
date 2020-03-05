@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .gnn import GCNLayer, GATLayer
-from ...batched_graph import max_nodes
+from ...readout import max_nodes
 from ...nn.pytorch import WeightAndSum
 from ...contrib.deprecation import deprecated
 

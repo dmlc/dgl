@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, \
+from ...readout import sum_nodes, mean_nodes, max_nodes, \
     softmax_nodes, topk_nodes
 
 

@@ -19,10 +19,10 @@ from ._ffi.function import register_func, get_global_func, list_global_func_name
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
-from .batched_graph import *
+from .readout import *
 from .batched_heterograph import *
 from .convert import *
-from .graph import DGLGraph
+from .graph import DGLGraph, batch, unbatch
 from .generators import *
 from .heterograph import DGLHeteroGraph
 from .nodeflow import *

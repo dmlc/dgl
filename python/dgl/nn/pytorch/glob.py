@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 from ...backend import pytorch as F
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
 

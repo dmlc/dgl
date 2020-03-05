@@ -3,7 +3,7 @@
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 
-from ...batched_graph import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
+from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
     softmax_nodes, topk_nodes
 
 __all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',

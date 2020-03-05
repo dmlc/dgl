@@ -142,6 +142,15 @@ Computing with DGLGraph
     DGLGraph.filter_edges
     DGLGraph.to
 
+Batch and Unbatch
+-------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    batch
+    unbatch
+
 Mapping between subgraph and parent graph
 -----------------------------------------
 .. autosummary::
