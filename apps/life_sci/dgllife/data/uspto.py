@@ -240,7 +240,7 @@ class USPTO(object):
                         atom_pair_features = dict()
                     reactant_complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
                                                                     canonical_atom_order=False)
-                    reactant_complete_graph.edata.updated(atom_pair_features)
+                    reactant_complete_graph.edata.update(atom_pair_features)
                     reactant_complete_graph.edata['label'] = get_pair_label(mol, graph_edits)
                     set_reactant_complete_graphs.append(reactant_complete_graph)
 
