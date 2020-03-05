@@ -37,7 +37,7 @@ bool Object::_DerivedFrom(uint32_t tid) const {
 // this is slow, usually caller always hold the result in a static variable.
 uint32_t Object::TypeKey2Index(const char* key) {
   TypeManager *t = TypeManager::Global();
-  std::lock_guard<std::mutex>(t->mutex);
+  std::lock_guard<std::mutex> lock(t->mutex);
   std::string skey = key;
   auto it = t->key2index.find(skey);
   if (it != t->key2index.end()) {
@@ -51,7 +51,7 @@ uint32_t Object::TypeKey2Index(const char* key) {
 
 const char* Object::TypeIndex2Key(uint32_t index) {
   TypeManager *t = TypeManager::Global();
-  std::lock_guard<std::mutex>(t->mutex);
+  std::lock_guard<std::mutex> lock(t->mutex);
   CHECK_NE(index, 0);
   return t->index2key.at(index - 1).c_str();
 }
