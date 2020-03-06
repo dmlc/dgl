@@ -1250,15 +1250,10 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
 
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
-// Using OurCSR
 bool UnitGraph::Load(dmlc::Stream* fs) {
   uint64_t magicNum;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
-
-  auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
-  CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
-  meta_graph_ = meta_imgraph;
 
   int64_t format_code;
   CHECK(fs->Read(&format_code)) << "Invalid format";
@@ -1279,14 +1274,16 @@ bool UnitGraph::Load(dmlc::Stream* fs) {
       break;
   }
 
+  meta_graph_ = GetAny()->meta_graph();
+
   return true;
 }
 
-// Using Out CSR
+
 void UnitGraph::Save(dmlc::Stream* fs) const {
   fs->Write(kDGLSerialize_UnitGraphMagic);
-  auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
-  fs->Write(meta_graph_ptr);
+  // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
+  // sparse matrix
   auto avail_fmt = SelectFormat(SparseFormat::ANY);
   fs->Write(static_cast<int64_t>(avail_fmt));
   switch (avail_fmt) {
