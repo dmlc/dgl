@@ -4,8 +4,9 @@
  * \brief DGL immutable graph index implementation
  */
 
-#include <dgl/packed_func_ext.h>
 #include <dgl/immutable_graph.h>
+#include <dgl/packed_func_ext.h>
+#include <dgl/runtime/smart_ptr_serializer.h>
 #include <dmlc/io.h>
 #include <dmlc/type_traits.h>
 #include <string.h>
@@ -274,6 +275,15 @@ DGLIdIters CSR::OutEdgeVec(dgl_id_t vid) const {
   const dgl_id_t start = indptr_data[vid];
   const dgl_id_t end = indptr_data[vid + 1];
   return DGLIdIters(eid_data + start, eid_data + end);
+}
+
+bool CSR::Load(dmlc::Stream *fs) {
+  fs->Read(const_cast<dgl::aten::CSRMatrix*>(&adj_));
+  return true;
+}
+
+void CSR::Save(dmlc::Stream *fs) const {
+  fs->Write(adj_);
 }
 
 //////////////////////////////////////////////////////////
@@ -643,19 +653,16 @@ bool ImmutableGraph::Load(dmlc::Stream *fs) {
   uint64_t magicNum;
   aten::CSRMatrix out_csr_matrix;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-  CHECK_EQ(magicNum, kDGLSerialize_ImGraph) << "Invalid ImmutableGraph Data";
-  CHECK(fs->Read(&out_csr_matrix)) << "Invalid csr matrix";
-  CSRPtr csr(new CSR(out_csr_matrix.indptr, out_csr_matrix.indices,
-                     out_csr_matrix.data));
-  auto g = new ImmutableGraph(nullptr, csr);
-  *this = *g;
+  CHECK_EQ(magicNum, kDGLSerialize_ImGraph)
+      << "Invalid ImmutableGraph Magic Number";
+  CHECK(fs->Read(&out_csr_)) << "Invalid csr matrix";
   return true;
 }
 
 /*! \return Save HeteroGraph to stream, using OutCSR Matrix */
 void ImmutableGraph::Save(dmlc::Stream *fs) const {
   fs->Write(kDGLSerialize_ImGraph);
-  fs->Write(GetOutCSR()->ToCSRMatrix());
+  fs->Write(GetOutCSR());
 }
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")

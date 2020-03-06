@@ -438,6 +438,9 @@ class BaseHeteroGraph : public runtime::Object {
  protected:
   /*! \brief meta graph */
   GraphPtr meta_graph_;
+
+  // empty constructor
+  BaseHeteroGraph(){}
 };
 
 // Define HeteroGraphRef
