@@ -263,6 +263,44 @@ GEN_FROMVECTOR_FOR(uint64_t, kDLInt, 64);
 GEN_FROMVECTOR_FOR(float, kDLFloat, 32);
 GEN_FROMVECTOR_FOR(double, kDLFloat, 64);
 
+template<typename T>
+std::vector<T> NDArray::ToVector(DLDataType dtype) const {
+  CHECK(data_->dl_tensor.ndim == 1) << "ToVector() only supported for 1D arrays";
+  CHECK(data_->dl_tensor.dtype.code == dtype.code &&
+        data_->dl_tensor.dtype.bits == dtype.bits &&
+        data_->dl_tensor.dtype.lanes == dtype.lanes) << "dtype mismatch";
+
+  int64_t size = data_->dl_tensor.shape[0];
+  std::vector<T> vec(size);
+  const DLContext &ctx = data_->dl_tensor.ctx;
+  DeviceAPI::Get(ctx)->CopyDataFromTo(
+      static_cast<T*>(data_->dl_tensor.data),
+      0,
+      vec.data(),
+      0,
+      size * sizeof(T),
+      ctx,
+      DLContext{kDLCPU, 0},
+      dtype,
+      nullptr);
+  return vec;
+}
+
+// specializations of ToVector
+#define GEN_TOVECTOR_FOR(T, DTypeCode, DTypeBits) \
+  template<> \
+  std::vector<T> NDArray::ToVector<T>() const { \
+    return ToVector<T>(DLDataType{DTypeCode, DTypeBits, 1}); \
+  }
+GEN_TOVECTOR_FOR(int32_t, kDLInt, 32);
+GEN_TOVECTOR_FOR(int64_t, kDLInt, 64);
+// XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
+// converting uints from signed NDArrays.
+GEN_TOVECTOR_FOR(uint32_t, kDLInt, 32);
+GEN_TOVECTOR_FOR(uint64_t, kDLInt, 64);
+GEN_TOVECTOR_FOR(float, kDLFloat, 32);
+GEN_TOVECTOR_FOR(double, kDLFloat, 64);
+
 }  // namespace runtime
 }  // namespace dgl
 

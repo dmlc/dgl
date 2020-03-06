@@ -1008,7 +1008,7 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
         indptr.todgltensor(), indices.todgltensor(), edge_ids.todgltensor(),
         restrict_format)
 
-def create_heterograph_from_relations(metagraph, rel_graphs):
+def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
@@ -1017,12 +1017,15 @@ def create_heterograph_from_relations(metagraph, rel_graphs):
         Meta-graph.
     rel_graphs : list of HeteroGraphIndex
         Bipartite graph of each relation.
+    num_nodes_per_type : utils.Index
+        Number of nodes per node type
 
     Returns
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+    return _CAPI_DGLHeteroCreateHeteroGraph(
+        metagraph, rel_graphs, num_nodes_per_type.todgltensor())
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.
@@ -1086,6 +1089,17 @@ class HeteroPickleStates(ObjectBase):
         return _CAPI_DGLHeteroPickleStatesGetMetagraph(self)
 
     @property
+    def num_nodes_per_type(self):
+        """Number of nodes per edge type
+
+        Returns
+        -------
+        NDArray
+            Array of number of nodes for each type
+        """
+        return _CAPI_DGLHeteroPickleStatesGetNumVertices(self)
+
+    @property
     def adjs(self):
         """Adjacency matrices of all the relation graphs
 
@@ -1097,11 +1111,11 @@ class HeteroPickleStates(ObjectBase):
         return list(_CAPI_DGLHeteroPickleStatesGetAdjs(self))
 
     def __getstate__(self):
-        return self.metagraph, self.adjs
+        return self.metagraph, self.num_nodes_per_type, self.adjs
 
     def __setstate__(self, state):
-        metagraph, adjs = state
+        metagraph, num_nodes_per_type, adjs = state
         self.__init_handle_by_constructor__(
-            _CAPI_DGLCreateHeteroPickleStates, metagraph, adjs)
+            _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
 
 _init_api("dgl.heterograph_index")

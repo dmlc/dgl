@@ -1172,8 +1172,8 @@ def from_edge_list(elist, is_multigraph, readonly):
         src, dst = elist
     else:
         src, dst = zip(*elist)
-    src = np.asarray(src)
-    dst = np.asarray(dst)
+    src = np.array(src)
+    dst = np.array(dst)
     src_ids = utils.toindex(src)
     dst_ids = utils.toindex(dst)
     num_nodes = max(src.max(), dst.max()) + 1

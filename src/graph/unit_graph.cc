@@ -179,6 +179,13 @@ class UnitGraph::COO : public BaseHeteroGraph {
     }
   }
 
+  std::vector<int64_t> NumVerticesPerType() const override {
+    if (NumVertexTypes() == 1)
+      return {adj_.num_rows};
+    else
+      return {adj_.num_rows, adj_.num_cols};
+  }
+
   uint64_t NumEdges(dgl_type_t etype) const override {
     return adj_.row->shape[0];
   }
@@ -544,6 +551,13 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
+  std::vector<int64_t> NumVerticesPerType() const override {
+    if (NumVertexTypes() == 1)
+      return {adj_.num_rows};
+    else
+      return {adj_.num_rows, adj_.num_cols};
+  }
+
   uint64_t NumEdges(dgl_type_t etype) const override {
     return adj_.indices->shape[0];
   }
@@ -779,6 +793,16 @@ uint64_t UnitGraph::NumVertices(dgl_type_t vtype) const {
   if (fmt == SparseFormat::CSC)
     vtype = (vtype == SrcType()) ? DstType() : SrcType();
   return ptr->NumVertices(vtype);
+}
+
+std::vector<int64_t> UnitGraph::NumVerticesPerType() const {
+  const SparseFormat fmt = SelectFormat(SparseFormat::ANY);
+  const auto ptr = GetFormat(fmt);
+  std::vector<int64_t> num_vertices_per_type = ptr->NumVerticesPerType();
+  if (fmt == SparseFormat::CSC && NumVertexTypes() == 2)
+    // need to swap the two elements
+    std::swap(num_vertices_per_type[0], num_vertices_per_type[1]);
+  return num_vertices_per_type;
 }
 
 uint64_t UnitGraph::NumEdges(dgl_type_t etype) const {

@@ -195,6 +195,18 @@ class NDArray {
   static NDArray FromVector(const std::vector<T>& vec, DLDataType dtype, DLContext ctx);
 
   /*!
+   * \brief Create a std::vector from a 1D NDArray.
+   * \tparam T Type of vector data.
+   * \note Type casting is NOT performed.  The caller has to make sure that the vector
+   *       type matches the dtype of NDArray.
+   */
+  template<typename T>
+  std::vector<T> ToVector() const;
+
+  template<typename T>
+  std::vector<T> ToVector(DLDataType dtype) const;
+
+  /*!
    * \brief Function to copy data from one array to another.
    * \param from The source array.
    * \param to The target array.

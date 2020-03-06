@@ -281,7 +281,7 @@ def bipartite(data, utype='_U', etype='_E', vtype='_V', card=None, validate=True
     else:
         raise DGLError('Unsupported graph data type:', type(data))
 
-def hetero_from_relations(rel_graphs):
+def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     """Create a heterograph from graphs representing connections of each relation.
 
     The input is a list of heterographs where the ``i``th graph contains edges of type
@@ -294,6 +294,9 @@ def hetero_from_relations(rel_graphs):
     ----------
     rel_graphs : list of DGLHeteroGraph
         Each element corresponds to a heterograph for one (src, edge, dst) relation.
+    num_nodes_per_type : dict[str, Tensor], optional
+        Number of nodes per node type.  If not given, DGL will infer the number of nodes
+        from the given relation graphs.
 
     Returns
     -------
@@ -350,31 +353,41 @@ def hetero_from_relations(rel_graphs):
     # TODO(minjie): handle node/edge data
     # infer meta graph
     ntype_set = set()
-    meta_edges = []
+    meta_edges_src, meta_edges_dst = [], []
     ntypes = []
     etypes = []
     # TODO(BarclayII): I'm keeping the node type names sorted because even if
     # the metagraph is the same, the same node type name in different graphs may
     # map to different node type IDs.
     # In the future, we need to lower the type names into C++.
-    for rgrh in rel_graphs:
-        assert len(rgrh.etypes) == 1
-        stype, etype, dtype = rgrh.canonical_etypes[0]
-        ntype_set.add(stype)
-        ntype_set.add(dtype)
-    ntypes = list(sorted(ntype_set))
+    if num_nodes_per_type is None:
+        num_nodes_per_type = {}
+        for rgrh in rel_graphs:
+            assert len(rgrh.etypes) == 1
+            stype, etype, dtype = rgrh.canonical_etypes[0]
+
+            num_nodes_stype = rgrh.number_of_nodes(stype)
+            num_nodes_dtype = rgrh.number_of_nodes(dtype)
+
+            if num_nodes_per_type.setdefault(stype, num_nodes_stype) != num_nodes_stype:
+                raise ValueError('Number of nodes of type %s is inconsistent.' % stype)
+            if num_nodes_per_type.setdefault(dtype, num_nodes_dtype) != num_nodes_dtype:
+                raise ValueError('Number of nodes of type %s is inconsistent.' % dtype)
+
+    ntypes = list(sorted(num_nodes_per_type.keys()))
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
     for rgrh in rel_graphs:
         stype, etype, dtype = rgrh.canonical_etypes[0]
-        stid = ntype_dict[stype]
-        dtid = ntype_dict[dtype]
-        meta_edges.append((stid, dtid))
+        meta_edges_src.append(ntype_dict[stype])
+        meta_edges_dst.append(ntype_dict[dtype])
         etypes.append(etype)
-    metagraph = graph_index.from_edge_list(meta_edges, True, True)
+    metagraph = graph_index.from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True, True)
 
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph, [rgrh._graph for rgrh in rel_graphs])
+        metagraph,
+        [rgrh._graph for rgrh in rel_graphs],
+        utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes]))
     retg = DGLHeteroGraph(hgidx, ntypes, etypes)
     for i, rgrh in enumerate(rel_graphs):
         for ntype in rgrh.ntypes:
@@ -441,8 +454,11 @@ def heterograph(data_dict, num_nodes_dict=None):
                     nsrc = len({n for n, d in data.nodes(data=True) if d['bipartite'] == 0})
                     ndst = data.number_of_nodes() - nsrc
             elif isinstance(data, DGLHeteroGraph):
-                # Do nothing; handled in the next loop
-                continue
+                # original node type and edge type of ``data`` is ignored.
+                assert len(data.canonical_etypes) == 1, \
+                    "Relational graphs must have only one edge type."
+                nsrc = data.number_of_nodes(data.canonical_etypes[0][0])
+                ndst = data.number_of_nodes(data.canonical_etypes[0][2])
             else:
                 raise DGLError('Unsupported graph data type %s for %s' % (
                     type(data), (srctype, etype, dsttype)))
@@ -464,7 +480,7 @@ def heterograph(data_dict, num_nodes_dict=None):
                 data, srctype, etype, dsttype,
                 card=(num_nodes_dict[srctype], num_nodes_dict[dsttype]), validate=False))
 
-    return hetero_from_relations(rel_graphs)
+    return hetero_from_relations(rel_graphs, num_nodes_dict)
 
 def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph=None):
     """Convert the given homogeneous graph to a heterogeneous graph.
@@ -622,7 +638,8 @@ def to_hetero(G, ntypes, etypes, ntype_field=NTYPE, etype_field=ETYPE, metagraph
                 card=(ntype_count[stid], ntype_count[dtid]), validate=False)
         rel_graphs.append(rel_graph)
 
-    hg = hetero_from_relations(rel_graphs)
+    hg = hetero_from_relations(
+        rel_graphs, {ntype: count for ntype, count in zip(ntypes, ntype_count)})
 
     ntype2ngrp = {ntype : node_groups[ntid] for ntid, ntype in enumerate(ntypes)}
     for ntid, ntype in enumerate(hg.ntypes):

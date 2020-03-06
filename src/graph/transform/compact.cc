@@ -57,8 +57,11 @@ CompactGraphs(
 
   // Step 2: Relabel the nodes for each type to a smaller ID space and save the mapping.
   std::vector<IdArray> induced_nodes;
-  for (auto &hashmap : hashmaps)
+  std::vector<int64_t> num_induced_nodes;
+  for (auto &hashmap : hashmaps) {
     induced_nodes.push_back(hashmap.Values());
+    num_induced_nodes.push_back(hashmap.Size());
+  }
 
   // Step 3: Remap the edges of each graph.
   std::vector<HeteroGraphPtr> new_graphs;
@@ -84,7 +87,7 @@ CompactGraphs(
           mapped_cols));
     }
 
-    new_graphs.push_back(CreateHeteroGraph(meta_graph, rel_graphs));
+    new_graphs.push_back(CreateHeteroGraph(meta_graph, rel_graphs, num_induced_nodes));
   }
 
   return std::make_pair(new_graphs, induced_nodes);

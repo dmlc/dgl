@@ -84,6 +84,10 @@ class IdHashMap {
     return values;
   }
 
+  inline size_t Size() const {
+    return oldv2newv_.size();
+  }
+
  private:
   static constexpr int32_t kFilterMask = 0xFFFFFF;
   static constexpr int32_t kFilterSize = kFilterMask + 1;

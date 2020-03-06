@@ -86,7 +86,7 @@ HeteroSubgraph SampleNeighbors(
   }
 
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
   ret.induced_vertices.resize(hg->NumVertexTypes());
   ret.induced_edges = std::move(induced_edges);
   return ret;
@@ -160,7 +160,7 @@ HeteroSubgraph SampleNeighborsTopk(
   }
 
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(hg->meta_graph(), subrels, hg->NumVerticesPerType());
   ret.induced_vertices.resize(hg->NumVertexTypes());
   ret.induced_edges = std::move(induced_edges);
   return ret;
