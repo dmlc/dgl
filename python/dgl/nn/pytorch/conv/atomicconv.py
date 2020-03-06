@@ -203,7 +203,7 @@ class AtomicConv(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph or BatchedDGLGraph
+        graph : DGLGraph
             Topology based on which message passing is performed.
         feat : Float32 tensor of shape (V, 1)
             Initial node features, which are atomic numbers in the paper.
