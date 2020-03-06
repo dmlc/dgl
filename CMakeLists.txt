@@ -132,9 +132,7 @@ list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # For distributed
-#add_definitions(-DIDXTYPEWIDTH=64)
-#add_definitions(-DREALTYPEWIDTH=32)
-set(IDX64 ON CACHE BOOL "use idx 64" FORCE)
+execute_process(COMMAND cd third_party/METIS; make config i64=1)
 add_subdirectory("third_party/METIS")
 list(APPEND DGL_LINKER_LIBS metis)
 
