@@ -124,11 +124,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
   }
 
   std::vector<HeteroGraphPtr> rst;
+  std::vector<int64_t> num_nodes_per_type(num_vertex_types);
   for (uint64_t g = 0; g < batch_size; ++g) {
-    rst.push_back(CreateHeteroGraph(meta_graph, rel_graphs[g], vertex_sizes.CreateView(
-        {static_cast<int64_t>(num_vertex_types)},
-        vertex_sizes->dtype,
-        g * num_vertex_types * vertex_sizes->dtype.bits / 8)));
+    for (uint64_t i = 0; i < num_vertex_types; ++i)
+      num_nodes_per_type[i] = vertex_sizes_data[i * batch_size + g];
+    rst.push_back(CreateHeteroGraph(meta_graph, rel_graphs[g], num_nodes_per_type));
   }
   return rst;
 }

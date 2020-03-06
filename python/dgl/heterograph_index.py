@@ -1094,10 +1094,10 @@ class HeteroPickleStates(ObjectBase):
 
         Returns
         -------
-        NDArray
+        Tensor
             Array of number of nodes for each type
         """
-        return _CAPI_DGLHeteroPickleStatesGetNumVertices(self)
+        return F.zerocopy_from_dgl_ndarray(_CAPI_DGLHeteroPickleStatesGetNumVertices(self))
 
     @property
     def adjs(self):
@@ -1115,6 +1115,7 @@ class HeteroPickleStates(ObjectBase):
 
     def __setstate__(self, state):
         metagraph, num_nodes_per_type, adjs = state
+        num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
         self.__init_handle_by_constructor__(
             _CAPI_DGLCreateHeteroPickleStates, metagraph, num_nodes_per_type, adjs)
 

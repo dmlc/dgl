@@ -1448,9 +1448,16 @@ def test_stack_reduce():
             'stack')
     assert g.nodes['game'].data['y'].shape == (g.number_of_nodes('game'), 1, 200)
 
-def test_issue_1320():
+def test_isolated_ntype():
     g = dgl.heterograph({
         ('A', 'AB', 'B'): [(0, 1), (1, 2), (2, 3)]},
+        num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
+    assert g.number_of_nodes('A') == 3
+    assert g.number_of_nodes('B') == 4
+    assert g.number_of_nodes('C') == 4
+
+    g = dgl.heterograph({
+        ('A', 'AC', 'C'): [(0, 1), (1, 2), (2, 3)]},
         num_nodes_dict={'A': 3, 'B': 4, 'C': 4})
     assert g.number_of_nodes('A') == 3
     assert g.number_of_nodes('B') == 4
@@ -1488,4 +1495,4 @@ if __name__ == '__main__':
     test_empty_heterograph()
     test_types_in_function()
     test_stack_reduce()
-    test_issue_1320()
+    test_isolated_ntype()
