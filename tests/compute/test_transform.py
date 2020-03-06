@@ -167,7 +167,7 @@ def test_laplacian_lambda_max():
     g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
     l_max = dgl.laplacian_lambda_max(g)
     assert (l_max[0] < 2 + eps)
-    # test BatchedDGLGraph
+    # test batched DGLGraph
     N_arr = [20, 30, 10, 12]
     bg = dgl.batch([
         dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
