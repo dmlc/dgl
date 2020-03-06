@@ -478,6 +478,12 @@ def test_remove_edges():
             g1 = dgl.remove_edges(g, F.tensor(edges_to_remove))
             check(g1, None, g, edges_to_remove)
 
+            g = dgl.graph(
+                spsp.csr_matrix(([1, 1, 1, 1], ([0, 2, 1, 3], [1, 3, 2, 4])), shape=(5, 5)),
+                restrict_format=fmt)
+            g1 = dgl.remove_edges(g, F.tensor(edges_to_remove))
+            check(g1, None, g, edges_to_remove)
+
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
         ('A', 'AB', 'B'): [(0, 1), (1, 3), (3, 5), (1, 6)],

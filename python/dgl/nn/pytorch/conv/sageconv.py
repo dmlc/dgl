@@ -27,7 +27,12 @@ class SAGEConv(nn.Module):
         Input feature size.
 
         If the layer is to be applied on a unidirectional bipartite graph, ``in_feats``
-        specifies the input feature size on both the source and destination nodes.
+        specifies the input feature size on both the source and destination nodes.  If
+        a scalar is given, the source and destination node feature size would take the
+        same value.
+
+        If aggregator type is ``gcn``, the feature size of source and destination nodes
+        are required to be the same.
     out_feats : int
         Output feature size.
     feat_drop : float

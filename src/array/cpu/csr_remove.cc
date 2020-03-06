@@ -37,7 +37,7 @@ void CSRRemoveConsecutive(
       if (k < n_entries && entry_data_sorted[k] == j) {
         // Move on to the next different entry
         while (k < n_entries && entry_data_sorted[k] == j)
-          ++j;
+          ++k;
         continue;
       }
       new_indices->push_back(indices_data[j]);

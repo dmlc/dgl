@@ -1796,12 +1796,12 @@ class DGLGraph(DGLBaseGraph):
         return self.nodes[:].data
 
     @property
-    def sdata(self):
+    def srcdata(self):
         """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
         return self.ndata
 
     @property
-    def ddata(self):
+    def dstdata(self):
         """Compatibility interface with heterogeneous graphs; identical to ``ndata``"""
         return self.ndata
 
