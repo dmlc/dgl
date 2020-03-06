@@ -352,7 +352,6 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     # TODO(minjie): this API can be generalized as a union operation of the input graphs
     # TODO(minjie): handle node/edge data
     # infer meta graph
-    ntype_set = set()
     meta_edges_src, meta_edges_dst = [], []
     ntypes = []
     etypes = []
