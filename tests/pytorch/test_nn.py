@@ -124,7 +124,7 @@ def test_set2set():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = s2s(g, h0)
-    assert h1.shape[0] == 10 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(11))
@@ -145,7 +145,7 @@ def test_glob_att_pool():
     # test#1: basic
     h0 = F.randn((g.number_of_nodes(), 5))
     h1 = gap(g, h0)
-    assert h1.shape[0] == 10 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
@@ -170,13 +170,13 @@ def test_simple_pool():
     max_pool = max_pool.to(ctx)
     sort_pool = sort_pool.to(ctx)
     h1 = sum_pool(g, h0)
-    assert F.allclose(h1, F.sum(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
-    assert F.allclose(h1, F.mean(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.mean(h0, 0))
     h1 = max_pool(g, h0)
-    assert F.allclose(h1, F.max(h0, 0))
+    assert F.allclose(F.squeeze(h1, 0), F.max(h0, 0))
     h1 = sort_pool(g, h0)
-    assert h1.shape[0] == 10 * 5 and h1.dim() == 1
+    assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5))
@@ -228,7 +228,7 @@ def test_set_trans():
     h1 = st_enc_1(g, h0)
     assert h1.shape == h0.shape
     h2 = st_dec(g, h1)
-    assert h2.shape[0] == 200 and h2.dim() == 1
+    assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.dim() == 2
 
     # test#2: batched graph
     g1 = dgl.DGLGraph(nx.path_graph(5))

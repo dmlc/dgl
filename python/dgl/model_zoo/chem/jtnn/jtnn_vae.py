@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 import rdkit.Chem as Chem
 
-from ....batched_graph import batch, unbatch
+from ....graph import batch, unbatch
 from ....contrib.deprecation import deprecated
 from ....data.utils import get_download_dir
 
