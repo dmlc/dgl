@@ -39,7 +39,7 @@ endif(USE_CUDA)
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
-include_directories("third_party/METIS/build/xinclude/")
+include_directories("third_party/METIS/include/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
@@ -86,6 +86,9 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
+
 # configure minigun
 add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 # Source file lists
@@ -129,6 +132,9 @@ list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # For distributed
+#add_definitions(-DIDXTYPEWIDTH=64)
+#add_definitions(-DREALTYPEWIDTH=32)
+set(IDX64 ON CACHE BOOL "use idx 64" FORCE)
 add_subdirectory("third_party/METIS")
 list(APPEND DGL_LINKER_LIBS metis)
 
