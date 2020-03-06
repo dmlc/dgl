@@ -240,6 +240,12 @@ class CSR : public GraphInterface {
 
   IdArray edge_ids() const { return adj_.data; }
 
+  /*! \return Load CSR from stream */
+  bool Load(dmlc::Stream *fs);
+
+  /*! \return Save CSR to stream */
+  void Save(dmlc::Stream* fs) const;
+
   void SortCSR() override {
     if (adj_.sorted)
       return;
@@ -247,9 +253,10 @@ class CSR : public GraphInterface {
   }
 
  private:
-  /*! \brief prive default constructor */
-  CSR() {adj_.sorted = false;}
+  friend class Serializer;
 
+  /*! \brief private default constructor */
+  CSR() {adj_.sorted = false;}
   // The internal CSR adjacency matrix.
   // The data field stores edge ids.
   aten::CSRMatrix adj_;
@@ -957,10 +964,10 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraphPtr Reverse() const;
 
-  /*! \return Load HeteroGraph from stream, using CSRMatrix*/
-  bool Load(dmlc::Stream* fs);
+  /*! \return Load ImmutableGraph from stream, using out csr */
+  bool Load(dmlc::Stream *fs);
 
-  /*! \return Save HeteroGraph to stream, using CSRMatrix */
+  /*! \return Save ImmutableGraph to stream, using out csr */
   void Save(dmlc::Stream* fs) const;
 
   void SortCSR() {
@@ -969,6 +976,8 @@ class ImmutableGraph: public GraphInterface {
   }
 
  protected:
+  friend class Serializer;
+
   /* !\brief internal default constructor */
   ImmutableGraph() {}
 
@@ -1034,6 +1043,7 @@ CSR::CSR(int64_t num_vertices, int64_t num_edges,
 }  // namespace dgl
 
 namespace dmlc {
+DMLC_DECLARE_TRAITS(has_saveload, dgl::CSR, true);
 DMLC_DECLARE_TRAITS(has_saveload, dgl::ImmutableGraph, true);
 }  // namespace dmlc
 

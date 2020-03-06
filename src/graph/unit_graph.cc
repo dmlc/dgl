@@ -4,12 +4,12 @@
  * \brief UnitGraph graph implementation
  */
 #include <dgl/array.h>
-#include <dgl/lazy.h>
-#include <dgl/immutable_graph.h>
 #include <dgl/base_heterograph.h>
+#include <dgl/immutable_graph.h>
+#include <dgl/lazy.h>
 
-#include "./unit_graph.h"
 #include "../c_api_common.h"
+#include "./unit_graph.h"
 
 namespace dgl {
 
@@ -408,7 +408,24 @@ class UnitGraph::COO : public BaseHeteroGraph {
            (NumVertices(SrcType()) > 1000000);
   }
 
+  bool Load(dmlc::Stream* fs) {
+    auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+    CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+    meta_graph_ = meta_imgraph;
+    CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
+    return true;
+  }
+  void Save(dmlc::Stream* fs) const {
+    auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+    fs->Write(meta_graph_ptr);
+    fs->Write(adj_);
+  }
+
  private:
+  friend class Serializer;
+
+  COO() {}
+
   /*! \brief internal adjacency matrix. Data array is empty */
   aten::COOMatrix adj_;
 
@@ -434,7 +451,6 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, int64_t num_src, int64_t num_dst,
@@ -446,12 +462,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     CHECK_EQ(indices->shape[0], edge_ids->shape[0])
       << "indices and edge id arrays should have the same length";
     adj_ = aten::CSRMatrix{num_src, num_dst, indptr, indices, edge_ids};
-    sorted_ = false;
   }
 
   CSR(GraphPtr metagraph, const aten::CSRMatrix& csr)
     : BaseHeteroGraph(metagraph), adj_(csr) {
-    sorted_ = false;
   }
 
   inline dgl_type_t SrcType() const {
@@ -752,15 +766,30 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     return adj_;
   }
 
+  bool Load(dmlc::Stream* fs) {
+    auto meta_imgraph = Serializer::make_shared<ImmutableGraph>();
+    CHECK(fs->Read(&meta_imgraph)) << "Invalid meta graph";
+    meta_graph_ = meta_imgraph;
+    CHECK(fs->Read(&adj_)) << "Invalid adj matrix";
+    return true;
+  }
+  void Save(dmlc::Stream* fs) const {
+    auto meta_graph_ptr = ImmutableGraph::ToImmutable(meta_graph());
+    fs->Write(meta_graph_ptr);
+    fs->Write(adj_);
+  }
+
+
  private:
+  friend class Serializer;
+
+  CSR() {};
+
   /*! \brief internal adjacency matrix. Data array stores edge ids */
   aten::CSRMatrix adj_;
 
   /*! \brief multi-graph flag */
   Lazy<bool> is_multigraph_;
-
-  /*! \brief indicate that the edges are stored in the sorted order. */
-  bool sorted_;
 };
 
 //////////////////////////////////////////////////////////
@@ -1216,17 +1245,17 @@ HeteroGraphPtr UnitGraph::GetAny() const {
 
 HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
   switch (format) {
-  case SparseFormat::CSR:
-    return GetOutCSR();
-  case SparseFormat::CSC:
-    return GetInCSR();
-  case SparseFormat::COO:
-    return GetCOO();
-  case SparseFormat::ANY:
-    return GetAny();
-  default:
-    LOG(FATAL) << "unsupported format code";
-    return nullptr;
+    case SparseFormat::CSR:
+      return GetOutCSR();
+    case SparseFormat::CSC:
+      return GetInCSR();
+    case SparseFormat::COO:
+      return GetCOO();
+    case SparseFormat::ANY:
+      return GetAny();
+    default:
+      LOG(FATAL) << "unsupported format code";
+      return nullptr;
   }
 }
 
@@ -1243,46 +1272,58 @@ SparseFormat UnitGraph::SelectFormat(SparseFormat preferred_format) const {
     return SparseFormat::COO;
 }
 
-UnitGraph* UnitGraph::EmptyGraph() {
-  auto src = NewIdArray(0);
-  auto dst = NewIdArray(0);
-  auto mg = CreateUnitGraphMetaGraph(1);
-  COOPtr coo(new COO(mg, 0, 0, src, dst));
-  return new UnitGraph(mg, nullptr, nullptr, coo);
-}
-
 constexpr uint64_t kDGLSerialize_UnitGraphMagic = 0xDD2E60F0F6B4A127;
 
-// Using OurCSR
 bool UnitGraph::Load(dmlc::Stream* fs) {
   uint64_t magicNum;
   CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
   CHECK_EQ(magicNum, kDGLSerialize_UnitGraphMagic) << "Invalid UnitGraph Data";
-  uint64_t num_vtypes, num_src, num_dst;
-  CHECK(fs->Read(&num_vtypes)) << "Invalid num_vtypes";
-  CHECK(fs->Read(&num_src)) << "Invalid num_src";
-  CHECK(fs->Read(&num_dst)) << "Invalid num_dst";
-  aten::CSRMatrix csr_matrix;
-  CHECK(fs->Read(&csr_matrix)) << "Invalid csr_matrix";
-  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
-  CSRPtr csr(new CSR(mg, num_src, num_dst, csr_matrix.indptr,
-                     csr_matrix.indices, csr_matrix.data));
-  *this = UnitGraph(mg, nullptr, csr, nullptr);
+
+  int64_t format_code;
+  CHECK(fs->Read(&format_code)) << "Invalid format";
+  restrict_format_ = static_cast<SparseFormat>(format_code);
+
+  switch (restrict_format_) {
+    case SparseFormat::COO:
+      fs->Read(&coo_);
+      break;
+    case SparseFormat::CSR:
+      fs->Read(&out_csr_);
+      break;
+    case SparseFormat::CSC:
+      fs->Read(&in_csr_);
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
+
+  meta_graph_ = GetAny()->meta_graph();
+
   return true;
 }
 
-// Using Out CSR
+
 void UnitGraph::Save(dmlc::Stream* fs) const {
-  // Following CreateFromCSR signature
-  aten::CSRMatrix csr_matrix = GetCSRMatrix(0);
-  uint64_t num_vtypes = NumVertexTypes();
-  uint64_t num_src = NumVertices(SrcType());
-  uint64_t num_dst = NumVertices(DstType());
   fs->Write(kDGLSerialize_UnitGraphMagic);
-  fs->Write(num_vtypes);
-  fs->Write(num_src);
-  fs->Write(num_dst);
-  fs->Write(csr_matrix);
+  // Didn't write UnitGraph::meta_graph_, since it's included in the underlying
+  // sparse matrix
+  auto avail_fmt = SelectFormat(SparseFormat::ANY);
+  fs->Write(static_cast<int64_t>(avail_fmt));
+  switch (avail_fmt) {
+    case SparseFormat::COO:
+      fs->Write(GetCOO());
+      break;
+    case SparseFormat::CSR:
+      fs->Write(GetOutCSR());
+      break;
+    case SparseFormat::CSC:
+      fs->Write(GetInCSR());
+      break;
+    default:
+      LOG(FATAL) << "unsupported format code";
+      break;
+  }
 }
 
 }  // namespace dgl

@@ -4,8 +4,8 @@ import os
 from dgl.data.utils import *
 
 _urls = {
-    'wmt': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wmt14bpe_de_en.zip',
-    'scripts': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/transformer_scripts.zip',
+    'wmt': 'https://data.dgl.ai/dataset/wmt14bpe_de_en.zip',
+    'scripts': 'https://data.dgl.ai/dataset/transformer_scripts.zip',
 }
 
 def prepare_dataset(dataset_name):

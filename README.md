@@ -9,11 +9,13 @@
 DGL is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
 <p align="center">
-  <img src="https://i.imgur.com/DwA1NbZ.png" alt="DGL v0.4 architecture" width="600">
+  <img src="http://data.dgl.ai/asset/image/DGL-Arch.png" alt="DGL v0.4 architecture" width="600">
   <br>
   <b>Figure</b>: DGL Overall Architecture
 </p>
 
+## <img src="http://data.dgl.ai/asset/image/new.png" width="30">DGL News
+03/02/2020: **Check out this cool paper: [Benchmarking Graph Neural Networks](https://arxiv.org/abs/2003.00982)!**  It includes a DGL-based benchmark framework for novel medium-scale graph datasets, covering mathematical modeling, computer vision, chemistry and combinatorial problems.  See [repo here](https://github.com/graphdeeplearning/benchmarking-gnns).
 
 ## Using DGL
 
@@ -87,7 +89,7 @@ class GATLayer(nn.Module):
 ```
 ## Performance and Scalability
 
-**Microbenchmark on speed and memory usage**: While leaving tensor and autograd functions to backend frameworks (e.g. PyTorch, MXNet, and TensorFlow), DGL aggressively optimizes storage and computation with its own kernels. Here's a comparison to another pupular package -- PyG. The short story is that raw speed is similar, but DGL has much better memory management.
+**Microbenchmark on speed and memory usage**: While leaving tensor and autograd functions to backend frameworks (e.g. PyTorch, MXNet, and TensorFlow), DGL aggressively optimizes storage and computation with its own kernels. Here's a comparison to another popular package -- PyG. The short story is that raw speed is similar, but DGL has much better memory management.
 
 
 | Dataset  |    Model     |                   Accuracy                   |                    Time <br> PyG &emsp;&emsp; DGL                    |           Memory <br> PyG &emsp;&emsp; DGL            |
@@ -101,16 +103,16 @@ class GATLayer(nn.Module):
 Table: Training time(in seconds) for 200 epochs and memory consumption(GB)
 
 High memory utilization allows DGL to push the limit of single-GPU performance, as seen in below images.
-| <img src="https://i.imgur.com/CvXc9Uu.png" width="400"> | <img src="https://i.imgur.com/HnCfJyU.png" width="400"> |
+| <img src="http://data.dgl.ai/asset/image/DGLvsPyG-time1.png" width="400"> | <img src="http://data.dgl.ai/asset/image/DGLvsPyG-time2.png" width="400"> |
 | -------- | -------- |
 
 **Scalability**: DGL has fully leveraged multiple GPUs in both one machine and clusters for increasing training speed, and has better performance than alternatives, as seen in below images.
 
 <p align="center">
-  <img src="https://i.imgur.com/IGERtVX.png" width="600">
+  <img src="http://data.dgl.ai/asset/image/one-four-GPUs.png" width="600">
 </p>
 
-| <img src="https://i.imgur.com/BugYro2.png"> |  <img src="https://i.imgur.com/KQ4nVdX.png"> | 
+| <img src="http://data.dgl.ai/asset/image/one-four-GPUs-DGLvsGraphVite.png"> |  <img src="http://data.dgl.ai/asset/image/one-fourMachines.png"> | 
 | :---------------------------------------: | -- |
 
 

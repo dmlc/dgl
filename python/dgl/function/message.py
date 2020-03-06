@@ -168,15 +168,21 @@ _TARGET_MAP = {
 
 def _gen_message_builtin(lhs, rhs, binary_op):
     name = "{}_{}_{}".format(lhs, binary_op, rhs)
-    docstring = """Builtin message function that computes message by performing
-    binary operation {} between {} feature and {} feature.
+    docstring = """Builtin message function that computes a message on an edge
+    by performing element-wise {} between features of {} and {}
+    if the features have the same shape; otherwise, it first broadcasts the features
+    to a new shape and performs the element-wise operation.
+
+    Broadcasting follows NumPy semantics. Please see
+    https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
+    for more details about the NumPy broadcasting semantics.
 
     Parameters
     ----------
-    {} : str
-        The {} feature field.
-    {} : str
-        The {} feature field.
+    lhs_field : str
+        The feature field of {}.
+    rhs_field : str
+        The feature field of {}.
     out : str
         The output message field.
 
@@ -187,8 +193,8 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     """.format(binary_op,
                TargetCode.CODE2STR[_TARGET_MAP[lhs]],
                TargetCode.CODE2STR[_TARGET_MAP[rhs]],
-               lhs, TargetCode.CODE2STR[_TARGET_MAP[lhs]],
-               rhs, TargetCode.CODE2STR[_TARGET_MAP[rhs]],
+               TargetCode.CODE2STR[_TARGET_MAP[lhs]],
+               TargetCode.CODE2STR[_TARGET_MAP[rhs]],
                name)
 
     def func(lhs_field, rhs_field, out):
