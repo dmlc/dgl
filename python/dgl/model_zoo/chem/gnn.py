@@ -110,7 +110,7 @@ class GATLayer(nn.Module):
 
         Parameters
         ----------
-        bg : BatchedDGLGraph
+        bg : DGLGraph
             Batched DGLGraphs for processing multiple molecules in parallel
         feats : FloatTensor of shape (N, M1)
             * N is the total number of atoms in the batched graph

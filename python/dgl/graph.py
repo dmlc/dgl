@@ -962,7 +962,7 @@ class DGLGraph(DGLBaseGraph):
         self._batch_num_nodes = batch_num_nodes
         self._batch_num_edges = batch_num_edges
 
-        # set parent if the graph is a induced subgraph.
+        # set parent if the graph is a subgraph.
         self._parent = parent
 
     def _create_subgraph(self, sgi, induced_nodes, induced_edges):
@@ -1893,7 +1893,7 @@ class DGLGraph(DGLBaseGraph):
 
     @property
     def parent(self):
-        """If current graph is a induced subgraph of a parent graph, return
+        """If current graph is a subgraph of a parent graph, return
         its parent graph, else return None.
 
         Returns
