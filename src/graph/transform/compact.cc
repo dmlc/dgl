@@ -35,8 +35,10 @@ CompactGraphs(
   std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
-  for (size_t i = 0; i < always_preserve.size(); ++i)
+  for (size_t i = 0; i < always_preserve.size(); ++i) {
+    hashmaps[i].Reserve(always_preserve[i]->shape[0]);
     hashmaps[i].Update(always_preserve[i]);
+  }
 
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];

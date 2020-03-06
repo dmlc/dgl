@@ -34,6 +34,10 @@ class IdHashMap {
     Update(ids);
   }
 
+  void Reserve(const int64_t size) {
+    oldv2newv_.reserve(size);
+  }
+
   // Update the hashmap with given id array.
   // The id array could contain duplicates.
   void Update(IdArray ids) {
