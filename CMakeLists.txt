@@ -39,6 +39,7 @@ endif(USE_CUDA)
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
+include_directories("third_party/METIS/build/xinclude/")
 include_directories("third_party/dmlc-core/include")
 include_directories("third_party/minigun/minigun")
 include_directories("third_party/minigun/third_party/moderngpu/src")
@@ -126,6 +127,10 @@ list(APPEND DGL_LINKER_LIBS metis)
 add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
+
+# For distributed
+add_subdirectory("third_party/METIS")
+list(APPEND DGL_LINKER_LIBS metis)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
