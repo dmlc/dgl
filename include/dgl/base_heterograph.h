@@ -549,18 +549,14 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
 // Declarations of functions and algorithms
 
-/*! \brief Create a heterograph from meta graph and a list of bipartite graph */
-HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
-
 /*!
  * \brief Create a heterograph from meta graph and a list of bipartite graph,
  * additionally specifying number of nodes per type.
  */
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr>& rel_graphs,
-    std::vector<int64_t> num_nodes_per_type);
+    const std::vector<HeteroGraphPtr> &rel_graphs,
+    const std::vector<int64_t> &num_nodes_per_type = {});
 
 /*!
  * \brief Create a heterograph from COO input.

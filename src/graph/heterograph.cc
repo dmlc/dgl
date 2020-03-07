@@ -173,28 +173,16 @@ std::vector<UnitGraphPtr> CastToUnitGraphs(const std::vector<HeteroGraphPtr>& re
 
 }  // namespace
 
-HeteroGraph::HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs)
-  : BaseHeteroGraph(meta_graph) {
-  HeteroGraphSanityCheck(meta_graph, rel_graphs);
-  num_verts_per_type_ = InferNumVerticesPerType(meta_graph, rel_graphs);
-  relation_graphs_ = CastToUnitGraphs(rel_graphs);
-}
-
 HeteroGraph::HeteroGraph(
     GraphPtr meta_graph,
     const std::vector<HeteroGraphPtr>& rel_graphs,
     const std::vector<int64_t>& num_nodes_per_type) : BaseHeteroGraph(meta_graph) {
-  HeteroGraphSanityCheck(meta_graph, rel_graphs);
-  num_verts_per_type_ = num_nodes_per_type;
-  relation_graphs_ = CastToUnitGraphs(rel_graphs);
-}
+  if (num_nodes_per_type.size() == 0)
+    num_verts_per_type_ = InferNumVerticesPerType(meta_graph, rel_graphs);
+  else
+    num_verts_per_type_ = num_nodes_per_type;
 
-HeteroGraph::HeteroGraph(
-    GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr>& rel_graphs,
-    std::vector<int64_t>&& num_nodes_per_type) : BaseHeteroGraph(meta_graph) {
   HeteroGraphSanityCheck(meta_graph, rel_graphs);
-  num_verts_per_type_ = std::move(num_nodes_per_type);
   relation_graphs_ = CastToUnitGraphs(rel_graphs);
 }
 
