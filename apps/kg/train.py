@@ -252,6 +252,7 @@ def run(args, logger):
     print('training takes {} seconds'.format(time.time() - start))
 
     if args.save_emb is True:
+        print('Save model embedding to %s' % args.save_path)
         model.save_emb(args.save_path, args.dataset)
 
     # test
