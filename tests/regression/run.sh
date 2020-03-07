@@ -11,12 +11,7 @@ git submodule update --recursive
 conda activate base
 pip install asv
 
-for backend in pytorch mxnet tensorflow
-do 
-conda activate "${backend}-ci"
-pip uninstall -y dgl-cu101
-pip install --pre dgl-cu101
-done
+source /root/regression/dgl/tests/scripts/build_dgl.sh gpu
 
 conda activate base
 asv machine --yes

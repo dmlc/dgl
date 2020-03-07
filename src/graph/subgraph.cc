@@ -38,7 +38,7 @@ HeteroSubgraph InEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArray
     }
   }
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels, graph->NumVerticesPerType());
   ret.induced_edges = std::move(induced_edges);
   return ret;
 }
@@ -73,7 +73,7 @@ HeteroSubgraph OutEdgeGraph(const HeteroGraphPtr graph, const std::vector<IdArra
     }
   }
   HeteroSubgraph ret;
-  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels);
+  ret.graph = CreateHeteroGraph(graph->meta_graph(), subrels, graph->NumVerticesPerType());
   ret.induced_edges = std::move(induced_edges);
   return ret;
 }

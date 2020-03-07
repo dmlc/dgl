@@ -364,6 +364,24 @@ class DGLHeteroGraph(object):
         return self._canonical_etypes
 
     @property
+    def ntype(self):
+        """Return the node type if the graph has only one node type."""
+        assert len(self.ntypes) == 1, "The graph has more than one node type."
+        return self.ntypes[0]
+
+    @property
+    def srctype(self):
+        """Return the source node type if the graph has only one edge type."""
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
+        return self.canonical_etypes[0][0]
+
+    @property
+    def dsttype(self):
+        """Return the destination node type if the graph has only one edge type."""
+        assert len(self.etypes) == 1, "The graph has more than one edge type."
+        return self.canonical_etypes[0][2]
+
+    @property
     def metagraph(self):
         """Return the metagraph as networkx.MultiDiGraph.
 
@@ -541,6 +559,68 @@ class DGLHeteroGraph(object):
         nodes
         """
         return HeteroNodeDataView(self, None, ALL)
+
+    @property
+    def srcdata(self):
+        """Return the data view of all source nodes.
+
+        **Only works if the graph has only one edge type.**
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all source nodes in a graph with only one edge type:
+
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.srcdata['h'] = torch.zeros(2, 5)
+
+        This is equivalent to
+
+        >>> g.nodes['user'].data['h'] = torch.zeros(2, 5)
+
+        Notes
+        -----
+        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+
+        See Also
+        --------
+        nodes
+        """
+        assert len(self.etypes) == 1, "Graph has more than one edge type."
+        srctype = self.canonical_etypes[0][0]
+        return HeteroNodeDataView(self, srctype, ALL)
+
+    @property
+    def dstdata(self):
+        """Return the data view of all destination nodes.
+
+        **Only works if the graph has only one edge type.**
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        To set features of all source nodes in a graph with only one edge type:
+
+        >>> g = dgl.bipartite([(0, 1), (1, 2)], 'user', 'plays', 'game')
+        >>> g.dstdata['h'] = torch.zeros(3, 5)
+
+        This is equivalent to
+
+        >>> g.nodes['game'].data['h'] = torch.zeros(3, 5)
+
+        Notes
+        -----
+        This is identical to :any:`DGLHeteroGraph.ndata` if the graph is homogeneous.
+
+        See Also
+        --------
+        nodes
+        """
+        assert len(self.etypes) == 1, "Graph has more than one edge type."
+        dsttype = self.canonical_etypes[0][2]
+        return HeteroNodeDataView(self, dsttype, ALL)
 
     @property
     def edges(self):
@@ -1684,6 +1764,7 @@ class DGLHeteroGraph(object):
         node_frames = [self._node_frames[self.get_ntype_id(ntype)] for ntype in ntypes]
         edge_frames = []
 
+        num_nodes_per_type = [self.number_of_nodes(ntype) for ntype in ntypes]
         ntypes_invmap = {ntype: i for i, ntype in enumerate(ntypes)}
         srctype_id, dsttype_id, _ = self._graph.metagraph.edges('eid')
         for i in range(len(self._etypes)):
@@ -1697,7 +1778,8 @@ class DGLHeteroGraph(object):
                 edge_frames.append(self._edge_frames[i])
 
         metagraph = graph_index.from_edge_list(meta_edges, True, True)
-        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_type))
         hg = DGLHeteroGraph(hgidx, ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 
@@ -1767,9 +1849,11 @@ class DGLHeteroGraph(object):
         edge_frames = [self._edge_frames[i] for i in etype_ids]
         induced_ntypes = [self._ntypes[i] for i in ntypes_invmap]
         induced_etypes = [self._etypes[i] for i in etype_ids]   # get the "name" of edge type
+        num_nodes_per_induced_type = [self.number_of_nodes(ntype) for ntype in induced_ntypes]
 
         metagraph = graph_index.from_edge_list((mapped_meta_src, mapped_meta_dst), True, True)
-        hgidx = heterograph_index.create_heterograph_from_relations(metagraph, rel_graphs)
+        hgidx = heterograph_index.create_heterograph_from_relations(
+            metagraph, rel_graphs, utils.toindex(num_nodes_per_induced_type))
         hg = DGLHeteroGraph(hgidx, induced_ntypes, induced_etypes, node_frames, edge_frames)
         return hg
 

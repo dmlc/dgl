@@ -12,6 +12,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
   std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
+  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
 
   // Loop over all canonical etypes
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {
@@ -46,8 +47,10 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
       aten::VecToIdArray(result_src),
       aten::VecToIdArray(result_dst));
     rel_graphs[etype] = rgptr;
+    num_nodes_per_type[src_vtype] = src_offset;
+    num_nodes_per_type[dst_vtype] = dst_offset;
   }
-  return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
+  return CreateHeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type));
 }
 
 std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
@@ -121,8 +124,11 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
   }
 
   std::vector<HeteroGraphPtr> rst;
+  std::vector<int64_t> num_nodes_per_type(num_vertex_types);
   for (uint64_t g = 0; g < batch_size; ++g) {
-    rst.push_back(HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs[g])));
+    for (uint64_t i = 0; i < num_vertex_types; ++i)
+      num_nodes_per_type[i] = vertex_sizes_data[i * batch_size + g];
+    rst.push_back(CreateHeteroGraph(meta_graph, rel_graphs[g], num_nodes_per_type));
   }
   return rst;
 }

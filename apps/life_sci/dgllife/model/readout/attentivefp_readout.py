@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dgl import BatchedDGLGraph
-
 __all__ = ['AttentiveFPReadout']
 
 class GlobalPool(nn.Module):
@@ -59,10 +57,7 @@ class GlobalPool(nn.Module):
             g.ndata['a'] = dgl.softmax_nodes(g, 'z')
             g.ndata['hv'] = self.project_nodes(node_feats)
 
-            if isinstance(g, BatchedDGLGraph):
-                g_repr = dgl.sum_nodes(g, 'hv', 'a')
-            else:
-                g_repr = dgl.sum_nodes(g, 'hv', 'a').unsqueeze(0)
+            g_repr = dgl.sum_nodes(g, 'hv', 'a')
             context = F.elu(g_repr)
 
             if get_node_weight:
@@ -120,9 +115,6 @@ class AttentiveFPReadout(nn.Module):
         with g.local_scope():
             g.ndata['hv'] = node_feats
             g_feats = dgl.sum_nodes(g, 'hv')
-
-        if not isinstance(g, BatchedDGLGraph):
-            g_feats = g_feats.unsqueeze(0)
 
         if get_node_weight:
             node_weights = []

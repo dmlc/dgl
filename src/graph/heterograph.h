@@ -19,7 +19,10 @@ namespace dgl {
 /*! \brief Heterograph */
 class HeteroGraph : public BaseHeteroGraph {
  public:
-  HeteroGraph(GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
+  HeteroGraph(
+      GraphPtr meta_graph,
+      const std::vector<HeteroGraphPtr>& rel_graphs,
+      const std::vector<int64_t>& num_nodes_per_type = {});
 
   HeteroGraphPtr GetRelationGraph(dgl_type_t etype) const override {
     CHECK_LT(etype, meta_graph_->NumEdges()) << "Invalid edge type: " << etype;
@@ -63,6 +66,10 @@ class HeteroGraph : public BaseHeteroGraph {
   uint64_t NumVertices(dgl_type_t vtype) const override {
     CHECK(meta_graph_->HasVertex(vtype)) << "Invalid vertex type: " << vtype;
     return num_verts_per_type_[vtype];
+  }
+
+  inline std::vector<int64_t> NumVerticesPerType() const override {
+    return num_verts_per_type_;
   }
 
   uint64_t NumEdges(dgl_type_t etype) const override {
@@ -198,7 +205,7 @@ class HeteroGraph : public BaseHeteroGraph {
   friend class Serializer;
 
   // Empty Constructor, only for serializer
-  HeteroGraph() : BaseHeteroGraph(static_cast<GraphPtr>(nullptr)) {}
+  HeteroGraph() : BaseHeteroGraph() {}
 
   /*! \brief A map from edge type to unit graph */
   std::vector<UnitGraphPtr> relation_graphs_;

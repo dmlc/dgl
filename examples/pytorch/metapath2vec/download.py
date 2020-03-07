@@ -24,7 +24,7 @@ class AminerDataset(object):
     """
     def __init__(self, path):
 
-        self.url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/aminer.zip'
+        self.url = 'https://data.dgl.ai/dataset/aminer.zip'
 
         if not os.path.exists(os.path.join(path, 'aminer.txt')):
             print('File not found. Downloading from', self.url)

@@ -7,6 +7,7 @@
 #ifndef DGL_RUNTIME_SMART_PTR_SERIALIZER_H_
 #define DGL_RUNTIME_SMART_PTR_SERIALIZER_H_
 
+#include <dgl/graph_serializer.h>
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 
@@ -24,7 +25,7 @@ struct Handler<std::shared_ptr<T>> {
     // shared_ptr<T>(), which is holding a nullptr. Here we need to manually
     // reset to a real object for further loading
     if (!(*data)) {
-      data->reset(new T());
+      data->reset(dgl::Serializer::new_object<T>());
     }
     return Handler<T>::Read(strm, data->get());
   }
@@ -40,7 +41,7 @@ struct Handler<std::unique_ptr<T>> {
     // unique_ptr<T>(), which is holding a nullptr. Here we need to manually
     // reset to a real object for further loading
     if (!(*data)) {
-      data->reset(new T());
+      data->reset(dgl::Serializer::new_object<T>());
     }
     return Handler<T>::Read(strm, data->get());
   }
