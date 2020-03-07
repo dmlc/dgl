@@ -167,6 +167,7 @@ def start_worker(args, logger):
     """Start kvclient for training
     """
     init_time_start = time.time()
+    time.sleep(5) # wait for launch script
 
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
