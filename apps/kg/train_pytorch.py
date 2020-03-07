@@ -112,7 +112,7 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
     update_time = 0
     forward_time = 0
     backward_time = 0
-    for step in range(args.init_step, args.max_step):
+    for step in range(0, args.max_step):
         start1 = time.time()
         pos_g, neg_g = next(train_sampler)
         sample_time += time.time() - start1
