@@ -560,12 +560,7 @@ HeteroGraphPtr CreateHeteroGraph(
 HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph,
     const std::vector<HeteroGraphPtr>& rel_graphs,
-    const std::vector<int64_t>& num_nodes_per_type);
-
-HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr>& rel_graphs,
-    std::vector<int64_t>&& num_nodes_per_type);
+    std::vector<int64_t> num_nodes_per_type);
 
 /*!
  * \brief Create a heterograph from COO input.
