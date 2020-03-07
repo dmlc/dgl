@@ -26,13 +26,13 @@ class ArgParser(argparse.ArgumentParser):
                           choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransR',
                                    'RESCAL', 'DistMult', 'ComplEx', 'RotatE'],
                           help='model to use')
-        self.add_argument('--data_path', type=str, default='data',
+        self.add_argument('--data_path', type=str, default='../data',
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
         self.add_argument('--format', type=str, default='1',
                           help='the format of the dataset.')
-        self.add_argument('--save_path', type=str, default='ckpts',
+        self.add_argument('--save_path', type=str, default='../ckpts',
                           help='place to save models and logs')
         self.add_argument('--save_emb', action='store_true',
                           help='save model embedding to save_path')
