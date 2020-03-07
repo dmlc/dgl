@@ -123,9 +123,6 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
-# Distributed
-list(APPEND DGL_LINKER_LIBS metis)
-
 # For serialization
 add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
