@@ -327,7 +327,7 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             for k, v in metrics.items():
-                print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+                print('Test average {} : {}'.format(k, v))
 
             for proc in procs:
                 proc.join()
