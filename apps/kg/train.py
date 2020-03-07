@@ -362,7 +362,6 @@ def run(args, logger):
 
     # test
     if args.test:
-        th.set_num_threads(args.num_thread)
         start = time.time()
         #if args.num_test_proc > 1:
         queue = mp.Queue(args.num_test_proc)
