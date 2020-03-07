@@ -197,6 +197,9 @@ def start_worker(args, logger):
     model.share_memory()
 
     train_data = TrainDataset(dataset, args, ranks=args.num_client)
+    # if there is no cross partition relaiton, we fall back to strict_rel_part
+    args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
+    args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
 
     train_samplers = []
     for i in range(args.num_client):

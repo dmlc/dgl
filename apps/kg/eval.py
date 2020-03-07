@@ -33,24 +33,18 @@ class ArgParser(argparse.ArgumentParser):
                           help='the format of the dataset.')
         self.add_argument('--model_path', type=str, default='ckpts',
                           help='the place where models are saved')
-
         self.add_argument('--batch_size', type=int, default=8,
                           help='batch size used for eval and test')
         self.add_argument('--neg_sample_size', type=int, default=-1,
                           help='negative sampling size for testing')
         self.add_argument('--neg_deg_sample', action='store_true',
                           help='negative sampling proportional to vertex degree for testing')
-        self.add_argument('--neg_chunk_size', type=int, default=-1,
-                          help='chunk size of the negative edges.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
-        self.add_argument('--eval_percent', type=float, default=1,
-                          help='sample some percentage for evaluation.')
         self.add_argument('--no_eval_filter', action='store_true',
                           help='do not filter positive edges among negative edges for evaluation')
-
         self.add_argument('--gpu', type=int, default=[-1], nargs='+',
                           help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
@@ -59,11 +53,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='double entitiy dim for complex number')
         self.add_argument('-dr', '--double_rel', action='store_true',
                           help='double relation dim for complex number')
-        self.add_argument('--seed', type=int, default=0,
-                          help='set random seed fro reproducibility')
-
-        self.add_argument('--num_worker', type=int, default=16,
-                          help='number of workers used for loading data')
         self.add_argument('--num_proc', type=int, default=1,
                           help='number of process used')
         self.add_argument('--num_thread', type=int, default=1,
@@ -119,12 +108,11 @@ def main(args):
     if args.neg_chunk_size < 0:
         args.neg_chunk_size = args.neg_sample_size
 
-    num_workers = args.num_worker
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
-    if args.num_proc > 1:
-        num_workers = 1
-    if args.num_proc > 1:
+    #if args.num_proc > 1:
+    #    num_workers = 1
+    #if args.num_proc > 1:
         test_sampler_tails = []
         test_sampler_heads = []
         for i in range(args.num_proc):
@@ -133,32 +121,32 @@ def main(args):
                                                             args.neg_chunk_size,
                                                             args.eval_filter,
                                                             mode='chunk-head',
-                                                            num_workers=num_workers,
+                                                            num_workers=1,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
                                                             args.neg_sample_size,
                                                             args.neg_chunk_size,
                                                             args.eval_filter,
                                                             mode='chunk-tail',
-                                                            num_workers=num_workers,
+                                                            num_workers=1,
                                                             rank=i, ranks=args.num_proc)
             test_sampler_heads.append(test_sampler_head)
             test_sampler_tails.append(test_sampler_tail)
-    else:
-        test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
-                                                        args.neg_sample_size,
-                                                        args.neg_chunk_size,
-                                                        args.eval_filter,
-                                                        mode='chunk-head',
-                                                        num_workers=num_workers,
-                                                        rank=0, ranks=1)
-        test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
-                                                        args.neg_sample_size,
-                                                        args.neg_chunk_size,
-                                                        args.eval_filter,
-                                                        mode='chunk-tail',
-                                                        num_workers=num_workers,
-                                                        rank=0, ranks=1)
+    #else:
+    #    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
+    #                                                    args.neg_sample_size,
+    #                                                    args.neg_chunk_size,
+    #                                                    args.eval_filter,
+    #                                                    mode='chunk-head',
+    #                                                    num_workers=1,
+    #                                                    rank=0, ranks=1)
+    #    test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
+    #                                                    args.neg_sample_size,
+    #                                                    args.neg_chunk_size,
+    #                                                    args.eval_filter,
+    #                                                    mode='chunk-tail',
+    #                                                    num_workers=1,
+    #                                                    rank=0, ranks=1)
 
     # load model
     n_entities = dataset.n_entities
@@ -166,41 +154,40 @@ def main(args):
     ckpt_path = args.model_path
     model = load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
 
-    if args.num_proc > 1:
-        model.share_memory()
+    model.share_memory()
     # test
     args.step = 0
     args.max_step = 0
     start = time.time()
-    if args.num_proc > 1:
-        queue = mp.Queue(args.num_proc)
-        procs = []
-        for i in range(args.num_proc):
-            proc = mp.Process(target=test_mp, args=(args,
-                                                    model,
-                                                    [test_sampler_heads[i], test_sampler_tails[i]],
-                                                    i,
-                                                    'Test',
-                                                    queue))
-            procs.append(proc)
-            proc.start()
+    #if args.num_proc > 1:
+    queue = mp.Queue(args.num_proc)
+    procs = []
+    for i in range(args.num_proc):
+        proc = mp.Process(target=test_mp, args=(args,
+                                                model,
+                                                [test_sampler_heads[i], test_sampler_tails[i]],
+                                                i,
+                                                'Test',
+                                                queue))
+        procs.append(proc)
+        proc.start()
 
-        total_metrics = {}
-        metrics = {}
-        logs = []
-        for i in range(args.num_proc):
-            log = queue.get()
-            logs = logs + log
+    total_metrics = {}
+    metrics = {}
+    logs = []
+    for i in range(args.num_proc):
+        log = queue.get()
+        logs = logs + log
 
-        for metric in logs[0].keys():
-            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-        for k, v in metrics.items():
-            print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+    for metric in logs[0].keys():
+        metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+    for k, v in metrics.items():
+        print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 
-        for proc in procs:
-            proc.join()
-    else:
-        test(args, model, [test_sampler_head, test_sampler_tail])
+    for proc in procs:
+        proc.join()
+    #else:
+    #    test(args, model, [test_sampler_head, test_sampler_tail])
     print('Test takes {:.3f} seconds'.format(time.time() - start))
 
 if __name__ == '__main__':
