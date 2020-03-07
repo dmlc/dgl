@@ -662,7 +662,7 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
 		std::cerr << "The input graph isn't immutable graph" << std::endl;
 		return aten::NewIdArray(0);
 	}
-	// TODO is this right to get an in-CSR?
+	// TODO(zhengda) is this right to get an in-CSR?
 	CSRPtr csr = ig->GetInCSR();
 	auto mat = csr->ToCSRMatrix();
 
@@ -670,7 +670,7 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
 	idx_t ncon = 1;        // # balacing constraints.
 	idx_t *xadj = static_cast<idx_t*>(mat.indptr->data);
 	idx_t *adjncy = static_cast<idx_t*>(mat.indices->data);
-	// TODO we could use this to create partitions that balance both #vertices and #edges.
+	// TODO(zhengda) we could use this to create partitions that balance both #vertices and #edges.
 	idx_t *vwgt = NULL;
 	idx_t nparts = k;
     IdArray part_arr = aten::NewIdArray(nvtxs);
