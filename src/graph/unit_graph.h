@@ -92,6 +92,11 @@ class UnitGraph : public BaseHeteroGraph {
 
   uint64_t NumVertices(dgl_type_t vtype) const override;
 
+  inline std::vector<int64_t> NumVerticesPerType() const override {
+    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on unit graphs.";
+    return {};
+  }
+
   uint64_t NumEdges(dgl_type_t etype) const override;
 
   bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const override;
