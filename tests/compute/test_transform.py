@@ -424,7 +424,10 @@ def test_to_block():
     def checkall(g, bg, rhs_nodes):
         for etype in g.etypes:
             ntype = g.to_canonical_etype(etype)[2]
-            check(g, bg, ntype, etype, rhs_nodes[ntype])
+            if rhs_nodes is not None and ntype in rhs_nodes:
+                check(g, bg, ntype, etype, rhs_nodes[ntype])
+            else:
+                check(g, bg, ntype, etype, None)
 
     g = dgl.heterograph({
         ('A', 'AA', 'A'): [(0, 1), (2, 3), (1, 2), (3, 4)],
@@ -442,6 +445,21 @@ def test_to_block():
     rhs_nodes = F.tensor([4, 3, 2, 1], dtype=F.int64)
     bg = dgl.to_block(g_a, rhs_nodes)
     check(g_a, bg, 'A', 'AA', rhs_nodes)
+
+    g_ab = g['AB']
+
+    bg = dgl.to_block(g_ab)
+    assert bg.number_of_nodes('B_l') == 4
+    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
+    assert bg.number_of_nodes('A_r') == 0
+    checkall(g_ab, bg, None)
+
+    rhs_nodes = {'B': F.tensor([5, 6], dtype=F.int64)}
+    bg = dgl.to_block(g, rhs_nodes)
+    assert bg.number_of_nodes('B_l') == 2
+    assert F.array_equal(bg.nodes['B_l'].data[dgl.NID], bg.nodes['B_r'].data[dgl.NID])
+    assert bg.number_of_nodes('A_r') == 0
+    checkall(g, bg, rhs_nodes)
 
     rhs_nodes = {'A': F.tensor([3, 4], dtype=F.int64), 'B': F.tensor([5, 6], dtype=F.int64)}
     bg = dgl.to_block(g, rhs_nodes)

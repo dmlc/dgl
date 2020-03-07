@@ -709,20 +709,21 @@ def compact_graphs(graphs, always_preserve=None):
     return new_graphs
 
 def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
-    """Convert a graph into a bipartite-structured graph for message passing.
+    """Convert a graph into a bipartite-structured "block" for message passing.
 
     Specifically, we create one node type ``ntype_l`` on the "left hand" side and another
     node type ``ntype_r`` on the "right hand" side for each node type ``ntype``.  The
-    nodes of type ``ntype_r`` would contain the nodes that have an edge of any type
-    pointing towards it, while ``ntype_l`` would contain the nodes that have an edge
-    of any type going out from it.  In addition, the left hand side would contain all
-    the nodes that appeared in the right hand side.
+    nodes of type ``ntype_r`` would contain the nodes that have an inbound edge of any type,
+    while ``ntype_l`` would contain all the nodes on the right hand side, as well as any
+    nodes that have an outbound edge of any type pointing to any node on the right hand side.
 
     For each relation graph of canonical edge type ``(utype, etype, vtype)``, edges
     from node type ``utype`` to node type ``vtype`` are preserved, except that the
     source node type and destination node type become ``utype_l`` and ``vtype_r`` in
     the new graph.  The resulting relation graph would have a canonical edge type
     ``(utype_l, etype, vtype_r)``.
+
+    We refer to such bipartite-structured graphs a **block**.
 
     If ``rhs_nodes`` is given, the right hand side would contain the given nodes.
     Otherwise, the right hand side would be determined by DGL via the rules above.
@@ -743,7 +744,7 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
     Returns
     -------
     DGLHeteroGraph
-        The new graph with the bipartite structure.
+        The new graph describing the block.
 
         The node IDs induced for each type in both sides would be stored in feature
         ``dgl.NID``.
@@ -760,7 +761,57 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
 
     Examples
     --------
+    Converting a homogeneous graph to a block as described above:
     >>> g = dgl.graph([(0, 1), (1, 2), (2, 3)])
+    >>> block = dgl.to_block(g, torch.LongTensor([3, 2]))
+
+    The right hand side nodes would be exactly the same as the ones given: [3, 2].
+    >>> induced_dst = block.dstdata[dgl.NID]
+    >>> induced_dst
+    tensor([3, 2])
+
+    The first few nodes of the left hand side nodes would also be exactly the same as
+    the ones given.  The rest of the nodes are the ones necessary for message passing
+    into nodes 3, 2.  This means that the node 1 would be included.
+    >>> induced_src = block.srcdata[dgl.NID]
+    >>> induced_src
+    tensor([3, 2, 1])
+
+    We can notice that the first two nodes are identical to the given nodes as well as
+    the right hand side nodes.
+
+    The induced edges can also be obtained by the following:
+    >>> block.edata[dgl.EID]
+    tensor([2, 1])
+
+    This indicates that edge (2, 3) and (1, 2) are included in the result graph.  We can
+    verify that the first edge in the block indeed maps to the edge (2, 3), and the
+    second edge in the block indeed maps to the edge (1, 2):
+    >>> src, dst = block.edges(order='eid')
+    >>> induced_src[src], induced_dst[dst]
+    (tensor([2, 1]), tensor([3, 2]))
+
+    Converting a heterogeneous graph to a block is similar, except that when specifying
+    the right hand side nodes, you have to give a dict:
+    >>> g = dgl.bipartite([(0, 1), (1, 2), (2, 3)], utype='A', vtype='B')
+
+    If you don't specify any node of type A on the right hand side, the node type ``A_r``
+    in the block would have zero nodes.
+    >>> block = dgl.to_block(g, {'B': torch.LongTensor([3, 2])})
+    >>> block.number_of_nodes('A_r')
+    0
+    >>> block.number_of_nodes('B_r')
+    2
+    >>> block.nodes['B_r'].data[dgl.NID]
+    tensor([3, 2])
+
+    The left hand side would contain all the nodes on the right hand side:
+    >>> block.nodes['B_l'].data[dgl.NID]
+    tensor([3, 2])
+
+    As well as all the nodes that have connections to the nodes on the right hand side:
+    >>> block.nodes['A_l'].data[dgl.NID]
+    tensor([2, 1])
     """
     if rhs_nodes is None:
         # Find all nodes that appeared as destinations
@@ -787,6 +838,7 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
 
     new_graph_index, lhs_nodes_nd, induced_edges_nd = _CAPI_DGLToBlock(g._graph, rhs_nodes_nd)
     lhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd.data) for nodes_nd in lhs_nodes_nd]
+    rhs_nodes = [F.zerocopy_from_dgl_ndarray(nodes_nd) for nodes_nd in rhs_nodes_nd]
 
     new_ntypes = [ntype + lhs_suffix for ntype in g.ntypes] + \
                  [ntype + rhs_suffix for ntype in g.ntypes]
@@ -794,7 +846,7 @@ def to_block(g, rhs_nodes=None, lhs_suffix="_l", rhs_suffix="_r"):
 
     for i, ntype in enumerate(g.ntypes):
         new_graph.nodes[ntype + lhs_suffix].data[NID] = lhs_nodes[i]
-        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[ntype]
+        new_graph.nodes[ntype + rhs_suffix].data[NID] = rhs_nodes[i]
 
     for i, canonical_etype in enumerate(g.canonical_etypes):
         induced_edges = F.zerocopy_from_dgl_ndarray(induced_edges_nd[i].data)
