@@ -34,7 +34,7 @@ namespace dgl {
  */
 template<typename T>
 struct DLDataTypeTraits {
-  static const DLDataType dtype;
+  static constexpr DLDataType dtype{0, 0, 0};   // dummy
 };
 #define GEN_DLDATATYPETRAITS_FOR(T, code, bits) \
   template<> \
