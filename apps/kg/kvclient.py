@@ -210,7 +210,7 @@ def start_worker(args, logger):
                                                        rank=i)
         train_sampler_tail = train_data.create_sampler(args.batch_size,
                                                        args.neg_sample_size,
-                                                       args.neg_chunk_size,
+                                                       args.neg_sample_size,
                                                        mode='tail',
                                                        num_workers=4,
                                                        shuffle=True,
