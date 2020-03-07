@@ -28,14 +28,6 @@ HeteroGraphPtr CreateHeteroGraph(
   return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs, std::move(num_nodes_per_type)));
 }
 
-HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr>& rel_graphs,
-    IdArray num_nodes_per_type) {
-  return HeteroGraphPtr(new HeteroGraph(
-      meta_graph, rel_graphs, num_nodes_per_type.ToVector<int64_t>()));
-}
-
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray row, IdArray col, SparseFormat restrict_format) {

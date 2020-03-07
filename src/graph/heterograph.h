@@ -75,7 +75,7 @@ class HeteroGraph : public BaseHeteroGraph {
     return num_verts_per_type_[vtype];
   }
 
-  std::vector<int64_t> NumVerticesPerType() const override {
+  inline std::vector<int64_t> NumVerticesPerType() const override {
     return num_verts_per_type_;
   }
 

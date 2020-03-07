@@ -1017,15 +1017,18 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
         Meta-graph.
     rel_graphs : list of HeteroGraphIndex
         Bipartite graph of each relation.
-    num_nodes_per_type : utils.Index
+    num_nodes_per_type : utils.Index, optional
         Number of nodes per node type
 
     Returns
     -------
     HeteroGraphIndex
     """
-    return _CAPI_DGLHeteroCreateHeteroGraph(
-        metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+    if num_nodes_per_type is None:
+        return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
+    else:
+        return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
+            metagraph, rel_graphs, num_nodes_per_type.todgltensor())
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.

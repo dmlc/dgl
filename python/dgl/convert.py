@@ -360,20 +360,16 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
     # map to different node type IDs.
     # In the future, we need to lower the type names into C++.
     if num_nodes_per_type is None:
-        num_nodes_per_type = {}
+        ntype_set = set()
         for rgrh in rel_graphs:
             assert len(rgrh.etypes) == 1
             stype, etype, dtype = rgrh.canonical_etypes[0]
-
-            num_nodes_stype = rgrh.number_of_nodes(stype)
-            num_nodes_dtype = rgrh.number_of_nodes(dtype)
-
-            if num_nodes_per_type.setdefault(stype, num_nodes_stype) != num_nodes_stype:
-                raise ValueError('Number of nodes of type %s is inconsistent.' % stype)
-            if num_nodes_per_type.setdefault(dtype, num_nodes_dtype) != num_nodes_dtype:
-                raise ValueError('Number of nodes of type %s is inconsistent.' % dtype)
-
-    ntypes = list(sorted(num_nodes_per_type.keys()))
+            ntype_set.add(stype)
+            ntype_set.add(dtype)
+        ntypes = list(sorted(ntype_set))
+    else:
+        ntypes = list(sorted(num_nodes_per_type.keys()))
+        num_nodes_per_type = utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes])
     ntype_dict = {ntype: i for i, ntype in enumerate(ntypes)}
     for rgrh in rel_graphs:
         stype, etype, dtype = rgrh.canonical_etypes[0]
@@ -384,9 +380,7 @@ def hetero_from_relations(rel_graphs, num_nodes_per_type=None):
 
     # create graph index
     hgidx = heterograph_index.create_heterograph_from_relations(
-        metagraph,
-        [rgrh._graph for rgrh in rel_graphs],
-        utils.toindex([num_nodes_per_type[ntype] for ntype in ntypes]))
+        metagraph, [rgrh._graph for rgrh in rel_graphs], num_nodes_per_type)
     retg = DGLHeteroGraph(hgidx, ntypes, etypes)
     for i, rgrh in enumerate(rel_graphs):
         for ntype in rgrh.ntypes:
@@ -456,8 +450,9 @@ def heterograph(data_dict, num_nodes_dict=None):
                 # original node type and edge type of ``data`` is ignored.
                 assert len(data.canonical_etypes) == 1, \
                     "Relational graphs must have only one edge type."
-                nsrc = data.number_of_nodes(data.canonical_etypes[0][0])
-                ndst = data.number_of_nodes(data.canonical_etypes[0][2])
+                srctype, _, dsttype = data.canonical_etypes[0]
+                nsrc = data.number_of_nodes(srctype)
+                ndst = data.number_of_nodes(dsttype)
             else:
                 raise DGLError('Unsupported graph data type %s for %s' % (
                     type(data), (srctype, etype, dsttype)))

@@ -46,6 +46,19 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef meta_graph = args[0];
     List<HeteroGraphRef> rel_graphs = args[1];
+    std::vector<HeteroGraphPtr> rel_ptrs;
+    rel_ptrs.reserve(rel_graphs.size());
+    for (const auto& ref : rel_graphs) {
+      rel_ptrs.push_back(ref.sptr());
+    }
+    auto hgptr = CreateHeteroGraph(meta_graph.sptr(), rel_ptrs);
+    *rv = HeteroGraphRef(hgptr);
+  });
+
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCreateHeteroGraphWithNumNodes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef meta_graph = args[0];
+    List<HeteroGraphRef> rel_graphs = args[1];
     IdArray num_nodes_per_type = args[2];
     std::vector<HeteroGraphPtr> rel_ptrs;
     rel_ptrs.reserve(rel_graphs.size());

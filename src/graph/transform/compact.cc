@@ -32,7 +32,8 @@ CompactGraphs(
     const std::vector<IdArray> &always_preserve) {
   // TODO(BarclayII): check whether the node space and metagraph of each graph is the same.
   // Step 1: Collect the nodes that has connections for each type.
-  std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
+  const int64_t num_ntypes = graphs[0]->NumVertexTypes();
+  std::vector<aten::IdHashMap<IdType>> hashmaps(num_ntypes);
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
   for (size_t i = 0; i < always_preserve.size(); ++i)
@@ -56,11 +57,11 @@ CompactGraphs(
   }
 
   // Step 2: Relabel the nodes for each type to a smaller ID space and save the mapping.
-  std::vector<IdArray> induced_nodes;
-  std::vector<int64_t> num_induced_nodes;
-  for (auto &hashmap : hashmaps) {
-    induced_nodes.push_back(hashmap.Values());
-    num_induced_nodes.push_back(hashmap.Size());
+  std::vector<IdArray> induced_nodes(num_ntypes);
+  std::vector<int64_t> num_induced_nodes(num_ntypes);
+  for (int64_t i = 0; i < num_ntypes; ++i) {
+    induced_nodes[i] = hashmaps[i].Values();
+    num_induced_nodes[i] = hashmaps[i].Size();
   }
 
   // Step 3: Remap the edges of each graph.

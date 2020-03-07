@@ -126,7 +126,10 @@ class BaseHeteroGraph : public runtime::Object {
   virtual uint64_t NumVertices(dgl_type_t vtype) const = 0;
 
   /*! \return the number of vertices for each type in the graph as a vector */
-  virtual std::vector<int64_t> NumVerticesPerType() const = 0;
+  inline virtual std::vector<int64_t> NumVerticesPerType() const {
+    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on this object.";
+    return {};
+  }
 
   /*! \return the number of edges in the graph.*/
   virtual uint64_t NumEdges(dgl_type_t etype) const = 0;
@@ -563,11 +566,6 @@ HeteroGraphPtr CreateHeteroGraph(
     GraphPtr meta_graph,
     const std::vector<HeteroGraphPtr>& rel_graphs,
     std::vector<int64_t>&& num_nodes_per_type);
-
-HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph,
-    const std::vector<HeteroGraphPtr>& rel_graphs,
-    IdArray num_nodes_per_type);
 
 /*!
  * \brief Create a heterograph from COO input.
