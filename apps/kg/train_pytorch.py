@@ -116,7 +116,6 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
         start1 = time.time()
         pos_g, neg_g = next(train_sampler)
         sample_time += time.time() - start1
-        args.step = step
 
         if client is not None:
             model.pull_model(client, pos_g, neg_g)
