@@ -250,11 +250,6 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
         if args.neg_deg_sample_eval:
             assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
 
-        if args.neg_chunk_size_valid < 0:
-            args.neg_chunk_size_valid = args.neg_sample_size_valid
-        if args.neg_chunk_size_test < 0:
-            args.neg_chunk_size_test = args.neg_sample_size_test
-
         print("Pull relation_emb ...")
         relation_id = F.arange(0, model_test.n_relations)
         relation_data = client.pull(name='relation_emb', id_tensor=relation_id)
@@ -290,14 +285,14 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             for i in range(args.num_test_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                args.neg_chunk_size_test,
+                                                                args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
                                                                 num_workers=args.num_thread,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                args.neg_chunk_size_test,
+                                                                args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
                                                                 num_workers=args.num_thread,
