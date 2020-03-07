@@ -715,6 +715,16 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     *rv = GraphOp::MetisPartition(g.sptr(), k);
   });
 
+#else
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphRef g = args[0];
+    int k = args[1];
+    LOG(WARNING) << "DGL doesn't support METIS partitioning in Windows";
+    *rv = aten::NewIdArray(0);
+  });
+
 #endif  // !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) && !defined(__NT__)
 
 }  // namespace dgl

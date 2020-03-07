@@ -237,14 +237,15 @@ def test_metis_partition():
     subgs = dgl.transform.metis_partition(g, 4)
     num_inner_nodes = 0
     num_inner_edges = 0
-    for part_id, subg in subgs.items():
-        lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
-        ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
-        num_inner_nodes += len(lnode_ids)
-        num_inner_edges += len(ledge_ids)
-        assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
-    assert num_inner_nodes == g.number_of_nodes()
-    print(g.number_of_edges() - num_inner_edges)
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            lnode_ids = np.nonzero(F.asnumpy(subg.ndata['inner_node']))[0]
+            ledge_ids = np.nonzero(F.asnumpy(subg.edata['inner_edge']))[0]
+            num_inner_nodes += len(lnode_ids)
+            num_inner_edges += len(ledge_ids)
+            assert np.sum(F.asnumpy(subg.ndata['part_id']) == part_id) == len(lnode_ids)
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_in_subgraph():

@@ -607,6 +607,9 @@ def metis_partition(g, k, num_hops=1):
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
     node_part = _CAPI_DGLMetisPartition(g._graph, k)
+    if len(node_part) == 0:
+        return None
+
     node_part = utils.toindex(node_part)
     parts = partition_graph_with_halo(g, node_part, num_hops)
     node_part = node_part.tousertensor()
