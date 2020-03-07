@@ -348,8 +348,8 @@ def run(args, logger):
                                                  rel_parts,
                                                  cross_rels,
                                                  barrier))
-            procs.append(proc)
-            proc.start()
+        procs.append(proc)
+        proc.start()
     for proc in procs:
         proc.join()
     #else:
