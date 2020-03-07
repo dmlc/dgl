@@ -615,7 +615,7 @@ def metis_partition(g, k, num_hops=1):
     node_part = node_part.tousertensor()
     for part_id in parts:
         part = parts[part_id]
-        part.ndata['part_id'] = node_part[part.parent_nid]
+        part.ndata['part_id'] = F.gather_row(node_part, part.parent_nid)
     return parts
 
 def compact_graphs(graphs, always_preserve=None):
