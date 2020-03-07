@@ -70,7 +70,6 @@ class KGDataset:
             if only_train == False:
                 self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
                 self.test = self.read_triple(test_path, "test", skip_first_line, format)
-        print(self.train)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f:
@@ -311,6 +310,7 @@ class KGDatasetUDDRaw(KGDataset):
             assert os.path.exists(os.path.join(path, f)), \
                 'File {} now exist in {}'.format(f, path)
 
+        assert len(format) == 3
         format = _parse_srd_format(format)
         self.load_entity_relation(path, files, format)
 
@@ -331,7 +331,7 @@ class KGDatasetUDDRaw(KGDataset):
                                                   read_triple=True,
                                                   only_train=False)
 
-    def load_entity_relation(path, files, format):
+    def load_entity_relation(self, path, files, format):
         entity_map = {}
         rel_map = {}
         for fi in files:
@@ -344,13 +344,13 @@ class KGDatasetUDDRaw(KGDataset):
                     rel_id = _get_id(rel_map, rel)
 
         entities = ["{}\t{}\n".format(key, val) for key, val in entity_map.items()]
-        with open(os.path.join(path, "entities.tsv")) as f:
+        with open(os.path.join(path, "entities.tsv"), "w+") as f:
             f.writelines(entities)
         self.entity2id = entity_map
         self.n_entities = len(entities)
 
         relations = ["{}\t{}\n".format(key, val) for key, val in rel_map.items()]
-        with open(os.path.join(path, "relations.tsv")) as f:
+        with open(os.path.join(path, "relations.tsv"), "w+") as f:
             f.writelines(relations)
         self.relation2id = rel_map
         self.n_relations = len(relations)
@@ -450,7 +450,7 @@ def get_dataset(data_path, data_name, format_str, files=None):
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str.startswith('raw_udd'):
         # user defined dataset
-        format = format_str[7:]
+        format = format_str[8:]
         dataset = KGDatasetUDDRaw(data_path, data_name, files, format)
     elif format_str.startswith('udd'):
         # user defined dataset
