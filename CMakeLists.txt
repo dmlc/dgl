@@ -131,14 +131,14 @@ add_subdirectory("third_party/dmlc-core")
 list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
-if(NOT WIN32)
+if(NOT MSVC)
 # For distributed
 set(GKLIB_PATH "third_party/METIS/GKlib")
 include(${GKLIB_PATH}/GKlibSystem.cmake)
 include_directories(${GKLIB_PATH})
 add_subdirectory("third_party/METIS/libmetis/")
 list(APPEND DGL_LINKER_LIBS metis)
-endif(NOT WIN32)
+endif(NOT MSVC)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
