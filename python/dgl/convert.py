@@ -859,6 +859,8 @@ def create_from_scipy(spmat, utype, etype, vtype, with_edge_id=False,
         If True, the entries in the sparse matrix are treated as edge IDs.
         Otherwise, the entries are ignored and edges will be added in
         (source, destination) order.
+        Note that this option only affects CSR matrices; COO matrices' rows and cols
+        are always assumed to be ordered by edge ID already.
     validate : bool, optional
         If True, checks if node IDs are within range.
     restrict_format : 'any', 'coo', 'csr', 'csc', optional

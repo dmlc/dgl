@@ -166,21 +166,31 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \brief Create a graph from COO arrays */
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-      IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
+      IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::kAny);
 
   static HeteroGraphPtr CreateFromCOO(
       int64_t num_vtypes, const aten::COOMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::ANY);
+      SparseFormat restrict_format = SparseFormat::kAny);
 
   /*! \brief Create a graph from (out) CSR arrays */
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst,
       IdArray indptr, IdArray indices, IdArray edge_ids,
-      SparseFormat restrict_format = SparseFormat::ANY);
+      SparseFormat restrict_format = SparseFormat::kAny);
 
   static HeteroGraphPtr CreateFromCSR(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
-      SparseFormat restrict_format = SparseFormat::ANY);
+      SparseFormat restrict_format = SparseFormat::kAny);
+
+  /*! \brief Create a graph from (in) CSC arrays */
+  static HeteroGraphPtr CreateFromCSC(
+      int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+      IdArray indptr, IdArray indices, IdArray edge_ids,
+      SparseFormat restrict_format = SparseFormat::kAny);
+
+  static HeteroGraphPtr CreateFromCSC(
+      int64_t num_vtypes, const aten::CSRMatrix& mat,
+      SparseFormat restrict_format = SparseFormat::kAny);
 
   /*! \brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);
@@ -231,7 +241,7 @@ class UnitGraph : public BaseHeteroGraph {
    * \param coo coo
    */
   UnitGraph(GraphPtr metagraph, CSRPtr in_csr, CSRPtr out_csr, COOPtr coo,
-            SparseFormat restrict_format = SparseFormat::ANY);
+            SparseFormat restrict_format = SparseFormat::kAny);
 
   /*! \return Return any existing format. */
   HeteroGraphPtr GetAny() const;

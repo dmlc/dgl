@@ -12,7 +12,7 @@ HeteroGraphPtr DisjointUnionHeteroGraph(
     GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& component_graphs) {
   CHECK_GT(component_graphs.size(), 0) << "Input graph list is empty";
   std::vector<HeteroGraphPtr> rel_graphs(meta_graph->NumEdges());
-  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices());
+  std::vector<int64_t> num_nodes_per_type(meta_graph->NumVertices(), 0);
 
   // Loop over all canonical etypes
   for (dgl_type_t etype = 0; etype < meta_graph->NumEdges(); ++etype) {

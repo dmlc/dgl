@@ -18,14 +18,14 @@ HeteroPickleStates HeteroPickle(HeteroGraphPtr graph) {
   states.num_nodes_per_type = graph->NumVerticesPerType();
   states.adjs.resize(graph->NumEdgeTypes());
   for (dgl_type_t etype = 0; etype < graph->NumEdgeTypes(); ++etype) {
-    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::ANY);
+    SparseFormat fmt = graph->SelectFormat(etype, SparseFormat::kAny);
     states.adjs[etype] = std::make_shared<SparseMatrix>();
     switch (fmt) {
-      case SparseFormat::COO:
+      case SparseFormat::kCOO:
         *states.adjs[etype] = graph->GetCOOMatrix(etype).ToSparseMatrix();
         break;
-      case SparseFormat::CSR:
-      case SparseFormat::CSC:
+      case SparseFormat::kCSR:
+      case SparseFormat::kCSC:
         *states.adjs[etype] = graph->GetCSRMatrix(etype).ToSparseMatrix();
         break;
       default:
@@ -47,15 +47,15 @@ HeteroGraphPtr HeteroUnpickle(const HeteroPickleStates& states) {
     const int64_t num_vtypes = (srctype == dsttype)? 1 : 2;
     const SparseFormat fmt = static_cast<SparseFormat>(states.adjs[etype]->format);
     switch (fmt) {
-      case SparseFormat::COO:
+      case SparseFormat::kCOO:
         relgraphs[etype] = UnitGraph::CreateFromCOO(
             num_vtypes, aten::COOMatrix(*states.adjs[etype]));
         break;
-      case SparseFormat::CSR:
+      case SparseFormat::kCSR:
         relgraphs[etype] = UnitGraph::CreateFromCSR(
             num_vtypes, aten::CSRMatrix(*states.adjs[etype]));
         break;
-      case SparseFormat::CSC:
+      case SparseFormat::kCSC:
       default:
         LOG(FATAL) << "Unsupported sparse format.";
     }

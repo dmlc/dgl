@@ -190,7 +190,10 @@ def repeat(input, repeats, dim):
 def gather_row(data, row_index):
     # MXNet workaround for empty row index
     if len(row_index) == 0:
-        return data[0:0]
+        if data.shape[0] == 0:
+            return data
+        else:
+            return data[0:0]
 
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
