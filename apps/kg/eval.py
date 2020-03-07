@@ -106,11 +106,6 @@ def main(args):
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
 
-    # for multiprocessing evaluation, we don't need to sample multiple batches at a time
-    # in each process.
-    #if args.num_proc > 1:
-    #    num_workers = 1
-    #if args.num_proc > 1:
     test_sampler_tails = []
     test_sampler_heads = []
     for i in range(args.num_proc):
@@ -130,21 +125,6 @@ def main(args):
                                                         rank=i, ranks=args.num_proc)
         test_sampler_heads.append(test_sampler_head)
         test_sampler_tails.append(test_sampler_tail)
-    #else:
-    #    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
-    #                                                    args.neg_sample_size,
-    #                                                    args.neg_chunk_size,
-    #                                                    args.eval_filter,
-    #                                                    mode='chunk-head',
-    #                                                    num_workers=1,
-    #                                                    rank=0, ranks=1)
-    #    test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
-    #                                                    args.neg_sample_size,
-    #                                                    args.neg_chunk_size,
-    #                                                    args.eval_filter,
-    #                                                    mode='chunk-tail',
-    #                                                    num_workers=1,
-    #                                                    rank=0, ranks=1)
 
     # load model
     n_entities = dataset.n_entities
@@ -184,8 +164,7 @@ def main(args):
 
     for proc in procs:
         proc.join()
-    #else:
-    #    test(args, model, [test_sampler_head, test_sampler_tail])
+
     print('Test takes {:.3f} seconds'.format(time.time() - start))
 
 if __name__ == '__main__':

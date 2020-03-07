@@ -198,7 +198,6 @@ def run(args, logger):
             valid_sampler_heads.append(valid_sampler_head)
             valid_sampler_tails.append(valid_sampler_tail)
     if args.test:
-
         test_sampler_tails = []
         test_sampler_heads = []
         for i in range(args.num_test_proc):
