@@ -22,8 +22,8 @@ class ArgParser(argparse.ArgumentParser):
         super(ArgParser, self).__init__()
 
         self.add_argument('--model_name', default='TransE',
-                          choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransH', 'TransR', 'TransD',
-                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE'],
+                          choices=['TransE', 'TransE_l1', 'TransE_l2', 'TransR',
+                                   'RESCAL', 'DistMult', 'ComplEx', 'RotatE'],
                           help='model to use')
         self.add_argument('--data_path', type=str, default='data',
                           help='root path of all dataset')
@@ -105,8 +105,6 @@ def main(args):
     args.neg_deg_sample_eval = args.neg_deg_sample
     if args.neg_sample_size < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
-    if args.neg_chunk_size < 0:
-        args.neg_chunk_size = args.neg_sample_size
 
     # for multiprocessing evaluation, we don't need to sample multiple batches at a time
     # in each process.
