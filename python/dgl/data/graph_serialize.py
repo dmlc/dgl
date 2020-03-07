@@ -28,7 +28,8 @@ class GraphData(ObjectBase):
     @staticmethod
     def create(g: DGLGraph):
         """Create GraphData"""
-        assert g.batch_size == 1, "BatchedDGLGraph is not supported for serialization"
+        # TODO(zihao): support serialize batched graph in the future.
+        assert g.batch_size == 1, "Batched DGLGraph is not supported for serialization"
         ghandle = g._graph
         if len(g.ndata) != 0:
             node_tensors = dict()
