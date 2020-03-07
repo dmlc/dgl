@@ -58,13 +58,11 @@ Users can specify one of the datasets with `--dataset` in `train.py` and `eval.p
 
 DGL-KE also support user defined dataset. It supports two formats:
 
-- raw_udd, raw user defined dataset format. it should contains five files:
-  - *entities* stores the mapping between entity name and entity Id
-  - *relations* stores the mapping between relation name relation Id
+- raw_udd_[s|r|h], raw user defined dataset format. it should contains five files:
   - *train* stores the triples in the training set. In format [src_name, rel_name, dst_name]
   - *valid* stores the triples in the validation set. In format [src_name, rel_name, dst_name]
   - *test* stores the triples in the test set. In format [src_name, rel_name, dst_name]
-- udd, user defined dataset format. it should contains five files:
+- udd_[s|r|h], user defined dataset format. it should contains five files:
   - *entities* stores the mapping between entity name and entity Id
   - *relations* stores the mapping between relation name relation Id
   - *train* stores the triples in the training set. In format [src_id, rel_id, dst_id]

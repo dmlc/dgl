@@ -23,6 +23,27 @@ def _download_and_extract(url, path, filename):
                     writer.write(chunk)
             print('Download finished. Unzipping the file...')
 
+def _get_id(dict, key):
+    id = dict.get(key, None)
+    if id is None:
+        id = len(dict)
+        dict[key] = id
+    return id
+
+def _parse_srd_format(format):
+    if format == "srd":
+        return [0, 1, 2]
+    if format == "sdr":
+        return [0, 2, 1]
+    if format == "rsd":
+        return [1, 0, 2]
+    if format == "rds":
+        return [2, 0, 1]
+    if format == "dsr":
+        return [1, 2, 0]
+    if format == "drs":
+        return [2, 1, 0]
+
 class KGDataset:
     '''Load a knowledge graph
 
@@ -39,16 +60,17 @@ class KGDataset:
     '''
     def __init__(self, entity_path, relation_path,
                  train_path, valid_path=None, test_path=None,
-                 read_triple=True, only_train=False,
+                 format=[0,1,2], read_triple=True, only_train=False,
                  skip_first_line=False):
         self.entity2id, self.n_entities = self.read_entity(entity_path)
         self.relation2id, self.n_relations = self.read_relation(relation_path)
 
         if read_triple == True:
-            self.train = self.read_triple(train_path, "train", skip_first_line)
+            self.train = self.read_triple(train_path, "train", skip_first_line, format)
             if only_train == False:
-                self.valid = self.read_triple(valid_path, "valid", skip_first_line)
-                self.test = self.read_triple(test_path, "test", skip_first_line)
+                self.valid = self.read_triple(valid_path, "valid", skip_first_line, format)
+                self.test = self.read_triple(test_path, "test", skip_first_line, format)
+        print(self.train)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f:
@@ -68,7 +90,7 @@ class KGDataset:
 
         return relation2id, len(relation2id)
 
-    def read_triple(self, path, mode, skip_first_line=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2]):
         # mode: train/valid/test
         if path is None:
             return None
@@ -80,7 +102,8 @@ class KGDataset:
             if skip_first_line:
                 _ = f.readline()
             for line in f:
-                h, r, t = line.strip().split('\t')
+                triple = line.strip().split('\t')
+                h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
                 heads.append(self.entity2id[h])
                 rels.append(self.relation2id[r])
                 tails.append(self.entity2id[t])
@@ -117,8 +140,8 @@ class KGDatasetFB15k(KGDataset):
                                              os.path.join(self.path, 'train.txt'),
                                              os.path.join(self.path, 'valid.txt'),
                                              os.path.join(self.path, 'test.txt'),
-                                             read_triple,
-                                             only_train)
+                                             read_triple=read_triple,
+                                             only_train=only_train)
 
 class KGDatasetFB15k237(KGDataset):
     '''Load a knowledge graph FB15k-237
@@ -147,8 +170,8 @@ class KGDatasetFB15k237(KGDataset):
                                                 os.path.join(self.path, 'train.txt'),
                                                 os.path.join(self.path, 'valid.txt'),
                                                 os.path.join(self.path, 'test.txt'),
-                                                read_triple,
-                                                only_train)
+                                                read_triple=read_triple,
+                                                only_train=only_train)
 
 class KGDatasetWN18(KGDataset):
     '''Load a knowledge graph wn18
@@ -177,8 +200,8 @@ class KGDatasetWN18(KGDataset):
                                             os.path.join(self.path, 'train.txt'),
                                             os.path.join(self.path, 'valid.txt'),
                                             os.path.join(self.path, 'test.txt'),
-                                            read_triple,
-                                            only_train)
+                                            read_triple=read_triple,
+                                            only_train=only_train)
 
 class KGDatasetWN18rr(KGDataset):
     '''Load a knowledge graph wn18rr
@@ -207,8 +230,8 @@ class KGDatasetWN18rr(KGDataset):
                                               os.path.join(self.path, 'train.txt'),
                                               os.path.join(self.path, 'valid.txt'),
                                               os.path.join(self.path, 'test.txt'),
-                                              read_triple,
-                                              only_train)
+                                              read_triple=read_triple,
+                                              only_train=only_train)
 
 class KGDatasetFreebase(KGDataset):
     '''Load a knowledge graph Full Freebase
@@ -237,8 +260,8 @@ class KGDatasetFreebase(KGDataset):
                                                 os.path.join(self.path, 'train.txt'),
                                                 os.path.join(self.path, 'valid.txt'),
                                                 os.path.join(self.path, 'test.txt'),
-                                                read_triple,
-                                                only_train)
+                                                read_triple=read_triple,
+                                                only_train=only_train)
 
     def read_entity(self, entity_path):
         with open(entity_path) as f_ent:
@@ -282,28 +305,61 @@ class KGDatasetUDDRaw(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name, files, read_triple=True, only_train=False):
+    def __init__(self, path, name, files, format):
         self.name = name
         for f in files:
             assert os.path.exists(os.path.join(path, f)), \
                 'File {} now exist in {}'.format(f, path)
 
+        format = _parse_srd_format(format)
+        self.load_entity_relation(path, files, format)
+
+        if len(files) == 1:
+            super(KGDatasetUDDRaw, self).__init__("entities.tsv",
+                                                  "relation.tsv",
+                                                  os.path.join(path, files[0]),
+                                                  format=format,
+                                                  read_triple=True,
+                                                  only_train=True)
         if len(files) == 3:
-            super(KGDatasetUDDRaw, self).__init__(os.path.join(path, files[0]),
+            super(KGDatasetUDDRaw, self).__init__("entities.tsv",
+                                                  "relation.tsv",
+                                                  os.path.join(path, files[0]),
                                                   os.path.join(path, files[1]),
                                                   os.path.join(path, files[2]),
-                                                  os.path.join(path, None),
-                                                  os.path.join(path, None),
-                                                  read_triple,
-                                                  only_train)
-        if len(files) == 5:
-            super(KGDatasetUDDRaw, self).__init__(os.path.join(path, files[0]),
-                                                  os.path.join(path, files[1]),
-                                                  os.path.join(path, files[2]),
-                                                  os.path.join(path, files[3]),
-                                                  os.path.join(path, files[4]),
-                                                  read_triple,
-                                                  only_train)
+                                                  format=format,
+                                                  read_triple=True,
+                                                  only_train=False)
+
+    def load_entity_relation(path, files, format):
+        entity_map = {}
+        rel_map = {}
+        for fi in files:
+            with open(os.path.join(path, fi)) as f:
+                for line in f:
+                    triple = line.strip().split('\t')
+                    src, rel, dst = triple[format[0]], triple[format[1]], triple[format[2]]
+                    src_id = _get_id(entity_map, src)
+                    dst_id = _get_id(entity_map, dst)
+                    rel_id = _get_id(rel_map, rel)
+
+        entities = ["{}\t{}\n".format(key, val) for key, val in entity_map.items()]
+        with open(os.path.join(path, "entities.tsv")) as f:
+            f.writelines(entities)
+        self.entity2id = entity_map
+        self.n_entities = len(entities)
+
+        relations = ["{}\t{}\n".format(key, val) for key, val in rel_map.items()]
+        with open(os.path.join(path, "relations.tsv")) as f:
+            f.writelines(relations)
+        self.relation2id = rel_map
+        self.n_relations = len(relations)
+
+    def read_entity(self, entity_path):
+        return self.entity2id, self.n_entities
+    
+    def read_relation(self, relation_path):
+        return self.relation2id, self.n_relations
 
 class KGDatasetUDD(KGDataset):
     '''Load a knowledge graph user defined dataset
@@ -318,28 +374,31 @@ class KGDatasetUDD(KGDataset):
     The mapping between entity (relation) name and entity (relation) Id is stored as 'name\tid'.
     The triples are stored as 'head_nid\trelation_id\ttail_nid'.
     '''
-    def __init__(self, path, name, files, read_triple=True, only_train=False):
+    def __init__(self, path, name, files, format, read_triple=True, only_train=False):
         self.name = name
         for f in files:
             assert os.path.exists(os.path.join(path, f)), \
                 'File {} now exist in {}'.format(f, path)
 
+        format = _parse_srd_format(format)
         if len(files) == 3:
             super(KGDatasetUDD, self).__init__(os.path.join(path, files[0]),
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
                                                os.path.join(path, None),
                                                os.path.join(path, None),
-                                               read_triple,
-                                               only_train)
+                                               format=format,
+                                               read_triple=read_triple,
+                                               only_train=only_train)
         if len(files) == 5:
             super(KGDatasetUDD, self).__init__(os.path.join(path, files[0]),
                                                os.path.join(path, files[1]),
                                                os.path.join(path, files[2]),
                                                os.path.join(path, files[3]),
                                                os.path.join(path, files[4]),
-                                               read_triple,
-                                               only_train)
+                                               format=format,
+                                               read_triple=read_triple,
+                                               only_train=only_train)
 
     def read_entity(self, entity_path):
         n_entities = 0
@@ -355,7 +414,7 @@ class KGDatasetUDD(KGDataset):
                 n_relations += 1
         return None, n_relations
 
-    def read_triple(self, path, mode, skip_first_line=False):
+    def read_triple(self, path, mode, skip_first_line=False, format=[0,1,2]):
         heads = []
         tails = []
         rels = []
@@ -364,7 +423,8 @@ class KGDatasetUDD(KGDataset):
             if skip_first_line:
                 _ = f.readline()
             for line in f:
-                h, r, t = line.strip().split('\t')
+                triple = line.strip().split('\t')
+                h, r, t = triple[format[0]], triple[format[1]], triple[format[2]]
                 heads.append(int(h))
                 tails.append(int(t))
                 rels.append(int(r))
@@ -388,12 +448,14 @@ def get_dataset(data_path, data_name, format_str, files=None):
             dataset = KGDatasetWN18rr(data_path)
         else: 
             assert False, "Unknown dataset {}".format(data_name)
-    elif format_str == 'raw_udd':
+    elif format_str.startswith('raw_udd'):
         # user defined dataset
-        dataset = KGDatasetUDDRaw(data_path, data_name, files)
-    elif format_str == 'udd':
+        format = format_str[7:]
+        dataset = KGDatasetUDDRaw(data_path, data_name, files, format)
+    elif format_str.startswith('udd'):
         # user defined dataset
-        dataset = KGDatasetUDD(data_path, data_name, files)
+        format = format_str[4:]
+        dataset = KGDatasetUDD(data_path, data_name, files, format)
     else:
         assert False, "Unknown format {}".format(format_str)
 
@@ -417,10 +479,11 @@ def get_partition_dataset(data_path, data_name, format_str, part_id):
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str == 'raw_udd':
         # user defined dataset
-        dataset = KGDatasetUDDRaw(data_path, data_name, files, read_triple=True, only_train=True)
+        assert False, "When using partitioned dataset, we assume dataset will not be raw"
     elif format_str == 'udd':
         # user defined dataset
-        dataset = KGDatasetUDD(data_path, data_name, files, read_triple=True, only_train=True)
+        format = format_str[4:]
+        dataset = KGDatasetUDD(data_path, data_name, files, format, read_triple=True, only_train=True)
     else:
         assert False, "Unknown format {}".format(format_str)
 
@@ -456,10 +519,11 @@ def get_server_partition_dataset(data_path, data_name, format_str, part_id):
             assert False, "Unknown dataset {}".format(data_name)
     elif format_str == 'raw_udd':
         # user defined dataset
-        dataset = KGDatasetUDDRaw(data_path, data_name, files, read_triple=False, only_train=True)
+        assert False, "When using partitioned dataset, we assume dataset will not be raw"
     elif format_str == 'udd':
         # user defined dataset
-        dataset = KGDatasetUDD(data_path, data_name, files, read_triple=False, only_train=True)
+        format = format_str[4:]
+        dataset = KGDatasetUDD(data_path, data_name, files, format, read_triple=False, only_train=True)
     else:
         assert False, "Unknown format {}".format(format_str)
 
