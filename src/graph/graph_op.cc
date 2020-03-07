@@ -654,6 +654,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
 
+#if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) && !defined(__NT__)
+
 IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   // The index type of Metis needs to be compatible with DGL index type.
   assert(sizeof(idx_t) == sizeof(dgl_id_t));
@@ -712,5 +714,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
     int k = args[1];
     *rv = GraphOp::MetisPartition(g.sptr(), k);
   });
+
+#endif  // !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) && !defined(__NT__)
 
 }  // namespace dgl
