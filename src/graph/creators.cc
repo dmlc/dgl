@@ -10,8 +10,10 @@ namespace dgl {
 
 // creator implementation
 HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs) {
-  return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs));
+    GraphPtr meta_graph,
+    const std::vector<HeteroGraphPtr>& rel_graphs,
+    const std::vector<int64_t>& num_nodes_per_type) {
+  return HeteroGraphPtr(new HeteroGraph(meta_graph, rel_graphs, num_nodes_per_type));
 }
 
 HeteroGraphPtr CreateFromCOO(

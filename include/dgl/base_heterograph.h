@@ -125,6 +125,12 @@ class BaseHeteroGraph : public runtime::Object {
   /*! \return the number of vertices in the graph.*/
   virtual uint64_t NumVertices(dgl_type_t vtype) const = 0;
 
+  /*! \return the number of vertices for each type in the graph as a vector */
+  inline virtual std::vector<int64_t> NumVerticesPerType() const {
+    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on this object.";
+    return {};
+  }
+
   /*! \return the number of edges in the graph.*/
   virtual uint64_t NumEdges(dgl_type_t etype) const = 0;
 
@@ -438,6 +444,9 @@ class BaseHeteroGraph : public runtime::Object {
  protected:
   /*! \brief meta graph */
   GraphPtr meta_graph_;
+
+  // empty constructor
+  BaseHeteroGraph(){}
 };
 
 // Define HeteroGraphRef
@@ -540,9 +549,14 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
 // Declarations of functions and algorithms
 
-/*! \brief Create a heterograph from meta graph and a list of bipartite graph */
+/*!
+ * \brief Create a heterograph from meta graph and a list of bipartite graph,
+ * additionally specifying number of nodes per type.
+ */
 HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
+    GraphPtr meta_graph,
+    const std::vector<HeteroGraphPtr> &rel_graphs,
+    const std::vector<int64_t> &num_nodes_per_type = {});
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -696,6 +710,9 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
 struct HeteroPickleStates : public runtime::Object {
   /*! \brief Metagraph. */
   GraphPtr metagraph;
+
+  /*! \brief Number of nodes per type */
+  std::vector<int64_t> num_nodes_per_type;
 
   /*! \brief adjacency matrices of each relation graph */
   std::vector<std::shared_ptr<SparseMatrix> > adjs;

@@ -292,7 +292,10 @@ std::pair<NDArray, IdArray> ConcatSlices(NDArray array, IdArray lengths);
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
- */ 
+ */
+
+constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
+
 struct CSRMatrix {
   /*! \brief the dense shape of the matrix */
   int64_t num_rows = 0, num_cols = 0;
@@ -305,36 +308,67 @@ struct CSRMatrix {
   /*! \brief default constructor */
   CSRMatrix() = default;
   /*! \brief constructor */
-  CSRMatrix(int64_t nrows, int64_t ncols,
-            IdArray parr, IdArray iarr, IdArray darr = NullArray(),
-            bool sorted_flag = false)
-    : num_rows(nrows), num_cols(ncols), indptr(parr), indices(iarr),
-      data(darr), sorted(sorted_flag) {}
+  CSRMatrix(int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
+            IdArray darr = NullArray(), bool sorted_flag = false)
+      : num_rows(nrows),
+        num_cols(ncols),
+        indptr(parr),
+        indices(iarr),
+        data(darr),
+        sorted(sorted_flag) {}
 
   /*! \brief constructor from SparseMatrix object */
   explicit CSRMatrix(const SparseMatrix& spmat)
-    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
-      indptr(spmat.indices[0]), indices(spmat.indices[1]), data(spmat.indices[2]),
-      sorted(spmat.flags[0]) {}
+      : num_rows(spmat.num_rows),
+        num_cols(spmat.num_cols),
+        indptr(spmat.indices[0]),
+        indices(spmat.indices[1]),
+        data(spmat.indices[2]),
+        sorted(spmat.flags[0]) {}
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
-    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCSR),
-                        num_rows, num_cols,
-                        {indptr, indices, data},
-                        {sorted});
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCSR), num_rows,
+                        num_cols, {indptr, indices, data}, {sorted});
+  }
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
+        << "Invalid CSRMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&indptr)) << "Invalid indptr";
+    CHECK(fs->Read(&indices)) << "Invalid indices";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&sorted)) << "Invalid sorted";
+    return true;
+  }
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(indptr);
+    fs->Write(indices);
+    fs->Write(data);
+    fs->Write(sorted);
   }
 };
 
 /*!
  * \brief Plain COO structure
- * 
+ *
  * The data array stores integer ids for reading edge features.
 
  * Note that we do allow duplicate non-zero entries -- multiple non-zero entries
  * that have the same row, col indices. It corresponds to multigraph in
  * graph terminology.
  */
+
+constexpr uint64_t kDGLSerialize_AtenCooMatrixMagic = 0xDD61ffd305dff127;
+
 // TODO(BarclayII): Graph queries on COO formats should support the case where
 // data ordered by rows/columns instead of EID.
 struct COOMatrix {
@@ -351,24 +385,57 @@ struct COOMatrix {
   /*! \brief default constructor */
   COOMatrix() = default;
   /*! \brief constructor */
-  COOMatrix(int64_t nrows, int64_t ncols,
-            IdArray rarr, IdArray carr, IdArray darr = NullArray(),
-            bool rsorted = false, bool csorted = false)
-    : num_rows(nrows), num_cols(ncols), row(rarr), col(carr), data(darr),
-      row_sorted(rsorted), col_sorted(csorted) {}
+  COOMatrix(int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
+            IdArray darr = NullArray(), bool rsorted = false,
+            bool csorted = false)
+      : num_rows(nrows),
+        num_cols(ncols),
+        row(rarr),
+        col(carr),
+        data(darr),
+        row_sorted(rsorted),
+        col_sorted(csorted) {}
 
   /*! \brief constructor from SparseMatrix object */
   explicit COOMatrix(const SparseMatrix& spmat)
-    : num_rows(spmat.num_rows), num_cols(spmat.num_cols),
-      row(spmat.indices[0]), col(spmat.indices[1]), data(spmat.indices[2]),
-      row_sorted(spmat.flags[0]), col_sorted(spmat.flags[1]) {}
+      : num_rows(spmat.num_rows),
+        num_cols(spmat.num_cols),
+        row(spmat.indices[0]),
+        col(spmat.indices[1]),
+        data(spmat.indices[2]),
+        row_sorted(spmat.flags[0]),
+        col_sorted(spmat.flags[1]) {}
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
-    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCOO),
-                        num_rows, num_cols,
-                        {row, col, data},
-                        {row_sorted, col_sorted});
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCOO), num_rows,
+                        num_cols, {row, col, data}, {row_sorted, col_sorted});
+  }
+
+  bool Load(dmlc::Stream* fs) {
+    uint64_t magicNum;
+    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
+    CHECK_EQ(magicNum, kDGLSerialize_AtenCooMatrixMagic)
+        << "Invalid COOMatrix Data";
+    CHECK(fs->Read(&num_cols)) << "Invalid num_cols";
+    CHECK(fs->Read(&num_rows)) << "Invalid num_rows";
+    CHECK(fs->Read(&row)) << "Invalid row";
+    CHECK(fs->Read(&col)) << "Invalid col";
+    CHECK(fs->Read(&data)) << "Invalid data";
+    CHECK(fs->Read(&row_sorted)) << "Invalid row_sorted";
+    CHECK(fs->Read(&col_sorted)) << "Invalid col_sorted";
+    return true;
+  }
+
+  void Save(dmlc::Stream* fs) const {
+    fs->Write(kDGLSerialize_AtenCooMatrixMagic);
+    fs->Write(num_cols);
+    fs->Write(num_rows);
+    fs->Write(row);
+    fs->Write(col);
+    fs->Write(data);
+    fs->Write(row_sorted);
+    fs->Write(col_sorted);
   }
 };
 
@@ -929,39 +996,8 @@ IdArray VecToIdArray(const std::vector<T>& vec,
 }  // namespace dgl
 
 namespace dmlc {
-
-namespace serializer {
-
-using dgl::aten::CSRMatrix;
-
-constexpr uint64_t kDGLSerialize_AtenCsrMatrixMagic = 0xDD6cd31205dff127;
-
-template <>
-struct Handler<CSRMatrix> {
-  inline static void Write(Stream* fs, const CSRMatrix& csr) {
-    fs->Write(kDGLSerialize_AtenCsrMatrixMagic);
-    fs->Write(csr.num_cols);
-    fs->Write(csr.num_rows);
-    fs->Write(csr.indptr);
-    fs->Write(csr.indices);
-    fs->Write(csr.data);
-    fs->Write(csr.sorted);
-  }
-  inline static bool Read(Stream* fs, CSRMatrix* csr) {
-    uint64_t magicNum;
-    CHECK(fs->Read(&magicNum)) << "Invalid Magic Number";
-    CHECK_EQ(magicNum, kDGLSerialize_AtenCsrMatrixMagic)
-        << "Invalid CSRMatrix Data";
-    CHECK(fs->Read(&csr->num_cols)) << "Invalid num_cols";
-    CHECK(fs->Read(&csr->num_rows)) << "Invalid num_rows";
-    CHECK(fs->Read(&csr->indptr)) << "Invalid indptr";
-    CHECK(fs->Read(&csr->indices)) << "Invalid indices";
-    CHECK(fs->Read(&csr->data)) << "Invalid data";
-    CHECK(fs->Read(&csr->sorted)) << "Invalid sorted";
-    return true;
-  }
-};
-}  // namespace serializer
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::CSRMatrix, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::aten::COOMatrix, true);
 }  // namespace dmlc
 
 #endif  // DGL_ARRAY_H_

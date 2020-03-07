@@ -92,6 +92,11 @@ class UnitGraph : public BaseHeteroGraph {
 
   uint64_t NumVertices(dgl_type_t vtype) const override;
 
+  inline std::vector<int64_t> NumVerticesPerType() const override {
+    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on unit graphs.";
+    return {};
+  }
+
   uint64_t NumEdges(dgl_type_t etype) const override;
 
   bool HasVertex(dgl_type_t vtype, dgl_id_t vid) const override;
@@ -225,6 +230,9 @@ class UnitGraph : public BaseHeteroGraph {
   friend class Serializer;
   friend class HeteroGraph;
 
+  // private empty constructor
+  UnitGraph() {}
+
   /*!
    * \brief constructor
    * \param metagraph metagraph
@@ -260,9 +268,6 @@ class UnitGraph : public BaseHeteroGraph {
   /*! \return Whether the graph is hypersparse */
   bool IsHypersparse() const;
 
-  // Empty Graph for Serializer Usgae
-  static UnitGraph* EmptyGraph();
-
   // Graph stored in different format. We use an on-demand strategy: the format is
   // only materialized if the operation that suitable for it is invoked.
   /*! \brief CSR graph that stores reverse edges */
@@ -285,6 +290,8 @@ class UnitGraph : public BaseHeteroGraph {
 
 namespace dmlc {
 DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::CSR, true);
+DMLC_DECLARE_TRAITS(has_saveload, dgl::UnitGraph::COO, true);
 }  // namespace dmlc
 
 #endif  // DGL_GRAPH_UNIT_GRAPH_H_

@@ -38,6 +38,8 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes) {
 
   const std::vector<IdHashMap<IdType>> rhs_node_mappings(rhs_nodes.begin(), rhs_nodes.end());
   std::vector<IdHashMap<IdType>> lhs_node_mappings(rhs_node_mappings);  // copy
+  std::vector<int64_t> num_nodes_per_type;
+  num_nodes_per_type.reserve(2 * num_ntypes);
 
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
@@ -54,6 +56,11 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes) {
   const auto new_meta_graph = ImmutableGraph::CreateFromCOO(
       num_ntypes * 2, etypes.src, new_dst);
 
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype)
+    num_nodes_per_type.push_back(lhs_node_mappings[ntype].Size());
+  for (int64_t ntype = 0; ntype < num_ntypes; ++ntype)
+    num_nodes_per_type.push_back(rhs_node_mappings[ntype].Size());
+
   std::vector<HeteroGraphPtr> rel_graphs;
   std::vector<IdArray> induced_edges;
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
@@ -69,7 +76,8 @@ ToBlock(HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes) {
     induced_edges.push_back(edge_arrays[etype].id);
   }
 
-  const HeteroGraphPtr new_graph = CreateHeteroGraph(new_meta_graph, rel_graphs);
+  const HeteroGraphPtr new_graph = CreateHeteroGraph(
+      new_meta_graph, rel_graphs, num_nodes_per_type);
   std::vector<IdArray> lhs_nodes;
   for (const IdHashMap<IdType> &lhs_map : lhs_node_mappings)
     lhs_nodes.push_back(lhs_map.Values());

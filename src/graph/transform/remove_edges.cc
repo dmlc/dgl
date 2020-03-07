@@ -64,7 +64,8 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
     induced_eids.push_back(induced_eids_rel);
   }
 
-  const HeteroGraphPtr new_graph = CreateHeteroGraph(graph->meta_graph(), rel_graphs);
+  const HeteroGraphPtr new_graph = CreateHeteroGraph(
+      graph->meta_graph(), rel_graphs, graph->NumVerticesPerType());
   return std::make_pair(new_graph, induced_eids);
 }
 

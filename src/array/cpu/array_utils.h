@@ -90,7 +90,7 @@ class IdHashMap {
     return values;
   }
 
-  size_t Size() const {
+  inline size_t Size() const {
     return oldv2newv_.size();
   }
 
