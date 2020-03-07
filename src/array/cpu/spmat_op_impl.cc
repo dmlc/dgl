@@ -392,14 +392,13 @@ template COOMatrix CSRToCOO<kDLCPU, int64_t>(CSRMatrix csr);
 // complexity: time O(NNZ), space O(1)
 template <DLDeviceType XPU, typename IdType>
 COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
-  CHECK(CSRHasData(csr)) << "missing data array.";
   const int64_t N = csr.num_rows;
   const int64_t M = csr.num_cols;
   const int64_t nnz = csr.indices->shape[0];
   const IdType* indptr_data = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices_data = static_cast<IdType*>(csr.indices->data);
   // data array should have the same type as the indices arrays
-  const IdType* data = static_cast<IdType*>(csr.data->data);
+  const IdType* data = CSRHasData(csr) ? static_cast<IdType*>(csr.data->data) : nullptr;
   NDArray ret_row = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   NDArray ret_col = NDArray::Empty({nnz}, csr.indices->dtype, csr.indices->ctx);
   IdType* ret_row_data = static_cast<IdType*>(ret_row->data);
@@ -408,8 +407,8 @@ COOMatrix CSRToCOODataAsOrder(CSRMatrix csr) {
   for (IdType row = 0; row < N; ++row) {
     for (IdType j = indptr_data[row]; j < indptr_data[row + 1]; ++j) {
       const IdType col = indices_data[j];
-      ret_row_data[data[j]] = row;
-      ret_col_data[data[j]] = col;
+      ret_row_data[data ? data[j] : j] = row;
+      ret_col_data[data ? data[j] : j] = col;
     }
   }
   return COOMatrix(N, M, ret_row, ret_col);
