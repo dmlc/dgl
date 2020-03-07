@@ -569,19 +569,19 @@ class EvalDataset(object):
         self.num_valid = len(dataset.valid[0])
         self.num_test = len(dataset.test[0])
 
-        if args.eval_percent < 1:
-            self.valid = np.random.randint(0, self.num_valid,
-                    size=(int(self.num_valid * args.eval_percent),)) + self.num_train
-        else:
-            self.valid = np.arange(self.num_train, self.num_train + self.num_valid)
+        #if args.eval_percent < 1:
+        #    self.valid = np.random.randint(0, self.num_valid,
+        #            size=(int(self.num_valid * args.eval_percent),)) + self.num_train
+        #else:
+        self.valid = np.arange(self.num_train, self.num_train + self.num_valid)
         print('|valid|:', len(self.valid))
 
-        if args.eval_percent < 1:
-            self.test = np.random.randint(0, self.num_test,
-                    size=(int(self.num_test * args.eval_percent,)))
-            self.test += self.num_train + self.num_valid
-        else:
-            self.test = np.arange(self.num_train + self.num_valid, self.g.number_of_edges())
+        #if args.eval_percent < 1:
+        #    self.test = np.random.randint(0, self.num_test,
+        #            size=(int(self.num_test * args.eval_percent,)))
+        #    self.test += self.num_train + self.num_valid
+        #else:
+        self.test = np.arange(self.num_train + self.num_valid, self.g.number_of_edges())
         print('|test|:', len(self.test))
 
     def get_edges(self, eval_type):
