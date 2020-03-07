@@ -24,6 +24,7 @@ done
 ##################################################################################
 # Start kvclient
 ##################################################################################
+sleep 5 # wait for server start
 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 DGLBACKEND=pytorch python3 ../kvclient.py --model TransE_l2 --dataset FB15k \
 --batch_size 1000 --neg_sample_size 200 --hidden_dim 400 --gamma 19.9 --lr 0.25 --max_step 500 --log_interval 100 --num_thread 1 \
 --batch_size_eval 16 --test -adv --regularization_coef 1e-9 --total_machine 4 --num_client 16
