@@ -193,9 +193,6 @@ def start_worker(args, logger):
     entity_partition_book.share_memory_()
     local2global.share_memory_()
 
-    model = load_model(logger, args, n_entities, n_relations)
-    model.share_memory()
-
     train_data = TrainDataset(dataset, args, ranks=args.num_client)
     # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
@@ -224,6 +221,9 @@ def start_worker(args, logger):
                                                               True, n_entities))
 
     dataset = None
+
+    model = load_model(logger, args, n_entities, n_relations)
+    model.share_memory()
 
     print('Total initialize time {:.3f} seconds'.format(time.time() - init_time_start))
 
