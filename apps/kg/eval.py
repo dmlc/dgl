@@ -111,25 +111,25 @@ def main(args):
     #if args.num_proc > 1:
     #    num_workers = 1
     #if args.num_proc > 1:
-        test_sampler_tails = []
-        test_sampler_heads = []
-        for i in range(args.num_proc):
-            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
-                                                            args.neg_sample_size,
-                                                            args.neg_chunk_size,
-                                                            args.eval_filter,
-                                                            mode='chunk-head',
-                                                            num_workers=1,
-                                                            rank=i, ranks=args.num_proc)
-            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
-                                                            args.neg_sample_size,
-                                                            args.neg_chunk_size,
-                                                            args.eval_filter,
-                                                            mode='chunk-tail',
-                                                            num_workers=1,
-                                                            rank=i, ranks=args.num_proc)
-            test_sampler_heads.append(test_sampler_head)
-            test_sampler_tails.append(test_sampler_tail)
+    test_sampler_tails = []
+    test_sampler_heads = []
+    for i in range(args.num_proc):
+        test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
+                                                        args.neg_sample_size,
+                                                        args.neg_chunk_size,
+                                                        args.eval_filter,
+                                                        mode='chunk-head',
+                                                        num_workers=1,
+                                                        rank=i, ranks=args.num_proc)
+        test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
+                                                        args.neg_sample_size,
+                                                        args.neg_chunk_size,
+                                                        args.eval_filter,
+                                                        mode='chunk-tail',
+                                                        num_workers=1,
+                                                        rank=i, ranks=args.num_proc)
+        test_sampler_heads.append(test_sampler_head)
+        test_sampler_tails.append(test_sampler_tail)
     #else:
     #    test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
     #                                                    args.neg_sample_size,
