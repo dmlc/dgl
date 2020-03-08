@@ -66,8 +66,6 @@ class ArgParser(argparse.ArgumentParser):
                           help='double relation dim for complex number')
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
-        self.add_argument('--soft_rel_part', action='store_true',
-                          help='enable soft relation partition')
         self.add_argument('--async_update', action='store_true',
                           help='allow async_update on node embedding')
         self.add_argument('--num_thread', type=int, default=1,
@@ -98,6 +96,9 @@ def get_server_data(args, machine_id):
    # Note that the dataset doesn't ccontain the triple
    print('n_entities: ' + str(dataset.n_entities))
    print('n_relations: ' + str(dataset.n_relations))
+
+   args.soft_rel_part = False
+   args.strict_rel_part = False
 
    model = load_model(None, args, dataset.n_entities, dataset.n_relations)
 
