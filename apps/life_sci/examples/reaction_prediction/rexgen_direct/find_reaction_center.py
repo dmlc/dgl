@@ -56,10 +56,10 @@ def main(args):
     for epoch in range(args['num_epochs']):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
+            total_iter += 1
             if total_iter >= 3:
                 t0 = time.time()
 
-            total_iter += 1
             batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
             labels = batch_atom_pair_labels.to(args['device'])
