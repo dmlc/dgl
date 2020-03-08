@@ -108,15 +108,10 @@ def test_simple_graph():
 
 
 def test_bidirected_graph():
-    def _test(in_readonly, multigraph, out_readonly):
-        if multigraph:
-            elist = [(0, 0), (0, 1), (0, 1), (1, 0),
-                    (1, 1), (2, 1), (2, 2), (2, 2)]
-            num_edges = 10
-        else:
-            elist = [(0, 0), (0, 1), (1, 0),
-                    (1, 1), (2, 1), (2, 2)]
-            num_edges = 7
+    def _test(in_readonly, out_readonly):
+        elist = [(0, 0), (0, 1), (1, 0),
+                (1, 1), (2, 1), (2, 2)]
+        num_edges = 7
         g = dgl.DGLGraph(elist, readonly=in_readonly)
         elist.append((1, 2))
         elist = set(elist)
@@ -126,13 +121,10 @@ def test_bidirected_graph():
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
         assert eset == set(elist)
 
-    _test(True, True, True)
-    _test(True, True, False)
-    _test(False, True, True)
-    _test(False, True, False)
-
-    _test(True, False, True)
-    _test(True, False, False)
+    _test(True, True)
+    _test(True, False)
+    _test(False, True)
+    _test(False, False)
 
 
 def test_khop_graph():
