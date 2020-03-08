@@ -3,11 +3,14 @@ import dgl.function as fn
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from torch.nn import Parameter
 
 __all__ = ['WLN']
 
-class Linear(nn.Linear):
-    """Linear layer.
+class WLNLinear(nn.Module):
+    """Linear layer for WLN
 
     Let stddev be
 
@@ -27,11 +30,46 @@ class Linear(nn.Linear):
         Whether bias will be added to the output. Default to True.
     """
     def __init__(self, in_feats, out_feats, bias=True):
-        super(Linear, self).__init__(in_features=in_feats,
-                                     out_features=out_feats,
-                                     bias=bias)
-        stddev = min(1.0 / math.sqrt(in_feats), 0.1)
+        super(WLNLinear, self).__init__()
+
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.weight = Parameter(torch.Tensor(out_feats, in_feats))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_feats))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Initialize model parameters."""
+        stddev = min(1.0 / math.sqrt(self.in_feats), 0.1)
         nn.init.normal_(self.weight, std=stddev)
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input):
+        """Applies the layer.
+
+        Parameters
+        ----------
+        input : float32 tensor of shape (N, *, in_feats)
+            N for the number of samples, * for any additional dimensions.
+
+        Returns
+        -------
+        float32 tensor of shape (N, *, out_feats)
+            Result of the layer.
+        """
+        return F.linear(input, self.weight, self.bias)
+
+    def extra_repr(self):
+        """Return a description of the layer."""
+        return 'in_feats={}, out_feats={}, bias={}'.format(
+            self.in_feats, self.out_feats, self.bias is not None
+        )
 
 class WLN(nn.Module):
     """Weisfeiler-Lehman Network (WLN)
@@ -62,20 +100,20 @@ class WLN(nn.Module):
 
         self.n_layers = n_layers
         self.project_node_in_feats = nn.Sequential(
-            Linear(node_in_feats, node_out_feats, bias=False),
+            WLNLinear(node_in_feats, node_out_feats, bias=False),
             nn.ReLU()
         )
         self.project_concatenated_messages = nn.Sequential(
-            Linear(edge_in_feats + node_out_feats, node_out_feats),
+            WLNLinear(edge_in_feats + node_out_feats, node_out_feats),
             nn.ReLU()
         )
         self.get_new_node_feats = nn.Sequential(
-            Linear(2 * node_out_feats, node_out_feats),
+            WLNLinear(2 * node_out_feats, node_out_feats),
             nn.ReLU()
         )
-        self.project_edge_messages = Linear(edge_in_feats, node_out_feats, bias=False)
-        self.project_node_messages = Linear(node_out_feats, node_out_feats, bias=False)
-        self.project_self = Linear(node_out_feats, node_out_feats, bias=False)
+        self.project_edge_messages = WLNLinear(edge_in_feats, node_out_feats, bias=False)
+        self.project_node_messages = WLNLinear(node_out_feats, node_out_feats, bias=False)
+        self.project_self = WLNLinear(node_out_feats, node_out_feats, bias=False)
 
     def forward(self, g, node_feats, edge_feats):
         """Performs message passing and updates node representations.

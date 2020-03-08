@@ -42,7 +42,7 @@ default_edge_featurizer = BaseBondFeaturizer({
     )
 })
 
-def default_atom_pair_featurizer(reactants, data_field='atom_pair'):
+def default_atom_pair_featurizer(reactants):
     """Featurize each pair of atoms, which will be used in updating
     the edata of a complete DGLGraph.
 
@@ -58,8 +58,7 @@ def default_atom_pair_featurizer(reactants, data_field='atom_pair'):
 
     Returns
     -------
-    dict
-        Mapping data_field to a float32 tensor of shape (V^2, 10), which are
+    float32 tensor of shape (V^2, 10)
         features for each pair of atoms.
     """
     # Decide the reactant membership for each atom
@@ -101,7 +100,8 @@ def default_atom_pair_featurizer(reactants, data_field='atom_pair'):
             pair_feature[-2] = 1. if len(reactant_list) == 1 else 0.
             pair_feature[-1] = 1. if len(reactant_list) > 1 else 0.
             features.append(pair_feature)
-    return {data_field: torch.from_numpy(np.stack(features, axis=0).astype(np.float32))}
+
+    return torch.from_numpy(np.stack(features, axis=0).astype(np.float32))
 
 def get_pair_label(reactants_mol, graph_edits):
     """Construct labels for each pair of atoms in reaction center prediction
@@ -193,15 +193,21 @@ class USPTO(object):
             'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
         self._subset = subset
 
+        self._atom_pair_featurizer = atom_pair_featurizer
         self._url = 'dataset/uspto.zip'
         data_path = get_download_dir() + '/uspto.zip'
         extracted_data_path = get_download_dir() + '/uspto'
         download(_get_dgl_url(self._url), path=data_path)
         extract_archive(data_path, extracted_data_path)
 
+        self.reactions = []
+        self.graph_edits = []
         self.mols = []
         self.reactant_mol_graphs = []
-        self.reactant_complete_graphs = []
+        self.atom_pair_features = []
+        self.atom_pair_labels = []
+        # Map number of nodes to a corresponding complete graph
+        self.complete_graphs = dict()
 
         if self.subset == 'full':
             subsets = ['train', 'valid', 'test']
@@ -215,43 +221,29 @@ class USPTO(object):
             file_path = extracted_data_path + '/{}.txt.proc'.format(set)
             set_mols, set_reactions, set_graph_edits = self.load_reaction_data(file_path)
             self.mols.extend(set_mols)
+            self.reactions.extend(set_reactions)
+            self.graph_edits.extend(set_graph_edits)
             set_reactant_mol_graphs = []
-            set_reactant_complete_graphs = []
             if load:
                 set_reactant_mol_graphs, _ = load_graphs(
                     extracted_data_path + '/{}_mol_graphs.bin'.format(set))
-                set_reactant_complete_graphs, _ = load_graphs(
-                    extracted_data_path + '/{}_complete_graphs.bin'.format(set))
             else:
                 for i in range(len(set_mols)):
                     print('Processing reaction {:d}/{:d} for {} set'.format(
                         i + 1, len(set_mols), set))
                     mol = set_mols[i]
-                    reaction = set_reactions[i]
-                    graph_edits = set_graph_edits[i]
-                    reactants = reaction.split('>')[0]
                     reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
                                                       edge_featurizer=edge_featurizer,
                                                       canonical_atom_order=False)
                     set_reactant_mol_graphs.append(reactant_mol_graph)
-                    if atom_pair_featurizer is not None:
-                        atom_pair_features = atom_pair_featurizer(reactants)
-                    else:
-                        atom_pair_features = dict()
-                    reactant_complete_graph = mol_to_complete_graph(mol, add_self_loop=True,
-                                                                    canonical_atom_order=False)
-                    reactant_complete_graph.edata.update(atom_pair_features)
-                    reactant_complete_graph.edata['label'] = get_pair_label(mol, graph_edits)
-                    set_reactant_complete_graphs.append(reactant_complete_graph)
 
                 save_graphs(extracted_data_path + '/{}_mol_graphs.bin'.format(set),
                             set_reactant_mol_graphs)
-                save_graphs(extracted_data_path + '/{}_complete_graphs.bin'.format(set),
-                            set_reactant_complete_graphs)
 
             self.mols.extend(set_mols)
             self.reactant_mol_graphs.extend(set_reactant_mol_graphs)
-            self.reactant_complete_graphs.extend(set_reactant_complete_graphs)
+        self.atom_pair_features.extend([None for _ in range(len(self.mols))])
+        self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
 
     def load_reaction_data(self, file_path):
         """Load reaction data from the raw file.
@@ -338,6 +330,10 @@ class USPTO(object):
 
         Returns
         -------
+        str
+            Reaction
+        str
+            Graph edits for the reaction
         rdkit.Chem.rdchem.Mol
             RDKit molecule instance
         DGLGraph
@@ -345,10 +341,28 @@ class USPTO(object):
         DGLGraph
             Complete DGLGraph, which will be needed for predicting
             scores between each pair of atoms
+        float32 tensor of shape (V^2, 10)
+            Features for each pair of atoms.
         float32 tensor of shape (V^2, 5)
             Labels for reaction center prediction.
             V for the number of atoms in the reactants.
         """
-        return self.mols[item], self.reactant_mol_graphs[item], \
-               self.reactant_complete_graphs[item], \
-               self.reactant_complete_graphs[item].edata['label']
+        mol = self.mols[item]
+        num_atoms = mol.GetNumAtoms()
+
+        if num_atoms not in self.complete_graphs:
+            self.complete_graphs[num_atoms] = mol_to_complete_graph(
+                mol, add_self_loop=True, canonical_atom_order=True)
+
+        if self.atom_pair_features[item] is None:
+            reactants = self.reactions[item].split('>')[0]
+            self.atom_pair_features[item] = self._atom_pair_featurizer(reactants)
+
+        if self.atom_pair_labels[item] is None:
+            self.atom_pair_labels[item] = get_pair_label(mol, self.graph_edits[item])
+
+        return self.reactions[item], self.graph_edits[item], mol, \
+               self.reactant_mol_graphs[item], \
+               self.complete_graphs[num_atoms], \
+               self.atom_pair_features[item], \
+               self.atom_pair_labels[item]

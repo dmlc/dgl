@@ -1,9 +1,10 @@
 """Weisfeiler-Lehman Network (WLN) for Reaction Center Prediction."""
 import dgl.function as fn
-import torch
 import torch.nn as nn
 
-from ..gnn.wln import Linear, WLN
+from ..gnn.wln import WLNLinear, WLN
+
+__all__ = ['WLNReactionCenter']
 
 class WLNContext(nn.Module):
     """Attention-based context computation for each node.
@@ -19,13 +20,13 @@ class WLNContext(nn.Module):
         Size for the input features of node pairs.
     """
     def __init__(self, node_in_feats, node_pair_in_feats):
-        super(WLNContext).__init__()
+        super(WLNContext, self).__init__()
 
-        self.project_feature_sum = Linear(node_in_feats, node_in_feats, bias=False)
-        self.project_node_pair_feature = Linear(node_pair_in_feats, node_in_feats)
+        self.project_feature_sum = WLNLinear(node_in_feats, node_in_feats, bias=False)
+        self.project_node_pair_feature = WLNLinear(node_pair_in_feats, node_in_feats)
         self.compute_attention = nn.Sequential(
             nn.ReLU(),
-            Linear(node_in_feats, 1),
+            WLNLinear(node_in_feats, 1),
             nn.Sigmoid()
         )
 
@@ -84,13 +85,16 @@ class WLNReactionCenter(nn.Module):
     n_layers : int
         Number of times for message passing. Note that same parameters
         are shared across n_layers message passing. Default to 3.
+    n_tasks : int
+        Number of tasks for prediction.
     """
     def __init__(self,
                  node_in_feats,
                  edge_in_feats,
                  node_pair_in_feats,
                  node_out_feats=300,
-                 n_layers=3):
+                 n_layers=3,
+                 n_tasks=5):
         super(WLNReactionCenter, self).__init__()
 
         self.gnn = WLN(node_in_feats=node_in_feats,
@@ -99,12 +103,12 @@ class WLNReactionCenter(nn.Module):
                        n_layers=n_layers)
         self.context_module = WLNContext(node_in_feats=node_out_feats,
                                          node_pair_in_feats=node_pair_in_feats)
-        self.project_feature_sum = Linear(node_out_feats, node_out_feats, bias=False)
-        self.project_node_pair_feature = Linear(node_pair_in_feats, node_out_feats, bias=False)
-        self.project_context_sum = Linear(node_out_feats, node_out_feats)
+        self.project_feature_sum = WLNLinear(node_out_feats, node_out_feats, bias=False)
+        self.project_node_pair_feature = WLNLinear(node_pair_in_feats, node_out_feats, bias=False)
+        self.project_context_sum = WLNLinear(node_out_feats, node_out_feats)
         self.predict = nn.Sequential(
             nn.ReLU(),
-            Linear(node_out_feats, 5)
+            WLNLinear(node_out_feats, n_tasks)
         )
 
     def forward(self, batch_mol_graphs, batch_complete_graphs,
@@ -157,12 +161,5 @@ class WLNReactionCenter(nn.Module):
                 self.project_node_pair_feature(node_pair_feats) + \
                 self.project_context_sum(batch_complete_graphs.edata['context_sum'])
             )
-
-        # Masking self loops
-        nodes = batch_complete_graphs.nodes()
-        e_ids = batch_complete_graphs.edge_ids(nodes, nodes)
-        bias = torch.zeros(scores.shape[0], 5).to(scores.device)
-        bias[e_ids, :] = 1e4
-        scores = scores - bias
 
         return scores
