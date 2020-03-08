@@ -36,7 +36,7 @@ CompactGraphs(
   std::vector<aten::IdHashMap<IdType>> hashmaps(num_ntypes);
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
-  int64_t max_vertex_cnt[num_ntypes] = {0};
+  int64_t max_vertex_cnt[num_ntypes] = {};
   for (size_t i = 0; i < graphs.size(); ++i) {
     const HeteroGraphPtr curr_graph = graphs[i];
     for (IdType ntype = 0; ntype < num_ntypes; ++ntype) {
