@@ -77,7 +77,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLMetisPartition")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
     int k = args[1];
-    LOG(WARNING) << "DGL doesn't support METIS partitioning in Windows";
+    LOG(FATAL) << "DGL doesn't support METIS partitioning in Windows";
     *rv = aten::NullArray();
   });
 
