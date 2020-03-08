@@ -205,7 +205,7 @@ def start_worker(args, logger):
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='head',
-                                                       num_workers=4,
+                                                       num_workers=1,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)
@@ -213,7 +213,7 @@ def start_worker(args, logger):
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='tail',
-                                                       num_workers=4,
+                                                       num_workers=1,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)

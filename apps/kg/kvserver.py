@@ -50,14 +50,12 @@ class ArgParser(argparse.ArgumentParser):
                           help='dataset name, under data_path')
         self.add_argument('--format', type=str, default='1',
                           help='the format of the dataset.')
-
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
                           help='learning rate')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
-
         self.add_argument('--gpu', type=int, default=[-1], nargs='+',
                           help='a list of active gpu ids, e.g. 0')
         self.add_argument('--mix_cpu_gpu', action='store_true',
@@ -66,20 +64,14 @@ class ArgParser(argparse.ArgumentParser):
                           help='double entitiy dim for complex number')
         self.add_argument('-dr', '--double_rel', action='store_true',
                           help='double relation dim for complex number')
-        self.add_argument('--seed', type=int, default=0,
-                          help='set random seed for reproducibility')
-
         self.add_argument('--rel_part', action='store_true',
                           help='enable relation partitioning')
         self.add_argument('--soft_rel_part', action='store_true',
                           help='enable soft relation partition')
-        self.add_argument('--nomp_thread_per_process', type=int, default=-1,
-                          help='num of omp threads used per process in multi-process training')
         self.add_argument('--async_update', action='store_true',
                           help='allow async_update on node embedding')
-        self.add_argument('--strict_rel_part', action='store_true',
-                          help='Strict relation partition')
-
+        self.add_argument('--num_thread', type=int, default=1,
+                          help='number of thread used')
         self.add_argument('--server_id', type=int, default=0,
                           help='Unique ID of each server')
         self.add_argument('--ip_config', type=str, default='ip_config.txt',
