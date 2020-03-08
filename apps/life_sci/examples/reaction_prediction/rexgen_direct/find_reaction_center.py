@@ -52,7 +52,7 @@ def eval_on_a_loader(args, model, data_loader):
 def main(args):
     setup(args)
     train_set = USPTO('train')
-    val_set = USPTO('valid')
+    val_set = USPTO('val')
     test_set = USPTO('test')
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate)
