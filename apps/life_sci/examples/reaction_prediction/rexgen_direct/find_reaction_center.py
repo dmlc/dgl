@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import torch
 
 from dgllife.data import USPTO
@@ -50,9 +51,14 @@ def main(args):
     total_iter = 0
     grad_norm_sum = 0
     num_correct = {k: [] for k in args['top_ks']}
+    loss_sum = 0
+    dur = []
     for epoch in range(args['num_epochs']):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
+            if total_iter >= 3:
+                t0 = time.time()
+
             total_iter += 1
             batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
@@ -60,6 +66,7 @@ def main(args):
             pred, biased_pred = perform_prediction(args['device'], model,
                                                    batch_mol_graphs, batch_complete_graphs)
             loss = criterion(pred, labels) / len(batch_reactions)
+            loss_sum += loss.cpu().detach().data.item()
             optimizer.zero_grad()
             loss.backward()
             grad_norm = clip_grad_norm_(model.parameters(), args['max_norm'])
@@ -67,16 +74,23 @@ def main(args):
             optimizer.step()
             scheduler.step()
 
+            if total_iter >= 3:
+                dur.append(time.time() - t0)
+
             eval(batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
 
             if total_iter % args['print_every']:
-                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | grad norm {:.4f}'.format(
+                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/epoch {:.4f} | ' \
+                           'loss {:.4f} | grad norm {:.4f} |'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
+                    np.mean(dur), loss_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
                 for k, correct_count in num_correct.items():
                     progress += ' | acc@{:d} {:.4f}'.format(k, np.mean(correct_count))
                 grad_norm_sum = 0
                 num_correct = {k: [] for k in args['top_ks']}
+                loss_sum = 0
+                print(progress)
 
             if total_iter % args['decay_every']:
                 torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
