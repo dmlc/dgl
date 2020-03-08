@@ -139,6 +139,12 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+  /*!
+   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable
+   * and call gk_csr_MakeSymmetric in GKlib. It works much faster.
+   * \param graph The input graph.
+   * \return a new immutable bidirected graph.
+   */
   static GraphPtr ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig);
 
   /*!
