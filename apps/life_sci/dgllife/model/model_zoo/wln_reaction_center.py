@@ -1,5 +1,6 @@
 """Weisfeiler-Lehman Network (WLN) for Reaction Center Prediction."""
 import dgl.function as fn
+import torch
 import torch.nn as nn
 
 from ..gnn.wln import WLNLinear, WLN
@@ -140,6 +141,8 @@ class WLNReactionCenter(nn.Module):
             * Forming a double bond
             * Forming a triple bond
             * Forming an aromatic bond
+        biased_scores : float32 tensor of shape (E_full, 5)
+            Comparing to scores, a bias is added if the pair is for a same atom.
         """
         node_feats = self.gnn(batch_mol_graphs, node_feats, edge_feats)
 
@@ -162,4 +165,11 @@ class WLNReactionCenter(nn.Module):
                 self.project_context_sum(batch_complete_graphs.edata['context_sum'])
             )
 
-        return scores
+        # Masking self loops
+        nodes = batch_complete_graphs.nodes()
+        e_ids = batch_complete_graphs.edge_ids(nodes, nodes)
+        bias = torch.zeros(scores.shape[0], 5).to(scores.device)
+        bias[e_ids, :] = 1e4
+        biased_scores = scores - bias
+
+        return scores, biased_scores
