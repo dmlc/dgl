@@ -655,5 +655,4 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
 
-
 }  // namespace dgl
