@@ -82,7 +82,7 @@ def get_logger(args):
 
 def main(args):
     args.eval_filter = not args.no_eval_filter
-    if args.neg_deg_sample:
+    if args.neg_deg_sample_eval:
         assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
 
     # load dataset and samplers
