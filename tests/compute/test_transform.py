@@ -261,6 +261,10 @@ def test_metis_partition():
         assert num_inner_nodes == g.number_of_nodes()
         print(g.number_of_edges() - num_inner_edges)
 
+def test_partition():
+    test_metis_partition()
+    test_partition_with_halo()
+
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_in_subgraph():
     g1 = dgl.graph([(1,0),(2,0),(3,0),(0,1),(2,1),(3,1),(0,2)], 'user', 'follow')
