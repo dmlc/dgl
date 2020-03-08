@@ -57,7 +57,6 @@ def main(args):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
-            print(total_iter)
             if total_iter >= 3:
                 t0 = time.time()
 
@@ -82,7 +81,7 @@ def main(args):
 
             if total_iter % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/epoch {:.4f} | ' \
-                           'loss {:.4f} | grad norm {:.4f} |'.format(
+                           'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
                     np.mean(dur), loss_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
