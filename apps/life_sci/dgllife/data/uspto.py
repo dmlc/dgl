@@ -220,9 +220,6 @@ class USPTO(object):
             print('Preparing {} set'.format(set))
             file_path = extracted_data_path + '/{}.txt.proc'.format(set)
             set_mols, set_reactions, set_graph_edits = self.load_reaction_data(file_path)
-            self.mols.extend(set_mols)
-            self.reactions.extend(set_reactions)
-            self.graph_edits.extend(set_graph_edits)
             set_reactant_mol_graphs = []
             if load:
                 set_reactant_mol_graphs, _ = load_graphs(
@@ -241,6 +238,8 @@ class USPTO(object):
                             set_reactant_mol_graphs)
 
             self.mols.extend(set_mols)
+            self.reactions.extend(set_reactions)
+            self.graph_edits.extend(set_graph_edits)
             self.reactant_mol_graphs.extend(set_reactant_mol_graphs)
         self.atom_pair_features.extend([None for _ in range(len(self.mols))])
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
