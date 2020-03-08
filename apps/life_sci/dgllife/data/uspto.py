@@ -267,7 +267,8 @@ class USPTO(object):
         all_graph_edits = []
         with open(file_path, 'r') as f:
             for i, line in enumerate(f):
-                print('Processing line {:d}'.format(i))
+                if i % 10000 == 0:
+                    print('Processing line {:d}'.format(i))
                 # Each line represents a reaction and the corresponding graph edits
                 #
                 # reaction example:
