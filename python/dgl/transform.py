@@ -575,7 +575,7 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def metis_partition(g, k, extra_cached_hops=1):
+def metis_partition(g, k, extra_cached_hops=0):
     '''
     This is to partition a graph with Metis partitioning.
 
