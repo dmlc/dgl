@@ -9,7 +9,11 @@
 #include <dgl/graph_op.h>
 
 namespace dgl {
+
+#if !defined(_WIN32)
+
 namespace {
+
 gk_csr_t *Convert2GKCsr(CSRPtr csr, bool is_row) {
   // TODO(zhengda) The conversion will be zero-copy in the future.
   const aten::CSRMatrix mat = csr->ToCSRMatrix();
@@ -81,8 +85,10 @@ CSRPtr Convert2DGLCsr(gk_csr_t *gk_csr, bool is_row) {
 
 }  // namespace
 
+#endif  // !defined(_WIN32)
+
 GraphPtr GraphOp::ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig) {
-  printf("convert to symmetric simple immutable graph\n");
+#if !defined(_WIN32)
   // TODO(zhengda) should we get whatever CSR exists in the graph.
   CSRPtr csr = ig->GetInCSR();
   gk_csr_t *gk_csr = Convert2GKCsr(csr, true);
@@ -90,6 +96,9 @@ GraphPtr GraphOp::ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig) {
   csr = Convert2DGLCsr(sym_gk_csr, true);
   // This is a symmetric graph now. The in-csr and out-csr are the same.
   return GraphPtr(new ImmutableGraph(csr, csr));
+#else
+  return GraphPtr();
+#endif  // !defined(_WIN32)
 }
 
 }  // namespace dgl

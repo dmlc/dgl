@@ -647,11 +647,16 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
     GraphRef g = args[0];
     auto gptr = g.sptr();
     auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
-    if (immutable_g == NULL || gptr->IsMultigraph()) {
-      *rv = GraphOp::ToBidirectedImmutableGraph(gptr);
-    } else {
-      *rv = GraphOp::ToBidirectedSimpleImmutableGraph(immutable_g);
+    GraphPtr ret;
+    // For immutable graphs, we can try a faster version.
+    if (immutable_g) {
+      ret = GraphOp::ToBidirectedSimpleImmutableGraph(immutable_g);
     }
+    // If the above option doesn't work, we call a general implementation.
+    if (!ret) {
+      ret = GraphOp::ToBidirectedImmutableGraph(gptr);
+    }
+    *rv = ret;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
