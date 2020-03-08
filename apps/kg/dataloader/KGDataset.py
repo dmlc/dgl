@@ -31,17 +31,17 @@ def _get_id(dict, key):
     return id
 
 def _parse_srd_format(format):
-    if format == "srd":
+    if format == "hrt":
         return [0, 1, 2]
-    if format == "sdr":
+    if format == "htr":
         return [0, 2, 1]
-    if format == "rsd":
+    if format == "rht":
         return [1, 0, 2]
-    if format == "rds":
+    if format == "rth":
         return [2, 0, 1]
-    if format == "dsr":
+    if format == "thr":
         return [1, 2, 0]
-    if format == "drs":
+    if format == "trh":
         return [2, 1, 0]
 
 class KGDataset:
