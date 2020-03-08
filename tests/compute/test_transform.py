@@ -232,7 +232,7 @@ def test_partition_with_halo():
             block_eids2 = F.asnumpy(F.gather_row(subg.parent_eid, block_eids2))
             assert np.all(np.sort(block_eids1) == np.sort(block_eids2))
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
+@unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
     subgs = dgl.transform.metis_partition(g, 4)

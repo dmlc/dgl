@@ -664,7 +664,7 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
     std::cerr << "The input graph isn't immutable graph" << std::endl;
     return aten::NewIdArray(0);
   }
-  // TODO(zhengda) is this right to get an in-CSR?
+  // This is a symmetric graph, so in-csr and out-csr are the same.
   CSRPtr csr = ig->GetInCSR();
   auto mat = csr->ToCSRMatrix();
 

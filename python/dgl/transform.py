@@ -600,6 +600,8 @@ def metis_partition(g, k, num_hops=1):
     a dict of DGLGraphs
         The key is the partition Id and the value is the DGLGraph of the partition.
     '''
+    # METIS works only on symmetric graphs.
+    g = to_bidirected(g, readonly=True)
     node_part = _CAPI_DGLMetisPartition(g._graph, k)
     if len(node_part) == 0:
         return None
