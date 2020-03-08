@@ -5,8 +5,6 @@ import os
 import random
 import torch
 
-from dgllife.data import USPTO
-
 def mkdir_p(path):
     """Create a folder for the given path.
     Parameters
@@ -54,26 +52,6 @@ def setup(args, seed=0):
     mkdir_p(args['result_path'])
 
     return args
-
-def load_data():
-    """Load and pre-process the dataset.
-
-    Construct DGLGraphs and featurize their nodes/edges.
-
-    Returns
-    -------
-    train_set
-        Training subset
-    val_set
-        Validation subset
-    test_set
-        Test subset
-    """
-    train_set = USPTO('train')
-    val_set = USPTO('val')
-    test_set = USPTO('test')
-
-    return train_set, val_set, test_set
 
 def collate(data):
     """Collate multiple datapoints
