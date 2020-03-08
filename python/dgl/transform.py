@@ -575,9 +575,12 @@ def partition_graph_with_halo(g, node_part, num_hops):
         subg_dict[i] = subg
     return subg_dict
 
-def metis_partition(g, k, num_hops=1):
+def metis_partition(g, k, extra_cached_hops=1):
     '''
     This is to partition a graph with Metis partitioning.
+
+    Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
+    to the partitions and their incoming edges.
 
     The partitioned graph is stored in DGLGraph. The DGLGraph has the `inner_node` node data
     that indicates whether a node is inside a partition and has the `inner_edge` edge data
@@ -592,7 +595,7 @@ def metis_partition(g, k, num_hops=1):
     k: int
         The number of partitions.
 
-    num_hops: int
+    extra_cached_hops: int
         The number of hops a HALO node can be accessed.
 
     Returns
@@ -607,7 +610,7 @@ def metis_partition(g, k, num_hops=1):
         return None
 
     node_part = utils.toindex(node_part)
-    parts = partition_graph_with_halo(g, node_part, num_hops)
+    parts = partition_graph_with_halo(g, node_part, extra_cached_hops)
     node_part = node_part.tousertensor()
     for part_id in parts:
         part = parts[part_id]

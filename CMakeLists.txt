@@ -86,6 +86,7 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
 
+# To compile METIS correct for DGL.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIDXTYPEWIDTH=64 -DREALTYPEWIDTH=32")
 
@@ -129,7 +130,7 @@ list(APPEND DGL_LINKER_LIBS dmlc)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 if(NOT MSVC)
-# For distributed
+# Compile METIS
 set(GKLIB_PATH "third_party/METIS/GKlib")
 include(${GKLIB_PATH}/GKlibSystem.cmake)
 include_directories(${GKLIB_PATH})

@@ -157,7 +157,7 @@ class GraphOp {
    * \param k The number of partitions.
    * \return The partition assignments of all vertices.
    */
-  static IdArray MetisPartition(GraphPtr graph, int k);
+  static IdArray MetisPartition(GraphPtr graph, int32_t k);
 };
 
 }  // namespace dgl
