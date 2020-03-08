@@ -10,7 +10,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
-from utils import setup, load_data, collate
+from utils import setup, collate
 
 def perform_prediction(device, model, mol_graphs, complete_graphs):
     node_feats = mol_graphs.ndata.pop('hv').to(device)
