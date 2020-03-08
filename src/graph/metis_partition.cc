@@ -6,6 +6,10 @@
 
 #include <metis.h>
 #include <dgl/graph_op.h>
+#include <dgl/packed_func_ext.h>
+#include "../c_api_common.h"
+
+using namespace dgl::runtime;
 
 namespace dgl {
 
@@ -19,11 +23,11 @@ IdArray GraphOp::MetisPartition(GraphPtr g, int k) {
   // This is a symmetric graph, so in-csr and out-csr are the same.
   const auto mat = ig->GetInCSR()->ToCSRMatrix();
 
-  const idx_t nvtxs = g->NumVertices();
-  const idx_t ncon = 1;        // # balacing constraints.
+  idx_t nvtxs = g->NumVertices();
+  idx_t ncon = 1;        // # balacing constraints.
   idx_t *xadj = static_cast<idx_t*>(mat.indptr->data);
   idx_t *adjncy = static_cast<idx_t*>(mat.indices->data);
-  const idx_t nparts = k;
+  idx_t nparts = k;
   IdArray part_arr = aten::NewIdArray(nvtxs);
   idx_t objval = 0;
   idx_t *part = static_cast<idx_t*>(part_arr->data);
