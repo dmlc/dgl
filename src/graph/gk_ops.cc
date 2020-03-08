@@ -4,7 +4,9 @@
  * \brief Graph operation implemented in GKlib
  */
 
+#if !defined(_WIN32)
 #include <GKlib.h>
+#endif  // !defined(_WIN32)
 
 #include <dgl/graph_op.h>
 
