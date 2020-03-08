@@ -35,8 +35,23 @@ CompactGraphs(
   std::vector<aten::IdHashMap<IdType>> hashmaps(graphs[0]->NumVertexTypes());
   std::vector<std::vector<EdgeArray>> all_edges(graphs.size());   // all_edges[i][etype]
 
+  int64_t max_vertex_cnt[graphs[0]->NumVertexTypes()] = {0};
+  for (size_t i = 0; i < graphs.size(); ++i) {
+    const HeteroGraphPtr curr_graph = graphs[i];
+    const int64_t num_vtypes = curr_graph->NumVertexTypes();
+    for (IdType vtype = 0; vtype < num_vtypes; ++vtype) {
+      max_vertex_cnt[vtype] += curr_graph->NumVertices(vtype);
+    }
+  }
+
+  for (size_t i = 0; i < graphs[0]->NumVertexTypes(); ++i) {
+    if (i < always_preserve.size())
+      hashmaps[i].Reserve(always_preserve[i]->shape[0] + max_vertex_cnt[i]);
+    else
+      hashmaps[i].Reserve(max_vertex_cnt[i]);
+  }
+
   for (size_t i = 0; i < always_preserve.size(); ++i) {
-    hashmaps[i].Reserve(always_preserve[i]->shape[0]);
     hashmaps[i].Update(always_preserve[i]);
   }
 
@@ -44,6 +59,7 @@ CompactGraphs(
     const HeteroGraphPtr curr_graph = graphs[i];
     const int64_t num_etypes = curr_graph->NumEdgeTypes();
 
+    all_edges[i].reserve(num_etypes);
     for (IdType etype = 0; etype < num_etypes; ++etype) {
       IdType srctype, dsttype;
       std::tie(srctype, dsttype) = curr_graph->GetEndpointTypes(etype);
