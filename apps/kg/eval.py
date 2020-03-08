@@ -33,11 +33,11 @@ class ArgParser(argparse.ArgumentParser):
                           help='the format of the dataset.')
         self.add_argument('--model_path', type=str, default='ckpts',
                           help='the place where models are saved')
-        self.add_argument('--batch_size', type=int, default=8,
+        self.add_argument('--batch_size_eval', type=int, default=8,
                           help='batch size used for eval and test')
-        self.add_argument('--neg_sample_size', type=int, default=-1,
+        self.add_argument('--neg_sample_size_test', type=int, default=-1,
                           help='negative sampling size for testing')
-        self.add_argument('--neg_deg_sample', action='store_true',
+        self.add_argument('--neg_deg_sample_eval', action='store_true',
                           help='negative sampling proportional to vertex degree for testing')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
@@ -94,31 +94,28 @@ def main(args):
     args.strict_rel_part = False
     args.soft_rel_part = False
     args.async_update = False
-    args.batch_size_eval = args.batch_size
 
     logger = get_logger(args)
     # Here we want to use the regualr negative sampler because we need to ensure that
     # all positive edges are excluded.
     eval_dataset = EvalDataset(dataset, args)
 
-    args.neg_sample_size_test = args.neg_sample_size
-    args.neg_deg_sample_eval = args.neg_deg_sample
-    if args.neg_sample_size < 0:
+    if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
 
     test_sampler_tails = []
     test_sampler_heads = []
     for i in range(args.num_proc):
-        test_sampler_head = eval_dataset.create_sampler('test', args.batch_size,
-                                                        args.neg_sample_size,
-                                                        args.neg_sample_size,
+        test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                        args.neg_sample_size_test,
+                                                        args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-head',
                                                         num_workers=1,
                                                         rank=i, ranks=args.num_proc)
-        test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size,
-                                                        args.neg_sample_size,
-                                                        args.neg_sample_size,
+        test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                        args.neg_sample_size_test,
+                                                        args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-tail',
                                                         num_workers=1,
