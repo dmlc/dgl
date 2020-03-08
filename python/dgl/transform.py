@@ -582,9 +582,7 @@ def metis_partition(g, k, extra_cached_hops=1):
     Metis assigns vertices to partitions. This API constructs graphs with the vertices assigned
     to the partitions and their incoming edges.
 
-    The partitioned graph is stored in DGLGraph. The DGLGraph has the `inner_node` node data
-    that indicates whether a node is inside a partition and has the `inner_edge` edge data
-    that indicates whether an edge is inside a partition. In addition, it has the `part_id`
+    The partitioned graph is stored in DGLGraph. The DGLGraph has the `part_id`
     node data that indicates the partition a node belongs to.
 
     Parameters
