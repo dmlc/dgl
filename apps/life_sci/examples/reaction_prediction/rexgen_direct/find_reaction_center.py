@@ -57,6 +57,7 @@ def main(args):
         model.train()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
+            print(total_iter)
             if total_iter >= 3:
                 t0 = time.time()
 
@@ -79,7 +80,7 @@ def main(args):
 
             eval(batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
 
-            if total_iter % args['print_every']:
+            if total_iter % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/epoch {:.4f} | ' \
                            'loss {:.4f} | grad norm {:.4f} |'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
@@ -92,7 +93,7 @@ def main(args):
                 loss_sum = 0
                 print(progress)
 
-            if total_iter % args['decay_every']:
+            if total_iter % args['decay_every'] == 0:
                 torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
 
 if __name__ == '__main__':
