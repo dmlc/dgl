@@ -139,6 +139,7 @@ class GraphOp {
    * \return a new immutable bidirected graph.
    */
   static GraphPtr ToBidirectedImmutableGraph(GraphPtr graph);
+  static GraphPtr ToBidirectedSimpleImmutableGraph(ImmutableGraphPtr ig);
 
   /*!
    * \brief Get a induced subgraph with HALO nodes.

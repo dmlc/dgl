@@ -645,7 +645,13 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphRef g = args[0];
-    *rv = GraphOp::ToBidirectedImmutableGraph(g.sptr());
+    auto gptr = g.sptr();
+    auto immutable_g = std::dynamic_pointer_cast<ImmutableGraph>(gptr);
+    if (immutable_g == NULL || gptr->IsMultigraph()) {
+      *rv = GraphOp::ToBidirectedImmutableGraph(gptr);
+    } else {
+      *rv = GraphOp::ToBidirectedSimpleImmutableGraph(immutable_g);
+    }
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
