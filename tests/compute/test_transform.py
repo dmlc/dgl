@@ -235,7 +235,20 @@ def test_partition_with_halo():
 @unittest.skipIf(F._default_context_str == 'gpu', reason="METIS doesn't support GPU")
 def test_metis_partition():
     g = dgl.DGLGraph(create_large_graph_index(1000), readonly=True)
-    subgs = dgl.transform.metis_partition(g, 4)
+    subgs = dgl.transform.metis_partition(g, 4, 0)
+    num_inner_nodes = 0
+    num_inner_edges = 0
+    if subgs is not None:
+        for part_id, subg in subgs.items():
+            assert np.all(F.asnumpy(subg.ndata['inner_node']) == 1)
+            assert np.all(F.asnumpy(subg.edata['inner_edge']) == 1)
+            assert np.all(F.asnumpy(subg.ndata['part_id']) == part_id)
+            num_inner_nodes += subg.number_of_nodes()
+            num_inner_edges += subg.number_of_edges()
+        assert num_inner_nodes == g.number_of_nodes()
+        print(g.number_of_edges() - num_inner_edges)
+
+    subgs = dgl.transform.metis_partition(g, 4, 1)
     num_inner_nodes = 0
     num_inner_edges = 0
     if subgs is not None:
