@@ -342,8 +342,11 @@ def to_bidirected(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
-    If g has m edges for i->j and n edges for j->i, then the
-    returned graph will have max(m, n) edges for both i->j and j->i.
+    If g has an edge for i->j but no edge for j->i, then the
+    returned graph will have both i->j and j->i.
+
+    If the input graph is a multigraph (there are multiple edges from node i to node j),
+    the returned graph isn't well defined.
 
     Parameters
     ----------
@@ -361,22 +364,12 @@ def to_bidirected(g, readonly=True):
     The following two examples use PyTorch backend, one for non-multi graph
     and one for multi-graph.
 
-    >>> # non-multi graph
     >>> g = dgl.DGLGraph()
     >>> g.add_nodes(2)
     >>> g.add_edges([0, 0], [0, 1])
     >>> bg1 = dgl.to_bidirected(g)
     >>> bg1.edges()
     (tensor([0, 1, 0]), tensor([0, 0, 1]))
-
-    >>> # multi-graph
-    >>> g.add_edges([0, 1], [1, 0])
-    >>> g.edges()
-    (tensor([0, 0, 0, 1]), tensor([0, 1, 1, 0]))
-
-    >>> bg2 = dgl.to_bidirected(g)
-    >>> bg2.edges()
-    (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
     """
     if readonly:
         newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
