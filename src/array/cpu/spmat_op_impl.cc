@@ -186,7 +186,7 @@ NDArray CSRGetData(CSRMatrix csr, int64_t row, int64_t col) {
       }
     }
   }
-  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t>(CSRMatrix, int64_t, int64_t);
@@ -228,7 +228,7 @@ NDArray CSRGetData(CSRMatrix csr, NDArray rows, NDArray cols) {
     }
   }
 
-  return NDArray::FromVector(ret_vec, csr.data->dtype, csr.data->ctx);
+  return NDArray::FromVector(ret_vec, csr.data->ctx);
 }
 
 template NDArray CSRGetData<kDLCPU, int32_t>(CSRMatrix csr, NDArray rows, NDArray cols);
@@ -306,9 +306,9 @@ std::vector<NDArray> CSRGetDataAndIndices(CSRMatrix csr, NDArray rows, NDArray c
     }
   }
 
-  return {NDArray::FromVector(ret_rows, csr.indptr->dtype, csr.indptr->ctx),
-          NDArray::FromVector(ret_cols, csr.indptr->dtype, csr.indptr->ctx),
-          NDArray::FromVector(ret_data, csr.data->dtype, csr.data->ctx)};
+  return {NDArray::FromVector(ret_rows, csr.indptr->ctx),
+          NDArray::FromVector(ret_cols, csr.indptr->ctx),
+          NDArray::FromVector(ret_data, csr.data->ctx)};
 }
 
 template std::vector<NDArray> CSRGetDataAndIndices<kDLCPU, int32_t>(
@@ -536,8 +536,8 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
   IdType* ptr = static_cast<IdType*>(sub_data_arr->data);
   std::copy(sub_data.begin(), sub_data.end(), ptr);
   return CSRMatrix{new_nrows, new_ncols,
-    NDArray::FromVector(sub_indptr, csr.indptr->dtype, csr.indptr->ctx),
-    NDArray::FromVector(sub_indices, csr.indptr->dtype, csr.indptr->ctx),
+    NDArray::FromVector(sub_indptr, csr.indptr->ctx),
+    NDArray::FromVector(sub_indices, csr.indptr->ctx),
     sub_data_arr};
 }
 

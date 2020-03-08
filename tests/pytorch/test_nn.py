@@ -402,6 +402,15 @@ def test_sage_conv():
         h = sage(g, feat)
         assert h.shape[-1] == 10
 
+        g = dgl.bipartite(sp.sparse.random(100, 200, density=0.1))
+        dst_dim = 5 if aggre_type != 'gcn' else 10
+        sage = nn.SAGEConv((10, dst_dim), 2, aggre_type)
+        feat = (F.randn((100, 10)), F.randn((200, dst_dim)))
+        sage = sage.to(ctx)
+        h = sage(g, feat)
+        assert h.shape[-1] == 2
+        assert h.shape[0] == 200
+
 def test_sgc_conv():
     ctx = F.ctx()
     g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)

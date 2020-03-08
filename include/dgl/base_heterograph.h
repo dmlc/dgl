@@ -125,6 +125,12 @@ class BaseHeteroGraph : public runtime::Object {
   /*! \return the number of vertices in the graph.*/
   virtual uint64_t NumVertices(dgl_type_t vtype) const = 0;
 
+  /*! \return the number of vertices for each type in the graph as a vector */
+  inline virtual std::vector<int64_t> NumVerticesPerType() const {
+    LOG(FATAL) << "[BUG] NumVerticesPerType() not supported on this object.";
+    return {};
+  }
+
   /*! \return the number of edges in the graph.*/
   virtual uint64_t NumEdges(dgl_type_t etype) const = 0;
 
@@ -543,9 +549,14 @@ DGL_DEFINE_OBJECT_REF(FlattenedHeteroGraphRef, FlattenedHeteroGraph);
 
 // Declarations of functions and algorithms
 
-/*! \brief Create a heterograph from meta graph and a list of bipartite graph */
+/*!
+ * \brief Create a heterograph from meta graph and a list of bipartite graph,
+ * additionally specifying number of nodes per type.
+ */
 HeteroGraphPtr CreateHeteroGraph(
-    GraphPtr meta_graph, const std::vector<HeteroGraphPtr>& rel_graphs);
+    GraphPtr meta_graph,
+    const std::vector<HeteroGraphPtr> &rel_graphs,
+    const std::vector<int64_t> &num_nodes_per_type = {});
 
 /*!
  * \brief Create a heterograph from COO input.
@@ -559,7 +570,18 @@ HeteroGraphPtr CreateHeteroGraph(
  */
 HeteroGraphPtr CreateFromCOO(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
-    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::ANY);
+    IdArray row, IdArray col, SparseFormat restrict_format = SparseFormat::kAny);
+
+/*!
+ * \brief Create a heterograph from COO input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param mat The COO matrix
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCOO(
+    int64_t num_vtypes, const aten::COOMatrix& mat,
+    SparseFormat restrict_format = SparseFormat::kAny);
 
 /*!
  * \brief Create a heterograph from CSR input.
@@ -575,7 +597,45 @@ HeteroGraphPtr CreateFromCOO(
 HeteroGraphPtr CreateFromCSR(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst,
     IdArray indptr, IdArray indices, IdArray edge_ids,
-    SparseFormat restrict_format = SparseFormat::ANY);
+    SparseFormat restrict_format = SparseFormat::kAny);
+
+/*!
+ * \brief Create a heterograph from CSR input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param mat The CSR matrix
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCSR(
+    int64_t num_vtypes, const aten::CSRMatrix& mat,
+    SparseFormat restrict_format = SparseFormat::kAny);
+
+/*!
+ * \brief Create a heterograph from CSC input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param num_src Number of nodes in the source type.
+ * \param num_dst Number of nodes in the destination type.
+ * \param indptr Indptr array
+ * \param indices Indices array
+ * \param edge_ids Edge ids
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCSC(
+    int64_t num_vtypes, int64_t num_src, int64_t num_dst,
+    IdArray indptr, IdArray indices, IdArray edge_ids,
+    SparseFormat restrict_format = SparseFormat::kAny);
+
+/*!
+ * \brief Create a heterograph from CSC input.
+ * \param num_vtypes Number of vertex types. Must be 1 or 2.
+ * \param mat The CSC matrix
+ * \param restrict_format Sparse format for storing this graph.
+ * \return A heterograph pointer.
+ */
+HeteroGraphPtr CreateFromCSC(
+    int64_t num_vtypes, const aten::CSRMatrix& mat,
+    SparseFormat restrict_format = SparseFormat::kAny);
 
 /*!
  * \brief Extract the subgraph of the in edges of the given nodes.
@@ -650,6 +710,9 @@ std::vector<HeteroGraphPtr> DisjointPartitionHeteroBySizes(
 struct HeteroPickleStates : public runtime::Object {
   /*! \brief Metagraph. */
   GraphPtr metagraph;
+
+  /*! \brief Number of nodes per type */
+  std::vector<int64_t> num_nodes_per_type;
 
   /*! \brief adjacency matrices of each relation graph */
   std::vector<std::shared_ptr<SparseMatrix> > adjs;

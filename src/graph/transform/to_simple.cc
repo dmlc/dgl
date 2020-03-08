@@ -71,7 +71,8 @@ ToSimpleGraph(const HeteroGraphPtr graph) {
         coalesced_adj.col);
   }
 
-  const HeteroGraphPtr result = CreateHeteroGraph(metagraph, rel_graphs);
+  const HeteroGraphPtr result = CreateHeteroGraph(
+      metagraph, rel_graphs, graph->NumVerticesPerType());
 
   return std::make_tuple(result, counts, edge_maps);
 }
