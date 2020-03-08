@@ -32,11 +32,34 @@ def eval(complete_graphs, preds, labels, num_correct):
             num_correct[k].append(is_correct)
         start = end
 
+def eval_on_a_loader(args, model, data_loader):
+    model.eval()
+    num_correct = {k: [] for k in args['top_ks']}
+    for batch_id, batch_data in enumerate(data_loader):
+        batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
+        batch_complete_graphs, batch_atom_pair_labels = batch_data
+        with torch.no_grad():
+            pred, biased_pred = perform_prediction(
+                args['device'], model, batch_mol_graphs, batch_complete_graphs)
+        eval(batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
+
+    msg = '|'
+    for k, correct_count in num_correct.items():
+        msg += ' acc@{:d} {:.4f} |'.format(k, np.mean(correct_count))
+
+    return msg
+
 def main(args):
     setup(args)
     train_set = USPTO('train')
+    val_set = USPTO('valid')
+    test_set = USPTO('test')
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
-                              collate_fn=collate, shuffle=True)
+                              collate_fn=collate)
+    val_loader = DataLoader(val_set, batch_size=args['batch_size'],
+                              collate_fn=collate)
+    test_loader = DataLoader(test_set, batch_size=args['batch_size'],
+                             collate_fn=collate)
 
     model = WLNReactionCenter(node_in_feats=args['node_in_feats'],
                               edge_in_feats=args['edge_in_feats'],
@@ -94,6 +117,12 @@ def main(args):
 
             if total_iter % args['decay_every'] == 0:
                 torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
+
+        print('Epoch {:d}/{:d}, validation ' + eval_on_a_loader(args, model, val_loader))
+
+    test_result = eval_on_a_loader(args, model, test_loader)
+    with open(args['result_path'] + '/results.txt', 'w') as f:
+        f.write(test_result)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
