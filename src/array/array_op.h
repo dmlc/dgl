@@ -113,6 +113,9 @@ CSRMatrix CSRSliceMatrix(CSRMatrix csr, runtime::NDArray rows, runtime::NDArray 
 template <DLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);
 
+template <DLDeviceType XPU, typename IdType>
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
+
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>
 COOMatrix CSRRowWiseSampling(
@@ -175,6 +178,9 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
 
 template <DLDeviceType XPU, typename IdType>
 COOMatrix COOSort(COOMatrix mat, bool sort_column);
+
+template <DLDeviceType XPU, typename IdType>
+COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 // FloatType is the type of probability data.
 template <DLDeviceType XPU, typename IdType, typename FloatType>

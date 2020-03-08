@@ -434,6 +434,14 @@ void CSRSort_(CSRMatrix* csr) {
   });
 }
 
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
+  CSRMatrix ret;
+  ATEN_CSR_SWITCH(csr, XPU, IdType, {
+    ret = impl::CSRRemove<XPU, IdType>(csr, entries);
+  });
+  return ret;
+}
+
 COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob, bool replace) {
   COOMatrix ret;
@@ -573,6 +581,14 @@ COOMatrix COOSort(COOMatrix mat, bool sort_column) {
   COOMatrix ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, {
     ret = impl::COOSort<XPU, IdType>(mat, sort_column);
+  });
+  return ret;
+}
+
+COOMatrix COORemove(COOMatrix coo, IdArray entries) {
+  COOMatrix ret;
+  ATEN_COO_SWITCH(coo, XPU, IdType, {
+    ret = impl::COORemove<XPU, IdType>(coo, entries);
   });
   return ret;
 }

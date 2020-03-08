@@ -1,7 +1,6 @@
 """MPNN"""
 import torch.nn as nn
 
-from dgl import BatchedDGLGraph
 from dgl.nn.pytorch import Set2Set
 
 from ..gnn import MPNNGNN
@@ -77,6 +76,4 @@ class MPNNPredictor(nn.Module):
         """
         node_feats = self.gnn(g, node_feats, edge_feats)
         graph_feats = self.readout(g, node_feats)
-        if not isinstance(g, BatchedDGLGraph):
-            graph_feats = graph_feats.unsqueeze(0)
         return self.predict(graph_feats)

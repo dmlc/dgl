@@ -1,16 +1,12 @@
 """Dataset for stochastic block model."""
 import math
-import os
-import pickle
 import random
 
 import numpy as np
 import numpy.random as npr
 import scipy as sp
-import networkx as nx
 
-from ..batched_graph import batch
-from ..graph import DGLGraph
+from ..graph import DGLGraph, batch
 from ..utils import Index
 
 def sbm(n_blocks, block_size, p, q, rng=None):
