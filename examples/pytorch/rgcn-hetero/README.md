@@ -34,7 +34,7 @@ Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 
 ### Entity Classification
 
-(all experiments use one-hot encoding as featureless input)
+All experiments use one-hot encoding as featureless input. Best accuracy reported.
 
 AIFB: accuracy 97.22% (DGL), 95.83% (paper)
 ```
