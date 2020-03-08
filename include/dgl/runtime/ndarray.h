@@ -14,8 +14,45 @@
 #include "serializer.h"
 #include "shared_mem.h"
 
+/*! \brief Check whether two data types are the same.*/
+inline bool operator == (const DLDataType& ty1, const DLDataType& ty2) {
+  return ty1.code == ty2.code && ty1.bits == ty2.bits && ty1.lanes == ty2.lanes;
+}
+
+/*! \brief Check whether two device contexts are the same.*/
+inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
+  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
+}
+
 namespace dgl {
+
+/*!
+ * \brief Type traits that converts a C type to a DLDataType.
+ *
+ * Usage:
+ * DLDataTypeTraits<int>::dtype == dtype
+ */
+template<typename T>
+struct DLDataTypeTraits {
+  static constexpr DLDataType dtype{0, 0, 0};   // dummy
+};
+#define GEN_DLDATATYPETRAITS_FOR(T, code, bits) \
+  template<> \
+  struct DLDataTypeTraits<T> { \
+    static constexpr DLDataType dtype{code, bits, 1}; \
+  }
+GEN_DLDATATYPETRAITS_FOR(int32_t, kDLInt, 32);
+GEN_DLDATATYPETRAITS_FOR(int64_t, kDLInt, 64);
+// XXX(BarclayII) most DL frameworks do not support unsigned int and long arrays, so I'm just
+// converting uints to signed DTypes.
+GEN_DLDATATYPETRAITS_FOR(uint32_t, kDLInt, 32);
+GEN_DLDATATYPETRAITS_FOR(uint64_t, kDLInt, 64);
+GEN_DLDATATYPETRAITS_FOR(float, kDLFloat, 32);
+GEN_DLDATATYPETRAITS_FOR(double, kDLFloat, 64);
+#undef GEN_DLDATATYPETRAITS_FOR
+
 namespace runtime {
+
 /*!
  * \brief Managed NDArray.
  *  The array is backed by reference counted blocks.
@@ -191,8 +228,14 @@ class NDArray {
   DGL_DLL static NDArray FromVector(
       const std::vector<T>& vec, DLContext ctx = DLContext{kDLCPU, 0});
 
+  /*!
+   * \brief Create a std::vector from a 1D NDArray.
+   * \tparam T Type of vector data.
+   * \note Type casting is NOT performed.  The caller has to make sure that the vector
+   *       type matches the dtype of NDArray.
+   */
   template<typename T>
-  static NDArray FromVector(const std::vector<T>& vec, DLDataType dtype, DLContext ctx);
+  std::vector<T> ToVector() const;
 
   /*!
    * \brief Function to copy data from one array to another.

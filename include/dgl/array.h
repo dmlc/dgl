@@ -38,22 +38,22 @@ typedef NDArray TypeArray;
  * \brief Sparse format.
  */
 enum class SparseFormat {
-  ANY = 0,
-  COO = 1,
-  CSR = 2,
-  CSC = 3
+  kAny = 0,
+  kCOO = 1,
+  kCSR = 2,
+  kCSC = 3
 };
 
 // Parse sparse format from string.
 inline SparseFormat ParseSparseFormat(const std::string& name) {
   if (name == "coo")
-    return SparseFormat::COO;
+    return SparseFormat::kCOO;
   else if (name == "csr")
-    return SparseFormat::CSR;
+    return SparseFormat::kCSR;
   else if (name == "csc")
-    return SparseFormat::CSC;
+    return SparseFormat::kCSC;
   else
-    return SparseFormat::ANY;
+    return SparseFormat::kAny;
 }
 
 // Sparse matrix object that is exposed to python API.
@@ -328,7 +328,7 @@ struct CSRMatrix {
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
-    return SparseMatrix(static_cast<int32_t>(SparseFormat::CSR), num_rows,
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCSR), num_rows,
                         num_cols, {indptr, indices, data}, {sorted});
   }
 
@@ -408,7 +408,7 @@ struct COOMatrix {
 
   // Convert to a SparseMatrix object that can return to python.
   SparseMatrix ToSparseMatrix() const {
-    return SparseMatrix(static_cast<int32_t>(SparseFormat::COO), num_rows,
+    return SparseMatrix(static_cast<int32_t>(SparseFormat::kCOO), num_rows,
                         num_cols, {row, col, data}, {row_sorted, col_sorted});
   }
 
@@ -547,6 +547,13 @@ bool CSRHasDuplicate(CSRMatrix csr);
  * indices = [0, 1, 1, 2, 3]
  */
 void CSRSort_(CSRMatrix* csr);
+
+/*!
+ * \brief Remove entries from CSR matrix by entry indices (data indices)
+ * \return A new CSR matrix as well as a mapping from the new CSR entries to the old CSR
+ *         entries.
+ */
+CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
@@ -722,6 +729,13 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo);
  * \return COO matrix with index sorted.
  */
 COOMatrix COOSort(COOMatrix mat, bool sort_column = false);
+
+/*!
+ * \brief Remove entries from COO matrix by entry indices (data indices)
+ * \return A new COO matrix as well as a mapping from the new COO entries to the old COO
+ *         entries.
+ */
+COOMatrix COORemove(COOMatrix coo, IdArray entries);
 
 /*!
  * \brief Randomly select a fixed number of non-zero entries along each given row independently.
