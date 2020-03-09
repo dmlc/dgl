@@ -104,25 +104,41 @@ def main(args):
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
 
     args.num_workers = 8 # fix num_workers to 8
-    test_sampler_tails = []
-    test_sampler_heads = []
-    for i in range(args.num_proc):
+    if args.num_proc > 1:
+        test_sampler_tails = []
+        test_sampler_heads = []
+        for i in range(args.num_proc):
+            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_test,
+                                                            args.eval_filter,
+                                                            mode='chunk-head',
+                                                            num_workers=args.num_workers,
+                                                            rank=i, ranks=args.num_proc)
+            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_test,
+                                                            args.eval_filter,
+                                                            mode='chunk-tail',
+                                                            num_workers=args.num_workers,
+                                                            rank=i, ranks=args.num_proc)
+            test_sampler_heads.append(test_sampler_head)
+            test_sampler_tails.append(test_sampler_tail)
+    else:
         test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                         args.neg_sample_size_test,
                                                         args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-head',
                                                         num_workers=args.num_workers,
-                                                        rank=i, ranks=args.num_proc)
+                                                        rank=0, ranks=1)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                         args.neg_sample_size_test,
                                                         args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-tail',
                                                         num_workers=args.num_workers,
-                                                        rank=i, ranks=args.num_proc)
-        test_sampler_heads.append(test_sampler_head)
-        test_sampler_tails.append(test_sampler_tail)
+                                                        rank=0, ranks=1)
 
     # load model
     n_entities = dataset.n_entities
@@ -130,38 +146,41 @@ def main(args):
     ckpt_path = args.model_path
     model = load_model_from_checkpoint(logger, args, n_entities, n_relations, ckpt_path)
 
-    model.share_memory()
+    if args.num_proc > 1:
+        model.share_memory()
     # test
     args.step = 0
     args.max_step = 0
     start = time.time()
-    #if args.num_proc > 1:
-    queue = mp.Queue(args.num_proc)
-    procs = []
-    for i in range(args.num_proc):
-        proc = mp.Process(target=test_mp, args=(args,
-                                                model,
-                                                [test_sampler_heads[i], test_sampler_tails[i]],
-                                                i,
-                                                'Test',
-                                                queue))
-        procs.append(proc)
-        proc.start()
+    if args.num_proc > 1:
+        queue = mp.Queue(args.num_proc)
+        procs = []
+        for i in range(args.num_proc):
+            proc = mp.Process(target=test_mp, args=(args,
+                                                    model,
+                                                    [test_sampler_heads[i], test_sampler_tails[i]],
+                                                    i,
+                                                    'Test',
+                                                    queue))
+            procs.append(proc)
+            proc.start()
 
-    total_metrics = {}
-    metrics = {}
-    logs = []
-    for i in range(args.num_proc):
-        log = queue.get()
-        logs = logs + log
+        total_metrics = {}
+        metrics = {}
+        logs = []
+        for i in range(args.num_proc):
+            log = queue.get()
+            logs = logs + log
 
-    for metric in logs[0].keys():
-        metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-    for k, v in metrics.items():
-        print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+        for k, v in metrics.items():
+            print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
 
-    for proc in procs:
-        proc.join()
+        for proc in procs:
+            proc.join()
+    else:
+        test(args, model, [test_sampler_head, test_sampler_tail])
 
     print('Test takes {:.3f} seconds'.format(time.time() - start))
 

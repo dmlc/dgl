@@ -144,33 +144,52 @@ def run(args, logger):
     # if there is no cross partition relaiton, we fall back to strict_rel_part
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
-
     args.num_workers = 8 # fix num_worker to 8
-    train_samplers = []
-    for i in range(args.num_proc):
+
+    if args.num_proc > 1:
+        train_samplers = []
+        for i in range(args.num_proc):
+            train_sampler_head = train_data.create_sampler(args.batch_size,
+                                                           args.neg_sample_size,
+                                                           args.neg_sample_size,
+                                                           mode='head',
+                                                           num_workers=args.num_workers,
+                                                           shuffle=True,
+                                                           exclude_positive=False,
+                                                           rank=i)
+            train_sampler_tail = train_data.create_sampler(args.batch_size,
+                                                           args.neg_sample_size,
+                                                           args.neg_sample_size,
+                                                           mode='tail',
+                                                           num_workers=arg.num_workers,
+                                                           shuffle=True,
+                                                           exclude_positive=False,
+                                                           rank=i)
+            train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                                  args.neg_sample_size, args.neg_sample_size,
+                                                                  True, dataset.n_entities))
+
+        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                        args.neg_sample_size, args.neg_sample_size,
+                                                       True, dataset.n_entities)
+    else: # This is used for debug
         train_sampler_head = train_data.create_sampler(args.batch_size,
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='head',
                                                        num_workers=args.num_workers,
                                                        shuffle=True,
-                                                       exclude_positive=False,
-                                                       rank=i)
+                                                       exclude_positive=False)
         train_sampler_tail = train_data.create_sampler(args.batch_size,
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='tail',
-                                                       num_workers=arg.num_workers,
+                                                       num_workers=args.num_workers,
                                                        shuffle=True,
-                                                       exclude_positive=False,
-                                                       rank=i)
-        train_samplers.append(NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                              args.neg_sample_size, args.neg_sample_size,
-                                                              True, dataset.n_entities))
-
-    train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
-                                                    args.neg_sample_size, args.neg_sample_size,
-                                                    True, dataset.n_entities)
+                                                       exclude_positive=False)
+        train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
+                                                        args.neg_chunk_size, args.neg_sample_size,
+                                                        True, n_entities)
 
 
     if args.valid or args.test:
@@ -179,51 +198,86 @@ def run(args, logger):
         else:
             args.num_test_proc = args.num_proc
         eval_dataset = EvalDataset(dataset, args)
+
     if args.valid:
-        valid_sampler_heads = []
-        valid_sampler_tails = []
-        for i in range(args.num_proc):
+        if args.num_proc > 1:
+            valid_sampler_heads = []
+            valid_sampler_tails = []
+            for i in range(args.num_proc):
+                valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
+                                                                  args.neg_sample_size_valid,
+                                                                  args.neg_sample_size_valid,
+                                                                  args.eval_filter,
+                                                                  mode='chunk-head',
+                                                                  num_workers=args.num_workers,
+                                                                  rank=i, ranks=args.num_proc)
+                valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
+                                                                  args.neg_sample_size_valid,
+                                                                  args.neg_sample_size_valid,
+                                                                  args.eval_filter,
+                                                                  mode='chunk-tail',
+                                                                  num_workers=args.num_workers,
+                                                                  rank=i, ranks=args.num_proc)
+                valid_sampler_heads.append(valid_sampler_head)
+                valid_sampler_tails.append(valid_sampler_tail)
+        else: # This is used for debug
             valid_sampler_head = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                              args.neg_sample_size_valid,
-                                                              args.neg_sample_size_valid,
-                                                              args.eval_filter,
-                                                              mode='chunk-head',
-                                                              num_workers=args.num_workers,
-                                                              rank=i, ranks=args.num_proc)
-            valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
-                                                              args.neg_sample_size_valid,
-                                                              args.neg_sample_size_valid,
-                                                              args.eval_filter,
-                                                              mode='chunk-tail',
-                                                              num_workers=args.num_workers,
-                                                              rank=i, ranks=args.num_proc)
-            valid_sampler_heads.append(valid_sampler_head)
-            valid_sampler_tails.append(valid_sampler_tail)
-    if args.test:
-        test_sampler_tails = []
-        test_sampler_heads = []
-        for i in range(args.num_test_proc):
-            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                             args.neg_sample_size_test,
-                                                             args.neg_sample_size_test,
+                                                             args.neg_sample_size_valid,
+                                                             args.neg_sample_size_valid,
                                                              args.eval_filter,
                                                              mode='chunk-head',
                                                              num_workers=args.num_workers,
-                                                             rank=i, ranks=args.num_test_proc)
-            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
-                                                             args.neg_sample_size_test,
-                                                             args.neg_sample_size_test,
+                                                             rank=0, ranks=1)
+            valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
+                                                             args.neg_sample_size_valid,
+                                                             args.neg_sample_size_valid,
                                                              args.eval_filter,
                                                              mode='chunk-tail',
                                                              num_workers=args.num_workers,
-                                                             rank=i, ranks=args.num_test_proc)
-            test_sampler_heads.append(test_sampler_head)
-            test_sampler_tails.append(test_sampler_tail)
+                                                             rank=0, ranks=1)
+    if args.test:
+        if args.num_test_proc > 1:
+            test_sampler_tails = []
+            test_sampler_heads = []
+            for i in range(args.num_test_proc):
+                test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                 args.neg_sample_size_test,
+                                                                 args.neg_sample_size_test,
+                                                                 args.eval_filter,
+                                                                 mode='chunk-head',
+                                                                 num_workers=args.num_workers,
+                                                                 rank=i, ranks=args.num_test_proc)
+                test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                                 args.neg_sample_size_test,
+                                                                 args.neg_sample_size_test,
+                                                                 args.eval_filter,
+                                                                 mode='chunk-tail',
+                                                                 num_workers=args.num_workers,
+                                                                 rank=i, ranks=args.num_test_proc)
+                test_sampler_heads.append(test_sampler_head)
+                test_sampler_tails.append(test_sampler_tail)
+        else:
+            test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_test,
+                                                            args.eval_filter,
+                                                            mode='chunk-head',
+                                                            num_workers=args.num_workers,
+                                                            rank=0, ranks=1)
+            test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
+                                                            args.neg_sample_size_test,
+                                                            args.neg_sample_size_test,
+                                                            args.eval_filter,
+                                                            mode='chunk-tail',
+                                                            num_workers=args.num_workers,
+                                                            rank=0, ranks=1)
 
     # load model
     model = load_model(logger, args, dataset.n_entities, dataset.n_relations)
-    model.share_memory()
+    if args.num_proc > 1 or args.async_update:
+        model.share_memory()
 
+    # We need to free all memory referenced by dataset.
     eval_dataset = None
     dataset = None
 
@@ -233,22 +287,26 @@ def run(args, logger):
     start = time.time()
     rel_parts = train_data.rel_parts if args.strict_rel_part or args.soft_rel_part else None
     cross_rels = train_data.cross_rels if args.soft_rel_part else None
-    procs = []
-    barrier = mp.Barrier(args.num_proc)
-    for i in range(args.num_proc):
-        valid_sampler = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
-        proc = mp.Process(target=train_mp, args=(args,
-                                                 model,
-                                                 train_samplers[i],
-                                                 valid_sampler,
-                                                 i,
-                                                 rel_parts,
-                                                 cross_rels,
-                                                 barrier))
-        procs.append(proc)
-        proc.start()
-    for proc in procs:
-        proc.join()
+    if args.num_proc > 1:
+        procs = []
+        barrier = mp.Barrier(args.num_proc)
+        for i in range(args.num_proc):
+            valid_sampler = [valid_sampler_heads[i], valid_sampler_tails[i]] if args.valid else None
+            proc = mp.Process(target=train_mp, args=(args,
+                                                     model,
+                                                     train_samplers[i],
+                                                     valid_sampler,
+                                                     i,
+                                                     rel_parts,
+                                                     cross_rels,
+                                                     barrier))
+            procs.append(proc)
+            proc.start()
+        for proc in procs:
+            proc.join()
+    else:
+        valid_samplers = [valid_sampler_head, valid_sampler_tail] if args.valid else None
+        train(args, model, train_sampler, valid_samplers, rel_parts=rel_parts)
 
     print('training takes {} seconds'.format(time.time() - start))
 
@@ -257,7 +315,7 @@ def run(args, logger):
         model.save_emb(args.save_path, args.dataset)
 
         # We need to save the model configurations as well.
-        conf_file = os.path.join(args.save_emb, 'config.json')
+        conf_file = os.path.join(args.save_path, 'config.json')
         with open(conf_file, 'w') as outfile:
             json.dump({'dataset': args.dataset,
                        'model': args.model_name,
@@ -278,32 +336,36 @@ def run(args, logger):
     # test
     if args.test:
         start = time.time()
-        queue = mp.Queue(args.num_test_proc)
-        procs = []
-        for i in range(args.num_test_proc):
-            proc = mp.Process(target=test_mp, args=(args,
-                                                    model,
-                                                    [test_sampler_heads[i], test_sampler_tails[i]],
-                                                    i,
-                                                    'Test',
-                                                    queue))
-            procs.append(proc)
-            proc.start()
+        if args.num_test_proc > 1:
+            queue = mp.Queue(args.num_test_proc)
+            procs = []
+            for i in range(args.num_test_proc):
+                proc = mp.Process(target=test_mp, args=(args,
+                                                        model,
+                                                        [test_sampler_heads[i], test_sampler_tails[i]],
+                                                        i,
+                                                        'Test',
+                                                        queue))
+                procs.append(proc)
+                proc.start()
 
-        total_metrics = {}
-        metrics = {}
-        logs = []
-        for i in range(args.num_test_proc):
-            log = queue.get()
-            logs = logs + log
+            total_metrics = {}
+            metrics = {}
+            logs = []
+            for i in range(args.num_test_proc):
+                log = queue.get()
+                logs = logs + log
             
-        for metric in logs[0].keys():
-            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-        for k, v in metrics.items():
-            print('Test average {} : {}'.format(k, v))
+            for metric in logs[0].keys():
+                metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+            for k, v in metrics.items():
+                print('Test average {} : {}'.format(k, v))
 
-        for proc in procs:
-            proc.join()
+            for proc in procs:
+                proc.join()
+        else:
+            test(args, model, [test_sampler_head, test_sampler_tail])
+            
         print('test:', time.time() - start)
 
 if __name__ == '__main__':
