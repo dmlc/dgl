@@ -48,8 +48,9 @@ class ArgParser(argparse.ArgumentParser):
                           help='root path of all dataset')
         self.add_argument('--dataset', type=str, default='FB15k',
                           help='dataset name, under data_path')
-        self.add_argument('--format', type=str, default='1',
-                          help='the format of the dataset.')
+        self.add_argument('--format', type=str, default='built_in',
+                          help='the format of the dataset, it can be built_in,'\
+                                'raw_udd_{htr} and udd_{htr}')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
