@@ -65,10 +65,10 @@ class ArgParser(argparse.ArgumentParser):
                           help='double entitiy dim for complex number')
         self.add_argument('-dr', '--double_rel', action='store_true',
                           help='double relation dim for complex number')
-        self.add_argument('--rel_part', action='store_true',
-                          help='enable relation partitioning')
-        self.add_argument('--async_update', action='store_true',
-                          help='allow async_update on node embedding')
+        #self.add_argument('--rel_part', action='store_true',
+        #                  help='enable relation partitioning')
+        #self.add_argument('--async_update', action='store_true',
+        #                  help='allow async_update on node embedding')
         self.add_argument('--num_thread', type=int, default=1,
                           help='number of thread used')
         self.add_argument('--server_id', type=int, default=0,
