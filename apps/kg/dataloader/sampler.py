@@ -570,7 +570,7 @@ class EvalDataset(object):
         self.num_test = len(dataset.test[0])
 
         if args.eval_percent < 1:
-            self.valid = np.random.randint(0, self.num_valid, 
+            self.valid = np.random.randint(0, self.num_valid,
                     size=(int(self.num_valid * args.eval_percent),)) + self.num_train
         else:
             self.valid = np.arange(self.num_train, self.num_train + self.num_valid)
