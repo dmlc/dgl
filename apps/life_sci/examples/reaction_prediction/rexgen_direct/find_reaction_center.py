@@ -73,7 +73,6 @@ def main(args):
 
     total_iter = 0
     grad_norm_sum = 0
-    num_correct = {k: [] for k in args['top_ks']}
     loss_sum = 0
     dur = []
     for epoch in range(args['num_epochs']):
@@ -100,18 +99,13 @@ def main(args):
             if total_iter >= 3:
                 dur.append(time.time() - t0)
 
-            eval(batch_complete_graphs, biased_pred, batch_atom_pair_labels, num_correct)
-
             if total_iter % args['print_every'] == 0:
-                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/epoch {:.4f} | ' \
+                progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/minibatch {:.4f} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
                     np.mean(dur), loss_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
-                for k, correct_count in num_correct.items():
-                    progress += ' | acc@{:d} {:.4f}'.format(k, np.mean(correct_count))
                 grad_norm_sum = 0
-                num_correct = {k: [] for k in args['top_ks']}
                 loss_sum = 0
                 print(progress)
 

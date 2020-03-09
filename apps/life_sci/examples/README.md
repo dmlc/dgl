@@ -45,3 +45,9 @@ We provide various examples across 3 applications -- property prediction, genera
 - Atomic Convolutional Networks for Predicting Protein-Ligand Binding Affinity (ACNN) [[paper]](https://arxiv.org/abs/1703.10603), [[github]](https://github.com/deepchem/deepchem/tree/master/contrib/atomicconv)
     - [ACNN with DGL](../dgllife/model/model_zoo/acnn.py)
     - [Example Training Script](binding_affinity_prediction)
+
+## Reaction Prediction
+- A graph-convolutional neural network model for the prediction of chemical reactivity [[paper]](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc04228d#!divAbstract), [[github]](https://github.com/connorcoley/rexgen_direct)
+    - An earlier version was published in NeurIPS 2017 as "Predicting Organic Reaction Outcomes with Weisfeiler-Lehman Network" [[paper]](https://arxiv.org/abs/1709.04555)
+    - [WLN with DGL for Reaction Center Prediction](../dgllife/model/model_zoo/wln_reaction_center.py)
+    - [Example Script](reaction_prediction/rexgen_direct)
