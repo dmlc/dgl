@@ -18,6 +18,8 @@ from dataloader import get_dataset, get_partition_dataset
 import dgl
 import dgl.backend as F
 
+WAIT_TIME = 10
+
 class ArgParser(argparse.ArgumentParser):
     def __init__(self):
         super(ArgParser, self).__init__()
@@ -167,7 +169,7 @@ def start_worker(args, logger):
     """Start kvclient for training
     """
     init_time_start = time.time()
-    time.sleep(5) # wait for launch script
+    time.sleep(WAIT_TIME) # wait for launch script
 
     server_namebook = dgl.contrib.read_ip_config(filename=args.ip_config)
 
