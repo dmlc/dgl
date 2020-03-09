@@ -1,0 +1,2362 @@
+cat_value,assigned_integer
+UNKNOWN,1
+Problem ID  2,2
+Problem ID  4,3
+Problem ID  44,4
+Problem ID  141,5
+Problem ID  5,6
+Problem ID  17,7
+Problem ID  23,8
+Problem ID  20,9
+Problem ID  19,10
+Problem ID  24,11
+Problem ID  12,12
+Problem ID  6,13
+Problem ID  7,14
+Problem ID  10,15
+Problem ID  40,16
+Problem ID  33,17
+Problem ID  26,18
+Problem ID  15,19
+Problem ID  9,20
+Problem ID  8,21
+Problem ID  14,22
+Problem ID  18,23
+Problem ID  11,24
+Problem ID  72,25
+Problem ID  246,26
+Problem ID  16,27
+Problem ID  21,28
+Problem ID  28,29
+Problem ID  74,30
+Problem ID  35,31
+Problem ID  104,32
+Problem ID  27,33
+Problem ID  51,34
+Problem ID  30,35
+Problem ID  29,36
+Problem ID  3,37
+Problem ID  31,38
+Problem ID  45,39
+Problem ID  32,40
+Problem ID  38,41
+Problem ID  91,42
+Problem ID  13,43
+Problem ID  36,44
+Problem ID  46,45
+Problem ID  84,46
+Problem ID  39,47
+Problem ID  70,48
+Problem ID  41,49
+Problem ID  118,50
+Problem ID  42,51
+Problem ID  83,52
+Problem ID  43,53
+Problem ID  48,54
+Problem ID  71,55
+Problem ID  68,56
+Problem ID  92,57
+Problem ID  47,58
+Problem ID  192,59
+Problem ID  103,60
+Problem ID  99,61
+Problem ID  85,62
+Problem ID  219,63
+Problem ID  50,64
+Problem ID  49,65
+Problem ID  57,66
+Problem ID  82,67
+Problem ID  52,68
+Problem ID  81,69
+Problem ID  53,70
+Problem ID  54,71
+Problem ID  55,72
+Problem ID  56,73
+Problem ID  80,74
+Problem ID  59,75
+Problem ID  58,76
+Problem ID  96,77
+Problem ID  62,78
+Problem ID  79,79
+Problem ID  69,80
+Problem ID  60,81
+Problem ID  64,82
+Problem ID  63,83
+Problem ID  65,84
+Problem ID  78,85
+Problem ID  77,86
+Problem ID  66,87
+Problem ID  67,88
+Problem ID  76,89
+Problem ID  75,90
+Problem ID  73,91
+Problem ID  86,92
+Problem ID  93,93
+Problem ID  100,94
+Problem ID  94,95
+Problem ID  87,96
+Problem ID  89,97
+Problem ID  88,98
+Problem ID  90,99
+Problem ID  95,100
+Problem ID  97,101
+Problem ID  61,102
+Problem ID  22,103
+Problem ID  144,104
+Problem ID  98,105
+Problem ID  240,106
+Problem ID  114,107
+Problem ID  101,108
+Problem ID  102,109
+Problem ID  106,110
+Problem ID  105,111
+Problem ID  130,112
+Problem ID  115,113
+Problem ID  107,114
+Problem ID  218,115
+Problem ID  158,116
+Problem ID  116,117
+Problem ID  109,118
+Problem ID  108,119
+Problem ID  112,120
+Problem ID  111,121
+Problem ID  110,122
+Problem ID  113,123
+Problem ID  169,124
+Problem ID  146,125
+Problem ID  119,126
+Problem ID  121,127
+Problem ID  120,128
+Problem ID  117,129
+Problem ID  154,130
+Problem ID  131,131
+Problem ID  206,132
+Problem ID  124,133
+Problem ID  123,134
+Problem ID  125,135
+Problem ID  122,136
+Problem ID  126,137
+Problem ID  127,138
+Problem ID  128,139
+Problem ID  139,140
+Problem ID  138,141
+Problem ID  25,142
+Problem ID  181,143
+Problem ID  129,144
+Problem ID  142,145
+Problem ID  133,146
+Problem ID  132,147
+Problem ID  134,148
+Problem ID  165,149
+Problem ID  135,150
+Problem ID  136,151
+Problem ID  137,152
+Problem ID  143,153
+Problem ID  140,154
+Problem ID  145,155
+Problem ID  148,156
+Problem ID  151,157
+Problem ID  162,158
+Problem ID  147,159
+Problem ID  149,160
+Problem ID  152,161
+Problem ID  150,162
+Problem ID  157,163
+Problem ID  156,164
+Problem ID  153,165
+Problem ID  190,166
+Problem ID  250,167
+Problem ID  155,168
+Problem ID  164,169
+Problem ID  199,170
+Problem ID  231,171
+Problem ID  163,172
+Problem ID  159,173
+Problem ID  161,174
+Problem ID  160,175
+Problem ID  174,176
+Problem ID  166,177
+Problem ID  167,178
+Problem ID  172,179
+Problem ID  173,180
+Problem ID  168,181
+Problem ID  170,182
+Problem ID  210,183
+Problem ID  179,184
+Problem ID  171,185
+Problem ID  184,186
+Problem ID  187,187
+Problem ID  175,188
+Problem ID  176,189
+Problem ID  177,190
+Problem ID  202,191
+Problem ID  178,192
+Problem ID  188,193
+Problem ID  180,194
+Problem ID  182,195
+Problem ID  185,196
+Problem ID  183,197
+Problem ID  189,198
+Problem ID  186,199
+Problem ID  200,200
+Problem ID  193,201
+Problem ID  191,202
+Problem ID  198,203
+Problem ID  220,204
+Problem ID  195,205
+Problem ID  201,206
+Problem ID  225,207
+Problem ID  196,208
+Problem ID  197,209
+Problem ID  213,210
+Problem ID  204,211
+Problem ID  194,212
+Problem ID  203,213
+Problem ID  205,214
+Problem ID  243,215
+Problem ID  207,216
+Problem ID  208,217
+Problem ID  228,218
+Problem ID  209,219
+Problem ID  211,220
+Problem ID  212,221
+Problem ID  245,222
+Problem ID  214,223
+Problem ID  223,224
+Problem ID  215,225
+Problem ID  216,226
+Problem ID  217,227
+Problem ID  229,228
+Problem ID  221,229
+Problem ID  222,230
+Problem ID  226,231
+Problem ID  224,232
+Problem ID  230,233
+Problem ID  227,234
+Problem ID  235,235
+Problem ID  242,236
+Problem ID  232,237
+Problem ID  233,238
+Problem ID  234,239
+Problem ID  236,240
+Problem ID  237,241
+Problem ID  238,242
+Problem ID  239,243
+Problem ID  241,244
+Problem ID  248,245
+Problem ID  247,246
+Problem ID  249,247
+Problem ID  252,248
+Problem ID  253,249
+Problem ID  256,250
+Problem ID  255,251
+Problem ID  251,252
+Problem ID  259,253
+Phone,254
+Email,255
+Self service,256
+Direct opening,257
+IVR,258
+Symptom 72,259
+Symptom 471,260
+Symptom 450,261
+Symptom 232,262
+Symptom 580,263
+Symptom 311,264
+Symptom 470,265
+Symptom 592,266
+Symptom 530,267
+Symptom 4,268
+Symptom 583,269
+Symptom 253,270
+Symptom 2,271
+Symptom 26,272
+Symptom 609,273
+Symptom 529,274
+Symptom 560,275
+Symptom 273,276
+Symptom 87,277
+Symptom 116,278
+Symptom 607,279
+Symptom 159,280
+Symptom 226,281
+Symptom 509,282
+Symptom 208,283
+Symptom 571,284
+Symptom 117,285
+Symptom 7,286
+Symptom 473,287
+Symptom 568,288
+Symptom 605,289
+Symptom 118,290
+Symptom 242,291
+Symptom 486,292
+Symptom 6,293
+Symptom 327,294
+Symptom 17,295
+Symptom 314,296
+Symptom 270,297
+Symptom 382,298
+Symptom 387,299
+Symptom 312,300
+Symptom 218,301
+Symptom 84,302
+Symptom 324,303
+Symptom 107,304
+Symptom 189,305
+Symptom 236,306
+Symptom 263,307
+Symptom 472,308
+Symptom 315,309
+Symptom 491,310
+Symptom 134,311
+Symptom 121,312
+Symptom 224,313
+Symptom 474,314
+Symptom 112,315
+Symptom 126,316
+Symptom 102,317
+Symptom 563,318
+Symptom 594,319
+Symptom 404,320
+Symptom 261,321
+Symptom 418,322
+Symptom 246,323
+Symptom 238,324
+Symptom 257,325
+Symptom 276,326
+Symptom 494,327
+Symptom 13,328
+Symptom 114,329
+Symptom 70,330
+Symptom 495,331
+Symptom 296,332
+Symptom 266,333
+Symptom 37,334
+Symptom 581,335
+Symptom 220,336
+Symptom 426,337
+Symptom 499,338
+Symptom 330,339
+Symptom 283,340
+Symptom 221,341
+Symptom 142,342
+Symptom 249,343
+Symptom 589,344
+Symptom 520,345
+Symptom 8,346
+Symptom 432,347
+Symptom 184,348
+Symptom 293,349
+Symptom 245,350
+Symptom 521,351
+Symptom 559,352
+Symptom 22,353
+Symptom 217,354
+Symptom 212,355
+Symptom 310,356
+Symptom 120,357
+Symptom 585,358
+Symptom 512,359
+Symptom 487,360
+Symptom 115,361
+Symptom 269,362
+Symptom 265,363
+Symptom 222,364
+Symptom 207,365
+Symptom 437,366
+Symptom 135,367
+Symptom 223,368
+Symptom 95,369
+Symptom 235,370
+Symptom 225,371
+Symptom 469,372
+Symptom 170,373
+Symptom 258,374
+Symptom 144,375
+Symptom 157,376
+Symptom 278,377
+Symptom 405,378
+Symptom 406,379
+Symptom 119,380
+Symptom 141,381
+Symptom 291,382
+Symptom 516,383
+Symptom 351,384
+Symptom 337,385
+Symptom 326,386
+Symptom 502,387
+Symptom 74,388
+Symptom 396,389
+Symptom 511,390
+Symptom 199,391
+Symptom 439,392
+Symptom 54,393
+Symptom 572,394
+Symptom 69,395
+Symptom 59,396
+Symptom 431,397
+Symptom 444,398
+Symptom 287,399
+Symptom 98,400
+Symptom 93,401
+Symptom 381,402
+Symptom 267,403
+Symptom 252,404
+Symptom 514,405
+Symptom 113,406
+Symptom 215,407
+Symptom 256,408
+Symptom 260,409
+Symptom 564,410
+Symptom 243,411
+Symptom 419,412
+Symptom 524,413
+Symptom 181,414
+Symptom 280,415
+Symptom 197,416
+Symptom 277,417
+Symptom 268,418
+Symptom 80,419
+Symptom 371,420
+Symptom 392,421
+Symptom 27,422
+Symptom 434,423
+Symptom 417,424
+Symptom 35,425
+Symptom 285,426
+Symptom 332,427
+Symptom 79,428
+Symptom 129,429
+Symptom 155,430
+Symptom 582,431
+Symptom 415,432
+Symptom 342,433
+Symptom 429,434
+Symptom 230,435
+Symptom 308,436
+Symptom 329,437
+Symptom 289,438
+Symptom 187,439
+Symptom 284,440
+Symptom 333,441
+Symptom 10,442
+Symptom 409,443
+Symptom 359,444
+Symptom 143,445
+Symptom 272,446
+Symptom 318,447
+Symptom 522,448
+Symptom 608,449
+Symptom 240,450
+Symptom 248,451
+Symptom 517,452
+Symptom 534,453
+Symptom 452,454
+Symptom 251,455
+Symptom 338,456
+Symptom 400,457
+Symptom 440,458
+Symptom 101,459
+Symptom 340,460
+Symptom 604,461
+Symptom 441,462
+Symptom 345,463
+Symptom 147,464
+Symptom 448,465
+Symptom 410,466
+Symptom 241,467
+Symptom 158,468
+Symptom 286,469
+Symptom 171,470
+Symptom 533,471
+Symptom 203,472
+Symptom 573,473
+Symptom 532,474
+Symptom 21,475
+Symptom 137,476
+Symptom 188,477
+Symptom 125,478
+Symptom 124,479
+Symptom 210,480
+Symptom 262,481
+Symptom 175,482
+Symptom 133,483
+Symptom 475,484
+Symptom 466,485
+Symptom 109,486
+Symptom 110,487
+Symptom 271,488
+Symptom 51,489
+Symptom 544,490
+Symptom 479,491
+Symptom 462,492
+Symptom 297,493
+Symptom 449,494
+Symptom 63,495
+Symptom 104,496
+Symptom 423,497
+Symptom 390,498
+Symptom 288,499
+Symptom 19,500
+Symptom 383,501
+Symptom 430,502
+Symptom 455,503
+Symptom 443,504
+Symptom 180,505
+Symptom 45,506
+Symptom 44,507
+Symptom 89,508
+Symptom 12,509
+Symptom 229,510
+Symptom 239,511
+Symptom 317,512
+Symptom 412,513
+Symptom 411,514
+Symptom 9,515
+Symptom 595,516
+Symptom 438,517
+Symptom 264,518
+Symptom 421,519
+Symptom 172,520
+Symptom 259,521
+Symptom 169,522
+Symptom 385,523
+Symptom 127,524
+Symptom 384,525
+Symptom 506,526
+Symptom 165,527
+Symptom 247,528
+Symptom 372,529
+Symptom 75,530
+Symptom 519,531
+Symptom 465,532
+Symptom 30,533
+Symptom 105,534
+Symptom 86,535
+Symptom 374,536
+Symptom 458,537
+Symptom 526,538
+Symptom 325,539
+Symptom 15,540
+Symptom 5,541
+Symptom 23,542
+Symptom 323,543
+Symptom 501,544
+Symptom 255,545
+Symptom 587,546
+Symptom 402,547
+Symptom 403,548
+Symptom 211,549
+Symptom 156,550
+Symptom 216,551
+Symptom 453,552
+Symptom 569,553
+Symptom 373,554
+Symptom 43,555
+Symptom 106,556
+Symptom 601,557
+Symptom 459,558
+Symptom 295,559
+Symptom 435,560
+Symptom 370,561
+Symptom 65,562
+Symptom 464,563
+Symptom 468,564
+Symptom 380,565
+Symptom 352,566
+Symptom 292,567
+Symptom 454,568
+Symptom 130,569
+Symptom 301,570
+Symptom 335,571
+Symptom 33,572
+Symptom 391,573
+Symptom 358,574
+Symptom 602,575
+Symptom 294,576
+Symptom 88,577
+Symptom 205,578
+Symptom 66,579
+Symptom 94,580
+Symptom 467,581
+Symptom 456,582
+Symptom 377,583
+Symptom 537,584
+Symptom 62,585
+Symptom 274,586
+Symptom 56,587
+Symptom 316,588
+Symptom 551,589
+Symptom 313,590
+Symptom 518,591
+Symptom 375,592
+Symptom 593,593
+Symptom 510,594
+Symptom 53,595
+Symptom 183,596
+Symptom 362,597
+Symptom 34,598
+Symptom 420,599
+Symptom 376,600
+Symptom 162,601
+Symptom 305,602
+Symptom 368,603
+Symptom 361,604
+Symptom 498,605
+Symptom 209,606
+Symptom 20,607
+Symptom 600,608
+Symptom 25,609
+Symptom 531,610
+Symptom 389,611
+Symptom 596,612
+Symptom 176,613
+Symptom 515,614
+Symptom 543,615
+Symptom 461,616
+Symptom 228,617
+Symptom 250,618
+Symptom 173,619
+Symptom 177,620
+Symptom 401,621
+Symptom 457,622
+Symptom 244,623
+Symptom 508,624
+Symptom 55,625
+Symptom 290,626
+Symptom 463,627
+Symptom 553,628
+Symptom 67,629
+Symptom 99,630
+Symptom 545,631
+Symptom 397,632
+Symptom 32,633
+Symptom 186,634
+Symptom 558,635
+Symptom 227,636
+Symptom 513,637
+Symptom 198,638
+Symptom 3,639
+Symptom 148,640
+Symptom 603,641
+Symptom 136,642
+Symptom 50,643
+Symptom 48,644
+Symptom 365,645
+Symptom 77,646
+Symptom 237,647
+Symptom 303,648
+Symptom 428,649
+Symptom 578,650
+Symptom 597,651
+Symptom 182,652
+Symptom 282,653
+Symptom 47,654
+Symptom 507,655
+Symptom 174,656
+Symptom 579,657
+Symptom 485,658
+Symptom 57,659
+Symptom 14,660
+Symptom 598,661
+Symptom 492,662
+Symptom 588,663
+Symptom 379,664
+Symptom 97,665
+Symptom 497,666
+Symptom 424,667
+Symptom 503,668
+Symptom 606,669
+Symptom 233,670
+Symptom 398,671
+Symptom 548,672
+Symptom 556,673
+Symptom 574,674
+Symptom 195,675
+Symptom 275,676
+Symptom 319,677
+Symptom 213,678
+Symptom 460,679
+Symptom 281,680
+Symptom 366,681
+Symptom 504,682
+Symptom 577,683
+Symptom 92,684
+Symptom 231,685
+Symptom 178,686
+Symptom 546,687
+Symptom 550,688
+Symptom 350,689
+Symptom 154,690
+Symptom 214,691
+Symptom 535,692
+Symptom 164,693
+Symptom 254,694
+Symptom 360,695
+Symptom 552,696
+Symptom 427,697
+Symptom 11,698
+Symptom 160,699
+Symptom 131,700
+Symptom 304,701
+Symptom 557,702
+Symptom 60,703
+Symptom 194,704
+Symptom 505,705
+Symptom 416,706
+Symptom 322,707
+Symptom 71,708
+Symptom 279,709
+Symptom 321,710
+Symptom 219,711
+Symptom 328,712
+Symptom 584,713
+Symptom 42,714
+Symptom 150,715
+Symptom 408,716
+Symptom 40,717
+Symptom 193,718
+Symptom 331,719
+Symptom 185,720
+Symptom 523,721
+Symptom 356,722
+Symptom 388,723
+Symptom 540,724
+Symptom 354,725
+Symptom 566,726
+Symptom 493,727
+Symptom 433,728
+Symptom 542,729
+Symptom 425,730
+Symptom 436,731
+Symptom 586,732
+Symptom 96,733
+Symptom 536,734
+Symptom 152,735
+Symptom 555,736
+Symptom 496,737
+Symptom 500,738
+Symptom 61,739
+Symptom 488,740
+Symptom 407,741
+Symptom 348,742
+Symptom 353,743
+Symptom 151,744
+Symptom 575,745
+Symptom 234,746
+Symptom 68,747
+Symptom 320,748
+Symptom 538,749
+Symptom 29,750
+Symptom 547,751
+Symptom 111,752
+Symptom 567,753
+Symptom 167,754
+Symptom 541,755
+Symptom 590,756
+Symptom 599,757
+Symptom 528,758
+Symptom 481,759
+Symptom 355,760
+Symptom 307,761
+Symptom 364,762
+Symptom 299,763
+Symptom 309,764
+Symptom 346,765
+Symptom 357,766
+Symptom 525,767
+Symptom 58,768
+Symptom 576,769
+Symptom 483,770
+Symptom 562,771
+Symptom 190,772
+Symptom 341,773
+Symptom 570,774
+Symptom 83,775
+Symptom 179,776
+Symptom 81,777
+Symptom 73,778
+Symptom 447,779
+Symptom 103,780
+Symptom 204,781
+Symptom 565,782
+Symptom 302,783
+Group 56,784
+Group 70,785
+Group 24,786
+Group 25,787
+Group 23,788
+Group 28,789
+Group 5,790
+Group 15,791
+Group 12,792
+Group 33,793
+Group 54,794
+Group 29,795
+Group 66,796
+Group 65,797
+Group 68,798
+Group 58,799
+Group 27,800
+Group 72,801
+Group 30,802
+Group 50,803
+Group 55,804
+Group 62,805
+Group 47,806
+Group 22,807
+Group 39,808
+Group 73,809
+Group 20,810
+Group 46,811
+Group 67,812
+Group 74,813
+Group 34,814
+Group 69,815
+Group 3,816
+Group 31,817
+Group 26,818
+Group 53,819
+Group 76,820
+Group 6,821
+Group 61,822
+Group 57,823
+Group 37,824
+Group 48,825
+Group 17,826
+Group 49,827
+Group 43,828
+Group 60,829
+Group 10,830
+Group 9,831
+Group 45,832
+Group 14,833
+Group 59,834
+Group 64,835
+Group 51,836
+Group 75,837
+Group 11,838
+Group 19,839
+Group 21,840
+Group 77,841
+Group 2,842
+Group 13,843
+Group 35,844
+Group 81,845
+Group 44,846
+Group 63,847
+Group 79,848
+Group 32,849
+Group 78,850
+Group 36,851
+Group 82,852
+Group 80,853
+Group 4,854
+Group 71,855
+Group 18,856
+Group 38,857
+Group 16,858
+Group 41,859
+Group 7,860
+Group 8,861
+Location 143,862
+Location 165,863
+Location 204,864
+Location 93,865
+Location 108,866
+Location 161,867
+Location 46,868
+Location 42,869
+Location 229,870
+Location 98,871
+Location 69,872
+Location 172,873
+Location 51,874
+Location 44,875
+Location 142,876
+Location 36,877
+Location 135,878
+Location 15,879
+Location 79,880
+Location 55,881
+Location 179,882
+Location 171,883
+Location 56,884
+Location 224,885
+Location 131,886
+Location 54,887
+Location 136,888
+Location 2,889
+Location 40,890
+Location 70,891
+Location 115,892
+Location 197,893
+Location 59,894
+Location 212,895
+Location 245,896
+Location 141,897
+Location 232,898
+Location 18,899
+Location 125,900
+Location 241,901
+Location 128,902
+Location 96,903
+Location 249,904
+Location 91,905
+Location 170,906
+Location 208,907
+Location 162,908
+Location 9,909
+Location 153,910
+Location 117,911
+Location 218,912
+Location 111,913
+Location 100,914
+Location 71,915
+Location 33,916
+Location 39,917
+Location 112,918
+Location 72,919
+Location 97,920
+Location 68,921
+Location 193,922
+Location 210,923
+Location 113,924
+Location 158,925
+Location 124,926
+Location 37,927
+Location 196,928
+Location 85,929
+Location 47,930
+Location 24,931
+Location 43,932
+Location 14,933
+Location 77,934
+Location 109,935
+Location 41,936
+Location 38,937
+Location 226,938
+Location 240,939
+Location 76,940
+Location 99,941
+Location 213,942
+Location 118,943
+Location 82,944
+Location 35,945
+Location 199,946
+Location 28,947
+Location 242,948
+Location 78,949
+Location 107,950
+Location 45,951
+Location 247,952
+Location 3,953
+Location 216,954
+Location 133,955
+Location 86,956
+Location 12,957
+Location 231,958
+Location 223,959
+Location 10,960
+Location 177,961
+Location 83,962
+Location 187,963
+Location 160,964
+Location 220,965
+Location 209,966
+Location 5,967
+Location 190,968
+Location 173,969
+Location 205,970
+Location 34,971
+Location 64,972
+Location 25,973
+Location 110,974
+Location 114,975
+Location 235,976
+Location 134,977
+Location 207,978
+Location 225,979
+Location 221,980
+Location 237,981
+Location 234,982
+Location 194,983
+Location 168,984
+Location 17,985
+Location 211,986
+Location 90,987
+Location 138,988
+Location 92,989
+Location 81,990
+Location 195,991
+Location 222,992
+Location 60,993
+Location 182,994
+Location 8,995
+Location 27,996
+Location 169,997
+Location 101,998
+Location 75,999
+Location 228,1000
+Location 236,1001
+Location 21,1002
+Location 174,1003
+Location 66,1004
+Location 6,1005
+Location 233,1006
+Location 203,1007
+Location 201,1008
+Location 214,1009
+Location 140,1010
+Location 157,1011
+Location 243,1012
+Location 155,1013
+Location 102,1014
+Location 13,1015
+Location 120,1016
+Location 244,1017
+Location 188,1018
+Location 11,1019
+Location 185,1020
+Location 65,1021
+Location 23,1022
+Location 49,1023
+Location 186,1024
+Location 248,1025
+Location 87,1026
+Location 61,1027
+Location 129,1028
+Location 148,1029
+Location 184,1030
+Location 183,1031
+Location 149,1032
+Location 137,1033
+Location 95,1034
+Location 167,1035
+Location 200,1036
+Location 30,1037
+Location 147,1038
+Location 166,1039
+Location 20,1040
+Location 122,1041
+Location 130,1042
+Location 227,1043
+Location 146,1044
+Location 156,1045
+Location 176,1046
+Location 206,1047
+Location 175,1048
+Location 52,1049
+Location 215,1050
+Location 189,1051
+Location 144,1052
+Location 180,1053
+Location 219,1054
+Location 22,1055
+Location 31,1056
+Location 121,1057
+Location 73,1058
+Location 53,1059
+Location 239,1060
+Location 29,1061
+Location 89,1062
+Location 164,1063
+Location 26,1064
+Location 178,1065
+Location 63,1066
+Location 119,1067
+Location 151,1068
+Location 123,1069
+Location 145,1070
+Location 191,1071
+Location 57,1072
+Location 16,1073
+Location 181,1074
+Location 132,1075
+Location 116,1076
+Location 94,1077
+Location 217,1078
+Location 19,1079
+Location 105,1080
+Location 50,1081
+Location 4,1082
+Location 106,1083
+Location 202,1084
+Location 246,1085
+Resolved by 149,1086
+Resolved by 81,1087
+Resolved by 5,1088
+Resolved by 113,1089
+Resolved by 62,1090
+Resolved by 71,1091
+Resolved by 197,1092
+Resolved by 208,1093
+Resolved by 215,1094
+Resolved by 30,1095
+Resolved by 227,1096
+Resolved by 158,1097
+Resolved by 85,1098
+Resolved by 163,1099
+Resolved by 15,1100
+Resolved by 99,1101
+Resolved by 66,1102
+Resolved by 184,1103
+Resolved by 183,1104
+Resolved by 77,1105
+Resolved by 196,1106
+Resolved by 206,1107
+Resolved by 174,1108
+Resolved by 106,1109
+Resolved by 139,1110
+Resolved by 143,1111
+Resolved by 153,1112
+Resolved by 89,1113
+Resolved by 231,1114
+Resolved by 180,1115
+Resolved by 121,1116
+Resolved by 32,1117
+Resolved by 21,1118
+Resolved by 175,1119
+Resolved by 133,1120
+Resolved by 171,1121
+Resolved by 3,1122
+Resolved by 76,1123
+Resolved by 24,1124
+Resolved by 130,1125
+Resolved by 159,1126
+Resolved by 134,1127
+Resolved by 33,1128
+Resolved by 56,1129
+Resolved by 64,1130
+Resolved by 83,1131
+Resolved by 166,1132
+Resolved by 120,1133
+Resolved by 53,1134
+Resolved by 16,1135
+Resolved by 195,1136
+Resolved by 27,1137
+Resolved by 165,1138
+Resolved by 169,1139
+Resolved by 167,1140
+Resolved by 221,1141
+Resolved by 103,1142
+Resolved by 117,1143
+Resolved by 220,1144
+Resolved by 114,1145
+Resolved by 57,1146
+Resolved by 13,1147
+Resolved by 67,1148
+Resolved by 137,1149
+Resolved by 2,1150
+Resolved by 189,1151
+Resolved by 132,1152
+Resolved by 170,1153
+Resolved by 127,1154
+Resolved by 135,1155
+Resolved by 188,1156
+Resolved by 22,1157
+Resolved by 229,1158
+Resolved by 125,1159
+Resolved by 204,1160
+Resolved by 100,1161
+Resolved by 118,1162
+Resolved by 6,1163
+Resolved by 11,1164
+Resolved by 87,1165
+Resolved by 108,1166
+Resolved by 150,1167
+Resolved by 123,1168
+Resolved by 226,1169
+Resolved by 115,1170
+Resolved by 193,1171
+Resolved by 23,1172
+Resolved by 216,1173
+Resolved by 213,1174
+Resolved by 20,1175
+Resolved by 209,1176
+Resolved by 126,1177
+Resolved by 37,1178
+Resolved by 152,1179
+Resolved by 52,1180
+Resolved by 210,1181
+Resolved by 91,1182
+Resolved by 69,1183
+Resolved by 41,1184
+Resolved by 119,1185
+Resolved by 90,1186
+Resolved by 151,1187
+Resolved by 112,1188
+Resolved by 109,1189
+Resolved by 212,1190
+Resolved by 107,1191
+Resolved by 203,1192
+Resolved by 35,1193
+Resolved by 131,1194
+Resolved by 42,1195
+Resolved by 98,1196
+Resolved by 84,1197
+Resolved by 9,1198
+Resolved by 218,1199
+Resolved by 7,1200
+Resolved by 75,1201
+Resolved by 54,1202
+Resolved by 104,1203
+Resolved by 155,1204
+Resolved by 182,1205
+Resolved by 200,1206
+Resolved by 190,1207
+Resolved by 50,1208
+Resolved by 48,1209
+Resolved by 46,1210
+Resolved by 177,1211
+Resolved by 154,1212
+Resolved by 38,1213
+Resolved by 191,1214
+Resolved by 147,1215
+Resolved by 40,1216
+Resolved by 146,1217
+Resolved by 179,1218
+Resolved by 92,1219
+Resolved by 44,1220
+Resolved by 202,1221
+Resolved by 101,1222
+Resolved by 111,1223
+Resolved by 105,1224
+Resolved by 136,1225
+Resolved by 181,1226
+Resolved by 31,1227
+Resolved by 178,1228
+Resolved by 58,1229
+Resolved by 145,1230
+Resolved by 29,1231
+Resolved by 225,1232
+Resolved by 173,1233
+Resolved by 45,1234
+Resolved by 198,1235
+Resolved by 211,1236
+Resolved by 86,1237
+Resolved by 140,1238
+Resolved by 214,1239
+Resolved by 49,1240
+Resolved by 124,1241
+Resolved by 116,1242
+Resolved by 19,1243
+Resolved by 8,1244
+Resolved by 187,1245
+Resolved by 199,1246
+Resolved by 161,1247
+Resolved by 129,1248
+Resolved by 142,1249
+Resolved by 70,1250
+Resolved by 223,1251
+Resolved by 164,1252
+Resolved by 122,1253
+Resolved by 128,1254
+Resolved by 36,1255
+Resolved by 138,1256
+Resolved by 74,1257
+Resolved by 102,1258
+Resolved by 230,1259
+Resolved by 96,1260
+Resolved by 176,1261
+Resolved by 95,1262
+Resolved by 156,1263
+Resolved by 4,1264
+Resolved by 47,1265
+Resolved by 186,1266
+Resolved by 201,1267
+Resolved by 82,1268
+Resolved by 88,1269
+Resolved by 160,1270
+Resolved by 43,1271
+Resolved by 228,1272
+Resolved by 224,1273
+Resolved by 18,1274
+Resolved by 97,1275
+Resolved by 34,1276
+Resolved by 148,1277
+Resolved by 60,1278
+Resolved by 55,1279
+Resolved by 207,1280
+Resolved by 14,1281
+Resolved by 78,1282
+Resolved by 80,1283
+Resolved by 219,1284
+Resolved by 10,1285
+Resolved by 68,1286
+Resolved by 17,1287
+Resolved by 79,1288
+Resolved by 39,1289
+Resolved by 94,1290
+Resolved by 162,1291
+Resolved by 61,1292
+Resolved by 59,1293
+Resolved by 222,1294
+Resolved by 93,1295
+Resolved by 185,1296
+Resolved by 194,1297
+Resolved by 168,1298
+Resolved by 157,1299
+Resolved by 110,1300
+Resolved by 26,1301
+Subcategory 170,1302
+Subcategory 215,1303
+Subcategory 125,1304
+Subcategory 97,1305
+Subcategory 168,1306
+Subcategory 229,1307
+Subcategory 94,1308
+Subcategory 185,1309
+Subcategory 110,1310
+Subcategory 164,1311
+Subcategory 271,1312
+Subcategory 220,1313
+Subcategory 224,1314
+Subcategory 9,1315
+Subcategory 291,1316
+Subcategory 194,1317
+Subcategory 106,1318
+Subcategory 191,1319
+Subcategory 135,1320
+Subcategory 175,1321
+Subcategory 223,1322
+Subcategory 130,1323
+Subcategory 23,1324
+Subcategory 47,1325
+Subcategory 107,1326
+Subcategory 127,1327
+Subcategory 54,1328
+Subcategory 75,1329
+Subcategory 192,1330
+Subcategory 303,1331
+Subcategory 114,1332
+Subcategory 120,1333
+Subcategory 103,1334
+Subcategory 200,1335
+Subcategory 3,1336
+Subcategory 123,1337
+Subcategory 16,1338
+Subcategory 270,1339
+Subcategory 167,1340
+Subcategory 144,1341
+Subcategory 90,1342
+Subcategory 31,1343
+Subcategory 29,1344
+Subcategory 13,1345
+Subcategory 302,1346
+Subcategory 113,1347
+Subcategory 28,1348
+Subcategory 109,1349
+Subcategory 88,1350
+Subcategory 117,1351
+Subcategory 156,1352
+Subcategory 150,1353
+Subcategory 44,1354
+Subcategory 162,1355
+Subcategory 289,1356
+Subcategory 80,1357
+Subcategory 231,1358
+Subcategory 83,1359
+Subcategory 25,1360
+Subcategory 153,1361
+Subcategory 105,1362
+Subcategory 277,1363
+Subcategory 4,1364
+Subcategory 189,1365
+Subcategory 112,1366
+Subcategory 78,1367
+Subcategory 283,1368
+Subcategory 154,1369
+Subcategory 132,1370
+Subcategory 225,1371
+Subcategory 52,1372
+Subcategory 208,1373
+Subcategory 151,1374
+Subcategory 176,1375
+Subcategory 12,1376
+Subcategory 301,1377
+Subcategory 202,1378
+Subcategory 65,1379
+Subcategory 245,1380
+Subcategory 173,1381
+Subcategory 228,1382
+Subcategory 40,1383
+Subcategory 259,1384
+Subcategory 275,1385
+Subcategory 169,1386
+Subcategory 86,1387
+Subcategory 269,1388
+Subcategory 251,1389
+Subcategory 140,1390
+Subcategory 6,1391
+Subcategory 182,1392
+Subcategory 20,1393
+Subcategory 274,1394
+Subcategory 207,1395
+Subcategory 46,1396
+Subcategory 57,1397
+Subcategory 101,1398
+Subcategory 261,1399
+Subcategory 219,1400
+Subcategory 50,1401
+Subcategory 258,1402
+Subcategory 174,1403
+Subcategory 30,1404
+Subcategory 305,1405
+Subcategory 115,1406
+Subcategory 166,1407
+Subcategory 184,1408
+Subcategory 67,1409
+Subcategory 48,1410
+Subcategory 294,1411
+Subcategory 59,1412
+Subcategory 89,1413
+Subcategory 204,1414
+Subcategory 227,1415
+Subcategory 198,1416
+Subcategory 262,1417
+Subcategory 255,1418
+Subcategory 116,1419
+Subcategory 276,1420
+Subcategory 177,1421
+Subcategory 197,1422
+Subcategory 99,1423
+Subcategory 178,1424
+Subcategory 11,1425
+Subcategory 145,1426
+Subcategory 69,1427
+Subcategory 199,1428
+Subcategory 292,1429
+Subcategory 43,1430
+Subcategory 8,1431
+Subcategory 157,1432
+Subcategory 282,1433
+Subcategory 281,1434
+Subcategory 179,1435
+Subcategory 32,1436
+Subcategory 298,1437
+Subcategory 146,1438
+Subcategory 161,1439
+Subcategory 196,1440
+Subcategory 260,1441
+Subcategory 36,1442
+Subcategory 124,1443
+Subcategory 149,1444
+Subcategory 92,1445
+Subcategory 111,1446
+Subcategory 118,1447
+Subcategory 203,1448
+Subcategory 100,1449
+Subcategory 18,1450
+Subcategory 159,1451
+Subcategory 102,1452
+Subcategory 17,1453
+Subcategory 249,1454
+Subcategory 296,1455
+Subcategory 300,1456
+Subcategory 142,1457
+Subcategory 183,1458
+Subcategory 250,1459
+Subcategory 66,1460
+Subcategory 248,1461
+Subcategory 82,1462
+Subcategory 233,1463
+Subcategory 252,1464
+Subcategory 68,1465
+Subcategory 181,1466
+Subcategory 218,1467
+Subcategory 188,1468
+Subcategory 60,1469
+Subcategory 134,1470
+Subcategory 243,1471
+Subcategory 187,1472
+Subcategory 226,1473
+Subcategory 205,1474
+Subcategory 247,1475
+Subcategory 163,1476
+Subcategory 64,1477
+Subcategory 285,1478
+Subcategory 217,1479
+Subcategory 242,1480
+Subcategory 138,1481
+Subcategory 85,1482
+Subcategory 172,1483
+Subcategory 53,1484
+Subcategory 10,1485
+Subcategory 246,1486
+Subcategory 72,1487
+Subcategory 257,1488
+Subcategory 171,1489
+Subcategory 158,1490
+Subcategory 235,1491
+Subcategory 129,1492
+Subcategory 77,1493
+Subcategory 254,1494
+Subcategory 56,1495
+Subcategory 244,1496
+Subcategory 232,1497
+Subcategory 122,1498
+Subcategory 240,1499
+Subcategory 209,1500
+Subcategory 42,1501
+Subcategory 256,1502
+Subcategory 74,1503
+Subcategory 287,1504
+Subcategory 84,1505
+Subcategory 299,1506
+Subcategory 279,1507
+Subcategory 241,1508
+Subcategory 236,1509
+Subcategory 2,1510
+Subcategory 213,1511
+Subcategory 273,1512
+Subcategory 141,1513
+Subcategory 62,1514
+Subcategory 160,1515
+Subcategory 216,1516
+Subcategory 195,1517
+Subcategory 35,1518
+Subcategory 212,1519
+Subcategory 33,1520
+Subcategory 34,1521
+Subcategory 96,1522
+Subcategory 211,1523
+Subcategory 288,1524
+Subcategory 280,1525
+Subcategory 230,1526
+Subcategory 45,1527
+Subcategory 136,1528
+Subcategory 104,1529
+Subcategory 51,1530
+Subcategory 210,1531
+Subcategory 165,1532
+Subcategory 253,1533
+Subcategory 128,1534
+Subcategory 234,1535
+Subcategory 284,1536
+Subcategory 193,1537
+Subcategory 186,1538
+Subcategory 264,1539
+Subcategory 87,1540
+Subcategory 222,1541
+Subcategory 95,1542
+Subcategory 119,1543
+Subcategory 237,1544
+Subcategory 304,1545
+Subcategory 126,1546
+Subcategory 37,1547
+Subcategory 295,1548
+Subcategory 152,1549
+Subcategory 155,1550
+Subcategory 131,1551
+Subcategory 14,1552
+Subcategory 71,1553
+Subcategory 24,1554
+Subcategory 22,1555
+False,2282
+True,2283
+code 5,1558
+code 10,1559
+code 3,1560
+code 7,1561
+code 6,1562
+code 1,1563
+code 11,1564
+code 8,1565
+code 4,1566
+code 9,1567
+code 2,1568
+code 17,1569
+code 16,1570
+code 15,1571
+code 13,1572
+code 14,1573
+code 12,1574
+Opened by  8,1575
+Opened by  397,1576
+Opened by  180,1577
+Opened by  131,1578
+Opened by  24,1579
+Opened by  40,1580
+Opened by  433,1581
+Opened by  62,1582
+Opened by  501,1583
+Opened by  301,1584
+Opened by  4,1585
+Opened by  55,1586
+Opened by  257,1587
+Opened by  128,1588
+Opened by  221,1589
+Opened by  386,1590
+Opened by  240,1591
+Opened by  325,1592
+Opened by  381,1593
+Opened by  185,1594
+Opened by  191,1595
+Opened by  59,1596
+Opened by  239,1597
+Opened by  305,1598
+Opened by  443,1599
+Opened by  390,1600
+Opened by  512,1601
+Opened by  461,1602
+Opened by  536,1603
+Opened by  9,1604
+Opened by  226,1605
+Opened by  316,1606
+Opened by  120,1607
+Opened by  168,1608
+Opened by  503,1609
+Opened by  228,1610
+Opened by  155,1611
+Opened by  517,1612
+Opened by  247,1613
+Opened by  444,1614
+Opened by  124,1615
+Opened by  47,1616
+Opened by  20,1617
+Opened by  431,1618
+Opened by  237,1619
+Opened by  441,1620
+Opened by  79,1621
+Opened by  505,1622
+Opened by  468,1623
+Opened by  502,1624
+Opened by  267,1625
+Opened by  360,1626
+Opened by  142,1627
+Opened by  188,1628
+Opened by  174,1629
+Opened by  419,1630
+Opened by  317,1631
+Opened by  385,1632
+Opened by  392,1633
+Opened by  460,1634
+Opened by  322,1635
+Opened by  2,1636
+Opened by  524,1637
+Opened by  533,1638
+Opened by  75,1639
+Opened by  157,1640
+Opened by  356,1641
+Opened by  402,1642
+Opened by  368,1643
+Opened by  364,1644
+Opened by  12,1645
+Opened by  44,1646
+Opened by  193,1647
+Opened by  453,1648
+Opened by  17,1649
+Opened by  108,1650
+Opened by  351,1651
+Opened by  70,1652
+Opened by  520,1653
+Opened by  465,1654
+Opened by  184,1655
+Opened by  58,1656
+Opened by  80,1657
+Opened by  10,1658
+Opened by  172,1659
+Opened by  467,1660
+Opened by  296,1661
+Opened by  119,1662
+Opened by  528,1663
+Opened by  277,1664
+Opened by  423,1665
+Opened by  253,1666
+Opened by  60,1667
+Opened by  337,1668
+Opened by  369,1669
+Opened by  464,1670
+Opened by  91,1671
+Opened by  298,1672
+Opened by  3,1673
+Opened by  500,1674
+Opened by  262,1675
+Opened by  39,1676
+Opened by  515,1677
+Opened by  530,1678
+Opened by  321,1679
+Opened by  319,1680
+Opened by  94,1681
+Opened by  255,1682
+Opened by  73,1683
+Opened by  412,1684
+Opened by  246,1685
+Opened by  382,1686
+Opened by  109,1687
+Opened by  163,1688
+Opened by  242,1689
+Opened by  32,1690
+Opened by  463,1691
+Opened by  68,1692
+Opened by  106,1693
+Opened by  320,1694
+Opened by  46,1695
+Opened by  350,1696
+Opened by  293,1697
+Opened by  354,1698
+Opened by  111,1699
+Opened by  535,1700
+Opened by  469,1701
+Opened by  403,1702
+Opened by  147,1703
+Opened by  230,1704
+Opened by  219,1705
+Opened by  182,1706
+Opened by  151,1707
+Opened by  486,1708
+Opened by  72,1709
+Opened by  256,1710
+Opened by  233,1711
+Opened by  472,1712
+Opened by  353,1713
+Opened by  122,1714
+Opened by  101,1715
+Opened by  90,1716
+Opened by  216,1717
+Opened by  430,1718
+Opened by  420,1719
+Opened by  198,1720
+Opened by  265,1721
+Opened by  209,1722
+Opened by  346,1723
+Opened by  5,1724
+Opened by  280,1725
+Opened by  270,1726
+Opened by  144,1727
+Opened by  344,1728
+Opened by  212,1729
+Opened by  118,1730
+Opened by  347,1731
+Opened by  462,1732
+Opened by  104,1733
+Opened by  194,1734
+Opened by  440,1735
+Opened by  483,1736
+Opened by  159,1737
+Opened by  481,1738
+Opened by  30,1739
+Opened by  438,1740
+Opened by  141,1741
+Opened by  162,1742
+Opened by  14,1743
+Opened by  74,1744
+Opened by  223,1745
+Opened by  447,1746
+Opened by  77,1747
+Opened by  519,1748
+Opened by  195,1749
+Opened by  148,1750
+Opened by  160,1751
+Opened by  54,1752
+Opened by  26,1753
+Opened by  370,1754
+Opened by  245,1755
+Opened by  448,1756
+Opened by  166,1757
+Opened by  275,1758
+Opened by  435,1759
+Opened by  67,1760
+Opened by  455,1761
+Opened by  406,1762
+Opened by  66,1763
+Opened by  52,1764
+Opened by  313,1765
+Opened by  538,1766
+Opened by  318,1767
+Opened by  429,1768
+Opened by  333,1769
+Opened by  150,1770
+Opened by  189,1771
+Opened by  452,1772
+Opened by  488,1773
+Opened by  389,1774
+Opened by  273,1775
+Opened by  211,1776
+Opened by  7,1777
+Opened by  88,1778
+Opened by  271,1779
+Opened by  508,1780
+Opened by  490,1781
+New,1784
+Resolved,1785
+Closed,1786
+Active,1787
+Awaiting User Info,1788
+Awaiting Problem,1789
+Awaiting Vendor,1790
+Awaiting Evidence,1791
+-100,1792
+2 - Medium,2360
+3 - Low,2362
+1 - High,2361
+Category 55,1796
+Category 40,1797
+Category 20,1798
+Category 9,1799
+Category 53,1800
+Category 44,1801
+Category 45,1802
+Category 42,1803
+Category 32,1804
+Category 8,1805
+Category 24,1806
+Category 61,1807
+Category 37,1808
+Category 26,1809
+Category 23,1810
+Category 62,1811
+Category 17,1812
+Category 13,1813
+Category 35,1814
+Category 43,1815
+Category 34,1816
+Category 19,1817
+Category 46,1818
+Category 63,1819
+Category 51,1820
+Category 22,1821
+Category 30,1822
+Category 31,1823
+Category 15,1824
+Category 47,1825
+Category 7,1826
+Category 57,1827
+Category 25,1828
+Category 56,1829
+Category 38,1830
+Category 49,1831
+Category 4,1832
+Category 28,1833
+Category 41,1834
+Category 36,1835
+Category 54,1836
+Category 29,1837
+Category 3,1838
+Category 27,1839
+Category 33,1840
+Category 58,1841
+Category 2,1842
+Category 21,1843
+Category 16,1844
+Category 50,1845
+Category 59,1846
+Category 12,1847
+Category 52,1848
+Category 5,1849
+Category 6,1850
+Category 10,1851
+Category 48,1852
+Category 14,1853
+CHG0000404,1854
+CHG0000647,1855
+CHG0000127,1856
+CHG0000646,1857
+CHG0000507,1858
+CHG0001863,1859
+CHG0000084,1860
+CHG0001271,1861
+CHG0000132,2277
+CHG0000047,1863
+CHG0000405,1864
+CHG0001019,1865
+CHG0000336,1866
+CHG0000089,1867
+CHG0000536,1868
+CHG0000097,2278
+CHG0000433,1870
+CHG0000402,1871
+CHG0000558,1872
+CHG0000232,1873
+CHG0001829,1874
+CHG0001301,1875
+CHG0003167,1876
+CHG0000428,1877
+CHG0000707,1878
+CHG0003447,1879
+CHG0000914,1880
+CHG0000704,1881
+CHG0000293,1882
+CHG0001656,1883
+CHG0000535,1884
+CHG0000461,1885
+CHG0000177,1886
+CHG0000171,1887
+CHG0000149,1888
+CHG0000772,1889
+CHG0000179,1890
+CHG0000705,1891
+CHG0000213,1892
+CHG0000207,1893
+CHG0000209,1894
+CHG0000561,1895
+CHG0000775,1896
+CHG0000323,1897
+CHG0000332,1898
+CHG0000363,1899
+CHG0001056,1900
+CHG0000553,1901
+CHG0000230,1902
+CHG0000918,1903
+CHG0000925,1904
+CHG0000434,1905
+CHG0000622,1906
+CHG0001864,1907
+CHG0000771,1908
+CHG0000357,1909
+CHG0002096,1910
+CHG0000359,1911
+CHG0000406,1912
+CHG0000342,1913
+CHG0000893,1914
+CHG0000697,1915
+CHG0000355,1916
+CHG0003305,1917
+CHG0000361,1918
+CHG0000432,1919
+CHG0000456,1920
+CHG0001222,1921
+CHG0000623,1922
+CHG0000474,1923
+CHG0000534,1924
+CHG0000802,1925
+CHG0000788,1926
+CHG0001767,1927
+CHG0000604,1928
+CHG0000932,1929
+CHG0000532,1930
+CHG0000530,1931
+CHG0000540,1932
+CHG0000560,1933
+CHG0000576,1934
+CHG0000581,1935
+CHG0003516,1936
+CHG0000910,1937
+CHG0000571,1938
+CHG0000852,1939
+CHG0000819,1940
+CHG0000752,1941
+CHG0000664,1942
+CHG0000866,1943
+CHG0000868,1944
+CHG0000648,1945
+CHG0000765,1946
+CHG0000872,1947
+CHG0000585,1948
+CHG0000696,1949
+CHG0000774,1950
+CHG0001073,1951
+CHG0000649,1952
+CHG0000666,1953
+CHG0000650,1954
+CHG0000657,1955
+CHG0000760,1956
+CHG0001002,1957
+CHG0000724,1958
+CHG0000680,1959
+CHG0000921,1960
+CHG0001920,1961
+CHG0000695,1962
+CHG0000968,1963
+CHG0000702,1964
+CHG0000706,1965
+CHG0000708,1966
+CHG0001437,1967
+CHG0000874,1968
+CHG0000751,1969
+CHG0000894,1970
+CHG0000720,1971
+CHG0000770,1972
+CHG0000884,1973
+CHG0001389,1974
+CHG0000789,1975
+CHG0000797,1976
+CHG0000997,1977
+CHG0000792,1978
+CHG0000778,1979
+CHG0000803,1980
+CHG0000886,1981
+CHG0001080,1982
+CHG0000870,1983
+CHG0000912,1984
+CHG0000887,1985
+CHG0001414,1986
+CHG0000863,1987
+CHG0000865,1988
+CHG0000885,1989
+CHG0000888,1990
+CHG0001126,1991
+CHG0000892,1992
+CHG0000879,1993
+CHG0000913,1994
+CHG0000931,1995
+CHG0000959,1996
+CHG0001145,1997
+CHG0001210,1998
+CHG0000990,1999
+CHG0001006,2000
+CHG0001378,2001
+CHG0001015,2002
+CHG0001100,2003
+CHG0001226,2004
+CHG0001043,2005
+CHG0001138,2006
+CHG0001462,2007
+CHG0001230,2008
+CHG0001754,2009
+CHG0001264,2010
+CHG0002504,2011
+CHG0001285,2012
+CHG0001720,2013
+CHG0001831,2014
+CHG0001434,2015
+CHG0001355,2016
+CHG0001398,2017
+CHG0001358,2018
+CHG0001826,2019
+CHG0001419,2020
+CHG0001451,2021
+CHG0001379,2022
+CHG0001363,2023
+CHG0001492,2024
+CHG0001530,2025
+CHG0001943,2026
+CHG0001526,2027
+CHG0001442,2028
+CHG0001653,2029
+CHG0001444,2030
+CHG0001482,2031
+CHG0001685,2032
+CHG0001447,2033
+CHG0001525,2034
+3 - Moderate,2035
+2 - High,2036
+4 - Low,2037
+1 - Critical,2038
+Resolver 89,2039
+Resolver 31,2040
+Resolver 6,2041
+Resolver 125,2042
+Resolver 78,2043
+Resolver 186,2044
+Resolver 216,2045
+Resolver 236,2046
+Resolver 17,2047
+Resolver 249,2048
+Resolver 193,2049
+Resolver 180,2050
+Resolver 175,2051
+Resolver 97,2052
+Resolver 76,2053
+Resolver 201,2054
+Resolver 215,2055
+Resolver 227,2056
+Resolver 159,2057
+Resolver 170,2058
+Resolver 99,2059
+Resolver 253,2060
+Resolver 198,2061
+Resolver 135,2062
+Resolver 94,2063
+Resolver 149,2064
+Resolver 188,2065
+Resolver 4,2066
+Resolver 83,2067
+Resolver 33,2068
+Resolver 26,2069
+Resolver 69,2070
+Resolver 145,2071
+Resolver 176,2072
+Resolver 150,2073
+Resolver 34,2074
+Resolver 71,2075
+Resolver 134,2076
+Resolver 183,2077
+Resolver 127,2078
+Resolver 57,2079
+Resolver 18,2080
+Resolver 48,2081
+Resolver 182,2082
+Resolver 203,2083
+Resolver 84,2084
+Resolver 184,2085
+Resolver 28,2086
+Resolver 242,2087
+Resolver 130,2088
+Resolver 212,2089
+Resolver 121,2090
+Resolver 129,2091
+Resolver 166,2092
+Resolver 241,2093
+Resolver 229,2094
+Resolver 115,2095
+Resolver 126,2096
+Resolver 165,2097
+Resolver 64,2098
+Resolver 74,2099
+Resolver 153,2100
+Resolver 2,2101
+Resolver 208,2102
+Resolver 214,2103
+Resolver 141,2104
+Resolver 13,2105
+Resolver 15,2106
+Resolver 58,2107
+Resolver 207,2108
+Resolver 24,2109
+Resolver 148,2110
+Resolver 117,2111
+Resolver 82,2112
+Resolver 251,2113
+Resolver 139,2114
+Resolver 225,2115
+Resolver 111,2116
+Resolver 152,2117
+Resolver 132,2118
+Resolver 224,2119
+Resolver 7,2120
+Resolver 120,2121
+Resolver 167,2122
+Resolver 137,2123
+Resolver 247,2124
+Resolver 25,2125
+Resolver 196,2126
+Resolver 197,2127
+Resolver 93,2128
+Resolver 237,2129
+Resolver 234,2130
+Resolver 22,2131
+Resolver 230,2132
+Resolver 140,2133
+Resolver 40,2134
+Resolver 155,2135
+Resolver 169,2136
+Resolver 92,2137
+Resolver 56,2138
+Resolver 101,2139
+Resolver 44,2140
+Resolver 133,2141
+Resolver 202,2142
+Resolver 100,2143
+Resolver 168,2144
+Resolver 124,2145
+Resolver 43,2146
+Resolver 37,2147
+Resolver 246,2148
+Resolver 147,2149
+Resolver 178,2150
+Resolver 233,2151
+Resolver 45,2152
+Resolver 109,2153
+Resolver 194,2154
+Resolver 55,2155
+Resolver 223,2156
+Resolver 8,2157
+Resolver 23,2158
+Resolver 163,2159
+Resolver 59,2160
+Resolver 172,2161
+Resolver 200,2162
+Resolver 187,2163
+Resolver 238,2164
+Resolver 53,2165
+Resolver 199,2166
+Resolver 51,2167
+Resolver 49,2168
+Resolver 171,2169
+Resolver 210,2170
+Resolver 164,2171
+Resolver 219,2172
+Resolver 10,2173
+Resolver 73,2174
+Resolver 209,2175
+Resolver 103,2176
+Resolver 119,2177
+Resolver 47,2178
+Resolver 192,2179
+Resolver 239,2180
+Resolver 112,2181
+Resolver 41,2182
+Resolver 102,2183
+Resolver 220,2184
+Resolver 123,2185
+Resolver 116,2186
+Resolver 39,2187
+Resolver 3,2188
+Resolver 191,2189
+Resolver 32,2190
+Resolver 138,2191
+Resolver 65,2192
+Resolver 63,2193
+Resolver 81,2194
+Resolver 161,2195
+Resolver 143,2196
+Resolver 36,2197
+Resolver 190,2198
+Resolver 136,2199
+Resolver 151,2200
+Resolver 217,2201
+Resolver 232,2202
+Resolver 177,2203
+Resolver 156,2204
+Resolver 235,2205
+Resolver 12,2206
+Resolver 52,2207
+Resolver 30,2208
+Resolver 128,2209
+Resolver 21,2210
+Resolver 67,2211
+Resolver 218,2212
+Resolver 9,2213
+Resolver 206,2214
+Resolver 98,2215
+Resolver 110,2216
+Resolver 131,2217
+Resolver 144,2218
+Resolver 107,2219
+Resolver 244,2220
+Resolver 181,2221
+Resolver 96,2222
+Resolver 142,2223
+Resolver 245,2224
+Resolver 87,2225
+Resolver 158,2226
+Resolver 154,2227
+Resolver 46,2228
+Resolver 160,2229
+Resolver 252,2230
+Resolver 62,2231
+Resolver 38,2232
+Resolver 114,2233
+Resolver 146,2234
+Resolver 77,2235
+Resolver 106,2236
+Resolver 231,2237
+Resolver 5,2238
+Resolver 50,2239
+Resolver 222,2240
+Resolver 205,2241
+Resolver 108,2242
+Resolver 221,2243
+Resolver 90,2244
+Resolver 250,2245
+Resolver 20,2246
+Resolver 35,2247
+Resolver 228,2248
+Resolver 91,2249
+Resolver 16,2250
+Resolver 85,2251
+Resolver 88,2252
+Resolver 240,2253
+Resolver 11,2254
+Resolver 118,2255
+Resolver 211,2256
+Resolver 75,2257
+Resolver 19,2258
+Resolver 86,2259
+Resolver 42,2260
+Resolver 179,2261
+Resolver 105,2262
+Resolver 68,2263
+Resolver 66,2264
+Resolver 243,2265
+Resolver 104,2266
+Resolver 204,2267
+Resolver 213,2268
+Resolver 185,2269
+Resolver 174,2270
+Resolver 122,2271
+Resolver 27,2272
+code 8s,2273
+Vendor 3,2274
+Vendor 2,2275
+Vendor 1,2276
+CHG0001327,2279
+2,2284
+3,2285
+4,2286
+5,2287
+6,2288
+7,2289
+8,2290
+9,2291
+10,2292
+11,2293
+12,2294
+13,2295
+14,2296
+15,2297
+16,2298
+17,2299
+18,2300
+19,2301
+20,2302
+21,2303
+22,2304
+23,2305
+24,2306
+25,2307
+26,2308
+27,2309
+cmdb_ci 31,2310
+cmdb_ci 23,2311
+cmdb_ci 22,2312
+cmdb_ci 6,2313
+cmdb_ci 3,2314
+cmdb_ci 49,2315
+cmdb_ci 15,2316
+cmdb_ci 16,2317
+cmdb_ci 19,2318
+cmdb_ci 48,2319
+cmdb_ci 14,2320
+cmdb_ci 28,2321
+cmdb_ci 21,2322
+cmdb_ci 11,2323
+cmdb_ci 10,2324
+cmdb_ci 2,2325
+cmdb_ci 7,2326
+cmdb_ci 5,2327
+cmdb_ci 12,2328
+cmdb_ci 35,2329
+cmdb_ci 26,2330
+cmdb_ci 53,2331
+cmdb_ci 4,2332
+cmdb_ci 17,2333
+cmdb_ci 51,2334
+cmdb_ci 33,2335
+cmdb_ci 36,2336
+cmdb_ci 13,2337
+cmdb_ci 27,2338
+cmdb_ci 8,2339
+cmdb_ci 9,2340
+cmdb_ci 42,2341
+cmdb_ci 39,2342
+cmdb_ci 34,2343
+cmdb_ci 24,2344
+cmdb_ci 46,2345
+cmdb_ci 47,2346
+cmdb_ci 41,2347
+cmdb_ci 38,2348
+cmdb_ci 20,2349
+cmdb_ci 50,2350
+cmdb_ci 40,2351
+cmdb_ci 18,2352
+cmdb_ci 37,2353
+cmdb_ci 45,2354
+cmdb_ci 32,2355
+cmdb_ci 43,2356
+cmdb_ci 29,2357
+cmdb_ci 30,2358
+cmdb_ci 25,2359
+D_sys_mod_count_0,2363
+D_sys_mod_count_1,2364
+D_sys_mod_count_2,2365
+D_sys_mod_count_3,2366
+D_sys_mod_count_4,2367
+D_reopen_count_0,2368
+D_reopen_count_4,2369
+D_reopen_count_1,2370
+D_reopen_count_2,2371
+D_reopen_count_3,2372
