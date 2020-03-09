@@ -5,6 +5,7 @@ import argparse
 import os
 import logging
 import time
+import json
 
 backend = os.environ.get('DGLBACKEND', 'pytorch')
 if backend.lower() == 'mxnet':
@@ -253,6 +254,25 @@ def run(args, logger):
     if args.save_emb is True:
         print('Save model embedding to %s' % args.save_path)
         model.save_emb(args.save_path, args.dataset)
+
+        # We need to save the model configurations as well.
+        conf_file = os.path.join(args.save_emb, 'config.json')
+        with open(conf_file, 'w') as outfile:
+            json.dump({'dataset': args.dataset,
+                       'model': args.model_name,
+                       'emb_size': args.hidden_dim,
+                       'max_train_step': args.max_step,
+                       'batch_size': args.batch_size,
+                       'neg_sample_size': args.neg_sample_size,
+                       'lr': args.lr,
+                       'gamma': args.gamma,
+                       'double_ent': args.double_ent,
+                       'double_rel': args.double_rel,
+                       'neg_adversarial_sampling': args.neg_adversarial_sampling,
+                       'adversarial_temperature': args.adversarial_temperature,
+                       'regularization_coef': args.regularization_coef,
+                       'regularization_norm': args.regularization_norm},
+                       outfile, indent=4)
 
     # test
     if args.test:
