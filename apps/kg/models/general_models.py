@@ -8,6 +8,7 @@ Graph Embedding Model
 6. RotatE
 """
 import os
+import json
 import numpy as np
 import dgl.backend as F
 
@@ -146,6 +147,12 @@ class KEModel(object):
             self.relation_emb.save(path, dataset+'_'+self.model_name+'_relation')   
 
         self.score_func.save(path, dataset+'_'+self.model_name)
+
+        # We need to save the model configurations as well.
+        conf_file = os.path.join(path, 'config.json')
+        with open(conf_file, 'w') as outfile:
+            json.dump({'model': self.model_name,
+                       'emb_size': self.hidden_dim}, outfile)
 
     def load_emb(self, path, dataset):
         """Load the model.
