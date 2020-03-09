@@ -65,7 +65,7 @@ In addition, atom mapping information is provided.
 You can then train a model on new datasets with 
 
 ```bash
-python find_reaction_center.py -t X -v Y -t Z
+python find_reaction_center.py --train-path X --val-path Y --test-path Z
 ```
 
 where `X`, `Y`, `Z` are paths to the new training/validation/test set as described above.

@@ -139,15 +139,15 @@ if __name__ == '__main__':
     from configure import reaction_center_config
 
     parser = ArgumentParser(description='Reaction Center Identification')
-    parser.add_argument('-r', '--result-path', type=str, default='center_results',
+    parser.add_argument('--result-path', type=str, default='center_results',
                         help='Path to training results')
-    parser.add_argument('-t', '--train-path', type=str, default=None,
+    parser.add_argument('--train-path', type=str, default=None,
                         help='Path to a new training set. '
                              'If None, we will use the default training set in USPTO.')
-    parser.add_argument('-v', '--val-path', type=str, default=None,
+    parser.add_argument('--val-path', type=str, default=None,
                         help='Path to a new validation set. '
                              'If None, we will use the default validation set in USPTO.')
-    parser.add_argument('-t', '--test-path', type=str, default=None,
+    parser.add_argument('--test-path', type=str, default=None,
                         help='Path to a new test set.'
                              'If None, we will use the default test set in USPTO.')
     args = parser.parse_args().__dict__
