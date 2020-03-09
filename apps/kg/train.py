@@ -38,8 +38,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='a list of data files, e.g. entity relation train valid test')
         self.add_argument('--save_path', type=str, default='ckpts',
                           help='place to save models and logs')
-        self.add_argument('--save_emb', action='store_true',
-                          help='save model embedding to save_path')
+        self.add_argument('--save_emb', type=str, default=None,
+                          help='save the embeddings in the specific location.')
         self.add_argument('--max_step', type=int, default=80000,
                           help='train xx steps')
         self.add_argument('--batch_size', type=int, default=1024,
@@ -316,9 +316,10 @@ def run(args, logger):
 
     print('training takes {} seconds'.format(time.time() - start))
 
-    if args.save_emb is True:
-        print('Save model embedding to %s' % args.save_path)
-        model.save_emb(args.save_path, args.dataset)
+    if args.save_emb is not None:
+        if not os.path.exists(args.save_emb):
+            os.mkdir(args.save_emb)
+        model.save_emb(args.save_emb, args.dataset)
 
         # We need to save the model configurations as well.
         conf_file = os.path.join(args.save_path, 'config.json')

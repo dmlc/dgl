@@ -274,8 +274,10 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             end += count
             percent += 1
 
-        if args.save_emb is True:
-            model_test.save_emb(args.save_path, args.dataset)
+            if args.save_emb is not None:
+                if not os.path.exists(args.save_emb):
+                    os.mkdir(args.save_emb)
+                model.save_emb(args.save_emb, args.dataset)
 
         if args.test:
             args.num_thread = 1

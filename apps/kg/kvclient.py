@@ -37,8 +37,8 @@ class ArgParser(argparse.ArgumentParser):
                                 'raw_udd_{htr} and udd_{htr}')
         self.add_argument('--save_path', type=str, default='../ckpts',
                           help='place to save models and logs')
-        self.add_argument('--save_emb', action='store_true',
-                          help='save model embedding to save_path')
+        self.add_argument('--save_emb', type=str, default=None,
+                          help='save the embeddings in the specific location.')
         self.add_argument('--max_step', type=int, default=80000,
                           help='train xx steps')
         self.add_argument('--batch_size', type=int, default=1024,
