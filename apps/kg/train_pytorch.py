@@ -199,7 +199,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
             queue.put(logs)
         else:
             for k, v in metrics.items():
-                print('[{}]{} average {} at [{}/{}]: {}'.format(rank, mode, k, args.step, args.max_step, v))
+                print('[{}]{} average {}: {}'.format(rank, mode, k, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
 
