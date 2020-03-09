@@ -414,7 +414,7 @@ if __name__ == '__main__':
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of propagation rounds")
-    parser.add_argument("-e", "--n-epochs", type=int, default=5,
+    parser.add_argument("-e", "--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
