@@ -113,9 +113,8 @@ class GATConv(nn.Module):
         # which further speeds up computation and saves memory footprint.
         el = (feat * self.attn_l).sum(dim=-1).unsqueeze(-1)
         er = (feat * self.attn_r).sum(dim=-1).unsqueeze(-1)
-        # el and er are a_l Wh_i and a_r Wh_j respectively.
         graph.ndata.update({'ft': feat, 'el': el, 'er': er})
-        # compute edge attention
+        # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
         graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
         e = self.leaky_relu(graph.edata.pop('e'))
         # compute softmax
