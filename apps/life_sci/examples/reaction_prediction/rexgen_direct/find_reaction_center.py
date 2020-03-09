@@ -74,13 +74,10 @@ def main(args):
     total_iter = 0
     grad_norm_sum = 0
     loss_sum = 0
-    dur = []
+    t0 = time.time()
     for epoch in range(args['num_epochs']):
-        model.train()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
-            if total_iter >= 3:
-                t0 = time.time()
 
             batch_reactions, batch_graph_edits, batch_mols, batch_mol_graphs, \
             batch_complete_graphs, batch_atom_pair_labels = batch_data
@@ -96,14 +93,11 @@ def main(args):
             optimizer.step()
             scheduler.step()
 
-            if total_iter >= 3:
-                dur.append(time.time() - t0)
-
             if total_iter % args['print_every'] == 0:
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/minibatch {:.4f} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
-                    np.mean(dur), loss_sum / args['print_every'],
+                    (time.time() - t0) / total_iter, loss_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
                 grad_norm_sum = 0
                 loss_sum = 0
