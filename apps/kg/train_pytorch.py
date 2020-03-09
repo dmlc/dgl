@@ -189,7 +189,6 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
     with th.no_grad():
         logs = []
         for sampler in test_samplers:
-            count = 0
             for pos_g, neg_g in sampler:
                 model.forward_test(pos_g, neg_g, logs, gpu_id)
 
