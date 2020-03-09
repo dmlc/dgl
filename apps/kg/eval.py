@@ -103,6 +103,7 @@ def main(args):
     if args.neg_sample_size_test < 0:
         args.neg_sample_size_test = args.neg_sample_size = eval_dataset.g.number_of_nodes()
 
+    args.num_workers = 8 # fix num_workers to 8
     test_sampler_tails = []
     test_sampler_heads = []
     for i in range(args.num_proc):
@@ -111,14 +112,14 @@ def main(args):
                                                         args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-head',
-                                                        num_workers=1,
+                                                        num_workers=args.num_workers,
                                                         rank=i, ranks=args.num_proc)
         test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                         args.neg_sample_size_test,
                                                         args.neg_sample_size_test,
                                                         args.eval_filter,
                                                         mode='chunk-tail',
-                                                        num_workers=1,
+                                                        num_workers=args.num_workers,
                                                         rank=i, ranks=args.num_proc)
         test_sampler_heads.append(test_sampler_head)
         test_sampler_tails.append(test_sampler_tail)

@@ -144,13 +144,14 @@ def run(args, logger):
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
 
+    args.num_workers = 8 # fix num_worker to 8
     train_samplers = []
     for i in range(args.num_proc):
         train_sampler_head = train_data.create_sampler(args.batch_size,
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='head',
-                                                       num_workers=4,
+                                                       num_workers=args.num_workers,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)
@@ -158,7 +159,7 @@ def run(args, logger):
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='tail',
-                                                       num_workers=4,
+                                                       num_workers=arg.num_workers,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)
@@ -186,14 +187,14 @@ def run(args, logger):
                                                               args.neg_sample_size_valid,
                                                               args.eval_filter,
                                                               mode='chunk-head',
-                                                              num_workers=1,
+                                                              num_workers=args.num_workers,
                                                               rank=i, ranks=args.num_proc)
             valid_sampler_tail = eval_dataset.create_sampler('valid', args.batch_size_eval,
                                                               args.neg_sample_size_valid,
                                                               args.neg_sample_size_valid,
                                                               args.eval_filter,
                                                               mode='chunk-tail',
-                                                              num_workers=1,
+                                                              num_workers=args.num_workers,
                                                               rank=i, ranks=args.num_proc)
             valid_sampler_heads.append(valid_sampler_head)
             valid_sampler_tails.append(valid_sampler_tail)
@@ -206,14 +207,14 @@ def run(args, logger):
                                                              args.neg_sample_size_test,
                                                              args.eval_filter,
                                                              mode='chunk-head',
-                                                             num_workers=1,
+                                                             num_workers=args.num_workers,
                                                              rank=i, ranks=args.num_test_proc)
             test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                              args.neg_sample_size_test,
                                                              args.neg_sample_size_test,
                                                              args.eval_filter,
                                                              mode='chunk-tail',
-                                                             num_workers=1,
+                                                             num_workers=args.num_workers,
                                                              rank=i, ranks=args.num_test_proc)
             test_sampler_heads.append(test_sampler_head)
             test_sampler_tails.append(test_sampler_tail)

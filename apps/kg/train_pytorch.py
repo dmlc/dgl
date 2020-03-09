@@ -288,14 +288,14 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
-                                                                num_workers=args.num_thread,
+                                                                num_workers=args.num_workers,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
                                                                 args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
-                                                                num_workers=args.num_thread,
+                                                                num_workers=args.num_workers,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_heads.append(test_sampler_head)
                 test_sampler_tails.append(test_sampler_tail)

@@ -199,13 +199,14 @@ def start_worker(args, logger):
     args.strict_rel_part = args.mix_cpu_gpu and (train_data.cross_part == False)
     args.soft_rel_part = args.mix_cpu_gpu and args.soft_rel_part and train_data.cross_part
 
+    args.num_workers = 8 # fix num_workers to 8
     train_samplers = []
     for i in range(args.num_client):
         train_sampler_head = train_data.create_sampler(args.batch_size,
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='head',
-                                                       num_workers=1,
+                                                       num_workers=args.num_workers,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)
@@ -213,7 +214,7 @@ def start_worker(args, logger):
                                                        args.neg_sample_size,
                                                        args.neg_sample_size,
                                                        mode='tail',
-                                                       num_workers=1,
+                                                       num_workers=args.num_workers,
                                                        shuffle=True,
                                                        exclude_positive=False,
                                                        rank=i)
