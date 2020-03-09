@@ -195,7 +195,7 @@ def run(args, logger):
                                                        exclude_positive=False)
         train_sampler = NewBidirectionalOneShotIterator(train_sampler_head, train_sampler_tail,
                                                         args.neg_sample_size, args.neg_sample_size,
-                                                        True, n_entities)
+                                                        True, dataset.n_entities)
 
 
     if args.valid or args.test:
