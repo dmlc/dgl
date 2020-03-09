@@ -30,7 +30,8 @@ setup(
         'torch>=1'
         'scikit-learn>=0.21.2',
         'pandas>=0.25.1',
-        'requests>=2.22.0'
+        'requests>=2.22.0',
+        'tqdm'
     ],
     url='https://github.com/dmlc/dgl/tree/master/apps/life_sci',
     classifiers=[

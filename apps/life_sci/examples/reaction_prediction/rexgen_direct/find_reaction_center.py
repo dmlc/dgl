@@ -2,7 +2,7 @@ import numpy as np
 import time
 import torch
 
-from dgllife.data import USPTO
+from dgllife.data import USPTO, WLNReactionDataset
 from dgllife.model import WLNReactionCenter
 from torch.nn import BCEWithLogitsLoss
 from torch.nn.utils import clip_grad_norm_
@@ -51,9 +51,21 @@ def eval_on_a_loader(args, model, data_loader):
 
 def main(args):
     setup(args)
-    train_set = USPTO('train')
-    val_set = USPTO('val')
-    test_set = USPTO('test')
+    if args['train_path'] is None:
+        train_set = USPTO('train')
+    else:
+        train_set = WLNReactionDataset(raw_file_path=args['train_path'],
+                                       mol_graph_path='train.bin')
+    if args['val_path'] is None:
+        val_set = USPTO('val')
+    else:
+        val_set = WLNReactionDataset(raw_file_path=args['val_path'],
+                                     mol_graph_path='val.bin')
+    if args['test_path'] is None:
+        test_set = USPTO('test')
+    else:
+        test_set = WLNReactionDataset(raw_file_path=args['test_path'],
+                                      mol_graph_path='test.bin')
     train_loader = DataLoader(train_set, batch_size=args['batch_size'],
                               collate_fn=collate)
     val_loader = DataLoader(val_set, batch_size=args['batch_size'],
@@ -129,6 +141,15 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Reaction Center Identification')
     parser.add_argument('-r', '--result-path', type=str, default='center_results',
                         help='Path to training results')
+    parser.add_argument('-t', '--train-path', type=str, default=None,
+                        help='Path to a new training set. '
+                             'If None, we will use the default training set in USPTO.')
+    parser.add_argument('-v', '--val-path', type=str, default=None,
+                        help='Path to a new validation set. '
+                             'If None, we will use the default validation set in USPTO.')
+    parser.add_argument('-t', '--test-path', type=str, default=None,
+                        help='Path to a new test set.'
+                             'If None, we will use the default test set in USPTO.')
     args = parser.parse_args().__dict__
     args.update(reaction_center_config)
 

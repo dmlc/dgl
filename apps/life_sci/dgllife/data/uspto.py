@@ -1,5 +1,6 @@
 """USPTO for reaction prediction"""
 import numpy as np
+import os
 import torch
 
 from collections import defaultdict
@@ -8,13 +9,15 @@ from dgl.data.utils import get_download_dir, download, _get_dgl_url, extract_arc
 from functools import partial
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdmolops
+from tqdm import tqdm
 
 from ..utils.featurizers import BaseAtomFeaturizer, ConcatFeaturizer, atom_type_one_hot, \
     atom_degree_one_hot, atom_explicit_valence_one_hot, atom_implicit_valence_one_hot, \
     atom_is_aromatic, BaseBondFeaturizer, bond_type_one_hot, bond_is_conjugated, bond_is_in_ring
 from ..utils.mol_to_graph import mol_to_bigraph, mol_to_complete_graph
 
-__all__ = ['USPTO']
+__all__ = ['WLNReactionDataset',
+           'USPTO']
 
 # Disable RDKit warnings
 RDLogger.DisableLog('rdApp.*')
@@ -138,28 +141,92 @@ def get_pair_label(reactants_mol, graph_edits):
 
     return labels.reshape(-1, 5)
 
-class USPTO(object):
-    """USPTO dataset for reaction prediction.
-
-    The dataset contains reactions from patents granted by United States Patent
-    and Trademark Office (USPTO), collected by Lowe [1]. Jin et al. removes duplicates
-    and erroneous reactions, obtaining a set of 480K reactions. They divide it
-    into 400K, 40K, and 40K for training, validation and test.
-
-    References:
-
-        * [1] Patent reaction extraction
-        * [2] Predicting Organic Reaction Outcomes with Weisfeiler-Lehman Network
+def get_bond_changes(reaction):
+    """Get the bond changes in a reaction.
 
     Parameters
     ----------
-    subset : str
-        Whether to use the full dataset or training/validation/test set as in Jin et al.
+    reaction : str
+        SMILES for a reaction, e.g. [CH3:14][NH2:15].[N+:1](=[O:2])([O-:3])[c:4]1[cH:5][c:6]([C:7]
+        (=[O:8])[OH:9])[cH:10][cH:11][c:12]1[Cl:13].[OH2:16]>>[N+:1](=[O:2])([O-:3])[c:4]1[cH:5]
+        [c:6]([C:7](=[O:8])[OH:9])[cH:10][cH:11][c:12]1[NH:15][CH3:14]. It consists of reactants,
+        products and the atom mapping.
 
-        * 'full' for the complete dataset
-        * 'train' for the training set
-        * 'val' for the validation set
-        * 'test' for the test set
+    Returns
+    -------
+    bond_changes : set of 3-tuples
+        Each tuple consists of (atom1, atom2, change type)
+        There are 5 possible values for change type. 0 for losing the bond, and 1, 2, 3, 1.5
+        separately for forming a single, double, triple or aromatic bond.
+    """
+    reactants = Chem.MolFromSmiles(reaction.split('>')[0])
+    products  = Chem.MolFromSmiles(reaction.split('>')[2])
+
+    conserved_maps = [
+        a.GetProp('molAtomMapNumber')
+        for a in products.GetAtoms() if a.HasProp('molAtomMapNumber')]
+    bond_changes = set() # keep track of bond changes
+
+    # Look at changed bonds
+    bonds_prev = {}
+    for bond in reactants.GetBonds():
+        nums = sorted(
+            [bond.GetBeginAtom().GetProp('molAtomMapNumber'),
+             bond.GetEndAtom().GetProp('molAtomMapNumber')])
+        if (nums[0] not in conserved_maps) and (nums[1] not in conserved_maps):
+            continue
+        bonds_prev['{}~{}'.format(nums[0], nums[1])] = bond.GetBondTypeAsDouble()
+    bonds_new = {}
+    for bond in products.GetBonds():
+        nums = sorted(
+            [bond.GetBeginAtom().GetProp('molAtomMapNumber'),
+             bond.GetEndAtom().GetProp('molAtomMapNumber')])
+        bonds_new['{}~{}'.format(nums[0], nums[1])] = bond.GetBondTypeAsDouble()
+
+    for bond in bonds_prev:
+        if bond not in bonds_new:
+            # lost bond
+            bond_changes.add((bond.split('~')[0], bond.split('~')[1], 0.0))
+        else:
+            if bonds_prev[bond] != bonds_new[bond]:
+                # changed bond
+                bond_changes.add((bond.split('~')[0], bond.split('~')[1], bonds_new[bond]))
+    for bond in bonds_new:
+        if bond not in bonds_prev:
+            # new bond
+            bond_changes.add((bond.split('~')[0], bond.split('~')[1], bonds_new[bond]))
+
+    return bond_changes
+
+def process_file(path):
+    """Pre-process a file of reactions for working with WLN.
+
+    Parameters
+    ----------
+    path : str
+        Path to the file of reactions
+    """
+    with open(path, 'r') as input_file, open(path + '.proc', 'w') as output_file:
+        for line in tqdm(input_file):
+            reaction = line.strip()
+            bond_changes = get_bond_changes(reaction)
+            output_file.write('{} {}\n'.format(
+                reaction,
+                ';'.join(['{}-{}-{}'.format(x[0], x[1], x[2]) for x in bond_changes])))
+    print('Finished processing {}'.format(path))
+
+class WLNReactionDataset(object):
+    """Dataset for reaction prediction with WLN
+
+    Parameters
+    ----------
+    raw_file_path : str
+        Path to the raw reaction file, where each line is the SMILES for a reaction.
+        We will check if raw_file_path + '.proc' exists, where each line has the reaction
+        SMILES and the corresponding graph edits. If not, we will preprocess
+        the raw reaction file.
+    mol_graph_path : str
+        Path to save/load DGLGraphs for molecules.
     mol_to_graph: callable, str -> DGLGraph
         A function turning RDKit molecule instances into DGLGraphs.
         Default to :func:`dgllife.utils.mol_to_bigraph`.
@@ -181,66 +248,46 @@ class USPTO(object):
         featurization methods and need to preprocess from scratch. Default to True.
     """
     def __init__(self,
-                 subset,
+                 raw_file_path,
+                 mol_graph_path,
                  mol_to_graph=mol_to_bigraph,
                  node_featurizer=default_node_featurizer,
                  edge_featurizer=default_edge_featurizer,
                  atom_pair_featurizer=default_atom_pair_featurizer,
                  load=True):
-        super(USPTO, self).__init__()
-
-        assert subset in ['full', 'train', 'val', 'test'], \
-            'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
-        self._subset = subset
+        super(WLNReactionDataset, self).__init__()
 
         self._atom_pair_featurizer = atom_pair_featurizer
-        self._url = 'dataset/uspto.zip'
-        data_path = get_download_dir() + '/uspto.zip'
-        extracted_data_path = get_download_dir() + '/uspto'
-        download(_get_dgl_url(self._url), path=data_path)
-        extract_archive(data_path, extracted_data_path)
-
-        self.reactions = []
-        self.graph_edits = []
-        self.mols = []
-        self.reactant_mol_graphs = []
         self.atom_pair_features = []
         self.atom_pair_labels = []
         # Map number of nodes to a corresponding complete graph
         self.complete_graphs = dict()
 
-        if self.subset == 'full':
-            subsets = ['train', 'valid', 'test']
-        elif self.subset == 'val':
-            subsets = ['valid']
+        path_to_reaction_file = raw_file_path + '.proc'
+        if not os.path.isfile(path_to_reaction_file):
+            # Pre-process graph edits information
+            process_file(raw_file_path)
+
+        full_mols, full_reactions, full_graph_edits = \
+            self.load_reaction_data(path_to_reaction_file)
+        if load and os.path.isfile(mol_graph_path):
+            self.reactant_mol_graphs, _ = load_graphs(mol_graph_path)
         else:
-            subsets = [self.subset]
+            self.reactant_mol_graphs = []
+            for i in range(len(full_mols)):
+                if i % 10000 == 0:
+                    print('Processing reaction {:d}/{:d}'.format(i + 1, len(full_mols)))
+                mol = full_mols[i]
+                reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
+                                                  edge_featurizer=edge_featurizer,
+                                                  canonical_atom_order=False)
+                self.reactant_mol_graphs.append(reactant_mol_graph)
 
-        for set in subsets:
-            print('Preparing {} set'.format(set))
-            file_path = extracted_data_path + '/{}.txt.proc'.format(set)
-            set_mols, set_reactions, set_graph_edits = self.load_reaction_data(file_path)
-            set_reactant_mol_graphs = []
-            if load:
-                set_reactant_mol_graphs, _ = load_graphs(
-                    extracted_data_path + '/{}_mol_graphs.bin'.format(set))
-            else:
-                for i in range(len(set_mols)):
-                    print('Processing reaction {:d}/{:d} for {} set'.format(
-                        i + 1, len(set_mols), set))
-                    mol = set_mols[i]
-                    reactant_mol_graph = mol_to_graph(mol, node_featurizer=node_featurizer,
-                                                      edge_featurizer=edge_featurizer,
-                                                      canonical_atom_order=False)
-                    set_reactant_mol_graphs.append(reactant_mol_graph)
+            save_graphs(mol_graph_path, self.reactant_mol_graphs)
 
-                save_graphs(extracted_data_path + '/{}_mol_graphs.bin'.format(set),
-                            set_reactant_mol_graphs)
-
-            self.mols.extend(set_mols)
-            self.reactions.extend(set_reactions)
-            self.graph_edits.extend(set_graph_edits)
-            self.reactant_mol_graphs.extend(set_reactant_mol_graphs)
+        self.mols = full_mols
+        self.reactions = full_reactions
+        self.graph_edits = full_graph_edits
         self.atom_pair_features.extend([None for _ in range(len(self.mols))])
         self.atom_pair_labels.extend([None for _ in range(len(self.mols))])
 
@@ -300,21 +347,6 @@ class USPTO(object):
 
         return all_mols, all_reactions, all_graph_edits
 
-    @property
-    def subset(self):
-        """Get the subset used for USPTO
-
-        Returns
-        -------
-        str
-
-            * 'full' for the complete dataset
-            * 'train' for the training set
-            * 'val' for the validation set
-            * 'test' for the test set
-        """
-        return self._subset
-
     def __len__(self):
         """Get the size for the dataset.
 
@@ -366,3 +398,87 @@ class USPTO(object):
                self.complete_graphs[num_atoms], \
                self.atom_pair_features[item], \
                self.atom_pair_labels[item]
+
+class USPTO(WLNReactionDataset):
+    """USPTO dataset for reaction prediction.
+
+    The dataset contains reactions from patents granted by United States Patent
+    and Trademark Office (USPTO), collected by Lowe [1]. Jin et al. removes duplicates
+    and erroneous reactions, obtaining a set of 480K reactions. They divide it
+    into 400K, 40K, and 40K for training, validation and test.
+
+    References:
+
+        * [1] Patent reaction extraction
+        * [2] Predicting Organic Reaction Outcomes with Weisfeiler-Lehman Network
+
+    Parameters
+    ----------
+    subset : str
+        Whether to use the training/validation/test set as in Jin et al.
+
+        * 'train' for the training set
+        * 'val' for the validation set
+        * 'test' for the test set
+    mol_to_graph: callable, str -> DGLGraph
+        A function turning RDKit molecule instances into DGLGraphs.
+        Default to :func:`dgllife.utils.mol_to_bigraph`.
+    node_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for nodes like atoms in a molecule, which can be used to update
+        ndata for a DGLGraph. By default, we consider descriptors including atom type,
+        atom degree, atom explicit valence, atom implicit valence, aromaticity.
+    edge_featurizer : callable, rdkit.Chem.rdchem.Mol -> dict
+        Featurization for edges like bonds in a molecule, which can be used to update
+        edata for a DGLGraph. By default, we consider descriptors including bond type,
+        whether bond is conjugated and whether bond is in ring.
+    atom_pair_featurizer : callable, str -> dict
+        Featurization for each pair of atoms in multiple reactants. The result will be
+        used to update edata in the complete DGLGraphs. By default, the features include
+        the bond type between the atoms (if any) and whether they belong to the same molecule.
+    load : bool
+        Whether to load the previously pre-processed dataset or pre-process from scratch.
+        ``load`` should be False when we want to try different graph construction and
+        featurization methods and need to preprocess from scratch. Default to True.
+    """
+    def __init__(self,
+                 subset,
+                 mol_to_graph=mol_to_bigraph,
+                 node_featurizer=default_node_featurizer,
+                 edge_featurizer=default_edge_featurizer,
+                 atom_pair_featurizer=default_atom_pair_featurizer,
+                 load=True):
+        assert subset in ['train', 'val', 'test'], \
+            'Expect subset to be "train" or "val" or "test", got {}'.format(subset)
+        self._subset = subset
+        if subset == 'val':
+            subset = 'valid'
+
+        self._url = 'dataset/uspto.zip'
+        data_path = get_download_dir() + '/uspto.zip'
+        extracted_data_path = get_download_dir() + '/uspto'
+        download(_get_dgl_url(self._url), path=data_path)
+        extract_archive(data_path, extracted_data_path)
+
+        super(USPTO, self).__init__(
+            raw_file_path=extracted_data_path + '/{}.txt'.format(subset),
+            mol_graph_path=extracted_data_path + '/{}_mol_graphs.bin'.format(subset),
+            mol_to_graph=mol_to_graph,
+            node_featurizer=node_featurizer,
+            edge_featurizer=edge_featurizer,
+            atom_pair_featurizer=atom_pair_featurizer,
+            load=load)
+
+    @property
+    def subset(self):
+        """Get the subset used for USPTO
+
+        Returns
+        -------
+        str
+
+            * 'full' for the complete dataset
+            * 'train' for the training set
+            * 'val' for the validation set
+            * 'test' for the test set
+        """
+        return self._subset
