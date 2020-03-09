@@ -118,9 +118,16 @@ def main(args):
             if total_iter % args['decay_every'] == 0:
                 torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
 
-        print('Epoch {:d}/{:d}, validation ' + eval_on_a_loader(args, model, val_loader))
+        print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
+              eval_on_a_loader(args, model, val_loader))
 
+    del train_loader
+    del val_loader
+    del train_set
+    del val_set
+    print('Evaluation on the test set.')
     test_result = eval_on_a_loader(args, model, test_loader)
+    print(test_result)
     with open(args['result_path'] + '/results.txt', 'w') as f:
         f.write(test_result)
 
