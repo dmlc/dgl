@@ -372,7 +372,6 @@ def run(args, logger):
                 proc.join()
         else:
             test(args, model, [test_sampler_head, test_sampler_tail])
-
         print('test:', time.time() - start)
 
 if __name__ == '__main__':
