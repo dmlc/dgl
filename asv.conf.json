@@ -17,7 +17,7 @@
     // uninstalling the project. See asv.conf.json documentation.
     //
     "install_command": [
-        "in-dir={env_dir} python -c \"print('skip')\""
+        "in-dir={env_dir} python -m pip install numpy"
     ],
     "build_command": [
         "python -c \"print('skip')\""
