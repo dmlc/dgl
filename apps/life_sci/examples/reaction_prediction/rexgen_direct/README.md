@@ -17,7 +17,7 @@ The dataset is divided into 400K, 40K, and 40K for training, validation and test
 
 Reaction centers refer to the pairs of atoms that lose/form a bond in the reactions. A Graph neural network 
 (Weisfeiler-Lehman Network in this case) is trained to update the representations of all atoms. Then we combine 
-the atom representations to predict the likelihood 
+pairs of atom representations to predict the likelihood for the corresponding atoms to form/lose a bond.
 
 ## References
 
