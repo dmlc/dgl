@@ -75,6 +75,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='do evaluation after every x steps')
         self.add_argument('--eval_interval', type=int, default=10000,
                           help='do evaluation after every x steps')
+        self.add_argument('--eval_percent', type=float, default=1,
+                          help='sample some percentage for evaluation.')
         self.add_argument('-adv', '--neg_adversarial_sampling', action='store_true',
                           help='if use negative adversarial sampling')
         self.add_argument('-a', '--adversarial_temperature', default=1.0, type=float,
