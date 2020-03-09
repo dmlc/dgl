@@ -74,8 +74,9 @@ def main(args):
     total_iter = 0
     grad_norm_sum = 0
     loss_sum = 0
-    t0 = time.time()
+    dur = []
     for epoch in range(args['num_epochs']):
+        t0 = time.time()
         for batch_id, batch_data in enumerate(train_loader):
             total_iter += 1
 
@@ -97,7 +98,7 @@ def main(args):
                 progress = 'Epoch {:d}/{:d}, iter {:d}/{:d} | time/minibatch {:.4f} | ' \
                            'loss {:.4f} | grad norm {:.4f}'.format(
                     epoch + 1, args['num_epochs'], batch_id + 1, len(train_loader),
-                    (time.time() - t0) / total_iter, loss_sum / args['print_every'],
+                    (np.sum(dur) + time.time() - t0) / total_iter, loss_sum / args['print_every'],
                     grad_norm_sum / args['print_every'])
                 grad_norm_sum = 0
                 loss_sum = 0
@@ -106,6 +107,7 @@ def main(args):
             if total_iter % args['decay_every'] == 0:
                 torch.save(model.state_dict(), args['result_path'] + '/model.pkl')
 
+        dur.append(time.time() - t0)
         print('Epoch {:d}/{:d}, validation '.format(epoch + 1, args['num_epochs']) + \
               eval_on_a_loader(args, model, val_loader))
 
