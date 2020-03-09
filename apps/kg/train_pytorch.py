@@ -112,11 +112,10 @@ def train(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=Non
     update_time = 0
     forward_time = 0
     backward_time = 0
-    for step in range(args.init_step, args.max_step):
+    for step in range(0, args.max_step):
         start1 = time.time()
         pos_g, neg_g = next(train_sampler)
         sample_time += time.time() - start1
-        args.step = step
 
         if client is not None:
             model.pull_model(client, pos_g, neg_g)
@@ -200,7 +199,7 @@ def test(args, model, test_samplers, rank=0, mode='Test', queue=None):
             queue.put(logs)
         else:
             for k, v in metrics.items():
-                print('[{}]{} average {} at [{}/{}]: {}'.format(rank, mode, k, args.step, args.max_step, v))
+                print('[{}]{} average {}: {}'.format(rank, mode, k, v))
     test_samplers[0] = test_samplers[0].reset()
     test_samplers[1] = test_samplers[1].reset()
 
@@ -212,6 +211,8 @@ def train_mp(args, model, train_sampler, valid_samplers=None, rank=0, rel_parts=
 
 @thread_wrapped_func
 def test_mp(args, model, test_samplers, rank=0, mode='Test', queue=None):
+    if args.num_proc > 1:
+        th.set_num_threads(args.num_thread)
     test(args, model, test_samplers, rank, mode, queue)
 
 @thread_wrapped_func
@@ -248,11 +249,6 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
         if args.neg_deg_sample_eval:
             assert not args.eval_filter, "if negative sampling based on degree, we can't filter positive edges."
 
-        if args.neg_chunk_size_valid < 0:
-            args.neg_chunk_size_valid = args.neg_sample_size_valid
-        if args.neg_chunk_size_test < 0:
-            args.neg_chunk_size_test = args.neg_sample_size_test
-
         print("Pull relation_emb ...")
         relation_id = F.arange(0, model_test.n_relations)
         relation_data = client.pull(name='relation_emb', id_tensor=relation_id)
@@ -278,10 +274,10 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             end += count
             percent += 1
 
-        if args.save_emb is not None:
-            if not os.path.exists(args.save_emb):
-                os.mkdir(args.save_emb)
-            model_test.save_emb(args.save_emb, args.dataset)
+            if args.save_emb is not None:
+                if not os.path.exists(args.save_emb):
+                    os.mkdir(args.save_emb)
+                model.save_emb(args.save_emb, args.dataset)
 
         if args.test:
             args.num_thread = 1
@@ -290,17 +286,17 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             for i in range(args.num_test_proc):
                 test_sampler_head = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                args.neg_chunk_size_test,
+                                                                args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-head',
-                                                                num_workers=args.num_thread,
+                                                                num_workers=args.num_workers,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_tail = eval_dataset.create_sampler('test', args.batch_size_eval,
                                                                 args.neg_sample_size_test,
-                                                                args.neg_chunk_size_test,
+                                                                args.neg_sample_size_test,
                                                                 args.eval_filter,
                                                                 mode='chunk-tail',
-                                                                num_workers=args.num_thread,
+                                                                num_workers=args.num_workers,
                                                                 rank=i, ranks=args.num_test_proc)
                 test_sampler_heads.append(test_sampler_head)
                 test_sampler_tails.append(test_sampler_tail)
@@ -332,7 +328,7 @@ def dist_train_test(args, model, train_sampler, entity_pb, relation_pb, l2g, ran
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             for k, v in metrics.items():
-                print('Test average {} at [{}/{}]: {}'.format(k, args.step, args.max_step, v))
+                print('Test average {} : {}'.format(k, v))
 
             for proc in procs:
                 proc.join()
