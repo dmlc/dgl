@@ -161,7 +161,7 @@ def run(args, logger):
                                                            args.neg_sample_size,
                                                            args.neg_sample_size,
                                                            mode='tail',
-                                                           num_workers=arg.num_workers,
+                                                           num_workers=args.num_workers,
                                                            shuffle=True,
                                                            exclude_positive=False,
                                                            rank=i)
@@ -365,7 +365,7 @@ def run(args, logger):
                 proc.join()
         else:
             test(args, model, [test_sampler_head, test_sampler_tail])
-            
+
         print('test:', time.time() - start)
 
 if __name__ == '__main__':
