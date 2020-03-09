@@ -322,7 +322,7 @@ def run(args, logger):
         model.save_emb(args.save_emb, args.dataset)
 
         # We need to save the model configurations as well.
-        conf_file = os.path.join(args.save_path, 'config.json')
+        conf_file = os.path.join(args.save_emb, 'config.json')
         with open(conf_file, 'w') as outfile:
             json.dump({'dataset': args.dataset,
                        'model': args.model_name,
