@@ -43,6 +43,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='hidden dim used by relation and entity')
         self.add_argument('-g', '--gamma', type=float, default=12.0,
                           help='margin value')
+        self.add_argument('--eval_percent', type=float, default=1,
+                          help='sample some percentage for evaluation.')
         self.add_argument('--no_eval_filter', action='store_true',
                           help='do not filter positive edges among negative edges for evaluation')
         self.add_argument('--gpu', type=int, default=[-1], nargs='+',

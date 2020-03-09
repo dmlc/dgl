@@ -53,6 +53,8 @@ class ArgParser(argparse.ArgumentParser):
                           help='negative sampling size for validation')
         self.add_argument('--neg_sample_size_test', type=int, default=-1,
                           help='negative sampling size for testing')
+        self.add_argument('--eval_percent', type=float, default=1,
+                          help='sample some percentage for evaluation.')
         self.add_argument('--hidden_dim', type=int, default=256,
                           help='hidden dim used by relation and entity')
         self.add_argument('--lr', type=float, default=0.0001,
